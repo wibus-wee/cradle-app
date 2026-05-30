@@ -114,7 +114,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: .cradle-source
-        run: pnpm install --frozen-lockfile --config.onlyBuiltDependencies='["@google/genai","protobufjs"]'
+        run: |
+          pnpm add -g electron-builder
+          echo "$(pnpm bin -g)" >> "$GITHUB_PATH"
+          export PATH="$(pnpm bin -g):$PATH"
+          pnpm install --frozen-lockfile --config.onlyBuiltDependencies='["@google/genai","protobufjs"]'
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
