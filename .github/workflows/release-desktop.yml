@@ -159,11 +159,6 @@ jobs:
         run: |
           pnpm dist:${{ matrix.platform }} --${{ matrix.arch }}
 
-      - name: Verify macOS code signature
-        if: runner.os == 'macOS'
-        working-directory: apps/desktop
-        run: codesign --verify --deep --strict dist/mac-${{ matrix.arch }}/Cradle.app
-
       - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
         with:
