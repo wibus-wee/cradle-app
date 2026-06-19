@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1200, height=630" />
+  <title>Cradle Open Graph</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #fafaf9;
+      --bg-subtle: #f2f0eb;
+      --bg-muted: #e8e6e1;
+      --text: #1a1a1a;
+      --text-secondary: #5a5a5a;
+      --text-muted: #8a8a8a;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.232);
+      --pattern-fg: rgba(0, 0, 0, 0.08);
+      --accent: #8b5cf8;
+      --peach: #ef9d7e;
+      --font-sans: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-feature-settings: "cv01", "cv02", "cv03", "cv04", "calt";
+    }
+
+    .canvas {
+      position: relative;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      align-items: center;
+      width: 1200px;
+      height: 630px;
+      padding: 80px 88px;
+      gap: 56px;
+    }
+
+    /* Background wash + dot grid (matches hero) */
+    .bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .bg::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(44% 44% at 14% 16%, rgba(139, 92, 248, 0.09) 0%, transparent 100%),
+        radial-gradient(50% 50% at 86% 84%, rgba(239, 157, 126, 0.12) 0%, transparent 100%);
+    }
+    .bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(var(--pattern-fg) 1px, transparent 1px);
+      background-size: 12px 12px;
+    }
+
+    /* Thin keyline frame */
+    .frame {
+      position: absolute;
+      inset: 40px;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      pointer-events: none;
+    }
+
+    /* ─── Icon: dashed blueprint frame with star corners ─── */
+    .icon-wrap {
+      position: relative;
+      z-index: 1;
+      justify-self: center;
+    }
+
+    .icon-frame {
+      position: relative;
+      border: 2px dashed var(--border-strong);
+      padding: 20px;
+      background: var(--bg);
+    }
+
+    .icon-frame .star {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+    }
+    .icon-frame .star.tl { top: -7px; left: -7px; }
+    .icon-frame .star.tr { top: -7px; right: -7px; }
+    .icon-frame .star.bl { bottom: -7px; left: -7px; }
+    .icon-frame .star.br { bottom: -7px; right: -7px; }
+
+    .icon {
+      display: block;
+      width: 235px;
+      height: 235px;
+    }
+
+    /* ─── Copy ─── */
+    .copy {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      height: 30px;
+      padding: 0 14px;
+      margin-bottom: 30px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .eyebrow .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139, 92, 248, 0.15);
+    }
+
+    h1 {
+      max-width: 620px;
+      margin: 0;
+      color: var(--text);
+      font-size: 72px;
+      font-weight: 600;
+      line-height: 0.98;
+      letter-spacing: -0.035em;
+    }
+    h1 .muted {
+      color: var(--text-muted);
+    }
+
+    .sub {
+      max-width: 480px;
+      margin: 26px 0 0;
+      color: var(--text-secondary);
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 38px;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .meta .sep {
+      width: 3px;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--text-muted);
+      opacity: 0.6;
+    }
+
+    /* Wordmark, bottom-left of frame */
+    .wordmark {
+      position: absolute;
+      left: 64px;
+      bottom: 58px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .wordmark .mark {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background: var(--text);
+      display: grid;
+      place-items: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <div class="bg" aria-hidden="true"></div>
+    <div class="frame" aria-hidden="true"></div>
+
+    <section class="icon-wrap" aria-label="Cradle icon">
+      <img class="icon" src="./public/icon.png" alt="Cradle" />
+    </section>
+
+    <section class="copy">
+      <div class="eyebrow">
+        <span class="dot"></span>
+        Command Center for AI Coding Agents
+      </div>
+      <h1>One layer above<br /><span class="muted">your AI tools.</span></h1>
+      <p class="sub">Run, organize, and coordinate every AI coding agent, session, and tool from one focused desktop workspace.</p>
+      <div class="meta">
+        <span>macOS 14+</span>
+        <span class="sep"></span>
+        <span>Apple Silicon &amp; Intel</span>
+        <span class="sep"></span>
+        <span>Free forever</span>
+      </div>
+    </section>
+
+    <div class="wordmark">
+      <img class="mark" src="./public/icon.png" alt="Cradle" />
+      Cradle
+    </div>
+  </main>
+</body>
+</html>
