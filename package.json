@@ -1,0 +1,15 @@
+{
+  "name": "cradle-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cradle open-source monorepo",
+  "scripts": {
+    "dev:landing": "pnpm --filter @cradle/landing dev",
+    "build:landing": "pnpm --filter @cradle/landing build",
+    "preview:landing": "pnpm --filter @cradle/landing preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.4"
+}

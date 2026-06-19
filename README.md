@@ -23,6 +23,10 @@ Cradle is a desktop-first platform for managing AI agents and their workflows. I
 | `@cradleapp/cc-switch` | Maps CC Switch provider data into Cradle as a read-only external provider source. | ![Beta](https://img.shields.io/badge/status-Beta-yellow) |
 | `@cradleapp/system-info` | Exposes system information capabilities through the plugin API and Web commands. | ![Beta](https://img.shields.io/badge/status-Beta-yellow) |
 
+## Feedback
+
+Have ideas, suggestions, or feedback? Join the Telegram channel [@wibusChannel](https://t.me/wibusChannel), or open an issue on GitHub.
+
 ## 🌻 Thanks
 
 I have been deeply inspired by the following projects and communities:
