@@ -161,6 +161,27 @@ jobs:
         run: |
           pnpm dist:${{ matrix.platform }} --${{ matrix.arch }}
 
+      - name: Create macOS updater zip
+        if: matrix.platform == 'mac'
+        working-directory: apps/desktop
+        env:
+          DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="release/mac-${RELEASE_ARCH}/Cradle.app"
+          zip_path="release/Cradle-${DESKTOP_VERSION}-${RELEASE_ARCH}-mac.zip"
+
+          if [ ! -d "$app_path" ]; then
+            echo "Packaged app is missing: $app_path" >&2
+            exit 1
+          fi
+
+          rm -f "$zip_path"
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
+          /usr/bin/du -h "$zip_path"
+
       - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
         with:
@@ -187,13 +208,14 @@ jobs:
         shell: bash
         env:
           RELEASE_CHANNEL: ${{ needs.resolve.outputs.channel }}
+          DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
           UPDATE_MANIFEST_URL: ${{ needs.resolve.outputs.update_url }}
         run: |
           set -euo pipefail
           mkdir -p release-assets
 
           shopt -s globstar nullglob
-          for file in artifacts/**/*.{dmg,zip,exe,AppImage,deb,blockmap}; do
+          for file in artifacts/**/*.{dmg,zip,exe,AppImage,deb}; do
             target="release-assets/$(basename "$file")"
             if [ -e "$target" ]; then
               echo "Duplicate release asset name: $(basename "$file")" >&2
@@ -210,6 +232,7 @@ jobs:
           const artifactsRoot = 'artifacts'
           const outputRoot = 'release-assets'
           const releaseChannel = process.env.RELEASE_CHANNEL
+          const desktopVersion = process.env.DESKTOP_VERSION
           const updateManifestUrl = process.env.UPDATE_MANIFEST_URL
 
           function walk(dir, files = []) {
@@ -304,27 +327,20 @@ jobs:
             return null
           }
 
-          function writeCradleUpdateManifest(manifestPath) {
+          function writeCradleUpdateManifest() {
             if (!updateManifestUrl || !updateManifestUrl.endsWith('/manifest.json')) {
               throw new Error('UPDATE_MANIFEST_URL must point directly at manifest.json')
             }
-
-            const electronManifest = parseManifest(manifestPath)
-            if (!electronManifest.version) {
-              throw new Error(`${path.basename(manifestPath)} is missing version`)
+            if (!desktopVersion) {
+              throw new Error('DESKTOP_VERSION is required')
             }
 
             const assetBaseUrl = dirnameUrl(updateManifestUrl)
             const updateFiles = []
-            for (const file of electronManifest.files) {
-              if (!file.url) {
-                continue
-              }
-
-              const artifactName = path.basename(file.url)
+            for (const artifactName of fs.readdirSync(outputRoot).filter(entry => entry.endsWith('.zip')).sort()) {
               const artifactPath = path.join(outputRoot, artifactName)
               if (!fs.existsSync(artifactPath)) {
-                throw new Error(`Update artifact is missing from release assets: ${artifactName}`)
+                continue
               }
 
               const artifactBytes = fs.readFileSync(artifactPath)
@@ -342,10 +358,10 @@ jobs:
             }
 
             const updateManifest = {
-              version: electronManifest.version,
-              releaseName: `Cradle ${electronManifest.version}`,
+              version: desktopVersion,
+              releaseName: `Cradle ${desktopVersion}`,
               releaseNotes: null,
-              releaseDate: electronManifest.releaseDate ?? new Date().toISOString(),
+              releaseDate: new Date().toISOString(),
               minSupportedVersion: null,
               files: updateFiles,
             }
@@ -429,11 +445,7 @@ jobs:
             }
           }
 
-          const latestMacManifest = path.join(outputRoot, 'latest-mac.yml')
-          if (!fs.existsSync(latestMacManifest)) {
-            throw new Error('Desktop release requires latest-mac.yml')
-          }
-          writeCradleUpdateManifest(latestMacManifest)
+          writeCradleUpdateManifest()
           NODE
 
           if [ "$RELEASE_CHANNEL" = "dev" ]; then
