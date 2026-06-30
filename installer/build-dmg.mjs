@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, cpSync, rmSync, chmodSync, readdirSync, mkdtempSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, mkdirSync, cpSync, rmSync, chmodSync, readdirSync, mkdtempSync, readlinkSync, unlinkSync, symlinkSync, lstatSync } from 'node:fs'
+import { resolve, relative, dirname, join } from 'node:path'
 import { arch, tmpdir } from 'node:os'
 import appdmg from 'appdmg'
 
@@ -100,11 +100,72 @@ function resolvePayload(appInput, stageDir) {
   process.exit(1)
 }
 
+/**
+ * Fix macOS framework symlinks to be relative.
+ *
+ * electron-builder may produce absolute symlinks that point into the CI runner
+ * working directory.  Once the app is installed on a different machine those
+ * links break and dyld cannot load the framework.  This helper rewrites every
+ * symlink inside `*.framework/` so they are relative to their own directory.
+ */
+function fixFrameworkSymlinks(appPath) {
+  const frameworksDir = join(appPath, 'Contents', 'Frameworks')
+  if (!existsSync(frameworksDir)) return
+
+  for (const entry of readdirSync(frameworksDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.endsWith('.framework')) continue
+
+    const fwDir = join(frameworksDir, entry.name)
+    const versionsDir = join(fwDir, 'Versions')
+    if (!existsSync(versionsDir)) continue
+
+    // Ensure Versions/Current -> A is a relative symlink
+    const currentLink = join(versionsDir, 'Current')
+    const versionA = join(versionsDir, 'A')
+    if (existsSync(versionA)) {
+      try {
+        const target = readlinkSync(currentLink)
+        if (target !== 'A') {
+          unlinkSync(currentLink)
+          symlinkSync('A', currentLink)
+        }
+      } catch {
+        // Not a symlink or missing — (re)create it
+        try { unlinkSync(currentLink) } catch {}
+        symlinkSync('A', currentLink)
+      }
+    }
+
+    // Fix top-level framework symlinks (e.g. "Electron Framework" -> "Versions/A/Electron Framework")
+    for (const item of readdirSync(fwDir)) {
+      if (item === 'Versions') continue
+      const itemPath = join(fwDir, item)
+      let stat
+      try { stat = lstatSync(itemPath) } catch { continue }
+      if (!stat.isSymbolicLink()) continue
+
+      const rawTarget = readlinkSync(itemPath)
+      // Only fix absolute symlinks
+      if (!rawTarget.startsWith('/')) continue
+
+      // Determine the correct relative target: Versions/Current/<name>
+      // or equivalently Versions/A/<name>
+      const expectedRelative = `Versions/A/${item}`
+      const expectedTarget = join(fwDir, expectedRelative)
+      if (existsSync(expectedTarget)) {
+        unlinkSync(itemPath)
+        symlinkSync(expectedRelative, itemPath)
+      }
+    }
+  }
+}
+
 function stagePayload(appPath, stageDir) {
   const payloadDir = resolve(stageDir, '.payload')
   mkdirSync(payloadDir, { recursive: true })
   const payloadApp = resolve(payloadDir, 'Cradle.app')
   execFileSync('/usr/bin/ditto', [appPath, payloadApp])
+  fixFrameworkSymlinks(payloadApp)
   execFileSync('/usr/bin/xattr', ['-cr', payloadApp], { stdio: 'ignore' })
   if (arch() === 'arm64') {
     execFileSync('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', payloadApp], { stdio: 'ignore' })
