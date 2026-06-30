@@ -87,4 +87,18 @@ describe('selectChatThinkingEffort', () => {
       runtimeKind: 'claude-agent',
     })).toBe('high')
   })
+
+  it('keeps the explicit session effort even when model capabilities do not list it', () => {
+    expect(selectChatThinkingEffort({
+      effectiveModel: model({
+        id: 'limited-model',
+        capabilities: {
+          reasoning: true,
+          reasoningEfforts: ['low', 'medium'],
+        },
+      }),
+      preferredThinkingEffort: 'xhigh',
+      preservePreferredThinkingEffort: true,
+    })).toBe('xhigh')
+  })
 })

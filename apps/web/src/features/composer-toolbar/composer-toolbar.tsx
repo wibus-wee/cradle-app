@@ -7,13 +7,28 @@ import type { ClaudeAgentModelAliasesSlot } from '~/features/chat/runtime/claude
 import { AgentSelector } from './agent-selector'
 import { ChatAgentIdentity } from './chat-agent-identity'
 import { filterThinkingOptionsForModel } from './constants'
+import type { ThinkingOption } from './provider-model-menu'
 import { ProviderModelSelector, useProviderThinkingOptions } from './provider-model-selector'
 import { RuntimeSelector } from './runtime-selector'
 import { ThinkingEffortButton } from './thinking-effort-button'
-import type { ComposerContext } from './types'
+import type { ComposerContext, ThinkingEffort } from './types'
 import type { ComposerStateResult } from './use-composer-state'
 
 const AGENTS_RUNTIME_SELECTOR_VALUE = 'agents'
+
+function includeSelectedThinkingOption(
+  options: Array<ThinkingOption<ThinkingEffort>>,
+  allOptions: Array<ThinkingOption<ThinkingEffort>>,
+  selected: ThinkingEffort,
+): Array<ThinkingOption<ThinkingEffort>> {
+  if (selected === null || options.some(option => option.value === selected)) {
+    return options
+  }
+
+  const optionValues = new Set(options.map(option => option.value))
+  optionValues.add(selected)
+  return allOptions.filter(option => optionValues.has(option.value))
+}
 
 interface ComposerToolbarProps {
   context: ComposerContext
@@ -69,9 +84,14 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
   }
 
   const thinkingOptions = useProviderThinkingOptions()
-  const thinkingControlOptions = selection.runtimeKind === 'claude-agent'
+  const supportedThinkingControlOptions = selection.runtimeKind === 'claude-agent'
     ? thinkingOptions
     : filterThinkingOptionsForModel(state.effectiveModel, thinkingOptions)
+  const thinkingControlOptions = includeSelectedThinkingOption(
+    supportedThinkingControlOptions,
+    thinkingOptions,
+    selection.thinkingEffort,
+  )
   const showThinkingControl = selection.runtimeKind !== 'cli-tui' && thinkingControlOptions.length > 0
   const showClaudeModelAliases = selection.targetMode === 'provider'
     && selection.runtimeKind === 'claude-agent'
