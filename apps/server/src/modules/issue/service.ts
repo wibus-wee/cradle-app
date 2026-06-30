@@ -1471,3 +1471,149 @@ export function unlinkIssue(sessionId: string): { ok: true } {
   db().update(sessions).set({ linkedIssueId: null }).where(eq(sessions.id, sessionId)).run()
   return { ok: true }
 }
+
+export interface MigrateIssuesOptions {
+  statusMappings?: Record<string, string>
+  milestoneMappings?: Record<string, string>
+  dryRun?: boolean
+}
+
+export interface MigrateIssuesResult {
+  processed: number
+  updated: number
+  numbersReassigned: number
+  statusesMapped: { from: string, to: string }[]
+  milestonesMapped: { from: string, to: string | null }[]
+  parentIssuesCleared: number
+}
+
+export function migrateIssues(sourceId: string, targetId: string, options: MigrateIssuesOptions = {}): MigrateIssuesResult {
+  if (sourceId === targetId) {
+    throw new AppError({ code: 'issue_migrate_same_workspace', status: 400, message: 'Source and target workspace must be different' })
+  }
+  requireWorkspace(sourceId)
+  requireWorkspace(targetId)
+  seedDefaultStatuses(targetId)
+
+  // Phase 1: Build status mapping (source status name → target status ID)
+  const sourceStatuses = readWorkspaceStatuses(sourceId)
+  const targetStatuses = readWorkspaceStatuses(targetId)
+  const targetStatusByName = new Map(targetStatuses.map(s => [normalizeStatusName(s.name), s]))
+  const defaultTargetStatusId = targetStatuses[0]?.id ?? null
+
+  const statusIdMap = new Map<string, string | null>()
+  const statusesMapped: { from: string, to: string }[] = []
+  for (const src of sourceStatuses) {
+    const explicitTarget = options.statusMappings?.[src.name]
+    const matchName = explicitTarget ?? src.name
+    const target = targetStatusByName.get(normalizeStatusName(matchName))
+    if (target) {
+      statusIdMap.set(src.id, target.id)
+      statusesMapped.push({ from: src.name, to: target.name })
+    } else {
+      statusIdMap.set(src.id, defaultTargetStatusId)
+      statusesMapped.push({ from: src.name, to: targetStatuses[0]?.name ?? '(none)' })
+    }
+  }
+
+  // Phase 2: Build milestone mapping (source milestone title → target milestone ID)
+  const sourceMilestones = db().select().from(issueMilestones).where(eq(issueMilestones.workspaceId, sourceId)).all()
+  const targetMilestones = db().select().from(issueMilestones).where(eq(issueMilestones.workspaceId, targetId)).all()
+  const targetMilestoneByTitle = new Map(targetMilestones.map(m => [m.title.trim().toLowerCase(), m]))
+
+  const milestoneIdMap = new Map<string, string | null>()
+  const milestonesMapped: { from: string, to: string | null }[] = []
+  for (const src of sourceMilestones) {
+    const explicitTarget = options.milestoneMappings?.[src.title]
+    const matchTitle = explicitTarget ?? src.title
+    const target = targetMilestoneByTitle.get(matchTitle.trim().toLowerCase())
+    if (target) {
+      milestoneIdMap.set(src.id, target.id)
+      milestonesMapped.push({ from: src.title, to: target.title })
+    } else {
+      milestoneIdMap.set(src.id, null)
+      milestonesMapped.push({ from: src.title, to: null })
+    }
+  }
+
+  // Phase 3: Migrate issues
+  const sourceIssues = db().select().from(issues).where(eq(issues.workspaceId, sourceId)).all()
+  let numbersReassigned = 0
+  let parentIssuesCleared = 0
+
+  // Dry run: count only
+  if (options.dryRun) {
+    for (const issue of sourceIssues) {
+      if (hasIssueNumberConflict(targetId, issue.number, issue.id)) {
+        numbersReassigned++
+      }
+      if (issue.parentIssueId) {
+        const parent = db().select({ workspaceId: issues.workspaceId }).from(issues).where(eq(issues.id, issue.parentIssueId)).get()
+        if (parent && parent.workspaceId === sourceId) {
+          // parent also in source — will move together, keep ref
+        } else if (parent && parent.workspaceId !== targetId) {
+          parentIssuesCleared++
+        }
+      }
+    }
+    return {
+      processed: sourceIssues.length,
+      updated: 0,
+      numbersReassigned,
+      statusesMapped,
+      milestonesMapped,
+      parentIssuesCleared,
+    }
+  }
+
+  // Real migration
+  let orderCounter = nextIssueOrder(targetId)
+  for (const issue of sourceIssues) {
+    const updates: Record<string, unknown> = {
+      workspaceId: targetId,
+      updatedAt: currentUnixSeconds(),
+    }
+
+    // Map status
+    const mappedStatusId = issue.statusId ? (statusIdMap.get(issue.statusId) ?? defaultTargetStatusId) : defaultTargetStatusId
+    updates.statusId = mappedStatusId
+
+    // Map milestone
+    if (issue.milestoneId) {
+      updates.milestoneId = milestoneIdMap.get(issue.milestoneId) ?? null
+    }
+
+    // Resolve number conflict
+    if (hasIssueNumberConflict(targetId, issue.number, issue.id)) {
+      updates.number = nextIssueNumber(targetId)
+      numbersReassigned++
+    }
+
+    // Reassign order
+    updates.order = orderCounter
+    orderCounter += 1024
+
+    // Handle parent issue refs
+    if (issue.parentIssueId) {
+      const parent = db().select({ workspaceId: issues.workspaceId }).from(issues).where(eq(issues.id, issue.parentIssueId)).get()
+      if (parent && parent.workspaceId !== sourceId && parent.workspaceId !== targetId) {
+        // Parent in a different workspace — clear ref
+        updates.parentIssueId = null
+        parentIssuesCleared++
+      }
+      // Otherwise: parent in source (will move together) or already in target — keep ref
+    }
+
+    recordFieldChanges(issue.id, issue, updates, { kind: 'system', id: null })
+    db().update(issues).set(updates).where(eq(issues.id, issue.id)).run()
+  }
+
+  return {
+    processed: sourceIssues.length,
+    updated: sourceIssues.length,
+    numbersReassigned,
+    statusesMapped,
+    milestonesMapped,
+    parentIssuesCleared,
+  }
+}

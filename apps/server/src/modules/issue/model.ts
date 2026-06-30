@@ -346,4 +346,25 @@ export const IssueModel = {
     labels: t.Optional(t.Union([t.Array(t.String()), t.String()])),
     statusId: t.Optional(t.String()),
   }),
+
+  migrateIssuesBody: t.Object({
+    targetWorkspaceId: t.String({ minLength: 1 }),
+    statusMappings: t.Optional(t.Record(t.String(), t.String(), {
+      description: 'Map source status name to target status name. Unmapped statuses fall back to target default.',
+    })),
+    milestoneMappings: t.Optional(t.Record(t.String(), t.String(), {
+      description: 'Map source milestone title to target milestone title. Unmapped milestones are cleared.',
+    })),
+    dryRun: t.Optional(t.Boolean({ description: 'Preview the migration without making changes.' })),
+  }),
+
+  migrateIssuesResponse: t.Object({
+    dryRun: t.Boolean(),
+    issuesProcessed: t.Number(),
+    issuesUpdated: t.Number(),
+    numbersReassigned: t.Number(),
+    statusesMapped: t.Array(t.Object({ from: t.String(), to: t.String() })),
+    milestonesMapped: t.Array(t.Object({ from: t.String(), to: t.Nullable(t.String()) })),
+    parentIssuesCleared: t.Number(),
+  }),
 }
