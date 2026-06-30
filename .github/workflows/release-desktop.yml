@@ -3,156 +3,809 @@ name: Release Desktop
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
+      - 'v*.*.*'  # release; SemVer is validated in the resolve job
+      - 'dev-*'   # dev
   workflow_dispatch:
     inputs:
-      version:
-        description: Release version without leading v
+      channel:
+        description: 'Release channel'
         required: true
-        type: string
-      update_url:
-        description: Generic electron-updater feed URL embedded into the Desktop app
-        required: false
-        type: string
-      skip_s3_upload:
-        description: Skip S3 update feed upload
-        required: false
-        type: boolean
-        default: true
+        type: choice
+        options:
+          - dev
+          - release
+      version:
+        description: 'Version (e.g. 1.2.3 for release, or auto-generated for dev)'
+        required: true
+      source_ref:
+        description: 'Git ref from wibus-wee/Cradle to checkout'
+        required: true
+        default: 'main'
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: release-desktop-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  NODE_VERSION: '24'
-
 jobs:
-  release-inputs:
-    name: Resolve Release Inputs
+  # Resolve release parameters.
+  resolve:
+    name: Resolve release params
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.release.outputs.version }}
-      channel: ${{ steps.release.outputs.channel }}
-      update-url: ${{ steps.release.outputs.update-url }}
-      prerelease: ${{ steps.release.outputs.prerelease }}
+      channel: ${{ steps.params.outputs.channel }}
+      desktop_version: ${{ steps.params.outputs.desktop_version }}
+      display_version: ${{ steps.params.outputs.display_version }}
+      release_tag: ${{ steps.params.outputs.release_tag }}
+      dev_feed_tag: ${{ steps.params.outputs.dev_feed_tag }}
+      source_ref: ${{ steps.params.outputs.source_ref }}
+      update_url: ${{ steps.params.outputs.update_url }}
+      release_download_url: ${{ steps.params.outputs.release_download_url }}
     steps:
-      - name: Resolve version and update feed
-        id: release
+      - name: Resolve parameters
+        id: params
         shell: bash
         run: |
+          semver_regex='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          DEV_FEED_TAG="feed-dev"
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            version="${{ inputs.version }}"
-            update_url="${{ inputs.update_url }}"
+            CHANNEL="${{ inputs.channel }}"
+            INPUT_VERSION="${{ inputs.version }}"
+            SOURCE_REF="${{ inputs.source_ref }}"
+
+            if [ "$CHANNEL" = "dev" ]; then
+              DISPLAY_VERSION="$INPUT_VERSION"
+              if [[ "$INPUT_VERSION" =~ $semver_regex ]]; then
+                DESKTOP_VERSION="$INPUT_VERSION"
+              else
+                DESKTOP_VERSION="0.0.0-dev.${INPUT_VERSION}"
+              fi
+              RELEASE_TAG="dev-${DISPLAY_VERSION}"
+            else
+              DISPLAY_VERSION="${INPUT_VERSION#v}"
+              DESKTOP_VERSION="$DISPLAY_VERSION"
+              RELEASE_TAG="v${DISPLAY_VERSION}"
+            fi
           else
-            version="${GITHUB_REF_NAME#v}"
-            update_url="${{ vars.CRADLE_DESKTOP_UPDATE_URL }}"
+            TAG="${GITHUB_REF_NAME}"
+            if [[ "$TAG" == dev-* ]]; then
+              CHANNEL="dev"
+              DISPLAY_VERSION="${TAG#dev-}"
+              DESKTOP_VERSION="0.0.0-dev.${DISPLAY_VERSION}"
+            else
+              CHANNEL="release"
+              DISPLAY_VERSION="${TAG#v}"
+              DESKTOP_VERSION="$DISPLAY_VERSION"
+            fi
+            SOURCE_REF="main"
+            RELEASE_TAG="$TAG"
           fi
 
-          if [ -z "$update_url" ]; then
-            echo "CRADLE_DESKTOP_UPDATE_URL repository variable or workflow input update_url is required." >&2
+          if [[ ! "$DESKTOP_VERSION" =~ $semver_regex ]]; then
+            echo "Desktop version must be SemVer-compatible: $DESKTOP_VERSION" >&2
             exit 1
           fi
 
-          channel="stable"
-          prerelease="false"
-          if [[ "$version" == *-* ]]; then
-            prerelease="true"
-            channel="${version#*-}"
-            channel="${channel%%.*}"
+          if [ "$CHANNEL" = "release" ]; then
+            UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/manifest.json"
+          else
+            UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/manifest.json"
+          fi
+          RELEASE_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}"
+
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "desktop_version=$DESKTOP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "dev_feed_tag=$DEV_FEED_TAG" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+          echo "update_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
+          echo "release_download_url=$RELEASE_DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
+
+          echo "Channel: $CHANNEL"
+          echo "Desktop version: $DESKTOP_VERSION"
+          echo "Display version: $DISPLAY_VERSION"
+          echo "Release tag: $RELEASE_TAG"
+          echo "Dev feed tag: $DEV_FEED_TAG"
+          echo "Source ref: $SOURCE_REF"
+          echo "Update URL: $UPDATE_URL"
+          echo "Release download URL: $RELEASE_DOWNLOAD_URL"
+
+  build-macos:
+    name: Build Desktop (mac arm64)
+    needs: [resolve]
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/Cradle
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ needs.resolve.outputs.source_ref }}
+
+      - name: Setup pnpm & Node.js
+        uses: ./.github/actions/setup
+        with:
+          node-version: 24
+
+      - name: Clean macOS build leftovers
+        shell: bash
+        run: |
+          sudo rm -rf apps/desktop/release || true
+          sudo rm -rf apps/desktop/dist || true
+          sudo rm -rf /tmp/electron-builder* || true
+
+      - name: Set desktop version
+        run: pnpm --filter @cradle/desktop run set-version ${{ needs.resolve.outputs.desktop_version }}
+
+      - name: Build & package macOS desktop
+        working-directory: apps/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
+          CRADLE_ELECTRON_REBUILD_ARCH: arm64
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        shell: bash
+        run: |
+          pnpm dist:mac --arm64
+
+      - name: Build installer DMG
+        env:
+          DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
+          RELEASE_ARCH: arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          node installer/build-dmg.mjs \
+            --app apps/desktop/release/mac-${RELEASE_ARCH}/Cradle.app \
+            --output apps/desktop/release/Cradle.dmg
+
+      - name: Create macOS updater zip
+        working-directory: apps/desktop
+        env:
+          DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
+          RELEASE_ARCH: arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="release/mac-${RELEASE_ARCH}/Cradle.app"
+          zip_path="release/Cradle-mac-${RELEASE_ARCH}.zip"
+
+          if [ ! -d "$app_path" ]; then
+            echo "Packaged app is missing: $app_path" >&2
+            exit 1
           fi
 
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "channel=$channel" >> "$GITHUB_OUTPUT"
-          echo "update-url=$update_url" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          rm -f "$zip_path"
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
+          /usr/bin/du -h "$zip_path"
 
-  build:
-    name: Build Desktop (${{ matrix.name }})
-    needs: release-inputs
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: mac
-            os: macos-latest
-            script: dist:mac
-            arch: arm64
-          - name: windows
-            os: windows-latest
-            script: dist:win
-            arch: x64
-          - name: linux
-            os: ubuntu-latest
-            script: dist:linux
-            arch: x64
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup desktop build environment
-        uses: ./.github/actions/desktop-build-setup
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Set desktop package version
-        run: pnpm --filter @cradle/desktop set-version -- ${{ needs.release-inputs.outputs.version }}
-
-      - name: Build and package desktop
-        run: pnpm --filter @cradle/desktop ${{ matrix.script }}
-        env:
-          CRADLE_DESKTOP_UPDATE_URL: ${{ needs.release-inputs.outputs.update-url }}
-          CRADLE_ELECTRON_REBUILD_ARCH: ${{ matrix.arch }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - name: Upload desktop artifacts
+      - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
         with:
-          artifact-name: desktop-${{ matrix.name }}
+          artifact-name: desktop-mac-arm64-${{ needs.resolve.outputs.desktop_version }}
+          retention-days: 7
 
-  github-release:
+  build-windows:
+    name: Build Desktop (windows x64)
+    needs: [resolve]
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/Cradle
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ needs.resolve.outputs.source_ref }}
+
+      - name: Setup pnpm & Node.js
+        uses: ./.github/actions/setup
+        with:
+          node-version: 24
+
+      - name: Set desktop version
+        run: pnpm --filter @cradle/desktop run set-version ${{ needs.resolve.outputs.desktop_version }}
+
+      - name: Build Windows desktop runtime and app bundles
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
+          CRADLE_ELECTRON_REBUILD_ARCH: x64
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: pnpm --filter @cradle/desktop build
+
+      - name: Verify Windows desktop runtime manifest
+        shell: pwsh
+        run: |
+          $manifestPath = "apps/server/dist/desktop-runtime/desktop-runtime.json"
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest | ConvertTo-Json -Depth 10
+          if ($manifest.electron.platform -ne "win32") {
+            throw "Expected desktop runtime platform win32, got $($manifest.electron.platform)"
+          }
+          if ($manifest.electron.arch -ne "x64") {
+            throw "Expected desktop runtime arch x64, got $($manifest.electron.arch)"
+          }
+
+      - name: Package unpacked Windows app
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder --config electron-builder.mjs --win --x64 --dir --publish never
+
+      - name: Verify native resources are Windows binaries
+        shell: pwsh
+        run: |
+          $serverNodeModules = "apps/desktop/release/win-unpacked/resources/server/node_modules"
+          if (Test-Path (Join-Path $serverNodeModules ".pnpm")) {
+            throw "Packaged server runtime still contains pnpm virtual store; NSIS installation requires a hoisted node_modules layout."
+          }
+
+          $requiredRuntimeFiles = @(
+            "ffi-rs/index.js",
+            "@ff-labs/fff-node/dist/src/ffi.js",
+            "@ff-labs/fff-bin-win32-x64/fff_c.dll",
+            "@yuuang/ffi-rs-win32-x64-msvc/ffi-rs.win32-x64-msvc.node"
+          )
+          foreach ($relativePath in $requiredRuntimeFiles) {
+            $path = Join-Path $serverNodeModules $relativePath
+            if (!(Test-Path $path)) {
+              throw "Packaged server runtime is missing $relativePath"
+            }
+          }
+
+          $nativeFiles = @(Get-ChildItem $serverNodeModules -Recurse -File -Include *.node,*.dll,*.dylib,*.so)
+          if ($nativeFiles.Count -eq 0) {
+            throw "No native .node/.dll files found in packaged server runtime."
+          }
+          $nativeFiles | Select-Object FullName, Length | Sort-Object FullName | Format-Table -AutoSize | Out-String -Width 4096 | Tee-Object -FilePath native-files.txt
+
+          $allowedOptionalPrebuilds = @($nativeFiles | Where-Object {
+            $_.FullName -match "\\node-pty\\prebuilds\\(darwin|linux)-"
+          })
+          if ($allowedOptionalPrebuilds.Count -gt 0) {
+            Write-Host "Ignoring node-pty optional non-Windows prebuilds that are not loaded on Windows:"
+            $allowedOptionalPrebuilds | Select-Object FullName | Format-Table -AutoSize
+          }
+
+          $wrongPlatformNames = @($nativeFiles | Where-Object {
+            ($_.FullName -match "darwin|linux|macos" -or $_.Extension -in ".dylib", ".so") -and $_.FullName -notmatch "\\node-pty\\prebuilds\\(darwin|linux)-"
+          })
+          if ($wrongPlatformNames.Count -gt 0) {
+            $wrongPlatformNames | Select-Object FullName | Format-Table -AutoSize
+            throw "Packaged runtime contains unexpected non-Windows native files."
+          }
+
+          $windowsRuntimeFiles = @($nativeFiles | Where-Object {
+            $_.FullName -notmatch "\\node-pty\\prebuilds\\(darwin|linux)-"
+          })
+          foreach ($file in $windowsRuntimeFiles) {
+            $stream = [System.IO.File]::OpenRead($file.FullName)
+            try {
+              $header = New-Object byte[] 2
+              [void]$stream.Read($header, 0, 2)
+              if ($header[0] -ne 0x4D -or $header[1] -ne 0x5A) {
+                throw "$($file.FullName) does not start with MZ PE magic."
+              }
+            }
+            finally {
+              $stream.Dispose()
+            }
+          }
+
+      - name: Smoke load native modules through packaged Electron
+        shell: pwsh
+        run: |
+          $script = @'
+          const { createRequire } = require('node:module')
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const { pathToFileURL } = require('node:url')
+
+          async function main() {
+            const root = path.resolve(process.cwd(), 'apps/desktop/release/win-unpacked/resources/server')
+            const req = createRequire(path.join(root, 'package.json'))
+            for (const specifier of ['better-sqlite3', 'sharp', 'node-pty', '@node-rs/jieba']) {
+              console.log(`loading ${specifier}`)
+              const loaded = req(specifier)
+              console.log(`loaded ${specifier}: ${typeof loaded}`)
+            }
+
+            const fffEntry = path.join(root, 'node_modules/@ff-labs/fff-node/dist/src/index.js')
+            console.log(`loading ${fffEntry}`)
+            const fff = await import(pathToFileURL(fffEntry).href)
+            console.log(`loaded @ff-labs/fff-node: ${Object.keys(fff).join(',')}`)
+            const markerPath = process.argv[2] ?? path.resolve(process.cwd(), 'native-smoke-success.txt')
+            fs.writeFileSync(markerPath, 'ok\n')
+            console.log(`wrote native smoke marker: ${markerPath}`)
+          }
+
+          main().catch((error) => {
+            console.error(error)
+            process.exit(1)
+          })
+          '@
+
+          Set-Content -Path native-smoke.cjs -Value $script -Encoding UTF8
+          $markerPath = Join-Path (Get-Location) "native-smoke-success.txt"
+          Remove-Item $markerPath -Force -ErrorAction SilentlyContinue
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          & "apps/desktop/release/win-unpacked/Cradle.exe" native-smoke.cjs $markerPath
+          $deadline = (Get-Date).AddSeconds(30)
+          while (!(Test-Path $markerPath) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 250
+          }
+          if (!(Test-Path $markerPath)) {
+            throw "Packaged Electron native module smoke failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Launch packaged Windows app e2e
+        run: node .github/scripts/windows-packaged-e2e.mjs
+        env:
+          CRADLE_E2E_ARTIFACT_NAME: win-unpacked
+
+      - name: Build Windows installer
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder --config electron-builder.mjs --win nsis --x64 --publish never --config.compression=normal
+
+      - name: Install Windows installer silently
+        id: install
+        shell: pwsh
+        run: |
+          $installer = Resolve-Path "apps/desktop/release/Cradle-setup.exe"
+          $installDir = Join-Path $env:RUNNER_TEMP "CradleInstall"
+          Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $installDir | Out-Null
+          $process = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$installDir" -Wait -NoNewWindow -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "NSIS installer exited with code $($process.ExitCode)"
+          }
+
+          $candidatePaths = @(
+            (Join-Path $installDir "Cradle.exe"),
+            (Join-Path $installDir "Cradle\Cradle.exe"),
+            (Join-Path $env:LOCALAPPDATA "Programs\Cradle\Cradle.exe"),
+            (Join-Path $env:ProgramFiles "Cradle\Cradle.exe")
+          ) | Where-Object { $_ -and (Test-Path $_) }
+          if (${env:ProgramFiles(x86)}) {
+            $programFilesX86Candidate = Join-Path ${env:ProgramFiles(x86)} "Cradle\Cradle.exe"
+            if (Test-Path $programFilesX86Candidate) {
+              $candidatePaths += $programFilesX86Candidate
+            }
+          }
+
+          $exe = $candidatePaths | Select-Object -First 1
+          if (!$exe) {
+            $searchRoots = @(
+              $installDir,
+              (Join-Path $env:LOCALAPPDATA "Programs"),
+              $env:ProgramFiles
+            ) | Where-Object { $_ -and (Test-Path $_) }
+            if (${env:ProgramFiles(x86)} -and (Test-Path ${env:ProgramFiles(x86)})) {
+              $searchRoots += ${env:ProgramFiles(x86)}
+            }
+            $exe = $searchRoots |
+              ForEach-Object { Get-ChildItem $_ -Recurse -Filter Cradle.exe -ErrorAction SilentlyContinue } |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if (!$exe) {
+            Get-ChildItem $installDir -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, Length | Format-Table -AutoSize
+            throw "Installed Cradle.exe was not found after running $installer"
+          }
+          "exe=$exe" >> $env:GITHUB_OUTPUT
+
+      - name: Launch installed Windows app e2e
+        run: node .github/scripts/windows-packaged-e2e.mjs
+        env:
+          CRADLE_E2E_ARTIFACT_NAME: installed
+          CRADLE_E2E_EXE_PATH: ${{ steps.install.outputs.exe }}
+
+      - name: Upload artifacts
+        uses: ./.github/actions/desktop-upload-artifacts
+        with:
+          artifact-name: desktop-win-x64-${{ needs.resolve.outputs.desktop_version }}
+          retention-days: 7
+
+  # Publish GitHub Release.
+  publish:
     name: Publish GitHub Release
-    needs:
-      - release-inputs
-      - build
+    needs: [resolve, build-macos, build-windows]
+    if: always() && needs.resolve.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Download desktop artifacts
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release-assets
-          pattern: desktop-*
-          merge-multiple: true
+          path: artifacts
 
-      - name: Publish GitHub release
+      - name: Prepare release assets
+        shell: bash
+        env:
+          RELEASE_CHANNEL: ${{ needs.resolve.outputs.channel }}
+          DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
+          DISPLAY_VERSION: ${{ needs.resolve.outputs.display_version }}
+          UPDATE_MANIFEST_URL: ${{ needs.resolve.outputs.update_url }}
+          RELEASE_DOWNLOAD_URL: ${{ needs.resolve.outputs.release_download_url }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          shopt -s globstar nullglob
+          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,AppImage,deb}; do
+            basename="$(basename "$file")"
+            if [[ "$basename" == "builder-debug.yml" ]]; then
+              continue
+            fi
+            target="release-assets/$basename"
+            if [ -e "$target" ]; then
+              echo "Duplicate release asset name: $basename" >&2
+              exit 1
+            fi
+            cp "$file" "$target"
+          done
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const crypto = require('node:crypto')
+
+          const artifactsRoot = 'artifacts'
+          const outputRoot = 'release-assets'
+          const releaseChannel = process.env.RELEASE_CHANNEL
+          const desktopVersion = process.env.DESKTOP_VERSION
+          const displayVersion = process.env.DISPLAY_VERSION
+          const updateManifestUrl = process.env.UPDATE_MANIFEST_URL
+          const releaseDownloadUrl = process.env.RELEASE_DOWNLOAD_URL
+
+          function readChangelog(locale) {
+            try {
+              const dir = path.join('apps', 'landing', 'changelog')
+              const candidates = [
+                path.join(dir, `${displayVersion}.${locale}.md`),
+                path.join(dir, `dev-${displayVersion}.${locale}.md`),
+              ]
+              const p = candidates.find(f => fs.existsSync(f))
+              if (!p) return null
+              const content = fs.readFileSync(p, 'utf8')
+              const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(content)
+              if (!match) return { title: null, date: null, body: content.trim() }
+              const meta = match[1]
+              const body = match[2].trim()
+              const get = (key) => {
+                const m = new RegExp(`^${key}:\\s*(.+)$`, 'm').exec(meta)
+                return m ? m[1].replace(/^['"]|['"]$/g, '') : null
+              }
+              return { title: get('title'), date: get('date'), body }
+            } catch {
+              return null
+            }
+          }
+
+          function readChangelogBody() {
+            for (const locale of ['zh', 'en']) {
+              const ch = readChangelog(locale)
+              if (ch && ch.body) return ch.body
+            }
+            return null
+          }
+
+          function generateReleaseBody() {
+            const en = readChangelog('en')
+            if (!en || !en.body) return null
+
+            const templatePath = path.join('.github', 'release-body.template.md')
+            if (!fs.existsSync(templatePath)) return null
+            let template = fs.readFileSync(templatePath, 'utf8')
+
+            const title = en.title || `Cradle ${displayVersion}`
+            const assets = fs.readdirSync(outputRoot)
+            const downloadLinks = []
+            const dmg = assets.find(f => f.endsWith('.dmg'))
+            const exe = assets.find(f => f.endsWith('.exe'))
+            if (dmg) downloadLinks.push(`[macOS (arm64)](${releaseDownloadUrl}/${encodeURIComponent(dmg)})`)
+            if (exe) downloadLinks.push(`[Windows (x64)](${releaseDownloadUrl}/${encodeURIComponent(exe)})`)
+
+            return template
+              .replace(/\{\{title\}\}/g, title)
+              .replace(/\{\{version\}\}/g, displayVersion)
+              .replace(/\{\{date\}\}/g, en.date || '')
+              .replace(/\{\{body\}\}/g, en.body)
+              .replace(/\{\{downloads\}\}/g, downloadLinks.join(' · ') || 'No downloads available')
+          }
+
+          function walk(dir, files = []) {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const entryPath = path.join(dir, entry.name)
+              if (entry.isDirectory()) {
+                walk(entryPath, files)
+              }
+              else if (entry.isFile() && entry.name.endsWith('.yml')) {
+                files.push(entryPath)
+              }
+            }
+            return files
+          }
+
+          function readScalar(value) {
+            return value.replace(/^['"]|['"]$/g, '')
+          }
+
+          function parseManifest(file) {
+            const manifest = { files: [] }
+            let currentFile = null
+
+            for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+              if (!line.trim()) {
+                continue
+              }
+
+              const topLevel = line.match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/)
+              if (topLevel) {
+                const [, key, value = ''] = topLevel
+                if (key !== 'files') {
+                  manifest[key] = readScalar(value)
+                }
+                currentFile = null
+                continue
+              }
+
+              const fileStart = line.match(/^\s*-\s+([A-Za-z0-9_-]+):\s*(.*)$/)
+              if (fileStart) {
+                currentFile = {}
+                manifest.files.push(currentFile)
+                currentFile[fileStart[1]] = readScalar(fileStart[2])
+                continue
+              }
+
+              const fileProperty = line.match(/^\s+([A-Za-z0-9_-]+):\s*(.*)$/)
+              if (fileProperty && currentFile) {
+                currentFile[fileProperty[1]] = readScalar(fileProperty[2])
+              }
+            }
+
+            return manifest
+          }
+
+          function writeManifest(file, manifest, artifactBaseUrl = null) {
+            const lines = []
+            if (manifest.version) {
+              lines.push(`version: ${manifest.version}`)
+            }
+            lines.push('files:')
+            for (const artifact of manifest.files) {
+              const projected = {
+                ...artifact,
+                url: artifactBaseUrl ? `${artifactBaseUrl}/${path.basename(artifact.url)}` : artifact.url,
+              }
+              lines.push(`  - url: ${projected.url}`)
+              for (const [key, value] of Object.entries(projected)) {
+                if (key !== 'url') {
+                  lines.push(`    ${key}: ${value}`)
+                }
+              }
+            }
+            if (manifest.path && artifactBaseUrl) {
+              manifest = {
+                ...manifest,
+                path: `${artifactBaseUrl}/${path.basename(manifest.path)}`,
+              }
+            }
+            for (const key of ['path', 'sha512', 'releaseName', 'releaseNotes', 'releaseDate']) {
+              if (manifest[key]) {
+                lines.push(`${key}: ${manifest[key]}`)
+              }
+            }
+            fs.writeFileSync(file, `${lines.join('\n')}\n`, 'utf8')
+          }
+
+          function dirnameUrl(url) {
+            return url.slice(0, url.lastIndexOf('/') + 1)
+          }
+
+          function readArtifactArch(fileName) {
+            if (fileName.includes('arm64')) {
+              return 'arm64'
+            }
+            if (fileName.includes('x64')) {
+              return 'x64'
+            }
+            if (fileName.includes('universal')) {
+              return 'universal'
+            }
+            return null
+          }
+
+          function writeCradleUpdateManifest() {
+            if (!updateManifestUrl || !updateManifestUrl.endsWith('/manifest.json')) {
+              throw new Error('UPDATE_MANIFEST_URL must point directly at manifest.json')
+            }
+            if (!desktopVersion) {
+              throw new Error('DESKTOP_VERSION is required')
+            }
+
+            const rawAssetBaseUrl = releaseChannel === 'dev' ? releaseDownloadUrl : dirnameUrl(updateManifestUrl)
+            const assetBaseUrl = rawAssetBaseUrl.endsWith('/') ? rawAssetBaseUrl : `${rawAssetBaseUrl}/`
+            const updateFiles = []
+            for (const artifactName of fs.readdirSync(outputRoot).filter(entry => entry.startsWith('Cradle-mac-') && entry.endsWith('.zip')).sort()) {
+              const artifactPath = path.join(outputRoot, artifactName)
+              if (!fs.existsSync(artifactPath)) {
+                continue
+              }
+
+              const artifactBytes = fs.readFileSync(artifactPath)
+              updateFiles.push({
+                url: `${assetBaseUrl}${artifactName}`,
+                size: fs.statSync(artifactPath).size,
+                sha256: crypto.createHash('sha256').update(artifactBytes).digest('hex'),
+                platform: 'darwin',
+                arch: readArtifactArch(artifactName),
+              })
+            }
+
+            if (updateFiles.length === 0) {
+              throw new Error('Cradle update manifest requires at least one macOS artifact')
+            }
+
+            const updateManifest = {
+              version: desktopVersion,
+              releaseName: `Cradle ${desktopVersion}`,
+              releaseNotes: readChangelogBody(),
+              releaseDate: new Date().toISOString(),
+              minSupportedVersion: null,
+              files: updateFiles,
+            }
+
+            fs.writeFileSync(
+              path.join(outputRoot, 'manifest.json'),
+              `${JSON.stringify(updateManifest, null, 2)}\n`,
+              'utf8',
+            )
+          }
+
+          const manifestsByName = new Map()
+          for (const file of walk(artifactsRoot)) {
+            const name = path.basename(file)
+            if (!manifestsByName.has(name)) {
+              manifestsByName.set(name, [])
+            }
+            manifestsByName.get(name).push(file)
+          }
+
+          for (const [name, files] of manifestsByName) {
+            const manifests = files.map(parseManifest)
+            const merged = { ...manifests[0], files: [] }
+            const seenUrls = new Set()
+            for (const manifest of manifests) {
+              for (const artifact of manifest.files) {
+                if (artifact.url && !seenUrls.has(artifact.url)) {
+                  seenUrls.add(artifact.url)
+                  merged.files.push(artifact)
+                }
+              }
+            }
+            writeManifest(
+              path.join(outputRoot, name),
+              merged,
+              releaseChannel === 'dev' ? releaseDownloadUrl : null,
+            )
+          }
+
+          writeCradleUpdateManifest()
+
+          const releaseBody = generateReleaseBody() || `Cradle ${displayVersion}`
+          fs.writeFileSync('release-body.md', releaseBody, 'utf8')
+          NODE
+
+          if [ "$RELEASE_CHANNEL" = "dev" ]; then
+            mkdir -p feed-assets
+            cp release-assets/manifest.json feed-assets/
+            if [ -f release-assets/latest.yml ]; then
+              cp release-assets/latest.yml feed-assets/
+            fi
+            find feed-assets -maxdepth 1 -type f -print | sort
+          fi
+
+          find release-assets -maxdepth 1 -type f -print | sort
+
+      - name: Create version release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.release-inputs.outputs.version }}
-          name: v${{ needs.release-inputs.outputs.version }}
-          prerelease: ${{ needs.release-inputs.outputs.prerelease == 'true' }}
-          generate_release_notes: true
-          files: release-assets/**/*
+          tag_name: ${{ needs.resolve.outputs.release_tag }}
+          name: "${{ needs.resolve.outputs.release_tag }} (${{ needs.resolve.outputs.channel }})"
+          prerelease: ${{ needs.resolve.outputs.channel == 'dev' }}
+          make_latest: ${{ needs.resolve.outputs.channel == 'release' }}
+          body_path: release-body.md
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish-s3:
-    name: Publish Update Feed
-    needs:
-      - release-inputs
-      - build
-    runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_s3_upload) }}
-    steps:
-      - uses: actions/checkout@v4
+      - name: Clear dev feed release assets
+        if: needs.resolve.outputs.channel == 'dev'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DEV_FEED_TAG: ${{ needs.resolve.outputs.dev_feed_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_id="$(gh api "repos/${GH_REPO}/releases/tags/${DEV_FEED_TAG}" --jq '.id' 2>/dev/null || true)"
+          if [ -z "$release_id" ]; then
+            exit 0
+          fi
 
-      - name: Publish desktop update feed
-        uses: ./.github/actions/desktop-publish-s3
+          gh api --paginate "repos/${GH_REPO}/releases/${release_id}/assets" --jq '.[].id' | while read -r asset_id; do
+            if [ -n "$asset_id" ]; then
+              gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
+            fi
+          done
+
+      - name: Update dev feed release
+        if: needs.resolve.outputs.channel == 'dev'
+        uses: softprops/action-gh-release@v2
         with:
-          channel: ${{ needs.release-inputs.outputs.channel }}
-          version: ${{ needs.release-inputs.outputs.version }}
-          aws-access-key-id: ${{ secrets.UPDATE_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.UPDATE_AWS_SECRET_ACCESS_KEY }}
-          s3-bucket: ${{ secrets.UPDATE_S3_BUCKET }}
-          s3-region: ${{ secrets.UPDATE_S3_REGION }}
-          s3-endpoint: ${{ secrets.UPDATE_S3_ENDPOINT }}
+          tag_name: ${{ needs.resolve.outputs.dev_feed_tag }}
+          target_commitish: ${{ github.sha }}
+          name: "Feed dev"
+          body: "Rolling desktop dev update feed for ${{ needs.resolve.outputs.release_tag }}."
+          prerelease: true
+          make_latest: false
+          files: |
+            feed-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-web:
+    name: Deploy Web
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://app.cradle.wibus.ren
+    steps:
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/Cradle
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ needs.resolve.outputs.source_ref }}
+
+      - name: Setup pnpm & Node.js
+        uses: ./.github/actions/setup
+        with:
+          node-version: 24
+
+      - name: Build Web App
+        run: pnpm build:web
+
+      - name: Prepare Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "app.cradle.wibus.ren" > apps/web/dist/CNAME
+          cp apps/web/dist/index.html apps/web/dist/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
