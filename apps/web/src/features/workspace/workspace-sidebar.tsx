@@ -14,6 +14,7 @@ import {
   FolderLine as FolderClosedIcon,
   FolderOpenLine as FolderOpenIcon,
   GitCompareLine as FileDiffIcon,
+  LoadingLine,
   MailLine as MailIcon,
   MailOpenLine as MailOpenIcon,
   More2Line as MoreHorizontalIcon,
@@ -27,7 +28,6 @@ import {
   Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
   UpSmallLine as ChevronUpIcon,
-  LoadingLine,
 } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
@@ -68,7 +68,7 @@ import type {
   GetRemoteHostsResponse,
   PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
-import { ProviderIcon, getRuntimeIconKey } from '~/components/common/provider-icons'
+import { getRuntimeIconKey, ProviderIcon } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
 import {
   ContextMenu,
@@ -98,7 +98,6 @@ import {
   MenuTrigger,
 } from '~/components/ui/menu'
 import { ScrollArea } from '~/components/ui/scroll-area'
-import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { prefetchChatSession } from '~/features/chat/session/chat-session-prefetch'
@@ -109,6 +108,7 @@ import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
+import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
 import { cn } from '~/lib/cn'
@@ -1662,8 +1662,7 @@ const SessionItem = memo(
 
       if (
         screenPointer
-        &&
-        event.type.startsWith('drag')
+        && event.type.startsWith('drag')
         && screenPointer.screenX === 0
         && screenPointer.screenY === 0
         && dragScreenPointerRef.current
@@ -2264,6 +2263,7 @@ const WorkspaceGroup = memo(
     const { t } = useTranslation('workspace')
     const queryClient = useQueryClient()
     const [renameOpen, setRenameOpen] = useState(false)
+    const [migrateOpen, setMigrateOpen] = useState(false)
     const [retainedSessionIds, setRetainedSessionIds] = useState<Set<string>>(() => new Set())
     const acknowledgedSessionIdsRef = useRef<Set<string> | null>(null)
     if (acknowledgedSessionIdsRef.current === null) {
@@ -2670,6 +2670,14 @@ const WorkspaceGroup = memo(
           separatorBefore: true,
         },
         {
+          key: 'migrate',
+          label: t('workspace.action.migrate'),
+          icon: <ArrowUpDownIcon />,
+          testId: `workspace-migrate-${workspace.id}`,
+          invoke: () => setMigrateOpen(true),
+          separatorBefore: true,
+        },
+        {
           key: 'remove',
           label: t('workspace.action.remove'),
           icon: <Trash2Icon />,
@@ -2709,6 +2717,11 @@ const WorkspaceGroup = memo(
               confirmLabel={t('workspace.dialog.rename')}
               onOpenChange={setRenameOpen}
               onCommit={handleRenameWorkspace}
+            />
+            <MigrateWorkspaceDialog
+              open={migrateOpen}
+              onOpenChange={setMigrateOpen}
+              sourceWorkspaceId={workspace.id}
             />
             <WorkspaceTextInputDialog
               open={createRequest !== null}
