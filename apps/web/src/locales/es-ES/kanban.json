@@ -141,6 +141,7 @@
   "property.milestone": "Hito",
   "property.priority": "Prioridad",
   "property.status": "Estado",
+  "property.workspace": "Workspace",
   "selection.clearAria": "Limpiar issues seleccionados",
   "selection.selected": "seleccionados",
   "sort.aria": "Ordenar issues",

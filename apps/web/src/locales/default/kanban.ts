@@ -107,6 +107,7 @@ export default {
   'property.agent': 'Agent',
   'property.labels': 'Labels',
   'property.milestone': 'Milestone',
+  'property.workspace': 'Workspace',
   'filter.aria': 'Filter issues',
   'filter.priority': 'Priority',
   'filter.none': 'None',

@@ -138,6 +138,7 @@ type CreateIssueInput = {
 type UpdateIssueInput = {
   id: string
   patch: Partial<{
+    workspaceId: string
     title: string
     description: string | null
     priority: IssuePriority

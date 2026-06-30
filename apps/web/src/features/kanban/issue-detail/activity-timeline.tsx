@@ -237,6 +237,7 @@ const fieldLabelKeys = {
   'priority': 'property.priority',
   'status': 'property.status',
   'title': 'table.title',
+  'workspace': 'property.workspace',
 } as const satisfies Record<IssueActivityField, KanbanKey>
 
 const valueTokenLabelKeys = {

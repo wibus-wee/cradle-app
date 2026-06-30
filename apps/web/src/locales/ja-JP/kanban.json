@@ -141,6 +141,7 @@
   "property.milestone": "マイルストーン",
   "property.priority": "優先度",
   "property.status": "ステータス",
+  "property.workspace": "Workspace",
   "selection.clearAria": "選択した Issue を解除",
   "selection.selected": "選択中",
   "sort.aria": "Issue を並べ替え",

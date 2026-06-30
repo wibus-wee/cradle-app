@@ -141,6 +141,7 @@
   "property.milestone": "里程碑",
   "property.priority": "优先级",
   "property.status": "状态",
+  "property.workspace": "Workspace",
   "selection.clearAria": "清除已选事项",
   "selection.selected": "已选",
   "sort.aria": "事项排序",

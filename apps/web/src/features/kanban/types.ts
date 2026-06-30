@@ -72,6 +72,7 @@ export type IssueActivityField
     | 'priority'
     | 'status'
     | 'title'
+    | 'workspace'
 
 export type IssueActivityAction
   = | 'added-description'

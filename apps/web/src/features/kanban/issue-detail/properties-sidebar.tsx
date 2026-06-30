@@ -30,6 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover
 import { AgentAvatar } from '~/features/agent-runtime/agent-avatar'
 import { useAgents } from '~/features/agent-runtime/use-agents'
 import type { AgentSession, IssueLinkedSession, KanbanIssue, KanbanMilestone, KanbanStatus } from '~/features/kanban/types'
+import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 import { openChatSession } from '~/navigation/navigation-commands'
 
@@ -63,6 +64,7 @@ const priorityLabelKeys: Record<
 }
 
 type IssuePatch = Partial<{
+  workspaceId: string
   title: string
   description: string | null
   priority: IssuePriority
@@ -95,8 +97,10 @@ export const PropertiesSidebar = ({
   readOnly = false,
 }: PropertiesSidebarProps) => {
   const { t } = useTranslation('kanban')
+  const { workspaces } = useWorkspaces()
   const currentStatus = statuses.find(s => s.id === issue.statusId)
   const currentMilestone = milestones.find(m => m.id === issue.milestoneId)
+  const currentWorkspace = workspaces.find(workspace => workspace.id === issue.workspaceId)
   const labels = issue.labels
   const labelWorkspaceIssues = (() => {
     const hasCurrentIssue = issues.some(candidate => candidate.id === issue.id)
@@ -110,6 +114,38 @@ export const PropertiesSidebar = ({
   return (
     <div className="flex flex-col gap-1">
       <div className="bg-card rounded-lg px-3 py-2 text-sm shadow-xs font-medium text-muted-foreground border border-border">
+        {/* Workspace */}
+        <PropertyRow label={t('property.workspace')}>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={readOnly}
+              className={cn(
+                'flex max-w-44 items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] text-foreground transition-colors',
+                readOnly ? 'cursor-default' : 'hover:bg-fill',
+              )}
+              data-testid="issue-workspace-trigger"
+            >
+              <span className="truncate">{currentWorkspace?.name ?? issue.workspaceId}</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuRadioGroup
+                value={issue.workspaceId}
+                onValueChange={(value) => {
+                  if (value !== issue.workspaceId) {
+                    onUpdate({ workspaceId: value })
+                  }
+                }}
+              >
+                {workspaces.map(workspace => (
+                  <DropdownMenuRadioItem key={workspace.id} value={workspace.id}>
+                    <span className="truncate">{workspace.name}</span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </PropertyRow>
+
         {/* Status */}
         <PropertyRow label={t('property.status')}>
           <DropdownMenu>

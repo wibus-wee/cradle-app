@@ -141,6 +141,7 @@
   "property.milestone": "Milestone",
   "property.priority": "Priority",
   "property.status": "Status",
+  "property.workspace": "Workspace",
   "selection.clearAria": "Clear selected issues",
   "selection.selected": "selected",
   "sort.aria": "Sort issues",
