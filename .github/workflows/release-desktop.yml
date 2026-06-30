@@ -2,6 +2,8 @@ name: Release Desktop
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'  # release; SemVer is validated in the resolve job
       - 'dev-*'   # dev
@@ -13,6 +15,7 @@ on:
         type: choice
         options:
           - dev
+          - bleeding-edge
           - release
       version:
         description: 'Version (e.g. 1.2.3 for release, or auto-generated for dev)'
@@ -42,6 +45,7 @@ jobs:
       display_version: ${{ steps.params.outputs.display_version }}
       release_tag: ${{ steps.params.outputs.release_tag }}
       dev_feed_tag: ${{ steps.params.outputs.dev_feed_tag }}
+      bleeding_edge_feed_tag: ${{ steps.params.outputs.bleeding_edge_feed_tag }}
       source_ref: ${{ steps.params.outputs.source_ref }}
       update_url: ${{ steps.params.outputs.update_url }}
       release_download_url: ${{ steps.params.outputs.release_download_url }}
@@ -52,6 +56,7 @@ jobs:
         run: |
           semver_regex='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
           DEV_FEED_TAG="feed-dev"
+          BLEEDING_EDGE_FEED_TAG="feed-bleeding-edge"
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             CHANNEL="${{ inputs.channel }}"
@@ -66,11 +71,25 @@ jobs:
                 DESKTOP_VERSION="0.0.0-dev.${INPUT_VERSION}"
               fi
               RELEASE_TAG="dev-${DISPLAY_VERSION}"
+            elif [ "$CHANNEL" = "bleeding-edge" ]; then
+              DISPLAY_VERSION="$INPUT_VERSION"
+              if [[ "$INPUT_VERSION" =~ $semver_regex ]]; then
+                DESKTOP_VERSION="$INPUT_VERSION"
+              else
+                DESKTOP_VERSION="0.0.0-bleeding-edge.${INPUT_VERSION}"
+              fi
+              RELEASE_TAG="bleeding-edge-${DISPLAY_VERSION}"
             else
               DISPLAY_VERSION="${INPUT_VERSION#v}"
               DESKTOP_VERSION="$DISPLAY_VERSION"
               RELEASE_TAG="v${DISPLAY_VERSION}"
             fi
+          elif [ "${{ github.ref_type }}" = "branch" ]; then
+            CHANNEL="bleeding-edge"
+            DISPLAY_VERSION="${{ github.sha }}"
+            DESKTOP_VERSION="0.0.0-bleeding-edge.${{ github.sha }}"
+            RELEASE_TAG="bleeding-edge-${{ github.sha }}"
+            SOURCE_REF="main"
           else
             TAG="${GITHUB_REF_NAME}"
             if [[ "$TAG" == dev-* ]]; then
@@ -93,16 +112,24 @@ jobs:
 
           if [ "$CHANNEL" = "release" ]; then
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/manifest.json"
+          elif [ "$CHANNEL" = "bleeding-edge" ]; then
+            UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/manifest.json"
           else
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/manifest.json"
           fi
           RELEASE_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}"
+
+          # bleeding-edge: no versioned release, all artifacts go to the feed release
+          if [ "$CHANNEL" = "bleeding-edge" ]; then
+            RELEASE_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}"
+          fi
 
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "desktop_version=$DESKTOP_VERSION" >> "$GITHUB_OUTPUT"
           echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "dev_feed_tag=$DEV_FEED_TAG" >> "$GITHUB_OUTPUT"
+          echo "bleeding_edge_feed_tag=$BLEEDING_EDGE_FEED_TAG" >> "$GITHUB_OUTPUT"
           echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
           echo "update_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
           echo "release_download_url=$RELEASE_DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
@@ -112,6 +139,7 @@ jobs:
           echo "Display version: $DISPLAY_VERSION"
           echo "Release tag: $RELEASE_TAG"
           echo "Dev feed tag: $DEV_FEED_TAG"
+          echo "Bleeding edge feed tag: $BLEEDING_EDGE_FEED_TAG"
           echo "Source ref: $SOURCE_REF"
           echo "Update URL: $UPDATE_URL"
           echo "Release download URL: $RELEASE_DOWNLOAD_URL"
@@ -639,7 +667,7 @@ jobs:
               throw new Error('DESKTOP_VERSION is required')
             }
 
-            const rawAssetBaseUrl = releaseChannel === 'dev' ? releaseDownloadUrl : dirnameUrl(updateManifestUrl)
+            const rawAssetBaseUrl = (releaseChannel === 'dev' || releaseChannel === 'bleeding-edge') ? releaseDownloadUrl : dirnameUrl(updateManifestUrl)
             const assetBaseUrl = rawAssetBaseUrl.endsWith('/') ? rawAssetBaseUrl : `${rawAssetBaseUrl}/`
             const updateFiles = []
             for (const artifactName of fs.readdirSync(outputRoot).filter(entry => entry.startsWith('Cradle-mac-') && entry.endsWith('.zip')).sort()) {
@@ -702,7 +730,7 @@ jobs:
             writeManifest(
               path.join(outputRoot, name),
               merged,
-              releaseChannel === 'dev' ? releaseDownloadUrl : null,
+              (releaseChannel === 'dev' || releaseChannel === 'bleeding-edge') ? releaseDownloadUrl : null,
             )
           }
 
@@ -724,6 +752,7 @@ jobs:
           find release-assets -maxdepth 1 -type f -print | sort
 
       - name: Create version release
+        if: needs.resolve.outputs.channel != 'bleeding-edge'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve.outputs.release_tag }}
@@ -768,6 +797,41 @@ jobs:
           make_latest: false
           files: |
             feed-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clear bleeding-edge feed release assets
+        if: needs.resolve.outputs.channel == 'bleeding-edge'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BLEEDING_EDGE_FEED_TAG: ${{ needs.resolve.outputs.bleeding_edge_feed_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_id="$(gh api "repos/${GH_REPO}/releases/tags/${BLEEDING_EDGE_FEED_TAG}" --jq '.id' 2>/dev/null || true)"
+          if [ -z "$release_id" ]; then
+            exit 0
+          fi
+
+          gh api --paginate "repos/${GH_REPO}/releases/${release_id}/assets" --jq '.[].id' | while read -r asset_id; do
+            if [ -n "$asset_id" ]; then
+              gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
+            fi
+          done
+
+      - name: Update bleeding-edge feed release
+        if: needs.resolve.outputs.channel == 'bleeding-edge'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve.outputs.bleeding_edge_feed_tag }}
+          target_commitish: ${{ github.sha }}
+          name: "Feed bleeding edge"
+          body: "Rolling desktop bleeding-edge update feed (commit ${{ github.sha }})."
+          prerelease: true
+          make_latest: false
+          files: |
+            release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
