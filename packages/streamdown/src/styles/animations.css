@@ -1,0 +1,360 @@
+/* === Streamdown Animation System ===
+ * Variable-driven architecture combining Lobe correctness + Alma visual richness.
+ * Presets override variables via container class; birth timestamps untouched.
+ */
+
+/* === CSS Variables (defaults = balanced preset) === */
+.streamdown-root {
+  --stream-fade-duration: 280ms;
+  --stream-fade-curve: cubic-bezier(0.22, 1, 0.36, 1);
+  --stream-reveal-blur: 0px;
+  --stream-reveal-translate-y: 2px;
+
+  /* Cursor */
+  --stream-cursor-color: currentColor;
+  --stream-cursor-width: 2px;
+  --stream-cursor-pulse-duration: 1000ms;
+
+  /* Glow */
+  --stream-glow-color: color-mix(in srgb, currentColor 10%, transparent);
+  --stream-glow-radius: 12px;
+
+  /* Block entrance */
+  --stream-block-entrance-translate: 6px;
+  --stream-block-entrance-duration: 200ms;
+
+  /* Trail */
+  --stream-trail-color: color-mix(in srgb, currentColor 40%, transparent);
+  --stream-trail-width: 24px;
+}
+
+/* === Preset Overrides === */
+.stream-preset-minimal {
+  --stream-fade-duration: 200ms;
+  --stream-fade-curve: ease-out;
+  --stream-reveal-blur: 0px;
+  --stream-reveal-translate-y: 0px;
+}
+
+.stream-preset-balanced {
+  --stream-fade-duration: 280ms;
+  --stream-fade-curve: cubic-bezier(0.22, 1, 0.36, 1);
+  --stream-reveal-blur: 0px;
+  --stream-reveal-translate-y: 2px;
+}
+
+.stream-preset-dramatic {
+  --stream-fade-duration: 350ms;
+  --stream-fade-curve: cubic-bezier(0.16, 1, 0.3, 1);
+  --stream-reveal-blur: 2px;
+  --stream-reveal-translate-y: 4px;
+}
+
+/* === Keyframes === */
+
+/* Universal reveal — driven by CSS variables */
+@keyframes stream-reveal {
+  0% {
+    opacity: 0;
+    filter: blur(var(--stream-reveal-blur));
+    transform: translateY(var(--stream-reveal-translate-y));
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+/* Block entrance (Alma-inspired) */
+@keyframes stream-block-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--stream-block-entrance-translate));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Cursor pulse (Alma-style) */
+@keyframes stream-cursor-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scaleY(1.05);
+  }
+}
+
+/* === Element Styles === */
+
+/* === Streaming Cursor via ::after pseudo-element ===
+ * Cursor auto-positions at the end of any block type (p, pre, ul, etc.)
+ * by targeting the last inline content of the last element in the block.
+ * Inspired by Alma's approach: no DOM element needed, always correct position.
+ */
+
+.stream-block {
+  position: relative;
+}
+
+/* Base cursor style (shared via custom properties on .stream-block-active) */
+.stream-block-active {
+  --_cursor-content: "";
+  --_cursor-display: inline-block;
+  --_cursor-width: var(--stream-cursor-width);
+  --_cursor-height: 1.1em;
+  --_cursor-bg: var(--stream-cursor-color);
+  --_cursor-radius: 1px;
+  --_cursor-ml: 1px;
+}
+
+/* Cursor via ::after on the last relevant element inside the active block */
+/* For paragraphs and headings — cursor after last inline content */
+.stream-block-active > p:last-of-type::after,
+.stream-block-active > h1:last-of-type::after,
+.stream-block-active > h2:last-of-type::after,
+.stream-block-active > h3:last-of-type::after,
+.stream-block-active > h4:last-of-type::after,
+.stream-block-active > h5:last-of-type::after,
+.stream-block-active > h6:last-of-type::after {
+  content: var(--_cursor-content);
+  display: var(--_cursor-display);
+  width: var(--_cursor-width);
+  height: var(--_cursor-height);
+  background: var(--_cursor-bg);
+  margin-left: var(--_cursor-ml);
+  vertical-align: text-bottom;
+  border-radius: var(--_cursor-radius);
+  animation: stream-cursor-pulse var(--stream-cursor-pulse-duration) ease-in-out infinite;
+}
+
+/* For code blocks — cursor after last line of code */
+.stream-block-active > pre code::after {
+  content: var(--_cursor-content);
+  display: var(--_cursor-display);
+  width: var(--_cursor-width);
+  height: var(--_cursor-height);
+  background: var(--_cursor-bg);
+  margin-left: var(--_cursor-ml);
+  vertical-align: text-bottom;
+  border-radius: var(--_cursor-radius);
+  animation: stream-cursor-pulse var(--stream-cursor-pulse-duration) ease-in-out infinite;
+}
+
+/* For lists — cursor after last list item */
+.stream-block-active > ul li:last-child::after,
+.stream-block-active > ol li:last-child::after {
+  content: var(--_cursor-content);
+  display: var(--_cursor-display);
+  width: var(--_cursor-width);
+  height: var(--_cursor-height);
+  background: var(--_cursor-bg);
+  margin-left: var(--_cursor-ml);
+  vertical-align: text-bottom;
+  border-radius: var(--_cursor-radius);
+  animation: stream-cursor-pulse var(--stream-cursor-pulse-duration) ease-in-out infinite;
+}
+
+/* For blockquotes — cursor after last p inside */
+.stream-block-active > blockquote p:last-of-type::after {
+  content: var(--_cursor-content);
+  display: var(--_cursor-display);
+  width: var(--_cursor-width);
+  height: var(--_cursor-height);
+  background: var(--_cursor-bg);
+  margin-left: var(--_cursor-ml);
+  vertical-align: text-bottom;
+  border-radius: var(--_cursor-radius);
+  animation: stream-cursor-pulse var(--stream-cursor-pulse-duration) ease-in-out infinite;
+}
+
+/* Cursor trail (dramatic preset only) — separate pseudo-element not feasible,
+   we use box-shadow on the cursor itself to simulate the trail effect */
+.stream-preset-dramatic .stream-block-active > p:last-of-type::after,
+.stream-preset-dramatic .stream-block-active > pre code::after,
+.stream-preset-dramatic .stream-block-active > ul li:last-child::after,
+.stream-preset-dramatic .stream-block-active > ol li:last-child::after,
+.stream-preset-dramatic .stream-block-active > blockquote p:last-of-type::after,
+.stream-preset-dramatic .stream-block-active > h1:last-of-type::after,
+.stream-preset-dramatic .stream-block-active > h2:last-of-type::after,
+.stream-preset-dramatic .stream-block-active > h3:last-of-type::after {
+  box-shadow: -8px 0 12px 2px var(--stream-trail-color);
+}
+
+/* === Char/Word Animation === */
+
+/* Active spans: start invisible, animate in using the universal keyframe */
+.streaming-response .stream-char,
+.streaming-response .stream-word {
+  display: inline;
+  opacity: 0;
+  animation: stream-reveal var(--stream-fade-duration) var(--stream-fade-curve) both;
+}
+
+/* Revealed spans: immediately visible, no animation */
+.stream-char-revealed,
+.stream-word-revealed {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+/* === Block Effects === */
+
+/* Block glow (balanced + dramatic) */
+.stream-preset-balanced .streaming-response > div[data-birth],
+.stream-preset-dramatic .streaming-response > div[data-birth] {
+  box-shadow: 0 0 var(--stream-glow-radius) var(--stream-glow-color);
+  transition: box-shadow 300ms ease-out;
+}
+
+/* Remove glow when block is settled */
+.streaming-response > div:not([data-birth]) {
+  box-shadow: none;
+}
+
+/* Block entrance animation (dramatic only) */
+.stream-preset-dramatic .streaming-response > div[data-birth] {
+  animation: stream-block-enter var(--stream-block-entrance-duration) var(--stream-fade-curve) both;
+}
+
+/* Code blocks get special glow */
+.streaming-response pre {
+  transition: box-shadow 300ms ease-out;
+}
+
+.stream-preset-balanced .streaming-response pre[data-birth],
+.stream-preset-dramatic .streaming-response pre[data-birth] {
+  box-shadow: 0 0 16px var(--stream-glow-color);
+}
+
+/* === Code Block (Highlighted) === */
+
+.sd-code-block {
+  position: relative;
+  margin: 0.75rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border, 220 13% 91%) / 0.6);
+  background: hsl(var(--muted, 220 14% 96%) / 0.3);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.sd-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid hsl(var(--border, 220 13% 91%) / 0.4);
+  background: hsl(var(--muted, 220 14% 96%) / 0.5);
+}
+
+.sd-code-lang {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground, 220 9% 46%));
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sd-code-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground, 220 9% 46%));
+  border-radius: 0.25rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms, background 150ms, color 150ms;
+}
+
+.sd-code-block:hover .sd-code-copy {
+  opacity: 1;
+}
+
+.sd-code-copy:hover {
+  background: hsl(var(--accent, 220 14% 96%));
+  color: hsl(var(--foreground, 224 71% 4%));
+}
+
+.sd-code-body {
+  overflow-x: auto;
+}
+
+.sd-code-body pre {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: transparent !important;
+  overflow-x: auto;
+}
+
+.sd-code-body code {
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', 'Cascadia Code', 'Segoe UI Mono', monospace);
+  font-size: inherit;
+  line-height: inherit;
+  tab-size: 2;
+}
+
+/* Shiki dual-theme support */
+.sd-code-body .shiki {
+  background: transparent !important;
+}
+
+.sd-code-body .shiki span {
+  color: var(--shiki-light) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sd-code-body .shiki span {
+    color: var(--shiki-dark) !important;
+  }
+}
+
+:root.dark .sd-code-body .shiki span,
+[data-theme="dark"] .sd-code-body .shiki span,
+.dark .sd-code-body .shiki span {
+  color: var(--shiki-dark) !important;
+}
+
+/* Inline code */
+.sd-inline-code {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125em;
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', 'Cascadia Code', 'Segoe UI Mono', monospace);
+  background: hsl(var(--muted, 220 14% 96%));
+  border: 1px solid hsl(var(--border, 220 13% 91%) / 0.6);
+}
+
+/* === Reduced Motion === */
+@media (prefers-reduced-motion: reduce) {
+  .streaming-response .stream-char,
+  .streaming-response .stream-word {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+
+  .stream-block-active > *::after {
+    animation: none !important;
+    opacity: 0.6 !important;
+  }
+
+  .streaming-response > div[data-birth] {
+    box-shadow: none !important;
+    animation: none !important;
+  }
+}

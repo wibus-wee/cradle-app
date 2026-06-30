@@ -1,0 +1,41 @@
+{
+  "name": "@cradle/design-system",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Cradle visual language — tokens, AI-readable contract, and HTML mockup templates.",
+  "exports": {
+    "./tokens.css": "./src/tokens.css",
+    "./skill": "./SKILL.md",
+    "./cheatsheet": "./CHEATSHEET.md"
+  },
+  "files": [
+    "CHEATSHEET.md",
+    "README.md",
+    "SKILL.md",
+    "references",
+    "src",
+    "templates"
+  ],
+  "scripts": {
+    "check": "tsx scripts/check.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "showcase:dev": "vite --config vite.showcase.config.ts",
+    "showcase:build": "vite build --config vite.showcase.config.ts",
+    "showcase:preview": "vite preview --config vite.showcase.config.ts",
+    "demo:pdf": "bash scripts/generate-pdfs.sh"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.4"
+  }
+}

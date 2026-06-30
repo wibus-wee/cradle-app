@@ -1,0 +1,21 @@
+{
+  "branch.checkout.error": "ブランチの切り替えに失敗しました",
+  "branch.create.cancel": "ブランチ作成をキャンセル",
+  "branch.create.creating": "作成中...",
+  "branch.create.description": "{{branch}} を元に新しいブランチを作成して切り替えます。Enter で確定します。",
+  "branch.create.empty": "ブランチ名を入力",
+  "branch.create.named": "\"{{branch}}\" を作成",
+  "branch.fetch": "ブランチを取得",
+  "branch.fetch.title": "fetch --all --prune",
+  "branch.loading": "読み込み中...",
+  "branch.local": "ローカルブランチ",
+  "branch.new": "新しいブランチ...",
+  "branch.noMatches": "一致するブランチはありません",
+  "branch.remote": "リモートブランチ",
+  "branch.search.placeholder": "ブランチを検索または切り替え...",
+  "panel.emptyCommits": "コミットはまだありません",
+  "panel.emptyWorkspace": "先に Workspace を選択してください",
+  "panel.error": "Git リポジトリではないか、権限がありません",
+  "panel.fetch": "Git 更新を取得",
+  "panel.fetch.title": "Fetch all (--all --prune)"
+}

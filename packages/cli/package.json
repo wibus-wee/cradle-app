@@ -1,0 +1,29 @@
+{
+  "name": "@cradle/cli",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "cradle": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "vite build && chmod +x dist/index.js",
+    "gen:cli": "tsx scripts/generate-cli.ts",
+    "typecheck": "tsc --noEmit",
+    "cradle": "tsx src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "commander": "^14.0.3",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}

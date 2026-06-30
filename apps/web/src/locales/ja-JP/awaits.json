@@ -1,0 +1,13 @@
+{
+  "action.openChat": "チャットを開く",
+  "empty.description": "CI、レビュー、時間指定の待機がここに表示されます。",
+  "empty.title": "保留中の待機はありません",
+  "error.description": "デスクトップの待機データを読み込めませんでした。",
+  "error.title": "待機データを利用できません",
+  "overview.description": "外部シグナルを待っているセッション",
+  "overview.title": "待機",
+  "relative.day": "{{count}}日",
+  "relative.hour": "{{count}}時間",
+  "relative.justNow": "たった今",
+  "relative.minute": "{{count}}分"
+}

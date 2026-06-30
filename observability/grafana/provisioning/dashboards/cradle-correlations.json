@@ -1,0 +1,927 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Runtime resources",
+      "type": "link",
+      "url": "/d/cradle-runtime/cradle-runtime-resources"
+    },
+    {
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Runtime snapshot",
+      "type": "link",
+      "url": "http://127.0.0.1:21423/observability/runtime-snapshot"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "y": 0,
+        "h": 1,
+        "x": 0,
+        "w": 24
+      },
+      "id": 1,
+      "panels": [],
+      "title": "Pressure Flags",
+      "type": "row",
+      "description": "压力信号分组。这里不判断归属，只把最容易解释内存、流状态、队列状态的信号放到同一段时间轴里。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "text": "clear"
+                },
+                "1": {
+                  "color": "orange",
+                  "text": "active"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 1,
+        "h": 7,
+        "x": 0,
+        "w": 24
+      },
+      "id": 2,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"usedJSHeapSize\"}) > bool 536870912",
+          "legendFormat": "renderer heap > 512 MiB",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_memory_bytes{job=~\"$job\", instance=~\"$instance\", process=\"Tab\", kind=\"working_set\"}) > bool 1073741824",
+          "legendFormat": "tab working set > 1 GiB",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"estimatedPartStringChars\"}) > bool 5000000",
+          "legendFormat": "chat payload > 5M chars",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_chat_replay_buffer_chunks{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"}) > bool 0",
+          "legendFormat": "replay buffer retained",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_observability_queue_depth{job=~\"$job\", instance=~\"$instance\"}) > bool 0",
+          "legendFormat": "observability queue backlog",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "Pressure Timeline",
+      "type": "state-timeline",
+      "description": "布尔压力时间线。active 表示该时间点跨过阈值：renderer heap > 512 MiB、Tab working set > 1 GiB、chat payload > 5M chars、replay buffer retained、observability queue backlog。它用于定位同一时间段有哪些候选原因同时出现。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 8,
+        "h": 8,
+        "x": 0,
+        "w": 12
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_memory_bytes{job=~\"$job\", instance=~\"$instance\", process=\"Tab\", kind=\"working_set\"})",
+          "legendFormat": "Tab working set",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"usedJSHeapSize\"})",
+          "legendFormat": "Renderer JS heap",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_process_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"rss\"})",
+          "legendFormat": "Server RSS",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_pty_rss_bytes{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "PTY RSS",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_chronicle_daemon_rss_bytes{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "Chronicle RSS",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "Memory Stack",
+      "type": "timeseries",
+      "description": "内存归因总览。Tab working set 是 Chromium/Electron Tab 进程工作集，包含 JS heap 之外的 native/DOM/layout/canvas/media 等内存；Renderer JS heap 只代表渲染进程 JavaScript 堆；Server/PTY/Chronicle RSS 用来排除其他进程族。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 8,
+        "h": 8,
+        "x": 12,
+        "w": 12
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=~\"estimatedPartStringChars|messageCount|partCount|textPartCount|toolPartCount|filePartCount\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Renderer Payload Shape",
+      "type": "timeseries",
+      "description": "渲染端 chat store 的形状。estimatedPartStringChars 近似 retained 字符串体积；messageCount/partCount 反映对象数量；text/tool/file part 的比例用于判断是文本内容、工具调用记录，还是文件 part 在撑大前端状态。"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "y": 16,
+        "h": 1,
+        "x": 0,
+        "w": 24
+      },
+      "id": 5,
+      "panels": [],
+      "title": "Flow Correlation",
+      "type": "row",
+      "description": "运行流状态关联。这里看 run、stream、replay、provider host 是否按生命周期同步下降。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 17,
+        "h": 8,
+        "x": 0,
+        "w": 12
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_chat_active_runs_total{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"})",
+          "legendFormat": "active runs",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_chat_replay_buffer_chunks{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"})",
+          "legendFormat": "replay chunks",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_chat_replay_buffer_deltas{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"})",
+          "legendFormat": "replay {{kind}} deltas",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=~\"generatingMessageCount|passiveStreamingMessageCount|activeAbortControllerCount|runDisplayMetaCount|activeGoalCount\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Runs, Streams, Replay",
+      "type": "timeseries",
+      "description": "把 server active runs、replay buffer、replay delta 类型和 renderer streaming 状态放在一起。任务结束后仍长期非零，通常意味着 stream/replay 状态未释放或前端仍保留可恢复流状态。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 17,
+        "h": 8,
+        "x": 12,
+        "w": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_provider_runtime_hosts_total{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"})",
+          "legendFormat": "provider hosts",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_provider_runtime_host_state_total{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_chat_active_runs_total{job=~\"$job\", instance=~\"$instance\", runtime_kind=~\"$runtime_kind\"})",
+          "legendFormat": "active runs",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Provider Hosts vs Active Runs",
+      "type": "timeseries",
+      "description": "provider hosts 和 active runs 的关系。provider hosts 高于 active runs 不一定错误，可能是 pin/ref/expiry；如果长期不下降，需要去 runtime snapshot 看具体 host id、ref count、pin count 和 expiry。"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "y": 25,
+        "h": 1,
+        "x": 0,
+        "w": 24
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Saturation Correlation",
+      "type": "row",
+      "description": "饱和与采样健康。这里用于判断看到的趋势是否可能被进程数量、server 资源、或 telemetry 队列状态影响。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 26,
+        "h": 8,
+        "x": 0,
+        "w": 8
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (type) (cradle_desktop_processes_total{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "{{type}} processes",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_windows_total{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "windows",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Electron Inventory",
+      "type": "timeseries",
+      "description": "Electron 进程和窗口数量。进程/窗口数量突然增长，会先解释 Tab/Browser/GPU working set 的变化，再去看 JS heap。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 26,
+        "h": 8,
+        "x": 8,
+        "w": 8
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_observability_queue_depth{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "queue depth",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_observability_state_total{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Observability Queue State",
+      "type": "timeseries",
+      "description": "observability 队列状态。queue depth 非零或 state 异常，说明 telemetry 持久化/导出可能滞后；此时图表趋势要和 runtime snapshot 交叉验证。"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "y": 26,
+        "h": 8,
+        "x": 16,
+        "w": 8
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_process_active_resources_total{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_process_cpu_percent{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "server cpu %",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Server Resource Pressure",
+      "type": "timeseries",
+      "description": "server handles、requests、CPU 的压力视图。handles/requests/CPU 增长可以解释 server RSS 或采样延迟，也能提示资源生命周期没有回落。"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "cradle",
+    "observability",
+    "runtime",
+    "correlation"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up, job)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Job",
+        "multi": true,
+        "name": "job",
+        "options": [],
+        "query": {
+          "query": "label_values(up, job)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up{job=~\"$job\"}, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "query": "label_values(up{job=~\"$job\"}, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(cradle_chat_active_runs_total{job=~\"$job\", instance=~\"$instance\"}, runtime_kind)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Runtime Kind",
+        "multi": true,
+        "name": "runtime_kind",
+        "options": [],
+        "query": {
+          "query": "label_values(cradle_chat_active_runs_total{job=~\"$job\", instance=~\"$instance\"}, runtime_kind)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Cradle Runtime - Correlations",
+  "uid": "cradle-correlations",
+  "version": 3,
+  "weekStart": ""
+}

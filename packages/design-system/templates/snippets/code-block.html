@@ -1,0 +1,51 @@
+<!-- code-block.html — Syntax-highlighted code block -->
+<div style="
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+">
+  <!-- Header bar -->
+  <div style="
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--color-neutral-9);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  ">
+    <span style="
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    ">tokens.css</span>
+    <button style="
+      height: 24px;
+      padding: 0 8px;
+      background: rgba(255,255,255,0.06);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+    ">Copy</button>
+  </div>
+
+  <!-- Code body -->
+  <pre style="
+    margin: 0;
+    padding: 16px 20px;
+    background: var(--color-neutral-10);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--color-neutral-1);
+  "><code><span style="color: rgba(255,255,255,0.35);">/* Neutral scale */</span>
+<span style="color: var(--color-neutral-5);">@theme</span> <span style="color: rgba(255,255,255,0.6);">{</span>
+  <span style="color: var(--color-code-keyword);">--color-neutral-1</span><span style="color: rgba(255,255,255,0.6);">:</span> <span style="color: var(--color-code-value);">#ffffff</span><span style="color: rgba(255,255,255,0.6);">;</span>
+  <span style="color: var(--color-code-keyword);">--color-neutral-9</span><span style="color: rgba(255,255,255,0.6);">:</span> <span style="color: var(--color-code-value);">#262626</span><span style="color: rgba(255,255,255,0.6);">;</span>
+  <span style="color: var(--color-code-keyword);">--color-accent</span><span style="color: rgba(255,255,255,0.6);">:</span>    <span style="color: var(--color-code-value);">#3b82f6</span><span style="color: rgba(255,255,255,0.6);">;</span>
+  <span style="color: var(--color-code-keyword);">--font-sans</span><span style="color: rgba(255,255,255,0.6);">:</span>       <span style="color: var(--color-code-string);">'Geist Variable'</span><span style="color: rgba(255,255,255,0.6);">, sans-serif;</span>
+<span style="color: rgba(255,255,255,0.6);">}</span></code></pre>
+</div>

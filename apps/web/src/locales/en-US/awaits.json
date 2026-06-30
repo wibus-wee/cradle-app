@@ -1,0 +1,13 @@
+{
+  "action.openChat": "Open Chat",
+  "empty.description": "Pending CI, review, and timed awaits will appear here.",
+  "empty.title": "No pending awaits",
+  "error.description": "Desktop await data could not be loaded.",
+  "error.title": "Awaits unavailable",
+  "overview.description": "Sessions waiting on external signals",
+  "overview.title": "Awaits",
+  "relative.day": "{{count}}d",
+  "relative.hour": "{{count}}h",
+  "relative.justNow": "just now",
+  "relative.minute": "{{count}}m"
+}

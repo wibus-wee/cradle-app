@@ -1,0 +1,39 @@
+.emptyScanCell {
+  opacity: 0;
+  animation: agent-identicon-empty-scan 1s step-end infinite;
+}
+
+.filledScanCell {
+  animation: agent-identicon-filled-scan 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emptyScanCell,
+  .filledScanCell {
+    animation: none;
+  }
+}
+
+@keyframes agent-identicon-empty-scan {
+  0%,
+  20% {
+    opacity: 1;
+  }
+
+  20.001%,
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-identicon-filled-scan {
+  0%,
+  20% {
+    opacity: 0;
+  }
+
+  20.001%,
+  to {
+    opacity: 1;
+  }
+}

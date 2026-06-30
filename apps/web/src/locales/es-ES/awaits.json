@@ -1,0 +1,13 @@
+{
+  "action.openChat": "Abrir chat",
+  "empty.description": "Las esperas de CI, revisión y tiempo aparecerán aquí.",
+  "empty.title": "No hay esperas pendientes",
+  "error.description": "No se pudieron cargar los datos de espera del escritorio.",
+  "error.title": "Esperas no disponibles",
+  "overview.description": "Sesiones esperando señales externas",
+  "overview.title": "Esperas",
+  "relative.day": "{{count}} d",
+  "relative.hour": "{{count}} h",
+  "relative.justNow": "ahora mismo",
+  "relative.minute": "{{count}} min"
+}

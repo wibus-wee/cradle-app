@@ -1,0 +1,48 @@
+{
+  "name": "@cradle/slack-conversation-bridge",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Slack Socket Mode adapter and controls for the Cradle server-owned conversation bridge",
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "Slack Conversation Bridge",
+    "description": "Connects Slack Socket Mode messages and /cradle controls to Cradle conversation bridge sessions",
+    "server": "dist/server.mjs",
+    "deployments": ["desktop"],
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "conversation-adapter.slack",
+          "type": "conversation-adapter",
+          "layer": "server",
+          "label": "Slack conversation adapter",
+          "permissions": ["slack.socket-mode"]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "slack.socket-mode",
+          "label": "Connect to Slack Socket Mode",
+          "required": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.1.0",
+    "markdown-to-slack-blocks": "^1.5.0"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@types/node": "^22.19.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.4"
+  }
+}

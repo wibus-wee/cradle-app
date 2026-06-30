@@ -1,0 +1,58 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/cli/index.ts"],
+  "project": ["src/**/*.ts"],
+  "ignore": [
+    "**/*.d.ts",
+    "**/routeTree.gen.ts",
+    "**/api-gen/**",
+    ".agents/**",
+    ".claude/**"
+  ],
+  "ignoreDependencies": [
+    "tw-animate-css",
+    "babel-plugin-react-compiler",
+    "@tailwindcss/typography",
+    "react-grab"
+  ],
+  "workspaces": {
+    "apps/server": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["vite-node"]
+    },
+    "apps/web": {
+      "entry": [
+        "src/main.tsx",
+        "openapi-ts.config.ts",
+        "src/**/*.test.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/routeTree.gen.ts", "src/api-gen/**"]
+    },
+    "packages/cli": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/db": {
+      "entry": ["src/index.ts", "src/paths.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/ipc": {
+      "entry": ["src/index.ts", "src/client.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/tabs": {
+      "entry": ["src/index.ts", "src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "e2e": {
+      "entry": [
+        "src/steps/**/*.ts",
+        "src/support/**/*.ts",
+        "cucumber.mjs"
+      ],
+      "project": ["src/**/*.ts"]
+    }
+  }
+}

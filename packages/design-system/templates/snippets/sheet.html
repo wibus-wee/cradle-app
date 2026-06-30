@@ -1,0 +1,152 @@
+<!-- sheet.html — Right-side panel with header, scrollable list, footer -->
+<div style="
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  background: var(--color-neutral-1);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+">
+  <!-- Header -->
+  <div style="
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    padding: 0 12px;
+    background: var(--color-neutral-2);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  ">
+    <span style="
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-neutral-9);
+    ">Sessions</span>
+    <button style="
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--color-neutral-5);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+    ">✕</button>
+  </div>
+
+  <!-- Scrollable list -->
+  <div style="flex: 1; overflow-y: auto; padding: 8px;">
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+
+      <button style="
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 8px;
+        background: var(--color-neutral-3);
+        border: none;
+        border-radius: 6px;
+        text-align: left;
+        cursor: pointer;
+      ">
+        <span style="
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: var(--color-accent-session);
+          flex-shrink: 0;
+        "></span>
+        <div style="flex: 1; min-width: 0;">
+          <p style="margin: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Design review session</p>
+          <p style="margin: 0; font-family: var(--font-mono); font-size: 10px; color: var(--color-neutral-5);">2m ago</p>
+        </div>
+      </button>
+
+      <button style="
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 8px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        text-align: left;
+        cursor: pointer;
+      ">
+        <span style="
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: var(--color-neutral-4);
+          flex-shrink: 0;
+        "></span>
+        <div style="flex: 1; min-width: 0;">
+          <p style="margin: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Code migration analysis</p>
+          <p style="margin: 0; font-family: var(--font-mono); font-size: 10px; color: var(--color-neutral-5);">1h ago</p>
+        </div>
+      </button>
+
+      <button style="
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 8px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        text-align: left;
+        cursor: pointer;
+      ">
+        <span style="
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: var(--color-neutral-4);
+          flex-shrink: 0;
+        "></span>
+        <div style="flex: 1; min-width: 0;">
+          <p style="margin: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Architecture planning</p>
+          <p style="margin: 0; font-family: var(--font-mono); font-size: 10px; color: var(--color-neutral-5);">Yesterday</p>
+        </div>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="
+    padding: 8px;
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
+  ">
+    <button style="
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      height: 32px;
+      background: var(--color-neutral-9);
+      color: var(--color-neutral-1);
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    ">New session</button>
+  </div>
+</div>

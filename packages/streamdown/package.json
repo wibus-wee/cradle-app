@@ -1,0 +1,29 @@
+{
+  "name": "@cradle/streamdown",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Streaming markdown renderer — CPS smoothing, block FSM, animated reveal",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles": "./src/styles/animations.css",
+    "./typography": "./src/styles/typography.css"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "dependencies": {
+    "@types/mdast": "^4.0.4",
+    "marked": "^15.0.0",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "shiki": "^3.0.0",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.1.0"
+  }
+}

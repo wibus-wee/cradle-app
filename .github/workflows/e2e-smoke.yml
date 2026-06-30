@@ -32,8 +32,6 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: main
 
       - uses: ./.github/actions/setup

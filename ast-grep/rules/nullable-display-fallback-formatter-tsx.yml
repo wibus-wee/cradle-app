@@ -1,0 +1,12 @@
+id: nullable-display-fallback-formatter-tsx
+language: TSX
+severity: warning
+message: Nullable formatter hides null behind a display fallback; keep null explicit or normalize at the data owner.
+rule:
+  any:
+    - pattern: 'function $FUNC($PARAM: $TYPE | null): string { return $PARAM === null ? $FALLBACK : $$$EXPR }'
+    - pattern: 'function $FUNC($PARAM: $TYPE | null): string { if ($PARAM === null) { return $FALLBACK } return $$$EXPR }'
+    - pattern: 'function $FUNC($PARAM: $TYPE | null): string { if (!$PARAM) { return $FALLBACK } return $$$EXPR }'
+constraints:
+  FUNC:
+    regex: ^(format|read|to|as|normalize|map)[A-Z].*

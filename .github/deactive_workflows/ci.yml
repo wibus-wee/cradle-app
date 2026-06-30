@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Lint ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Run ESLint
+        run: pnpm lint
+
+  # ─── Typecheck ────────────────────────────────────────────────────────────
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Typecheck Server (apps/server)
+        run: pnpm typecheck:server
+      - name: Typecheck Web App (apps/web)
+        run: pnpm typecheck:apps-web
+      - name: Typecheck Desktop (apps/desktop)
+        run: pnpm typecheck:desktop
+
+  # ─── Unit Tests (src + packages) ──────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Run Vitest (src + packages)
+        run: pnpm test
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results-${{ github.run_id }}
+          path: coverage/
+          retention-days: 7
+
+  # ─── Server Tests (apps/server) ───────────────────────────────────────────
+  server-tests:
+    name: Server Tests
+    runs-on: ubuntu-latest
+    env:
+      CRADLE_CREDENTIAL_SECRET: ci-test-secret
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Run Server Vitest
+        run: pnpm test:server
+      - name: Upload server test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-test-results-${{ github.run_id }}
+          path: apps/server/coverage/
+          retention-days: 7
+
+  # ─── Build ────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build Web App (apps/web)
+        run: pnpm build:web
+      - name: Build Server (apps/server)
+        run: pnpm build:server
+      - name: Build Desktop (apps/desktop)
+        run: pnpm build:desktop

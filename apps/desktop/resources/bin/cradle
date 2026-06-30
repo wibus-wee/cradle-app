@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+SOURCE="$0"
+while [ -L "$SOURCE" ]; do
+  DIR="$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd)"
+  TARGET="$(readlink "$SOURCE")"
+  case "$TARGET" in
+    /*) SOURCE="$TARGET" ;;
+    *) SOURCE="$DIR/$TARGET" ;;
+  esac
+done
+
+BIN_DIR="$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd)"
+RESOURCE_DIR="$(CDPATH= cd -- "$BIN_DIR/.." && pwd)"
+APP_EXECUTABLE="$RESOURCE_DIR/../MacOS/Cradle"
+CLI_ENTRY="$RESOURCE_DIR/cli/index.js"
+
+if [ ! -x "$APP_EXECUTABLE" ]; then
+  echo "Cannot find Cradle app executable at $APP_EXECUTABLE" >&2
+  exit 1
+fi
+
+if [ ! -f "$CLI_ENTRY" ]; then
+  echo "Cannot find Cradle CLI entry at $CLI_ENTRY" >&2
+  exit 1
+fi
+
+ELECTRON_RUN_AS_NODE=1 exec "$APP_EXECUTABLE" "$CLI_ENTRY" "$@"

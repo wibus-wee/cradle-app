@@ -1,0 +1,31 @@
+name: Desktop Build Setup
+description: Setup Node.js, pnpm, and platform prerequisites for desktop builds
+
+inputs:
+  node-version:
+    description: Node.js version to use
+    required: false
+    default: '24'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm and Node.js
+      uses: ./.github/actions/setup
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install Linux packaging dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libarchive-tools rpm snapd
+
+    - name: Clean macOS build leftovers
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        sudo rm -rf apps/desktop/release || true
+        sudo rm -rf apps/desktop/dist || true
+        sudo rm -rf /tmp/electron-builder* || true

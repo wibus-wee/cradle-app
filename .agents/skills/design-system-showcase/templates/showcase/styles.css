@@ -1,0 +1,379 @@
+/**
+ * Showcase root CSS.
+ *
+ * Copy this file to showcase/src/styles.css.
+ * CUSTOMIZE blocks are marked — update token values and font hooks to match your project.
+ */
+
+@import 'tailwindcss';
+@import '../../src/tokens.css';
+
+/*
+ * Showcase-only theme bridge.
+ *
+ * src/tokens.css declares the light-mode scale only. Dark mode inversion and
+ * --color-paper / --color-border must be repeated here for the standalone showcase.
+ *
+ * CUSTOMIZE: Replace values with your project's actual palette.
+ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-5) transparent;
+}
+
+:root {
+  --color-paper: #faf9f5;
+  /* CUSTOMIZE */
+  --color-border: rgba(24, 24, 27, 0.1);
+  /* CUSTOMIZE */
+
+  /*
+   * CUSTOMIZE: If your project uses web fonts loaded via Google Fonts or a
+   * similar service, wire them into the token chain here so the showcase
+   * renders the intended faces on all devices.
+   *
+   * Example (Yohaku uses Inter + Noto Serif SC):
+   *   --app-font-sans: 'Inter';
+   *   --app-font-serif: 'Noto Serif SC';
+   */
+}
+
+[data-theme='dark'] {
+  /* CUSTOMIZE: Replace with your project's dark-mode token inversion */
+  --color-neutral-1: #141414;
+  --color-neutral-2: #242424;
+  --color-neutral-3: #404040;
+  --color-neutral-4: #5c5c5c;
+  --color-neutral-5: #787878;
+  --color-neutral-6: #a8a8a8;
+  --color-neutral-7: #d0d0d0;
+  --color-neutral-8: #e3e3e3;
+  --color-neutral-9: #f0f0f0;
+  --color-neutral-10: #f8f8f8;
+
+  --color-paper: #1a1814;
+  /* CUSTOMIZE */
+  --color-border: rgba(255, 255, 255, 0.1);
+  /* CUSTOMIZE */
+}
+
+/* ─── Base ─────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-neutral-9);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Showcase page chrome ──────────────────────────────────── */
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 88px 64px 120px;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 56px 24px 96px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 44px 16px 80px;
+  }
+}
+
+/* ─── Toolbar ───────────────────────────────────────────────── */
+
+.toolbar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--color-paper) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    top: 10px;
+    right: 10px;
+    padding: 3px;
+    font-size: 11px;
+  }
+}
+
+.toolbar button,
+.toolbar a {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--color-neutral-7);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.toolbar button:hover,
+.toolbar a:hover {
+  background: var(--color-neutral-3);
+  color: var(--color-neutral-9);
+}
+
+.toolbar button[data-active='true'] {
+  color: var(--color-neutral-9);
+  font-weight: 500;
+}
+
+.toolbar .sep {
+  width: 1px;
+  height: 14px;
+  background: var(--color-border);
+  margin: 0 2px;
+}
+
+.toolbar__icon {
+  padding: 3px 5px;
+}
+
+/* ─── Section layout ────────────────────────────────────────── */
+
+.section {
+  padding: 64px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.section-head {
+  margin-bottom: 40px;
+}
+
+.section-num {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--color-neutral-10);
+  line-height: 1.2;
+}
+
+.section-lede {
+  margin: 0;
+  color: var(--color-neutral-7);
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+.subhead {
+  margin: 32px 0 16px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-neutral-6);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ─── Color swatches ────────────────────────────────────────── */
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.swatch__chip {
+  height: 48px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.swatch--accent .swatch__chip {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-color: transparent;
+}
+
+.swatch__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swatch__name {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-neutral-9);
+}
+
+.swatch__role {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-neutral-7);
+  line-height: 1.4;
+}
+
+.swatch__hex {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--color-neutral-6);
+}
+
+/* ─── Demo cards ────────────────────────────────────────────── */
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.demo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.demo-card__frame {
+  display: block;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-neutral-2);
+  text-decoration: none;
+  aspect-ratio: 794 / 1123;
+}
+
+.demo-card__viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.demo-card__iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  border: none;
+  pointer-events: none;
+}
+
+.demo-card__shield {
+  position: absolute;
+  inset: 0;
+}
+
+.demo-card__open {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--color-paper) 80%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  color: var(--color-neutral-7);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.demo-card__frame:hover .demo-card__open {
+  opacity: 1;
+}
+
+.demo-card__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-neutral-9);
+}
+
+.demo-card__desc {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-neutral-7);
+  line-height: 1.5;
+}
+
+.demo-card__pdf {
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.demo-card__pdf:hover {
+  text-decoration: underline;
+}
+
+/* ─── Snippet frames ─────────────────────────────────────────── */
+
+.snippet-frame {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.snippet-frame__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: var(--color-neutral-2);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--color-neutral-6);
+}
+
+.snippet-frame__body {
+  padding: 24px;
+  background: var(--color-paper);
+}

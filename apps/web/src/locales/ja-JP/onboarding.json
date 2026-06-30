@@ -1,0 +1,18 @@
+{
+  "brand.name": "Cradle",
+  "brand.tagline": "One layer above your AI tools.",
+  "credentials.welcomeTitle": "Welcome to Cradle!",
+  "credentials.description": "まずプロバイダーを接続してください。プロバイダーを選択して Cradle を始めましょう。",
+  "credentials.ccSwitch.description": "CC-Switch の既存プロバイダーを使用 — インポート不要。",
+  "credentials.ready": "準備完了",
+  "credentials.skip": "スキップ",
+  "credentials.openSettings": "設定を開く",
+  "credentials.toast.opening.title": "プロバイダー設定を開いています",
+  "credentials.toast.opening.description": "APIキーを追加して始めましょう。",
+  "credentials.toast.ccSwitch.title": "CC-Switch 接続済み",
+  "credentials.toast.ccSwitch.description": "既存のプロバイダーが利用可能です。",
+  "credentials.providers.anthropic.tagline": "Anthropic 公式 Claude API またはメッセージ API",
+  "credentials.providers.openai.tagline": "OpenAI Responses API または Codex 公式アカウント",
+  "credentials.providers.universal.tagline": "OpenAI と Anthropic 対応のカスタムエンドポイント",
+  "nav.continueHint": "で続行"
+}

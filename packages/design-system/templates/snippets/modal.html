@@ -1,0 +1,112 @@
+<!-- modal.html — Dialog overlay with header, body, footer -->
+<div style="
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+">
+  <div style="
+    width: 480px;
+    max-width: calc(100vw - 32px);
+    background: var(--color-neutral-1);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px -2px rgba(0,0,0,0.10), 0 2px 4px -1px rgba(0,0,0,0.06);
+    overflow: hidden;
+  ">
+    <!-- Header -->
+    <div style="
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 0;
+    ">
+      <h2 style="
+        margin: 0;
+        font-family: var(--font-sans);
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--color-neutral-9);
+        line-height: 1.3;
+      ">Delete workspace</h2>
+      <button style="
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: var(--color-neutral-5);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        cursor: pointer;
+      ">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding: 12px 20px 20px;">
+      <p style="
+        margin: 0 0 12px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--color-neutral-6);
+      ">This action cannot be undone. The workspace and all its contents, including sessions, agents, and documents, will be permanently removed.</p>
+
+      <div style="
+        padding: 10px 12px;
+        background: rgba(239,68,68,0.06);
+        border: 1px solid rgba(239,68,68,0.15);
+        border-radius: 8px;
+      ">
+        <p style="
+          margin: 0;
+          font-family: var(--font-sans);
+          font-size: 12px;
+          color: var(--color-error);
+          line-height: 1.5;
+        ">12 sessions and 34 documents will be deleted.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--color-neutral-2);
+      border-top: 1px solid var(--color-border);
+    ">
+      <button style="
+        height: 32px;
+        padding: 0 14px;
+        background: transparent;
+        color: var(--color-neutral-7);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      ">Cancel</button>
+      <button style="
+        height: 32px;
+        padding: 0 14px;
+        background: rgba(239,68,68,0.1);
+        color: var(--color-error);
+        border: none;
+        border-radius: 8px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      ">Delete workspace</button>
+    </div>
+  </div>
+</div>

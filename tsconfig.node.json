@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "paths": {},
+    "types": ["node"],
+    "strict": true,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "apps/server/src/**/*",
+    "apps/server/vite.config.ts",
+    "apps/server/runtime-packages.mjs"
+  ],
+  "exclude": ["apps/server/tests/**/*"]
+}

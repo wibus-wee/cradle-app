@@ -1,0 +1,8 @@
+{
+  "action.cancel": "Cancel",
+  "action.select": "Select",
+  "directory.empty": "Empty directory",
+  "directory.error": "Unable to access this path",
+  "directory.listing": "Directories",
+  "directory.title": "Choose directory"
+}

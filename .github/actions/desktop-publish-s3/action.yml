@@ -1,0 +1,76 @@
+name: Desktop Publish to S3
+description: Publish Electron Builder artifacts to a generic electron-updater feed on S3-compatible storage
+
+inputs:
+  channel:
+    description: Update channel path, for example stable or canary
+    required: true
+  version:
+    description: Release version
+    required: true
+  aws-access-key-id:
+    description: AWS access key id
+    required: false
+    default: ''
+  aws-secret-access-key:
+    description: AWS secret access key
+    required: false
+    default: ''
+  s3-bucket:
+    description: S3 bucket name
+    required: false
+    default: ''
+  s3-region:
+    description: S3 region
+    required: false
+    default: us-east-1
+  s3-endpoint:
+    description: S3-compatible endpoint
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Download desktop artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release
+        pattern: desktop-*
+        merge-multiple: true
+
+    - name: Publish generic update feed
+      shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        AWS_REGION: ${{ inputs.s3-region }}
+        S3_BUCKET: ${{ inputs.s3-bucket }}
+        S3_ENDPOINT: ${{ inputs.s3-endpoint }}
+        CHANNEL: ${{ inputs.channel }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        if [ -z "$S3_BUCKET" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+          echo "S3 credentials or bucket are not configured; skipping update feed upload."
+          exit 0
+        fi
+
+        endpoint_arg=()
+        if [ -n "$S3_ENDPOINT" ]; then
+          endpoint_arg=(--endpoint-url "$S3_ENDPOINT")
+        fi
+
+        shopt -s nullglob
+
+        for file in release/*.{dmg,zip,exe,AppImage,deb,rpm,snap,tar.gz,blockmap}; do
+          filename=$(basename "$file")
+          aws s3 cp "$file" "s3://$S3_BUCKET/$CHANNEL/$VERSION/$filename" "${endpoint_arg[@]}"
+        done
+
+        for yml in release/*.yml; do
+          filename=$(basename "$yml")
+          sed -i.bak "s|url: |url: $VERSION/|g" "$yml"
+          rm -f "$yml.bak"
+          aws s3 cp "$yml" "s3://$S3_BUCKET/$CHANNEL/$filename" "${endpoint_arg[@]}"
+          aws s3 cp "$yml" "s3://$S3_BUCKET/$CHANNEL/$VERSION/$filename" "${endpoint_arg[@]}"
+        done

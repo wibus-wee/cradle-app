@@ -1,0 +1,56 @@
+{
+  "name": "@cradle/desktop",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "author": {
+    "email": "wibus_wee@outlook.com",
+    "name": "wibus-wee",
+    "url": "https://wibus.ren"
+  },
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "pnpm build:mac-bridge && electron-vite dev",
+    "sync:codex-runtime": "node scripts/sync-codex-runtime.mjs --current",
+    "sync:codex-runtime:all": "node scripts/sync-codex-runtime.mjs --all",
+    "build": "pnpm --filter @cradle/server build:desktop-runtime && pnpm --filter @cradle/server build:desktop-plugins && pnpm --filter @cradle/cli build && pnpm build:mac-bridge && electron-vite build",
+    "build:relayd-resource": "pnpm --filter @cradle/relayd build:desktop-resource",
+    "build:mac-bridge": "node scripts/build-mac-bridge.mjs",
+    "record:appshot-parity": "node scripts/record-appshot-parity.mjs",
+    "set-version": "node scripts/set-version.mjs",
+    "pack": "pnpm build && electron-builder --config electron-builder.mjs --dir",
+    "verify:macos-distribution-credentials": "node scripts/verify-macos-distribution-credentials.mjs",
+    "dist": "pnpm build && electron-builder --config electron-builder.mjs",
+    "dist:publish": "pnpm build && electron-builder --config electron-builder.mjs --publish always",
+    "dist:mac": "pnpm build && electron-builder --config electron-builder.mjs --mac",
+    "generate-update-manifest": "node scripts/generate-update-manifest.mjs",
+    "smoke:update": "node scripts/run-update-smoke.mjs",
+    "dist:win": "pnpm build && electron-builder --config electron-builder.mjs --win",
+    "dist:linux": "pnpm build && electron-builder --config electron-builder.mjs --linux",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@cradle/browser-use": "workspace:*",
+    "@cradle/ipc": "workspace:*",
+    "@cradle/plugin-sdk": "workspace:*",
+    "electron-updater": "^6.8.9",
+    "electron-window-state": "^5.0.3",
+    "get-port": "^7.1.0",
+    "semver": "^7.8.5",
+    "tar": "^7.5.13",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/router-plugin": "^1.168.18",
+    "@types/node": "^22.19.1",
+    "@types/semver": "^7.7.1",
+    "@vitejs/plugin-react": "^5.1.1",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "electron": "42.4.1",
+    "electron-builder": "^26.15.6",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.6"
+  }
+}

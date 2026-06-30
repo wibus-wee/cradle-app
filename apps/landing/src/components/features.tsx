@@ -3,8 +3,16 @@
  */
 
 import {
-  CheckCircle2, Clock, Play, Plus, Puzzle, RefreshCw, Shield, Square, Zap,
-} from 'lucide-react'
+  CheckCircleLine as CheckCircle2,
+  ClockLine as Clock,
+  PlayLine as Play,
+  PlusLine as Plus,
+  PuzzledLine as Puzzle,
+  Refresh1Line as RefreshCw,
+  ShieldLine as Shield,
+  SquareLine as Square,
+  FlashLine as Zap
+} from '@mingcute/react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useCallback, useEffect, useState } from 'react'
 

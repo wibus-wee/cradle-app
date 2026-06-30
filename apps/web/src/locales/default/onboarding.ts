@@ -1,0 +1,18 @@
+export default {
+  'brand.name': 'Cradle',
+  'brand.tagline': 'One layer above your AI tools.',
+  'credentials.welcomeTitle': 'Welcome to Cradle!',
+  'credentials.description': 'You should connect a provider first. Choose a provider to start using Cradle.',
+  'credentials.ccSwitch.description': 'Use your existing providers in CC-Switch — no import needed.',
+  'credentials.ready': 'Ready',
+  'credentials.skip': 'Skip for now',
+  'credentials.openSettings': 'Open settings',
+  'credentials.toast.opening.title': 'Opening provider settings',
+  'credentials.toast.opening.description': 'Add your API key to get started.',
+  'credentials.toast.ccSwitch.title': 'CC-Switch connected',
+  'credentials.toast.ccSwitch.description': 'Your existing providers are ready to use.',
+  'credentials.providers.anthropic.tagline': 'Official Claude API or Anthropic message API',
+  'credentials.providers.openai.tagline': 'OpenAI Responses API or Official Codex account',
+  'credentials.providers.universal.tagline': 'Custom endpoint with OpenAI and Anthropic supported',
+  'nav.continueHint': 'to continue',
+} as const

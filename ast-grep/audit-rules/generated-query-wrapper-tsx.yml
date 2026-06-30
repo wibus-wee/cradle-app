@@ -1,0 +1,9 @@
+id: generated-query-wrapper-tsx
+language: TSX
+severity: warning
+message: Hook only returns useQuery(...); verify it owns real feature semantics instead of hiding generated query ownership.
+rule:
+  pattern: function $FUNC($$$ARGS) { return useQuery($$$QUERY_ARGS) }
+constraints:
+  FUNC:
+    regex: ^use[A-Z].*

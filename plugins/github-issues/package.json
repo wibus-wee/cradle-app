@@ -1,0 +1,43 @@
+{
+  "name": "@cradle/github-issues",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "GitHub Issues",
+    "description": "Mirrors GitHub Issues into Cradle read-only external issue cards",
+    "server": "dist/server.mjs",
+    "deployments": ["desktop"],
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "external-issue-source.github-issues",
+          "type": "external-issue-source",
+          "layer": "server",
+          "label": "GitHub Issues source",
+          "permissions": ["github.issues.read"]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "github.issues.read",
+          "label": "Read GitHub issues",
+          "required": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@types/node": "^22.19.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.4"
+  }
+}

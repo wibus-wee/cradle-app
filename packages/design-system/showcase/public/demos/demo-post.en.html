@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Building the AI-Native Desktop — Cradle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="_shared.css" />
+  <style>
+    .page {
+      max-width: 672px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 48px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .logo {
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-neutral-9);
+      letter-spacing: -0.01em;
+    }
+    .date {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-neutral-5);
+    }
+    .article-eyebrow {
+      margin: 0 0 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-accent);
+      letter-spacing: 0.04em;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-family: var(--font-sans);
+      font-size: 30px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: var(--color-neutral-10);
+    }
+    .lede {
+      margin: 0 0 40px;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.7;
+      color: var(--color-neutral-6);
+    }
+    h2 {
+      margin: 40px 0 12px;
+      font-family: var(--font-sans);
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      color: var(--color-neutral-9);
+    }
+    p {
+      margin: 0 0 20px;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--color-neutral-7);
+    }
+    .pull-quote {
+      margin: 32px 0;
+      padding: 20px 24px;
+      border-left: 3px solid var(--color-accent);
+      background: var(--color-neutral-2);
+      border-radius: 0 8px 8px 0;
+    }
+    .pull-quote p {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.6;
+      color: var(--color-neutral-9);
+    }
+    pre {
+      margin: 24px 0;
+      padding: 16px 20px;
+      background: var(--color-neutral-10);
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.7;
+      color: var(--color-neutral-1);
+    }
+    p code {
+      padding: 1px 5px;
+      background: var(--color-neutral-3);
+      border-radius: 4px;
+      color: var(--color-neutral-8);
+      font-size: 12px;
+    }
+    .page-footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .page-footer-left {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      color: var(--color-neutral-6);
+    }
+    .page-footer-right {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-neutral-5);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-header">
+      <span class="logo">Cradle</span>
+      <span class="date">June 2026</span>
+    </header>
+
+    <article>
+      <p class="article-eyebrow">Architecture · v0.1</p>
+      <h1>Building the AI-Native Desktop</h1>
+      <p class="lede">
+        What would a desktop operating environment look like if it were designed from scratch for the age of AI agents? Cradle is our answer — and the design choices it makes are as deliberate as the technical ones.
+      </p>
+
+      <h2>The problem with current AI interfaces</h2>
+      <p>
+        Most AI tools today are web apps wearing a chat UI. They inherit the constraints of the web: stateless sessions, no persistent context, no spatial organization. The user is expected to manage their own mental model of what the AI knows and what it has done.
+      </p>
+      <p>
+        Cradle starts from the opposite direction. The desktop environment is the primary artifact. Sessions, agents, workspaces, and documents are persistent, spatial, and owned by the user — not ephemeral API calls to a remote service.
+      </p>
+
+      <h2>Two-tone chrome architecture</h2>
+      <p>
+        The first design decision that shapes everything else: Cradle's chrome (sidebar, header, footer) is always visually dimmer than its content areas. Chrome renders at <code>--color-neutral-2</code> (#f5f5f5 in light mode, #111111 in dark mode). Content surfaces render at <code>--color-neutral-1</code> (#ffffff / #141414).
+      </p>
+      <p>
+        This isn't arbitrary. Chrome is infrastructure — it should recede. Content is what the user came for — it should advance. The 10-tier neutral scale (1=lightest to 10=darkest) is the mechanical implementation of this principle, and it inverts cleanly in dark mode.
+      </p>
+
+      <div class="pull-quote">
+        <p>"Chrome is infrastructure. It should recede. Content is what the user came for — it should advance."</p>
+      </div>
+
+      <h2>Spring physics everywhere</h2>
+      <p>
+        Every interactive motion in Cradle uses spring physics rather than CSS transitions. The default spring configuration is stiffness 600, damping 40 — snappy but not jittery. Message entrances use 500/35 for a slightly warmer feel that suits conversational content.
+      </p>
+      <p>
+        CSS transitions (ease-in-out, linear) reveal the seams of a UI — they feel like animations. Spring physics approximates physical motion — the user's brain reads it as "real." This is especially important in an AI environment where content appearance is unpredictable and fast.
+      </p>
+
+      <pre><code>// Spring configuration — all interactive motion
+const spring = { type: 'spring', stiffness: 600, damping: 40 }
+
+// Message entrance — slightly softer
+const messageSpring = {
+  type: 'spring',
+  stiffness: 500,
+  damping: 35,
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+}</code></pre>
+
+      <h2>Semantic accent colors</h2>
+      <p>
+        Cradle deals with several categories of AI content: workspace sessions, built-in agents, global context, document scopes. Each category has a dedicated accent color. Users learn to associate <code>#8b5cf6</code> (purple) with sessions, <code>#f43f5e</code> (rose) with agents, <code>#10b981</code> (emerald) with workspace scope.
+      </p>
+      <p>
+        This is the opposite of decorative color usage. The accent palette is a closed semantic system — colors are not chosen for aesthetics but for category disambiguation at a glance.
+      </p>
+
+      <h2>Surface texture, not elevation</h2>
+      <p>
+        Cradle does not use elevation shadows (drop shadows that make components look like they're floating). The "floating card" pattern is a web UI convention that feels wrong in a dense desktop environment.
+      </p>
+      <p>
+        Instead, Cradle uses surface texture — subtle inset shadows that make surfaces feel physically present without suggesting levitation. The difference is a matter of a few CSS values, but it changes the entire feel of the interface from "web-like" to "native-like."
+      </p>
+    </article>
+
+    <footer class="page-footer">
+      <span class="page-footer-left">Cradle · Design System Documentation</span>
+      <span class="page-footer-right">v0.1-alpha · 2026</span>
+    </footer>
+  </div>
+</body>
+</html>

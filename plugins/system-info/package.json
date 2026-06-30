@@ -1,0 +1,58 @@
+{
+  "name": "@cradle/system-info",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "System Info",
+    "description": "Exposes system information via API and web command",
+    "server": "dist/server.mjs",
+    "web": "dist/web.mjs",
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "route.info",
+          "type": "server-route",
+          "layer": "server",
+          "label": "System info API",
+          "description": "Exposes GET /info under the plugin route segment.",
+          "permissions": ["system.read"]
+        },
+        {
+          "id": "panel.system-info",
+          "type": "web-panel",
+          "layer": "web",
+          "label": "System Info panel",
+          "permissions": []
+        },
+        {
+          "id": "command.show",
+          "type": "web-command",
+          "layer": "web",
+          "label": "Show System Info",
+          "permissions": []
+        }
+      ],
+      "permissions": [
+        {
+          "id": "system.read",
+          "label": "Read local system information",
+          "required": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@mingcute/react": "^1.4.1",
+    "@types/react": "^19.2.1",
+    "@vitejs/plugin-react": "^5.1.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "vite": "^8.0.0"
+  }
+}

@@ -4,7 +4,7 @@
 
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import { Download } from 'lucide-react'
+import { DownloadLine as Download } from '@mingcute/react'
 import { useEffect, useRef, useState } from 'react'
 import { ThemeToggle } from './blueprint-annotations'
 
@@ -73,31 +73,6 @@ export function Nav() {
             Cradle
           </span>
         </a>
-
-        {/* Center nav */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <a
-            href="#/changelog"
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--text-secondary)',
-              textDecoration: 'none',
-              padding: '4px 10px',
-              transition: 'color 0.15s, background 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text)'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = 'var(--fill-hover)'
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
-            }}
-          >
-            Changelog
-          </a>
-        </div>
 
         {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

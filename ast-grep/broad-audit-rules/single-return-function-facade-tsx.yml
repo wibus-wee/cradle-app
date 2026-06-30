@@ -1,0 +1,8 @@
+id: single-return-function-facade-tsx
+language: TSX
+severity: hint
+message: Function body only returns one expression; verify it owns semantics instead of naming a pass-through projection.
+rule:
+  any:
+    - pattern: 'function $FUNC($$$ARGS) { return $$$EXPR }'
+    - pattern: 'function $FUNC($$$ARGS): $RET { return $$$EXPR }'

@@ -1,0 +1,93 @@
+<!--
+  Output: Dark abstract onboarding background for the Cradle web app.
+  Input: Text-safe background guidance from /Users/wibus/dev/SKILL and the Cradle landing page palette.
+  Position: Owned by features/onboarding; referenced by the development-only onboarding overlay.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none">
+  <defs>
+    <linearGradient id="base" x1="188" y1="32" x2="1652" y2="1128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08090D"/>
+      <stop offset="0.38" stop-color="#101015"/>
+      <stop offset="0.7" stop-color="#090A0F"/>
+      <stop offset="1" stop-color="#15110F"/>
+    </linearGradient>
+    <linearGradient id="ribbonA" x1="261" y1="188" x2="1650" y2="750" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#67E8F9" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#67E8F9" stop-opacity="0.48"/>
+      <stop offset="0.48" stop-color="#FDE68A" stop-opacity="0.32"/>
+      <stop offset="0.76" stop-color="#FB7185" stop-opacity="0.48"/>
+      <stop offset="1" stop-color="#FB7185" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ribbonB" x1="1626" y1="224" x2="255" y2="846" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A7F3D0" stop-opacity="0"/>
+      <stop offset="0.21" stop-color="#A7F3D0" stop-opacity="0.44"/>
+      <stop offset="0.53" stop-color="#93C5FD" stop-opacity="0.3"/>
+      <stop offset="0.83" stop-color="#F0ABFC" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#F0ABFC" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="warmHaze" x1="1436" y1="143" x2="603" y2="1018" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F59E0B" stop-opacity="0.34"/>
+      <stop offset="0.46" stop-color="#22D3EE" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#10B981" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="centerLift" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1120 498) rotate(124) scale(738 1094)">
+      <stop stop-color="#F8FAFC" stop-opacity="0.04"/>
+      <stop offset="0.44" stop-color="#22D3EE" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(960 520) rotate(90) scale(610 1010)">
+      <stop offset="0.54" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="0.8" stop-color="#000000" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.82"/>
+    </radialGradient>
+    <filter id="softGlow" x="-240" y="-240" width="2400" height="1560" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="38"/>
+    </filter>
+    <filter id="deepGlow" x="-360" y="-360" width="2640" height="1800" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="72"/>
+    </filter>
+    <filter id="filmGrain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.18"/>
+      </feComponentTransfer>
+    </filter>
+    <pattern id="microGrid" width="72" height="72" patternUnits="userSpaceOnUse">
+      <path d="M72 0H0V72" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
+      <path d="M24 0V72M48 0V72M0 24H72M0 48H72" stroke="white" stroke-opacity="0.025" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#base)"/>
+  <rect width="1920" height="1080" fill="url(#centerLift)"/>
+  <rect width="1920" height="1080" fill="url(#microGrid)" opacity="0.36"/>
+
+  <g filter="url(#deepGlow)" opacity="0.46">
+    <path d="M-118 300C164 144 455 142 755 254C1107 386 1358 384 1651 206C1777 129 1885 105 2018 122" stroke="url(#ribbonA)" stroke-width="118" stroke-linecap="round"/>
+    <path d="M-95 873C200 765 449 753 704 838C990 934 1223 899 1498 693C1713 532 1864 492 2046 559" stroke="url(#ribbonB)" stroke-width="148" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#softGlow)" opacity="0.56">
+    <path d="M-90 415C210 279 485 288 737 410C1007 540 1249 545 1564 354C1743 245 1898 234 2033 302" stroke="url(#ribbonA)" stroke-width="36" stroke-linecap="round"/>
+    <path d="M-112 778C164 672 414 688 694 768C989 853 1242 814 1531 604C1738 453 1884 431 2026 495" stroke="url(#ribbonB)" stroke-width="42" stroke-linecap="round"/>
+    <path d="M1078 -78C1264 85 1371 252 1399 425C1438 667 1322 844 1129 1132" stroke="url(#warmHaze)" stroke-width="150" stroke-linecap="round"/>
+  </g>
+
+  <g opacity="0.84">
+    <path d="M232 253C492 148 685 226 902 349C1123 474 1315 477 1589 329" stroke="white" stroke-opacity="0.13" stroke-width="1.5"/>
+    <path d="M314 828C520 773 724 828 904 884C1149 960 1335 908 1541 732" stroke="white" stroke-opacity="0.11" stroke-width="1.5"/>
+    <path d="M1171 63C1318 218 1353 404 1314 606C1275 809 1178 963 1062 1105" stroke="#FDE68A" stroke-opacity="0.13" stroke-width="1.5"/>
+  </g>
+
+  <g opacity="0.9">
+    <path d="M405 232L476 274L559 251L632 303" stroke="#67E8F9" stroke-opacity="0.32" stroke-width="1.5"/>
+    <path d="M1294 745L1370 685L1452 707L1522 639" stroke="#A7F3D0" stroke-opacity="0.28" stroke-width="1.5"/>
+    <path d="M1184 241L1248 319L1328 304L1399 379" stroke="#FB7185" stroke-opacity="0.26" stroke-width="1.5"/>
+    <path d="M590 792L673 829L760 797L842 848" stroke="#FDE68A" stroke-opacity="0.23" stroke-width="1.5"/>
+  </g>
+
+  <rect width="1920" height="1080" fill="url(#vignette)"/>
+  <rect width="1920" height="1080" filter="url(#filmGrain)" opacity="0.42" style="mix-blend-mode:soft-light"/>
+  <rect x="0.5" y="0.5" width="1919" height="1079" stroke="white" stroke-opacity="0.06"/>
+</svg>

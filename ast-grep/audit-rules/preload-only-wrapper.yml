@@ -1,0 +1,11 @@
+id: preload-only-wrapper
+language: TypeScript
+severity: warning
+message: Preload function only delegates to a loader; verify this wrapper still carries route/tab ownership.
+rule:
+  any:
+    - pattern: 'function $FUNC($$$ARGS) { void $LOADER($$$CALL_ARGS) }'
+    - pattern: 'function $FUNC($$$ARGS): void { void $LOADER($$$CALL_ARGS) }'
+constraints:
+  FUNC:
+    regex: ^preload[A-Z].*

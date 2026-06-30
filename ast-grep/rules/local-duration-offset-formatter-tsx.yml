@@ -1,0 +1,15 @@
+id: local-duration-offset-formatter-tsx
+language: TSX
+severity: warning
+message: Local duration offset formatter hand-rolls colon notation; use a duration formatting package or a shared owner.
+rule:
+  pattern: |
+    function $FUNC($PARAM: number): string {
+      const $TOTAL = Math.max(0, Math.floor($PARAM / 1000))
+      const $MINUTES = Math.floor($TOTAL / 60)
+      const $SECONDS = $TOTAL % 60
+      return `${String($MINUTES).padStart(2, '0')}:${String($SECONDS).padStart(2, '0')}`
+    }
+constraints:
+  FUNC:
+    regex: ^(format|read|to|as|normalize|map|build)[A-Z].*

@@ -1,0 +1,2 @@
+export const CENTER_COLUMN_EXPANDED_SCALE = 0.98
+export const CENTER_COLUMN_EXPANDED_Y = -7

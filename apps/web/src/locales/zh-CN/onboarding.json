@@ -1,0 +1,18 @@
+{
+  "brand.name": "Cradle",
+  "brand.tagline": "One layer above your AI tools.",
+  "credentials.welcomeTitle": "Welcome to Cradle!",
+  "credentials.description": "先连接一个 Provider。选择一个 Provider 开始使用 Cradle。",
+  "credentials.ccSwitch.description": "使用 CC-Switch 中已有的 Provider — 无需导入。",
+  "credentials.ready": "就绪",
+  "credentials.skip": "暂时跳过",
+  "credentials.openSettings": "打开设置",
+  "credentials.toast.opening.title": "正在打开 Provider 设置",
+  "credentials.toast.opening.description": "添加 API Key 即可开始使用。",
+  "credentials.toast.ccSwitch.title": "CC-Switch 已连接",
+  "credentials.toast.ccSwitch.description": "已有的 Provider 可以直接使用。",
+  "credentials.providers.anthropic.tagline": "Anthropic 官方 Claude API 或消息 API",
+  "credentials.providers.openai.tagline": "OpenAI Responses API 或 Codex 官方账号",
+  "credentials.providers.universal.tagline": "支持 OpenAI 和 Anthropic 的自定义端点",
+  "nav.continueHint": "即可继续"
+}

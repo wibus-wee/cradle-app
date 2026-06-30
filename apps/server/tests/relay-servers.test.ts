@@ -1,0 +1,439 @@
+import { randomUUID } from 'node:crypto'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { agentCredentials, providerTargets } from '@cradle/db'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { createServerApp } from '../src/app'
+import { db, shutdownInfra } from '../src/infra'
+import { getRuntimeRegistry } from '../src/modules/chat-runtime/chat-runtime-provider-registry'
+import { createRemoteMockProvider } from '../src/modules/chat-runtime-providers/remote-mock/provider'
+import { shouldStartManagedLocalRelayd, startManagedLocalRelayd, stopManagedLocalRelayd } from '../src/modules/relay-servers/local-relayd-supervisor'
+
+type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
+
+function makeTempDir(prefix: string): string {
+  return mkdtempSync(join(tmpdir(), prefix))
+}
+
+function restoreEnv(name: string, previousValue: string | undefined): void {
+  if (previousValue === undefined) {
+    delete process.env[name]
+    return
+  }
+  process.env[name] = previousValue
+}
+
+function writeFakeRelaydExecutable(dir: string, name = 'fake-relayd.cjs'): string {
+  mkdirSync(dir, { recursive: true })
+  const executablePath = join(dir, name)
+  writeFileSync(executablePath, `#!/usr/bin/env node
+const http = require('node:http')
+const listen = process.env.CRADLE_RELAYD_LISTEN || '127.0.0.1:0'
+const index = listen.lastIndexOf(':')
+const host = listen.slice(0, index)
+const port = Number(listen.slice(index + 1))
+const server = http.createServer((req, res) => {
+  if (req.url === '/healthz' || req.url === '/readyz') {
+    res.writeHead(200, { 'content-type': 'text/plain' })
+    res.end('ok')
+    return
+  }
+  if (req.url === '/secret') {
+    res.writeHead(200, { 'content-type': 'text/plain' })
+    res.end(process.env.CRADLE_RELAYD_DEV_HMAC_SECRET || '')
+    return
+  }
+  res.writeHead(404, { 'content-type': 'text/plain' })
+  res.end('not found')
+})
+server.listen(port, host)
+function shutdown() {
+  server.close(() => process.exit(0))
+  setTimeout(() => process.exit(0), 1000).unref()
+}
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
+`)
+  chmodSync(executablePath, 0o755)
+  return executablePath
+}
+
+async function createAppWithDataDir(dataDir: string): Promise<ElysiaApp> {
+  process.env.CRADLE_DATA_DIR = dataDir
+  const app = await createServerApp()
+  const registry = getRuntimeRegistry()
+  if (!registry.get('remote-mock')) {
+    registry.register(createRemoteMockProvider({
+      readSecret: () => '',
+    }))
+  }
+  return app
+}
+
+interface RelayServerView {
+  id: string
+  displayName: string
+  relayUrl: string
+  enabled: boolean
+  isDefault: boolean
+}
+
+async function createRelayServer(app: ElysiaApp, input: {
+  id?: string
+  displayName: string
+  relayUrl: string
+  isDefault?: boolean
+  enabled?: boolean
+}): Promise<RelayServerView> {
+  const res = await app.handle(new Request('http://localhost/relay-servers', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      id: input.id,
+      displayName: input.displayName,
+      relayUrl: input.relayUrl,
+      isDefault: input.isDefault,
+      enabled: input.enabled,
+    }),
+  }))
+  expect(res.status).toBe(200)
+  return await res.json() as RelayServerView
+}
+
+async function createPendingRelayHost(app: ElysiaApp, hostId: string): Promise<void> {
+  const res = await app.handle(new Request('http://localhost/remote-hosts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      id: hostId,
+      displayName: hostId,
+      enabled: true,
+      connectionConfig: { transport: 'relay' },
+    }),
+  }))
+  expect(res.status).toBe(200)
+}
+
+describe('relay servers', () => {
+  afterEach(() => {
+    shutdownInfra()
+  })
+
+  it('does not autostart managed local relayd in test or production by default', () => {
+    const previousNodeEnv = process.env.NODE_ENV
+    const previousCradleEnv = process.env.CRADLE_ENV
+    const previousAutostart = process.env.CRADLE_RELAYD_AUTOSTART
+
+    try {
+      delete process.env.CRADLE_RELAYD_AUTOSTART
+      process.env.NODE_ENV = 'development'
+      process.env.CRADLE_ENV = 'production'
+      expect(shouldStartManagedLocalRelayd()).toBe(false)
+
+      process.env.NODE_ENV = 'production'
+      delete process.env.CRADLE_ENV
+      expect(shouldStartManagedLocalRelayd()).toBe(false)
+
+      process.env.NODE_ENV = 'test'
+      expect(shouldStartManagedLocalRelayd()).toBe(false)
+
+      process.env.CRADLE_RELAYD_AUTOSTART = '1'
+      expect(shouldStartManagedLocalRelayd()).toBe(true)
+    }
+    finally {
+      restoreEnv('NODE_ENV', previousNodeEnv)
+      restoreEnv('CRADLE_ENV', previousCradleEnv)
+      restoreEnv('CRADLE_RELAYD_AUTOSTART', previousAutostart)
+    }
+  })
+
+  it('creates, lists, updates, and deletes relay servers', async () => {
+    const dataDir = makeTempDir('cradle-relay-servers-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      app = await createAppWithDataDir(dataDir)
+
+      const created = await createRelayServer(app, {
+        displayName: 'Official relay',
+        relayUrl: 'https://relay.example.com',
+      })
+      expect(created.id).toBeTruthy()
+      expect(created.isDefault).toBe(false)
+      expect(created.enabled).toBe(true)
+
+      const listRes = await app.handle(new Request('http://localhost/relay-servers'))
+      expect(listRes.status).toBe(200)
+      expect(await listRes.json()).toEqual([created])
+
+      const updateRes = await app.handle(new Request(`http://localhost/relay-servers/${created.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ displayName: 'Renamed relay' }),
+      }))
+      expect(updateRes.status).toBe(200)
+      expect((await updateRes.json() as RelayServerView).displayName).toBe('Renamed relay')
+
+      const deleteRes = await app.handle(new Request(`http://localhost/relay-servers/${created.id}`, { method: 'DELETE' }))
+      expect(deleteRes.status).toBe(200)
+
+      const afterDelete = await app.handle(new Request('http://localhost/relay-servers'))
+      expect(await afterDelete.json()).toEqual([])
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('keeps at most one default relay server', async () => {
+    const dataDir = makeTempDir('cradle-relay-servers-default-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      app = await createAppWithDataDir(dataDir)
+
+      const first = await createRelayServer(app, {
+        displayName: 'Relay A',
+        relayUrl: 'https://a.example.com',
+        isDefault: true,
+      })
+      const second = await createRelayServer(app, {
+        displayName: 'Relay B',
+        relayUrl: 'https://b.example.com',
+        isDefault: true,
+      })
+
+      // Promoting B to default must demote A.
+      const list = await (await app.handle(new Request('http://localhost/relay-servers'))).json() as RelayServerView[]
+      const a = list.find(s => s.id === first.id)
+      const b = list.find(s => s.id === second.id)
+      expect(a?.isDefault).toBe(false)
+      expect(b?.isDefault).toBe(true)
+      expect(list[0]?.id).toBe(second.id)
+
+      // Promoting A back demotes B via an update.
+      await app.handle(new Request(`http://localhost/relay-servers/${first.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ isDefault: true }),
+      }))
+      const list2 = await (await app.handle(new Request('http://localhost/relay-servers'))).json() as RelayServerView[]
+      expect(list2.find(s => s.id === first.id)?.isDefault).toBe(true)
+      expect(list2.find(s => s.id === second.id)?.isDefault).toBe(false)
+      expect(list2[0]?.id).toBe(first.id)
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('pairs a relay host through a configured relay server id', async () => {
+    const dataDir = makeTempDir('cradle-relay-servers-pairing-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousCredentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
+    const previousRelaySecret = process.env.CRADLE_RELAY_HMAC_SECRET
+    const previousRelayDevSecret = process.env.CRADLE_RELAYD_DEV_HMAC_SECRET
+    let app: ElysiaApp | undefined
+
+    try {
+      process.env.CRADLE_CREDENTIAL_SECRET = 'remote-relay-credential-secret'
+      delete process.env.CRADLE_RELAY_HMAC_SECRET
+      delete process.env.CRADLE_RELAYD_DEV_HMAC_SECRET
+      app = await createAppWithDataDir(dataDir)
+
+      const relayUrl = `http://127.0.0.1:${randomPort()}/`
+      const server = await createRelayServer(app, {
+        displayName: 'Pairing relay',
+        relayUrl,
+        isDefault: true,
+      })
+      await createPendingRelayHost(app, 'remote-host-relay-server-pairing')
+
+      // Pairing token request carries the relay server id, not a URL.
+      const tokenRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-relay-server-pairing/relay/pairing-token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ relayServerId: server.id, ttlMs: 60_000 }),
+      }))
+      expect(tokenRes.status).toBe(200)
+      const token = await tokenRes.json() as {
+        relayUrl: string
+        relayServerId: string | null
+        pairingToken: string
+        roomId: string
+      }
+      // The resolved URL comes from the relay server, and the id is echoed back.
+      expect(token.relayUrl).toBe(relayUrl)
+      expect(token.relayServerId).toBe(server.id)
+      expect(token.pairingToken).toBeTruthy()
+
+      // A pending relay host with no relay server and no default must error.
+      const noDefaultApp = app
+      await createPendingRelayHost(noDefaultApp, 'remote-host-no-relay')
+      // Delete the default so there is nothing to fall back to.
+      await noDefaultApp.handle(new Request(`http://localhost/relay-servers/${server.id}`, { method: 'DELETE' }))
+      const errRes = await noDefaultApp.handle(new Request('http://localhost/remote-hosts/remote-host-no-relay/relay/pairing-token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ttlMs: 60_000 }),
+      }))
+      expect(errRes.status).toBe(400)
+
+      // The relay HMAC signing key is provisioned as a hidden system secret.
+      expect(db().select().from(agentCredentials).all()).toEqual([
+        expect.objectContaining({
+          id: 'system:remote-relay-hmac:v1',
+          kind: 'system-relay-hmac-secret',
+        }),
+      ])
+      expect(db().select().from(providerTargets).all()).toHaveLength(0)
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_CREDENTIAL_SECRET', previousCredentialSecret)
+      restoreEnv('CRADLE_RELAY_HMAC_SECRET', previousRelaySecret)
+      restoreEnv('CRADLE_RELAYD_DEV_HMAC_SECRET', previousRelayDevSecret)
+    }
+  })
+
+  it('starts a managed local relayd and keeps an explicit relay server default', async () => {
+    const dataDir = makeTempDir('cradle-managed-local-relayd-')
+    const binDir = makeTempDir('cradle-managed-local-relayd-bin-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousAutostart = process.env.CRADLE_RELAYD_AUTOSTART
+    const previousRelaydPath = process.env.CRADLE_RELAYD_PATH
+    const previousRelaydListen = process.env.CRADLE_RELAYD_LISTEN
+    const previousRelaydPublicUrl = process.env.CRADLE_RELAYD_PUBLIC_URL
+    let app: ElysiaApp | undefined
+
+    try {
+      process.env.CRADLE_RELAYD_AUTOSTART = '1'
+      process.env.CRADLE_RELAYD_PATH = writeFakeRelaydExecutable(binDir)
+      delete process.env.CRADLE_RELAYD_LISTEN
+      delete process.env.CRADLE_RELAYD_PUBLIC_URL
+      app = await createAppWithDataDir(dataDir)
+
+      await startManagedLocalRelayd()
+      const firstList = await (await app.handle(new Request('http://localhost/relay-servers'))).json() as RelayServerView[]
+      const localRelay = firstList.find(server => server.id === 'system:local-relayd')
+      expect(localRelay).toEqual(expect.objectContaining({
+        displayName: 'Built-in local relay',
+        enabled: true,
+        isDefault: true,
+      }))
+      expect(localRelay?.relayUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
+
+      const explicitRelay = await createRelayServer(app, {
+        displayName: 'Public relay',
+        relayUrl: 'https://relay.example.test',
+        isDefault: true,
+      })
+      await stopManagedLocalRelayd()
+      await startManagedLocalRelayd()
+
+      const secondList = await (await app.handle(new Request('http://localhost/relay-servers'))).json() as RelayServerView[]
+      expect(secondList.find(server => server.id === explicitRelay.id)?.isDefault).toBe(true)
+      expect(secondList.find(server => server.id === 'system:local-relayd')?.isDefault).toBe(false)
+    }
+    finally {
+      await stopManagedLocalRelayd()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(binDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_RELAYD_AUTOSTART', previousAutostart)
+      restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
+      restoreEnv('CRADLE_RELAYD_LISTEN', previousRelaydListen)
+      restoreEnv('CRADLE_RELAYD_PUBLIC_URL', previousRelaydPublicUrl)
+    }
+  })
+
+  it('injects the server relay HMAC secret into managed local relayd', async () => {
+    const dataDir = makeTempDir('cradle-managed-local-relayd-secret-')
+    const binDir = makeTempDir('cradle-managed-local-relayd-secret-bin-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousAutostart = process.env.CRADLE_RELAYD_AUTOSTART
+    const previousRelaydPath = process.env.CRADLE_RELAYD_PATH
+    const previousRelaySecret = process.env.CRADLE_RELAY_HMAC_SECRET
+    const previousRelayDevSecret = process.env.CRADLE_RELAYD_DEV_HMAC_SECRET
+    let app: ElysiaApp | undefined
+
+    try {
+      process.env.CRADLE_RELAYD_AUTOSTART = '1'
+      process.env.CRADLE_RELAYD_PATH = writeFakeRelaydExecutable(binDir)
+      process.env.CRADLE_RELAY_HMAC_SECRET = 'server-managed-local-relayd-secret'
+      delete process.env.CRADLE_RELAYD_DEV_HMAC_SECRET
+      app = await createAppWithDataDir(dataDir)
+
+      await startManagedLocalRelayd()
+      const list = await (await app.handle(new Request('http://localhost/relay-servers'))).json() as RelayServerView[]
+      const localRelay = list.find(server => server.id === 'system:local-relayd')
+      expect(localRelay?.relayUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
+
+      const secretRes = await fetch(`${localRelay?.relayUrl}/secret`)
+      expect(secretRes.status).toBe(200)
+      expect(await secretRes.text()).toBe('server-managed-local-relayd-secret')
+    }
+    finally {
+      await stopManagedLocalRelayd()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(binDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_RELAYD_AUTOSTART', previousAutostart)
+      restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
+      restoreEnv('CRADLE_RELAY_HMAC_SECRET', previousRelaySecret)
+      restoreEnv('CRADLE_RELAYD_DEV_HMAC_SECRET', previousRelayDevSecret)
+    }
+  })
+
+  it('starts managed local relayd from the packaged desktop resource path', async () => {
+    const dataDir = makeTempDir('cradle-managed-local-relayd-packaged-')
+    const resourcesDir = makeTempDir('cradle-managed-local-relayd-resources-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousAutostart = process.env.CRADLE_RELAYD_AUTOSTART
+    const previousRelaydPath = process.env.CRADLE_RELAYD_PATH
+    const previousResourcesPath = (process as { resourcesPath?: string }).resourcesPath
+    let app: ElysiaApp | undefined
+
+    try {
+      process.env.CRADLE_RELAYD_AUTOSTART = '1'
+      delete process.env.CRADLE_RELAYD_PATH
+      ;(process as { resourcesPath?: string }).resourcesPath = resourcesDir
+      const executableName = process.platform === 'win32' ? 'relayd.exe' : 'relayd'
+      const relaydResourceDir = join(resourcesDir, 'relayd', `${process.platform}-${process.arch}`)
+      writeFakeRelaydExecutable(relaydResourceDir, executableName)
+      app = await createAppWithDataDir(dataDir)
+
+      await startManagedLocalRelayd()
+      const list = await (await app.handle(new Request('http://localhost/relay-servers'))).json() as RelayServerView[]
+      expect(list.find(server => server.id === 'system:local-relayd')).toEqual(expect.objectContaining({
+        displayName: 'Built-in local relay',
+        enabled: true,
+        isDefault: true,
+      }))
+    }
+    finally {
+      await stopManagedLocalRelayd()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(resourcesDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_RELAYD_AUTOSTART', previousAutostart)
+      restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
+      ;(process as { resourcesPath?: string }).resourcesPath = previousResourcesPath
+    }
+  })
+})
+
+function randomPort(): number {
+  // A random high port for a URL that the pairing-token flow never actually
+  // connects to (the fake relay is not started here — the token mint is what we
+  // assert). Randomizing avoids collisions across parallel test runs.
+  return 30_000 + Math.floor(Number.parseInt(randomUUID().slice(0, 4), 16) / 65535 * 30_000)
+}

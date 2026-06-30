@@ -1,0 +1,7 @@
+id: compatibility-comment-marker
+language: TypeScript
+severity: hint
+message: Comment explicitly mentions legacy/deprecated compatibility debt; verify it is still wanted.
+rule:
+  kind: comment
+  regex: (?i)(deprecated|deprecation|backwards?-compat(?:ible|ibility)|backwards?\s+compatibility|compatibility\s+(re-export|export|shim|path|wrapper)|compat(?:ible)?\s+(shim|path|wrapper)|old\s+(helper|path|api|surface|entry|wrapper|di\s+consumers)|transitional)

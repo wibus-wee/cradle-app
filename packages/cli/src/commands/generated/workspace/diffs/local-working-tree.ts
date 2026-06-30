@@ -1,0 +1,36 @@
+import { registerOperationCommand } from '../../../../runtime/operation-command'
+import type { CliOperationSpec } from '../../../../runtime/types'
+import type { Command } from 'commander'
+
+const spec = {
+  "arguments": [
+    {
+      "description": "Defaults to CRADLE_WORKSPACE_ID.",
+      "name": "workspaceId",
+      "required": true,
+      "target": "path.workspaceId",
+      "type": "string",
+      "envDefault": "CRADLE_WORKSPACE_ID"
+    }
+  ],
+  "command": [
+    "workspace",
+    "diffs",
+    "local-working-tree"
+  ],
+  "description": "Create or refresh local working tree diff review",
+  "flags": [
+    {
+      "name": "repo",
+      "required": false,
+      "target": "body.repo",
+      "type": "string"
+    }
+  ],
+  "method": "post",
+  "path": "/workspaces/{workspaceId}/diff-reviews/local-working-tree"
+} satisfies CliOperationSpec
+
+export function register(program: Command): void {
+  registerOperationCommand(program, spec)
+}

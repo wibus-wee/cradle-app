@@ -1,0 +1,11 @@
+id: service-pass-through-wrapper
+language: TypeScript
+severity: hint
+message: Function only returns another object's method call; verify this module owns the semantics rather than re-exporting another owner.
+rule:
+  all:
+    - pattern: function $FUNC($$$ARGS) { return $TARGET.$METHOD($$$CALL_ARGS) }
+    - not:
+        pattern: function $FUNC($$$ARGS) { return import($PATH).then($CALLBACK) }
+    - not:
+        pattern: function $FUNC($$$ARGS) { return Promise.resolve($VALUE) }

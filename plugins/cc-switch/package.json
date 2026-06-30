@@ -1,0 +1,47 @@
+{
+  "name": "@cradle/cc-switch",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "CC Switch",
+    "description": "Mirrors CC Switch providers through Cradle external provider sources",
+    "icon": "assets/icon.png",
+    "server": "dist/server.mjs",
+    "deployments": ["desktop"],
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "external-provider-source.cc-switch",
+          "type": "external-provider-source",
+          "layer": "server",
+          "label": "CC Switch provider source",
+          "permissions": ["filesystem.cc-switch.read"]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "filesystem.cc-switch.read",
+          "label": "Read CC Switch local configuration",
+          "required": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.1",
+    "smol-toml": "^1.6.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.19.1",
+    "vite": "^8.0.0"
+  }
+}

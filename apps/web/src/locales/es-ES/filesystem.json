@@ -1,0 +1,8 @@
+{
+  "action.cancel": "Cancelar",
+  "action.select": "Seleccionar",
+  "directory.empty": "Directorio vacío",
+  "directory.error": "No se puede acceder a esta ruta",
+  "directory.listing": "Directorios",
+  "directory.title": "Elegir directorio"
+}

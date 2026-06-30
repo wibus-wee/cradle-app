@@ -1,0 +1,9 @@
+id: local-number-formatter-tsx
+language: TSX
+severity: warning
+message: Local number formatter only switches between String and toFixed; inline it or move number formatting to a shared owner.
+rule:
+  pattern: 'function $FUNC($PARAM: number): string { return Number.isInteger($PARAM) ? String($PARAM) : $PARAM.toFixed($DIGITS) }'
+constraints:
+  FUNC:
+    regex: ^(format|read|to|as|normalize|map)[A-Z].*

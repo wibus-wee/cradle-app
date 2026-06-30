@@ -1,2 +1,22 @@
 packages:
+  - packages/*
   - apps/*
+  - plugins/*
+  - documentations
+allowBuilds:
+  '@google/genai': true
+  '@swc/core': true
+  better-sqlite3: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  fs-xattr: true
+  macos-alias: true
+  msw: true
+  node-pty: true
+  protobufjs: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - '@hijarvis/core@0.1.0'
+patchedDependencies:
+  '@elysiajs/node@1.4.5': patches/@elysiajs__node@1.4.5.patch

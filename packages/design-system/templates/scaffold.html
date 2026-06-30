@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+  Cradle Design System — Mockup Scaffold
+
+  HOW TO USE:
+  1. Drop snippets from templates/snippets/ into <main class="mockup-shell">.
+  2. Open in a browser to preview with the light/dark toggle.
+
+  RULES:
+  - Never use raw hex values in HTML attributes or styles outside this <style> block.
+  - Never use Tailwind's built-in neutral color classes — use var(--color-neutral-N).
+  - Font faces must come from var(--font-*) only.
+-->
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cradle Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    :root {
+      --color-neutral-1: #ffffff;
+      --color-neutral-2: #f5f5f5;
+      --color-neutral-3: #ebebeb;
+      --color-neutral-4: #d4d4d4;
+      --color-neutral-5: #a3a3a3;
+      --color-neutral-6: #737373;
+      --color-neutral-7: #595959;
+      --color-neutral-8: #404040;
+      --color-neutral-9: #262626;
+      --color-neutral-10: #141414;
+      --color-accent: #3b82f6;
+      --color-paper: #ffffff;
+      --color-border: rgba(0, 0, 0, 0.08);
+      --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    }
+
+    [data-theme='dark'] {
+      --color-neutral-1: #141414;
+      --color-neutral-2: #111111;
+      --color-neutral-3: #1a1a1a;
+      --color-neutral-4: #2a2a2a;
+      --color-neutral-5: #404040;
+      --color-neutral-6: #8a8a8a;
+      --color-neutral-7: #a3a3a3;
+      --color-neutral-8: #d4d4d4;
+      --color-neutral-9: #f5f5f5;
+      --color-neutral-10: #ffffff;
+      --color-paper: #141414;
+      --color-border: rgba(255, 255, 255, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--color-paper);
+      color: var(--color-neutral-9);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mockup-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .toolbar {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 100;
+      background: var(--color-neutral-2);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-neutral-7);
+    }
+
+    .toolbar button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+      font: inherit;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .toolbar button:hover {
+      background: var(--color-neutral-3);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toolbar">
+    <button
+      onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">
+      light · dark
+    </button>
+  </div>
+
+  <main class="mockup-shell">
+    <!--
+      Drop snippets from templates/snippets/ here.
+      Snippets use only the CSS vars declared above — no raw hex, no hardcoded fonts.
+
+      Available snippets:
+        hero.html             — title, tagline, CTA
+        list-card.html        — card grid or list
+        form.html             — input, label, button
+        modal.html            — dialog overlay
+        sheet.html            — right-side panel
+        code-block.html       — syntax-highlighted code
+        stat-grid.html        — metrics/stats layout
+        comment-thread.html   — comment UI
+    -->
+  </main>
+</body>
+
+</html>

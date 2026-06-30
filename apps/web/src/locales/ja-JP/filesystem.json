@@ -1,0 +1,8 @@
+{
+  "action.cancel": "キャンセル",
+  "action.select": "選択",
+  "directory.empty": "空のディレクトリ",
+  "directory.error": "このパスにアクセスできません",
+  "directory.listing": "ディレクトリ",
+  "directory.title": "ディレクトリを選択"
+}

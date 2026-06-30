@@ -1,0 +1,13 @@
+id: local-clamp-helper
+language: TypeScript
+severity: warning
+message: Local clamp helper hand-rolls bounded numeric math; use es-toolkit clamp or a shared numeric owner.
+rule:
+  any:
+    - pattern: 'function $FUNC($PARAM: number): number { return Math.min($MAX, Math.max($MIN, $PARAM)) }'
+    - pattern: 'function $FUNC($PARAM: number): number { return Math.max($MIN, Math.min($MAX, $PARAM)) }'
+    - pattern: 'function $FUNC($PARAM: number): number { return Number.isFinite($PARAM) ? Math.min($MAX, Math.max($MIN, $PARAM)) : $FALLBACK }'
+    - pattern: 'function $FUNC($PARAM: number): number { return Number.isFinite($PARAM) ? Math.max($MIN, Math.min($MAX, $PARAM)) : $FALLBACK }'
+constraints:
+  FUNC:
+    regex: ^(clamp|safe|bound|bounded)[A-Z].*

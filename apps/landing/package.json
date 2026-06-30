@@ -11,9 +11,8 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
     "@gsap/react": "^2.1.2",
+    "@mingcute/react": "^1.4.1",
     "gsap": "^3.13.0",
-    "lucide-react": "1.8.0",
-    "marked": "^18.0.5",
     "motion": "^12.38.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

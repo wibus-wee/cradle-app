@@ -1,0 +1,21 @@
+{
+  "branch.checkout.error": "Error al cambiar de rama",
+  "branch.create.cancel": "Cancelar creación de rama",
+  "branch.create.creating": "Creando...",
+  "branch.create.description": "Basado en {{branch}}, crea y cambia a la nueva rama. Pulsa Enter para confirmar.",
+  "branch.create.empty": "Introduce un nombre de rama",
+  "branch.create.named": "Crear \"{{branch}}\"",
+  "branch.fetch": "Obtener ramas",
+  "branch.fetch.title": "fetch --all --prune",
+  "branch.loading": "Cargando...",
+  "branch.local": "Ramas locales",
+  "branch.new": "Nueva rama...",
+  "branch.noMatches": "No hay ramas coincidentes",
+  "branch.remote": "Ramas remotas",
+  "branch.search.placeholder": "Buscar o cambiar de rama...",
+  "panel.emptyCommits": "Aún no hay commits",
+  "panel.emptyWorkspace": "Selecciona primero un Workspace",
+  "panel.error": "No es un repositorio Git o no hay permisos",
+  "panel.fetch": "Obtener actualizaciones de Git",
+  "panel.fetch.title": "Fetch all (--all --prune)"
+}

@@ -1,0 +1,21 @@
+{
+  "branch.checkout.error": "切换分支失败",
+  "branch.create.cancel": "取消创建分支",
+  "branch.create.creating": "创建中...",
+  "branch.create.description": "将基于 {{branch}} 创建并切换分支。按 Enter 确认。",
+  "branch.create.empty": "输入分支名称",
+  "branch.create.named": "创建 \"{{branch}}\"",
+  "branch.fetch": "拉取分支",
+  "branch.fetch.title": "fetch --all --prune",
+  "branch.loading": "加载中...",
+  "branch.local": "本地分支",
+  "branch.new": "新建分支...",
+  "branch.noMatches": "无匹配分支",
+  "branch.remote": "远端分支",
+  "branch.search.placeholder": "搜索或切换分支...",
+  "panel.emptyCommits": "暂无 commit",
+  "panel.emptyWorkspace": "请先选择 Workspace",
+  "panel.error": "不是 Git 仓库或无权限",
+  "panel.fetch": "拉取 Git 更新",
+  "panel.fetch.title": "Fetch all (--all --prune)"
+}

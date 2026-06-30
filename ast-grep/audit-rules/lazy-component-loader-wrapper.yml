@@ -1,0 +1,11 @@
+id: lazy-component-loader-wrapper
+language: TypeScript
+severity: warning
+message: Loader only adapts a component import/default export; verify the loader is still an owned boundary.
+rule:
+  any:
+    - pattern: function $FUNC($$$ARGS) { return import($PATH).then($CALLBACK) }
+    - pattern: function $FUNC($$$ARGS) { return Promise.resolve($VALUE) }
+constraints:
+  FUNC:
+    regex: ^load[A-Z].*

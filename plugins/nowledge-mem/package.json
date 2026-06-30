@@ -1,0 +1,165 @@
+{
+  "name": "@cradle/nowledge-mem",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "Nowledge Mem",
+    "icon": "assets/nowledge-mem-logo.webp",
+    "description": "Official Nowledge Mem adapter for guided memory, Working Memory, thread, and context operations.",
+    "server": "dist/server.mjs",
+    "web": "dist/web.mjs",
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "route.status",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge status",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.config",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge config",
+          "permissions": []
+        },
+        {
+          "id": "panel.config",
+          "type": "web-panel",
+          "layer": "web",
+          "label": "Nowledge Mem Settings",
+          "description": "Connection and runtime settings for the Nowledge Mem adapter.",
+          "permissions": []
+        },
+        {
+          "id": "route.working-memory",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge Working Memory",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.context-bundle",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge Context Bundle",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.memories.search",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge memory search",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.memories",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge memory create",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.memories.create",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge memory create",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads.search",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread search",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread create",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads.create",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread create",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads.:threadId",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread read",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads.read",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread read",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads.:threadId.append",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread append",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "route.threads.append",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Nowledge thread append",
+          "permissions": ["nowledge.network"]
+        },
+        {
+          "id": "skill.nowledge-mem",
+          "type": "skill",
+          "layer": "server",
+          "label": "Nowledge Mem skill",
+          "permissions": []
+        },
+        {
+          "id": "mcp.nowledge-mem",
+          "type": "mcp-server",
+          "layer": "server",
+          "label": "Nowledge Mem MCP server",
+          "permissions": ["nowledge.network"]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "nowledge.network",
+          "label": "Connect to Nowledge Mem API",
+          "required": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "vite build && cp SKILL.md dist/SKILL.md",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@mingcute/react": "^1.4.1",
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.2.1",
+    "@vitejs/plugin-react": "^5.1.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.4"
+  }
+}

@@ -1,0 +1,213 @@
+name: Daily E2E
+
+on:
+  # Run every day at 02:00 UTC (10:00 CST)
+  schedule:
+    - cron: '0 2 * * *'
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Cucumber tags filter (e.g. "@P0 or @P1"). Leave empty for full suite.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  e2e:
+    name: Full E2E Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── Checkout & Setup ──────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      # ── Install Playwright ────────────────────────────────────────────────
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      # ── Run E2E (server auto-starts via BeforeAll hook) ───────────────────
+      - name: Run E2E tests
+        id: e2e
+        # continue-on-error so artifact upload and issue creation always run
+        continue-on-error: true
+        env:
+          NODE_ENV: test
+          CRADLE_CREDENTIAL_SECRET: e2e-test-secret
+        run: |
+          TAGS="${{ github.event.inputs.tags }}"
+          CMD="pnpm exec cucumber-js --config e2e/cucumber.mjs \
+            --format json:e2e/artifacts/cucumber-report.json \
+            --format html:e2e/artifacts/cucumber-report.html"
+          if [ -n "$TAGS" ]; then
+            CMD="$CMD --tags \"$TAGS\""
+          fi
+          eval $CMD
+
+      # ── Upload Artifacts ──────────────────────────────────────────────────
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-${{ github.run_id }}
+          # Includes: HTML report, JSON report, per-scenario screenshots/traces/logs
+          path: e2e/artifacts/
+          retention-days: 14
+
+      # ── Create GitHub Issue on Failure ────────────────────────────────────
+      - name: Create failure issue
+        if: steps.e2e.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACTS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRANCH: ${{ github.ref_name }}
+          TAGS_FILTER: ${{ github.event.inputs.tags || '(full suite)' }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+
+            const runUrl = process.env.RUN_URL
+            const artifactsUrl = process.env.ARTIFACTS_URL
+            const branch = process.env.BRANCH
+            const tagsFilter = process.env.TAGS_FILTER
+            const today = new Date().toISOString().split('T')[0]
+
+            // ── Parse cucumber JSON report ───────────────────────────────
+            let failedScenarios = []
+            let totalScenarios = 0
+            let passedScenarios = 0
+
+            const reportPath = 'e2e/artifacts/cucumber-report.json'
+            if (fs.existsSync(reportPath)) {
+              try {
+                const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+                for (const feature of report) {
+                  for (const element of (feature.elements || [])) {
+                    if (element.type !== 'scenario') continue
+                    totalScenarios++
+                    const steps = element.steps || []
+                    const failed = steps.some(s => s.result?.status === 'failed')
+                    const tags = (element.tags || []).map(t => t.name).join(' ')
+                    if (failed) {
+                      const featureFile = path.basename(feature.uri || 'unknown.feature')
+                      const errorMsg = steps
+                        .filter(s => s.result?.status === 'failed')
+                        .map(s => (s.result?.error_message || '').split('\n')[0])
+                        .join('; ')
+                      failedScenarios.push({
+                        feature: featureFile,
+                        name: element.name,
+                        tags,
+                        error: errorMsg.slice(0, 200),
+                      })
+                    } else {
+                      passedScenarios++
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to parse cucumber JSON report:', e.message)
+              }
+            }
+
+            // ── Build issue body ─────────────────────────────────────────
+            const failedList = failedScenarios.map(s =>
+              `- [ ] **${s.feature}** — ${s.name}\n  > Tags: \`${s.tags || 'none'}\`\n  > Error: ${s.error || '(no error message)'}`
+            ).join('\n')
+
+            const agentPrompt = failedScenarios.map(s =>
+              `- ${s.name} (${s.feature}${s.tags ? ' ' + s.tags : ''})`
+            ).join('\n')
+
+            const body = `## Daily E2E Run Failed — ${today}
+
+            | Field | Value |
+            |-------|-------|
+            | Date | ${today} |
+            | Branch | \`${branch}\` |
+            | Tags filter | \`${tagsFilter}\` |
+            | Result | ❌ ${failedScenarios.length} failed / ${totalScenarios} total (${passedScenarios} passed) |
+            | Run | [View run #${process.env.RUN_ID}](${runUrl}) |
+
+            ## Failed Scenarios
+
+            ${failedScenarios.length > 0 ? failedList : '_No detailed data — check artifacts for raw output._'}
+
+            ## Artifacts
+
+            > Screenshots, Playwright traces, and HTML report are attached to the run.
+
+            - [📦 Download E2E artifacts](${artifactsUrl}/artifacts)
+            - [📋 View run logs](${runUrl})
+
+            ---
+
+            ## Agent Delegation Prompt
+
+            <details>
+            <summary>Copy this block and paste it to a developer agent</summary>
+
+            \`\`\`
+            The following Cucumber E2E scenarios failed in the Cradle daily CI run (${today}, branch: ${branch}):
+
+            ${agentPrompt || '(see run logs for details)'}
+
+            Run URL: ${runUrl}
+            Artifacts: ${artifactsUrl}/artifacts
+
+            Please investigate each failing scenario, identify the root cause (check screenshots/traces in artifacts), and provide a fix. Each test exercises a real user-facing workflow in the Cradle web app.
+
+            Repo context: Elysia server + React web app + TypeScript + Playwright/Cucumber E2E.
+            E2E command to reproduce: pnpm e2e:test
+            \`\`\`
+
+            </details>`
+
+            // Normalize indentation (template literals add leading spaces)
+            const cleanBody = body.split('\n').map(l => l.trimStart()).join('\n')
+
+            // ── Check for existing open issue to avoid duplicates ────────
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'daily-e2e-failure',
+            })
+
+            const todayIssue = existingIssues.data.find(i => i.title.includes(today))
+
+            if (todayIssue) {
+              // Append a new comment to the existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: todayIssue.number,
+                body: `### Re-run failed (${new Date().toISOString()})\n\n${cleanBody}`,
+              })
+              console.log(`Appended to existing issue #${todayIssue.number}`)
+            } else {
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `❌ Daily E2E Failed — ${today}`,
+                body: cleanBody,
+                labels: ['daily-e2e-failure', 'bug'],
+              })
+              console.log(`Created issue #${issue.number}: ${issue.html_url}`)
+            }
+
+      # ── Fail the workflow if E2E failed ───────────────────────────────────
+      - name: Propagate E2E failure
+        if: steps.e2e.outcome == 'failure'
+        run: exit 1

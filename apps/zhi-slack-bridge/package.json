@@ -1,0 +1,29 @@
+{
+  "name": "@cradle/zhi-slack-bridge",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "description": "MCP human-in-the-loop bridge: routes zhi tool calls to Slack threads",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsup",
+    "start": "node dist/main.js",
+    "start:mcp": "node dist/mcp-server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@slack/bolt": "^4.1.0",
+    "dotenv": "^16.4.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

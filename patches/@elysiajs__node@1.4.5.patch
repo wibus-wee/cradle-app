@@ -1,0 +1,72 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index e87389ca5e266b5320b3b0448429a73c996a233f..0d86f2b2020de19fb31a538085cb61effe1f3772 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -136,13 +136,6 @@ function createWebSocketAdapter() {
+             }
+           },
+           async message(ws, message) {
+-            if (message.includes("ping")) {
+-              try {
+-                return void ws.pong(message);
+-              } catch (error) {
+-                handleErrors?.(ws, error);
+-              }
+-            }
+             if (parseMessage)
+               message = await parseMessage(ws, message);
+             if (message) {
+diff --git a/dist/cjs/ws.js b/dist/cjs/ws.js
+index 0fab606dd166d8445ea9fe0988959e6379a1f0dc..f3f26e0678e446c33375930bf379cafdc134c91f 100644
+--- a/dist/cjs/ws.js
++++ b/dist/cjs/ws.js
+@@ -130,13 +130,6 @@ function createWebSocketAdapter() {
+             }
+           },
+           async message(ws, message) {
+-            if (message.includes("ping")) {
+-              try {
+-                return void ws.pong(message);
+-              } catch (error) {
+-                handleErrors?.(ws, error);
+-              }
+-            }
+             if (parseMessage)
+               message = await parseMessage(ws, message);
+             if (message) {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 9f35dbbaf4cc606cdc0efb915958adfa5f4a7e38..e7a801772c459f6d0d964fec5e94a56291721841 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -119,13 +119,6 @@ function createWebSocketAdapter() {
+             }
+           },
+           async message(ws, message) {
+-            if (message.includes("ping")) {
+-              try {
+-                return void ws.pong(message);
+-              } catch (error) {
+-                handleErrors?.(ws, error);
+-              }
+-            }
+             if (parseMessage)
+               message = await parseMessage(ws, message);
+             if (message) {
+diff --git a/dist/ws.mjs b/dist/ws.mjs
+index 08245da777227056f7884e1ab882a904e8bd5576..a22fc052771b3cd4d6af4d564fe6de2aad54dcd3 100644
+--- a/dist/ws.mjs
++++ b/dist/ws.mjs
+@@ -114,13 +114,6 @@ function createWebSocketAdapter() {
+             }
+           },
+           async message(ws, message) {
+-            if (message.includes("ping")) {
+-              try {
+-                return void ws.pong(message);
+-              } catch (error) {
+-                handleErrors?.(ws, error);
+-              }
+-            }
+             if (parseMessage)
+               message = await parseMessage(ws, message);
+             if (message) {

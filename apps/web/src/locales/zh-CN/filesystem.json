@@ -1,0 +1,8 @@
+{
+  "action.cancel": "取消",
+  "action.select": "选择",
+  "directory.empty": "空目录",
+  "directory.error": "无法访问该路径",
+  "directory.listing": "目录",
+  "directory.title": "选择目录"
+}

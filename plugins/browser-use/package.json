@@ -1,0 +1,73 @@
+{
+  "name": "@cradle/browser-use",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "Browser Use",
+    "icon": "assets/icon.svg",
+    "server": "dist/server.mjs",
+    "desktop": "dist/desktop.mjs",
+    "deployments": ["desktop"],
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "mcp.browser-use",
+          "type": "mcp-server",
+          "layer": "server",
+          "label": "Browser automation MCP server",
+          "permissions": ["desktop.browser-webview"]
+        },
+        {
+          "id": "skill.browser-use",
+          "type": "skill",
+          "layer": "server",
+          "label": "Browser automation skill",
+          "permissions": []
+        },
+        {
+          "id": "desktop.webview-listener",
+          "type": "desktop.webviewListener",
+          "layer": "desktop",
+          "label": "Browser webview listener",
+          "permissions": ["desktop.browser-webview"]
+        },
+        {
+          "id": "desktop.shared-config.browser-backend-socket",
+          "type": "desktop.sharedConfigEndpoint",
+          "layer": "desktop",
+          "label": "Browser backend socket path",
+          "permissions": []
+        }
+      ],
+      "permissions": [
+        {
+          "id": "desktop.browser-webview",
+          "label": "Control Cradle browser webviews",
+          "required": true
+        }
+      ]
+    }
+  },
+  "exports": {
+    ".": "./dist/mcp-server.mjs",
+    "./browser-commands": "./src/browser-commands.ts",
+    "./protocol": "./src/protocol.ts"
+  },
+  "main": "dist/mcp-server.mjs",
+  "types": "src/mcp-server.ts",
+  "scripts": {
+    "build": "vite build && cp SKILL.md dist/SKILL.md",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@types/node": "^25.8.0",
+    "vite": "^8.0.0"
+  }
+}

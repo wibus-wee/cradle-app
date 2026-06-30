@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link
+      rel="preload"
+      href="/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <script>
+      (function () {
+        var parsed = JSON.parse(
+          localStorage.getItem("cradle:theme:v1") ||
+            '{"state":{"mode":"system"}}',
+        );
+        var mode = parsed.state.mode;
+        var dark =
+          mode === "dark" ||
+          (mode === "system" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+    <style>
+      html,
+      body,
+      #app {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        background: #f7f7f5;
+      }
+
+      html.dark,
+      html.dark body,
+      html.dark #app {
+        background: #171713;
+      }
+    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cradle</title>
+  </head>
+  <body>
+    <div id="app" class="antialiased"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,174 @@
+import { useQuery } from '@tanstack/react-query'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
+
+import {
+  getSessionsByIdOptions,
+  getWorkspacesByWorkspaceIdOptions,
+} from '~/api-gen/@tanstack/react-query.gen'
+import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
+import { getLocalWorkspacePath } from '~/features/workspace/types'
+import { isElectron, nativeIpc } from '~/lib/electron'
+import { closeSurfaceById } from '~/navigation/navigation-commands'
+import { useSurfaceActive } from '~/navigation/surface-activity-context'
+import { chatSurfaceId } from '~/navigation/surface-identity'
+import { useSurfaceStore } from '~/navigation/surface-store'
+import { useSessionLayoutStore } from '~/store/session-layout'
+
+import { ChatSessionFrameHost } from './chat-session-frame-host'
+import { readSessionThinkingEffort } from './session-thinking-effort'
+
+function loadTerminalPanelView() {
+  return import('~/features/tui/bottom-terminal-panel').then(module => ({ default: module.BottomTerminalPanel }))
+}
+
+function loadTuiView() {
+  return import('~/features/tui/tui-view').then(module => ({ default: module.TuiView }))
+}
+
+const BottomTerminalPanel = lazy(loadTerminalPanelView)
+const TuiView = lazy(loadTuiView)
+
+export const CHAT_SESSION_FALLBACK_LABEL = 'Chat'
+
+export function isGeneratedChatLabel(label: string, sessionId: string): boolean {
+  return label === `Chat: ${sessionId.slice(0, 6)}`
+}
+
+function ChatSessionLayoutSlots({
+  sessionId,
+  workspaceId,
+  workspacePath,
+}: {
+  sessionId: string
+  workspaceId: string | null
+  workspacePath: string | null
+}) {
+  'use no memo'
+
+  const hasWorkspace = !!(workspaceId && workspacePath)
+
+  const panel = useMemo(
+    () => hasWorkspace
+      ? (
+          <Suspense fallback={null}>
+            <BottomTerminalPanel
+              ownerId={`chat:${sessionId}`}
+              cwd={workspacePath!}
+            />
+          </Suspense>
+        )
+      : undefined,
+    [hasWorkspace, sessionId, workspacePath],
+  )
+
+  useRegisterLayoutSlots(sessionId, useMemo(() => ({
+    asideSessionId: sessionId,
+    asideWorkspaceId: hasWorkspace ? workspaceId : null,
+    hasAside: true,
+    hasBrowserPanel: hasWorkspace,
+    hasPanel: hasWorkspace,
+    panel,
+  }), [hasWorkspace, panel, sessionId, workspaceId]))
+
+  return null
+}
+
+export function ChatSessionRouteContent({ sessionId }: { sessionId: string }) {
+  'use no memo'
+
+  const active = useSurfaceActive()
+  const updateSurfaceTitle = useSurfaceStore(state => state.updateSurfaceTitle)
+  const surfaceId = chatSurfaceId(sessionId)
+
+  const { data: session } = useQuery({
+    ...getSessionsByIdOptions({ path: { id: sessionId } }),
+    enabled: !!sessionId,
+  })
+  const hasLoadedSession = !!session
+  const sessionTitle = session?.title ?? null
+  const sessionProviderTargetId = session?.providerTargetId ?? null
+  const sessionModelId = session?.modelId ?? null
+  const sessionThinkingEffort = readSessionThinkingEffort(session?.thinkingEffort)
+  const isCliTui = session?.runtimeKind === 'cli-tui'
+
+  useEffect(() => {
+    if (typeof session?.archivedAt !== 'number') {
+      return
+    }
+
+    closeSurfaceById(surfaceId)
+
+    if (isElectron) {
+      void nativeIpc?.window.closeSurface(surfaceId).catch(() => {})
+    }
+  }, [session?.archivedAt, sessionId, surfaceId])
+
+  useEffect(() => {
+    if (!hasLoadedSession) {
+      return
+    }
+    updateSurfaceTitle(surfaceId, sessionTitle || CHAT_SESSION_FALLBACK_LABEL)
+  }, [hasLoadedSession, sessionTitle, surfaceId, updateSurfaceTitle])
+
+  const workspaceId = session?.workspaceId ?? null
+  const agentId = session?.agentId ?? null
+  const activeSession = useMemo(() => ({
+    sessionId,
+    sessionProviderTargetId,
+    sessionModelId,
+    sessionThinkingEffort,
+    runtimeKind: session?.runtimeKind,
+    workspaceId,
+    agentId,
+  }), [agentId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId])
+
+  const { data: workspace } = useQuery({
+    ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId: workspaceId! } }),
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  })
+
+  const workspacePath = getLocalWorkspacePath(workspace)
+  useEffect(() => {
+    if (!session) {
+      return
+    }
+    useSessionLayoutStore.getState().upsertSession({
+      sessionId,
+      sessionTitle: session.title,
+      workspaceId,
+      workspacePath,
+      runtimeKind: session.runtimeKind,
+    })
+  }, [session, sessionId, workspaceId, workspacePath])
+
+  useEffect(() => {
+    if (workspacePath) {
+      void loadTerminalPanelView()
+    }
+  }, [workspacePath])
+
+  useEffect(() => {
+    if (isCliTui) {
+      void loadTuiView()
+    }
+  }, [isCliTui])
+
+  if (isCliTui) {
+    return (
+      <>
+        <ChatSessionLayoutSlots sessionId={sessionId} workspaceId={workspaceId} workspacePath={workspacePath} />
+        <Suspense fallback={null}>
+          <TuiView sessionId={sessionId} />
+        </Suspense>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <ChatSessionLayoutSlots sessionId={sessionId} workspaceId={workspaceId} workspacePath={workspacePath} />
+      <ChatSessionFrameHost activeSession={activeSession} active={active} />
+    </>
+  )
+}

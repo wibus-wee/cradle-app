@@ -1,0 +1,567 @@
+import { Settings2Line as SettingsIcon } from '@mingcute/react'
+import type { FileUIPart } from 'ai'
+import { m } from 'motion/react'
+import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { getSkills } from '~/api-gen/sdk.gen'
+import { Button } from '~/components/ui/button'
+import { toastManager } from '~/components/ui/toast'
+import type { ClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
+import { hasClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
+import type { ApiProviderKind, RuntimeKind } from '~/features/agent-runtime/types'
+import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
+import type { ComposerStateResult } from '~/features/composer-toolbar/use-composer-state'
+import type { RuntimeProviderBinding } from '~/features/composer-toolbar/types'
+import type { SkillInventoryEntry } from '~/features/skills/types'
+import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
+import { cn } from '~/lib/cn'
+import { getServerUrl, isElectron, platform } from '~/lib/electron'
+import { openSettingsSection as openSettingsRouteSection } from '~/navigation/navigation-commands'
+import { useNewChatStore } from '~/store/new-chat'
+import { useSettingsOverlayStore } from '~/store/settings-overlay'
+
+import type { ChatRuntimeSettings } from '../commands/chat-response-command'
+import { DEFAULT_CHAT_RUNTIME_SETTINGS } from '../commands/runtime-settings-command'
+import type { ChatContextPart } from '../context/chat-context-parts'
+import type { MentionItem } from '../mentions/mention-panel'
+import { searchPluginMentions } from '../mentions/plugin-mentions'
+import type { SkillMentionItem } from '../mentions/skill-mention-panel'
+import { useDraftClaudeAgentModelAliases, useProviderTargetClaudeAgentModelAliases } from '../runtime/claude-session-model-matrix-control'
+import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
+import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
+import { CODEX_REVIEW_SLASH_ACTION_ID, CRADLE_APPSHOT_SLASH_ACTION_ID, CRADLE_APPSHOT_SLASH_COMMAND, withSlashCommandAvailability } from '../slash-commands/chat-slash-commands'
+import { useRuntimeComposerSlashCommands } from '../slash-commands/use-runtime-composer-slash-commands'
+import { Composer } from './composer'
+import type { ComposerSlashCommandActionContext, ComposerSlashCommandActionResult, ComposerSlashCommandActionTools } from './composer-action-context'
+import { modelSupportsAttachments } from './composer-attachment-state'
+import { ComposerSlotStates } from './composer-slot-states'
+import { useComposerAppshotCapture } from './use-composer-appshot-capture'
+
+type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
+
+interface DraftClaudeAgentConfig {
+  modelAliases: ClaudeAgentModelAliases
+}
+
+export type DraftChatRuntimeSettings = ChatRuntimeSettings & {
+  claudeAgent?: DraftClaudeAgentConfig | null
+}
+
+const PLACEHOLDER_HINT_KEYS = [
+  'placeholder.task',
+  'placeholder.structure',
+  'placeholder.risk',
+  'placeholder.fixTest',
+  'placeholder.refactor',
+] as const
+
+export interface DraftChatComposerSubmitOptions {
+  runtimeKind: RuntimeKind
+  providerBinding: RuntimeProviderBinding
+  agentId?: string
+  agentName?: string
+  providerTargetId?: string
+  providerTargetName?: string
+  modelId?: string | null
+  thinkingEffort?: ChatThinkingEffort
+  runtimeSettings: DraftChatRuntimeSettings
+}
+
+export type DraftChatComposerSendHandler = (
+  text: string,
+  files: FileUIPart[],
+  contextParts: ChatContextPart[],
+  options: DraftChatComposerSubmitOptions,
+) => boolean | void | Promise<boolean | void>
+
+interface DraftChatComposerProps {
+  workspaceId: string | null
+  active?: boolean
+  contextBar?: ReactNode
+  replaceText?: string
+  replaceTextKey?: number
+  onDraftChange?: (draft: string) => void
+  onSend: DraftChatComposerSendHandler
+  onSendInNewWindow?: DraftChatComposerSendHandler
+  testIdPrefix?: string
+}
+
+interface DraftChatComposerContentProps extends DraftChatComposerProps {
+  composerState: ComposerStateResult
+}
+
+function useRotatingPlaceholder(hints: string[], active: boolean, interval = 4000): string {
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    if (!active) {
+      return
+    }
+    const timer = setInterval(() => {
+      setIndex(i => (i + 1) % hints.length)
+    }, interval)
+    return () => clearInterval(timer)
+  }, [active, hints.length, interval])
+
+  return hints[index]
+}
+
+export function DraftChatComposer(props: DraftChatComposerProps) {
+  const composerState = useComposerState({ context: 'new-chat', workspaceId: props.workspaceId, enableAgents: true })
+  return <DraftChatComposerContent {...props} composerState={composerState} />
+}
+
+export function DraftChatComposerWithState(props: DraftChatComposerContentProps) {
+  return <DraftChatComposerContent {...props} />
+}
+
+function DraftChatComposerContent({
+  workspaceId,
+  active = true,
+  contextBar,
+  replaceText,
+  replaceTextKey,
+  onDraftChange,
+  onSend,
+  onSendInNewWindow,
+  testIdPrefix = 'draft-chat',
+  composerState,
+}: DraftChatComposerContentProps) {
+  const { t } = useTranslation('new-chat')
+  const { selection, effectiveAgent, effectiveProfile, effectiveModel } = composerState
+  const runtimeSettings = useNewChatStore(s => s.lastRuntimeSettings ?? DEFAULT_CHAT_RUNTIME_SETTINGS)
+  const setRuntimeSettings = useNewChatStore(s => s.setLastRuntimeSettings)
+  const claudeAgentByProfile = useNewChatStore(s => s.lastClaudeAgentByProfile)
+  const setClaudeAgentForProfile = useNewChatStore(s => s.setLastClaudeAgentForProfile)
+  const [sending, setSending] = useState(false)
+  const [reviewModeOpen, setReviewModeOpen] = useState(false)
+  const setSettingsSection = useSettingsOverlayStore(s => s.setSettingsSection)
+
+  const placeholderHints = PLACEHOLDER_HINT_KEYS.map(key => t(key))
+  const placeholder = useRotatingPlaceholder(placeholderHints, active)
+
+  const readinessNotice = (() => {
+    if (
+      composerState.isLoadingAgents
+      || composerState.isLoadingProfiles
+      || composerState.isLoadingModels
+    ) {
+      return null
+    }
+    if (selection.targetMode === 'agent' && composerState.agents.length === 0) {
+      return {
+        key: 'agents',
+        icon: SettingsIcon,
+        message: t('readiness.agent.message'),
+        actionLabel: t('readiness.agent.action'),
+        disabled: false,
+      }
+    }
+    if (selection.targetMode === 'provider' && composerState.providerBinding !== 'runtime-owned' && !effectiveProfile) {
+      return {
+        key: 'providers',
+        icon: SettingsIcon,
+        message: t('readiness.provider.message'),
+        actionLabel: t('readiness.provider.action'),
+        disabled: false,
+      }
+    }
+    return null
+  })()
+
+  const searchFiles = async (query: string, signal?: AbortSignal): Promise<MentionItem[]> => {
+    if (!workspaceId) {
+      return []
+    }
+    return searchWorkspaceFiles({ workspaceId, query, limit: 30, signal })
+  }
+
+  const searchSkills = async (_query: string, signal?: AbortSignal): Promise<SkillMentionItem[]> => {
+    const { data } = await getSkills({
+      query: {
+        workspaceId: workspaceId ?? undefined,
+        agentId: effectiveAgent?.id ?? undefined,
+      },
+      signal,
+    })
+    const activeSkills: SkillMentionItem[] = []
+    for (const skill of (data ?? []) as SkillInventoryEntry[]) {
+      if (!skill.active) {
+        continue
+      }
+      activeSkills.push({
+        name: skill.name,
+        description: skill.description,
+        scope: skill.scope,
+        location: skill.location,
+        skillDir: skill.skillDir,
+      })
+    }
+    return activeSkills
+  }
+
+  const openSettingsSection = (section: string) => {
+    setSettingsSection(section)
+    openSettingsRouteSection(section)
+  }
+
+  const updateRuntimeSettings = (patch: Partial<ChatRuntimeSettings>) => {
+    setRuntimeSettings({
+      ...runtimeSettings,
+      ...patch,
+    })
+  }
+
+  const updateClaudeAgentAliases = (next: ClaudeAgentModelAliases) => {
+    if (!selection.profileId) {
+      return
+    }
+    setClaudeAgentForProfile(selection.profileId, hasClaudeAgentModelAliases(next) ? { modelAliases: next } : null)
+  }
+
+  const selectedProviderKind = effectiveProfile?.providerKind
+  const selectedApiProviderKind: ApiProviderKind | null = selectedProviderKind && selectedProviderKind !== 'cli-tool'
+    ? selectedProviderKind
+    : null
+  const claudeAgent = selection.profileId ? claudeAgentByProfile[selection.profileId] ?? null : null
+  const inputCollapsed = selection.targetMode === 'agent' && selection.runtimeKind === 'cli-tui'
+
+  const providerTargetAliases = useProviderTargetClaudeAgentModelAliases({
+    providerTargetId: selection.profileId,
+    providerKind: selectedApiProviderKind,
+    enabled: selection.targetMode === 'provider' && selection.runtimeKind === 'claude-agent',
+  })
+  const claudeModelAliasesSlot = useDraftClaudeAgentModelAliases({
+    active,
+    runtimeKind: selection.runtimeKind,
+    providerTargetId: selection.profileId,
+    providerKind: selectedApiProviderKind,
+    aliases: claudeAgent?.modelAliases ?? providerTargetAliases.aliases,
+    loading: providerTargetAliases.isLoading,
+    onChange: updateClaudeAgentAliases,
+  })
+  const claudeModelAliases = claudeModelAliasesSlot
+    ? { slot: claudeModelAliasesSlot, providerSettingsLoading: providerTargetAliases.isLoading }
+    : null
+  const supportsAttachments = modelSupportsAttachments(effectiveModel)
+  const appshotRuntime = useComposerAppshotCapture({
+    active,
+    supportsAttachments,
+  })
+  const cradleSlashCommands = (() => {
+    const appshotCommand = (() => {
+      if (!isElectron || platform !== 'darwin') {
+        return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, {
+          enabled: false,
+          reason: 'Requires the macOS desktop app.',
+        })
+      }
+      if (!supportsAttachments) {
+        return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, {
+          enabled: false,
+          reason: 'Requires an image-capable model.',
+        })
+      }
+      return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, undefined)
+    })()
+
+    return [appshotCommand]
+  })()
+  const slashCommands = useRuntimeComposerSlashCommands(selection.runtimeKind, cradleSlashCommands)
+  const sendDisabled = selection.targetMode === 'agent'
+    ? !effectiveAgent || sending
+    : !effectiveProfile || sending
+
+  const toolbar = (
+    <div className="flex min-w-0 items-center gap-1">
+      <ComposerToolbar
+        context="new-chat"
+        state={composerState}
+        claudeModelAliases={claudeModelAliases}
+      />
+    </div>
+  )
+  const footer = (
+    <div className="flex w-full min-w-0 items-center justify-between gap-3 text-muted-foreground">
+      <div className="shrink-0">
+        <RuntimeSettingsControl
+          settings={runtimeSettings}
+          applied
+          disabled={sending}
+          showInteractionLabel={false}
+          onChange={updateRuntimeSettings}
+        />
+      </div>
+      {contextBar && (
+        <div className="flex min-w-0 justify-end">
+          {contextBar}
+        </div>
+      )}
+    </div>
+  )
+
+  const handleSendWithTarget = async (
+    sendTarget: DraftChatComposerSendHandler,
+    text: string,
+    files: FileUIPart[],
+    contextParts: ChatContextPart[],
+  ) => {
+    const trimmedText = text.trim()
+    const hasDraft = trimmedText.length > 0 || files.length > 0 || contextParts.length > 0
+    const canSubmit = selection.targetMode === 'agent'
+      ? !!effectiveAgent && (selection.runtimeKind === 'cli-tui' || hasDraft) && !sending
+      : !!effectiveProfile && hasDraft && !sending
+
+    if (!canSubmit) {
+      return false
+    }
+
+    setSending(true)
+    const submitRuntimeSettings: DraftChatRuntimeSettings = {
+      ...runtimeSettings,
+      ...(selection.targetMode === 'provider' && selection.runtimeKind === 'claude-agent' && claudeAgent ? { claudeAgent } : {}),
+    }
+    const submitOptions: DraftChatComposerSubmitOptions = {
+      runtimeKind: selection.runtimeKind,
+      providerBinding: composerState.providerBinding,
+      ...(effectiveAgent
+        ? {
+            agentId: effectiveAgent.id,
+            agentName: effectiveAgent.name,
+          }
+        : {
+            providerTargetId: effectiveProfile?.id,
+            providerTargetName: effectiveProfile?.name,
+            modelId: selection.runtimeKind === 'claude-agent'
+              ? selection.modelId ?? undefined
+              : selection.modelId ?? effectiveModel?.id,
+            thinkingEffort: selection.thinkingEffort ?? undefined,
+          }),
+      runtimeSettings: submitRuntimeSettings,
+    }
+
+    return Promise.resolve()
+      .then(() => sendTarget(trimmedText, files, contextParts, submitOptions))
+      .then(() => true)
+      .finally(() => {
+        setSending(false)
+      })
+  }
+
+  const handleSend = (text: string, files: FileUIPart[], contextParts: ChatContextPart[]) => {
+    return handleSendWithTarget(onSend, text, files, contextParts)
+  }
+
+  const handleSendInNewWindow = (text: string, files: FileUIPart[], contextParts: ChatContextPart[]) => {
+    return onSendInNewWindow
+      ? handleSendWithTarget(onSendInNewWindow, text, files, contextParts)
+      : handleSend(text, files, contextParts)
+  }
+
+  const handleSlashCommandAction = async (
+    command: ChatComposerSlashCommand,
+    _context: ComposerSlashCommandActionContext,
+    tools?: ComposerSlashCommandActionTools,
+  ): Promise<ComposerSlashCommandActionResult | void> => {
+    if (command.action.kind !== 'uiAction') {
+      return
+    }
+    if (command.action.actionId === CODEX_REVIEW_SLASH_ACTION_ID) {
+      setReviewModeOpen(true)
+      return { insertText: '' }
+    }
+    if (command.action.actionId !== CRADLE_APPSHOT_SLASH_ACTION_ID) {
+      return
+    }
+    if (!appshotRuntime.hasNativeCapture) {
+      toastManager.add({
+        type: 'error',
+        title: 'Appshot is unavailable',
+        description: 'Appshot capture requires the Electron desktop app.',
+      })
+      return
+    }
+    if (!supportsAttachments) {
+      toastManager.add({
+        type: 'error',
+        title: 'Appshot attachment is unavailable',
+        description: 'The selected model does not accept image attachments.',
+      })
+      return
+    }
+
+    try {
+      await appshotRuntime.capture({ tools })
+      return { insertText: '' }
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: 'Appshot capture failed',
+        description: error instanceof Error ? error.message : 'Unknown Appshot capture error.',
+      })
+    }
+  }
+
+  const submitCodexReviewPrompt = (prompt: string) => {
+    void handleSend(prompt, [], [])
+  }
+
+  const resolveCodexReviewMergeBase = async (baseBranch: string, repositoryPath?: string | null) => {
+    if (!workspaceId) {
+      return null
+    }
+    const url = new URL(`/workspaces/${encodeURIComponent(workspaceId)}/git/merge-base`, getServerUrl())
+    url.searchParams.set('baseBranch', baseBranch)
+    if (repositoryPath) {
+      url.searchParams.set('repo', repositoryPath)
+    }
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Failed to resolve merge base (${response.status}).`)
+    }
+    const payload = await response.json() as { mergeBaseSha?: unknown }
+    return typeof payload.mergeBaseSha === 'string' ? payload.mergeBaseSha : null
+  }
+
+  const reviewSlot = ({
+    open: reviewModeOpen,
+    workspaceId,
+    onDismiss: () => setReviewModeOpen(false),
+    onSubmitPrompt: submitCodexReviewPrompt,
+    resolveMergeBase: resolveCodexReviewMergeBase,
+  })
+
+  return (
+    <>
+      <ComposerSlotStates
+        slots={[]}
+        states={[]}
+        review={reviewSlot}
+      />
+      <Composer
+        send={{
+          submit: handleSend,
+          submitInNewWindow: handleSendInNewWindow,
+          isSending: sending,
+          sendDisabled,
+          allowEmptySend: selection.runtimeKind === 'cli-tui',
+        }}
+        commands={{
+          commands: slashCommands,
+          runAction: handleSlashCommandAction,
+        }}
+        attachments={{
+          supportsAttachments,
+          appendFileParts: appshotRuntime.externalFileParts,
+          appendFilePartsKey: appshotRuntime.externalFilePartsKey,
+          pendingAppshots: appshotRuntime.pendingAppshots,
+          onActionTargetElementChange: appshotRuntime.setActionTargetElement,
+        }}
+        runtimeSettings={{
+          settings: runtimeSettings,
+          disabled: sending,
+          onChange: updateRuntimeSettings,
+        }}
+        slots={{
+          toolbar,
+          footer,
+        }}
+        externalSignals={{
+          replaceText,
+          replaceTextKey,
+        }}
+        view={{
+          placeholder,
+          searchFiles,
+          searchPlugins: searchPluginMentions,
+          searchSkills,
+          onDraftChange,
+          inputCollapsed,
+          surfaceId: 'new-chat',
+          className: 'relative',
+          cardClassName: cn(
+            'overflow-hidden rounded-2xl',
+            'border-border/60 bg-background shadow-none',
+            'ring-1 ring-inset ring-white/[0.02] dark:ring-white/[0.04]',
+            'transition-[border-color,box-shadow] duration-200',
+            'focus-within:border-ring/50 focus-within:shadow-[var(--shadow-xs)]',
+          ),
+          textareaRows: 5,
+          textareaClassName: 'px-5 pt-5 pb-3 text-[15px] leading-[1.75] placeholder:text-muted-foreground/30 min-h-30 max-h-80 rounded-t-2xl disabled:opacity-30',
+          attachmentListClassName: 'border-border/60 px-3 py-2',
+          actionBarClassName: cn(
+            'px-2.5 py-2',
+            inputCollapsed ? 'border-t-0' : 'border-t border-border/60',
+          ),
+          attachButtonClassName: 'text-muted-foreground/30',
+          attachIconClassName: 'size-3',
+          sendButtonClassName: 'ml-0.5',
+        }}
+        accessibility={{
+          textareaAriaLabel: t('accessibility.message', 'New chat message'),
+          sendButtonAriaLabel: t('send.tooltip'),
+        }}
+        testIds={{
+          actionTarget: `${testIdPrefix}-composer-action-target`,
+          textarea: `${testIdPrefix}-textarea`,
+          fileInput: `${testIdPrefix}-file-input`,
+          attachButton: `${testIdPrefix}-attach-btn`,
+          sendButton: `${testIdPrefix}-send-btn`,
+        }}
+      />
+      <DraftChatReadinessNotice
+        notice={readinessNotice}
+        onAction={openSettingsSection}
+        testIdPrefix={testIdPrefix}
+      />
+    </>
+  )
+}
+
+function DraftChatReadinessNotice({
+  notice,
+  onAction,
+  testIdPrefix,
+}: {
+  notice: {
+    key: string
+    icon: typeof SettingsIcon
+    message: string
+    actionLabel: string
+    disabled: boolean
+  } | null
+  onAction: (section: string) => void
+  testIdPrefix: string
+}) {
+  if (!notice) {
+    return null
+  }
+
+  const NoticeIcon = notice.icon
+
+  return (
+    <m.div
+      className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2 text-[12px] text-muted-foreground"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18 }}
+      data-testid={`${testIdPrefix}-readiness-notice`}
+    >
+      <NoticeIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
+      <span className="min-w-0 flex-1 leading-relaxed">{notice.message}</span>
+      <Button
+        type="button"
+        size="xs"
+        variant="outline"
+        onClick={() => onAction(notice.key)}
+        disabled={notice.disabled}
+        className="h-7 shrink-0"
+      >
+        {notice.actionLabel}
+      </Button>
+    </m.div>
+  )
+}

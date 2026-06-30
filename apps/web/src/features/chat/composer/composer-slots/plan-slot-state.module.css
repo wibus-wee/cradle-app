@@ -1,0 +1,15 @@
+.shell {
+  container: plan-slot / inline-size;
+}
+
+@container plan-slot (max-width: 40rem) {
+  .actionButton {
+    width: 1.5rem;
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  .actionLabel {
+    display: none;
+  }
+}

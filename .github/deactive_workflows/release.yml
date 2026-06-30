@@ -1,0 +1,135 @@
+name: Release
+
+# Trigger: pushing a semver tag (e.g. v1.2.3)
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ─── Build & verify ────────────────────────────────────────────────────
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Typecheck
+        run: |
+          pnpm typecheck:server
+          pnpm typecheck:apps-web
+
+      - name: Test
+        env:
+          CRADLE_CREDENTIAL_SECRET: ci-test-secret
+          NODE_ENV: test
+        run: |
+          pnpm test
+          pnpm test:server
+
+      - name: Build
+        run: |
+          pnpm build:web
+          pnpm build:server
+          pnpm build:desktop
+
+  # ─── Desktop packaging (matrix: mac/win/linux) ─────────────────────────
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    needs: [build]
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Build Desktop
+        run: pnpm build:desktop
+
+      - name: Package Desktop App
+        run: pnpm --filter @cradle/desktop exec electron-builder --${{ matrix.platform }} --publish never
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ github.run_id }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+          retention-days: 30
+
+  # ─── Create GitHub Release ─────────────────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [desktop]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: desktop-*
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+            const tag = context.ref.replace('refs/tags/', '')
+
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: tag,
+              draft: false,
+              prerelease: tag.includes('-'),
+              generate_release_notes: true,
+            })
+
+            const assetsDir = 'release-assets'
+            if (fs.existsSync(assetsDir)) {
+              const walkDir = (dir) => {
+                const files = []
+                for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                  const full = path.join(dir, entry.name)
+                  if (entry.isDirectory()) files.push(...walkDir(full))
+                  else files.push(full)
+                }
+                return files
+              }
+
+              for (const file of walkDir(assetsDir)) {
+                const ext = path.extname(file)
+                if (['.dmg', '.exe', '.AppImage', '.deb'].includes(ext)) {
+                  console.log(`Uploading ${file}...`)
+                  await github.rest.repos.uploadReleaseAsset({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    release_id: release.id,
+                    name: path.basename(file),
+                    data: fs.readFileSync(file),
+                  })
+                }
+              }
+            }
+
+            console.log(`Created release ${release.html_url}`)

@@ -1,0 +1,9 @@
+id: local-intl-number-formatter
+language: TypeScript
+severity: warning
+message: Local number formatter only wraps Intl.NumberFormat; inline it or move number formatting to a shared owner.
+rule:
+  pattern: 'function $FUNC($PARAM: number): string { return new Intl.NumberFormat($$$ARGS).format($PARAM) }'
+constraints:
+  FUNC:
+    regex: ^(format|read|to|as|normalize|map)[A-Z].*

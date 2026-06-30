@@ -1,0 +1,11 @@
+id: formatter-delegation-wrapper-tsx
+language: TSX
+severity: warning
+message: Helper only delegates to another formatter/helper; remove the wrapper and call the target directly.
+rule:
+  pattern: 'function $FUNC($$$ARGS): string { return $TARGET($$$CALL_ARGS) }'
+constraints:
+  FUNC:
+    regex: ^(format|read|to|as|normalize|map)[A-Z].*
+  TARGET:
+    regex: ^(format|read|to|as|normalize|map)[A-Z].*

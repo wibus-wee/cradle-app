@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.node.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node", "@cucumber/cucumber", "@playwright/test"]
+  },
+  "include": ["./**/*.ts"],
+  "exclude": []
+}

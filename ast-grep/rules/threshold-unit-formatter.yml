@@ -1,0 +1,11 @@
+id: threshold-unit-formatter
+language: TypeScript
+severity: warning
+message: Local threshold/unit formatter; inline it or move unit formatting to a shared owner.
+rule:
+  any:
+    - pattern: 'function $FUNC($PARAM: number): string { if ($PARAM < $$$LIMIT) { return $$$A } return $$$B }'
+    - pattern: 'function $FUNC($PARAM: number): string { if ($PARAM < $$$LIMIT) { return $$$A } if ($PARAM < $$$LIMIT2) { return $$$B } return $$$C }'
+constraints:
+  FUNC:
+    regex: ^(format|read|to|as|normalize|map)[A-Z].*

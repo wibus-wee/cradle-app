@@ -1,0 +1,163 @@
+<!-- comment-thread.html — Comment thread with avatar, name, time, body, and nested replies -->
+<section style="padding: 24px 0; max-width: 600px;">
+
+  <!-- Top-level comment -->
+  <div style="display: flex; gap: 10px;">
+    <div style="
+      width: 28px;
+      height: 28px;
+      border-radius: 9999px;
+      background: var(--color-neutral-3);
+      border: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-neutral-6);
+    ">AK</div>
+    <div style="flex: 1; min-width: 0;">
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+        <span style="
+          font-family: var(--font-sans);
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--color-neutral-9);
+        ">Alex Kim</span>
+        <span style="
+          font-family: var(--font-mono);
+          font-size: 11px;
+          color: var(--color-neutral-5);
+        ">3h ago</span>
+      </div>
+      <p style="
+        margin: 0 0 8px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--color-neutral-7);
+      ">The two-tone chrome separation is the right call. Having the sidebar at neutral-2 vs content at neutral-1 creates a clear spatial hierarchy without needing borders.</p>
+      <button style="
+        background: none;
+        border: none;
+        padding: 0;
+        font-family: var(--font-sans);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-neutral-5);
+        cursor: pointer;
+      ">Reply</button>
+    </div>
+  </div>
+
+  <!-- Nested reply -->
+  <div style="
+    margin: 8px 0 0 38px;
+    padding-left: 16px;
+    border-left: 2px solid var(--color-neutral-3);
+  ">
+    <div style="display: flex; gap: 10px;">
+      <div style="
+        width: 24px;
+        height: 24px;
+        border-radius: 9999px;
+        background: var(--color-neutral-3);
+        border: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-family: var(--font-sans);
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--color-neutral-6);
+      ">JL</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+          <span style="
+            font-family: var(--font-sans);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--color-neutral-9);
+          ">Jamie Lee</span>
+          <span style="
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--color-neutral-5);
+          ">2h ago</span>
+        </div>
+        <p style="
+          margin: 0 0 6px;
+          font-family: var(--font-sans);
+          font-size: 12px;
+          line-height: 1.6;
+          color: var(--color-neutral-7);
+        ">Agreed. And the inset-shadow approach for depth keeps it from looking like Material Design's "floating cards" problem.</p>
+        <button style="
+          background: none;
+          border: none;
+          padding: 0;
+          font-family: var(--font-sans);
+          font-size: 11px;
+          font-weight: 500;
+          color: var(--color-neutral-5);
+          cursor: pointer;
+        ">Reply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Second top-level comment -->
+  <div style="display: flex; gap: 10px; margin-top: 16px;">
+    <div style="
+      width: 28px;
+      height: 28px;
+      border-radius: 9999px;
+      background: var(--color-neutral-3);
+      border: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-neutral-6);
+    ">MT</div>
+    <div style="flex: 1; min-width: 0;">
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+        <span style="
+          font-family: var(--font-sans);
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--color-neutral-9);
+        ">Morgan T.</span>
+        <span style="
+          font-family: var(--font-mono);
+          font-size: 11px;
+          color: var(--color-neutral-5);
+        ">1h ago</span>
+      </div>
+      <p style="
+        margin: 0 0 8px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--color-neutral-7);
+      ">Spring physics for all interactive motion is the right default. The 600/40 config feels snappy but not jittery. Messages at 500/35 feel slightly warmer which suits the chat context.</p>
+      <button style="
+        background: none;
+        border: none;
+        padding: 0;
+        font-family: var(--font-sans);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-neutral-5);
+        cursor: pointer;
+      ">Reply</button>
+    </div>
+  </div>
+
+</section>

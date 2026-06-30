@@ -1,0 +1,180 @@
+<!doctype html>
+<!--
+  Design-system mockup scaffold.
+
+  Copy this file to templates/scaffold.html in the target design-system package.
+
+  HOW TO USE:
+  1. Replace ALL token values in the :root block with your project's actual tokens.
+     Your tokens must also be declared in src/tokens.css — both files must stay in sync.
+     The `pnpm check` script validates this automatically.
+  2. Drop snippets from templates/snippets/ into <main class="mockup-shell">.
+  3. Open in a browser to preview with the light/dark toggle.
+
+  RULES:
+  - Never use raw hex values in HTML attributes or styles outside this <style> block.
+  - Never use Tailwind's text-neutral-50…950 classes — use text-neutral-N (1..10).
+  - Font faces must come from var(--font-*) only.
+-->
+<html lang="zh-CN" data-theme="light">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mockup Scaffold</title>
+  <style>
+    /*
+     * Token CSS vars — mirror src/tokens.css.
+     * The verify script (scripts/check.ts) lints these against CHEATSHEET.md.
+     *
+     * CUSTOMIZE: Replace all hex values with your project's actual token colors.
+     */
+    :root {
+      /* Neutral (Tier 1 · surface, Tier 2 · border/icon, Tier 3 · body) */
+      --color-neutral-1: #f9f8f5;
+      /* Tier 1 · lightest surface */
+      --color-neutral-2: #f0efeb;
+      /* Tier 1 · card bg */
+      --color-neutral-3: #e3e1db;
+      /* Tier 1 · hover, subtle fill */
+      --color-neutral-4: #d0cec6;
+      /* Tier 1 · strong fill */
+      --color-neutral-5: #a8a69f;
+      /* Tier 2 · border — NEVER use as text */
+      --color-neutral-6: #787670;
+      /* Tier 2 · icon, tiny label only */
+      --color-neutral-7: #5c5a55;
+      /* Tier 2 · secondary text */
+      --color-neutral-8: #403f3a;
+      /* Tier 3 · strong secondary */
+      --color-neutral-9: #24231f;
+      /* Tier 3 · default body color */
+      --color-neutral-10: #141312;
+      /* Tier 3 · headings, max emphasis */
+
+      /* Accent (≤ 5% of any surface) */
+      --color-accent: #c56473;
+
+      /* Semantic */
+      --color-info: #3d6896;
+      --color-success: #5e9f7e;
+      --color-warning: #a87a3d;
+      --color-error: #a64953;
+
+      /* Surface & border (runtime values — fine-tune per project) */
+      --color-paper: #faf9f5;
+      --color-border: rgba(24, 24, 27, 0.1);
+
+      /* Font stacks — include mandatory CJK fallback chains */
+      --font-sans: -apple-system, 'PingFang SC', 'Microsoft YaHei',
+        'Noto Sans SC', 'Hiragino Sans GB', system-ui, sans-serif;
+      --font-serif: 'Noto Serif CJK SC', 'Source Han Serif SC', SongTi SC,
+        STSong, Georgia, serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas, Monaco,
+        'Hannotate SC', monospace;
+    }
+
+    /* Dark mode — adapt inversion logic to match your project's dark theme */
+    [data-theme='dark'] {
+      --color-neutral-1: #141414;
+      --color-neutral-2: #242424;
+      --color-neutral-3: #404040;
+      --color-neutral-4: #5c5c5c;
+      --color-neutral-5: #787878;
+      --color-neutral-6: #a8a8a8;
+      --color-neutral-7: #d0d0d0;
+      --color-neutral-8: #e3e3e3;
+      --color-neutral-9: #f0f0f0;
+      --color-neutral-10: #f8f8f8;
+
+      --color-paper: #1a1814;
+      --color-border: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Base styles */
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 14px;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--color-paper);
+      color: var(--color-neutral-9);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Mockup wrapper — remove or adjust as needed */
+    .mockup-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    /* Fixed toolbar */
+    .toolbar {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 100;
+      background: var(--color-neutral-2);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-neutral-7);
+    }
+
+    .toolbar button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+      font: inherit;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .toolbar button:hover {
+      background: var(--color-neutral-3);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toolbar">
+    <button
+      onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">
+      light · dark
+    </button>
+  </div>
+
+  <main class="mockup-shell">
+    <!--
+      Drop snippets from templates/snippets/ here.
+      Snippets use only the CSS vars declared above — no raw hex, no hardcoded fonts.
+
+      Available snippets:
+        hero.html         — title, tagline, CTA
+        list-card.html    — card grid or list
+        form.html         — input, label, button
+        modal.html        — dialog overlay
+        sheet.html        — bottom/side sheet
+        code-block.html   — syntax-highlighted code
+        stat-grid.html    — metrics/stats layout
+        comment-thread.html — comment UI
+        logo.html         — brand mark
+    -->
+  </main>
+</body>
+
+</html>

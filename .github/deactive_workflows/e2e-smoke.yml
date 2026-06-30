@@ -1,0 +1,103 @@
+name: E2E Smoke (PR)
+
+# Runs P0 E2E scenarios on pull requests when the `e2e` label is applied.
+# This is opt-in to avoid running the full E2E suite on every PR push.
+# Maintainers add the `e2e` label to PRs that touch critical user-facing paths.
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  # Only run when the triggering label is exactly 'e2e'
+  gate:
+    name: Check label
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'e2e'
+    steps:
+      - run: echo "e2e label added — smoke run will proceed"
+
+  e2e-smoke:
+    name: E2E Smoke (P0)
+    runs-on: ubuntu-latest
+    needs: gate
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run P0 smoke scenarios
+        id: smoke
+        continue-on-error: true
+        env:
+          NODE_ENV: test
+          CRADLE_CREDENTIAL_SECRET: e2e-test-secret
+        run: |
+          pnpm exec cucumber-js --config e2e/cucumber.mjs \
+            --tags "@P0" \
+            --format json:e2e/artifacts/cucumber-report.json \
+            --format html:e2e/artifacts/cucumber-report.html
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-artifacts-${{ github.run_id }}
+          path: e2e/artifacts/
+          retention-days: 7
+
+      - name: Post PR comment on failure
+        if: steps.smoke.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs')
+            const runUrl = process.env.RUN_URL
+
+            let summary = '_(no cucumber JSON report found)_'
+            const reportPath = 'e2e/artifacts/cucumber-report.json'
+            if (fs.existsSync(reportPath)) {
+              try {
+                const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+                const failed = []
+                for (const feature of report) {
+                  for (const el of (feature.elements || [])) {
+                    if (el.type !== 'scenario') continue
+                    const hasFailed = (el.steps || []).some(s => s.result?.status === 'failed')
+                    if (hasFailed) {
+                      const file = require('path').basename(feature.uri || 'unknown.feature')
+                      failed.push(`- **${file}** — ${el.name}`)
+                    }
+                  }
+                }
+                summary = failed.length
+                  ? failed.join('\n')
+                  : '_(could not extract failed scenarios)_'
+              } catch (e) {
+                summary = `_(parse error: ${e.message})_`
+              }
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ❌ E2E Smoke Failed\n\n**Failed scenarios (P0):**\n${summary}\n\n[View run](${runUrl}) · [Download artifacts](${runUrl}/artifacts)`,
+            })
+
+      - name: Propagate failure
+        if: steps.smoke.outcome == 'failure'
+        run: exit 1

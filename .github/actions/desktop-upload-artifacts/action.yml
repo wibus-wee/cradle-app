@@ -1,0 +1,32 @@
+name: Desktop Upload Artifacts
+description: Upload Electron Builder desktop artifacts and updater manifests
+
+inputs:
+  artifact-name:
+    description: Uploaded artifact name
+    required: true
+  retention-days:
+    description: Retention period in days
+    required: false
+    default: '14'
+
+runs:
+  using: composite
+  steps:
+    - name: Upload desktop artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          apps/desktop/release/*.dmg
+          apps/desktop/release/*.zip
+          apps/desktop/release/*.exe
+          apps/desktop/release/*.blockmap
+          apps/desktop/release/*.yml
+          apps/desktop/release/*.AppImage
+          apps/desktop/release/*.deb
+          apps/desktop/release/*.rpm
+          apps/desktop/release/*.snap
+          apps/desktop/release/*.tar.gz
+        if-no-files-found: error
+        retention-days: ${{ inputs.retention-days }}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cradle health *)",
+      "Bash(curl -s http://localhost:21423/session-awaits/d2e8acb9-0d66-4b57-ad1b-df7ef16f359f)",
+      "Bash(python3 -m json.tool)",
+      "Bash(gh issue create --repo wibus-wee/Cradle --title 'session-await trigger: 409 session-busy 未被正确识别为可重试错误' --body ' *)",
+      "Bash(grep *)"
+    ]
+  }
+}

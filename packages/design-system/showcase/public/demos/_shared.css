@@ -1,0 +1,30 @@
+/* Shared demo CSS — imports tokens from the package */
+/* Since this is a standalone HTML demo, tokens are inlined via :root vars */
+:root {
+  --color-neutral-1: #ffffff;
+  --color-neutral-2: #f5f5f5;
+  --color-neutral-3: #ebebeb;
+  --color-neutral-4: #d4d4d4;
+  --color-neutral-5: #a3a3a3;
+  --color-neutral-6: #737373;
+  --color-neutral-7: #595959;
+  --color-neutral-8: #404040;
+  --color-neutral-9: #262626;
+  --color-neutral-10: #141414;
+  --color-accent: #3b82f6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+}
+/* Base typography */
+body {
+  font-family: var(--font-sans);
+  color: var(--color-neutral-9);
+  background: var(--color-neutral-1);
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+}

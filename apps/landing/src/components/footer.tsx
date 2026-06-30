@@ -20,10 +20,6 @@ export function Footer() {
         </span>
       </div>
       <span style={{ fontSize: 11, color: 'var(--border-strong)' }}>·</span>
-      <a href="#/changelog" style={{ fontSize: 12, color: 'var(--text-muted)', textDecoration: 'none' }}>
-        Changelog
-      </a>
-      <span style={{ fontSize: 11, color: 'var(--border-strong)' }}>·</span>
       <a href="https://x.com/wibus_wee" style={{ fontSize: 12, color: 'var(--text-muted)' }} target="_blank" rel="noopener noreferrer">
         By wibus
       </a>

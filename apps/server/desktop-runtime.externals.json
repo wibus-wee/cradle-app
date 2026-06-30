@@ -1,0 +1,10 @@
+{
+  "packages": [
+    "@anthropic-ai/claude-agent-sdk",
+    "@ff-labs/fff-node",
+    "@node-rs/jieba",
+    "better-sqlite3",
+    "node-pty",
+    "sharp"
+  ]
+}
