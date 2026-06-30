@@ -392,7 +392,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
       input,
       abortController,
       attachPermissionHandler: true,
-      readCurrentPermissionMode: () => this.activePermissionModesBySession.get(sessionId) ?? turnPermissionMode,
     })
     turnPermissionMode = readActiveClaudeQueryPermissionMode(queryOptions.permissionMode)
 

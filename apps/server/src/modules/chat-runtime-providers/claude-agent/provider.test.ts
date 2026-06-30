@@ -821,7 +821,7 @@ describe('claudeAgentProvider MCP integration', () => {
     ]))
   })
 
-  it('leaves Claude disallowed tools empty and denies native ExitPlanMode after capture', async () => {
+  it('leaves Claude disallowed tools empty — plan mode enforced by SDK natively', async () => {
     const requestToolApproval = vi.fn()
     sdkMocks.query.mockReturnValue(createAsyncQuery([
       {
@@ -851,12 +851,13 @@ describe('claudeAgentProvider MCP integration', () => {
     const options = readQueryOptions(0)
     expect(options).toEqual(expect.objectContaining({
       permissionMode: 'plan',
-      allowDangerouslySkipPermissions: true,
+      allowDangerouslySkipPermissions: false,
     }))
     expect(options.disallowedTools).toEqual([])
     expect(options.disallowedTools).not.toContain('AskUserQuestion')
     expect(options.disallowedTools).not.toContain('EnterPlanMode')
     expect(options.disallowedTools).not.toContain('ExitPlanMode')
+    // canUseTool no longer intercepts plan mode — the SDK's native permissionMode: 'plan' handles it.
     await expect((options.canUseTool as CanUseTool)(
       'ExitPlanMode',
       { plan: '1. Inspect\n2. Patch' },
@@ -865,13 +866,25 @@ describe('claudeAgentProvider MCP integration', () => {
         toolUseID: 'toolu_plan_1',
       },
     )).resolves.toEqual({
-      behavior: 'deny',
-      message: 'Cradle captured the proposed plan. Stop here and wait for the user to refine or implement it in a later turn.',
+      behavior: 'allow',
+      updatedInput: { plan: '1. Inspect\n2. Patch' },
+    })
+    // Bash is also allowed by canUseTool (SDK handles blocking natively)
+    await expect((options.canUseTool as CanUseTool)(
+      'Bash',
+      { command: 'echo hi' },
+      {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_bash_1',
+      },
+    )).resolves.toEqual({
+      behavior: 'allow',
+      updatedInput: { command: 'echo hi' },
     })
     expect(requestToolApproval).not.toHaveBeenCalled()
   })
 
-  it('denies AskUserQuestion in plan mode so decisions cannot continue the same turn', async () => {
+  it('routes AskUserQuestion through requestUserInput regardless of plan mode — SDK blocks natively', async () => {
     const requestUserInput = vi.fn(async (request: RuntimeUserInputRequest) => ({
       requestId: request.providerRequestId,
       answers: { 'question-1': ['Implement now'] },
@@ -902,6 +915,8 @@ describe('claudeAgentProvider MCP integration', () => {
     }
 
     const options = readQueryOptions(0)
+    // canUseTool no longer has plan mode logic — AskUserQuestion is routed to requestUserInput.
+    // The SDK's native permissionMode: 'plan' handles blocking tools before canUseTool is called.
     await expect((options.canUseTool as CanUseTool)(
       'AskUserQuestion',
       {
@@ -922,10 +937,10 @@ describe('claudeAgentProvider MCP integration', () => {
         toolUseID: 'toolu_question_plan_1',
       },
     )).resolves.toEqual({
-      behavior: 'deny',
-      message: 'Cradle plan mode is active. Do not execute tools in this turn; provide the plan through ExitPlanMode.',
+      behavior: 'allow',
+      updatedInput: expect.any(Object),
     })
-    expect(requestUserInput).not.toHaveBeenCalled()
+    expect(requestUserInput).toHaveBeenCalled()
   })
 
   it('returns an explicit allow decision for non-user-input permission requests', async () => {

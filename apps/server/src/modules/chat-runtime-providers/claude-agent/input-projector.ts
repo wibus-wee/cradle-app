@@ -45,7 +45,7 @@ import type {
 } from './types'
 
 export const CLAUDE_AGENT_SDK_PERSIST_SESSION = true
-const CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE = 'Cradle captured the proposed plan. Stop here and wait for the user to refine or implement it in a later turn.'
+
 
 export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLabel: string): ClaudeAgentUserContent {
   if (typeof message === 'string') {
@@ -169,7 +169,6 @@ export function buildClaudeQueryOptions(input: {
   input: StreamTurnInput | GetCapabilitiesInput
   abortController: AbortController
   attachPermissionHandler: boolean
-  readCurrentPermissionMode?: () => 'bypassPermissions' | 'plan'
   persistSession?: boolean
 }): Options {
   const profile = requireRuntimeProviderTargetProfile(input.input.profile, CLAUDE_AGENT_RUNTIME_KIND)
@@ -189,8 +188,6 @@ export function buildClaudeQueryOptions(input: {
   const permissionMode = (providerOptions
     ? projectRuntimeSettingsToClaudePermissionMode(providerOptions.runtimeSettings)
     : undefined) ?? config.permissionMode
-  const supportsRuntimePermissionSwitch = input.attachPermissionHandler
-
   if (authMode === 'apiKey' && !anthropicCredential) {
     throw new ProviderRuntimeError(ProviderErrors.authFailed(CLAUDE_AGENT_RUNTIME_KIND))
   }
@@ -205,10 +202,7 @@ export function buildClaudeQueryOptions(input: {
     abortController: input.abortController,
     cwd: runtimeContext.cwd,
     permissionMode,
-    allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions'
-      || supportsRuntimePermissionSwitch
-      ? true
-      : config.allowDangerouslySkipPermissions,
+    allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions',
     maxTurns: config.maxTurns,
     additionalDirectories: uniquePaths([
       ...runtimeContext.additionalDirectories,
@@ -238,22 +232,9 @@ export function buildClaudeQueryOptions(input: {
   }
   const disallowedTools = config.disallowedTools ?? []
   queryOptions.disallowedTools = [...new Set(disallowedTools)]
-  const readCurrentPermissionMode = input.readCurrentPermissionMode
-    ?? (() => permissionMode === 'plan' ? 'plan' : 'bypassPermissions')
   const hasUserInputHandler = Boolean(input.deps.requestUserInput)
   if (input.attachPermissionHandler || hasUserInputHandler) {
     queryOptions.canUseTool = (async (toolName, toolInput, options) => {
-      if (input.attachPermissionHandler && readCurrentPermissionMode() === 'plan') {
-        if (isExitPlanModeToolName(toolName)) {
-          return handleExitPlanModeCapture(toolInput)
-        }
-
-        return {
-          behavior: 'deny',
-          message: 'Cradle plan mode is active. Do not execute tools in this turn; provide the plan through ExitPlanMode.',
-        }
-      }
-
       if (toolName === 'AskUserQuestion' && input.deps.requestUserInput) {
         return handleAskUserQuestionViaCanUseTool(input.deps, input.input, toolInput, options)
       }
@@ -686,26 +667,6 @@ function readClaudeAgentAskUserQuestionInput(input: unknown): { questions: Array
   })
 
   return questions.length > 0 ? { questions } : null
-}
-
-function isExitPlanModeToolName(toolName: string): boolean {
-  return toolName === 'ExitPlanMode' || toolName === 'exit_plan_mode' || toolName === 'exitplanmode'
-}
-
-function handleExitPlanModeCapture(
-  toolInput: unknown,
-): { behavior: 'deny', message: string } {
-  if (!isRecord(toolInput)) {
-    return {
-      behavior: 'deny',
-      message: 'Invalid ExitPlanMode input.',
-    }
-  }
-
-  return {
-    behavior: 'deny',
-    message: CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE,
-  }
 }
 
 function allowClaudeAgentTool(toolInput: Record<string, unknown>): { behavior: 'allow', updatedInput: Record<string, unknown> } {
