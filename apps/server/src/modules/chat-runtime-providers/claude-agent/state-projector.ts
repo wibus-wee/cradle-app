@@ -573,6 +573,21 @@ export function projectClaudeAgentCrewUiSlotState(
   }
 }
 
+export function readClaudeAgentCrewProviderThreadIdForAgent(
+  runtimeSession: RuntimeSession,
+  agentId: string,
+): string | null {
+  const normalizedAgentId = agentId.trim()
+  if (!normalizedAgentId) {
+    return null
+  }
+
+  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
+  const calls = readClaudeAgentCrewCallsSnapshot(readRecord(snapshot.claudeAgent).crewCalls)
+  const call = calls.find(item => item.agentId === normalizedAgentId)
+  return call?.id ?? null
+}
+
 function mergeClaudeAgentCrewCall(
   existing: ClaudeAgentCrewCallSnapshot,
   next: ClaudeAgentCrewCallSnapshot,
@@ -634,18 +649,18 @@ function readClaudeAgentCrewCallsSnapshot(value: unknown): ClaudeAgentCrewCallSn
 }
 
 function readClaudeAgentReceiverThreadIds(call: ClaudeAgentCrewCallSnapshot): string[] {
-  if (call.tool !== 'Agent' || call.agentId === null) {
+  if (call.tool !== 'Agent') {
     return []
   }
-  return [call.agentId]
+  return [call.id]
 }
 
 function projectClaudeAgentCrewAgents(call: ClaudeAgentCrewCallSnapshot): RuntimeCrewAgentItem[] {
-  if (call.tool !== 'Agent' || call.agentId === null) {
+  if (call.tool !== 'Agent') {
     return []
   }
   return [{
-    threadId: call.agentId,
+    threadId: call.id,
     status: call.status,
     message: call.description ?? call.prompt,
     name: call.subagentType,

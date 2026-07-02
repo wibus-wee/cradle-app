@@ -18,11 +18,13 @@ Stored turns pass the resolved model through SDK query options and model alias e
 
 Claude SDK `EnterPlanMode` is intercepted as a provider-owned request to switch Cradle's session `interactionMode` to `plan` through Chat Runtime settings, so composer state and the active SDK permission mode share one owner. Claude SDK `ExitPlanMode` remains available in SDK plan mode as the provider-owned signal for submitting a proposed plan. Cradle captures that tool input into its existing tool chunk envelope, stores the latest captured plan in the Claude Agent provider snapshot, exposes it through the runtime-neutral `plan` UI slot, projects a synthetic `plan_implementation` approval so the renderer can submit `PLEASE IMPLEMENT THIS PLAN:` as an ordinary follow-up, denies the native exit action, and keeps runtime interaction state changes owned by Chat Runtime settings.
 
+Claude Agent SubAgent output is provider-thread-first. Active child SDK messages carrying `parent_tool_use_id` or task lifecycle `tool_use_id` are mapped with the normal Claude Agent chunk mapper but published through Chat Runtime provider-thread events, not through the parent chat queue. Parent `Agent` rows remain tool lifecycle/reference rows; full child transcripts hydrate and stream through provider-thread APIs. Claude SDK `canUseTool` approvals from a SubAgent carry `agentID`; when the provider can resolve that agent id to the parent tool-call provider thread, the approval chunks are published to the child provider-thread stream so the Browser Panel detail view can approve or deny without leaking child activity into the parent transcript.
+
 Claude SDK `TodoWrite` remains a Claude-owned tool, but the adapter also projects the latest normalized todo list into the Claude Agent provider snapshot and exposes it as the runtime-neutral `progress` UI slot. Claude SDK `TaskCreate`, `TaskUpdate`, and `TaskList` also feed the same progress slot when the SDK provides structured task input/output such as `tool_use_result`; the adapter does not parse human-facing task result strings for IDs. The tool result payload still carries `result.pluginState.todos` for TodoWrite transcript rendering; the provider snapshot is the source for composer-adjacent live progress state.
 
 ## Files
 
-- `provider.ts`: Claude Agent `ChatRuntime` implementation; starts or resumes SDK sessions, resolves agent-scoped runtime cwd, projects SDK session titles to Chat Runtime, forwards MCP servers, streams turns, and handles live steering, cancellation, context usage reads, session title generation, and Cradle runtime settings updates through SDK permission mode projection.
+- `provider.ts`: Claude Agent `ChatRuntime` implementation; starts or resumes SDK sessions, resolves agent-scoped runtime cwd, projects SDK session titles to Chat Runtime, forwards MCP servers, streams turns, routes active SubAgent child chunks and approvals through provider-thread events, and handles live steering, cancellation, context usage reads, session title generation, and Cradle runtime settings updates through SDK permission mode projection.
 - `provider.test.ts`: Regression tests for Claude Agent SDK options, title projection, MCP forwarding, history projection, streaming, steering, attachments, model switching, and tool chunk mapping.
 - `metadata.ts`: Claude Agent runtime kind, catalog metadata, static capabilities, slash-command presentation projection, and static runtime UI slots.
 - `types.ts`: Claude Agent provider-private content and session-info types shared by package modules.
@@ -30,8 +32,8 @@ Claude SDK `TodoWrite` remains a Claude-owned tool, but the adapter also project
 - `input-projector.ts`: Projects Cradle message input, history, selected Skills, provider config, and environment into Claude Agent SDK content and query options.
 - `context-usage-projector.ts`: Projects Claude Agent SDK context usage control responses into Chat Runtime context usage details and compact UI slot state.
 - `async-input-stream.ts`: Claude Agent SDK async user-message input stream built on shared provider queue infrastructure.
-- `state-projector.ts`: Projects Claude Agent provider snapshot state such as pending resumed-session model switches, captured plan UI slot state, and captured TodoWrite/Task progress state.
+- `permission-bridge.ts`: Provider-owned bridge between SDK permission callbacks and Chat Runtime semantics, including AskUserQuestion user-input requests, plan-mode denial, pending tool approvals, and SubAgent `agentID` metadata forwarding.
+- `state-projector.ts`: Projects Claude Agent provider snapshot state such as pending resumed-session model switches, captured plan UI slot state, captured TodoWrite/Task progress state, and crew/subagent provider-thread ids.
 - `event-to-chunk-mapper.ts`: Maps Claude Agent SDK messages into AI SDK `UIMessageChunk` events.
-- `subagent-projector.ts`: Projects forwarded subagent chunk streams into nested Cradle subagent output tool payloads.
 - `event-to-chunk-mapper.test.ts`: Mapper-level regression tests.
 - `tools/`: Claude Code tool identity, todo/task progress projection, and tool envelope mapping.

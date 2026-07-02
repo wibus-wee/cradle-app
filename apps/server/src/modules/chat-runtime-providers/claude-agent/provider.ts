@@ -22,6 +22,7 @@ import type {
   ProviderThreadListResult,
   ProviderThreadReadInput,
   ProviderThreadReadResult,
+  ProviderThreadEvent,
   ProviderThreadTurn,
   ProviderThreadTurnsInput,
   ProviderThreadTurnsResult,
@@ -86,6 +87,7 @@ import {
   projectClaudeAgentPlanUiSlotState,
   projectClaudeAgentProgressUiSlotState,
   projectClaudeAgentUsageUiSlotState,
+  readClaudeAgentCrewProviderThreadIdForAgent,
   readClaudeAgentPendingModelSwitchId,
   resolveClaudeAgentPendingModelSwitchId,
   writeClaudeAgentAccountSnapshot,
@@ -96,6 +98,7 @@ import {
   writeClaudeAgentRateLimitSnapshot,
   writeClaudeAgentPendingModelSwitch,
 } from './state-projector'
+import { ClaudeCodeToolName } from './tools/identity'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload } from './tools/mapper'
 import type { ClaudeAgentProviderDeps, ClaudeAgentSessionInfo, ClaudeTitleGenerationThinkingEffort } from './types'
 
@@ -110,6 +113,8 @@ type ActiveClaudeQuery = {
   releaseLiveRuntimeSession: () => void
   currentTurn: ActiveClaudeTurn | null
   syntheticTurn: ActiveClaudeSyntheticTurn | null
+  providerThreadTurns: Map<string, ActiveClaudeProviderThreadTurn>
+  completedProviderThreadParentOutputIds: Set<string>
   onProviderSyntheticTurnEvent: StreamTurnInput['onProviderSyntheticTurnEvent'] | null
   closed: boolean
 }
@@ -131,6 +136,13 @@ type ActiveClaudeSyntheticTurn = {
   providerThreadId: string | null
   mapperState: ClaudeAgentChunkMapperState
   onProviderSyntheticTurnEvent: NonNullable<StreamTurnInput['onProviderSyntheticTurnEvent']>
+}
+
+type ActiveClaudeProviderThreadTurn = {
+  providerThreadId: string
+  providerTurnId: string
+  mapperState: ClaudeAgentChunkMapperState
+  terminal: boolean
 }
 
 type ContextUsageRuntimeInput = Pick<GetContextUsageInput, 'runtimeSession'>
@@ -432,6 +444,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
         releaseLiveRuntimeSession: () => undefined,
         currentTurn: null,
         syntheticTurn: null,
+        providerThreadTurns: new Map(),
+        completedProviderThreadParentOutputIds: new Set(),
         onProviderSyntheticTurnEvent: null,
         closed: false,
       }
@@ -574,6 +588,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     finally {
       endGeneration()
       if (activeEntry.currentTurn === turn) {
+        this.completeClaudeProviderThreadTurns(activeEntry, turn)
         activeEntry.currentTurn = null
         turn.queue.close()
       }
@@ -599,6 +614,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     finally {
       const turn = entry.currentTurn
       if (turn) {
+        this.completeClaudeProviderThreadTurns(entry, turn)
         turn.endGeneration()
         turn.queue.close()
         entry.currentTurn = null
@@ -625,6 +641,14 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
 
     this.projectClaudeAgentRuntimeState(entry.runtimeSession, message)
+
+    if (turn) {
+      const providerThreadId = readClaudeActiveProviderThreadId(message)
+      if (providerThreadId) {
+        await this.handleClaudeProviderThreadMessage(entry, turn, providerThreadId, message)
+        return
+      }
+    }
 
     const result = await mapClaudeAgentMessageToChunks(message, entry.mapperState)
     for (const plan of result.capturedPlans) {
@@ -674,6 +698,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     if (message.type === 'result' && !readClaudeMessageParentToolUseId(message)) {
       if (turn) {
+        this.completeClaudeProviderThreadTurns(entry, turn)
         await this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(() => undefined)
         turn.endGeneration()
         entry.currentTurn = null
@@ -683,6 +708,120 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
   }
 
+  private async handleClaudeProviderThreadMessage(
+    entry: ActiveClaudeQuery,
+    turn: ActiveClaudeTurn,
+    providerThreadId: string,
+    message: SDKMessage,
+  ): Promise<void> {
+    const providerThreadTurn = this.ensureClaudeProviderThreadTurn(entry, providerThreadId)
+    const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(message, providerThreadTurn.mapperState)
+    for (const crewCall of result.capturedCrewCalls) {
+      writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
+    }
+    this.updateClaudeTurnUsage(result.usage)
+    this.publishClaudeProviderThreadEvent(turn, providerThreadTurn, result.chunks)
+    if (hasTerminalProviderThreadChunk(result.chunks)) {
+      this.emitClaudeProviderThreadParentOutput(entry, turn, providerThreadId, result.chunks)
+      providerThreadTurn.terminal = true
+      entry.providerThreadTurns.delete(providerThreadId)
+    }
+  }
+
+  private ensureClaudeProviderThreadTurn(
+    entry: ActiveClaudeQuery,
+    providerThreadId: string,
+  ): ActiveClaudeProviderThreadTurn {
+    const existing = entry.providerThreadTurns.get(providerThreadId)
+    if (existing) {
+      return existing
+    }
+
+    const providerThreadTurn: ActiveClaudeProviderThreadTurn = {
+      providerThreadId,
+      providerTurnId: `claude-subagent-${randomUUID()}`,
+      mapperState: createClaudeAgentChunkMapperState(`provider-thread:${providerThreadId}`),
+      terminal: false,
+    }
+    entry.providerThreadTurns.set(providerThreadId, providerThreadTurn)
+    return providerThreadTurn
+  }
+
+  private publishClaudeProviderThreadEvent(
+    turn: ActiveClaudeTurn,
+    providerThreadTurn: ActiveClaudeProviderThreadTurn,
+    chunks: UIMessageChunk[],
+  ): void {
+    if (chunks.length === 0 || providerThreadTurn.terminal) {
+      return
+    }
+    const event: ProviderThreadEvent = {
+      providerThreadId: providerThreadTurn.providerThreadId,
+      providerTurnId: providerThreadTurn.providerTurnId,
+      notification: {
+        type: 'claudeAgentSubagent',
+        parentToolUseId: providerThreadTurn.providerThreadId,
+      },
+      chunks,
+    }
+    turn.input.onProviderThreadEvent?.(event)
+  }
+
+  private completeClaudeProviderThreadTurns(entry: ActiveClaudeQuery, turn: ActiveClaudeTurn): void {
+    for (const providerThreadTurn of entry.providerThreadTurns.values()) {
+      const chunks: UIMessageChunk[] = [
+        { type: 'finish', finishReason: 'stop' },
+      ]
+      this.publishClaudeProviderThreadEvent(turn, providerThreadTurn, chunks)
+      this.emitClaudeProviderThreadParentOutput(entry, turn, providerThreadTurn.providerThreadId, chunks)
+      providerThreadTurn.terminal = true
+    }
+    entry.providerThreadTurns.clear()
+  }
+
+  private emitClaudeProviderThreadParentOutput(
+    entry: ActiveClaudeQuery,
+    turn: ActiveClaudeTurn,
+    providerThreadId: string,
+    terminalChunks: UIMessageChunk[],
+  ): void {
+    if (entry.completedProviderThreadParentOutputIds.has(providerThreadId)) {
+      return
+    }
+    entry.completedProviderThreadParentOutputIds.add(providerThreadId)
+
+    const errorText = readTerminalProviderThreadErrorText(terminalChunks)
+    if (errorText) {
+      turn.queue.push({
+        type: 'tool-output-error',
+        toolCallId: providerThreadId,
+        errorText,
+      })
+      return
+    }
+
+    const args = entry.mapperState.toolArgsByToolCallId.get(providerThreadId)
+    const current = entry.mapperState.emittedToolStateByToolCallId.get(providerThreadId) ?? {
+      started: false,
+      inputAvailable: false,
+    }
+    current.outputAvailable = true
+    entry.mapperState.emittedToolStateByToolCallId.set(providerThreadId, current)
+    turn.queue.push({
+      type: 'tool-output-available',
+      toolCallId: providerThreadId,
+      output: createClaudeCodeToolResultPayload({
+        apiName: ClaudeCodeToolName.Agent,
+        args,
+        result: {
+          status: 'completed',
+          providerThreadId,
+          threadId: providerThreadId,
+        },
+      }),
+    })
+  }
+
   private emitClaudeAgentToolApprovalRequest(sessionId: string, request: ClaudeAgentToolApprovalRequest): void {
     const entry = this.activeQueries.get(sessionId)
     const turn = entry?.currentTurn
@@ -690,42 +829,40 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return
     }
 
-    const current = entry.mapperState.emittedToolStateByToolCallId.get(request.toolCallId) ?? {
-      started: false,
-      inputAvailable: false,
-    }
-    entry.mapperState.toolNamesByToolCallId.set(request.toolCallId, request.toolName)
-
-    if (!current.started) {
-      turn.queue.push({
-        type: 'tool-input-start',
-        toolCallId: request.toolCallId,
-        toolName: request.toolName,
-      })
-      current.started = true
+    const providerThreadTurn = this.resolveClaudeToolApprovalProviderThreadTurn(entry, request)
+    if (providerThreadTurn) {
+      this.publishClaudeProviderThreadEvent(
+        turn,
+        providerThreadTurn,
+        emitClaudeAgentToolApprovalChunks(providerThreadTurn.mapperState, request),
+      )
+      return
     }
 
-    if (!current.inputAvailable) {
-      entry.mapperState.toolArgsByToolCallId.set(request.toolCallId, request.toolInput)
-      turn.queue.push({
-        type: 'tool-input-available',
-        toolCallId: request.toolCallId,
-        toolName: request.toolName,
-        input: createClaudeCodeToolInputPayload(request.toolName, request.toolInput),
-      })
-      current.inputAvailable = true
+    for (const chunk of emitClaudeAgentToolApprovalChunks(entry.mapperState, request)) {
+      turn.queue.push(chunk)
+    }
+  }
+
+  private resolveClaudeToolApprovalProviderThreadTurn(
+    entry: ActiveClaudeQuery,
+    request: ClaudeAgentToolApprovalRequest,
+  ): ActiveClaudeProviderThreadTurn | null {
+    if (!request.agentId) {
+      return null
     }
 
-    if (!current.approvalRequested) {
-      turn.queue.push({
-        type: 'tool-approval-request',
-        toolCallId: request.toolCallId,
-        approvalId: request.toolCallId,
-      })
-      current.approvalRequested = true
+    const mappedProviderThreadId = readClaudeAgentCrewProviderThreadIdForAgent(entry.runtimeSession, request.agentId)
+    if (mappedProviderThreadId) {
+      return this.ensureClaudeProviderThreadTurn(entry, mappedProviderThreadId)
     }
 
-    entry.mapperState.emittedToolStateByToolCallId.set(request.toolCallId, current)
+    const providerThreadTurn = entry.providerThreadTurns.get(request.agentId)
+    if (providerThreadTurn) {
+      return providerThreadTurn
+    }
+
+    return null
   }
 
   private async handleClaudeSyntheticSessionMessage(entry: ActiveClaudeQuery, message: SDKMessage): Promise<void> {
@@ -871,6 +1008,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return
     }
     entry.closed = true
+    if (entry.currentTurn) {
+      this.completeClaudeProviderThreadTurns(entry, entry.currentTurn)
+    }
     entry.abortController.abort()
     entry.inputStream.close()
     closeClaudeQuery(entry.query)
@@ -972,9 +1112,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     return {
       runtimeKind: this.runtimeKind,
       providerSessionId: record.parentSessionId,
-      threadId: record.agentId,
-      turns: page.map(message => projectClaudeSubagentTurn(record.agentId, message)),
-      messages: projectClaudeSubagentMessagesToUiMessages(record.agentId, page, displayMessages),
+      threadId: readClaudeSubagentProviderThreadId(record),
+      turns: page.map(message => projectClaudeSubagentTurn(record, message)),
+      messages: projectClaudeSubagentMessagesToUiMessages(record, page, displayMessages),
       nextCursor: offset + limit < messages.length ? String(offset + limit) : null,
       backwardsCursor: offset > 0 ? String(Math.max(0, offset - limit)) : null,
     }
@@ -1351,12 +1491,85 @@ function hasClaudeAgentAccountSignal(account: AccountInfo | undefined): account 
   )
 }
 
+function emitClaudeAgentToolApprovalChunks(
+  state: ClaudeAgentChunkMapperState,
+  request: ClaudeAgentToolApprovalRequest,
+): UIMessageChunk[] {
+  const current = state.emittedToolStateByToolCallId.get(request.toolCallId) ?? {
+    started: false,
+    inputAvailable: false,
+  }
+  const chunks: UIMessageChunk[] = []
+  state.toolNamesByToolCallId.set(request.toolCallId, request.toolName)
+
+  if (!current.started) {
+    chunks.push({
+      type: 'tool-input-start',
+      toolCallId: request.toolCallId,
+      toolName: request.toolName,
+    })
+    current.started = true
+  }
+
+  if (!current.inputAvailable) {
+    state.toolArgsByToolCallId.set(request.toolCallId, request.toolInput)
+    chunks.push({
+      type: 'tool-input-available',
+      toolCallId: request.toolCallId,
+      toolName: request.toolName,
+      input: createClaudeCodeToolInputPayload(request.toolName, request.toolInput),
+    })
+    current.inputAvailable = true
+  }
+
+  if (!current.approvalRequested) {
+    chunks.push({
+      type: 'tool-approval-request',
+      toolCallId: request.toolCallId,
+      approvalId: request.toolCallId,
+    })
+    current.approvalRequested = true
+  }
+
+  state.emittedToolStateByToolCallId.set(request.toolCallId, current)
+  return chunks
+}
+
 function readClaudeMessageParentToolUseId(message: SDKMessage): string | null {
   if (!('parent_tool_use_id' in message)) {
     return null
   }
   const parentToolUseId = (message as { parent_tool_use_id?: unknown }).parent_tool_use_id
   return typeof parentToolUseId === 'string' && parentToolUseId.length > 0 ? parentToolUseId : null
+}
+
+function readClaudeActiveProviderThreadId(message: SDKMessage): string | null {
+  return readClaudeMessageParentToolUseId(message) ?? readClaudeSystemTaskToolUseId(message)
+}
+
+function readClaudeSystemTaskToolUseId(message: SDKMessage): string | null {
+  if (message.type !== 'system') {
+    return null
+  }
+  switch (message.subtype) {
+    case 'task_started':
+    case 'task_progress':
+    case 'task_notification': {
+      const toolUseId = (message as { tool_use_id?: unknown }).tool_use_id
+      return typeof toolUseId === 'string' && toolUseId.length > 0 ? toolUseId : null
+    }
+    default:
+      return null
+  }
+}
+
+function hasTerminalProviderThreadChunk(chunks: UIMessageChunk[]): boolean {
+  return chunks.some(chunk => chunk.type === 'finish' || chunk.type === 'error')
+}
+
+function readTerminalProviderThreadErrorText(chunks: UIMessageChunk[]): string | null {
+  const error = chunks.find((chunk): chunk is Extract<UIMessageChunk, { type: 'error' }> => chunk.type === 'error')
+  return error?.errorText ?? null
 }
 
 function shouldRouteClaudeMessageToSyntheticTurn(entry: ActiveClaudeQuery, message: SDKMessage): boolean {
@@ -1438,13 +1651,14 @@ function readProviderThreadOffset(cursor: string | null | undefined): number {
 
 function projectClaudeSubagentThread(record: ClaudeSubagentThreadRecord): ProviderThread {
   const parentToolUseId = readClaudeSubagentParentToolUseId(record.messages)
+  const providerThreadId = readClaudeSubagentProviderThreadId(record)
   const preview = readClaudeSubagentPreview(record.messages)
   const createdAt = readClaudeSubagentBoundaryTimestamp(record.messages, 'first')
   const updatedAt = readClaudeSubagentBoundaryTimestamp(record.messages, 'last')
   const subagentType = readFirstClaudeSubagentString(record.messages, 'subagent_type')
   const taskDescription = readFirstClaudeSubagentString(record.messages, 'task_description')
   return {
-    id: record.agentId,
+    id: providerThreadId,
     providerSessionTreeId: record.parentSessionId,
     forkedFromId: parentToolUseId,
     preview,
@@ -1472,6 +1686,10 @@ function projectClaudeSubagentThread(record: ClaudeSubagentThreadRecord): Provid
   }
 }
 
+function readClaudeSubagentProviderThreadId(record: ClaudeSubagentThreadRecord): string {
+  return readClaudeSubagentParentToolUseId(record.messages) ?? record.agentId
+}
+
 function compareClaudeProviderThreads(
   left: ProviderThread,
   right: ProviderThread,
@@ -1488,11 +1706,20 @@ function claudeProviderThreadMatchesSearch(thread: ProviderThread, searchTerm: s
   return [
     thread.id,
     thread.forkedFromId,
+    readClaudeProviderThreadSourceAgentId(thread.source),
     thread.preview,
     thread.agentNickname,
     thread.agentRole,
     thread.name,
   ].some(value => normalizeProviderThreadText(value)?.includes(searchTerm))
+}
+
+function readClaudeProviderThreadSourceAgentId(source: unknown): string | null {
+  if (!source || typeof source !== 'object') {
+    return null
+  }
+  const agentId = (source as { agentId?: unknown }).agentId
+  return typeof agentId === 'string' ? agentId : null
 }
 
 function normalizeProviderThreadText(text: string | null | undefined): string | null {
@@ -1560,8 +1787,12 @@ function readClaudeSubagentTimestamp(message: ClaudeSubagentSessionMessage): num
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
-function projectClaudeSubagentTurn(agentId: string, message: ClaudeSubagentSessionMessage): ProviderThreadTurn {
+function projectClaudeSubagentTurn(
+  record: ClaudeSubagentThreadRecord,
+  message: ClaudeSubagentSessionMessage,
+): ProviderThreadTurn {
   const timestamp = readClaudeSubagentTimestamp(message)
+  const providerThreadId = readClaudeSubagentProviderThreadId(record)
   return {
     id: message.uuid,
     status: 'completed',
@@ -1571,17 +1802,19 @@ function projectClaudeSubagentTurn(agentId: string, message: ClaudeSubagentSessi
     itemsView: 'full',
     items: [{
       provider: 'claude-agent',
-      providerThreadId: agentId,
+      providerThreadId,
+      agentId: record.agentId,
       message,
     }],
   }
 }
 
 function projectClaudeSubagentMessagesToUiMessages(
-  agentId: string,
+  record: ClaudeSubagentThreadRecord,
   messages: ClaudeSubagentSessionMessage[],
   toolSourceMessages: ClaudeSubagentSessionMessage[] = messages,
 ): UIMessage[] {
+  const providerThreadId = readClaudeSubagentProviderThreadId(record)
   const toolUseById = collectClaudeSubagentToolUses(toolSourceMessages)
   return messages.flatMap((message): UIMessage[] => {
     const parts = projectClaudeSubagentMessageParts(message, toolUseById)
@@ -1589,12 +1822,13 @@ function projectClaudeSubagentMessagesToUiMessages(
       return []
     }
     return [{
-      id: `provider-thread:${agentId}:message:${message.uuid}`,
+      id: `provider-thread:${providerThreadId}:message:${message.uuid}`,
       role: readClaudeSubagentUiRole(message),
       parts,
       metadata: {
         provider: 'claude-agent',
-        providerThreadId: agentId,
+        providerThreadId,
+        agentId: record.agentId,
         providerMessageId: message.uuid,
         parentToolUseId: message.parent_tool_use_id,
       },

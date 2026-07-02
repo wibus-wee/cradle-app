@@ -891,6 +891,15 @@ function mergeReplayChunk(existing: unknown, next: unknown): unknown | null {
     }
   }
 
+  if (
+    existingRecord.type === 'tool-output-available'
+    && nextRecord.type === 'tool-output-available'
+    && typeof existingRecord.toolCallId === 'string'
+    && existingRecord.toolCallId === nextRecord.toolCallId
+  ) {
+    return { ...nextRecord }
+  }
+
   return null
 }
 

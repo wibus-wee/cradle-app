@@ -16,6 +16,7 @@ export interface ToolCallBlockProps {
   input?: unknown
   output?: unknown
   errorText?: string
+  sessionId?: string | null
   workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
   onApprovalResponse?: (approval: { id: string, approved: boolean }) => void
   children?: ReactNode

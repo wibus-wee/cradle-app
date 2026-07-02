@@ -4262,7 +4262,7 @@ describe('chat runtime capability', () => {
     }
   })
 
-  it('persists provider synthetic turns as system-origin assistant messages without active-run lock', async () => {
+  it('routes provider-thread synthetic turns without persisting child output into the parent session', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -4317,7 +4317,6 @@ describe('chat runtime capability', () => {
       expect(messageRows.map(row => ({ role: row.role, status: row.status, content: row.content }))).toEqual([
         { role: 'user', status: 'complete', content: 'Launch background agent' },
         { role: 'assistant', status: 'complete', content: 'Parent response' },
-        { role: 'assistant', status: 'complete', content: 'Background agent report' },
       ])
 
       const runRows = db()
@@ -4327,10 +4326,7 @@ describe('chat runtime capability', () => {
         .all()
       expect(runRows.map(row => ({ origin: row.origin, status: row.status }))).toEqual([
         { origin: 'user', status: 'complete' },
-        { origin: 'system', status: 'complete' },
       ])
-      const syntheticRun = runRows.find(row => row.origin === 'system')
-      expect(syntheticRun).toBeDefined()
       const eventRows = db()
         .select({
           eventType: sessionEvents.eventType,
@@ -4345,14 +4341,6 @@ describe('chat runtime capability', () => {
         'RunStarted',
         'AssistantMessageCompleted',
         'RunCompleted',
-        'RunStarted',
-        'AssistantMessageCompleted',
-        'RunCompleted',
-      ])
-      expect(eventRows.slice(-3)).toEqual([
-        { eventType: 'RunStarted', subjectRunId: syntheticRun!.id },
-        { eventType: 'AssistantMessageCompleted', subjectRunId: null },
-        { eventType: 'RunCompleted', subjectRunId: syntheticRun!.id },
       ])
       expect(getActiveSessionRun('session-chat-provider-synthetic-turn')).toBeNull()
     }

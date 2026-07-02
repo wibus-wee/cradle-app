@@ -21,14 +21,6 @@ import type { UIMessageChunk } from 'ai'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE, isClaudeAgentEnterPlanModeToolName, isClaudeAgentExitPlanModeToolName } from './plan-mode'
 import { ClaudeCodeToolName } from './tools/identity'
-import type { ClaudeAgentSubagentProjection } from './subagent-projector'
-import {
-  compactClaudeAgentSubagentProjection,
-  createClaudeAgentSubagentOutput,
-  createClaudeAgentSubagentProjection,
-  projectClaudeAgentSubagentMessage,
-  projectClaudeAgentSubagentOutputChunk,
-} from './subagent-projector'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload, normalizeClaudeCodeToolApiName } from './tools/mapper'
 import {
   captureClaudeAgentTaskToolInput,
@@ -98,8 +90,6 @@ export interface ClaudeAgentChunkMapperState {
   toolArgsByToolCallId: Map<string, unknown>
   /** Tracks structured Claude TaskCreate/TaskUpdate state for progress slot projection. */
   taskProgress: ClaudeAgentTaskProgressState
-  /** Accumulated child-agent stream state keyed by parent tool call. */
-  subagentStreams: Map<string, ClaudeAgentSubagentStreamState>
   /** Maps content block index → text item ID for currently-streaming text blocks. */
   activeTextBlockByIndex: Map<number, string>
   /** Maps content block index → reasoning item ID for currently-streaming thinking blocks. */
@@ -112,10 +102,6 @@ export interface ClaudeAgentChunkMapperState {
   capturedExitPlanToolCallIds: Set<string>
   /** Latest plan body written through Claude plan mode before ExitPlanMode. */
   latestPlanFileContent: string | null
-}
-
-interface ClaudeAgentSubagentStreamState extends ClaudeAgentSubagentProjection {
-  mapperState: ClaudeAgentChunkMapperState
 }
 
 interface TextAccumulator {
@@ -168,54 +154,7 @@ export interface ClaudeAgentChunkMapperResult {
 
 export async function mapClaudeAgentMessageToChunks(msg: SDKMessage, state: ClaudeAgentChunkMapperState): Promise<ClaudeAgentChunkMapperResult> {
   normalizeClaudeAgentChunkMapperState(state)
-  const parentToolUseId = readClaudeParentProjectionToolUseId(msg)
-  if (parentToolUseId) {
-    const streamState = subagentStreamState(parentToolUseId, state)
-    const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(msg, streamState.mapperState)
-
-    if (result.chunks.length === 0) {
-      return result
-    }
-
-    const preliminaryChunk = projectClaudeAgentSubagentOutputChunk(parentToolUseId, streamState, result.chunks)
-    return {
-      ...result,
-      chunks: preliminaryChunk ? [preliminaryChunk] : [],
-      capturedPlans: [],
-      capturedTodos: [],
-      capturedInteractionModes: [],
-      capturedCrewCalls: shouldKeepParentProjectedCrewCalls(msg) ? result.capturedCrewCalls : [],
-    }
-  }
-
   return mapClaudeAgentMessageToChunksWithoutParentProjection(msg, state)
-}
-
-function readClaudeParentProjectionToolUseId(message: SDKMessage): string | null {
-  if ('parent_tool_use_id' in message && typeof message.parent_tool_use_id === 'string') {
-    return message.parent_tool_use_id
-  }
-  if (
-    message.type === 'system'
-    && (
-      message.subtype === 'task_started'
-      || message.subtype === 'task_progress'
-      || message.subtype === 'task_notification'
-    )
-    && typeof message.tool_use_id === 'string'
-  ) {
-    return message.tool_use_id
-  }
-  return null
-}
-
-function shouldKeepParentProjectedCrewCalls(message: SDKMessage): boolean {
-  return message.type === 'system'
-    && (
-      message.subtype === 'task_started'
-      || message.subtype === 'task_progress'
-      || message.subtype === 'task_notification'
-    )
 }
 
 function normalizeClaudeAgentChunkMapperState(state: ClaudeAgentChunkMapperState): void {
@@ -226,7 +165,6 @@ function normalizeClaudeAgentChunkMapperState(state: ClaudeAgentChunkMapperState
   state.toolInputTextByToolCallId ??= new Map()
   state.toolArgsByToolCallId ??= new Map()
   state.taskProgress ??= createClaudeAgentTaskProgressState()
-  state.subagentStreams ??= new Map()
   state.activeTextBlockByIndex ??= new Map()
   state.activeThinkingBlockByIndex ??= new Map()
   state.completedTextBlockIndices ??= new Set()
@@ -247,7 +185,6 @@ export function createClaudeAgentChunkMapperState(textItemId: string = randomUUI
     toolInputTextByToolCallId: new Map(),
     toolArgsByToolCallId: new Map(),
     taskProgress: createClaudeAgentTaskProgressState(),
-    subagentStreams: new Map(),
     activeTextBlockByIndex: new Map(),
     activeThinkingBlockByIndex: new Map(),
     completedTextBlockIndices: new Set(),
@@ -272,20 +209,6 @@ export function resetClaudeAgentChunkMapperForTurn(state: ClaudeAgentChunkMapper
   state.completedThinkingBlockIndices.clear()
   state.capturedExitPlanToolCallIds.clear()
   state.latestPlanFileContent = null
-}
-
-function subagentStreamState(parentToolUseId: string, state: ClaudeAgentChunkMapperState): ClaudeAgentSubagentStreamState {
-  const existing = state.subagentStreams.get(parentToolUseId)
-  if (existing) {
-    return existing
-  }
-
-  const next: ClaudeAgentSubagentStreamState = {
-    ...createClaudeAgentSubagentProjection(parentToolUseId),
-    mapperState: createClaudeAgentChunkMapperState(`subagent-text-${parentToolUseId}`),
-  }
-  state.subagentStreams.set(parentToolUseId, next)
-  return next
 }
 
 export async function mapClaudeAgentMessageToChunksWithoutParentProjection(msg: SDKMessage, state: ClaudeAgentChunkMapperState): Promise<ClaudeAgentChunkMapperResult> {
@@ -456,7 +379,10 @@ function mapAssistant(msg: SDKAssistantMessage, state: ClaudeAgentChunkMapperSta
   for (let blockIndex = 0; blockIndex < msg.message.content.length; blockIndex++) {
     const block = msg.message.content[blockIndex]!
     if (block.type === 'text') {
-      if (state.completedTextBlockIndices.has(blockIndex)) {
+      if (
+        state.activeTextBlockByIndex.has(blockIndex)
+        || state.completedTextBlockIndices.has(blockIndex)
+      ) {
         continue
       }
       pendingText += block.text
@@ -479,7 +405,13 @@ function mapAssistant(msg: SDKAssistantMessage, state: ClaudeAgentChunkMapperSta
 
     // Skip thinking blocks that were fully handled by stream events — they already
     // emitted reasoning-start/delta/end, and the snapshot would create a duplicate part.
-    if (block.type === 'thinking' && state.completedThinkingBlockIndices.has(blockIndex)) {
+    if (
+      block.type === 'thinking'
+      && (
+        state.activeThinkingBlockByIndex.has(blockIndex)
+        || state.completedThinkingBlockIndices.has(blockIndex)
+      )
+    ) {
       continue
     }
 
@@ -555,13 +487,6 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
             chunks.push({ type: 'tool-output-error', toolCallId: b.tool_use_id, errorText })
           }
           else {
-            const subagentState = state.subagentStreams.get(b.tool_use_id)
-            const subagentMessage = subagentState
-              ? projectClaudeAgentSubagentMessage(b.tool_use_id, subagentState)
-              : null
-            if (subagentState) {
-              compactClaudeAgentSubagentProjection(subagentState, subagentMessage)
-            }
             const output = createClaudeCodeToolResult(
               b.tool_use_id,
               normalizedOutput,
@@ -578,9 +503,7 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
             chunks.push({
               type: 'tool-output-available',
               toolCallId: b.tool_use_id,
-              output: subagentMessage
-                ? createClaudeAgentSubagentOutput(subagentMessage, b.content ?? output)
-                : output,
+              output,
             })
             chunks.push(...projectClaudeToolResultImageFileChunks(normalizedOutput))
           }

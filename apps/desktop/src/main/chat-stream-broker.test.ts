@@ -348,6 +348,54 @@ describe('chat stream broker', () => {
     ])
   })
 
+  it('coalesces replay tool output snapshots by keeping the latest output', async () => {
+    const controlled = createControlledSseResponse({ 'x-cradle-run-id': 'run-tool-output-replay' })
+    const fetchFn = vi.fn(async () => controlled.response)
+    const broker = new ChatStreamBroker({
+      serverUrl: 'http://127.0.0.1:21423',
+      fetchFn: fetchFn as typeof fetch,
+    })
+    const first = new FakeWebContents()
+    const late = new FakeWebContents()
+
+    await broker.startResponse(first as never, {
+      sessionId: 'session-tool-output-replay',
+      body: { text: 'hello' },
+    })
+    controlled.controller.enqueue(encodeSse({ type: 'tool-input-start', toolCallId: 'call-subagent', toolName: 'Agent' }))
+    controlled.controller.enqueue(encodeSse({
+      type: 'tool-output-available',
+      toolCallId: 'call-subagent',
+      output: { snapshot: 'first' },
+      preliminary: true,
+    }))
+    controlled.controller.enqueue(encodeSse({
+      type: 'tool-output-available',
+      toolCallId: 'call-subagent',
+      output: { snapshot: 'second' },
+      preliminary: true,
+    }))
+    controlled.controller.enqueue(encodeSse({
+      type: 'tool-output-available',
+      toolCallId: 'call-subagent',
+      output: { snapshot: 'final' },
+    }))
+
+    await vi.waitFor(() => {
+      expect(readChannelPayloads(first, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL)).toHaveLength(4)
+      expect(broker.diagnostics().streams[0]?.replayChunkCount).toBe(2)
+    })
+
+    await broker.subscribeSession(late as never, {
+      sessionId: 'session-tool-output-replay',
+    })
+
+    expect(readChannelPayloads(late, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL)).toMatchObject([
+      { chunk: { type: 'tool-input-start', toolCallId: 'call-subagent', toolName: 'Agent' } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'call-subagent', output: { snapshot: 'final' } } },
+    ])
+  })
+
   it('does not replay duplicate chunks to an early subscriber when upstream data arrives before the handle resolves', async () => {
     const fetchFn = vi.fn(async () => createImmediateSseResponse([
       { type: 'start', messageId: 'assistant-fast' },

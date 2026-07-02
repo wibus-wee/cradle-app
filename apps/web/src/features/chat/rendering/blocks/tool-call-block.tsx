@@ -2,13 +2,15 @@ import {
   AlertLine as CircleAlertIcon,
   CheckCircleLine as CheckCircle2Icon,
   ClockLine as ClockIcon,
+  ExternalLinkLine as ExternalLinkIcon,
   RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
 import { m } from 'motion/react'
-import type { KeyboardEvent, ReactNode } from 'react'
-import { Activity, useEffect, useState } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { useLayoutStore } from '~/store/layout'
@@ -16,7 +18,6 @@ import { useLayoutStore } from '~/store/layout'
 import { readBuiltinToolCallInputPayload } from '../chat-tool-entities'
 import { readTerminalOutputSections } from '../terminal-tool-details'
 import { STATUS_LABELS, TOOL_ICON_MAP } from '../tool-block-constants'
-import { basename } from '../tool-block-utils'
 import type { RenderableToolPart, ToolPayload, ToolState, ToolUiDescriptor } from '../tool-ui-classifier'
 import { describeToolCall, readToolInputPayload, readToolPayload } from '../tool-ui-classifier'
 import { EditFileBlock } from './edit-file-block'
@@ -105,6 +106,32 @@ function hasWorkflowDetails(input: ToolPayload, output: ToolPayload, descriptor:
     || input.workflowSessionUrl !== null
     || output.workflowSessionUrl !== null
   )
+}
+
+function readSubagentPanelName(
+  input: ToolPayload,
+  output: ToolPayload,
+  descriptor: ToolUiDescriptor,
+): string {
+  return output.workflowName
+    ?? input.workflowName
+    ?? output.subagentName
+    ?? input.subagentName
+    ?? descriptor.target
+    ?? descriptor.title
+    ?? 'Subagent'
+}
+
+function readSubagentPanelRole(
+  input: ToolPayload,
+  output: ToolPayload,
+  descriptor: ToolUiDescriptor,
+): string | null {
+  return output.agentType
+    ?? input.agentType
+    ?? output.taskType
+    ?? input.taskType
+    ?? (descriptor.toolName.includes('Workflow') ? 'Workflow' : null)
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +319,7 @@ export function ToolCallBlock({
   input,
   output,
   errorText,
+  sessionId,
   workspaceDiffTarget,
   onApprovalResponse,
   children,
@@ -314,13 +342,13 @@ export function ToolCallBlock({
 
   const hasTerminalPanel
     = descriptor.kind === 'terminal'
-    && (inputPayload.command !== null
-      || inputPayload.timeout !== null
-      || outputPayload.backgroundTaskId !== null
-      || readTerminalOutputSections(outputPayload, errorText).length > 0)
+      && (inputPayload.command !== null
+        || inputPayload.timeout !== null
+        || outputPayload.backgroundTaskId !== null
+        || readTerminalOutputSections(outputPayload, errorText).length > 0)
   const hasDiffPanel
     = (descriptor.kind === 'file-diff' || descriptor.kind === 'notebook-diff')
-    && (!!errorText || hasFileDiffInlineContent(inputPayload, outputPayload))
+      && (!!errorText || hasFileDiffInlineContent(inputPayload, outputPayload))
   const hasWorkflowPanel = hasWorkflowDetails(inputPayload, outputPayload, descriptor)
   const hasStructuredPanel = hasTerminalPanel || hasDiffPanel || hasWorkflowPanel
   const workspaceDiffPath
@@ -329,6 +357,7 @@ export function ToolCallBlock({
       : null
   const canOpenWorkspaceDiff = !!workspaceDiffTarget && !!workspaceDiffPath
   const openWorkspaceDiffTab = useBrowserPanelStore(s => s.openWorkspaceDiffTab)
+  const openSubagentTab = useBrowserPanelStore(s => s.openSubagentTab)
   const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
   const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
   const hasChildren = hasRenderableChildren(children)
@@ -342,8 +371,14 @@ export function ToolCallBlock({
   const errored = isError(state)
   const planImplementationApproval
     = descriptor.kind === 'plan-implementation' && state === 'approval-requested'
-  const retainNestedActivity = descriptor.kind === 'subagent' && hasChildren
   const approvalReason = readApprovalReason(input, approval)
+  const canOpenSubagentThread = descriptor.kind === 'subagent' && !!sessionId
+  const subagentPanelName = canOpenSubagentThread
+    ? readSubagentPanelName(inputPayload, outputPayload, descriptor)
+    : null
+  const subagentPanelRole = canOpenSubagentThread
+    ? readSubagentPanelRole(inputPayload, outputPayload, descriptor)
+    : null
 
   useEffect(() => {
     if (errored && hasStructuredPanel) {
@@ -362,6 +397,23 @@ export function ToolCallBlock({
     })
     setBrowserPanelOpen(true, workspaceDiffTarget.ownerId)
     requestScrollToFilePath({ path: workspaceDiffPath, tabId })
+  }
+
+  const openSubagentOutput = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!sessionId || !subagentPanelName) {
+      return
+    }
+    const ownerId = useLayoutStore.getState().activeBrowserPanelOwnerId
+    openSubagentTab({
+      sessionId,
+      threadId: toolCallId,
+      agentName: subagentPanelName,
+      agentRole: subagentPanelRole,
+      ownerId,
+    })
+    setBrowserPanelOpen(true, ownerId)
   }
 
   const toggleExpanded = () => {
@@ -412,6 +464,25 @@ export function ToolCallBlock({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground/80">
             {descriptor.title}
           </span>
+          {canOpenSubagentThread && (
+            <Tooltip>
+              <TooltipTrigger
+                render={(
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="size-6 text-muted-foreground/50 hover:text-foreground"
+                    aria-label={`Open ${subagentPanelName ?? 'Subagent'} output`}
+                    onClick={openSubagentOutput}
+                  >
+                    <ExternalLinkIcon className="size-3.5" aria-hidden />
+                  </Button>
+                )}
+              />
+              <TooltipContent sideOffset={6}>Open output</TooltipContent>
+            </Tooltip>
+          )}
           {expandable && (
             <ChevronRightIcon
               className={cn(
@@ -525,25 +596,11 @@ export function ToolCallBlock({
         )}
       </div>
 
-      {hasChildren
-        && (retainNestedActivity
-          ? (
-            <Activity
-              name={`tool:${toolCallId}:nested-activity`}
-              mode={expanded ? 'visible' : 'hidden'}
-            >
-              <div className={cn('ml-3 mt-0.5 overflow-y-auto space-y-0', !running && 'max-h-80')}>
-                {children}
-              </div>
-            </Activity>
-          )
-          : expanded
-            ? (
-              <div className={cn('ml-3 mt-0.5 overflow-y-auto space-y-0', !running && 'max-h-80')}>
-                {children}
-              </div>
-            )
-            : null)}
+      {hasChildren && expanded && (
+        <div className={cn('ml-3 mt-0.5 overflow-y-auto space-y-0', !running && 'max-h-80')}>
+          {children}
+        </div>
+      )}
     </>
   )
 

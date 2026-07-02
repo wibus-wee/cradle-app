@@ -2,8 +2,8 @@ import type { UIMessage } from 'ai'
 
 import { useChatStore } from '~/store/chat'
 
-import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
 import type { ChatContinuationMode, ChatQueueItem, ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../commands/chat-response-command'
+import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
 
 // ── Message Snapshot Types ──────────────────────────────────
 
@@ -201,8 +201,7 @@ export function releaseSessionStreamingStateForTerminalRun(
     const nextMeta = nextState.sessionMetaMap.get(sessionId)
     const nextSessionMessageIds = new Set((nextState.messagesMap.get(sessionId) ?? []).map(message => message.id))
     const hasRemainingStreamingRefs = [...nextSessionMessageIds].some(messageId =>
-      nextState.generatingMessageIds.has(messageId) || nextState.passiveStreamingMessageIds.has(messageId),
-    )
+      nextState.generatingMessageIds.has(messageId) || nextState.passiveStreamingMessageIds.has(messageId))
     if (!hasRemainingStreamingRefs && nextMeta?.passiveStatus === 'streaming') {
       nextState.setSessionMeta(sessionId, { passiveStatus: 'idle' })
     }
@@ -245,11 +244,12 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export function readBuiltinToolCallInputPayload(value: unknown): { apiName: string, args: unknown } | null {
+export function readBuiltinToolCallInputPayload(value: unknown): { identifier: string | null, apiName: string, args: unknown } | null {
   if (!isRecord(value) || value.type !== 'cradle.builtin-tool-call.input.v1' || typeof value.apiName !== 'string') {
     return null
   }
   return {
+    identifier: typeof value.identifier === 'string' ? value.identifier : null,
     apiName: value.apiName,
     args: value.args,
   }
@@ -300,9 +300,6 @@ export function readRuntimeToolApprovalRequest(
   messages: UIMessage[],
   response: ToolApprovalResponseInput,
 ): RuntimeToolApprovalRequest | null {
-  if (!response.approvalId.startsWith('server-request-')) {
-    return null
-  }
   const message = messages.find(item => item.id === response.messageId)
   const part = message?.parts.find(item => isMatchingApprovalPart(item, response.approvalId))
   if (!part || !('toolCallId' in part) || typeof part.toolCallId !== 'string') {
@@ -311,8 +308,21 @@ export function readRuntimeToolApprovalRequest(
   if (part.toolCallId !== response.approvalId) {
     return null
   }
+  const inputPayload = readBuiltinToolCallInputPayload((part as { input?: unknown }).input)
   const apiName = readToolApiName(part)
-  if (!apiName || !RUNTIME_TOOL_APPROVAL_API_NAMES.has(apiName)) {
+  if (
+    !response.approvalId.startsWith('server-request-')
+    && inputPayload?.identifier !== 'claude-code'
+  ) {
+    return null
+  }
+  if (
+    !apiName
+    || (
+      inputPayload?.identifier !== 'claude-code'
+      && !RUNTIME_TOOL_APPROVAL_API_NAMES.has(apiName)
+    )
+  ) {
     return null
   }
   return {

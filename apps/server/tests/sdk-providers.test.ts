@@ -94,20 +94,6 @@ async function collectSseChunks(response: Response): Promise<UIMessageChunk[]> {
     })
 }
 
-function readSubagentOutput(output: unknown): { message: UIMessage, result?: unknown } | null {
-  if (!output || typeof output !== 'object') {
-    return null
-  }
-  const record = output as { type?: unknown, message?: unknown, result?: unknown }
-  if (record.type !== 'cradle.subagent-output.v1' || !record.message || typeof record.message !== 'object') {
-    return null
-  }
-  return {
-    message: record.message as UIMessage,
-    ...(record.result === undefined ? {} : { result: record.result }),
-  }
-}
-
 function isToolPartFor(part: UIMessage['parts'][number], toolCallId: string): boolean {
   return part.type.startsWith('tool-') && 'toolCallId' in part && part.toolCallId === toolCallId
 }
@@ -671,7 +657,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
     }
   })
 
-  it('streams subagent progress as preliminary AI SDK tool output on the parent tool', async () => {
+  it('keeps active subagent progress out of the parent stream and transcript', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -762,18 +748,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       expect(runRes.status).toBe(200)
 
       const chunks = await collectSseChunks(runRes)
-      const preliminaryOutputs = chunks.filter((chunk): chunk is UIMessageChunk & {
-        type: 'tool-output-available'
-        toolCallId: string
-        output: unknown
-        preliminary?: boolean
-      } => chunk.type === 'tool-output-available')
-      const subagentOutput = preliminaryOutputs
-        .filter(chunk => chunk.toolCallId === 'toolu_parent_1' && chunk.preliminary === true)
-        .map(chunk => readSubagentOutput(chunk.output))
-        .find(output => output?.message.parts.some(part => part.type === 'text' && 'text' in part && part.text?.includes('Subagent investigating')))
-
-      expect(subagentOutput).toBeTruthy()
+      expect(JSON.stringify(chunks)).not.toContain('Subagent investigating')
       expect(chunks.map(chunk => chunk.type)).toContain('finish')
 
       const timeline = await waitForMessageStatus(app, 'session-claude-subagent', 'complete')
@@ -781,16 +756,13 @@ describe('sdk-backed providers in unified chat runtime', () => {
       expect(assistantMessages).toHaveLength(1)
       const assistant = assistantMessages[0]
       expect(assistant?.message.parts).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'tool-task', toolCallId: 'toolu_parent_1', state: 'output-available' }),
+        expect.objectContaining({ type: 'tool-task', toolCallId: 'toolu_parent_1' }),
         expect.objectContaining({ type: 'text', text: 'Main task dispatch' }),
       ]))
       const toolPart = assistant?.message.parts.find(part =>
         isToolPartFor(part, 'toolu_parent_1'))
-      const persistedOutput = readSubagentOutput((toolPart as { output?: unknown } | undefined)?.output)
-      expect(persistedOutput?.message.parts).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'text', text: '[Investigate Agent started]' }),
-        expect.objectContaining({ type: 'text', text: 'Subagent investigating' }),
-      ]))
+      expect(toolPart).toBeTruthy()
+      expect(JSON.stringify(assistant?.message)).not.toContain('Subagent investigating')
     }
     finally {
       shutdownInfra()
@@ -811,7 +783,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
     }
   })
 
-  it('backfills late subagent taskId metadata and persists task_notification lifecycle text', async () => {
+  it('keeps late subagent lifecycle text out of the parent stream and transcript', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -897,24 +869,16 @@ describe('sdk-backed providers in unified chat runtime', () => {
       expect(runRes.status).toBe(200)
 
       const chunks = await collectSseChunks(runRes)
-      const subagentOutput = chunks
-        .filter((chunk): chunk is UIMessageChunk & { type: 'tool-output-available', output: unknown } => chunk.type === 'tool-output-available')
-        .map(chunk => readSubagentOutput(chunk.output))
-        .find(output => output?.message.parts.some(part => part.type === 'text' && 'text' in part && part.text?.includes('Late task completed')))
-      expect(subagentOutput?.message.parts).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'text', text: 'Working before task metadata arrives' }),
-        expect.objectContaining({ type: 'text', text: 'Late task completed' }),
-      ]))
+      expect(JSON.stringify(chunks)).not.toContain('Working before task metadata arrives')
+      expect(JSON.stringify(chunks)).not.toContain('Late task completed')
 
       const timeline = await waitForMessageStatus(app, 'session-claude-subagent-late-task', 'complete')
       const assistant = timeline.find(message => message.role === 'assistant')
       const toolPart = assistant?.message.parts.find(part =>
         isToolPartFor(part, 'toolu_parent_late'))
-      const persistedOutput = readSubagentOutput((toolPart as { output?: unknown } | undefined)?.output)
-      expect(persistedOutput?.message.parts).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'text', text: 'Working before task metadata arrives' }),
-        expect.objectContaining({ type: 'text', text: 'Late task completed' }),
-      ]))
+      expect(toolPart).toBeTruthy()
+      expect(JSON.stringify(assistant?.message)).not.toContain('Working before task metadata arrives')
+      expect(JSON.stringify(assistant?.message)).not.toContain('Late task completed')
     }
     finally {
       shutdownInfra()
@@ -1043,10 +1007,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
 })
 
 describe('claude-agent mapper: input_json_delta streaming', () => {
-  it('keeps subagent text projection isolated from the parent assistant stream', async () => {
+  it('maps subagent text as ordinary chunks while provider routing owns parent isolation', async () => {
     const { createClaudeAgentChunkMapperState, mapClaudeAgentMessageToChunks } = await import('../src/modules/chat-runtime-providers/claude-agent/event-to-chunk-mapper')
 
-    const state = createClaudeAgentChunkMapperState('parent-text-1')
+    const childState = createClaudeAgentChunkMapperState('child-text-1')
 
     const subagentResult = await mapClaudeAgentMessageToChunks({
       type: 'assistant',
@@ -1056,17 +1020,16 @@ describe('claude-agent mapper: input_json_delta streaming', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Child text' }],
       },
-    } as any, state)
+    } as any, childState)
 
     expect(subagentResult.chunks).toEqual([
-      expect.objectContaining({
-        type: 'tool-output-available',
-        toolCallId: 'toolu_parent',
-        preliminary: true,
-      }),
+      { type: 'text-start', id: 'child-text-1' },
+      { type: 'text-delta', id: 'child-text-1', delta: 'Child text' },
     ])
-    expect(state.assistantStarted).toBe(false)
-    expect(state.emittedTextByTextItemId.size).toBe(0)
+    expect(childState.assistantStarted).toBe(true)
+    expect(childState.emittedTextByTextItemId.size).toBe(1)
+
+    const parentState = createClaudeAgentChunkMapperState('parent-text-1')
 
     const parentDelta = await mapClaudeAgentMessageToChunks({
       type: 'stream_event',
@@ -1076,7 +1039,7 @@ describe('claude-agent mapper: input_json_delta streaming', () => {
         index: 0,
         delta: { type: 'text_delta', text: 'Parent text' },
       },
-    } as any, state)
+    } as any, parentState)
 
     expect(parentDelta.chunks).toEqual([
       { type: 'text-start', id: 'parent-text-1' },
@@ -1090,7 +1053,7 @@ describe('claude-agent mapper: input_json_delta streaming', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Parent text' }],
       },
-    } as any, state)
+    } as any, parentState)
 
     expect(parentSnapshot.chunks).toEqual([])
   })

@@ -10,8 +10,6 @@ import {
   StopwatchLine as TimerIcon,
   TargetLine as TargetIcon,
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
 import { useQuery } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
 import type { AnchorHTMLAttributes } from 'react'
@@ -23,6 +21,7 @@ import { getChatRunsByRunIdSnapshotOptions } from '~/api-gen/@tanstack/react-que
 import type { GetChatRunsByRunIdSnapshotResponse } from '~/api-gen/types.gen'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 import { formatShortDurationMs } from '~/lib/number-format'
@@ -72,7 +71,7 @@ import {
   splitExecutionPhase,
   splitSegmentExecutionPhase,
 } from './chat-render-plan'
-import { readSubagentOutputMessage, toolNameFromPart } from './chat-tool-entities'
+import { toolNameFromPart } from './chat-tool-entities'
 import { ImageLightbox } from './image-lightbox'
 import { MarkdownFileLink } from './markdown-file-link'
 import type { RenderableToolPart } from './tool-ui-classifier'
@@ -80,7 +79,6 @@ import { describeToolCall } from './tool-ui-classifier'
 
 const THINKING_IDLE_DELAY_MS = 900
 const MESSAGE_STREAMING_ANIMATION_MAX_CHARS = 12000
-const SUBAGENT_STREAMING_ANIMATION_MAX_CHARS = 4000
 const ACTIVE_TOOL_STATES = new Set(['input-streaming', 'input-available', 'approval-requested'])
 const CODEX_GOAL_COMMAND_PREFIX = '/goal '
 const STEER_MESSAGE_CONTAINER_CLASS = 'max-w-[78%]'
@@ -506,120 +504,6 @@ function isToolPartActiveInState(
   return part ? isToolPartActive(part) : false
 }
 
-/* ─── Subagent part render ──────────────────────────────────────── */
-
-function renderSubagentItem(
-  item: ChatRenderItem,
-  isActiveStreamingItem: boolean,
-  isMessageStreaming: boolean,
-  streamdownSettings: {
-    animationPreset: string
-    animateMode: 'char' | 'word'
-    showCursor: boolean
-  },
-  sessionId?: string,
-) {
-  switch (item.kind) {
-    case 'text':
-      return (
-        <Streamdown
-          key={item.key}
-          content={item.text}
-          streaming={isActiveStreamingItem}
-          animationPreset={
-            streamdownSettings.animationPreset as 'minimal' | 'balanced' | 'dramatic'
-          }
-          animateMode={streamdownSettings.animateMode}
-          showCursor={streamdownSettings.showCursor}
-          animated={item.text.length <= SUBAGENT_STREAMING_ANIMATION_MAX_CHARS}
-          components={{
-            a: props => (
-              <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} />
-            ),
-          }}
-        />
-      )
-    case 'reasoning':
-      return (
-        <ReasoningBlock
-          key={item.key}
-          text={item.text}
-          state={isActiveStreamingItem && item.state === 'streaming' ? 'streaming' : 'done'}
-        />
-      )
-    case 'tool-call': {
-      return (
-        <ToolCallBlockFromPart
-          key={item.key}
-          messageId={item.messageId}
-          part={item.part}
-          animated={false}
-          isMessageStreaming={isMessageStreaming}
-        />
-      )
-    }
-    case 'tool-group':
-      return (
-        <GroupedToolCallBlockFromParts
-          key={item.key}
-          items={item.items}
-          uiKind={item.uiKind}
-          animated={false}
-        />
-      )
-    case 'file-attachment':
-      return <FileAttachmentBlock key={item.key} part={item.part} />
-    case 'skill-context':
-      return <SkillContextBlock key={item.key} part={item.part} />
-    case 'plugin-context':
-      return <PluginContextBlock key={item.key} part={item.part} />
-    default:
-      return null
-  }
-}
-
-function groupSubagentMessageParts(messageId: string, parts: UIMessage['parts']) {
-  return groupMessageParts({
-    parts,
-    messageId,
-    describeToolKind: part => describeToolCall(part).kind,
-  })
-}
-
-function SubagentMessageContent({
-  message,
-  isStreaming,
-  animationPreset,
-  animateMode,
-  showCursor,
-  sessionId,
-}: {
-  message: UIMessage
-  isStreaming: boolean
-  animationPreset: string
-  animateMode: 'char' | 'word'
-  showCursor: boolean
-  sessionId?: string
-}) {
-  const groupedParts = groupSubagentMessageParts(message.id, message.parts)
-  const streamdownSettings = {
-    animationPreset,
-    animateMode,
-    showCursor,
-  }
-  const activeStreamingItemKey = isStreaming ? readActiveStreamingItemKey(groupedParts) : null
-  const streamingTailItemKey = isStreaming ? readStreamingTailItemKey(groupedParts) : null
-
-  return groupedParts.map(groupedItem =>
-    renderSubagentItem(
-      groupedItem,
-      groupedItem.key === activeStreamingItemKey,
-      isStreaming && groupedItem.key === streamingTailItemKey,
-      streamdownSettings,
-      sessionId,
-    ))
-}
-
 /* ─── Execution Phase Fold ──────────────────────────────────────── */
 
 function ExecutionPhaseFold({
@@ -995,14 +879,6 @@ function readActiveStreamingItemKey(items: ChatRenderItem[]): string | null {
   return tail.key
 }
 
-function readStreamingTailItemKey(items: ChatRenderItem[]): string | null {
-  return items.at(-1)?.key ?? null
-}
-
-function readStreamingTailSegmentKey(segments: ChatRenderSegment[]): string | null {
-  return segments.at(-1)?.key ?? null
-}
-
 function readToolApproval(
   part: RenderableToolPart,
 ): { id: string, approved?: boolean, reason?: string } | undefined {
@@ -1018,10 +894,6 @@ function readToolApproval(
   }
 }
 
-function readToolPreliminary(part: RenderableToolPart): boolean {
-  return (part as { preliminary?: unknown }).preliminary === true
-}
-
 function ToolCallBlockFromPart({
   messageId,
   part,
@@ -1029,7 +901,6 @@ function ToolCallBlockFromPart({
   children,
   animated,
   sessionId,
-  isMessageStreaming = false,
 }: {
   messageId: string
   part: RenderableToolPart
@@ -1037,7 +908,6 @@ function ToolCallBlockFromPart({
   children?: React.ReactNode
   animated?: boolean
   sessionId?: string | null
-  isMessageStreaming?: boolean
 }) {
   const workspaceDiffTarget = useSessionLayoutStore(
     useShallow((state) => {
@@ -1048,7 +918,6 @@ function ToolCallBlockFromPart({
       return workspaceId ? { workspaceId } : undefined
     }),
   )
-  const subagentMessage = readSubagentOutputMessage(part.output)
   const approval = readToolApproval(part)
 
   return (
@@ -1062,6 +931,7 @@ function ToolCallBlockFromPart({
       output={part.output}
       errorText={part.errorText}
       animated={animated}
+      sessionId={sessionId}
       workspaceDiffTarget={workspaceDiffTarget}
       onApprovalResponse={
         approval && onToolApprovalResponse
@@ -1074,18 +944,6 @@ function ToolCallBlockFromPart({
           : undefined
       }
     >
-      {subagentMessage
-? (
-        <SubagentMessageContent
-          message={subagentMessage}
-          isStreaming={isMessageStreaming && readToolPreliminary(part)}
-          animationPreset={STREAMDOWN_RENDER_OPTIONS.animationPreset}
-          animateMode={STREAMDOWN_RENDER_OPTIONS.animateMode}
-          showCursor={STREAMDOWN_RENDER_OPTIONS.showCursor}
-          sessionId={sessionId ?? undefined}
-        />
-      )
-: null}
       {children}
     </ToolCallBlock>
   )
@@ -1096,13 +954,11 @@ function ToolCallBlockByPartIndex({
   messageId,
   partIndex,
   onToolApprovalResponse,
-  isMessageStreaming,
 }: {
   sessionId: string
   messageId: string
   partIndex: number
   onToolApprovalResponse?: MessageBubbleProps['onToolApprovalResponse']
-  isMessageStreaming: boolean
 }) {
   const part = useChatStore(
     state => readRenderableToolPartFromState(state, sessionId, messageId, partIndex),
@@ -1117,7 +973,6 @@ function ToolCallBlockByPartIndex({
       part={part}
       sessionId={sessionId}
       onToolApprovalResponse={onToolApprovalResponse}
-      isMessageStreaming={isMessageStreaming}
     />
   )
 }
@@ -1438,7 +1293,6 @@ const MessageSegmentView = ({
   sessionId,
   isUser,
   isActiveStreamingSegment,
-  isMessageStreaming,
   onToolApprovalResponse,
   onImageClick,
   textTransform,
@@ -1447,7 +1301,6 @@ const MessageSegmentView = ({
   sessionId: string
   isUser: boolean
   isActiveStreamingSegment: boolean
-  isMessageStreaming: boolean
   onToolApprovalResponse?: MessageBubbleProps['onToolApprovalResponse']
   onImageClick?: () => void
   textTransform?: MessageTextTransform
@@ -1488,7 +1341,6 @@ const MessageSegmentView = ({
           messageId={segment.messageId}
           partIndex={segment.partIndex}
           onToolApprovalResponse={onToolApprovalResponse}
-          isMessageStreaming={isMessageStreaming}
         />
       )
     case 'file-attachment':
@@ -1543,9 +1395,6 @@ const MessageBubbleSegmentsView = ({
   const isAssistant = frame.role === 'assistant'
   const activeStreamingSegmentKey = isStreaming && !frame.hasHiddenRuntimeUserInputTail
     ? readActiveStreamingSegmentKey(segments)
-    : null
-  const streamingTailSegmentKey = isStreaming && !frame.hasHiddenRuntimeUserInputTail
-    ? readStreamingTailSegmentKey(segments)
     : null
   const executionPhaseSplit = isStreaming
     ? null
@@ -1607,7 +1456,6 @@ const MessageBubbleSegmentsView = ({
         sessionId={sessionId}
         isUser={isUser}
         isActiveStreamingSegment={segment.key === activeStreamingSegmentKey}
-        isMessageStreaming={isStreaming && segment.key === streamingTailSegmentKey}
         onToolApprovalResponse={onToolApprovalResponse}
         onImageClick={
           segment.kind === 'file-attachment' ? () => handleImageClick(index) : undefined
@@ -1856,7 +1704,6 @@ function MessageBubbleView({
     describeToolKind: part => describeToolCall(part).kind,
   })
   const activeStreamingItemKey = isStreaming ? readActiveStreamingItemKey(groupedItems) : null
-  const streamingTailItemKey = isStreaming ? readStreamingTailItemKey(groupedItems) : null
 
   const executionPhaseSplit = isStreaming
     ? null
@@ -1936,7 +1783,12 @@ function MessageBubbleView({
 
       case 'tool-group':
         return (
-          <GroupedToolCallBlockFromParts key={item.key} items={item.items} uiKind={item.uiKind} />
+          <GroupedToolCallBlockFromParts
+            key={item.key}
+            items={item.items}
+            uiKind={item.uiKind}
+            sessionId={sessionId}
+          />
         )
 
       case 'tool-call':
@@ -1945,8 +1797,8 @@ function MessageBubbleView({
             key={item.key}
             messageId={message.id}
             part={item.part}
+            sessionId={sessionId}
             onToolApprovalResponse={onToolApprovalResponse}
-            isMessageStreaming={isStreaming && item.key === streamingTailItemKey}
           />
         )
 

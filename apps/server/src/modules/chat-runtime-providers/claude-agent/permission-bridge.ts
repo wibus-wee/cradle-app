@@ -23,6 +23,7 @@ export interface ClaudeAgentToolApprovalRequest {
   toolCallId: string
   toolName: string
   toolInput: Record<string, unknown>
+  agentId: string | null
 }
 
 export interface ClaudeAgentPermissionBridgeState {
@@ -167,6 +168,7 @@ async function handleClaudeAgentToolPermissionRequest(input: {
     toolCallId: input.options.toolUseID,
     toolName: input.toolName,
     toolInput: input.toolInput,
+    agentId: readClaudeAgentPermissionAgentId(input.options),
   })
 
   const resolution = await input.deps.requestToolApproval({
@@ -200,4 +202,9 @@ async function handleClaudeAgentToolPermissionRequest(input: {
     behavior: 'deny',
     message: resolution.reason ?? 'Tool execution denied by user.',
   }
+}
+
+function readClaudeAgentPermissionAgentId(options: ClaudeAgentCanUseToolOptions): string | null {
+  const agentId = options.agentID
+  return typeof agentId === 'string' && agentId.length > 0 ? agentId : null
 }

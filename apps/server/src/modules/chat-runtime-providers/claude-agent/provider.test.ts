@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { addHostMcpServer, removeHostMcpServer } from '../../../plugins/mcp-registry'
 import type {
   ProviderSyntheticTurnEvent,
+  ProviderThreadEvent,
   RuntimeProviderTargetProfile,
   RuntimeSession,
   RuntimeToolApprovalRequest,
@@ -99,6 +100,65 @@ function createPendingQuery(contextUsage: SDKControlGetContextUsageResponse = cr
       closed = true
       resolveNext?.()
     }),
+    interrupt: vi.fn().mockResolvedValue(undefined),
+    setModel: vi.fn().mockResolvedValue(undefined),
+    setPermissionMode: vi.fn().mockResolvedValue(undefined),
+    supportedCommands: vi.fn().mockResolvedValue([]),
+    getContextUsage: vi.fn().mockResolvedValue(contextUsage),
+    initializationResult: vi.fn().mockResolvedValue({
+      commands: [],
+      agents: [],
+      output_style: 'default',
+      available_output_styles: ['default'],
+      models: [],
+      account: {},
+    }),
+  }
+}
+
+function createControllableQuery(contextUsage: SDKControlGetContextUsageResponse = createContextUsageResponse()) {
+  const queue: unknown[] = []
+  let resolveNext: ((result: IteratorResult<unknown>) => void) | null = null
+  let closed = false
+
+  const close = () => {
+    closed = true
+    resolveNext?.({ done: true as const, value: undefined })
+    resolveNext = null
+  }
+
+  return {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    async next() {
+      if (queue.length > 0) {
+        return { done: false as const, value: queue.shift() }
+      }
+      if (closed) {
+        return { done: true as const, value: undefined }
+      }
+      return await new Promise<IteratorResult<unknown>>((resolve) => {
+        resolveNext = resolve
+      })
+    },
+    async return() {
+      close()
+      return { done: true as const, value: undefined }
+    },
+    push(value: unknown) {
+      if (closed) {
+        return
+      }
+      if (resolveNext) {
+        const resolve = resolveNext
+        resolveNext = null
+        resolve({ done: false as const, value })
+        return
+      }
+      queue.push(value)
+    },
+    close: vi.fn(close),
     interrupt: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setPermissionMode: vi.fn().mockResolvedValue(undefined),
@@ -225,6 +285,13 @@ function readQueryOptions(callIndex: number): Record<string, unknown> {
   return call!.options!
 }
 
+function requireCanUseTool(value: CanUseTool | null): CanUseTool {
+  if (!value) {
+    throw new Error('Claude Agent query options did not include canUseTool')
+  }
+  return value
+}
+
 async function readPromptText(callIndex: number): Promise<string> {
   const content = await readPromptContent(callIndex)
   return String(content)
@@ -333,7 +400,7 @@ function createBangResultMessage(input: {
   } as UIMessage
 }
 
-describe('claudeAgentProvider MCP integration', () => {
+describe.sequential('claudeAgentProvider MCP integration', () => {
   afterEach(() => {
     removeHostMcpServer('browser-use')
     removeHostMcpServer('nowledge-mem')
@@ -554,11 +621,15 @@ describe('claudeAgentProvider MCP integration', () => {
       providerSessionId: 'claude-session-1',
       threads: [
         {
-          id: 'agent-a',
+          id: 'call_agent_1',
           providerSessionTreeId: 'claude-session-1',
           forkedFromId: 'call_agent_1',
           preview: 'Subagent report',
           sourceKind: 'subAgent',
+          source: expect.objectContaining({
+            agentId: 'agent-a',
+            parentToolUseId: 'call_agent_1',
+          }),
           agentNickname: 'general-purpose',
           agentRole: 'Inspect the runtime logs',
           modelProvider: 'claude-sonnet-4-20250514',
@@ -639,9 +710,13 @@ describe('claudeAgentProvider MCP integration', () => {
       runtimeKind: 'claude-agent',
       providerSessionId: 'claude-session-1',
       thread: {
-        id: 'agent-a',
+        id: 'call_agent_1',
         forkedFromId: 'call_agent_1',
         preview: 'Checking the trace.\nSubagent report',
+        source: expect.objectContaining({
+          agentId: 'agent-a',
+          parentToolUseId: 'call_agent_1',
+        }),
       },
     })
 
@@ -655,7 +730,7 @@ describe('claudeAgentProvider MCP integration', () => {
     })).resolves.toMatchObject({
       runtimeKind: 'claude-agent',
       providerSessionId: 'claude-session-1',
-      threadId: 'agent-a',
+      threadId: 'call_agent_1',
       turns: [
         {
           id: 'msg-agent-a-1',
@@ -670,8 +745,13 @@ describe('claudeAgentProvider MCP integration', () => {
       ],
       messages: [
         {
-          id: 'provider-thread:agent-a:message:msg-agent-a-1',
+          id: 'provider-thread:call_agent_1:message:msg-agent-a-1',
           role: 'assistant',
+          metadata: expect.objectContaining({
+            providerThreadId: 'call_agent_1',
+            agentId: 'agent-a',
+            parentToolUseId: 'call_agent_1',
+          }),
           parts: [
             { type: 'reasoning', text: 'Checking the trace.', state: 'done' },
             {
@@ -689,8 +769,13 @@ describe('claudeAgentProvider MCP integration', () => {
           ],
         },
         {
-          id: 'provider-thread:agent-a:message:msg-agent-a-tool-result',
+          id: 'provider-thread:call_agent_1:message:msg-agent-a-tool-result',
           role: 'assistant',
+          metadata: expect.objectContaining({
+            providerThreadId: 'call_agent_1',
+            agentId: 'agent-a',
+            parentToolUseId: 'call_agent_1',
+          }),
           parts: [
             {
               type: 'tool-Read',
@@ -1128,6 +1213,7 @@ describe('claudeAgentProvider MCP integration', () => {
       },
     })
     const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
 
     await vi.waitFor(() => {
       expect(sdkMocks.query).toHaveBeenCalledOnce()
@@ -1669,14 +1755,26 @@ describe('claudeAgentProvider MCP integration', () => {
         activeCount: 0,
         completedCount: 1,
         failedCount: 0,
-        agents: [],
+        agents: [
+          expect.objectContaining({
+            threadId: 'toolu_agent_1',
+            status: 'completed',
+            agentNickname: 'Explore',
+            agentRole: 'Explore landing page changelog',
+          }),
+        ],
         calls: [
           expect.objectContaining({
             id: 'toolu_agent_1',
             prompt: 'Explore landing page changelog',
             model: 'sonnet',
-            receiverThreadIds: [],
-            agents: [],
+            receiverThreadIds: ['toolu_agent_1'],
+            agents: [
+              expect.objectContaining({
+                threadId: 'toolu_agent_1',
+                status: 'completed',
+              }),
+            ],
           }),
         ],
       }),
@@ -2537,6 +2635,376 @@ describe('claudeAgentProvider MCP integration', () => {
 
     await provider.dispose()
     expect(activeQueries[0]?.close).toHaveBeenCalledOnce()
+  })
+
+  it.sequential('routes active parent-tool child messages to provider-thread events instead of parent chunks', async () => {
+    const prompts: unknown[] = []
+    sdkMocks.query.mockImplementation((call: { prompt?: AsyncIterable<{ message: { content: unknown } }> }) => {
+      expect(call.prompt).toBeDefined()
+      return createPromptDrivenQuery(call.prompt!, [
+        [
+          {
+            type: 'assistant',
+            session_id: 'claude-session-active-subagent',
+            message: {
+              content: [{ type: 'text', text: 'Parent response' }],
+            },
+          },
+          {
+            type: 'stream_event',
+            session_id: 'claude-session-active-subagent',
+            parent_tool_use_id: 'toolu_agent_active',
+            event: {
+              type: 'content_block_delta',
+              index: 0,
+              delta: { type: 'text_delta', text: 'Active child report' },
+            },
+          },
+          {
+            type: 'result',
+            session_id: 'claude-session-active-subagent',
+            parent_tool_use_id: 'toolu_agent_active',
+            usage: { input_tokens: 2, output_tokens: 3 },
+          },
+          {
+            type: 'result',
+            session_id: 'claude-session-active-subagent',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          },
+        ],
+      ], prompts)
+    })
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const providerThreadEvents: ProviderThreadEvent[] = []
+    const chunks: UIMessageChunk[] = []
+    for await (const chunk of provider.streamTurn({
+      runId: 'run-claude-agent-active-subagent-parent',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Launch active child work'),
+      workspaceId: 'workspace-1',
+      onProviderThreadEvent: (event) => {
+        providerThreadEvents.push(event)
+      },
+    })) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text-delta', delta: 'Parent response' }),
+    ]))
+    expect(chunks).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text-delta', delta: 'Active child report' }),
+    ]))
+    expect(providerThreadEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text-delta', delta: 'Active child report' }),
+      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+    ]))
+    expect(new Set(providerThreadEvents.map(event => event.providerTurnId)).size).toBe(1)
+    expect(providerThreadEvents.every(event => event.providerThreadId === 'toolu_agent_active')).toBe(true)
+
+    await provider.dispose()
+  })
+
+  it.sequential('emits parent Agent tool output when an active child provider thread completes', async () => {
+    const prompts: unknown[] = []
+    sdkMocks.query.mockImplementation((call: { prompt?: AsyncIterable<{ message: { content: unknown } }> }) => {
+      expect(call.prompt).toBeDefined()
+      return createPromptDrivenQuery(call.prompt!, [
+        [
+          {
+            type: 'assistant',
+            session_id: 'claude-session-active-subagent-output',
+            message: {
+              content: [
+                {
+                  type: 'tool_use',
+                  id: 'toolu_agent_active_output',
+                  name: 'Agent',
+                  input: {
+                    description: 'Audit runtime',
+                    prompt: 'Inspect provider-thread completion handling.',
+                    subagent_type: 'Explore',
+                  },
+                },
+              ],
+            },
+          },
+          {
+            type: 'assistant',
+            session_id: 'claude-session-active-subagent-output',
+            parent_tool_use_id: 'toolu_agent_active_output',
+            message: {
+              content: [{ type: 'text', text: 'Active child report' }],
+            },
+          },
+          {
+            type: 'result',
+            session_id: 'claude-session-active-subagent-output',
+            parent_tool_use_id: 'toolu_agent_active_output',
+            usage: { input_tokens: 2, output_tokens: 3 },
+          },
+          {
+            type: 'result',
+            session_id: 'claude-session-active-subagent-output',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          },
+        ],
+      ], prompts)
+    })
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const providerThreadEvents: ProviderThreadEvent[] = []
+    const chunks: UIMessageChunk[] = []
+    for await (const chunk of provider.streamTurn({
+      runId: 'run-claude-agent-active-subagent-output',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Launch active child work'),
+      workspaceId: 'workspace-1',
+      onProviderThreadEvent: (event) => {
+        providerThreadEvents.push(event)
+      },
+    })) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'tool-output-available',
+        toolCallId: 'toolu_agent_active_output',
+      }),
+    ]))
+    expect(providerThreadEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text-delta', delta: 'Active child report' }),
+      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+    ]))
+
+    await provider.dispose()
+  })
+
+  it.sequential('routes active subagent tool approval requests to provider-thread events', async () => {
+    const activeQuery = createControllableQuery()
+    const approvalResolver: {
+      resolve: ((resolution: RuntimeToolApprovalResolution) => void) | null
+    } = { resolve: null }
+    const requestToolApproval = vi.fn((request: RuntimeToolApprovalRequest) => {
+      return new Promise<RuntimeToolApprovalResolution>((resolve) => {
+        approvalResolver.resolve = resolve
+      })
+    })
+    let canUseTool: CanUseTool | null = null
+    sdkMocks.query.mockImplementation((call: { options?: { canUseTool?: unknown } }) => {
+      canUseTool = typeof call.options?.canUseTool === 'function'
+        ? call.options.canUseTool as CanUseTool
+        : null
+      return activeQuery
+    })
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+      requestToolApproval,
+    })
+    const providerThreadEvents: ProviderThreadEvent[] = []
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-subagent-tool-approval',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Launch child work needing approval'),
+      workspaceId: 'workspace-1',
+      providerOptions: {
+        runtimeSettings: { accessMode: 'approval-required', interactionMode: 'default' },
+      },
+      onProviderThreadEvent: (event) => {
+        providerThreadEvents.push(event)
+      },
+    })
+    const pendingNext = stream.next()
+
+    await vi.waitFor(() => {
+      expect(typeof canUseTool).toBe('function')
+    })
+    const capturedCanUseTool = requireCanUseTool(canUseTool)
+
+    activeQuery.push({
+      type: 'system',
+      subtype: 'task_started',
+      session_id: 'claude-session-subagent-tool-approval',
+      uuid: 'task-started-subagent-tool-approval',
+      task_id: 'agent-child-approval',
+      tool_use_id: 'toolu_agent_child_approval',
+      task_type: 'agent',
+      subagent_type: 'researcher',
+      description: 'Investigate with shell access',
+      prompt: 'Investigate with shell access',
+    })
+
+    await vi.waitFor(() => {
+      expect(providerThreadEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'text-delta', delta: '[researcher started]' }),
+      ]))
+    })
+
+    const toolInput = { command: 'pwd' }
+    const permissionResult = capturedCanUseTool(
+      'Bash',
+      toolInput,
+      {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_child_bash_approval',
+        agentID: 'agent-child-approval',
+      },
+    )
+
+    await vi.waitFor(() => {
+      expect(providerThreadEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
+        {
+          type: 'tool-input-start',
+          toolCallId: 'toolu_child_bash_approval',
+          toolName: 'Bash',
+        },
+        {
+          type: 'tool-input-available',
+          toolCallId: 'toolu_child_bash_approval',
+          toolName: 'Bash',
+          input: {
+            type: 'cradle.builtin-tool-call.input.v1',
+            identifier: 'claude-code',
+            apiName: 'Bash',
+            args: toolInput,
+          },
+        },
+        {
+          type: 'tool-approval-request',
+          toolCallId: 'toolu_child_bash_approval',
+          approvalId: 'toolu_child_bash_approval',
+        },
+      ]))
+    })
+    expect(providerThreadEvents
+      .filter(event => event.chunks.some(chunk => 'toolCallId' in chunk && chunk.toolCallId === 'toolu_child_bash_approval'))
+      .every(event => event.providerThreadId === 'toolu_agent_child_approval')).toBe(true)
+    expect(requestToolApproval).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'chat-session-1',
+      runId: 'run-claude-agent-subagent-tool-approval',
+      providerRequestId: 'toolu_child_bash_approval',
+      toolCallId: 'toolu_child_bash_approval',
+      metadata: expect.objectContaining({
+        permission: expect.objectContaining({
+          agentID: 'agent-child-approval',
+        }),
+      }),
+    }))
+
+    approvalResolver.resolve?.({
+      requestId: 'toolu_child_bash_approval',
+      approved: true,
+    })
+    await expect(permissionResult).resolves.toEqual({
+      behavior: 'allow',
+      updatedInput: toolInput,
+    })
+
+    activeQuery.close()
+    await provider.dispose()
+  })
+
+  it.sequential('keeps unresolved agent approval requests on the parent stream', async () => {
+    const activeQuery = createControllableQuery()
+    const approvalResolver: {
+      resolve: ((resolution: RuntimeToolApprovalResolution) => void) | null
+    } = { resolve: null }
+    const requestToolApproval = vi.fn((request: RuntimeToolApprovalRequest) => {
+      return new Promise<RuntimeToolApprovalResolution>((resolve) => {
+        approvalResolver.resolve = resolve
+      })
+    })
+    let canUseTool: CanUseTool | null = null
+    sdkMocks.query.mockImplementation((call: { options?: { canUseTool?: unknown } }) => {
+      canUseTool = typeof call.options?.canUseTool === 'function'
+        ? call.options.canUseTool as CanUseTool
+        : null
+      return activeQuery
+    })
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+      requestToolApproval,
+    })
+    const providerThreadEvents: ProviderThreadEvent[] = []
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-unresolved-tool-approval',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Launch child work with unresolved approval'),
+      workspaceId: 'workspace-1',
+      providerOptions: {
+        runtimeSettings: { accessMode: 'approval-required', interactionMode: 'default' },
+      },
+      onProviderThreadEvent: (event) => {
+        providerThreadEvents.push(event)
+      },
+    })
+    const parentChunk = stream.next()
+
+    await vi.waitFor(() => {
+      expect(typeof canUseTool).toBe('function')
+    })
+    const capturedCanUseTool = requireCanUseTool(canUseTool)
+
+    activeQuery.push({
+      type: 'assistant',
+      session_id: 'claude-session-unresolved-tool-approval',
+      parent_tool_use_id: 'toolu_agent_unresolved_approval',
+      message: {
+        content: [{ type: 'text', text: 'Child work started' }],
+      },
+    })
+
+    await vi.waitFor(() => {
+      expect(providerThreadEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'text-delta', delta: 'Child work started' }),
+      ]))
+    })
+
+    const permissionResult = capturedCanUseTool(
+      'Bash',
+      { command: 'pwd' },
+      {
+        signal: new AbortController().signal,
+        toolUseID: 'toolu_unresolved_bash_approval',
+        agentID: 'agent-not-in-crew-state',
+      },
+    )
+
+    await expect(parentChunk).resolves.toEqual({
+      done: false,
+      value: {
+        type: 'tool-input-start',
+        toolCallId: 'toolu_unresolved_bash_approval',
+        toolName: 'Bash',
+      },
+    })
+    expect(providerThreadEvents.flatMap(event => event.chunks)).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ toolCallId: 'toolu_unresolved_bash_approval' }),
+    ]))
+
+    approvalResolver.resolve?.({
+      requestId: 'toolu_unresolved_bash_approval',
+      approved: true,
+    })
+    await expect(permissionResult).resolves.toEqual({
+      behavior: 'allow',
+      updatedInput: { command: 'pwd' },
+    })
+
+    activeQuery.close()
+    await provider.dispose()
   })
 
   it('routes background Claude messages after a parent result into provider synthetic turn events', async () => {

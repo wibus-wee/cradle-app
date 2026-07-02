@@ -1,5 +1,4 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { UIMessage } from 'ai'
 import { describe, expect, it } from 'vitest'
 
 import { createClaudeAgentChunkMapperState, mapClaudeAgentMessageToChunks } from './event-to-chunk-mapper'
@@ -78,6 +77,102 @@ describe('mapClaudeAgentMessageToChunks', () => {
     expect(result.chunks).toEqual([
       { type: 'finish', finishReason: 'stop' },
     ])
+  })
+
+  it('does not duplicate an active thinking stream when the assistant snapshot arrives before content_block_stop', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+
+    await mapClaudeAgentMessageToChunks({
+      type: 'stream_event',
+      session_id: 'claude-session-thinking',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'thinking', thinking: '' },
+      },
+    } as unknown as SDKMessage, state)
+    await mapClaudeAgentMessageToChunks({
+      type: 'stream_event',
+      session_id: 'claude-session-thinking',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'thinking_delta', thinking: 'Checking the trace.' },
+      },
+    } as unknown as SDKMessage, state)
+
+    const snapshot = await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-thinking',
+      message: {
+        content: [
+          { type: 'thinking', thinking: 'Checking the trace.' },
+        ],
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(snapshot.chunks).toEqual([])
+  })
+
+  it('does not let an active text snapshot pre-emit provider-thread text that stream deltas will emit', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const chunks: Awaited<ReturnType<typeof mapClaudeAgentMessageToChunks>>['chunks'] = []
+
+    for (const message of [
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-text',
+        parent_tool_use_id: 'toolu_parent_1',
+        event: {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'text', text: '' },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-text',
+        parent_tool_use_id: 'toolu_parent_1',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'Sub' },
+        },
+      },
+    ] as SDKMessage[]) {
+      const result = await mapClaudeAgentMessageToChunks(message, state)
+      chunks.push(...result.chunks)
+    }
+
+    const snapshot = await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-text',
+      parent_tool_use_id: 'toolu_parent_1',
+      message: {
+        content: [
+          { type: 'text', text: 'Subagent report' },
+        ],
+      },
+    } as unknown as SDKMessage, state)
+    chunks.push(...snapshot.chunks)
+
+    const streamedRemainder = await mapClaudeAgentMessageToChunks({
+      type: 'stream_event',
+      session_id: 'claude-session-text',
+      parent_tool_use_id: 'toolu_parent_1',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'agent report' },
+      },
+    } as unknown as SDKMessage, state)
+    chunks.push(...streamedRemainder.chunks)
+
+    expect(snapshot.chunks).toEqual([])
+    expect(chunks
+      .filter(chunk => chunk.type === 'text-delta')
+      .map(chunk => chunk.delta)
+      .join('')).toBe('Subagent report')
   })
 
   it('captures Claude ExitPlanMode as a completed plan and implementation approval once', async () => {
@@ -745,9 +840,9 @@ describe('mapClaudeAgentMessageToChunks', () => {
     ])
   })
 
-  it('throttles preliminary subagent snapshots while keeping the terminal output complete', async () => {
+  it('maps parent-tool child stream events as ordinary chunks without subagent snapshots', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
-    const emittedPreliminaryOutputs: unknown[] = []
+    const chunks: Awaited<ReturnType<typeof mapClaudeAgentMessageToChunks>>['chunks'] = []
 
     for (let index = 0; index < 256; index += 1) {
       const result = await mapClaudeAgentMessageToChunks({
@@ -761,43 +856,23 @@ describe('mapClaudeAgentMessageToChunks', () => {
         },
       } as unknown as SDKMessage, state)
 
-      emittedPreliminaryOutputs.push(
-        ...result.chunks.filter(chunk => chunk.type === 'tool-output-available'),
-      )
+      chunks.push(...result.chunks)
     }
 
-    expect(emittedPreliminaryOutputs.length).toBeLessThan(80)
-
-    const result = await mapClaudeAgentMessageToChunks({
-      type: 'user',
-      session_id: 'claude-session-1',
-      message: {
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 'toolu_parent_1',
-            content: { ok: true },
-          },
-        ],
-      },
-    } as unknown as SDKMessage, state)
-
-    const output = result.chunks.find(chunk => chunk.type === 'tool-output-available') as
-      | { type: 'tool-output-available', output: { message?: UIMessage } }
-      | undefined
-    const text = output?.output.message?.parts
-      .filter(part => part.type === 'text')
-      .map(part => part.text)
+    const text = chunks
+      .filter(chunk => chunk.type === 'text-delta')
+      .map(chunk => chunk.delta)
       .join('')
 
+    expect(chunks.some(chunk => chunk.type === 'tool-output-available')).toBe(false)
     expect(text).toContain('255')
   })
 
-  it('bounds preliminary subagent snapshots while preserving terminal subagent output', async () => {
+  it('does not compact parent-tool child text into a preliminary subagent envelope', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const longText = `${'x'.repeat(70 * 1024)}tail`
 
-    const preliminary = await mapClaudeAgentMessageToChunks({
+    const result = await mapClaudeAgentMessageToChunks({
       type: 'stream_event',
       session_id: 'claude-session-1',
       parent_tool_use_id: 'toolu_parent_1',
@@ -808,42 +883,14 @@ describe('mapClaudeAgentMessageToChunks', () => {
       },
     } as unknown as SDKMessage, state)
 
-    const preliminaryOutput = preliminary.chunks.find(chunk => chunk.type === 'tool-output-available') as
-      | { type: 'tool-output-available', output: { message?: UIMessage, truncated?: boolean } }
-      | undefined
-    const preliminaryText = preliminaryOutput?.output.message?.parts
-      .filter(part => part.type === 'text')
-      .map(part => part.text)
+    const text = result.chunks
+      .filter(chunk => chunk.type === 'text-delta')
+      .map(chunk => chunk.delta)
       .join('')
 
-    expect(preliminaryOutput?.output.truncated).toBe(true)
-    expect(preliminaryText?.length).toBeLessThan(longText.length)
-    expect(preliminaryText).not.toContain('tail')
-
-    const terminal = await mapClaudeAgentMessageToChunks({
-      type: 'user',
-      session_id: 'claude-session-1',
-      message: {
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 'toolu_parent_1',
-            content: { ok: true },
-          },
-        ],
-      },
-    } as unknown as SDKMessage, state)
-
-    const terminalOutput = terminal.chunks.find(chunk => chunk.type === 'tool-output-available') as
-      | { type: 'tool-output-available', output: { message?: UIMessage, truncated?: boolean } }
-      | undefined
-    const terminalText = terminalOutput?.output.message?.parts
-      .filter(part => part.type === 'text')
-      .map(part => part.text)
-      .join('')
-
-    expect(terminalOutput?.output.truncated).toBeUndefined()
-    expect(terminalText).toContain('tail')
+    expect(result.chunks.some(chunk => chunk.type === 'tool-output-available')).toBe(false)
+    expect(text.length).toBe(longText.length)
+    expect(text).toContain('tail')
   })
 
   it('closes streamed text and finishes the turn when Claude reports end_turn', async () => {

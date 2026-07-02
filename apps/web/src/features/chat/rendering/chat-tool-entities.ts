@@ -21,11 +21,6 @@ export interface BuiltinToolCallResultPayload extends BuiltinToolCallIdentity {
   result: unknown
 }
 
-interface SubagentToolOutput {
-  type: 'cradle.subagent-output.v1'
-  message: UIMessage
-}
-
 export function isToolLikePart(part: MessagePart): part is MessagePart & {
   toolCallId: string
   toolName?: string
@@ -104,28 +99,6 @@ export function readBuiltinToolCallIdentity(input: unknown, output: unknown): Bu
   return null
 }
 
-export function readSubagentOutputMessage(output: unknown): UIMessage | null {
-  if (!isSubagentToolOutput(output)) {
-    return null
-  }
-  return output.message
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isSubagentToolOutput(output: unknown): output is SubagentToolOutput {
-  return typeof output === 'object'
-    && output !== null
-    && (output as { type?: unknown }).type === 'cradle.subagent-output.v1'
-    && isUiMessage((output as { message?: unknown }).message)
-}
-
-function isUiMessage(value: unknown): value is UIMessage {
-  return typeof value === 'object'
-    && value !== null
-    && typeof (value as { id?: unknown }).id === 'string'
-    && ((value as { role?: unknown }).role === 'assistant' || (value as { role?: unknown }).role === 'user')
-    && Array.isArray((value as { parts?: unknown }).parts)
 }

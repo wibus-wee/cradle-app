@@ -1,21 +1,23 @@
-import { useQuery } from '@tanstack/react-query'
 import {
-  RobotLine as BotIcon,
   CheckCircleLine as CheckCircle2Icon,
-  CloseCircleLine as XCircleIcon
+  CloseCircleLine as XCircleIcon,
+  RobotLine as BotIcon,
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
+import { submitRuntimeToolApproval } from '../chat/commands/chat-response-command'
 import { getProviderThread, getProviderThreadTurns, providerThreadQueryKey, providerThreadTurnsQueryKey, subscribeProviderThreadStream } from '../chat/commands/provider-thread-command'
 import { MessageBubble } from '../chat/rendering/message-bubble'
 import { SubagentIdenticon } from '../chat/rendering/subagent-identicon'
+import { isMatchingApprovalPart, readRuntimeUserInputRequestId } from '../chat/session/use-chat-session-types'
 import { ChatStreamingHandler } from '../chat/transport/chat-streaming-handler'
 import { buildUIMessageChunkStreamFromResponse } from '../chat/transport/sse-chat-transport'
 
@@ -38,10 +40,12 @@ export function SubagentOutputPanel({
   const scrollMeasureFrameRef = useRef<number | null>(null)
   const shouldStickToBottomRef = useRef(true)
   const viewSessionId = buildProviderThreadViewSessionId(sessionId, threadId)
+  const queryClient = useQueryClient()
 
   const {
     data: threadData,
     isError: isThreadError,
+    isLoading: isThreadLoading,
   } = useQuery({
     queryKey: providerThreadQueryKey(sessionId, threadId),
     queryFn: ({ signal }) => getProviderThread(sessionId, threadId, signal),
@@ -51,6 +55,7 @@ export function SubagentOutputPanel({
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   })
+  const thread = threadData?.thread ?? null
 
   const {
     data: turnsData,
@@ -65,8 +70,6 @@ export function SubagentOutputPanel({
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   })
-  const canSubscribeThreadStream = !!threadData && !isThreadError && !isTurnsError
-
   useEffect(() => {
     const messages = turnsData?.messages
     if (!messages) {
@@ -74,13 +77,19 @@ export function SubagentOutputPanel({
     }
     const store = useChatStore.getState()
     const hydratedIds = new Set(messages.map(message => message.id))
+    const hasHydratedMessages = messages.length > 0
     const liveMessages = (store.messagesMap.get(viewSessionId) ?? [])
-      .filter(message => !hydratedIds.has(message.id) && !isProviderThreadLiveFallbackMessageId(message.id, sessionId, threadId))
+      .filter((message) => {
+        if (hydratedIds.has(message.id) || isProviderThreadLiveFallbackMessageId(message.id, sessionId, threadId)) {
+          return false
+        }
+        return !hasHydratedMessages || store.passiveStreamingMessageIds.has(message.id)
+      })
     store.setMessages(viewSessionId, [...messages, ...liveMessages])
   }, [sessionId, threadId, turnsData?.messages, viewSessionId])
 
   useEffect(() => {
-    if (!sessionId || !threadId || !canSubscribeThreadStream) {
+    if (!sessionId || !threadId || isThreadLoading || isThreadError || thread?.status === 'completed') {
       return
     }
     const controller = new AbortController()
@@ -108,6 +117,8 @@ export function SubagentOutputPanel({
         const stream = buildUIMessageChunkStreamFromResponse(response, viewSessionId)
         await handler.consume(stream)
         handler.finish()
+        void queryClient.invalidateQueries({ queryKey: providerThreadQueryKey(sessionId, threadId) })
+        void queryClient.invalidateQueries({ queryKey: providerThreadTurnsQueryKey(sessionId, threadId) })
       }
       catch (error) {
         if (controller.signal.aborted) {
@@ -121,21 +132,47 @@ export function SubagentOutputPanel({
       controller.abort()
       handler.dispose()
     }
-  }, [canSubscribeThreadStream, sessionId, threadId, viewSessionId])
+  }, [isThreadError, isThreadLoading, queryClient, sessionId, thread?.status, threadId, viewSessionId])
 
   const messages = useChatStore(useShallow(chatSelectors.messages(viewSessionId)))
   const streamStatus = useChatStore(chatSelectors.visibleStatus(viewSessionId))
-  const thread = threadData?.thread ?? null
   const fallbackDisplayName = agentName.trim() || thread?.name || 'Subagent'
   const displayName = thread?.agentNickname ?? fallbackDisplayName
   const displayRole = thread?.agentRole ?? agentRole
   const liveStreamPending = streamStatus === 'streaming' && messages.length === 0
   const status = thread?.status ?? (isTurnsLoading || liveStreamPending ? 'active' : 'idle')
   const statusLabel = formatAgentStatus(status)
-  const hasError =
-    (isThreadError || isTurnsError || streamStatus === 'error') &&
-    messages.length === 0 &&
-    !liveStreamPending
+  const hasError
+    = (isThreadError || isTurnsError || streamStatus === 'error')
+      && messages.length === 0
+      && !liveStreamPending
+
+  const handleToolApprovalResponse = useCallback(async (response: {
+    messageId: string
+    approvalId: string
+    approved: boolean
+  }) => {
+    const requestId = readRuntimeUserInputRequestId(response.approvalId)
+    useChatStore.getState().updateMessage(viewSessionId, response.messageId, message => ({
+      ...message,
+      parts: message.parts.map(part =>
+        isMatchingApprovalPart(part, response.approvalId)
+          ? {
+              ...part,
+              state: 'approval-responded',
+              approval: {
+                id: response.approvalId,
+                approved: response.approved,
+              },
+            } as UIMessage['parts'][number]
+          : part),
+    }), { dirtyToolCallIds: new Set([response.approvalId]) })
+    await submitRuntimeToolApproval({
+      sessionId,
+      requestId,
+      approved: response.approved,
+    })
+  }, [sessionId, viewSessionId])
 
   const cancelScheduledScroll = useCallback(() => {
     if (scrollFrameRef.current === null) {
@@ -275,8 +312,10 @@ export function SubagentOutputPanel({
             {messages.map(message => (
               <ProviderThreadMessage
                 key={message.id}
+                sessionId={sessionId}
                 viewSessionId={viewSessionId}
                 messageId={message.id}
+                onToolApprovalResponse={handleToolApprovalResponse}
               />
             ))}
           </div>
@@ -299,11 +338,19 @@ export function SubagentOutputPanel({
 }
 
 function ProviderThreadMessage({
+  sessionId,
   viewSessionId,
   messageId,
+  onToolApprovalResponse,
 }: {
+  sessionId: string
   viewSessionId: string
   messageId: string
+  onToolApprovalResponse?: (response: {
+    messageId: string
+    approvalId: string
+    approved: boolean
+  }) => void
 }) {
   const message = useChatStore(chatSelectors.message(viewSessionId, messageId))
   const isStreaming = useChatStore(chatSelectors.isVisibleStreamingMessage(viewSessionId, messageId))
@@ -315,6 +362,8 @@ function ProviderThreadMessage({
       message={message}
       isStreaming={isStreaming}
       executionDetailsDefaultOpen={false}
+      sessionId={sessionId}
+      onToolApprovalResponse={onToolApprovalResponse}
     />
   )
 }
