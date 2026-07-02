@@ -8,7 +8,7 @@ const spec = {
     "remote-host",
     "list"
   ],
-  "description": "List remote hosts",
+  "description": "List remote Cradle Server hosts",
   "flags": [],
   "method": "get",
   "path": "/remote-hosts"

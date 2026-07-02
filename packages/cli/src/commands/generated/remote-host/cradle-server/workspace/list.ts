@@ -13,21 +13,14 @@ const spec = {
   ],
   "command": [
     "remote-host",
-    "agentd",
-    "fs",
-    "stat"
+    "cradle-server",
+    "workspace",
+    "list"
   ],
-  "description": "Stat a path on a connected remote host",
-  "flags": [
-    {
-      "name": "path",
-      "required": true,
-      "target": "query.path",
-      "type": "string"
-    }
-  ],
+  "description": "List workspaces from a remote Cradle Server",
+  "flags": [],
   "method": "get",
-  "path": "/remote-hosts/{hostId}/agentd/fs/stat"
+  "path": "/remote-hosts/{hostId}/cradle-server/workspaces"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

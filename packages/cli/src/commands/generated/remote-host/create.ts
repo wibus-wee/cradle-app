@@ -8,7 +8,7 @@ const spec = {
     "remote-host",
     "create"
   ],
-  "description": "Create a remote host",
+  "description": "Create a remote Cradle Server host",
   "flags": [
     {
       "name": "id",

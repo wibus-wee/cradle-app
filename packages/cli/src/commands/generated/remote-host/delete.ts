@@ -15,7 +15,7 @@ const spec = {
     "remote-host",
     "delete"
   ],
-  "description": "Delete a remote host",
+  "description": "Delete a remote Cradle Server host",
   "flags": [],
   "method": "delete",
   "path": "/remote-hosts/{hostId}"

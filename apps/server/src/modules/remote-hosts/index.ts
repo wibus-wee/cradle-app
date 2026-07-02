@@ -9,7 +9,7 @@ export const remoteHosts = new Elysia({
 })
   .get('', () => RemoteHosts.listRemoteHosts(), {
     detail: {
-      'summary': 'List remote hosts',
+      'summary': 'List remote Cradle Server hosts',
       'x-cradle-cli': {
         command: ['remote-host', 'list'],
       },
@@ -24,24 +24,13 @@ export const remoteHosts = new Elysia({
     capabilities: body.capabilities,
   }), {
     detail: {
-      'summary': 'Create a remote host',
+      'summary': 'Create a remote Cradle Server host',
       'x-cradle-cli': {
         command: ['remote-host', 'create'],
       },
     },
     body: RemoteHostsModel.createHostBody,
     response: { 200: RemoteHostsModel.host },
-  })
-  .post('/relay/enrollments/:enrollmentId/host-session', ({ params, body }) => RemoteHosts.createRemoteHostRelayHostSession(params.enrollmentId, {
-    enrollmentSecret: body.enrollmentSecret,
-    ttlMs: body.ttlMs,
-  }), {
-    detail: {
-      summary: 'Create a short-lived relay host session for an enrolled agentd',
-    },
-    params: RemoteHostsModel.relayEnrollmentIdParams,
-    body: RemoteHostsModel.relayHostSessionBody,
-    response: { 200: RemoteHostsModel.relayHostSessionResponse },
   })
   .patch('/:hostId', ({ params, body }) => RemoteHosts.updateRemoteHost(params.hostId, {
     displayName: body.displayName,
@@ -50,7 +39,7 @@ export const remoteHosts = new Elysia({
     capabilities: body.capabilities,
   }), {
     detail: {
-      'summary': 'Update a remote host',
+      'summary': 'Update a remote Cradle Server host',
       'x-cradle-cli': {
         command: ['remote-host', 'update'],
       },
@@ -64,7 +53,7 @@ export const remoteHosts = new Elysia({
     return { ok: true as const }
   }, {
     detail: {
-      'summary': 'Delete a remote host',
+      'summary': 'Delete a remote Cradle Server host',
       'x-cradle-cli': {
         command: ['remote-host', 'delete'],
       },
@@ -72,42 +61,9 @@ export const remoteHosts = new Elysia({
     params: RemoteHostsModel.hostIdParams,
     response: { 200: RemoteHostsModel.ok },
   })
-  .post('/:hostId/agentd/connect', ({ params }) => RemoteHosts.connectRemoteHostAgentd(params.hostId), {
-    detail: {
-      'summary': 'Connect to a remote host agentd daemon',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'connect'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    response: { 200: RemoteHostsModel.connection },
-  })
-  .post('/:hostId/agentd/disconnect', async ({ params }) => {
-    await RemoteHosts.disconnectRemoteHostAgentd(params.hostId)
-    return { ok: true as const }
-  }, {
-    detail: {
-      'summary': 'Disconnect from a remote host agentd daemon',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'disconnect'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    response: { 200: RemoteHostsModel.ok },
-  })
-  .get('/:hostId/agentd/health', ({ params }) => RemoteHosts.readRemoteHostAgentdHealth(params.hostId), {
-    detail: {
-      'summary': 'Read remote host agentd daemon health',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'health'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    response: { 200: RemoteHostsModel.health },
-  })
   .post('/:hostId/cradle-server/connect', ({ params }) => RemoteHosts.connectRemoteHostCradleServer(params.hostId), {
     detail: {
-      'summary': 'Connect to a remote Cradle Server through SSH',
+      'summary': 'Connect to a remote Cradle Server',
       'x-cradle-cli': {
         command: ['remote-host', 'cradle-server', 'connect'],
       },
@@ -120,7 +76,7 @@ export const remoteHosts = new Elysia({
     return { ok: true as const }
   }, {
     detail: {
-      'summary': 'Disconnect from a remote Cradle Server tunnel',
+      'summary': 'Disconnect from a remote Cradle Server',
       'x-cradle-cli': {
         command: ['remote-host', 'cradle-server', 'disconnect'],
       },
@@ -130,7 +86,7 @@ export const remoteHosts = new Elysia({
   })
   .get('/:hostId/cradle-server/health', ({ params }) => RemoteHosts.readRemoteHostCradleServerHealth(params.hostId), {
     detail: {
-      'summary': 'Read remote Cradle Server health through the SSH tunnel',
+      'summary': 'Read remote Cradle Server health',
       'x-cradle-cli': {
         command: ['remote-host', 'cradle-server', 'health'],
       },
@@ -140,128 +96,63 @@ export const remoteHosts = new Elysia({
   })
   .post('/:hostId/cradle-server/test', ({ params }) => RemoteHosts.testRemoteHostCradleServer(params.hostId), {
     detail: {
-      'summary': 'Test remote Cradle Server SSH connectivity and health',
+      'summary': 'Test remote Cradle Server connectivity and health',
     },
     params: RemoteHostsModel.hostIdParams,
     response: { 200: RemoteHostsModel.cradleServerHealth },
   })
-  .get('/:hostId/agentd/runtimes', ({ params }) => RemoteHosts.listRemoteRuntimes(params.hostId), {
-    detail: {
-      'summary': 'List runtimes exposed by a remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'runtime', 'list'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    response: { 200: RemoteHostsModel.runtimeList },
-  })
-  .get('/:hostId/agentd/workspaces', ({ params, query }) => RemoteHosts.listRemoteWorkspaces(params.hostId, {
-    root: query.root ?? null,
+  .get('/:hostId/cradle-server/workspaces', async ({ params }) => ({
+    workspaces: await RemoteHosts.listRemoteCradleWorkspaces(params.hostId),
   }), {
     detail: {
-      'summary': 'List legacy workspace suggestions from a remote host',
+      'summary': 'List workspaces from a remote Cradle Server',
       'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'workspace', 'list'],
+        command: ['remote-host', 'cradle-server', 'workspace', 'list'],
       },
     },
     params: RemoteHostsModel.hostIdParams,
-    query: RemoteHostsModel.workspaceQuery,
-    response: { 200: RemoteHostsModel.workspaceList },
+    response: { 200: RemoteHostsModel.remoteWorkspaceList },
   })
-  .get('/:hostId/agentd/fs/directory', ({ params, query }) => RemoteHosts.listRemoteDirectory(params.hostId, {
-    path: query.path ?? null,
+  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files', async ({ params }) => ({
+    files: await RemoteHosts.listRemoteCradleWorkspaceFiles(params.hostId, params.remoteWorkspaceId),
   }), {
     detail: {
-      'summary': 'List a directory on a connected remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'fs', 'directory', 'list'],
-      },
+      summary: 'List root files from a remote Cradle Server workspace',
     },
-    params: RemoteHostsModel.hostIdParams,
-    query: RemoteHostsModel.fsPathQuery,
-    response: { 200: RemoteHostsModel.fsDirectoryList },
+    params: RemoteHostsModel.remoteWorkspaceIdParams,
+    response: { 200: RemoteHostsModel.workspaceFileList },
   })
-  .get('/:hostId/agentd/fs/stat', ({ params, query }) => RemoteHosts.statRemotePath(params.hostId, {
-    path: query.path,
+  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files/children', async ({ params, query }) => ({
+    files: await RemoteHosts.listRemoteCradleWorkspaceFileChildren(
+      params.hostId,
+      params.remoteWorkspaceId,
+      query.path ?? '',
+    ),
   }), {
     detail: {
-      'summary': 'Stat a path on a connected remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'fs', 'stat'],
-      },
+      summary: 'List child files from a remote Cradle Server workspace',
     },
-    params: RemoteHostsModel.hostIdParams,
-    query: RemoteHostsModel.requiredFsPathQuery,
-    response: { 200: RemoteHostsModel.fsStat },
+    params: RemoteHostsModel.remoteWorkspaceIdParams,
+    query: RemoteHostsModel.fileChildrenQuery,
+    response: { 200: RemoteHostsModel.workspaceFileList },
   })
-  .get('/:hostId/agentd/git/repository', ({ params, query }) => RemoteHosts.probeRemoteRepository(params.hostId, {
-    path: query.path,
-  }), {
+  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files/content', ({ params, query }) => {
+    return RemoteHosts.readRemoteCradleWorkspaceFileContent(params.hostId, params.remoteWorkspaceId, query.path)
+  }, {
     detail: {
-      'summary': 'Probe whether a remote path belongs to a git repository',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'git', 'repository', 'probe'],
-      },
+      summary: 'Read file content from a remote Cradle Server workspace',
     },
-    params: RemoteHostsModel.hostIdParams,
-    query: RemoteHostsModel.requiredFsPathQuery,
-    response: { 200: RemoteHostsModel.gitRepositoryProbe },
+    params: RemoteHostsModel.remoteWorkspaceIdParams,
+    query: RemoteHostsModel.fileContentQuery,
+    response: { 200: RemoteHostsModel.readFileResponse },
   })
-  .get('/:hostId/agentd/agents', ({ params }) => RemoteHosts.listRemoteAgents(params.hostId), {
+  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files/info', ({ params, query }) => {
+    return RemoteHosts.readRemoteCradleWorkspaceFileInfo(params.hostId, params.remoteWorkspaceId, query.path)
+  }, {
     detail: {
-      'summary': 'List live agents on a remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'agent', 'list'],
-      },
+      summary: 'Read file metadata from a remote Cradle Server workspace',
     },
-    params: RemoteHostsModel.hostIdParams,
-    response: { 200: RemoteHostsModel.agentList },
-  })
-  .post('/:hostId/agentd/agents', ({ params, body }) => RemoteHosts.startRemoteAgent(params.hostId, {
-    runtimeKind: body.runtimeKind,
-    workspacePath: body.workspacePath,
-    chatSessionId: body.chatSessionId ?? null,
-    providerSessionId: body.providerSessionId ?? null,
-    modelId: body.modelId ?? null,
-  }), {
-    detail: {
-      'summary': 'Start a mock remote agent on a remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'agentd', 'agent', 'start'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    body: RemoteHostsModel.startAgentBody,
-    response: { 200: RemoteHostsModel.startAgentResponse },
-  })
-  .post('/:hostId/relay/pairing-token', ({ params, body }) => RemoteHosts.createRemoteHostRelayPairingToken(params.hostId, {
-    relayUrl: body.relayUrl,
-    relayServerId: body.relayServerId,
-    ttlMs: body.ttlMs,
-  }), {
-    detail: {
-      'summary': 'Create relay pairing tokens for a remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'relay', 'pairing-token'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    body: RemoteHostsModel.relayPairingTokenBody,
-    response: { 200: RemoteHostsModel.relayPairingTokenResponse },
-  })
-  .post('/:hostId/relay/claim', ({ params, body }) => RemoteHosts.claimRemoteHostRelayPairing(params.hostId, {
-    relayUrl: body.relayUrl,
-    relayServerId: body.relayServerId,
-    pairingCode: body.pairingCode,
-    ttlMs: body.ttlMs,
-  }), {
-    detail: {
-      'summary': 'Claim a relay pairing code for a remote host',
-      'x-cradle-cli': {
-        command: ['remote-host', 'relay', 'claim'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    body: RemoteHostsModel.relayClaimBody,
-    response: { 200: RemoteHostsModel.relayClaimResponse },
+    params: RemoteHostsModel.remoteWorkspaceIdParams,
+    query: RemoteHostsModel.fileInfoQuery,
+    response: { 200: RemoteHostsModel.fileInfoResponse },
   })

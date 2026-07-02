@@ -1,2 +1,0 @@
-ALTER TABLE `diff_review_agent_fixes` ADD `target_revision_id` text REFERENCES diff_review_revisions(id);--> statement-breakpoint
-CREATE INDEX `diff_review_agent_fixes_target_revision_id_idx` ON `diff_review_agent_fixes` (`target_revision_id`);

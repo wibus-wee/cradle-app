@@ -16,7 +16,7 @@ const spec = {
     "cradle-server",
     "connect"
   ],
-  "description": "Connect to a remote Cradle Server through SSH",
+  "description": "Connect to a remote Cradle Server",
   "flags": [],
   "method": "post",
   "path": "/remote-hosts/{hostId}/cradle-server/connect"

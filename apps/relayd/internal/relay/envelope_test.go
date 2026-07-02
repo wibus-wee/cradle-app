@@ -15,7 +15,7 @@ func TestParseEnvelope(t *testing.T) {
 		Version: ProtocolVersion,
 		RoomID:  "room_1",
 		Seq:     1,
-		Kind:    KindRemoteAgentFrame,
+		Kind:    KindRelayDataFrame,
 		Payload: payload,
 	})
 	if err != nil {
@@ -40,7 +40,7 @@ func TestParseEnvelopeRejectsInvalidVersion(t *testing.T) {
 		Version: 99,
 		RoomID:  "room_1",
 		Seq:     1,
-		Kind:    KindRemoteAgentFrame,
+		Kind:    KindRelayDataFrame,
 		Payload: payload,
 	})
 	if err != nil {

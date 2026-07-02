@@ -11,7 +11,7 @@ import (
 const (
 	ProtocolVersion = 1
 
-	KindRemoteAgentFrame = "remote_agent_frame"
+	KindRelayDataFrame = "relay_data_frame"
 	KindPeerClosed       = "relay_peer_closed"
 	KindRelayError       = "relay_error"
 )
@@ -62,7 +62,7 @@ func (e Envelope) Validate(maxBytes int64) error {
 		return fmt.Errorf("%w: kind is required", ErrInvalidEnvelope)
 	}
 	switch e.Kind {
-	case KindRemoteAgentFrame, KindPeerClosed, KindRelayError:
+	case KindRelayDataFrame, KindPeerClosed, KindRelayError:
 	default:
 		return fmt.Errorf("%w: unknown kind", ErrInvalidEnvelope)
 	}

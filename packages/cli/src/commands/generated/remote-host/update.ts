@@ -15,7 +15,7 @@ const spec = {
     "remote-host",
     "update"
   ],
-  "description": "Update a remote host",
+  "description": "Update a remote Cradle Server host",
   "flags": [
     {
       "name": "displayName",

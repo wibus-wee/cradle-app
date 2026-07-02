@@ -1,15 +1,11 @@
-import { randomUUID } from 'node:crypto'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { agentCredentials, providerTargets } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { getRuntimeRegistry } from '../src/modules/chat-runtime/chat-runtime-provider-registry'
-import { createRemoteMockProvider } from '../src/modules/chat-runtime-providers/remote-mock/provider'
 import { shouldStartManagedLocalRelayd, startManagedLocalRelayd, stopManagedLocalRelayd } from '../src/modules/relay-servers/local-relayd-supervisor'
 
 type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
@@ -63,14 +59,7 @@ process.on('SIGINT', shutdown)
 
 async function createAppWithDataDir(dataDir: string): Promise<ElysiaApp> {
   process.env.CRADLE_DATA_DIR = dataDir
-  const app = await createServerApp()
-  const registry = getRuntimeRegistry()
-  if (!registry.get('remote-mock')) {
-    registry.register(createRemoteMockProvider({
-      readSecret: () => '',
-    }))
-  }
-  return app
+  return await createServerApp()
 }
 
 interface RelayServerView {
@@ -101,20 +90,6 @@ async function createRelayServer(app: ElysiaApp, input: {
   }))
   expect(res.status).toBe(200)
   return await res.json() as RelayServerView
-}
-
-async function createPendingRelayHost(app: ElysiaApp, hostId: string): Promise<void> {
-  const res = await app.handle(new Request('http://localhost/remote-hosts', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      id: hostId,
-      displayName: hostId,
-      enabled: true,
-      connectionConfig: { transport: 'relay' },
-    }),
-  }))
-  expect(res.status).toBe(200)
 }
 
 describe('relay servers', () => {
@@ -231,76 +206,6 @@ describe('relay servers', () => {
     finally {
       rmSync(dataDir, { recursive: true, force: true })
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
-    }
-  })
-
-  it('pairs a relay host through a configured relay server id', async () => {
-    const dataDir = makeTempDir('cradle-relay-servers-pairing-')
-    const previousDataDir = process.env.CRADLE_DATA_DIR
-    const previousCredentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
-    const previousRelaySecret = process.env.CRADLE_RELAY_HMAC_SECRET
-    const previousRelayDevSecret = process.env.CRADLE_RELAYD_DEV_HMAC_SECRET
-    let app: ElysiaApp | undefined
-
-    try {
-      process.env.CRADLE_CREDENTIAL_SECRET = 'remote-relay-credential-secret'
-      delete process.env.CRADLE_RELAY_HMAC_SECRET
-      delete process.env.CRADLE_RELAYD_DEV_HMAC_SECRET
-      app = await createAppWithDataDir(dataDir)
-
-      const relayUrl = `http://127.0.0.1:${randomPort()}/`
-      const server = await createRelayServer(app, {
-        displayName: 'Pairing relay',
-        relayUrl,
-        isDefault: true,
-      })
-      await createPendingRelayHost(app, 'remote-host-relay-server-pairing')
-
-      // Pairing token request carries the relay server id, not a URL.
-      const tokenRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-relay-server-pairing/relay/pairing-token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ relayServerId: server.id, ttlMs: 60_000 }),
-      }))
-      expect(tokenRes.status).toBe(200)
-      const token = await tokenRes.json() as {
-        relayUrl: string
-        relayServerId: string | null
-        pairingToken: string
-        roomId: string
-      }
-      // The resolved URL comes from the relay server, and the id is echoed back.
-      expect(token.relayUrl).toBe(relayUrl)
-      expect(token.relayServerId).toBe(server.id)
-      expect(token.pairingToken).toBeTruthy()
-
-      // A pending relay host with no relay server and no default must error.
-      const noDefaultApp = app
-      await createPendingRelayHost(noDefaultApp, 'remote-host-no-relay')
-      // Delete the default so there is nothing to fall back to.
-      await noDefaultApp.handle(new Request(`http://localhost/relay-servers/${server.id}`, { method: 'DELETE' }))
-      const errRes = await noDefaultApp.handle(new Request('http://localhost/remote-hosts/remote-host-no-relay/relay/pairing-token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ttlMs: 60_000 }),
-      }))
-      expect(errRes.status).toBe(400)
-
-      // The relay HMAC signing key is provisioned as a hidden system secret.
-      expect(db().select().from(agentCredentials).all()).toEqual([
-        expect.objectContaining({
-          id: 'system:remote-relay-hmac:v1',
-          kind: 'system-relay-hmac-secret',
-        }),
-      ])
-      expect(db().select().from(providerTargets).all()).toHaveLength(0)
-    }
-    finally {
-      rmSync(dataDir, { recursive: true, force: true })
-      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
-      restoreEnv('CRADLE_CREDENTIAL_SECRET', previousCredentialSecret)
-      restoreEnv('CRADLE_RELAY_HMAC_SECRET', previousRelaySecret)
-      restoreEnv('CRADLE_RELAYD_DEV_HMAC_SECRET', previousRelayDevSecret)
     }
   })
 
@@ -430,10 +335,3 @@ describe('relay servers', () => {
     }
   })
 })
-
-function randomPort(): number {
-  // A random high port for a URL that the pairing-token flow never actually
-  // connects to (the fake relay is not started here — the token mint is what we
-  // assert). Randomizing avoids collisions across parallel test runs.
-  return 30_000 + Math.floor(Number.parseInt(randomUUID().slice(0, 4), 16) / 65535 * 30_000)
-}

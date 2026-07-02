@@ -221,7 +221,7 @@ func TestWebSocketRoutesEnvelopeBetweenHostAndController(t *testing.T) {
 		Version: relay.ProtocolVersion,
 		RoomID:  roomID,
 		Seq:     1,
-		Kind:    relay.KindRemoteAgentFrame,
+		Kind:    relay.KindRelayDataFrame,
 		Payload: payload,
 	}, 1024)
 	if err != nil {
@@ -324,7 +324,7 @@ func TestWebSocketHeartbeatKeepsIdleConnectionOpen(t *testing.T) {
 		Version: relay.ProtocolVersion,
 		RoomID:  roomID,
 		Seq:     1,
-		Kind:    relay.KindRemoteAgentFrame,
+		Kind:    relay.KindRelayDataFrame,
 		Payload: payload,
 	}, 1024)
 	if err != nil {
@@ -379,7 +379,7 @@ func TestWebSocketRejectsRoomMismatch(t *testing.T) {
 		Version: relay.ProtocolVersion,
 		RoomID:  "room_other",
 		Seq:     1,
-		Kind:    relay.KindRemoteAgentFrame,
+		Kind:    relay.KindRelayDataFrame,
 		Payload: payload,
 	}, 1024)
 	if err != nil {
