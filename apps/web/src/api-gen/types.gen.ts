@@ -2292,7 +2292,7 @@ export type GetRemoteHostsResponses = {
         capabilitiesJson: string;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'offline';
+        connectionState: 'idle' | 'connected' | 'offline';
         lastError: string | null;
     }>;
 };
@@ -2305,8 +2305,8 @@ export type PostRemoteHostsData = {
         displayName: string;
         enabled?: boolean;
         connectionConfig?: {
-            transport?: 'ssh' | 'direct-socket' | 'relay';
-            localSocketPath?: string;
+            transport?: 'ssh' | 'direct-url';
+            baseUrl?: string;
             ssh?: {
                 hostName: string;
                 user?: string | null;
@@ -2314,27 +2314,11 @@ export type PostRemoteHostsData = {
                 auth?: 'default' | 'identityFile';
                 identityFilePath?: string | null;
             };
-            relay?: {
-                relayUrl: string;
-                enrollmentId?: string;
-                relayServerId?: string | null;
-                enrollmentSecretHash?: string;
-                lastSessionRoomId?: string;
-                lastSeenAt?: string | number;
-            };
             sshExecutable?: string;
             sshArgs?: Array<string>;
             connectTimeoutMs?: string | number;
         };
         capabilities?: {
-            agentd?: {
-                enabled?: boolean;
-                remoteSocketPath?: string;
-                lastDaemonHostId?: string | null;
-                lastDaemonVersion?: string | null;
-                lastPlatform?: string | null;
-                lastArch?: string | null;
-            };
             cradleServer?: {
                 enabled?: boolean;
                 remoteHost?: string;
@@ -2360,39 +2344,12 @@ export type PostRemoteHostsResponses = {
         capabilitiesJson: string;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'offline';
+        connectionState: 'idle' | 'connected' | 'offline';
         lastError: string | null;
     };
 };
 
 export type PostRemoteHostsResponse = PostRemoteHostsResponses[keyof PostRemoteHostsResponses];
-
-export type PostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionData = {
-    body: {
-        enrollmentSecret: string;
-        ttlMs?: string | number;
-    };
-    path: {
-        enrollmentId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/relay/enrollments/{enrollmentId}/host-session';
-};
-
-export type PostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        relayUrl: string;
-        roomId: string;
-        roomStartToken: string;
-        hostToken: string;
-        expiresAt: string;
-    };
-};
-
-export type PostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionResponse = PostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionResponses[keyof PostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionResponses];
 
 export type DeleteRemoteHostsByHostIdData = {
     body?: never;
@@ -2419,8 +2376,8 @@ export type PatchRemoteHostsByHostIdData = {
         displayName?: string;
         enabled?: boolean;
         connectionConfig?: {
-            transport?: 'ssh' | 'direct-socket' | 'relay';
-            localSocketPath?: string;
+            transport?: 'ssh' | 'direct-url';
+            baseUrl?: string;
             ssh?: {
                 hostName: string;
                 user?: string | null;
@@ -2428,27 +2385,11 @@ export type PatchRemoteHostsByHostIdData = {
                 auth?: 'default' | 'identityFile';
                 identityFilePath?: string | null;
             };
-            relay?: {
-                relayUrl: string;
-                enrollmentId?: string;
-                relayServerId?: string | null;
-                enrollmentSecretHash?: string;
-                lastSessionRoomId?: string;
-                lastSeenAt?: string | number;
-            };
             sshExecutable?: string;
             sshArgs?: Array<string>;
             connectTimeoutMs?: string | number;
         };
         capabilities?: {
-            agentd?: {
-                enabled?: boolean;
-                remoteSocketPath?: string;
-                lastDaemonHostId?: string | null;
-                lastDaemonVersion?: string | null;
-                lastPlatform?: string | null;
-                lastArch?: string | null;
-            };
             cradleServer?: {
                 enabled?: boolean;
                 remoteHost?: string;
@@ -2476,85 +2417,12 @@ export type PatchRemoteHostsByHostIdResponses = {
         capabilitiesJson: string;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'offline';
+        connectionState: 'idle' | 'connected' | 'offline';
         lastError: string | null;
     };
 };
 
 export type PatchRemoteHostsByHostIdResponse = PatchRemoteHostsByHostIdResponses[keyof PatchRemoteHostsByHostIdResponses];
-
-export type PostRemoteHostsByHostIdAgentdConnectData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/agentd/connect';
-};
-
-export type PostRemoteHostsByHostIdAgentdConnectResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        hostId: string;
-        state: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'offline';
-        localSocketPath: string | null;
-        daemonHostId: string | null;
-        daemonVersion: string | null;
-        platform: string | null;
-        arch: string | null;
-        lastError: string | null;
-    };
-};
-
-export type PostRemoteHostsByHostIdAgentdConnectResponse = PostRemoteHostsByHostIdAgentdConnectResponses[keyof PostRemoteHostsByHostIdAgentdConnectResponses];
-
-export type PostRemoteHostsByHostIdAgentdDisconnectData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/agentd/disconnect';
-};
-
-export type PostRemoteHostsByHostIdAgentdDisconnectResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type PostRemoteHostsByHostIdAgentdDisconnectResponse = PostRemoteHostsByHostIdAgentdDisconnectResponses[keyof PostRemoteHostsByHostIdAgentdDisconnectResponses];
-
-export type GetRemoteHostsByHostIdAgentdHealthData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/agentd/health';
-};
-
-export type GetRemoteHostsByHostIdAgentdHealthResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        hostId: string;
-        status: 'ok' | 'offline';
-        daemonVersion: string | null;
-        daemonHostId: string | null;
-        uptimeSeconds: number | null;
-        connectionState: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'offline';
-        lastError: string | null;
-    };
-};
-
-export type GetRemoteHostsByHostIdAgentdHealthResponse = GetRemoteHostsByHostIdAgentdHealthResponses[keyof GetRemoteHostsByHostIdAgentdHealthResponses];
 
 export type PostRemoteHostsByHostIdCradleServerConnectData = {
     body?: never;
@@ -2685,43 +2553,16 @@ export type PostRemoteHostsByHostIdCradleServerTestResponses = {
 
 export type PostRemoteHostsByHostIdCradleServerTestResponse = PostRemoteHostsByHostIdCradleServerTestResponses[keyof PostRemoteHostsByHostIdCradleServerTestResponses];
 
-export type GetRemoteHostsByHostIdAgentdRuntimesData = {
+export type GetRemoteHostsByHostIdCradleServerWorkspacesData = {
     body?: never;
     path: {
         hostId: string;
     };
     query?: never;
-    url: '/remote-hosts/{hostId}/agentd/runtimes';
+    url: '/remote-hosts/{hostId}/cradle-server/workspaces';
 };
 
-export type GetRemoteHostsByHostIdAgentdRuntimesResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        runtimes: Array<{
-            runtimeKind: string;
-            label: string;
-            status: 'available' | 'unavailable';
-            detail: string | null;
-        }>;
-    };
-};
-
-export type GetRemoteHostsByHostIdAgentdRuntimesResponse = GetRemoteHostsByHostIdAgentdRuntimesResponses[keyof GetRemoteHostsByHostIdAgentdRuntimesResponses];
-
-export type GetRemoteHostsByHostIdAgentdWorkspacesData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: {
-        root?: string;
-    };
-    url: '/remote-hosts/{hostId}/agentd/workspaces';
-};
-
-export type GetRemoteHostsByHostIdAgentdWorkspacesResponses = {
+export type GetRemoteHostsByHostIdCradleServerWorkspacesResponses = {
     /**
      * Response for status 200
      */
@@ -2729,218 +2570,131 @@ export type GetRemoteHostsByHostIdAgentdWorkspacesResponses = {
         workspaces: Array<{
             id: string;
             name: string;
-            path: string;
-            reason: string;
+            locator: {
+                hostId: string;
+                path: string;
+                kind?: 'project' | 'managed-worktree';
+                sourceWorkspaceId?: string | null;
+            };
+            gitIdentity: {
+                originUrl?: string | null;
+                repoRoot?: string | null;
+                headSha?: string | null;
+                branch?: string | null;
+            };
+            identifier: string;
+            pinned: number;
+            createdAt: number;
+            updatedAt: number;
         }>;
-        message: string | null;
     };
 };
 
-export type GetRemoteHostsByHostIdAgentdWorkspacesResponse = GetRemoteHostsByHostIdAgentdWorkspacesResponses[keyof GetRemoteHostsByHostIdAgentdWorkspacesResponses];
+export type GetRemoteHostsByHostIdCradleServerWorkspacesResponse = GetRemoteHostsByHostIdCradleServerWorkspacesResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesResponses];
 
-export type GetRemoteHostsByHostIdAgentdFsDirectoryData = {
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesData = {
     body?: never;
     path: {
         hostId: string;
+        remoteWorkspaceId: string;
     };
-    query?: {
-        path?: string;
-    };
-    url: '/remote-hosts/{hostId}/agentd/fs/directory';
+    query?: never;
+    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files';
 };
 
-export type GetRemoteHostsByHostIdAgentdFsDirectoryResponses = {
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponses = {
     /**
      * Response for status 200
      */
     200: {
-        path: string;
-        parentPath: string | null;
-        entries: Array<{
+        files: Array<{
+            type: 'file' | 'directory';
             name: string;
             path: string;
-            kind: 'file' | 'directory' | 'symlink' | 'other';
-            size: number | null;
-            modifiedAt: number | null;
-            hidden: boolean;
         }>;
     };
 };
 
-export type GetRemoteHostsByHostIdAgentdFsDirectoryResponse = GetRemoteHostsByHostIdAgentdFsDirectoryResponses[keyof GetRemoteHostsByHostIdAgentdFsDirectoryResponses];
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponses];
 
-export type GetRemoteHostsByHostIdAgentdFsStatData = {
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenData = {
     body?: never;
     path: {
         hostId: string;
+        remoteWorkspaceId: string;
+    };
+    query?: {
+        path?: string;
+    };
+    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files/children';
+};
+
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        files: Array<{
+            type: 'file' | 'directory';
+            name: string;
+            path: string;
+        }>;
+    };
+};
+
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponses];
+
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentData = {
+    body?: never;
+    path: {
+        hostId: string;
+        remoteWorkspaceId: string;
     };
     query: {
         path: string;
     };
-    url: '/remote-hosts/{hostId}/agentd/fs/stat';
+    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files/content';
 };
 
-export type GetRemoteHostsByHostIdAgentdFsStatResponses = {
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        content: string | null;
+    };
+};
+
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponses];
+
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoData = {
+    body?: never;
+    path: {
+        hostId: string;
+        remoteWorkspaceId: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files/info';
+};
+
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponses = {
     /**
      * Response for status 200
      */
     200: {
         name: string;
         path: string;
-        kind: 'file' | 'directory' | 'symlink' | 'other';
-        size: number | null;
-        modifiedAt: number | null;
-        hidden: boolean;
-    };
+        size: number;
+        modifiedAt: number;
+        mimeType: string;
+        extension: string;
+        previewKind: 'text' | 'markdown' | 'image' | 'pdf' | 'office' | 'unsupported';
+    } | null;
 };
 
-export type GetRemoteHostsByHostIdAgentdFsStatResponse = GetRemoteHostsByHostIdAgentdFsStatResponses[keyof GetRemoteHostsByHostIdAgentdFsStatResponses];
-
-export type GetRemoteHostsByHostIdAgentdGitRepositoryData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query: {
-        path: string;
-    };
-    url: '/remote-hosts/{hostId}/agentd/git/repository';
-};
-
-export type GetRemoteHostsByHostIdAgentdGitRepositoryResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        path: string;
-        isRepository: boolean;
-        rootPath: string | null;
-        branch: string | null;
-        remoteUrl: string | null;
-    };
-};
-
-export type GetRemoteHostsByHostIdAgentdGitRepositoryResponse = GetRemoteHostsByHostIdAgentdGitRepositoryResponses[keyof GetRemoteHostsByHostIdAgentdGitRepositoryResponses];
-
-export type GetRemoteHostsByHostIdAgentdAgentsData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/agentd/agents';
-};
-
-export type GetRemoteHostsByHostIdAgentdAgentsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        agents: Array<{
-            agentId: string;
-            runtimeKind: string;
-            workspacePath: string;
-            status: 'idle' | 'running' | 'failed';
-            providerSessionId: string | null;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-    };
-};
-
-export type GetRemoteHostsByHostIdAgentdAgentsResponse = GetRemoteHostsByHostIdAgentdAgentsResponses[keyof GetRemoteHostsByHostIdAgentdAgentsResponses];
-
-export type PostRemoteHostsByHostIdAgentdAgentsData = {
-    body: {
-        runtimeKind: string;
-        workspacePath: string;
-        chatSessionId?: string | null;
-        providerSessionId?: string | null;
-        modelId?: string | null;
-    };
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/agentd/agents';
-};
-
-export type PostRemoteHostsByHostIdAgentdAgentsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        agent: {
-            agentId: string;
-            runtimeKind: string;
-            workspacePath: string;
-            status: 'idle' | 'running' | 'failed';
-            providerSessionId: string | null;
-            createdAt: number;
-            updatedAt: number;
-        };
-    };
-};
-
-export type PostRemoteHostsByHostIdAgentdAgentsResponse = PostRemoteHostsByHostIdAgentdAgentsResponses[keyof PostRemoteHostsByHostIdAgentdAgentsResponses];
-
-export type PostRemoteHostsByHostIdRelayPairingTokenData = {
-    body: {
-        relayUrl?: string;
-        relayServerId?: string;
-        ttlMs?: string | number;
-    };
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/relay/pairing-token';
-};
-
-export type PostRemoteHostsByHostIdRelayPairingTokenResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        relayUrl: string;
-        relayServerId: string | null;
-        roomId: string;
-        pairingToken: string;
-        hostToken: string;
-        enrollmentId: string;
-        enrollmentSecret: string;
-        expiresAt: string;
-    };
-};
-
-export type PostRemoteHostsByHostIdRelayPairingTokenResponse = PostRemoteHostsByHostIdRelayPairingTokenResponses[keyof PostRemoteHostsByHostIdRelayPairingTokenResponses];
-
-export type PostRemoteHostsByHostIdRelayClaimData = {
-    body: {
-        relayUrl?: string;
-        relayServerId?: string;
-        pairingCode: string;
-        ttlMs?: string | number;
-    };
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/relay/claim';
-};
-
-export type PostRemoteHostsByHostIdRelayClaimResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        relayUrl: string;
-        roomId: string;
-        enrollmentId: string;
-    };
-};
-
-export type PostRemoteHostsByHostIdRelayClaimResponse = PostRemoteHostsByHostIdRelayClaimResponses[keyof PostRemoteHostsByHostIdRelayClaimResponses];
+export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponses];
 
 export type GetExternalIssueSourcesData = {
     body?: never;

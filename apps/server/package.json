@@ -37,8 +37,6 @@
     "@cradle/chat-runtime-contracts": "workspace:*",
     "@cradle/db": "workspace:*",
     "@cradle/plugin-sdk": "workspace:*",
-    "@cradle/remote-agent-protocol": "workspace:*",
-    "@cradle/remote-relay-protocol": "workspace:*",
     "@elysia/openapi": "^1.4.15",
     "@elysiajs/cors": "^1.4.2",
     "@elysiajs/node": "^1.4.5",

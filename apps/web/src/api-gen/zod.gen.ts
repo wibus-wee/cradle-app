@@ -473,12 +473,8 @@ export const zPostRemoteHostsBody = z.object({
     displayName: z.string().min(1).regex(/.*\S.*/),
     enabled: z.boolean().optional(),
     connectionConfig: z.object({
-        transport: z.enum([
-            'ssh',
-            'direct-socket',
-            'relay'
-        ]).optional(),
-        localSocketPath: z.string().min(1).regex(/.*\S.*/).optional(),
+        transport: z.enum(['ssh', 'direct-url']).optional(),
+        baseUrl: z.string().min(1).regex(/.*\S.*/).optional(),
         ssh: z.object({
             hostName: z.string().min(1).regex(/.*\S.*/),
             user: z.string().nullish(),
@@ -489,17 +485,6 @@ export const zPostRemoteHostsBody = z.object({
             auth: z.enum(['default', 'identityFile']).optional(),
             identityFilePath: z.string().nullish()
         }).optional(),
-        relay: z.object({
-            relayUrl: z.string().min(1).regex(/.*\S.*/),
-            enrollmentId: z.string().min(1).regex(/.*\S.*/).optional(),
-            relayServerId: z.string().nullish(),
-            enrollmentSecretHash: z.string().min(1).regex(/.*\S.*/).optional(),
-            lastSessionRoomId: z.string().min(1).regex(/.*\S.*/).optional(),
-            lastSeenAt: z.union([
-                z.string(),
-                z.int().gte(0)
-            ]).optional()
-        }).optional(),
         sshExecutable: z.string().min(1).regex(/.*\S.*/).optional(),
         sshArgs: z.array(z.string()).optional(),
         connectTimeoutMs: z.union([
@@ -508,14 +493,6 @@ export const zPostRemoteHostsBody = z.object({
         ]).optional()
     }).optional(),
     capabilities: z.object({
-        agentd: z.object({
-            enabled: z.boolean().optional(),
-            remoteSocketPath: z.string().min(1).regex(/.*\S.*/).optional(),
-            lastDaemonHostId: z.string().nullish(),
-            lastDaemonVersion: z.string().nullish(),
-            lastPlatform: z.string().nullish(),
-            lastArch: z.string().nullish()
-        }).optional(),
         cradleServer: z.object({
             enabled: z.boolean().optional(),
             remoteHost: z.string().min(1).regex(/.*\S.*/).optional(),
@@ -527,18 +504,6 @@ export const zPostRemoteHostsBody = z.object({
     }).optional()
 });
 
-export const zPostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionBody = z.object({
-    enrollmentSecret: z.string().min(1).regex(/.*\S.*/),
-    ttlMs: z.union([
-        z.string(),
-        z.int().gte(1000).lte(3600000)
-    ]).optional()
-});
-
-export const zPostRemoteHostsRelayEnrollmentsByEnrollmentIdHostSessionPath = z.object({
-    enrollmentId: z.string().min(1)
-});
-
 export const zDeleteRemoteHostsByHostIdPath = z.object({
     hostId: z.string().min(1)
 });
@@ -547,12 +512,8 @@ export const zPatchRemoteHostsByHostIdBody = z.object({
     displayName: z.string().min(1).regex(/.*\S.*/).optional(),
     enabled: z.boolean().optional(),
     connectionConfig: z.object({
-        transport: z.enum([
-            'ssh',
-            'direct-socket',
-            'relay'
-        ]).optional(),
-        localSocketPath: z.string().min(1).regex(/.*\S.*/).optional(),
+        transport: z.enum(['ssh', 'direct-url']).optional(),
+        baseUrl: z.string().min(1).regex(/.*\S.*/).optional(),
         ssh: z.object({
             hostName: z.string().min(1).regex(/.*\S.*/),
             user: z.string().nullish(),
@@ -563,17 +524,6 @@ export const zPatchRemoteHostsByHostIdBody = z.object({
             auth: z.enum(['default', 'identityFile']).optional(),
             identityFilePath: z.string().nullish()
         }).optional(),
-        relay: z.object({
-            relayUrl: z.string().min(1).regex(/.*\S.*/),
-            enrollmentId: z.string().min(1).regex(/.*\S.*/).optional(),
-            relayServerId: z.string().nullish(),
-            enrollmentSecretHash: z.string().min(1).regex(/.*\S.*/).optional(),
-            lastSessionRoomId: z.string().min(1).regex(/.*\S.*/).optional(),
-            lastSeenAt: z.union([
-                z.string(),
-                z.int().gte(0)
-            ]).optional()
-        }).optional(),
         sshExecutable: z.string().min(1).regex(/.*\S.*/).optional(),
         sshArgs: z.array(z.string()).optional(),
         connectTimeoutMs: z.union([
@@ -582,14 +532,6 @@ export const zPatchRemoteHostsByHostIdBody = z.object({
         ]).optional()
     }).optional(),
     capabilities: z.object({
-        agentd: z.object({
-            enabled: z.boolean().optional(),
-            remoteSocketPath: z.string().min(1).regex(/.*\S.*/).optional(),
-            lastDaemonHostId: z.string().nullish(),
-            lastDaemonVersion: z.string().nullish(),
-            lastPlatform: z.string().nullish(),
-            lastArch: z.string().nullish()
-        }).optional(),
         cradleServer: z.object({
             enabled: z.boolean().optional(),
             remoteHost: z.string().min(1).regex(/.*\S.*/).optional(),
@@ -602,18 +544,6 @@ export const zPatchRemoteHostsByHostIdBody = z.object({
 });
 
 export const zPatchRemoteHostsByHostIdPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zPostRemoteHostsByHostIdAgentdConnectPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zPostRemoteHostsByHostIdAgentdDisconnectPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zGetRemoteHostsByHostIdAgentdHealthPath = z.object({
     hostId: z.string().min(1)
 });
 
@@ -633,83 +563,40 @@ export const zPostRemoteHostsByHostIdCradleServerTestPath = z.object({
     hostId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdAgentdRuntimesPath = z.object({
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesPath = z.object({
     hostId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdAgentdWorkspacesPath = z.object({
-    hostId: z.string().min(1)
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesPath = z.object({
+    hostId: z.string().min(1),
+    remoteWorkspaceId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdAgentdWorkspacesQuery = z.object({
-    root: z.string().optional()
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenPath = z.object({
+    hostId: z.string().min(1),
+    remoteWorkspaceId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdAgentdFsDirectoryPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zGetRemoteHostsByHostIdAgentdFsDirectoryQuery = z.object({
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenQuery = z.object({
     path: z.string().optional()
 });
 
-export const zGetRemoteHostsByHostIdAgentdFsStatPath = z.object({
-    hostId: z.string().min(1)
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentPath = z.object({
+    hostId: z.string().min(1),
+    remoteWorkspaceId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdAgentdFsStatQuery = z.object({
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentQuery = z.object({
     path: z.string().min(1).regex(/.*\S.*/)
 });
 
-export const zGetRemoteHostsByHostIdAgentdGitRepositoryPath = z.object({
-    hostId: z.string().min(1)
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoPath = z.object({
+    hostId: z.string().min(1),
+    remoteWorkspaceId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdAgentdGitRepositoryQuery = z.object({
+export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoQuery = z.object({
     path: z.string().min(1).regex(/.*\S.*/)
-});
-
-export const zGetRemoteHostsByHostIdAgentdAgentsPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zPostRemoteHostsByHostIdAgentdAgentsBody = z.object({
-    runtimeKind: z.string().min(1).regex(/.*\S.*/),
-    workspacePath: z.string().min(1).regex(/.*\S.*/),
-    chatSessionId: z.string().nullish(),
-    providerSessionId: z.string().nullish(),
-    modelId: z.string().nullish()
-});
-
-export const zPostRemoteHostsByHostIdAgentdAgentsPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zPostRemoteHostsByHostIdRelayPairingTokenBody = z.object({
-    relayUrl: z.string().min(1).regex(/.*\S.*/).optional(),
-    relayServerId: z.string().min(1).regex(/.*\S.*/).optional(),
-    ttlMs: z.union([
-        z.string(),
-        z.int().gte(1000).lte(3600000)
-    ]).optional()
-});
-
-export const zPostRemoteHostsByHostIdRelayPairingTokenPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zPostRemoteHostsByHostIdRelayClaimBody = z.object({
-    relayUrl: z.string().min(1).regex(/.*\S.*/).optional(),
-    relayServerId: z.string().min(1).regex(/.*\S.*/).optional(),
-    pairingCode: z.string().min(1).regex(/.*\S.*/),
-    ttlMs: z.union([
-        z.string(),
-        z.int().gte(1000).lte(3600000)
-    ]).optional()
-});
-
-export const zPostRemoteHostsByHostIdRelayClaimPath = z.object({
-    hostId: z.string().min(1)
 });
 
 export const zGetExternalIssueSourcesBindingsQuery = z.object({

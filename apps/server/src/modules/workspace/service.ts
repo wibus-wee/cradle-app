@@ -378,12 +378,8 @@ export async function getFiles(workspaceId: string) {
   if (isLocalWorkspaceLocator(locator)) {
     return listFiles(locator.path)
   }
-  const directory = await RemoteHosts.listRemoteDirectory(locator.hostId, { path: locator.path })
-  return directory.entries.map(entry => ({
-    type: entry.kind === 'directory' || entry.kind === 'symlink' ? 'directory' as const : 'file' as const,
-    name: entry.name,
-    path: relativizeRemotePath(locator.path, entry.path),
-  }))
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  return await RemoteHosts.listRemoteCradleWorkspaceFiles(locator.hostId, remoteWorkspace.id)
 }
 
 export async function getFileChildren(workspaceId: string, relativePath = '') {
@@ -395,14 +391,8 @@ export async function getFileChildren(workspaceId: string, relativePath = '') {
   if (isLocalWorkspaceLocator(locator)) {
     return listFileChildren(locator.path, relativePath)
   }
-  const directory = await RemoteHosts.listRemoteDirectory(locator.hostId, {
-    path: joinRemoteWorkspacePath(locator.path, relativePath),
-  })
-  return directory.entries.map(entry => ({
-    type: entry.kind === 'directory' || entry.kind === 'symlink' ? 'directory' as const : 'file' as const,
-    name: entry.name,
-    path: relativizeRemotePath(locator.path, entry.path),
-  }))
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  return await RemoteHosts.listRemoteCradleWorkspaceFileChildren(locator.hostId, remoteWorkspace.id, relativePath)
 }
 
 export async function searchFiles(workspaceId: string, input: { query?: string, limit?: number }) {
@@ -486,9 +476,8 @@ export async function getFileContent(workspaceId: string, relativePath: string):
   if (isLocalWorkspaceLocator(locator)) {
     return readTextFile(locator.path, relativePath)
   }
-  return (await RemoteHosts.readRemoteFile(locator.hostId, {
-    path: joinRemoteWorkspacePath(locator.path, relativePath),
-  })).content
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  return (await RemoteHosts.readRemoteCradleWorkspaceFileContent(locator.hostId, remoteWorkspace.id, relativePath)).content
 }
 
 export async function getFileInfo(workspaceId: string, relativePath: string) {
@@ -500,18 +489,8 @@ export async function getFileInfo(workspaceId: string, relativePath: string) {
   if (isLocalWorkspaceLocator(locator)) {
     return getWorkspaceFileInfo(locator.path, relativePath)
   }
-  const stat = await RemoteHosts.statRemotePath(locator.hostId, {
-    path: joinRemoteWorkspacePath(locator.path, relativePath),
-  })
-  return {
-    name: stat.name,
-    path: relativePath,
-    size: stat.size ?? 0,
-    modifiedAt: stat.modifiedAt ?? 0,
-    mimeType: 'text/plain',
-    extension: '',
-    previewKind: stat.kind === 'file' ? 'text' as const : 'unsupported' as const,
-  }
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  return await RemoteHosts.readRemoteCradleWorkspaceFileInfo(locator.hostId, remoteWorkspace.id, relativePath)
 }
 
 export async function getFileBytes(workspaceId: string, relativePath: string) {
@@ -725,30 +704,23 @@ export function getLocalWorkspacePath(workspaceId: string): string | null {
 
 function unsupportedRemoteWorkspaceOperation(operation: string): never {
   throw new AppError({
-    code: 'workspace_operation_not_supported_for_host',
+    code: 'workspace_operation_not_supported_for_remote_cradle_server',
     status: 409,
-    message: `This workspace operation is not available for remote hosts yet: ${operation}.`,
+    message: `This workspace operation is not available for remote Cradle Server workspaces yet: ${operation}.`,
   })
 }
 
-function joinRemoteWorkspacePath(rootPath: string, relativePath: string): string {
-  const trimmedRelativePath = relativePath.trim().replace(/^[/\\]+/, '')
-  if (!trimmedRelativePath) {
-    return rootPath
+async function resolveRemoteCradleWorkspace(locator: WorkspaceLocator) {
+  const remoteWorkspace = await RemoteHosts.resolveRemoteWorkspaceByPath(locator.hostId, locator.path)
+  if (!remoteWorkspace) {
+    throw new AppError({
+      code: 'remote_cradle_workspace_not_found',
+      status: 404,
+      message: 'Remote Cradle Server workspace was not found.',
+      details: { hostId: locator.hostId, path: locator.path },
+    })
   }
-  return `${rootPath.replace(/[/\\]+$/, '')}/${trimmedRelativePath}`
-}
-
-function relativizeRemotePath(rootPath: string, absolutePath: string): string {
-  const normalizedRoot = rootPath.replace(/[/\\]+$/, '')
-  if (absolutePath === normalizedRoot) {
-    return ''
-  }
-  const prefix = `${normalizedRoot}/`
-  if (absolutePath.startsWith(prefix)) {
-    return absolutePath.slice(prefix.length)
-  }
-  return absolutePath
+  return remoteWorkspace
 }
 
 function assertMultiWorkspacePocEnabled(): void {

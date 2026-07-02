@@ -16,7 +16,7 @@ const spec = {
     "cradle-server",
     "health"
   ],
-  "description": "Read remote Cradle Server health through the SSH tunnel",
+  "description": "Read remote Cradle Server health",
   "flags": [],
   "method": "get",
   "path": "/remote-hosts/{hostId}/cradle-server/health"

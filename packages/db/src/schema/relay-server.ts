@@ -5,11 +5,10 @@ import { textPk, timestamps } from './shared'
 /**
  * A reusable relay server that remote hosts can pair through.
  *
- * The relay itself owns only short-lived pairing/room state (see the
- * remote-agent-relay ExecPlan). This table is the Cradle-side registry of relay
- * servers a user has configured: a friendly name, the public URL both the
- * remote `cradle-agentd` and Cradle Server connect to, and whether it is the
- * default offered when pairing a new host.
+ * The relay itself owns only short-lived pairing/room state. This table is the
+ * Cradle-side registry of relay servers a user has configured: a friendly name,
+ * the public URL participating Cradle Server peers connect to, and whether it
+ * is the default offered when pairing a new host.
  */
 export const relayServers = sqliteTable(
   'relay_servers',

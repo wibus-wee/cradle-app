@@ -5,18 +5,15 @@ const nullableNumber = t.Union([t.Number(), t.Null()])
 const nonBlankString = t.String({ minLength: 1, pattern: '.*\\S.*' })
 const remoteHostTransport = t.Union([
   t.Literal('ssh'),
-  t.Literal('direct-socket'),
-  t.Literal('relay'),
+  t.Literal('direct-url'),
 ])
 const sshAuth = t.Union([
   t.Literal('default'),
   t.Literal('identityFile'),
 ])
-const connectionState = t.Union([
+const cradleServerConnectionState = t.Union([
   t.Literal('idle'),
-  t.Literal('connecting'),
   t.Literal('connected'),
-  t.Literal('disconnected'),
   t.Literal('offline'),
 ])
 
@@ -28,32 +25,13 @@ const sshProfile = t.Object({
   identityFilePath: t.Optional(nullableString),
 }, { additionalProperties: false })
 
-const relayConfig = t.Object({
-  relayUrl: nonBlankString,
-  enrollmentId: t.Optional(nonBlankString),
-  relayServerId: t.Optional(nullableString),
-  enrollmentSecretHash: t.Optional(nonBlankString),
-  lastSessionRoomId: t.Optional(nonBlankString),
-  lastSeenAt: t.Optional(t.Integer({ minimum: 0 })),
-}, { additionalProperties: false })
-
 const connectionConfig = t.Object({
   transport: t.Optional(remoteHostTransport),
-  localSocketPath: t.Optional(nonBlankString),
+  baseUrl: t.Optional(nonBlankString),
   ssh: t.Optional(sshProfile),
-  relay: t.Optional(relayConfig),
   sshExecutable: t.Optional(nonBlankString),
   sshArgs: t.Optional(t.Array(t.String())),
   connectTimeoutMs: t.Optional(t.Integer({ minimum: 1, maximum: 120_000 })),
-}, { additionalProperties: false })
-
-const agentdCapability = t.Object({
-  enabled: t.Optional(t.Boolean()),
-  remoteSocketPath: t.Optional(nonBlankString),
-  lastDaemonHostId: t.Optional(nullableString),
-  lastDaemonVersion: t.Optional(nullableString),
-  lastPlatform: t.Optional(nullableString),
-  lastArch: t.Optional(nullableString),
 }, { additionalProperties: false })
 
 const cradleServerCapability = t.Object({
@@ -63,15 +41,8 @@ const cradleServerCapability = t.Object({
 }, { additionalProperties: false })
 
 const capabilities = t.Object({
-  agentd: t.Optional(agentdCapability),
   cradleServer: t.Optional(cradleServerCapability),
 }, { additionalProperties: false })
-
-const cradleServerConnectionState = t.Union([
-  t.Literal('idle'),
-  t.Literal('connected'),
-  t.Literal('offline'),
-])
 
 const cradleServerHealthPayload = t.Object({
   status: t.Literal('ok'),
@@ -93,44 +64,35 @@ const cradleServerHealthPayload = t.Object({
   timestamp: t.Number(),
 }, { additionalProperties: false })
 
-const runtimeSummary = t.Object({
-  runtimeKind: t.String(),
-  label: t.String(),
-  status: t.Union([t.Literal('available'), t.Literal('unavailable')]),
-  detail: nullableString,
+const workspaceLocator = t.Object({
+  hostId: nonBlankString,
+  path: nonBlankString,
+  kind: t.Optional(t.Union([t.Literal('project'), t.Literal('managed-worktree')])),
+  sourceWorkspaceId: t.Optional(nullableString),
 }, { additionalProperties: false })
 
-const fsEntryKind = t.Union([
-  t.Literal('file'),
-  t.Literal('directory'),
-  t.Literal('symlink'),
-  t.Literal('other'),
-])
-
-const fsEntry = t.Object({
-  name: t.String(),
-  path: t.String(),
-  kind: fsEntryKind,
-  size: nullableNumber,
-  modifiedAt: nullableNumber,
-  hidden: t.Boolean(),
+const workspaceGitIdentity = t.Object({
+  originUrl: t.Optional(nullableString),
+  repoRoot: t.Optional(nullableString),
+  headSha: t.Optional(nullableString),
+  branch: t.Optional(nullableString),
 }, { additionalProperties: false })
 
-const workspaceSummary = t.Object({
+const workspaceRecord = t.Object({
   id: t.String(),
   name: t.String(),
-  path: t.String(),
-  reason: t.String(),
-}, { additionalProperties: false })
-
-const agentSummary = t.Object({
-  agentId: t.String(),
-  runtimeKind: t.String(),
-  workspacePath: t.String(),
-  status: t.Union([t.Literal('idle'), t.Literal('running'), t.Literal('failed')]),
-  providerSessionId: nullableString,
+  locator: workspaceLocator,
+  gitIdentity: workspaceGitIdentity,
+  identifier: t.String(),
+  pinned: t.Number(),
   createdAt: t.Number(),
   updatedAt: t.Number(),
+}, { additionalProperties: false })
+
+const workspaceFileEntry = t.Object({
+  type: t.Union([t.Literal('file'), t.Literal('directory')]),
+  name: t.String(),
+  path: t.String(),
 }, { additionalProperties: false })
 
 export const RemoteHostsModel = {
@@ -138,8 +100,9 @@ export const RemoteHostsModel = {
     hostId: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
-  relayEnrollmentIdParams: t.Object({
-    enrollmentId: t.String({ minLength: 1 }),
+  remoteWorkspaceIdParams: t.Object({
+    hostId: t.String({ minLength: 1 }),
+    remoteWorkspaceId: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
   host: t.Object({
@@ -151,7 +114,7 @@ export const RemoteHostsModel = {
     capabilitiesJson: t.String(),
     createdAt: t.Number(),
     updatedAt: t.Number(),
-    connectionState,
+    connectionState: cradleServerConnectionState,
     lastError: nullableString,
   }, { additionalProperties: false }),
 
@@ -170,27 +133,6 @@ export const RemoteHostsModel = {
     capabilities: t.Optional(capabilities),
   }, { additionalProperties: false }),
 
-  connection: t.Object({
-    hostId: t.String(),
-    state: connectionState,
-    localSocketPath: nullableString,
-    daemonHostId: nullableString,
-    daemonVersion: nullableString,
-    platform: nullableString,
-    arch: nullableString,
-    lastError: nullableString,
-  }, { additionalProperties: false }),
-
-  health: t.Object({
-    hostId: t.String(),
-    status: t.Union([t.Literal('ok'), t.Literal('offline')]),
-    daemonVersion: nullableString,
-    daemonHostId: nullableString,
-    uptimeSeconds: nullableNumber,
-    connectionState,
-    lastError: nullableString,
-  }, { additionalProperties: false }),
-
   cradleServerConnection: t.Object({
     hostId: t.String(),
     state: cradleServerConnectionState,
@@ -207,101 +149,49 @@ export const RemoteHostsModel = {
     health: cradleServerHealthPayload,
   }, { additionalProperties: false }),
 
-  runtimeList: t.Object({
-    runtimes: t.Array(runtimeSummary),
+  remoteWorkspaceList: t.Object({
+    workspaces: t.Array(workspaceRecord),
   }, { additionalProperties: false }),
 
-  workspaceQuery: t.Object({
-    root: t.Optional(t.String()),
-  }, { additionalProperties: false }),
-
-  fsPathQuery: t.Object({
+  fileChildrenQuery: t.Object({
     path: t.Optional(t.String()),
   }, { additionalProperties: false }),
 
-  requiredFsPathQuery: t.Object({
+  fileContentQuery: t.Object({
     path: nonBlankString,
   }, { additionalProperties: false }),
 
-  workspaceList: t.Object({
-    workspaces: t.Array(workspaceSummary),
-    message: nullableString,
+  fileInfoQuery: t.Object({
+    path: nonBlankString,
   }, { additionalProperties: false }),
 
-  fsDirectoryList: t.Object({
-    path: t.String(),
-    parentPath: nullableString,
-    entries: t.Array(fsEntry),
+  workspaceFileList: t.Object({
+    files: t.Array(workspaceFileEntry),
   }, { additionalProperties: false }),
 
-  fsStat: fsEntry,
-
-  gitRepositoryProbe: t.Object({
-    path: t.String(),
-    isRepository: t.Boolean(),
-    rootPath: nullableString,
-    branch: nullableString,
-    remoteUrl: nullableString,
+  readFileResponse: t.Object({
+    content: nullableString,
   }, { additionalProperties: false }),
 
-  agentList: t.Object({
-    agents: t.Array(agentSummary),
-  }, { additionalProperties: false }),
-
-  startAgentBody: t.Object({
-    runtimeKind: nonBlankString,
-    workspacePath: nonBlankString,
-    chatSessionId: t.Optional(nullableString),
-    providerSessionId: t.Optional(nullableString),
-    modelId: t.Optional(nullableString),
-  }, { additionalProperties: false }),
-
-  startAgentResponse: t.Object({
-    agent: agentSummary,
-  }, { additionalProperties: false }),
-
-  relayPairingTokenBody: t.Object({
-    relayUrl: t.Optional(nonBlankString),
-    relayServerId: t.Optional(nonBlankString),
-    ttlMs: t.Optional(t.Integer({ minimum: 1_000, maximum: 3_600_000 })),
-  }, { additionalProperties: false }),
-
-  relayPairingTokenResponse: t.Object({
-    relayUrl: t.String(),
-    relayServerId: nullableString,
-    roomId: t.String(),
-    pairingToken: t.String(),
-    hostToken: t.String(),
-    enrollmentId: t.String(),
-    enrollmentSecret: t.String(),
-    expiresAt: t.String(),
-  }, { additionalProperties: false }),
-
-  relayClaimBody: t.Object({
-    relayUrl: t.Optional(nonBlankString),
-    relayServerId: t.Optional(nonBlankString),
-    pairingCode: nonBlankString,
-    ttlMs: t.Optional(t.Integer({ minimum: 1_000, maximum: 3_600_000 })),
-  }, { additionalProperties: false }),
-
-  relayClaimResponse: t.Object({
-    relayUrl: t.String(),
-    roomId: t.String(),
-    enrollmentId: t.String(),
-  }, { additionalProperties: false }),
-
-  relayHostSessionBody: t.Object({
-    enrollmentSecret: nonBlankString,
-    ttlMs: t.Optional(t.Integer({ minimum: 1_000, maximum: 3_600_000 })),
-  }, { additionalProperties: false }),
-
-  relayHostSessionResponse: t.Object({
-    relayUrl: t.String(),
-    roomId: t.String(),
-    roomStartToken: t.String(),
-    hostToken: t.String(),
-    expiresAt: t.String(),
-  }, { additionalProperties: false }),
+  fileInfoResponse: t.Union([
+    t.Object({
+      name: t.String(),
+      path: t.String(),
+      size: t.Number(),
+      modifiedAt: t.Number(),
+      mimeType: t.String(),
+      extension: t.String(),
+      previewKind: t.Union([
+        t.Literal('text'),
+        t.Literal('markdown'),
+        t.Literal('image'),
+        t.Literal('pdf'),
+        t.Literal('office'),
+        t.Literal('unsupported'),
+      ]),
+    }, { additionalProperties: false }),
+    t.Null(),
+  ]),
 
   ok: t.Object({
     ok: t.Literal(true),

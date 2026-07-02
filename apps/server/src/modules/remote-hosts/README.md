@@ -1,49 +1,48 @@
-# Remote Hosts
+# remote-hosts
 
-This module owns Cradle-local configuration for remote machines. A remote host is one machine profile with one shared connection config and capability-specific settings.
+Owns Cradle's registry of remote Cradle Server instances. A remote host row stores how the local Cradle Server reaches another Cradle Server, either through a direct HTTP(S) base URL for tests and trusted networks or through an SSH local port tunnel for ordinary remote machines.
 
-Rows live in `remote_hosts`. Chat-session-to-remote-agent links live in `remote_host_agentd_session_links`. These rows are Cradle application data; this module must not write remote host identity into provider target namespaces.
+Rows live in `remote_hosts`. The remote host module owns connection lifecycle, health probing, and proxying selected remote Cradle Server APIs. It must not write remote server identity into provider target namespaces.
 
-The durable row shape is:
+## Files
 
-```json
-{
-  "displayName": "Devbox",
-  "connectionConfig": {
-    "transport": "ssh",
-    "ssh": {
-      "hostName": "devbox.local",
-      "user": "wibus",
-      "auth": "identityFile",
-      "identityFilePath": "~/.ssh/id_ed25519"
+- `index.ts`: Elysia route surface under `/remote-hosts`, including host CRUD, `/cradle-server/connect`, `/cradle-server/disconnect`, `/cradle-server/health`, and remote workspace file proxy routes.
+- `model.ts`: TypeBox request and response schemas for remote host config, remote Cradle Server health, workspace list, and file proxy responses.
+- `service.ts`: Drizzle-backed host registry, SSH/direct URL connection lifecycle, health checks, and remote workspace proxy functions.
+- `remote-cradle-client.ts`: Small HTTP client for calling the target Cradle Server's existing `/health` and `/workspaces` APIs.
+- `cradle-server-tunnel.ts`: OpenSSH local TCP port-forwarding helper for reaching a target Cradle Server through an SSH profile.
+
+## Connection Config
+
+A direct URL host uses:
+
+    {
+      "transport": "direct-url",
+      "baseUrl": "http://127.0.0.1:21423"
     }
-  },
-  "capabilities": {
-    "agentd": {
-      "enabled": true,
-      "remoteSocketPath": "~/.cradle/agentd/agent.sock"
-    },
-    "cradleServer": {
-      "enabled": true,
-      "remoteHost": "127.0.0.1",
-      "remotePort": 21423
+
+An SSH host uses:
+
+    {
+      "transport": "ssh",
+      "ssh": {
+        "hostName": "devbox.local",
+        "user": "wibus",
+        "port": 22,
+        "auth": "default"
+      }
     }
-  }
-}
-```
 
-`connectionConfig.transport` is explicit. `ssh` uses the system OpenSSH executable. `auth: "default"` means Cradle lets OpenSSH use the user's normal SSH config and agent. `auth: "identityFile"` adds `-i <identityFilePath>`. Port and raw `sshArgs` are advanced config fields and are not part of the normal UI.
+The Cradle Server capability controls where the SSH tunnel connects after reaching the target machine:
 
-`capabilities.agentd` owns the existing remote daemon behavior. Agentd routes live under `/remote-hosts/:hostId/agentd/...` and speak `@cradle/remote-agent-protocol` through either an SSH Unix-socket tunnel, a direct local socket for tests, or relay transport.
+    {
+      "cradleServer": {
+        "enabled": true,
+        "remoteHost": "127.0.0.1",
+        "remotePort": 21423
+      }
+    }
 
-`capabilities.cradleServer` owns the new remote Cradle Server path. Cradle starts an OpenSSH local port-forwarding child process equivalent to:
+## Ownership Boundary
 
-```text
-ssh -N -L 127.0.0.1:<localPort>:127.0.0.1:21423 user@remote
-```
-
-The HTTP routes under `/remote-hosts/:hostId/cradle-server/...` then call the remote server through `http://127.0.0.1:<localPort>`. The first accepted remote Cradle Server behavior is `/health`; workspace/session handoff semantics are intentionally outside this module's first milestone.
-
-Relay remains scoped to the agentd capability. A pending relay host can be created with `connectionConfig.transport = "relay"` and no SSH profile. Pairing creates a Cradle-owned relay enrollment on the host config and stores only durable relay coordinates plus the enrollment secret hash. It must not persist WebSocket host/controller tokens.
-
-Connection state is process-local and realtime. SQLite stores machine config and durable capability metadata only. If an SSH tunnel exits or a WebSocket closes, the configured host row remains and the user must reconnect explicitly.
+This module deliberately does not define a second remote agent protocol. The target Cradle Server already owns workspace, session, runtime, provider, and file semantics. Local Cradle connects to that server and calls its HTTP APIs. If a new remote capability is needed, add it to the owning target Cradle Server module first, then proxy it here only when the local product needs that projection.

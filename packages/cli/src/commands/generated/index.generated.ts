@@ -174,24 +174,13 @@ import { register as registerRelayServerCreate } from './relay-server/create'
 import { register as registerRelayServerDelete } from './relay-server/delete'
 import { register as registerRelayServerList } from './relay-server/list'
 import { register as registerRelayServerUpdate } from './relay-server/update'
-import { register as registerRemoteHostAgentdAgentList } from './remote-host/agentd/agent/list'
-import { register as registerRemoteHostAgentdAgentStart } from './remote-host/agentd/agent/start'
-import { register as registerRemoteHostAgentdConnect } from './remote-host/agentd/connect'
-import { register as registerRemoteHostAgentdDisconnect } from './remote-host/agentd/disconnect'
-import { register as registerRemoteHostAgentdFsDirectoryList } from './remote-host/agentd/fs/directory/list'
-import { register as registerRemoteHostAgentdFsStat } from './remote-host/agentd/fs/stat'
-import { register as registerRemoteHostAgentdGitRepositoryProbe } from './remote-host/agentd/git/repository/probe'
-import { register as registerRemoteHostAgentdHealth } from './remote-host/agentd/health'
-import { register as registerRemoteHostAgentdRuntimeList } from './remote-host/agentd/runtime/list'
-import { register as registerRemoteHostAgentdWorkspaceList } from './remote-host/agentd/workspace/list'
 import { register as registerRemoteHostCradleServerConnect } from './remote-host/cradle-server/connect'
 import { register as registerRemoteHostCradleServerDisconnect } from './remote-host/cradle-server/disconnect'
 import { register as registerRemoteHostCradleServerHealth } from './remote-host/cradle-server/health'
+import { register as registerRemoteHostCradleServerWorkspaceList } from './remote-host/cradle-server/workspace/list'
 import { register as registerRemoteHostCreate } from './remote-host/create'
 import { register as registerRemoteHostDelete } from './remote-host/delete'
 import { register as registerRemoteHostList } from './remote-host/list'
-import { register as registerRemoteHostRelayClaim } from './remote-host/relay/claim'
-import { register as registerRemoteHostRelayPairingToken } from './remote-host/relay/pairing-token'
 import { register as registerRemoteHostUpdate } from './remote-host/update'
 import { register as registerSearchChronicle } from './search/chronicle'
 import { register as registerSearchThreads } from './search/threads'
@@ -462,24 +451,13 @@ export function registerGeneratedCommands(program: Command): void {
   registerRelayServerDelete(program)
   registerRelayServerList(program)
   registerRelayServerUpdate(program)
-  registerRemoteHostAgentdAgentList(program)
-  registerRemoteHostAgentdAgentStart(program)
-  registerRemoteHostAgentdConnect(program)
-  registerRemoteHostAgentdDisconnect(program)
-  registerRemoteHostAgentdFsDirectoryList(program)
-  registerRemoteHostAgentdFsStat(program)
-  registerRemoteHostAgentdGitRepositoryProbe(program)
-  registerRemoteHostAgentdHealth(program)
-  registerRemoteHostAgentdRuntimeList(program)
-  registerRemoteHostAgentdWorkspaceList(program)
   registerRemoteHostCradleServerConnect(program)
   registerRemoteHostCradleServerDisconnect(program)
   registerRemoteHostCradleServerHealth(program)
+  registerRemoteHostCradleServerWorkspaceList(program)
   registerRemoteHostCreate(program)
   registerRemoteHostDelete(program)
   registerRemoteHostList(program)
-  registerRemoteHostRelayClaim(program)
-  registerRemoteHostRelayPairingToken(program)
   registerRemoteHostUpdate(program)
   registerSearchChronicle(program)
   registerSearchThreads(program)

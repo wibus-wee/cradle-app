@@ -3,7 +3,7 @@
   "roomId": "room_fixture",
   "seq": 2,
   "ack": 1,
-  "kind": "remote_agent_frame",
+  "kind": "relay_data_frame",
   "streamId": "stream_1",
   "payload": {
     "protocolVersion": 1,
@@ -11,7 +11,7 @@
     "streamId": "stream_1",
     "method": "agent/turn",
     "params": {
-      "remoteAgentId": "agent_1",
+      "targetId": "target_1",
       "chatSessionId": "session_1",
       "runId": "run_1"
     }

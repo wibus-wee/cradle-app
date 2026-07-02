@@ -1,7 +1,0 @@
-{
-  "version": 99,
-  "roomId": "room_fixture",
-  "seq": 1,
-  "kind": "remote_agent_frame",
-  "payload": {}
-}

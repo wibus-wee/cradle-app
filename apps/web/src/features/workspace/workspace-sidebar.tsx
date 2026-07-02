@@ -54,8 +54,8 @@ import {
   postSessionsByIdUnread,
 } from '~/api-gen'
 import {
-  getRemoteHostsByHostIdAgentdFsDirectoryOptions,
-  getRemoteHostsByHostIdAgentdGitRepositoryOptions,
+  getRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesOptions,
+  getRemoteHostsByHostIdCradleServerWorkspacesOptions,
   getRemoteHostsOptions,
   getSessionsByIdQueryKey,
   patchWorkspacesByWorkspaceIdMutation,
@@ -64,8 +64,8 @@ import {
   postWorkspacesMultiFolderMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
-  GetRemoteHostsByHostIdAgentdFsDirectoryResponse,
-  GetRemoteHostsByHostIdAgentdGitRepositoryResponse,
+  GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponse,
+  GetRemoteHostsByHostIdCradleServerWorkspacesResponse,
   GetRemoteHostsResponse,
   PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
@@ -1191,52 +1191,47 @@ function WorkspaceRecognitionDialog({
 }
 
 type RemoteHost = GetRemoteHostsResponse[number]
-type RemoteDirectoryEntry = GetRemoteHostsByHostIdAgentdFsDirectoryResponse['entries'][number]
+type RemoteWorkspace = GetRemoteHostsByHostIdCradleServerWorkspacesResponse['workspaces'][number]
+type RemoteWorkspaceFileEntry = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponse['files'][number]
 
-function workspaceNameFromPath(path: string): string {
-  const trimmed = path.trim().replace(/\/+$/, '')
-  const name = trimmed.split('/').filter(Boolean).pop()
-  return name && name !== '~' ? name : trimmed || 'workspace'
+function RemoteWorkspaceFileRow({ entry }: { entry: RemoteWorkspaceFileEntry }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-border/40 px-2 py-1.5 last:border-b-0">
+      {entry.type === 'directory'
+        ? <FolderClosedIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
+        : <FilePlusIcon className="size-3.5 shrink-0 text-muted-foreground/45" aria-hidden="true" />}
+      <span className="truncate text-[11.5px] text-foreground/80">{entry.name}</span>
+    </div>
+  )
 }
 
-function RemoteDirectoryEntryRow({
-  entry,
-  onNavigate,
+function RemoteWorkspaceCard({
+  workspace,
+  selected,
   onSelect,
 }: {
-  entry: RemoteDirectoryEntry
-  onNavigate: () => void
+  workspace: RemoteWorkspace
+  selected: boolean
   onSelect: () => void
 }) {
-  const { t } = useTranslation(['workspace', 'settings'])
-  const navigable = entry.kind === 'directory' || entry.kind === 'symlink'
-
   return (
-    <div className="group flex items-center gap-2 border-b border-border/40 px-2 py-1.5 last:border-b-0 hover:bg-muted/40">
-      <button
-        type="button"
-        disabled={!navigable}
-        onClick={onNavigate}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
-      >
-        {navigable
-          ? <FolderClosedIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
-          : <FilePlusIcon className="size-3.5 shrink-0 text-muted-foreground/45" aria-hidden="true" />}
-        <span className={cn('truncate text-[11.5px]', navigable ? 'text-foreground/85' : 'text-muted-foreground/60', entry.hidden && 'opacity-70')}>
-          {entry.name}
-        </span>
-      </button>
-      {navigable && (
-        <Button
-          size="xs"
-          variant="ghost"
-          className="h-5 shrink-0 px-1.5 text-[10px] opacity-0 group-hover:opacity-100"
-          onClick={onSelect}
-        >
-          {t('settings:remoteHosts.directory.select')}
-        </Button>
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'flex w-full flex-col gap-1 border-b border-border/40 px-2.5 py-2 text-left last:border-b-0 hover:bg-muted/40',
+        selected && 'bg-muted/50',
       )}
-    </div>
+    >
+      <span className="truncate text-[11.5px] font-medium text-foreground/85">{workspace.name}</span>
+      <span className="truncate font-mono text-[10.5px] text-muted-foreground/70">{workspace.locator.path}</span>
+      {workspace.gitIdentity.branch && (
+        <span className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
+          <FileDiffIcon className="size-3" aria-hidden="true" />
+          {workspace.gitIdentity.branch}
+        </span>
+      )}
+    </button>
   )
 }
 
@@ -1250,224 +1245,148 @@ function RemoteWorkspaceBrowser({
   onCreate: (input: CreateWorkspaceInput) => Promise<void>
 }) {
   const { t } = useTranslation(['workspace', 'settings'])
-  const [cwd, setCwd] = useState('~')
-  const [pathInput, setPathInput] = useState('~')
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [workspaceName, setWorkspaceName] = useState('')
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
 
-  const directoryQuery = useQuery({
-    ...getRemoteHostsByHostIdAgentdFsDirectoryOptions({ path: { hostId: host.id }, query: { path: cwd } }),
+  const workspacesQuery = useQuery({
+    ...getRemoteHostsByHostIdCradleServerWorkspacesOptions({ path: { hostId: host.id } }),
     retry: false,
   })
-  const gitQuery = useQuery({
-    ...getRemoteHostsByHostIdAgentdGitRepositoryOptions({
-      path: { hostId: host.id },
-      query: { path: selectedPath ?? cwd },
-    }),
-    enabled: !!selectedPath,
-    retry: false,
-  })
+  const workspaces = workspacesQuery.data?.workspaces ?? []
+  const selectedWorkspace = useMemo(() => {
+    return workspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? workspaces[0] ?? null
+  }, [selectedWorkspaceId, workspaces])
 
   useEffect(() => {
-    setCwd('~')
-    setPathInput('~')
-    setSelectedPath(null)
-    setWorkspaceName('')
+    setSelectedWorkspaceId(null)
   }, [host.id])
 
   useEffect(() => {
-    setPathInput(cwd)
-    setSelectedPath(null)
-  }, [cwd])
-
-  useEffect(() => {
-    if (selectedPath) {
-      setWorkspaceName(workspaceNameFromPath(selectedPath))
+    if (!selectedWorkspaceId && workspaces.length > 0) {
+      setSelectedWorkspaceId(workspaces[0].id)
     }
-  }, [selectedPath])
+  }, [selectedWorkspaceId, workspaces])
 
-  const directory: GetRemoteHostsByHostIdAgentdFsDirectoryResponse | undefined = directoryQuery.data
-  const git: GetRemoteHostsByHostIdAgentdGitRepositoryResponse | undefined = gitQuery.data
-  const entries = directory?.entries ?? []
-  const directories = entries.filter(entry => entry.kind === 'directory' || entry.kind === 'symlink')
-  const files = entries.filter(entry => entry.kind !== 'directory' && entry.kind !== 'symlink')
-  const resolvedPath = directory?.path ?? cwd
-  const parentPath = directory?.parentPath ?? null
-  const selectedWorkspacePath = git?.isRepository && git.rootPath ? git.rootPath : selectedPath
-  const selectedWorkspaceName = workspaceName.trim() || (selectedWorkspacePath ? workspaceNameFromPath(selectedWorkspacePath) : '')
-
-  const goTo = (nextPath: string) => {
-    const trimmed = nextPath.trim()
-    if (trimmed && trimmed !== cwd) {
-      setCwd(trimmed)
-    }
-  }
+  const filesQuery = useQuery({
+    ...getRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesOptions({
+      path: {
+        hostId: host.id,
+        remoteWorkspaceId: selectedWorkspace?.id ?? '',
+      },
+    }),
+    enabled: !!selectedWorkspace,
+    retry: false,
+  })
 
   const handleCreate = async () => {
-    if (!selectedWorkspacePath || !selectedWorkspaceName) {
+    if (!selectedWorkspace) {
       return
     }
 
     await onCreate({
-      name: selectedWorkspaceName,
+      name: selectedWorkspace.name,
       locator: {
         hostId: host.id,
-        path: selectedWorkspacePath,
+        path: selectedWorkspace.locator.path,
+        kind: selectedWorkspace.locator.kind,
+        sourceWorkspaceId: selectedWorkspace.id,
       },
-      ...(git
-        ? {
-            gitIdentity: {
-              originUrl: git.remoteUrl,
-              repoRoot: git.rootPath,
-              branch: git.branch,
-            },
-          }
-        : {}),
+      gitIdentity: selectedWorkspace.gitIdentity,
     })
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center gap-1.5">
-        <Input
-          value={pathInput}
-          onChange={event => setPathInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              goTo(pathInput)
-            }
-          }}
-          placeholder={t('settings:remoteHosts.directory.pathPlaceholder')}
-          className="h-8 flex-1 font-mono text-[11.5px]"
-        />
-        <Button
-          size="icon-xs"
-          variant="outline"
-          onClick={() => goTo(pathInput)}
-          aria-label={t('settings:remoteHosts.directory.go')}
-        >
-          <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          disabled={!parentPath}
-          onClick={() => parentPath && goTo(parentPath)}
-          aria-label={t('settings:remoteHosts.directory.up')}
-        >
-          <ChevronUpIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-[10.5px] text-muted-foreground/70" title={resolvedPath}>
-          {resolvedPath}
-        </span>
-        <Button
-          size="xs"
-          variant="ghost"
-          className="h-6 shrink-0 px-2 text-[10.5px]"
-          disabled={directoryQuery.isLoading}
-          onClick={() => setSelectedPath(resolvedPath)}
-        >
-          {t('settings:remoteHosts.directory.useCurrent')}
-        </Button>
-      </div>
-
-      {directoryQuery.isLoading
+      {workspacesQuery.isLoading
         ? (
             <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
               <LoadingLine className="size-3 animate-spin" />
               {t('settings:remoteHosts.loading')}
             </div>
           )
-        : directoryQuery.isError
+        : workspacesQuery.isError
           ? (
               <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
-                {directoryQuery.error instanceof Error ? directoryQuery.error.message : String(directoryQuery.error)}
+                {workspacesQuery.error instanceof Error ? workspacesQuery.error.message : String(workspacesQuery.error)}
               </p>
             )
-          : entries.length === 0
+          : workspaces.length === 0
             ? (
                 <p className="rounded-md border border-dashed border-border/70 px-2.5 py-3 text-center text-[11px] text-muted-foreground">
-                  {t('settings:remoteHosts.directory.empty')}
+                  {t('settings:remoteHosts.detail.noWorkspaces')}
                 </p>
               )
             : (
-                <div className="max-h-56 overflow-y-auto rounded-md border border-border/60">
-                  {[...directories, ...files].map(entry => (
-                    <RemoteDirectoryEntryRow
-                      key={entry.path}
-                      entry={entry}
-                      onNavigate={() => goTo(entry.path)}
-                      onSelect={() => setSelectedPath(entry.path)}
-                    />
-                  ))}
+                <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                  <div className="min-h-0 overflow-y-auto rounded-md border border-border/60">
+                    {workspaces.map(workspace => (
+                      <RemoteWorkspaceCard
+                        key={workspace.id}
+                        workspace={workspace}
+                        selected={selectedWorkspace?.id === workspace.id}
+                        onSelect={() => setSelectedWorkspaceId(workspace.id)}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="min-w-0 space-y-3">
+                    {selectedWorkspace && (
+                      <div className="space-y-2 rounded-lg border border-border/70 bg-card/60 p-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-medium uppercase text-muted-foreground/70">
+                            {t('workspace.dialog.selectedWorkspace', { defaultValue: 'Selected workspace' })}
+                          </p>
+                          <p className="truncate font-mono text-[11.5px] text-foreground/80" title={selectedWorkspace.locator.path}>
+                            {selectedWorkspace.locator.path}
+                          </p>
+                        </div>
+                        {selectedWorkspace.gitIdentity.originUrl && (
+                          <p className="break-all font-mono text-[11px] text-muted-foreground/80">
+                            {selectedWorkspace.gitIdentity.originUrl}
+                          </p>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={creating}
+                          onClick={() => void handleCreate()}
+                        >
+                          {creating && <LoadingLine className="animate-spin" />}
+                          {t('workspace.dialog.create')}
+                        </Button>
+                      </div>
+                    )}
+
+                    {filesQuery.isLoading
+                      ? (
+                          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
+                            <LoadingLine className="size-3 animate-spin" />
+                            {t('workspace.dialog.loadingFiles', { defaultValue: 'Loading files...' })}
+                          </div>
+                        )
+                      : filesQuery.isError
+                        ? (
+                            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+                              {filesQuery.error instanceof Error ? filesQuery.error.message : String(filesQuery.error)}
+                            </p>
+                          )
+                        : filesQuery.data && filesQuery.data.files.length > 0
+                          ? (
+                              <div className="max-h-56 overflow-y-auto rounded-md border border-border/60">
+                                {filesQuery.data.files.map(entry => (
+                                  <RemoteWorkspaceFileRow key={entry.path} entry={entry} />
+                                ))}
+                              </div>
+                            )
+                          : selectedWorkspace
+                            ? (
+                                <p className="rounded-md border border-dashed border-border/70 px-2.5 py-3 text-center text-[11px] text-muted-foreground">
+                                  {t('settings:remoteHosts.files.empty')}
+                                </p>
+                              )
+                            : null}
+                  </div>
                 </div>
               )}
-
-      {selectedPath && (
-        <div className="space-y-3 rounded-lg border border-border/70 bg-card/60 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase text-muted-foreground/70">
-                {t('settings:remoteHosts.directory.selected')}
-              </p>
-              <p className="truncate font-mono text-[11.5px] text-foreground/80" title={selectedWorkspacePath ?? selectedPath}>
-                {selectedWorkspacePath ?? selectedPath}
-              </p>
-            </div>
-            {gitQuery.isLoading && <LoadingLine className="size-3.5 text-muted-foreground" />}
-          </div>
-
-          {gitQuery.isError && (
-            <p className="text-[11px] text-muted-foreground/70">
-              {t('settings:remoteHosts.directory.probeUnavailable')}
-            </p>
-          )}
-
-          {git && (
-            git.isRepository
-              ? (
-                  <div className="space-y-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-2 text-[11px]">
-                    <div className="font-medium text-emerald-700 dark:text-emerald-300">
-                      {t('settings:remoteHosts.directory.isRepo')}
-                    </div>
-                    {git.branch && <p className="font-mono text-foreground/75">{git.branch}</p>}
-                    {git.remoteUrl && <p className="break-all font-mono text-foreground/75">{git.remoteUrl}</p>}
-                  </div>
-                )
-              : (
-                  <p className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                    {t('settings:remoteHosts.directory.notRepo')}
-                  </p>
-                )
-          )}
-
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                {t('workspace.dialog.nameLabel')}
-              </label>
-              <Input
-                value={workspaceName}
-                onChange={event => setWorkspaceName(event.target.value)}
-                className="h-8 text-[12px]"
-              />
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!selectedWorkspacePath || !selectedWorkspaceName || creating}
-              onClick={() => void handleCreate()}
-            >
-              {creating && <LoadingLine className="animate-spin" />}
-              {t('workspace.dialog.create')}
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

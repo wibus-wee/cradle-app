@@ -16,7 +16,7 @@ const spec = {
     "cradle-server",
     "disconnect"
   ],
-  "description": "Disconnect from a remote Cradle Server tunnel",
+  "description": "Disconnect from a remote Cradle Server",
   "flags": [],
   "method": "post",
   "path": "/remote-hosts/{hostId}/cradle-server/disconnect"

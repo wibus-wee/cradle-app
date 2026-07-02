@@ -1,1 +1,0 @@
-ALTER TABLE `diff_review_guides` ADD `title` text;
