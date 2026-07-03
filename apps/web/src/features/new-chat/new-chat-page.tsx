@@ -3,7 +3,6 @@ import {
   FolderLine as FolderIcon,
   Message1Line as MessageSquareIcon,
   NewFolderLine as FolderPlusIcon,
-  ShieldLine as ShieldIcon,
 } from '@mingcute/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearch } from '@tanstack/react-router'
@@ -17,18 +16,16 @@ import { postSessions, postSessionsByIdIsolationStart } from '~/api-gen/sdk.gen'
 import type { PostSessionsData } from '~/api-gen/types.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
-import { toastManager } from '~/components/ui/toast'
 import { DitheredGradientDecoration } from '~/components/ui/canvas-art'
 import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from '~/components/ui/menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { runtimeComposerUsesCollapsedInput } from '~/features/agent-runtime/use-runtime-catalog'
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
 import { DraftChatComposerWithState } from '~/features/chat/composer/draft-chat-composer'
-import { DEFAULT_CHAT_RUNTIME_SETTINGS } from '~/features/chat/commands/runtime-settings-command'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
-import { IssueIsolationStartDialog, type IssueIsolationStartChoice } from '~/features/new-chat/issue-isolation-start-dialog'
+import type { IssueIsolationStartChoice } from '~/features/new-chat/issue-isolation-start-dialog'
+import { IssueIsolationStartDialog } from '~/features/new-chat/issue-isolation-start-dialog'
 import {
   useIssueIsolationContext,
 } from '~/features/session/use-session-isolation'
@@ -96,12 +93,10 @@ function useNewChatPageOwner(
     options: DraftChatComposerSubmitOptions
     target: 'tab' | 'window'
   } | null>(null)
-  const nextIsolationChoiceRef = useRef<IssueIsolationStartChoice | null>(null)
   const { workspaces, loading: workspacesLoading } = useWorkspaces()
   const { addFromPicker, adding: addingWorkspace } = useAddWorkspace()
   const queryClient = useQueryClient()
   const composerState = useComposerState({ context: 'new-chat', enableAgents: true })
-  const lastRuntimeSettings = useNewChatStore(s => s.lastRuntimeSettings ?? DEFAULT_CHAT_RUNTIME_SETTINGS)
 
   const [draft, setDraft] = useState('')
   const [quickActionText, setQuickActionText] = useState<string | undefined>(undefined)
@@ -167,10 +162,6 @@ function useNewChatPageOwner(
     isolation?: { choice: IssueIsolationStartChoice, worktreeId?: string },
   ) => {
     const trimmedText = text.trim()
-    const isolatedSessionOnly = isolation?.choice === 'new-isolated'
-      && trimmedText.length === 0
-      && files.length === 0
-      && contextParts.length === 0
     try {
       const linkedIssueFields = issueId ? { linkedIssueId: issueId } : {}
       const worktreeFields = isolation?.choice === 'continue' && isolation.worktreeId
@@ -268,29 +259,27 @@ function useNewChatPageOwner(
         modelId: options.modelId ?? null,
         runtimeKind: options.runtimeKind,
       }, { promote: true })
-      if (!isolatedSessionOnly) {
-        startOptimisticChatResponse({
-          sessionId: session.id,
-          queryClient,
-          body: {
-            text: trimmedText,
-            files,
-            contextParts,
-            modelId: options.modelId,
-            thinkingEffort: options.thinkingEffort,
-            runtimeSettings: options.runtimeSettings,
-          },
-          onAccepted: () => {
-            void Promise.all([
-              queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
-              queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-            ])
-          },
-          onError: (err) => {
-            console.error('[NewChatPage] start response failed:', err)
-          },
-        })
-      }
+      startOptimisticChatResponse({
+        sessionId: session.id,
+        queryClient,
+        body: {
+          text: trimmedText,
+          files,
+          contextParts,
+          modelId: options.modelId,
+          thinkingEffort: options.thinkingEffort,
+          runtimeSettings: options.runtimeSettings,
+        },
+        onAccepted: () => {
+          void Promise.all([
+            queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
+            queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+          ])
+        },
+        onError: (err) => {
+          console.error('[NewChatPage] start response failed:', err)
+        },
+      })
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
         queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
@@ -347,64 +336,7 @@ function useNewChatPageOwner(
     setIsolationDialogOpen(false)
   }, [])
 
-  const handleStartIsolatedChat = useCallback(async () => {
-    const cs = composerState
-    if (!selectedProjectWorkspaceId) {
-      return false
-    }
-    if (runtimeComposerUsesCollapsedInput(cs.runtimeComposer)) {
-      if (!cs.effectiveAgent) {
-        toastManager.add({ type: 'error', title: t('isolatedProviderRequired') })
-        return false
-      }
-      return handleSendToTarget('', [], [], {
-        runtimeKind: cs.selection.runtimeKind,
-        providerBinding: cs.providerBinding,
-        runtimeComposer: cs.runtimeComposer,
-        agentId: cs.effectiveAgent.id,
-        agentName: cs.effectiveAgent.name,
-        runtimeSettings: lastRuntimeSettings,
-      }, 'tab', { choice: 'new-isolated' })
-    }
-    if (!cs.effectiveProfile) {
-      toastManager.add({ type: 'error', title: t('isolatedProviderRequired') })
-      return false
-    }
-    const started = await handleSendToTarget('', [], [], {
-      runtimeKind: cs.selection.runtimeKind,
-      providerBinding: cs.providerBinding,
-      runtimeComposer: cs.runtimeComposer,
-      providerTargetId: cs.effectiveProfile.id,
-      providerTargetName: cs.effectiveProfile.name,
-      modelId: cs.selection.modelId ?? cs.effectiveModel?.id,
-      thinkingEffort: cs.selection.thinkingEffort ?? undefined,
-      runtimeSettings: lastRuntimeSettings,
-    }, 'tab', { choice: 'new-isolated' })
-    if (started) {
-      toastManager.add({
-        type: 'success',
-        title: t('isolatedDefaultTitle'),
-        description: t('isolatedActionTooltip'),
-      })
-    }
-    return started
-  }, [composerState, handleSendToTarget, lastRuntimeSettings, selectedProjectWorkspaceId, t])
-
-  const handleSendIsolated = useCallback((
-    text: string,
-    files: FileUIPart[],
-    contextParts: ChatContextPart[],
-    options: DraftChatComposerSubmitOptions,
-  ) => {
-    return handleSendToTarget(text, files, contextParts, options, 'tab', { choice: 'new-isolated' })
-  }, [handleSendToTarget])
-
   const handleSend = useCallback((text: string, files: FileUIPart[], contextParts: ChatContextPart[], options: DraftChatComposerSubmitOptions) => {
-    const isolationChoice = nextIsolationChoiceRef.current
-    nextIsolationChoiceRef.current = null
-    if (isolationChoice) {
-      return handleSendToTarget(text, files, contextParts, options, 'tab', { choice: isolationChoice })
-    }
     return handleSendToTarget(text, files, contextParts, options, 'tab')
   }, [handleSendToTarget])
 
@@ -412,10 +344,9 @@ function useNewChatPageOwner(
     return handleSendToTarget(text, files, contextParts, options, 'window')
   }, [handleSendToTarget])
 
-  const handleIsolationDialogDismiss = useCallback(() => {
-    pendingSendRef.current = null
-    setIsolationDialogOpen(false)
-  }, [])
+  const handleSendIsolated = useCallback((text: string, files: FileUIPart[], contextParts: ChatContextPart[], options: DraftChatComposerSubmitOptions) => {
+    return handleSendToTarget(text, files, contextParts, options, 'tab', { choice: 'new-isolated' })
+  }, [handleSendToTarget])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setQuickActionText(prompt)
@@ -434,12 +365,10 @@ function useNewChatPageOwner(
     handleSend,
     handleSendInNewWindow,
     handleSendIsolated,
-    handleStartIsolatedChat,
     handleIsolationDialogConfirm,
     dismissIsolationDialog,
     isolationDialogOpen,
     issueIsolationGroups: issueIsolationContext.data?.groups ?? [],
-    nextIsolationChoiceRef,
     isReady,
     now,
     recentSessions,
@@ -480,39 +409,12 @@ function NewChatComposerCard({
     setSelectedWorkspaceId,
     setDraft,
     selectedWorkspace,
-    selectedProjectWorkspaceId,
     t,
     workspaces,
   } = owner
 
-  const isolatedAction = selectedProjectWorkspaceId
-    ? (
-      <Tooltip>
-        <TooltipTrigger
-          render={(
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="text-muted-foreground"
-              data-testid="new-chat-isolated-start"
-              onClick={() => {
-                void owner.handleStartIsolatedChat()
-              }}
-            >
-              <ShieldIcon className="size-3 shrink-0" aria-hidden />
-              <span className="max-w-28 truncate">{t('isolatedAction')}</span>
-            </Button>
-          )}
-        />
-        <TooltipContent>{t('isolatedActionTooltip')}</TooltipContent>
-      </Tooltip>
-    )
-    : null
-
   const workspaceSelector = (
     <div className="flex items-center gap-1">
-      {isolatedAction}
     <Menu>
       <MenuTrigger render={<Button variant="ghost" size="xs" className="text-foreground hover:text-foreground" />} data-testid="new-chat-workspace-selector">
         <FolderIcon className="size-3 shrink-0" />
@@ -560,6 +462,7 @@ function NewChatComposerCard({
       workspaceId={selectedWorkspace?.id ?? null}
       active={active}
       contextBar={workspaceSelector}
+      onSendIsolated={handleSendIsolated}
       replaceText={quickActionText}
       replaceTextKey={quickActionKey}
       onDraftChange={setDraft}

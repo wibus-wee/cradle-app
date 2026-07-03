@@ -35,6 +35,7 @@ export default {
   'workspace.adding': 'Adding...',
   'workspace.group': 'Workspaces',
   'send.tooltip': 'Send',
+  'send.inWorktree': 'Send in worktree',
   'isolatedAction': 'New isolated chat',
   'isolatedActionTooltip': 'Create a session in an isolated git worktree',
   'isolatedDefaultTitle': 'Isolated chat',

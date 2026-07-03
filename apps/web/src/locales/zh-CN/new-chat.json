@@ -26,6 +26,7 @@
   "relative.minutesAgo": "{{count}} 分钟前",
   "relative.monthsAgo": "{{count}} 个月前",
   "send.tooltip": "发送",
+  "send.inWorktree": "在 worktree 中发送",
   "isolatedAction": "新建隔离环境",
   "isolatedActionTooltip": "在隔离 git worktree 中创建会话",
   "isolatedDefaultTitle": "隔离会话",

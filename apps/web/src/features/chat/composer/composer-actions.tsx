@@ -1,4 +1,5 @@
 import {
+  DownSmallLine as ChevronDownIcon,
   RouteLine as RouteIcon,
   SendPlaneLine as SendHorizonalIcon,
   SquareLine as SquareIcon,
@@ -8,6 +9,13 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { ButtonGroup } from '~/components/ui/button-group'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
@@ -17,6 +25,13 @@ import type { ChatRuntimeCompactUiSlotState } from '../capabilities/chat-capabil
 import { ContextUsageDetailPanel } from '../context/context-usage-detail-panel'
 import type { ComposerAttachmentController } from './composer-attachment-state'
 import { ComposerAttachmentButton } from './composer-attachments'
+
+export interface ComposerSendVariantAction {
+  id: string
+  label: string
+  icon?: ReactNode
+  onSelect: () => void
+}
 
 const TOKEN_CIRCLE_RADIUS = 7
 const TOKEN_CIRCUMFERENCE = 2 * Math.PI * TOKEN_CIRCLE_RADIUS
@@ -146,6 +161,7 @@ export function ComposerActions({
   sessionContextWindow,
   compactState,
   sendButtonAriaLabel,
+  sendVariants,
 }: {
   actionsClassName?: string
   attachButtonClassName?: string
@@ -171,6 +187,7 @@ export function ComposerActions({
   sessionContextWindow?: number | null
   compactState?: ChatRuntimeCompactUiSlotState | null
   sendButtonAriaLabel?: string
+  sendVariants?: ComposerSendVariantAction[]
 }) {
   const isPlanSendMode = Boolean(isPlanMode && !isBangMode)
   const sendButtonSize = isPlanSendMode ? 'xs' : 'icon-xs'
@@ -192,6 +209,54 @@ export function ComposerActions({
       'dark:bg-amber-400 dark:text-amber-950 dark:hover:bg-amber-300',
     ],
   )
+  const sendButton = (
+    <Button
+      variant="default"
+      size={sendButtonSize}
+      disabled={disabled || sendDisabled || sendBlocked || !hasDraft}
+      onClick={() => onSend()}
+      aria-label={sendButtonLabel ?? 'Send message'}
+      className={sendButtonChrome}
+      data-testid={sendButtonTestId}
+    >
+      <ComposerSendIcon isBangMode={isBangMode} isPlanMode={isPlanMode} isSending={isSending} />
+      {isPlanSendMode && <span className="text-[11px] font-semibold">Plan</span>}
+    </Button>
+  )
+  const sendVariantsAvailable = !!sendVariants && sendVariants.length > 0 && !isBangMode && !isPlanSendMode
+  const sendButtonNode = sendVariantsAvailable && sendVariants
+    ? (
+      <ButtonGroup>
+        {sendButton}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="default"
+              size="icon-xs"
+              disabled={disabled || sendDisabled || sendBlocked || !hasDraft}
+              aria-label={sendButtonLabel ? `${sendButtonLabel} options` : 'Send options'}
+              className={cn(sendButtonClassName, 'px-1')}
+              data-testid={`${sendButtonTestId}-variants`}
+            >
+              <ChevronDownIcon className="size-3" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {sendVariants.map(variant => (
+              <DropdownMenuItem
+                key={variant.id}
+                onSelect={() => variant.onSelect()}
+                disabled={disabled || sendDisabled || sendBlocked || !hasDraft}
+              >
+                {variant.icon}
+                <span>{variant.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ButtonGroup>
+    )
+    : sendButton
 
   return (
     <div className={cn('flex items-center gap-1', actionsClassName)}>
@@ -241,20 +306,7 @@ export function ComposerActions({
               <SquareIcon className="size-3" aria-hidden="true" />
             </Button>
           )
-        : (
-            <Button
-              variant="default"
-              size={sendButtonSize}
-              disabled={disabled || sendDisabled || sendBlocked || !hasDraft}
-              onClick={() => onSend()}
-              aria-label={sendButtonLabel ?? 'Send message'}
-              className={sendButtonChrome}
-              data-testid={sendButtonTestId}
-            >
-              <ComposerSendIcon isBangMode={isBangMode} isPlanMode={isPlanMode} isSending={isSending} />
-              {isPlanSendMode && <span className="text-[11px] font-semibold">Plan</span>}
-            </Button>
-          )}
+        : sendButtonNode}
     </div>
   )
 }

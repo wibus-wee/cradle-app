@@ -26,6 +26,7 @@
   "relative.minutesAgo": "{{count}} minutes ago",
   "relative.monthsAgo": "{{count}} months ago",
   "send.tooltip": "Send",
+  "send.inWorktree": "Send in worktree",
   "isolatedAction": "New isolated chat",
   "isolatedActionTooltip": "Create a session in an isolated git worktree",
   "isolatedDefaultTitle": "Isolated chat",

@@ -1,4 +1,4 @@
-import { Settings2Line as SettingsIcon } from '@mingcute/react'
+import { Settings2Line as SettingsIcon, ShieldLine as ShieldIcon } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
 import { m } from 'motion/react'
 import type { ReactNode } from 'react'
@@ -97,6 +97,7 @@ interface DraftChatComposerProps {
   onDraftChange?: (draft: string) => void
   onSend: DraftChatComposerSendHandler
   onSendInNewWindow?: DraftChatComposerSendHandler
+  onSendIsolated?: DraftChatComposerSendHandler
   testIdPrefix?: string
 }
 
@@ -138,6 +139,7 @@ function DraftChatComposerContent({
   onDraftChange,
   onSend,
   onSendInNewWindow,
+  onSendIsolated,
   testIdPrefix = 'draft-chat',
   composerState,
 }: DraftChatComposerContentProps) {
@@ -375,6 +377,23 @@ function DraftChatComposerContent({
       : handleSend(text, files, contextParts)
   }
 
+  const handleSendIsolated = (text: string, files: FileUIPart[], contextParts: ChatContextPart[]) => {
+    return onSendIsolated
+      ? handleSendWithTarget(onSendIsolated, text, files, contextParts)
+      : handleSend(text, files, contextParts)
+  }
+
+  const sendVariants = onSendIsolated && workspaceId
+    ? [
+      {
+        id: 'worktree',
+        label: t('send.inWorktree'),
+        icon: <ShieldIcon className="size-3.5" aria-hidden />,
+        submitHandler: handleSendIsolated,
+      },
+    ]
+    : undefined
+
   const handleSlashCommandAction = async (
     command: ChatComposerSlashCommand,
     _context: ComposerSlashCommandActionContext,
@@ -460,6 +479,7 @@ function DraftChatComposerContent({
         send={{
           submit: handleSend,
           submitInNewWindow: handleSendInNewWindow,
+          sendVariants,
           isSending: sending,
           sendDisabled,
           allowEmptySend: allowEmptySubmit,

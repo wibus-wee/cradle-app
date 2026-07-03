@@ -133,7 +133,7 @@ stateDiagram-v2
 
 | Phase | Cradle API / UI | Cursor analogue |
 |-------|-----------------|-----------------|
-| **Start (new chat)** | Create session + `POST …/isolation/start` in one user action | `/worktree` at chat start |
+| **Start (new chat)** | Send ▾ → “in worktree” → create session + `POST …/isolation/start` + first message | `/worktree` at chat start |
 | **Start (running chat)** | Header “隔离” → `isolation/start`; if streaming → `pending` | `/worktree` mid-chat |
 | **Boundary** | Main dirty + pending → dialog: migrate / leave-main / cancel | (Cursor: manual apply) |
 | **Work** | Agent, PTY, git scoped to execution root | Agent in worktree |
@@ -189,15 +189,18 @@ UI: banner when `worktreeHealth !== 'ok'` — **“隔离环境不可用”** wi
 
 ## UI flows (minimal)
 
-### New chat — “新建隔离环境”
+### New chat — split-button send
 
-One-shot:
+Isolation is chosen **at send time** — not a navigation target, not a persistent toggle.
 
-1. User selects project workspace.
-2. Click → create session + start isolation + navigate to chat.
-3. Toast: “已在隔离环境 {branch} 中运行”.
+1. User selects project workspace → the send button becomes a split button `[Send][▾]` (a `ButtonGroup`).
+2. Compose first prompt → click `Send` for a normal session, or click `▾` and pick “in worktree”.
+3. “in worktree” → `postSessions` + `isolation/start` + first message, then navigate to chat.
+4. Toast: “已在隔离环境 {branch} 中运行”.
 
-No silent ref-only arming.
+No empty-session navigation. No silent ref-only arming. The choice is one-shot per send — no armed state lingers across sessions.
+
+When the launcher is opened for an issue that already has isolation groups, a normal send still triggers `IssueIsolationStartDialog` (choose main / continue existing / new isolated); “in worktree” is an explicit new-isolated shortcut.
 
 ### Chat header — “隔离”
 
@@ -243,7 +246,7 @@ Run once after `git worktree add`, cwd = new checkout. Failures → warning in i
 | Phase | Scope |
 |-------|--------|
 | **A — Storage & health** | App Support paths; `reconcileWorktree`; extended `isolationView`; execution root strict mode; repair/leave APIs |
-| **B — UX & git client** | One-click new isolated chat; header labels/toasts; git `sessionId` scoping + api-gen; missing-worktree banner |
+| **B — UX & git client** | Split-button “in worktree” send variant; header labels/toasts; git `sessionId` scoping + api-gen; missing-worktree banner |
 | **C — Legacy & setup** | Relocate/abandon repo-path worktrees; optional `worktrees.json` hooks |
 
 Phase A unblocks correct behavior; B fixes reported confusion; C is polish.

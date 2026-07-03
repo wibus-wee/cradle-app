@@ -56,9 +56,17 @@ import { PromptEditor } from './prompt-editor'
 
 export type { ComposerSendHandler } from './composer-submit'
 
+export interface ComposerSendVariant {
+  id: string
+  label: string
+  icon?: React.ReactNode
+  submitHandler: ComposerSendHandler
+}
+
 export interface ComposerSendController {
   submit: ComposerSendHandler
   submitInNewWindow?: ComposerSendHandler
+  sendVariants?: ComposerSendVariant[]
   stop?: () => void
   isStreaming?: boolean
   isSending?: boolean
@@ -207,6 +215,7 @@ export function Composer({
   const {
     submit,
     submitInNewWindow,
+    sendVariants,
     isStreaming,
     isSending,
     disabled,
@@ -565,6 +574,16 @@ export function Composer({
     surfaceId,
   ])
 
+  const sendVariantActions = useMemo(
+    () => (sendVariants ?? []).map(variant => ({
+      id: variant.id,
+      label: variant.label,
+      icon: variant.icon,
+      onSelect: () => handleSend(undefined, variant.submitHandler),
+    })),
+    [sendVariants, handleSend],
+  )
+
   const toggleRuntimeInteractionMode = useCallback(() => {
     if (!runtimeInteractionMode || runtimeSettingsDisabled || !onRuntimeSettingsChange) {
       return false
@@ -877,6 +896,7 @@ export function Composer({
               compactState={compactState}
               contextBar={contextBar}
               disabled={effectiveDisabled}
+              sendVariants={sendVariantActions}
               hasDraft={hasDraft}
               isBangMode={isBangMode}
               isPlanMode={isPlanMode}
