@@ -52,22 +52,6 @@ CREATE INDEX `agent_sessions_issue_id_idx` ON `agent_sessions` (`issue_id`);--> 
 CREATE INDEX `agent_sessions_provider_target_id_idx` ON `agent_sessions` (`provider_target_id`);--> statement-breakpoint
 CREATE INDEX `agent_sessions_agent_id_idx` ON `agent_sessions` (`agent_id`);--> statement-breakpoint
 CREATE INDEX `agent_sessions_chat_session_id_idx` ON `agent_sessions` (`chat_session_id`);--> statement-breakpoint
-CREATE TABLE `assets` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workspace_id` text,
-	`filename` text NOT NULL,
-	`media_type` text NOT NULL,
-	`byte_size` integer NOT NULL,
-	`width` integer,
-	`height` integer,
-	`sha256` text NOT NULL,
-	`storage_path` text NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `assets_workspace_id_idx` ON `assets` (`workspace_id`);--> statement-breakpoint
-CREATE INDEX `assets_sha256_idx` ON `assets` (`sha256`);--> statement-breakpoint
 CREATE TABLE `automation_artifacts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`automation_run_id` text NOT NULL,
@@ -308,18 +292,12 @@ CREATE TABLE `session_events` (
 	`version` integer NOT NULL,
 	`event_type` text NOT NULL,
 	`payload` text DEFAULT '{}' NOT NULL,
-	`subject_run_id` text GENERATED ALWAYS AS (case
-      when event_type = 'RunStarted' then json_extract(payload, '$.run.id')
-      when event_type in ('RunCompleted', 'RunFailed', 'RunAborted') then json_extract(payload, '$.runId')
-      else null
-    end) VIRTUAL,
 	`occurred_at` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `session_events_aggregate_version_unique` ON `session_events` (`aggregate_id`,`version`);--> statement-breakpoint
 CREATE INDEX `session_events_aggregate_id_idx` ON `session_events` (`aggregate_id`);--> statement-breakpoint
 CREATE INDEX `session_events_event_type_idx` ON `session_events` (`event_type`);--> statement-breakpoint
-CREATE UNIQUE INDEX `session_events_terminal_fact_run_unique` ON `session_events` (`aggregate_id`,`subject_run_id`) WHERE "session_events"."event_type" in ('RunCompleted', 'RunFailed', 'RunAborted') and "session_events"."subject_run_id" is not null;--> statement-breakpoint
 CREATE TABLE `sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`parent_session_id` text,
@@ -327,7 +305,6 @@ CREATE TABLE `sessions` (
 	`workspace_id` text,
 	`title` text NOT NULL,
 	`title_source` text DEFAULT 'initial' NOT NULL,
-	`origin` text DEFAULT 'manual' NOT NULL,
 	`provider_target_id` text,
 	`runtime_kind` text DEFAULT 'standard' NOT NULL,
 	`agent_id` text,
@@ -348,7 +325,6 @@ CREATE TABLE `sessions` (
 --> statement-breakpoint
 CREATE INDEX `sessions_parent_session_id_idx` ON `sessions` (`parent_session_id`);--> statement-breakpoint
 CREATE INDEX `sessions_workspace_id_idx` ON `sessions` (`workspace_id`);--> statement-breakpoint
-CREATE INDEX `sessions_origin_idx` ON `sessions` (`origin`);--> statement-breakpoint
 CREATE INDEX `sessions_provider_target_id_idx` ON `sessions` (`provider_target_id`);--> statement-breakpoint
 CREATE INDEX `sessions_linked_issue_id_idx` ON `sessions` (`linked_issue_id`);--> statement-breakpoint
 CREATE INDEX `sessions_archived_at_idx` ON `sessions` (`archived_at`);--> statement-breakpoint
@@ -387,125 +363,6 @@ CREATE TABLE `usage_logs` (
 CREATE INDEX `usage_logs_session_id_idx` ON `usage_logs` (`session_id`);--> statement-breakpoint
 CREATE INDEX `usage_logs_message_id_idx` ON `usage_logs` (`message_id`);--> statement-breakpoint
 CREATE INDEX `usage_logs_provider_target_id_idx` ON `usage_logs` (`provider_target_id`);--> statement-breakpoint
-CREATE TABLE `conversation_bridge_channel_bindings` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`external_workspace_id` text NOT NULL,
-	`external_channel_id` text NOT NULL,
-	`cradle_workspace_id` text NOT NULL,
-	`session_agent_id` text,
-	`session_provider_target_id` text,
-	`session_runtime_kind` text,
-	`session_model_id` text,
-	`bound_by_external_actor_id` text,
-	`metadata_json` text DEFAULT '{}' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`connection_id`) REFERENCES `conversation_bridge_connections`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`cradle_workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`session_agent_id`) REFERENCES `agents`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`session_provider_target_id`) REFERENCES `provider_targets`(`id`) ON UPDATE no action ON DELETE set null
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `conversation_bridge_channel_bindings_connection_channel_unique` ON `conversation_bridge_channel_bindings` (`connection_id`,`external_workspace_id`,`external_channel_id`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_channel_bindings_workspace_idx` ON `conversation_bridge_channel_bindings` (`cradle_workspace_id`);--> statement-breakpoint
-CREATE TABLE `conversation_bridge_connection_secrets` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`name` text NOT NULL,
-	`secret_ref` text NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`connection_id`) REFERENCES `conversation_bridge_connections`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`secret_ref`) REFERENCES `agent_credentials`(`id`) ON UPDATE no action ON DELETE restrict
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `conversation_bridge_connection_secrets_connection_name_unique` ON `conversation_bridge_connection_secrets` (`connection_id`,`name`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_connection_secrets_secret_idx` ON `conversation_bridge_connection_secrets` (`secret_ref`);--> statement-breakpoint
-CREATE TABLE `conversation_bridge_connections` (
-	`id` text PRIMARY KEY NOT NULL,
-	`platform` text NOT NULL,
-	`adapter_owner` text NOT NULL,
-	`adapter_id` text NOT NULL,
-	`display_name` text NOT NULL,
-	`enabled` integer DEFAULT true NOT NULL,
-	`secret_refs_json` text DEFAULT '{}' NOT NULL,
-	`config_json` text DEFAULT '{}' NOT NULL,
-	`health_status` text DEFAULT 'unknown' NOT NULL,
-	`health_message` text,
-	`last_started_at` integer,
-	`last_stopped_at` integer,
-	`last_error_at` integer,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `conversation_bridge_connections_platform_idx` ON `conversation_bridge_connections` (`platform`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_connections_adapter_idx` ON `conversation_bridge_connections` (`adapter_owner`,`adapter_id`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_connections_enabled_idx` ON `conversation_bridge_connections` (`enabled`);--> statement-breakpoint
-CREATE TABLE `conversation_bridge_delivery_attempts` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`external_workspace_id` text NOT NULL,
-	`external_channel_id` text NOT NULL,
-	`external_thread_id` text NOT NULL,
-	`session_id` text NOT NULL,
-	`cradle_message_id` text,
-	`run_id` text,
-	`payload_json` text DEFAULT '{}' NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`attempt_count` integer DEFAULT 0 NOT NULL,
-	`external_message_id` text,
-	`error_text` text,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`connection_id`) REFERENCES `conversation_bridge_connections`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `conversation_bridge_delivery_attempts_status_idx` ON `conversation_bridge_delivery_attempts` (`status`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_delivery_attempts_thread_idx` ON `conversation_bridge_delivery_attempts` (`connection_id`,`external_workspace_id`,`external_channel_id`,`external_thread_id`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_delivery_attempts_session_idx` ON `conversation_bridge_delivery_attempts` (`session_id`);--> statement-breakpoint
-CREATE TABLE `conversation_bridge_inbound_events` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`external_event_id` text NOT NULL,
-	`external_workspace_id` text,
-	`external_channel_id` text,
-	`external_thread_id` text,
-	`external_message_id` text,
-	`event_type` text NOT NULL,
-	`status` text DEFAULT 'received' NOT NULL,
-	`reason` text,
-	`payload_json` text DEFAULT '{}' NOT NULL,
-	`received_at` integer NOT NULL,
-	`processed_at` integer,
-	FOREIGN KEY (`connection_id`) REFERENCES `conversation_bridge_connections`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `conversation_bridge_inbound_events_connection_event_unique` ON `conversation_bridge_inbound_events` (`connection_id`,`external_event_id`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_inbound_events_status_idx` ON `conversation_bridge_inbound_events` (`status`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_inbound_events_thread_idx` ON `conversation_bridge_inbound_events` (`connection_id`,`external_workspace_id`,`external_channel_id`,`external_thread_id`);--> statement-breakpoint
-CREATE TABLE `conversation_bridge_thread_bindings` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`external_workspace_id` text NOT NULL,
-	`external_channel_id` text NOT NULL,
-	`external_thread_id` text NOT NULL,
-	`session_id` text NOT NULL,
-	`cradle_workspace_id` text,
-	`created_by_external_actor_id` text,
-	`metadata_json` text DEFAULT '{}' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`connection_id`) REFERENCES `conversation_bridge_connections`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`cradle_workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE set null
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `conversation_bridge_thread_bindings_connection_thread_unique` ON `conversation_bridge_thread_bindings` (`connection_id`,`external_workspace_id`,`external_channel_id`,`external_thread_id`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_thread_bindings_session_idx` ON `conversation_bridge_thread_bindings` (`session_id`);--> statement-breakpoint
-CREATE INDEX `conversation_bridge_thread_bindings_channel_idx` ON `conversation_bridge_thread_bindings` (`connection_id`,`external_workspace_id`,`external_channel_id`);--> statement-breakpoint
 CREATE TABLE `chronicle_accessibility_events` (
 	`id` text PRIMARY KEY NOT NULL,
 	`source_id` text NOT NULL,
@@ -1094,279 +951,6 @@ CREATE INDEX `chronicle_speaker_profiles_workspace_last_seen_idx` ON `chronicle_
 CREATE INDEX `chronicle_speaker_profiles_normalized_label_idx` ON `chronicle_speaker_profiles` (`normalized_label`);--> statement-breakpoint
 CREATE INDEX `chronicle_speaker_profiles_source_transcript_id_idx` ON `chronicle_speaker_profiles` (`source_transcript_id`);--> statement-breakpoint
 CREATE INDEX `chronicle_speaker_profiles_source_segment_id_idx` ON `chronicle_speaker_profiles` (`source_segment_id`);--> statement-breakpoint
-CREATE TABLE `diff_review_agent_fixes` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`target_revision_id` text,
-	`thread_id` text,
-	`anchor_json` text,
-	`instruction` text NOT NULL,
-	`profile_id` text,
-	`expected_output` text NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`session_id` text,
-	`run_id` text,
-	`artifact_id` text,
-	`result_revision_id` text,
-	`error_message` text,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`target_revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`thread_id`) REFERENCES `diff_review_threads`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`result_revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE set null
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_agent_fixes_review_id_idx` ON `diff_review_agent_fixes` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_agent_fixes_target_revision_id_idx` ON `diff_review_agent_fixes` (`target_revision_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_agent_fixes_thread_id_idx` ON `diff_review_agent_fixes` (`thread_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_agent_fixes_result_revision_id_idx` ON `diff_review_agent_fixes` (`result_revision_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_agent_fixes_status_idx` ON `diff_review_agent_fixes` (`status`);--> statement-breakpoint
-CREATE TABLE `diff_review_comments` (
-	`id` text PRIMARY KEY NOT NULL,
-	`thread_id` text NOT NULL,
-	`author_kind` text DEFAULT 'user' NOT NULL,
-	`author_id` text NOT NULL,
-	`body_markdown` text NOT NULL,
-	`external_url` text,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`thread_id`) REFERENCES `diff_review_threads`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_comments_thread_id_idx` ON `diff_review_comments` (`thread_id`);--> statement-breakpoint
-CREATE TABLE `diff_review_commit_plans` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`revision_id` text NOT NULL,
-	`actor_id` text NOT NULL,
-	`strategy` text NOT NULL,
-	`status` text DEFAULT 'draft' NOT NULL,
-	`groups_json` text NOT NULL,
-	`rationale` text NOT NULL,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_commit_plans_review_id_idx` ON `diff_review_commit_plans` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_commit_plans_revision_id_idx` ON `diff_review_commit_plans` (`revision_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_commit_plans_created_at_idx` ON `diff_review_commit_plans` (`created_at`);--> statement-breakpoint
-CREATE TABLE `diff_review_events` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`event_kind` text NOT NULL,
-	`actor_kind` text DEFAULT 'system' NOT NULL,
-	`actor_id` text,
-	`payload_json` text DEFAULT '{}' NOT NULL,
-	`created_at` integer NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_events_review_id_idx` ON `diff_review_events` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_events_created_at_idx` ON `diff_review_events` (`created_at`);--> statement-breakpoint
-CREATE TABLE `diff_review_file_view_state` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`revision_id` text NOT NULL,
-	`file_id` text NOT NULL,
-	`user_id` text NOT NULL,
-	`viewed` integer DEFAULT true NOT NULL,
-	`viewed_at` integer NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`file_id`) REFERENCES `diff_review_files`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_file_view_state_review_id_idx` ON `diff_review_file_view_state` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_file_view_state_revision_id_idx` ON `diff_review_file_view_state` (`revision_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_file_view_state_file_user_unique` ON `diff_review_file_view_state` (`review_id`,`revision_id`,`file_id`,`user_id`);--> statement-breakpoint
-CREATE TABLE `diff_review_files` (
-	`id` text PRIMARY KEY NOT NULL,
-	`revision_id` text NOT NULL,
-	`path` text NOT NULL,
-	`previous_path` text,
-	`status` text NOT NULL,
-	`additions` integer DEFAULT 0 NOT NULL,
-	`deletions` integer DEFAULT 0 NOT NULL,
-	`is_generated` integer DEFAULT false NOT NULL,
-	`is_binary` integer DEFAULT false NOT NULL,
-	`is_viewed` integer DEFAULT false NOT NULL,
-	FOREIGN KEY (`revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_files_revision_id_idx` ON `diff_review_files` (`revision_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_files_revision_path_unique` ON `diff_review_files` (`revision_id`,`path`);--> statement-breakpoint
-CREATE TABLE `diff_review_guides` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`revision_id` text NOT NULL,
-	`provider_target_id` text,
-	`runtime_kind` text NOT NULL,
-	`model_id` text,
-	`session_id` text,
-	`run_id` text,
-	`input_hash` text NOT NULL,
-	`status` text NOT NULL,
-	`title` text,
-	`steps_json` text DEFAULT '[]' NOT NULL,
-	`error_message` text,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_guides_review_id_idx` ON `diff_review_guides` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_guides_revision_id_idx` ON `diff_review_guides` (`revision_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_guides_review_revision_unique` ON `diff_review_guides` (`review_id`,`revision_id`);--> statement-breakpoint
-CREATE TABLE `diff_review_preferences` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workspace_id` text NOT NULL,
-	`user_id` text NOT NULL,
-	`diff_style` text DEFAULT 'split' NOT NULL,
-	`code_theme` text DEFAULT 'system' NOT NULL,
-	`font_size` integer DEFAULT 11 NOT NULL,
-	`line_height` integer DEFAULT 18 NOT NULL,
-	`hide_whitespace_only` integer DEFAULT false NOT NULL,
-	`structural_highlighting` integer DEFAULT false NOT NULL,
-	`collapse_generated_files` integer DEFAULT false NOT NULL,
-	`notification_mode` text DEFAULT 'reviews-and-comments' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_preferences_workspace_id_idx` ON `diff_review_preferences` (`workspace_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_preferences_workspace_user_unique` ON `diff_review_preferences` (`workspace_id`,`user_id`);--> statement-breakpoint
-CREATE TABLE `diff_review_revisions` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`source_version` text NOT NULL,
-	`patch_hash` text NOT NULL,
-	`file_count` integer DEFAULT 0 NOT NULL,
-	`additions` integer DEFAULT 0 NOT NULL,
-	`deletions` integer DEFAULT 0 NOT NULL,
-	`patch` text NOT NULL,
-	`generated_at` integer NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_revisions_review_id_idx` ON `diff_review_revisions` (`review_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_revisions_review_patch_unique` ON `diff_review_revisions` (`review_id`,`patch_hash`);--> statement-breakpoint
-CREATE TABLE `diff_review_source_operations` (
-	`id` text PRIMARY KEY NOT NULL,
-	`source_id` text,
-	`review_id` text NOT NULL,
-	`operation_kind` text NOT NULL,
-	`idempotency_key` text NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`request_json` text DEFAULT '{}' NOT NULL,
-	`response_json` text,
-	`error_message` text,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`source_id`) REFERENCES `diff_review_sources`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_source_operations_review_id_idx` ON `diff_review_source_operations` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_source_operations_source_id_idx` ON `diff_review_source_operations` (`source_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_source_operations_idempotency_unique` ON `diff_review_source_operations` (`source_id`,`operation_kind`,`idempotency_key`);--> statement-breakpoint
-CREATE TABLE `diff_review_source_readiness_cache` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workspace_id` text NOT NULL,
-	`source_kind` text NOT NULL,
-	`state` text NOT NULL,
-	`actions_json` text DEFAULT '[]' NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_source_readiness_workspace_id_idx` ON `diff_review_source_readiness_cache` (`workspace_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_source_readiness_kind_unique` ON `diff_review_source_readiness_cache` (`workspace_id`,`source_kind`);--> statement-breakpoint
-CREATE TABLE `diff_review_sources` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workspace_id` text NOT NULL,
-	`kind` text NOT NULL,
-	`owner_namespace` text DEFAULT 'diff-review' NOT NULL,
-	`binding_json` text DEFAULT '{}' NOT NULL,
-	`refresh_policy` text DEFAULT 'manual' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_sources_workspace_id_idx` ON `diff_review_sources` (`workspace_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_sources_kind_idx` ON `diff_review_sources` (`kind`);--> statement-breakpoint
-CREATE TABLE `diff_review_submissions` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`revision_id` text NOT NULL,
-	`actor_id` text NOT NULL,
-	`decision` text NOT NULL,
-	`body_markdown` text,
-	`submitted_at` integer NOT NULL,
-	`source_sync_state` text DEFAULT 'local-only' NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_submissions_review_id_idx` ON `diff_review_submissions` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_submissions_revision_id_idx` ON `diff_review_submissions` (`revision_id`);--> statement-breakpoint
-CREATE TABLE `diff_review_thread_reactions` (
-	`id` text PRIMARY KEY NOT NULL,
-	`thread_id` text NOT NULL,
-	`user_id` text NOT NULL,
-	`reaction` text NOT NULL,
-	`created_at` integer NOT NULL,
-	FOREIGN KEY (`thread_id`) REFERENCES `diff_review_threads`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_thread_reactions_thread_id_idx` ON `diff_review_thread_reactions` (`thread_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_review_thread_reactions_unique` ON `diff_review_thread_reactions` (`thread_id`,`user_id`,`reaction`);--> statement-breakpoint
-CREATE TABLE `diff_review_threads` (
-	`id` text PRIMARY KEY NOT NULL,
-	`review_id` text NOT NULL,
-	`original_revision_id` text NOT NULL,
-	`current_revision_id` text,
-	`file_id` text,
-	`anchor_json` text,
-	`state` text DEFAULT 'open' NOT NULL,
-	`created_by` text NOT NULL,
-	`resolved_by` text,
-	`resolved_at` integer,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`review_id`) REFERENCES `diff_reviews`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`original_revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`current_revision_id`) REFERENCES `diff_review_revisions`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`file_id`) REFERENCES `diff_review_files`(`id`) ON UPDATE no action ON DELETE set null
-);
---> statement-breakpoint
-CREATE INDEX `diff_review_threads_review_id_idx` ON `diff_review_threads` (`review_id`);--> statement-breakpoint
-CREATE INDEX `diff_review_threads_state_idx` ON `diff_review_threads` (`state`);--> statement-breakpoint
-CREATE INDEX `diff_review_threads_current_revision_id_idx` ON `diff_review_threads` (`current_revision_id`);--> statement-breakpoint
-CREATE TABLE `diff_reviews` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workspace_id` text NOT NULL,
-	`source_id` text,
-	`repository_path` text NOT NULL,
-	`source_kind` text NOT NULL,
-	`title` text NOT NULL,
-	`status` text DEFAULT 'open' NOT NULL,
-	`review_state` text DEFAULT 'unreviewed' NOT NULL,
-	`current_revision_id` text,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
-	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `diff_reviews_workspace_id_idx` ON `diff_reviews` (`workspace_id`);--> statement-breakpoint
-CREATE INDEX `diff_reviews_source_id_idx` ON `diff_reviews` (`source_id`);--> statement-breakpoint
-CREATE INDEX `diff_reviews_current_revision_id_idx` ON `diff_reviews` (`current_revision_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `diff_reviews_source_unique` ON `diff_reviews` (`source_id`);--> statement-breakpoint
 CREATE TABLE `external_provider_records` (
 	`id` text PRIMARY KEY NOT NULL,
 	`source_key` text NOT NULL,
@@ -1738,16 +1322,6 @@ CREATE TABLE `observability_incidents` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `observability_incidents_dedupe_key_unique` ON `observability_incidents` (`dedupe_key`);--> statement-breakpoint
-CREATE TABLE `plugin_activation_policies` (
-	`id` text PRIMARY KEY NOT NULL,
-	`plugin_name` text NOT NULL,
-	`enabled` integer DEFAULT true NOT NULL,
-	`reason` text,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `plugin_activation_policies_plugin_unique` ON `plugin_activation_policies` (`plugin_name`);--> statement-breakpoint
 CREATE TABLE `plugin_storage_entries` (
 	`id` text PRIMARY KEY NOT NULL,
 	`plugin_name` text NOT NULL,
@@ -1793,30 +1367,6 @@ CREATE TABLE `provider_targets` (
 CREATE INDEX `provider_targets_kind_idx` ON `provider_targets` (`kind`);--> statement-breakpoint
 CREATE INDEX `provider_targets_enabled_idx` ON `provider_targets` (`enabled`);--> statement-breakpoint
 CREATE UNIQUE INDEX `provider_targets_source_record_unique` ON `provider_targets` (`source_key`,`external_record_id`);--> statement-breakpoint
-CREATE TABLE `relay_servers` (
-	`id` text PRIMARY KEY NOT NULL,
-	`display_name` text NOT NULL,
-	`relay_url` text NOT NULL,
-	`enabled` integer DEFAULT true NOT NULL,
-	`is_default` integer DEFAULT false NOT NULL,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `relay_servers_default_idx` ON `relay_servers` (`is_default`);--> statement-breakpoint
-CREATE INDEX `relay_servers_enabled_idx` ON `relay_servers` (`enabled`);--> statement-breakpoint
-CREATE TABLE `remote_hosts` (
-	`id` text PRIMARY KEY NOT NULL,
-	`display_name` text NOT NULL,
-	`enabled` integer DEFAULT true NOT NULL,
-	`connection_config_json` text DEFAULT '{}' NOT NULL,
-	`capabilities_json` text DEFAULT '{}' NOT NULL,
-	`last_seen_at` integer,
-	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `remote_hosts_enabled_idx` ON `remote_hosts` (`enabled`);--> statement-breakpoint
 CREATE TABLE `provider_target_model_cache` (
 	`provider_target_id` text PRIMARY KEY NOT NULL,
 	`models_json` text DEFAULT '[]' NOT NULL,
@@ -1886,12 +1436,11 @@ CREATE TABLE `kv_cache` (
 CREATE TABLE `workspaces` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`locator_json` text NOT NULL,
-	`git_identity_json` text DEFAULT '{}' NOT NULL,
+	`path` text NOT NULL,
 	`identifier` text DEFAULT '' NOT NULL,
 	`pinned` integer DEFAULT 0 NOT NULL,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `workspaces_locator_unique` ON `workspaces` (`locator_json`);
+CREATE UNIQUE INDEX `workspaces_path_unique` ON `workspaces` (`path`);

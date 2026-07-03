@@ -1,0 +1,1 @@
+DROP TABLE `remote_host_agentd_session_links`;

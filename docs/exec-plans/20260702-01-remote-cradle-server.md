@@ -21,9 +21,10 @@ The first observable outcome is that `/remote-hosts/:hostId/cradle-server/health
 - [x] (2026-07-02 21:25+08:00) Regenerated web and CLI API clients from the new OpenAPI document; generated `/remote-host/agentd/*` CLI commands disappeared and `/remote-host/cradle-server/*` commands were generated.
 - [x] (2026-07-02 21:40+08:00) Rewrote `apps/web/src/features/settings/remote-hosts-settings.tsx` so the UI configures SSH tunnel or direct URL to a remote Cradle Server and browses remote workspaces/files through `/cradle-server/*`.
 - [x] (2026-07-02 21:55+08:00) Reworked the Add Workspace remote flow in `apps/web/src/features/workspace/workspace-sidebar.tsx` to select workspaces returned by the remote Cradle Server instead of browsing an agent daemon filesystem.
-- [x] (2026-07-02 22:00+08:00) Removed the old remote-host agentd session link schema and squashed Drizzle migrations to a fresh baseline because the user confirmed there are no users and destructive schema history is acceptable.
+- [x] (2026-07-02 22:00+08:00) Removed the old remote-host agentd session link schema from runtime schema.
 - [x] (2026-07-02 22:05+08:00) Renamed relayd envelope data frames from the remote-agent-specific `remote_agent_frame` to the generic `relay_data_frame`.
 - [x] (2026-07-02 22:05+08:00) Ran validation commands and recorded the results below.
+- [x] (2026-07-03 00:20+08:00) Restored the original Drizzle migration history and added a regular append-only migration, `packages/db/drizzle/0016_foamy_sleeper.sql`, to drop `remote_host_agentd_session_links`.
 
 ## Surprises & Discoveries
 
@@ -41,6 +42,9 @@ The first observable outcome is that `/remote-hosts/:hostId/cradle-server/health
 
 - Observation: The generated CLI workflow updates `resources/skills/cradle-cli/SKILL.md`.
   Evidence: `pnpm gen:cli` printed `Generated 275 CLI commands` and `Updated SKILL.md with 26 modules`, and the git status shows the skill file modified.
+
+- Observation: Drizzle migration history must remain append-only even for this destructive remote refactor.
+  Evidence: The initial implementation incorrectly squashed `packages/db/drizzle` to a fresh baseline. This was corrected by restoring migrations `0000` through `0015` and generating `0016_foamy_sleeper.sql`, which contains `DROP TABLE remote_host_agentd_session_links;`.
 
 ## Decision Log
 
@@ -60,13 +64,13 @@ The first observable outcome is that `/remote-hosts/:hostId/cradle-server/health
   Rationale: The user rejected `agentd`, not the relay server concept. `relayd` can remain a generic peer relay, but its envelope kind should not encode remote-agent semantics.
   Date/Author: 2026-07-02 / Codex
 
-- Decision: Squash DB migrations to a single current baseline.
-  Rationale: The user confirmed there are no users and allowed destructive refactoring. Keeping historical migrations would make fresh databases still pass through old remote runtime and agentd tables, which contradicts the goal of deleting the daemon path.
-  Date/Author: 2026-07-02 / Codex
+- Decision: Preserve Drizzle migration history and remove the old agentd session link table with a regular appended migration.
+  Rationale: Even though the remote feature has no users and the runtime schema can be destructively simplified, migration history should remain reviewable and append-only. The correct path is to delete the schema definition and add a new migration that drops the obsolete table.
+  Date/Author: 2026-07-03 / Codex
 
 ## Outcomes & Retrospective
 
-The refactor now removes the agent daemon path from active server, web, CLI, package, and DB schema surfaces. A remote host is configured as either `ssh` or `direct-url`; both target a Cradle Server, not `cradle-agentd`. The server exposes Cradle Server connection, health, workspace list, and workspace file proxy routes under `/remote-hosts/:hostId/cradle-server/*`. The Remote Hosts settings UI and Add Workspace dialog now call those generated routes.
+The refactor now removes the agent daemon path from active server, web, CLI, package, and DB schema surfaces. A remote host is configured as either `ssh` or `direct-url`; both target a Cradle Server, not `cradle-agentd`. The server exposes Cradle Server connection, health, workspace list, and workspace file proxy routes under `/remote-hosts/:hostId/cradle-server/*`. The Remote Hosts settings UI and Add Workspace dialog now call those generated routes. Drizzle migration history is preserved, with the obsolete `remote_host_agentd_session_links` table removed by `0016_foamy_sleeper.sql`.
 
 Validation passed for the server, CLI, relayd, and focused server tests. Web typecheck did not fully pass because of pre-existing missing UI dependencies or aliases unrelated to this refactor; the previous remote-specific errors were fixed before stopping. The remaining product-code string scan for agentd-specific identifiers is clean except for generic chat rendering branches that classify `taskType === 'remote_agent'`, which do not import agentd packages or call `/agentd` routes.
 
@@ -142,7 +146,7 @@ The server test suite must include a fake remote Cradle Server that serves `/hea
 
 The repository must no longer register `remote-mock` in the runtime catalog. A test or typecheck should prove `apps/server/src/modules/chat-runtime/chat-runtime-provider-registry.ts` compiles without importing the deleted provider.
 
-A final search should show no product code references to `@cradle/remote-agent-protocol`, `apps/agentd`, `remote-mock`, or `/agentd` routes. Historical migration files were squashed as part of this destructive refactor. The remaining `remote_agent` strings in web chat rendering are generic task-type display logic and not part of the deleted agent daemon path.
+A final search should show no product code references to `@cradle/remote-agent-protocol`, `apps/agentd`, `remote-mock`, or `/agentd` routes. Historical migration files may contain old names because migration history is append-only. The remaining `remote_agent` strings in web chat rendering are generic task-type display logic and not part of the deleted agent daemon path.
 
 ## Idempotence and Recovery
 
@@ -207,3 +211,5 @@ Validation transcript highlights:
 Revision note 2026-07-02: Initial plan created after user clarified that `agentd` should not exist and destructive refactoring is allowed in an isolated worktree.
 
 Revision note 2026-07-02 22:05+08:00: Updated the plan after implementation. Recorded completed server, web, CLI, DB, and relayd changes; captured validation results and the remaining unrelated web typecheck blocker.
+
+Revision note 2026-07-03 00:20+08:00: Corrected the DB migration approach. Restored the original Drizzle history and recorded the new append-only migration that drops `remote_host_agentd_session_links`.
