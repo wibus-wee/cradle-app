@@ -16,7 +16,7 @@ import type {
   RuntimeProviderTargetProfile,
   RuntimeToolActivityStatus,
 } from '../../chat-runtime/runtime-provider-types'
-import type { ProviderRuntimeLease } from '../../provider-runtime/host-manager'
+import type { ProviderProcessHostLease } from '../kit/process-host'
 import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './app-server/client'
 import type { ReasoningEffort } from './app-server-protocol/ReasoningEffort'
 import type { CodexNativeHistorySnapshot } from './projection/state-projector'
@@ -65,7 +65,7 @@ export interface CodexAppServerHostResource {
 
 export interface ActiveCodexTurn {
   client: CodexAppServerClientLike
-  hostLease: ProviderRuntimeLease<CodexAppServerHostResource>
+  hostLease: ProviderProcessHostLease<CodexAppServerHostResource>
   abortController: AbortController
   threadId: string
   turnId: string | null

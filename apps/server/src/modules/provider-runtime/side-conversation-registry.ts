@@ -74,6 +74,7 @@ export function reserveSideConversationHostLease(input: {
   sideConversationId: string
   providerTargetId: string
   runtimeKind: RuntimeKind
+  ttlMs?: number
 }): ReservedSideConversationHostLease {
   pruneExpiredSideConversations()
   const lease = providerRuntimeHostManager.acquireLease({
@@ -81,6 +82,7 @@ export function reserveSideConversationHostLease(input: {
     providerTargetId: input.providerTargetId,
     scopeId: input.sideConversationId,
     pinned: true,
+    ttlMs: input.ttlMs,
   })
   return {
     sideConversationId: input.sideConversationId,

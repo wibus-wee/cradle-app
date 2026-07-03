@@ -12,7 +12,7 @@ on:
         required: false
         default: ''
       source_ref:
-        description: 'Git ref from wibus-wee/Cradle to test'
+        description: 'Git ref from wibus-wee/cradle-app to test'
         required: false
         default: 'main'
 
@@ -31,7 +31,7 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
+          repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: ${{ github.event.inputs.source_ref || 'main' }}
 

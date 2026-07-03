@@ -14,15 +14,12 @@ import {
   DEFAULT_CLAUDE_AGENT_ALIASES,
   hasClaudeAgentModelAliases,
 } from '~/features/agent-runtime/claude-agent-config'
-import type { ApiProviderKind, ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
+import { supportsClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-model-aliases'
+import type { ApiProviderKind, ModelDescriptor } from '~/features/agent-runtime/types'
 import { BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS } from '~/features/browser/native-surface-occlusion'
 import { cn } from '~/lib/cn'
 
 import { useRuntimeSettings } from './use-runtime-settings'
-
-export function supportsClaudeAgentModelAliases(providerKind: ApiProviderKind | null): boolean {
-  return providerKind === 'anthropic' || providerKind === 'universal'
-}
 
 function providerTargetModelSettingsQueryKey(providerTargetId: string | null) {
   return ['provider-target-model-settings', providerTargetId ?? 'no-provider-target'] as const
@@ -45,14 +42,14 @@ export interface ClaudeAgentModelAliasesSlot {
 export function useSessionClaudeAgentModelAliases(args: {
   active: boolean
   sessionId: string
-  runtimeKind: RuntimeKind | undefined
+  enabled: boolean
   providerTargetId: string | null
   providerKind: ApiProviderKind | null
   fallbackAliases?: ClaudeAgentModelAliases
 }): ClaudeAgentModelAliasesSlot | null {
-  const { active, sessionId, runtimeKind, providerTargetId, providerKind, fallbackAliases } = args
+  const { active, sessionId, enabled: enabledInput, providerTargetId, providerKind, fallbackAliases } = args
   const enabled = active
-    && runtimeKind === 'claude-agent'
+    && enabledInput
     && !!providerTargetId
     && !!sessionId
     && supportsClaudeAgentModelAliases(providerKind)
@@ -90,16 +87,16 @@ export function useSessionClaudeAgentModelAliases(args: {
  */
 export function useDraftClaudeAgentModelAliases(args: {
   active: boolean
-  runtimeKind: RuntimeKind | undefined
+  enabled: boolean
   providerTargetId: string | null
   providerKind: ApiProviderKind | null
   aliases: ClaudeAgentModelAliases | null
   loading?: boolean
   onChange: (next: ClaudeAgentModelAliases) => void
 }): ClaudeAgentModelAliasesSlot | null {
-  const { active, runtimeKind, providerTargetId, providerKind, aliases, loading, onChange } = args
+  const { active, enabled: enabledInput, providerTargetId, providerKind, aliases, loading, onChange } = args
   const enabled = active
-    && runtimeKind === 'claude-agent'
+    && enabledInput
     && !!providerTargetId
     && supportsClaudeAgentModelAliases(providerKind)
 

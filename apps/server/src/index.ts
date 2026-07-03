@@ -13,7 +13,7 @@ function serializeRuntimeError(err: unknown): Record<string, unknown> {
     return {
       name: err.name,
       message: err.message,
-      stack: err.stack,
+      stack: err.stack
     }
   }
   return { value: String(err) }
@@ -22,13 +22,12 @@ function serializeRuntimeError(err: unknown): Record<string, unknown> {
 async function recordFatalError(
   message: string,
   err: unknown,
-  code: CreateEventInput['code'] = OBSERVABILITY_CODES.serverBootstrapFatal,
+  code: CreateEventInput['code'] = OBSERVABILITY_CODES.serverBootstrapFatal
 ): Promise<void> {
   const logger = getLogger()
   if (err instanceof Error) {
     logger.error(message, { err })
-  }
-  else {
+  } else {
     logger.error(message, { reason: err })
   }
   try {
@@ -40,12 +39,11 @@ async function recordFatalError(
       message,
       attrs: {
         error: serializeRuntimeError(err),
-        pid: process.pid,
-      },
+        pid: process.pid
+      }
     })
     await flushEvents()
-  }
-  catch (observabilityError) {
+  } catch (observabilityError) {
     logger.error('failed to persist fatal observability event', { err: observabilityError })
   }
   flushLogger()
@@ -53,13 +51,21 @@ async function recordFatalError(
 
 function installProcessFatalHandlers(): void {
   process.on('unhandledRejection', (reason) => {
-    void recordFatalError('unhandled promise rejection', reason, OBSERVABILITY_CODES.serverUnhandledRejection).finally(() => {
+    void recordFatalError(
+      'unhandled promise rejection',
+      reason,
+      OBSERVABILITY_CODES.serverUnhandledRejection
+    ).finally(() => {
       process.exit(1)
     })
   })
 
   process.on('uncaughtException', (err) => {
-    void recordFatalError('uncaught exception', err, OBSERVABILITY_CODES.serverUncaughtException).finally(() => {
+    void recordFatalError(
+      'uncaught exception',
+      err,
+      OBSERVABILITY_CODES.serverUncaughtException
+    ).finally(() => {
       process.exit(1)
     })
   })
@@ -74,11 +80,16 @@ async function bootstrap() {
   initializeLogger()
   await initializeTelemetry()
   installProcessFatalHandlers()
-  const [{ createServerApp }, { loadServerConfig }, { warmupModelsDevCache }, { recoverPersistedRunProjections }] = await Promise.all([
+  const [
+    { createServerApp },
+    { loadServerConfig },
+    { warmupModelsDevCache },
+    { recoverPersistedRunProjections }
+  ] = await Promise.all([
     import('./app'),
     import('./config/server-config'),
     import('./modules/model-registry/model-info-registry'),
-    import('./modules/chat-runtime/service'),
+    import('./modules/chat-runtime/runtime')
   ])
 
   const config = loadServerConfig()
@@ -87,15 +98,18 @@ async function bootstrap() {
   const app = await createServerApp()
   let runtimeServer: RuntimeServer | null = null
 
-  app.listen({
-    port: config.port,
-    hostname: config.host,
-  }, (server) => {
-    runtimeServer = server
-    void recoverPersistedRunProjections().catch((error) => {
-      logger.warn('failed to recover persisted run projections', { error })
-    })
-  })
+  app.listen(
+    {
+      port: config.port,
+      hostname: config.host
+    },
+    (server) => {
+      runtimeServer = server
+      void recoverPersistedRunProjections().catch((error) => {
+        logger.warn('failed to recover persisted run projections', { error })
+      })
+    }
+  )
 
   // Pre-warm models.dev cache so first model list request is fast
   warmupModelsDevCache()
@@ -104,28 +118,27 @@ async function bootstrap() {
 
   let shutdownStarted = false
   const gracefulShutdown = async (signal: string) => {
-    if (shutdownStarted) { return }
+    if (shutdownStarted) {
+      return
+    }
     shutdownStarted = true
 
     logger.info('received process signal, shutting down gracefully...', {
       signal,
       pid: process.pid,
       ppid: process.ppid,
-      desktopPid: process.env.CRADLE_DESKTOP_PID ?? null,
+      desktopPid: process.env.CRADLE_DESKTOP_PID ?? null
     })
     try {
       if (runtimeServer) {
         await runtimeServer.stop()
-      }
-      else {
+      } else {
         await app.stop()
       }
       logger.info('graceful shutdown complete')
-    }
- catch (err) {
+    } catch (err) {
       logger.error('error during graceful shutdown', { err })
-    }
- finally {
+    } finally {
       await shutdownTelemetry()
       flushLogger()
       process.exit(0)

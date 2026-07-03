@@ -7,17 +7,17 @@
 import {
   ArrowLeftLine as ArrowLeftIcon,
   CheckCircleLine as CheckCircle2Icon,
+  CloseLine as XIcon,
   GitBranchLine as GitBranchIcon,
   Refresh1Line as RefreshCwIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 
 import type { GetWorkspacesByWorkspaceIdGitBranchesResponse } from '~/api-gen/types.gen'
+import { Button } from '~/components/ui/button'
 import { ScrollArea } from '~/components/ui/scroll-area'
+import { Spinner } from '~/components/ui/spinner'
 import { useGitBranches, useGitRepositories, useGitStatus } from '~/features/git/use-git'
 import { cn } from '~/lib/cn'
 
@@ -132,18 +132,20 @@ export function ReviewSlotState({
       {gitUnavailable && (
         <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-destructive/20 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
           <span>{repositoryCount > 1 ? 'Choose a workspace with one Git repository for review mode.' : 'Git repository unavailable.'}</span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={() => {
               void repositoriesQuery.refetch()
               void statusQuery.refetch()
               void branchesQuery.refetch()
             }}
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-sm px-2 text-xs font-medium transition-colors hover:bg-destructive/10 focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-7 shrink-0 gap-1 rounded-sm px-2 text-xs font-medium hover:bg-destructive/10"
           >
             <RefreshCwIcon className="size-3" aria-hidden="true" />
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -177,15 +179,17 @@ export function ReviewSlotState({
           )
         : (
             <div className="grid gap-1.5">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 disabled={busy}
                 onClick={() => setStep('choose-target')}
-                className="inline-flex h-7 w-fit items-center gap-1 rounded-sm px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                className="h-7 w-fit gap-1 rounded-sm px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ArrowLeftIcon className="size-3.5" aria-hidden="true" />
                 Back
-              </button>
+              </Button>
               <ScrollArea className="max-h-44 rounded-md border border-border/70" viewportClassName="max-h-44">
                 <div className="grid gap-1 p-1">
                   {branchLines.length === 0 && !loadingBaseBranches && (
@@ -200,13 +204,14 @@ export function ReviewSlotState({
                     </div>
                   )}
                   {branchLines.map(branch => (
-                    <button
+                    <Button
                       key={branch.key}
                       type="button"
+                      variant="ghost"
                       disabled={busy}
                       onClick={() => void submitBaseBranchReview(branch.label)}
                       className={cn(
-                        'flex h-8 min-w-0 items-center gap-2 rounded-sm px-2 text-left text-xs transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60',
+                        'h-8 min-w-0 justify-start gap-2 rounded-sm px-2 text-left text-xs hover:bg-muted disabled:opacity-60',
                         submittingBranchName === branch.label && 'bg-muted',
                       )}
                     >
@@ -215,7 +220,7 @@ export function ReviewSlotState({
                       {submittingBranchName === branch.label && (
                         <Spinner className="size-3.5 shrink-0 !text-muted-foreground" aria-hidden="true" />
                       )}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </ScrollArea>
@@ -259,17 +264,18 @@ function ReviewOptionButton({
 }) {
   const Icon = loading ? Spinner : CheckCircle2Icon
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-12 min-w-0 items-center gap-2 rounded-md border border-border/70 px-2.5 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60"
+      className="h-auto min-h-12 min-w-0 justify-start gap-2 rounded-md border-border/70 px-2.5 py-2 text-left whitespace-normal hover:bg-muted disabled:opacity-60"
     >
       <Icon className={cn('size-3.5 shrink-0 text-muted-foreground', loading && 'animate-spin')} aria-hidden="true" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-foreground">{title}</span>
         <span className="block truncate text-[11px] text-muted-foreground">{description}</span>
       </span>
-    </button>
+    </Button>
   )
 }

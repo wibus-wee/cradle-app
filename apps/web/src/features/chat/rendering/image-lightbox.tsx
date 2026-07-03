@@ -1,10 +1,10 @@
 import {
+  CloseLine as XIcon,
   LeftSmallLine as ChevronLeftIcon,
   RightSmallLine as ChevronRightIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
@@ -23,13 +23,13 @@ export function ImageLightbox({ images, initialIndex, open, onOpenChange }: Imag
     setCurrentIndex(initialIndex)
   }, [initialIndex, open])
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     setCurrentIndex(prev => (prev > 0 ? prev - 1 : images.length - 1))
-  }
+  }, [images.length])
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     setCurrentIndex(prev => (prev < images.length - 1 ? prev + 1 : 0))
-  }
+  }, [images.length])
 
   useEffect(() => {
     if (!open) { return }
@@ -111,10 +111,12 @@ export function ImageLightbox({ images, initialIndex, open, onOpenChange }: Imag
 
               {images.length > 1 && (
                 <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm">
-                  {images.map((_, index) => (
-                    <button
-                      key={index}
+                  {images.map((image, index) => (
+                    <Button
+                      key={`${image.url}:${image.alt}`}
                       type="button"
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={() => setCurrentIndex(index)}
                       className={cn(
                         'size-2 rounded-full transition-colors',

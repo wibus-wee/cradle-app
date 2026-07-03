@@ -5,11 +5,18 @@
 ; See: https://github.com/electron-userland/electron-builder/issues/6409
 ; See: https://github.com/electron-userland/electron-builder/issues/894
 
-; --- Early init: kill lingering process ---
+; --- Early init: kill process + pre-clean heavy directories ---
 
 !macro customInit
+  ; Kill any lingering process first
   nsProcess::_KillProcess "${APP_EXECUTABLE_FILENAME}" $R0
   Sleep 1000
+
+  ; Pre-clean heavy directories so the uninstaller doesn't time out.
+  ; resources/server/node_modules can be thousands of files — Windows
+  ; deletes them very slowly via atomicRMDir, which causes timeout → retry loops.
+  RMDir /r "$INSTDIR\resources\server\node_modules"
+  RMDir /r "$INSTDIR\resources\server"
 !macroend
 
 ; --- Override process detection during install ---

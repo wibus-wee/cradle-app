@@ -129,6 +129,48 @@ export interface RuntimeProviderTargetProfile {
   providerTargetId: string
 }
 
+export interface RuntimeOwnedProviderTarget {
+  id: string
+  kind: 'external'
+  displayName: string
+  providerKind: ProviderKind
+  enabled: boolean
+  iconSlug: string | null
+  connectionConfigJson: string
+  credentialRef: string | null
+  enabledModelsJson: string
+  customModelsJson: string
+  sourceKey: string
+  externalRecordId: string | null
+  sourceFingerprint: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ProjectRuntimeOwnedProviderTargetInput {
+  providerTargetId: string
+  now: number
+}
+
+export interface ListRuntimeOwnedProviderTargetsInput {
+  runtimeKind: RuntimeKind
+  workspacePath?: string
+  now: number
+}
+
+export interface ListRuntimeOwnedProviderTargetModelsInput {
+  runtimeKind: RuntimeKind
+  providerTargetId: string
+  workspacePath?: string
+}
+
+export interface RuntimeOwnedProviderTargets {
+  ownsProviderTargetId: (providerTargetId: string) => boolean
+  projectProviderTarget: (input: ProjectRuntimeOwnedProviderTargetInput) => RuntimeOwnedProviderTarget | null
+  listProviderTargets?: (input: ListRuntimeOwnedProviderTargetsInput) => Promise<RuntimeOwnedProviderTarget[]>
+  listModelsForProviderTarget?: (input: ListRuntimeOwnedProviderTargetModelsInput) => Promise<RuntimeModelDescriptor[]>
+}
+
 export type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
 
 export interface RuntimeSlashCommand {
@@ -137,6 +179,9 @@ export interface RuntimeSlashCommand {
   argumentHint: string
   aliases?: string[]
 }
+
+export const RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID = 'cradle.runtime.codeReview'
+export const RUNTIME_USAGE_COMMAND_ACTION_ID = 'cradle.runtime.usage'
 
 export type RuntimeUiSlotSurface =
   | 'slashCommand'
@@ -177,6 +222,11 @@ export type RuntimeUiSlotIconKey =
   | 'tool-activity'
   | 'usage'
 
+export type RuntimeUiSlotCommandAction =
+  | { kind: 'insertText' }
+  | { kind: 'submitText'; requiresEmptyComposer?: boolean }
+  | { kind: 'uiAction'; actionId: string }
+
 export interface RuntimeUiSlot {
   id: string
   name: string
@@ -186,6 +236,8 @@ export interface RuntimeUiSlot {
   aliases?: string[]
   iconKey?: RuntimeUiSlotIconKey
   commandText?: string
+  commandAction?: RuntimeUiSlotCommandAction
+  requiresSession?: boolean
   surfaces: RuntimeUiSlotSurface[]
 }
 
@@ -683,7 +735,18 @@ export interface ChatRuntimeCapabilities {
   readonly supportsRuntimeSettings: boolean
   readonly supportsUiSlotStates: boolean
   readonly supportsDynamicCapabilities: boolean
+  readonly supportsTitleGeneration: boolean
   readonly sessionModelSwitch: 'in-session' | 'restart-session' | 'unsupported'
+}
+
+export type ChatRuntimeStability = 'stable' | 'experimental'
+
+export type ChatRuntimeCapabilityDegradationStatus = 'unsupported' | 'partial' | 'experimental'
+
+export interface ChatRuntimeCapabilityDegradation {
+  capability: string
+  status: ChatRuntimeCapabilityDegradationStatus
+  reason: string
 }
 
 export interface ProviderHealthStatus {
@@ -698,6 +761,95 @@ export interface ChatRuntimeHealthItem extends ProviderHealthStatus {
   source: 'builtin' | 'plugin'
   pluginOwner: string | null
   hasHealthCheck: boolean
+}
+
+export type ChatSessionTailEventType =
+  | 'UserMessageAppended'
+  | 'RunStarted'
+  | 'AssistantMessageCompleted'
+  | 'RunCompleted'
+  | 'RunFailed'
+  | 'RunAborted'
+  | 'InteractionRequested'
+  | 'InteractionResolved'
+  | 'QueueItemEnqueued'
+  | 'QueueItemClaimed'
+  | 'QueueItemReleased'
+  | 'QueueItemFailed'
+  | 'QueueItemReordered'
+  | 'QueueItemUpdated'
+  | 'QueueItemCancelled'
+  | 'SteerApplied'
+  | 'LastTurnRolledBack'
+  | 'TitleChanged'
+  | 'SnapshotRequired'
+
+export type ChatSessionTailEventPayload =
+  | { messageId: string }
+  | {
+      runId: string
+      assistantMessageId: string | null
+      queueItemId: string | null
+      runtimeSettings?: ChatRuntimeSettings
+    }
+  | { messageId: string; status: 'streaming' | 'complete' | 'aborted' | 'failed' }
+  | {
+      runId: string
+      queueItemId: string | null
+      bindingId: string | null
+      status: 'complete' | 'aborted' | 'failed'
+      stopReason: string
+      errorText: string | null
+    }
+  | {
+      runId: string
+      requestId: string
+      interactionKind: 'toolApproval' | 'userInput'
+      providerMethod: string
+      toolCallId: string
+      questionCount: number | null
+    }
+  | {
+      runId: string
+      requestId: string
+      interactionKind: 'toolApproval' | 'userInput'
+      resolution: 'submitted' | 'cancelled'
+      approved: boolean | null
+    }
+  | {
+      reason: 'tail_gap'
+      latestVersion: number
+      latestSequenceId: number
+    }
+  | { queueItemId: string; status?: string; startedRunId?: string | null }
+  | { queueItemId: string; position: number }
+  | { queueItemId: string; updatedAt: number }
+  | {
+      messageIds: string[]
+      providerRuntimeKind: string
+      providerSessionId: string | null
+      providerRolledBackTurns: number
+    }
+  | { title: string; titleSource: 'provider' | 'user' }
+
+export interface ChatSessionTailEvent {
+  scope: 'session'
+  sessionId: string
+  sequenceId: number
+  version: number
+  type: ChatSessionTailEventType
+  occurredAt: number
+  payload: ChatSessionTailEventPayload
+}
+
+export interface ChatGlobalSessionTailEvent {
+  scope: 'sessions'
+  sessionId: string
+  sequenceId: number
+  version: number
+  type: ChatSessionTailEventType
+  occurredAt: number
+  payload: ChatSessionTailEventPayload
 }
 
 export interface ProviderContext {
@@ -868,21 +1020,53 @@ export function requireRuntimeProviderTargetProfile(
 }
 
 export type RuntimeCatalogSurface = 'chat' | 'jarvis'
+export type RuntimeIconDescriptor = { key: string } | { svg: string } | { url: string }
+export type ChatRuntimeAvailability = 'stable' | 'preview' | 'dev-only' | 'hidden'
+export type RuntimeSessionLaunchMode = 'runtime-provider' | 'agent-terminal'
+export type RuntimeComposerInputMode = 'rich' | 'collapsed' | 'none'
+export type RuntimeComposerModelSelection = 'provider-model' | 'runtime-owned' | 'alias-matrix' | 'none'
+export type RuntimeComposerThinkingDescriptor
+  = | { efforts: string[] }
+    | 'per-model'
+    | 'unsupported'
+
+export interface RuntimeComposerDescriptor {
+  inputMode: RuntimeComposerInputMode
+  allowEmptySubmit?: boolean
+  modelSelection: RuntimeComposerModelSelection
+  thinking: RuntimeComposerThinkingDescriptor
+}
+
+export type RuntimeSettingsSchemaLike = Record<string, unknown>
 
 export interface ChatRuntimeMetadata {
   label: string
   description?: string
   providerKinds: ProviderKind[]
   providerBinding?: 'required' | 'runtime-owned'
+  sessionLaunchMode?: RuntimeSessionLaunchMode
+  icon?: RuntimeIconDescriptor
   iconKey?: string
   surfaces?: RuntimeCatalogSurface[]
   sortOrder?: number
+  stability?: ChatRuntimeStability
+  availability?: ChatRuntimeAvailability
+  degradations?: ChatRuntimeCapabilityDegradation[]
+  composer?: RuntimeComposerDescriptor
+  slots?: RuntimeUiSlot[]
+  settingsSchema?: RuntimeSettingsSchemaLike
 }
 
 export interface ChatRuntimeCatalogItem extends ChatRuntimeMetadata {
   runtimeKind: RuntimeKind
   source: 'builtin' | 'plugin'
   pluginOwner: string | null
+  icon: RuntimeIconDescriptor
+  availability: ChatRuntimeAvailability
+  sessionLaunchMode: RuntimeSessionLaunchMode
+  composer: RuntimeComposerDescriptor
+  slots: RuntimeUiSlot[]
+  capabilities: ChatRuntimeCapabilities | null
 }
 
 export type ChatRuntimeAccessMode = 'approval-required' | 'full-access'
@@ -1167,6 +1351,37 @@ export interface UpdateRuntimeSettingsInput {
   settings: ChatRuntimeSettings
 }
 
+export interface RuntimeGoalContinuationOptions {
+  includeBlockedGoals?: boolean
+}
+
+export interface RuntimeContinuableGoal {
+  objective: string
+  status: string
+}
+
+export interface ReadRuntimeContinuableGoalInput {
+  providerStateSnapshot: string | null | undefined
+  options?: RuntimeGoalContinuationOptions
+}
+
+export interface ReadRuntimeGoalCommandObjectiveInput {
+  text: string
+}
+
+export interface RuntimeGoalContinuationMessageInput {
+  message: UIMessage
+}
+
+export interface RuntimeGoalContinuation {
+  continuationPrompt: string
+  readContinuableGoal: (input: ReadRuntimeContinuableGoalInput) => RuntimeContinuableGoal | null
+  readGoalCommandObjective?: (input: ReadRuntimeGoalCommandObjectiveInput) => string | null
+  annotateContinuationMessage: (input: RuntimeGoalContinuationMessageInput) => UIMessage
+  isContinuationMessage: (input: RuntimeGoalContinuationMessageInput) => boolean
+  allowsEmptyResponse: (input: RuntimeGoalContinuationMessageInput) => boolean
+}
+
 export interface TokenUsage {
   promptTokens: number
   completionTokens: number
@@ -1177,9 +1392,11 @@ export interface ChatRuntime {
   readonly runtimeKind: RuntimeKind
   readonly metadata: ChatRuntimeMetadata
   readonly capabilities: ChatRuntimeCapabilities
+  readonly ownedProviderTargets?: RuntimeOwnedProviderTargets
   readonly lastUsage?: TokenUsage | null
   readonly totalUsage?: TokenUsage | null
   readonly lastModelId?: string | null
+  readonly goalContinuation?: RuntimeGoalContinuation
   startChatSession: (input: StartChatSessionInput) => Promise<RuntimeSession>
   resumeChatSession: (input: ResumeChatSessionInput) => Promise<RuntimeSession>
   forkRuntimeSession?: (input: ForkRuntimeSessionInput) => Promise<RuntimeSession>

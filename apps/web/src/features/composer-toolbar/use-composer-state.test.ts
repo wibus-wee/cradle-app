@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 
-import { resolveChatModelId, resolveRuntimeOwnedChatProfileId, selectChatThinkingEffort } from './use-composer-state'
+import { resolveChatModelId, resolveRuntimeOwnedChatProfileId, selectChatThinkingEffort } from './resolution/chat-selection'
 
 function model(overrides: Partial<ModelDescriptor> & { id: string }): ModelDescriptor {
   return {
@@ -63,11 +63,10 @@ describe('resolveChatModelId', () => {
 })
 
 describe('resolveRuntimeOwnedChatProfileId', () => {
-  it('restores an OpenCode runtime-native provider from a persisted provider/model id', () => {
+  it('restores a runtime-owned provider from persisted provider/model id metadata', () => {
     expect(resolveRuntimeOwnedChatProfileId({
       boundModelId: 'mimo/mimo-v2.5-pro-ultraspeed',
       providerBinding: 'runtime-owned',
-      runtimeKind: 'opencode',
       profiles: [
         {
           id: 'runtime-native:opencode:openai',
@@ -75,6 +74,8 @@ describe('resolveRuntimeOwnedChatProfileId', () => {
           providerKind: 'openai-compatible',
           enabled: true,
           iconSlug: 'opencode',
+          sourceKey: 'runtime-native:opencode',
+          externalRecordId: 'openai',
         },
         {
           id: 'runtime-native:opencode:mimo',
@@ -82,6 +83,8 @@ describe('resolveRuntimeOwnedChatProfileId', () => {
           providerKind: 'openai-compatible',
           enabled: true,
           iconSlug: 'opencode',
+          sourceKey: 'runtime-native:opencode',
+          externalRecordId: 'mimo',
         },
       ],
     })).toBe('runtime-native:opencode:mimo')
@@ -91,7 +94,6 @@ describe('resolveRuntimeOwnedChatProfileId', () => {
     expect(resolveRuntimeOwnedChatProfileId({
       boundModelId: 'openai/gpt-5',
       providerBinding: 'required',
-      runtimeKind: 'codex',
       profiles: [
         {
           id: 'runtime-native:opencode:openai',
@@ -99,6 +101,8 @@ describe('resolveRuntimeOwnedChatProfileId', () => {
           providerKind: 'openai-compatible',
           enabled: true,
           iconSlug: 'opencode',
+          sourceKey: 'runtime-native:opencode',
+          externalRecordId: 'openai',
         },
       ],
     })).toBeNull()
@@ -113,21 +117,27 @@ describe('selectChatThinkingEffort', () => {
     })).toBeNull()
   })
 
-  it('keeps the preferred effort for claude-agent even when the model is unresolved', () => {
-    // Claude Agent owns effort support at the runtime layer, so a missing model
-    // descriptor must not clamp the selected effort to null.
+  it('keeps the preferred runtime-declared effort even when the model is unresolved', () => {
     expect(selectChatThinkingEffort({
       effectiveModel: null,
       preferredThinkingEffort: 'xhigh',
-      runtimeKind: 'claude-agent',
+      runtimeComposer: {
+        inputMode: 'rich',
+        modelSelection: 'alias-matrix',
+        thinking: { efforts: ['low', 'medium', 'high', 'xhigh'] },
+      },
     })).toBe('xhigh')
   })
 
-  it('falls back to high for claude-agent when the preferred effort is unset', () => {
+  it('falls back to high when the runtime declares high as a supported effort', () => {
     expect(selectChatThinkingEffort({
       effectiveModel: null,
       preferredThinkingEffort: null,
-      runtimeKind: 'claude-agent',
+      runtimeComposer: {
+        inputMode: 'rich',
+        modelSelection: 'alias-matrix',
+        thinking: { efforts: ['low', 'medium', 'high', 'xhigh'] },
+      },
     })).toBe('high')
   })
 

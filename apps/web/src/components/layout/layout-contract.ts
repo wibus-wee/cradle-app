@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { SessionLayoutRecord } from '~/store/session-layout'
+import type { SessionLayoutRecord } from '~/components/layout/layout-records'
 
 import type { LayoutSlots } from './layout-slots-context'
 

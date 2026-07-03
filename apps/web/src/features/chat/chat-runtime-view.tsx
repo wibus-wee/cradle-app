@@ -1,35 +1,26 @@
-import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
-import { getSkills, patchSessionsById } from '~/api-gen/sdk.gen'
+import { getSkills } from '~/api-gen/sdk.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
+import {
+  runtimeComposerUsesAliasMatrixModelSelection,
+  useRuntimeCatalog,
+} from '~/features/agent-runtime/use-runtime-catalog'
 import type { MentionItem } from '~/features/chat'
 import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
 import type { SkillInventoryEntry } from '~/features/skills/types'
-import { updateSessionInSessionLists } from '~/features/workspace/use-session'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 
 import type { ChatViewProps } from './chat-view'
 import { searchSessionPluginMentions } from './mentions/plugin-mentions'
+import { runtimeSupportsCodexPluginMentions } from './runtime/codex-app-server-bridge'
 import type { SkillMentionItem } from './mentions/skill-mention-panel'
-import type { SendMessageOptions } from './session/use-chat-session'
 import { useProviderTargetClaudeAgentModelAliases, useSessionClaudeAgentModelAliases } from './runtime/claude-session-model-matrix-control'
+import type { SendMessageOptions } from './session/use-chat-session'
+import { useSessionProviderModelPersistence } from './session/use-session-binding'
 
 const ChatView = lazy(() => import('./chat-view').then(module => ({ default: module.ChatView })))
-
-type SessionProviderModelPatch = {
-  providerTargetId?: string
-  modelId?: string | null
-  thinkingEffort?: SendMessageOptions['thinkingEffort'] | null
-}
-
-interface SessionProviderModelSaveState {
-  queue: Promise<void>
-  revision: number
-  confirmedSession: unknown
-}
 
 export function ChatRuntimeView({
   active = true,
@@ -64,7 +55,7 @@ export function ChatRuntimeView({
   prepareSend?: ChatViewProps['prepareSend']
   compactInset?: boolean
 }) {
-  const queryClient = useQueryClient()
+  const persistSessionProviderModel = useSessionProviderModelPersistence(sessionId)
   const composerResetKey = [
     sessionId,
     agentId ?? '',
@@ -73,6 +64,9 @@ export function ChatRuntimeView({
     sessionThinkingEffort ?? '',
     runtimeKind ?? '',
   ].join(':')
+  const { runtimes } = useRuntimeCatalog()
+  const runtimeDescriptor = runtimes.find(runtime => runtime.runtimeKind === runtimeKind) ?? null
+  const supportsCodexPluginMentions = runtimeSupportsCodexPluginMentions(runtimeDescriptor)
   const composerState = useComposerState({
     context: 'chat',
     workspaceId,
@@ -84,7 +78,6 @@ export function ChatRuntimeView({
     resetKey: composerResetKey,
   })
   const [pendingProviderTargetId, setPendingProviderTargetId] = useState<string | null>(null)
-  const providerModelSaveStateRef = useRef<SessionProviderModelSaveState | null>(null)
   const searchFiles = async (query: string, signal?: AbortSignal): Promise<MentionItem[]> => {
     if (!workspaceId) {
       return []
@@ -117,7 +110,7 @@ export function ChatRuntimeView({
   const searchPlugins = (query: string, signal?: AbortSignal) => {
     return searchSessionPluginMentions({
       sessionId,
-      runtimeKind,
+      supportsCodexPluginMentions,
       providerTargetId: composerState.selection.profileId,
       modelId: composerState.selection.modelId,
       query,
@@ -137,67 +130,6 @@ export function ChatRuntimeView({
       thinkingEffort: composerState.selection.thinkingEffort ?? undefined,
     }
   }, [composerState.selection.modelId, composerState.selection.profileId, composerState.selection.runtimeKind, composerState.selection.thinkingEffort])
-
-  const persistSessionProviderModel = useCallback((body: SessionProviderModelPatch) => {
-    const targetSessionId = sessionId
-    const previousSessionKey = getSessionsByIdQueryKey({ path: { id: targetSessionId } })
-    const previousSession = queryClient.getQueryData(previousSessionKey)
-    let saveState = providerModelSaveStateRef.current
-    if (!saveState) {
-      saveState = {
-        queue: Promise.resolve(),
-        revision: 0,
-        confirmedSession: previousSession,
-      }
-      providerModelSaveStateRef.current = saveState
-    }
-    const revision = saveState.revision + 1
-    saveState.revision = revision
-    const optimisticPatch = {
-      ...('providerTargetId' in body ? { providerTargetId: body.providerTargetId } : {}),
-      ...(body.modelId !== undefined ? { modelId: body.modelId } : {}),
-      ...(body.thinkingEffort !== undefined ? { thinkingEffort: body.thinkingEffort } : {}),
-    }
-
-    queryClient.setQueryData(previousSessionKey, current =>
-      current && typeof current === 'object'
-        ? { ...current, ...optimisticPatch }
-        : current)
-    updateSessionInSessionLists(queryClient, { id: targetSessionId, ...optimisticPatch })
-
-    const saveTask = saveState.queue
-      .catch(() => undefined)
-      .then(async () => {
-        try {
-          const { data } = await patchSessionsById({
-            path: { id: targetSessionId },
-            body,
-          })
-          const currentSaveState = providerModelSaveStateRef.current
-          if (data && currentSaveState) {
-            currentSaveState.confirmedSession = data
-          }
-          if (data && currentSaveState?.revision === revision) {
-            queryClient.setQueryData(previousSessionKey, data)
-            updateSessionInSessionLists(queryClient, data)
-          }
-        }
-        catch {
-          const currentSaveState = providerModelSaveStateRef.current
-          if (currentSaveState?.revision === revision) {
-            queryClient.setQueryData(previousSessionKey, currentSaveState.confirmedSession ?? previousSession)
-            void queryClient.invalidateQueries({ queryKey: previousSessionKey })
-            void queryClient.invalidateQueries({ predicate: query =>
-              query.queryKey[0] !== null
-              && typeof query.queryKey[0] === 'object'
-              && (query.queryKey[0] as { _id?: unknown })._id === 'getSessions' })
-          }
-        }
-      })
-
-    saveState.queue = saveTask.catch(() => undefined)
-    return saveTask
-  }, [queryClient, sessionId])
 
   const {
     modelsByProfileId,
@@ -272,16 +204,17 @@ export function ChatRuntimeView({
   const selectedApiProviderKind = selectedProviderKind && selectedProviderKind !== 'cli-tool'
     ? selectedProviderKind
     : null
+  const usesAliasMatrixModelSelection = runtimeComposerUsesAliasMatrixModelSelection(sessionComposerState.runtimeComposer)
 
   const providerTargetAliases = useProviderTargetClaudeAgentModelAliases({
     providerTargetId: sessionComposerState.selection.profileId,
     providerKind: selectedApiProviderKind,
-    enabled: sessionComposerState.selection.targetMode === 'provider' && runtimeKind === 'claude-agent',
+    enabled: sessionComposerState.selection.targetMode === 'provider' && usesAliasMatrixModelSelection,
   })
   const claudeModelAliasesSlot = useSessionClaudeAgentModelAliases({
     active,
     sessionId,
-    runtimeKind,
+    enabled: usesAliasMatrixModelSelection,
     providerTargetId: sessionComposerState.selection.profileId,
     providerKind: selectedApiProviderKind,
     fallbackAliases: providerTargetAliases.aliases,

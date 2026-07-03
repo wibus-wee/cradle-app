@@ -202,7 +202,6 @@ import { register as registerSessionLinkedIssueGet } from './session/linked-issu
 import { register as registerSessionLinkedIssueLink } from './session/linked-issue/link'
 import { register as registerSessionLinkedIssueUnlink } from './session/linked-issue/unlink'
 import { register as registerSessionList } from './session/list'
-import { register as registerSessionMessages } from './session/messages'
 import { register as registerSessionUpdate } from './session/update'
 import { register as registerSkillCreate } from './skill/create'
 import { register as registerSkillDocumentDelete } from './skill/document/delete'
@@ -479,7 +478,6 @@ export function registerGeneratedCommands(program: Command): void {
   registerSessionLinkedIssueLink(program)
   registerSessionLinkedIssueUnlink(program)
   registerSessionList(program)
-  registerSessionMessages(program)
   registerSessionUpdate(program)
   registerSkillCreate(program)
   registerSkillDocumentDelete(program)

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { Activity, useLayoutEffect, useState } from 'react'
+import { Activity, useLayoutEffect, useMemo, useState } from 'react'
 import { shallow } from 'zustand/shallow'
 
 import type { RuntimeKind } from '~/features/agent-runtime/types'
@@ -8,11 +8,9 @@ import { cn } from '~/lib/utils'
 import { SurfaceActivityProvider } from '~/navigation/surface-activity-context'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
-import { useChatSessionDriver } from './use-chat-session'
 import { ChatRuntimeView } from '../chat-runtime-view'
+import { ChatSessionSyncBoundary } from './chat-session-sync-boundary'
 
-const mountedSessionFrameCounts = new Map<string, number>()
-const pendingSessionCacheReleaseDisposers = new Map<string, () => void>()
 type ChatStoreSnapshot = ReturnType<typeof useChatStore.getState>
 
 export interface ChatSessionFrameDescriptor {
@@ -39,8 +37,7 @@ export function ChatSessionFrameHost({
     (state: ChatStoreSnapshot) => candidateSessionIds.filter(sessionId => chatSelectors.isSessionStreaming(sessionId)(state)),
     shallow,
   )
-  const streamingSessionIdSet = new Set(streamingSessionIds)
-  const streamingSessionIdsSignature = streamingSessionIds.join('\0')
+  const streamingSessionIdSet = useMemo(() => new Set(streamingSessionIds), [streamingSessionIds])
   const frameDescriptors = trimRetainedFrames(candidateFrames, activeSession, streamingSessionIdSet)
 
   useLayoutEffect(() => {
@@ -52,13 +49,13 @@ export function ChatSessionFrameHost({
       )
       return areFrameListsEqual(currentFrames, nextFrames) ? currentFrames : nextFrames
     })
-  }, [activeSession, streamingSessionIdsSignature])
+  }, [activeSession, streamingSessionIdSet])
 
   return (
     <div className="relative h-full w-full min-h-0 min-w-0 overflow-hidden" data-chat-session-frame-host="">
       {frameDescriptors.map(frame => (
-        <ChatSessionDriverMount
-          key={`driver:${frame.sessionId}`}
+        <ChatSessionSyncBoundary
+          key={`sync:${frame.sessionId}`}
           sessionId={frame.sessionId}
           active={(active && frame.sessionId === activeSession.sessionId) || streamingSessionIdSet.has(frame.sessionId)}
         />
@@ -80,61 +77,6 @@ export function ChatSessionFrameHost({
       })}
     </div>
   )
-}
-
-const ChatSessionDriverMount = ({ sessionId, active }: { sessionId: string, active: boolean }) => {
-  useChatSessionDriver(sessionId, active)
-
-  useLayoutEffect(() => {
-    retainSessionCache(sessionId)
-    return () => releaseSessionCache(sessionId)
-  }, [sessionId])
-
-  return null
-}
-ChatSessionDriverMount.displayName = 'ChatSessionDriverMount'
-
-function retainSessionCache(sessionId: string): void {
-  pendingSessionCacheReleaseDisposers.get(sessionId)?.()
-  pendingSessionCacheReleaseDisposers.delete(sessionId)
-  mountedSessionFrameCounts.set(sessionId, (mountedSessionFrameCounts.get(sessionId) ?? 0) + 1)
-}
-
-function releaseSessionCache(sessionId: string): void {
-  const nextCount = (mountedSessionFrameCounts.get(sessionId) ?? 1) - 1
-  if (nextCount > 0) {
-    mountedSessionFrameCounts.set(sessionId, nextCount)
-    return
-  }
-
-  mountedSessionFrameCounts.delete(sessionId)
-  releaseSessionCacheWhenIdle(sessionId)
-}
-
-function releaseSessionCacheWhenIdle(sessionId: string): void {
-  const release = () => {
-    pendingSessionCacheReleaseDisposers.get(sessionId)?.()
-    pendingSessionCacheReleaseDisposers.delete(sessionId)
-    useChatStore.getState().clearSession(sessionId)
-  }
-
-  if (!chatSelectors.isSessionStreaming(sessionId)(useChatStore.getState())) {
-    release()
-    return
-  }
-
-  const unsubscribe = useChatStore.subscribe((state) => {
-    if ((mountedSessionFrameCounts.get(sessionId) ?? 0) > 0) {
-      unsubscribe()
-      pendingSessionCacheReleaseDisposers.delete(sessionId)
-      return
-    }
-    if (chatSelectors.isSessionStreaming(sessionId)(state)) {
-      return
-    }
-    release()
-  })
-  pendingSessionCacheReleaseDisposers.set(sessionId, unsubscribe)
 }
 
 const ChatSessionFrame = ({

@@ -7,6 +7,7 @@
 import type { UIMessageChunk } from 'ai'
 
 import type { ProviderThreadEvent } from '../../../chat-runtime/runtime-provider-types'
+import { providerChunk } from '../../kit/chunk-mapper'
 import type { CodexAppServerMessage } from '../app-server/client'
 import type { CodexAppServerMapperState } from './event-to-chunk-mapper'
 import {
@@ -86,12 +87,12 @@ export function publishProviderThreadEvent(
       state = createCodexAppServerMapperState(`provider-thread:${providerThreadId}`)
       mapperStates.set(providerThreadId, state)
     }
-    const chunks = mapCodexAppServerNotificationToChunks(notification, state)
-    if (notification.method === 'turn/completed') {
-      chunks.push(...closeOpenCodexAppServerReasoning(state))
-      chunks.push(...closeOpenCodexAppServerText(state))
-      chunks.push({ type: 'finish', finishReason: 'stop' })
-    }
+      const chunks = mapCodexAppServerNotificationToChunks(notification, state)
+      if (notification.method === 'turn/completed') {
+        chunks.push(...closeOpenCodexAppServerReasoning(state))
+        chunks.push(...closeOpenCodexAppServerText(state))
+        chunks.push(providerChunk.finish('stop'))
+      }
     if (chunks.length === 0) {
       return
     }

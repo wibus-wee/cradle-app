@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
-
 import type {
   AssistantMessage as OpencodeAssistantMessage,
   Part as OpencodePart,
   ToolPart as OpencodeToolPart,
 } from '@opencode-ai/sdk'
+import { describe, expect, it } from 'vitest'
+
+import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
 import { OpencodeEventStreamProjector } from './event-stream'
 
 function assistantMessage(input: Partial<OpencodeAssistantMessage> = {}): OpencodeAssistantMessage {
@@ -29,7 +30,7 @@ function assistantMessage(input: Partial<OpencodeAssistantMessage> = {}): Openco
   }
 }
 
-describe('OpencodeEventStreamProjector', () => {
+describe('opencodeEventStreamProjector', () => {
   it('projects OpenCode streamed tool parts before final assistant text', () => {
     const projector = new OpencodeEventStreamProjector('ses_1')
     const toolPart = {
@@ -100,6 +101,7 @@ describe('OpencodeEventStreamProjector', () => {
     expect(chunks.find(chunk => chunk.type === 'text-delta')).toMatchObject({
       delta: 'Done.',
     })
+    assertValidProviderChunkSequence(chunks)
   })
 
   it('buffers text deltas until the assistant message role is known', () => {

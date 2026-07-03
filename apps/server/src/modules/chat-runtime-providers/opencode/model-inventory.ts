@@ -7,9 +7,20 @@ import type {
 } from '../../chat-runtime/runtime-provider-types'
 import type { ProviderKind } from '../../provider-contracts/types'
 import { acquireOpencodeRuntimeResource } from './runtime-context'
+import {
+  OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID,
+  readOpenCodeRuntimeNativeProviderId,
+  toOpenCodeRuntimeNativeProviderTargetId,
+} from './native-provider-target-id'
 
-export const OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID = 'runtime-native-opencode'
-export const OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_PREFIX = 'runtime-native:opencode:'
+export {
+  isOpenCodeRuntimeNativeProviderTargetId,
+  OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID,
+  OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_PREFIX,
+  readOpenCodeRuntimeNativeProviderId,
+  toOpenCodeRuntimeNativeProviderTargetId,
+} from './native-provider-target-id'
+
 const OPENCODE_MODEL_CATALOG_SCOPE_ID = 'model-catalog'
 
 type OpenCodeProvider = ProviderListResponse['all'][number]
@@ -143,30 +154,6 @@ function filterConnectedOpenCodeProviders(providerList: ProviderListResponse): O
     return []
   }
   return providerList.all.filter(provider => connected.has(provider.id))
-}
-
-export function toOpenCodeRuntimeNativeProviderTargetId(nativeProviderId: string): string {
-  return `${OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_PREFIX}${encodeURIComponent(nativeProviderId)}`
-}
-
-export function readOpenCodeRuntimeNativeProviderId(providerTargetId: string | null | undefined): string | null {
-  if (!providerTargetId?.startsWith(OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_PREFIX)) {
-    return null
-  }
-  const encoded = providerTargetId.slice(OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_PREFIX.length)
-  if (!encoded) {
-    return null
-  }
-  try {
-    return decodeURIComponent(encoded)
-  }
-  catch {
-    return null
-  }
-}
-
-export function isOpenCodeRuntimeNativeProviderTargetId(providerTargetId: string | null | undefined): boolean {
-  return readOpenCodeRuntimeNativeProviderId(providerTargetId) !== null
 }
 
 export function flattenOpenCodeProviders(input: {

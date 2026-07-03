@@ -3,6 +3,10 @@ import type { UIMessageChunk } from 'ai'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import type { RuntimeKind } from '../provider-contracts/types'
+import {
+  recordRuntimeInteractionRequested,
+  recordRuntimeInteractionResolved,
+} from './interaction/event-recorder'
 import type {
   RuntimeUserInputRequest,
   RuntimeUserInputResolution,
@@ -38,7 +42,7 @@ export function setRuntimeUserInputPublisher(nextPublisher: RuntimeUserInputPubl
   publisher = nextPublisher
 }
 
-export function requestRuntimeUserInput(
+export async function requestRuntimeUserInput(
   input: RuntimeUserInputRequest
 ): Promise<RuntimeUserInputResolution> {
   const pendingKey = readPendingKey(input.sessionId, input.providerRequestId)
@@ -53,21 +57,46 @@ export function requestRuntimeUserInput(
     )
   }
 
-  return new Promise((resolve, reject) => {
+  const createdAt = currentUnixSeconds()
+  const pending = new Promise<RuntimeUserInputResolution>((resolve, reject) => {
     pendingUserInputById.set(pendingKey, {
       request: input,
-      createdAt: currentUnixSeconds(),
+      createdAt,
       resolve,
       reject
     })
   })
+
+  try {
+    await recordRuntimeInteractionRequested({
+      sessionId: input.sessionId,
+      runId: input.runId,
+      requestId: input.providerRequestId,
+      interactionKind: 'userInput',
+      providerKind: input.providerKind,
+      runtimeKind: input.runtimeKind,
+      providerMethod: input.providerMethod,
+      toolCallId: input.toolCallId,
+      questionCount: input.questions.length,
+      createdAt
+    })
+  } catch (error) {
+    const current = pendingUserInputById.get(pendingKey)
+    if (current?.request === input) {
+      pendingUserInputById.delete(pendingKey)
+      current.reject(error instanceof Error ? error : new Error(String(error)))
+    }
+    throw error
+  }
+
+  return pending
 }
 
-export function submitRuntimeUserInput(input: {
+export async function submitRuntimeUserInput(input: {
   sessionId: string
   requestId: string
   answers: Record<string, string[]>
-}): RuntimeUserInputResolution {
+}): Promise<RuntimeUserInputResolution> {
   const pendingKey = readPendingKey(input.sessionId, input.requestId)
   const pending = pendingUserInputById.get(pendingKey)
   if (!pending || pending.request.sessionId !== input.sessionId) {
@@ -94,6 +123,14 @@ export function submitRuntimeUserInput(input: {
       answers: input.answers,
       acceptedAt: currentUnixSeconds()
     }
+  })
+  await recordRuntimeInteractionResolved({
+    sessionId: pending.request.sessionId,
+    runId: pending.request.runId,
+    requestId: input.requestId,
+    interactionKind: 'userInput',
+    resolution: 'submitted',
+    updatedAt: currentUnixSeconds()
   })
   return resolution
 }
@@ -175,6 +212,14 @@ export function rejectPendingUserInputsForRun(runId: string, error: Error): void
     }
     pendingUserInputById.delete(requestId)
     pending.reject(error)
+    void recordRuntimeInteractionResolved({
+      sessionId: pending.request.sessionId,
+      runId: pending.request.runId,
+      requestId: pending.request.providerRequestId,
+      interactionKind: 'userInput',
+      resolution: 'cancelled',
+      updatedAt: currentUnixSeconds()
+    }).catch(() => undefined)
   }
 }
 

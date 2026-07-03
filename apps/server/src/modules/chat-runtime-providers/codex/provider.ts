@@ -40,7 +40,6 @@ import type {
   RuntimePresentationCapabilities,
   RuntimeSession,
   RuntimeUiSlotState,
-  RuntimeUserInputQuestion,
   StartChatSessionInput,
   SteerTurnInput,
   StreamTurnInput,
@@ -56,27 +55,34 @@ import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contract'
 import { readTrustedCodexConfig } from '../../provider-contracts/provider-base'
 import { createBoundedTextCollector } from '../bounded-text-collector'
+import { requestProviderToolApproval } from '../kit/permission-bridge'
 import { readWorkspaceProviderStateSnapshot } from '../provider-state-snapshot'
-import {
-  buildDefaultCodexAppServerRequestResult,
-  CodexAppServerBridge,
-  getCodexAppServerCapabilities,
-} from './app-server/bridge'
 import type {
   CodexAppServerCapabilityManifest,
   CodexAppServerInvokeInput,
   CodexAppServerInvokeResponse,
   CodexAppServerStreamInput,
 } from './app-server/bridge'
+import {
+  buildDefaultCodexAppServerRequestResult,
+  CodexAppServerBridge,
+  getCodexAppServerCapabilities,
+} from './app-server/bridge'
+import type { CodexAppServerAuthCarrier, CodexAppServerAuthResolution, CodexChatgptAuthCredential } from './app-server/chatgpt-auth'
+import {
+  readCodexApiKeyAuth,
+  readCodexChatgptAuth,
+  resolveCodexAppServerAuth,
+} from './app-server/chatgpt-auth'
 import type { CodexAppServerClientOptions, CodexAppServerMessage } from './app-server/client'
 import { buildCodexAppServerEnv } from './app-server/env'
+import type { CodexAppServerHostLease } from './app-server/host-lease'
+import { acquireCodexAppServerHostLease, codexChatSessionAppServerScopeId } from './app-server/host-lease'
 import { subscribeCodexAppServerHostNotifications } from './app-server/host-resource'
 import {
   isCodexAppServerToolApprovalRequest,
   isCodexAppServerUserInputRequest,
 } from './app-server/server-request-methods'
-import type { CodexAppServerHostLease } from './app-server/host-lease'
-import { acquireCodexAppServerHostLease, codexChatSessionAppServerScopeId } from './app-server/host-lease'
 import type { Thread } from './app-server-protocol/v2/Thread'
 import type { ThreadBackgroundTerminal } from './app-server-protocol/v2/ThreadBackgroundTerminal'
 import type { ThreadBackgroundTerminalsListResponse } from './app-server-protocol/v2/ThreadBackgroundTerminalsListResponse'
@@ -89,43 +95,6 @@ import type { ThreadSourceKind } from './app-server-protocol/v2/ThreadSourceKind
 import type { ThreadTurnsListResponse } from './app-server-protocol/v2/ThreadTurnsListResponse'
 import type { Turn } from './app-server-protocol/v2/Turn'
 import type { UserInput } from './app-server-protocol/v2/UserInput'
-import type { CodexAppServerAuthCarrier, CodexAppServerAuthResolution, CodexChatgptAuthCredential } from './app-server/chatgpt-auth'
-import {
-  readCodexApiKeyAuth,
-  readCodexChatgptAuth,
-  resolveCodexAppServerAuth,
-} from './app-server/chatgpt-auth'
-import { projectCodexEstimatedContextUsage } from './projection/context-usage-projector'
-import { CodexActiveTurnRegistry } from './turn/active-turn-registry'
-import {
-  createCodexAppServerMapperState,
-} from './turn/event-to-chunk-mapper'
-import {
-  describeCodexUserInput,
-  projectCodexUserInput,
-} from './turn/input-projector'
-import { codexRequestError, formatUnknownError } from './provider-errors'
-import { toSandboxPolicy } from './config/sandbox-policy'
-import {
-  buildCodexTitleConfig,
-  generateAndSetCodexThreadTitle,
-  generateAndSetCodexThreadTitleOrThrow,
-  setCodexThreadGoal,
-  shouldGenerateCodexThreadTitle,
-} from './turn/title-generation'
-import type { CodexTitleGenerationThinkingEffort } from './turn/title-generation'
-import {
-  buildCodexMcpElicitationResponse,
-  readCodexMcpElicitationQuestions,
-  readCodexUserInputQuestions,
-} from './turn/elicitation'
-import { waitForCodexShellCommandCompletion } from './turn/shell-command'
-import {
-  CODEX_RUNTIME_CAPABILITIES,
-  CODEX_RUNTIME_KIND as RUNTIME_KIND,
-  CODEX_RUNTIME_METADATA,
-  createCodexRuntimePresentation,
-} from './metadata'
 import {
   buildCodexCollaborationMode,
   buildCodexConfig,
@@ -134,6 +103,15 @@ import {
   resolveCodexSkillExtraRoots,
 } from './config/runtime-config'
 import { resolveCodexRuntimeContext } from './config/runtime-context'
+import { toSandboxPolicy } from './config/sandbox-policy'
+import {
+  CODEX_RUNTIME_CAPABILITIES,
+  CODEX_RUNTIME_KIND as RUNTIME_KIND,
+  CODEX_RUNTIME_METADATA,
+} from './metadata'
+import { createCodexRuntimePresentation } from './presentation'
+import { createCodexGoalContinuation } from './goal-continuation'
+import { projectCodexEstimatedContextUsage } from './projection/context-usage-projector'
 import {
   clearCodexGoalSnapshot,
   hasActiveGoal,
@@ -146,12 +124,27 @@ import {
   writeCodexGoalSnapshot,
   writeCodexThreadSnapshot,
 } from './projection/state-projector'
+import { projectCodexUiSlotStates } from './projection/ui-slot-projector'
+import { codexRequestError, formatUnknownError } from './provider-errors'
+import type { CodexAppServerItem } from './tools/mapper'
+import { buildCodexToolInput, buildCodexToolOutput, readCodexToolError, readCodexToolName } from './tools/mapper'
+import { CodexActiveTurnRegistry } from './turn/active-turn-registry'
 import {
-  CodexProviderError,
+  buildCodexMcpElicitationResponse,
+  readCodexMcpElicitationQuestions,
+  readCodexUserInputQuestions,
+} from './turn/elicitation'
+import {
+  createCodexAppServerMapperState,
+} from './turn/event-to-chunk-mapper'
+import {
+  describeCodexUserInput,
+  projectCodexUserInput,
+} from './turn/input-projector'
+import { waitForCodexShellCommandCompletion } from './turn/shell-command'
+import {
   createCodexEmptyStreamError,
   createCodexStreamDiagnostics,
-  getNotificationTurnId,
-  getThreadId,
   getTurnId,
   normalizeProviderTitle,
   readLatestThreadTitle,
@@ -165,6 +158,11 @@ import {
   publishProviderThreadEvent,
   streamCodexMappedTurnEvents,
 } from './turn/stream-handler'
+import type { CodexStreamTurnContext } from './turn/stream-turn-context'
+import {
+  disposeCodexSystemPromptFile,
+  resolveCodexStreamTurnContext,
+} from './turn/stream-turn-context'
 import {
   hydrateCodexNativeHistory,
   injectCodexNativeHistory,
@@ -175,13 +173,14 @@ import {
   startOrResumeThread,
   syncCodexSkillExtraRoots,
 } from './turn/thread-lifecycle'
-import type { CodexStreamTurnContext } from './turn/stream-turn-context'
+import type { CodexTitleGenerationThinkingEffort } from './turn/title-generation'
 import {
-  disposeCodexSystemPromptFile,
-  resolveCodexStreamTurnContext,
-} from './turn/stream-turn-context'
-import type { CodexAppServerItem } from './tools/mapper'
-import { buildCodexToolInput, buildCodexToolOutput, readCodexToolError, readCodexToolName } from './tools/mapper'
+  buildCodexTitleConfig,
+  generateAndSetCodexThreadTitle,
+  generateAndSetCodexThreadTitleOrThrow,
+  setCodexThreadGoal,
+  shouldGenerateCodexThreadTitle,
+} from './turn/title-generation'
 import type {
   ActiveCodexTurn,
   CodexAppServerClientLike,
@@ -191,7 +190,6 @@ import type {
   CodexCollaborationModeListResponse,
   CodexConfigReadResponse,
   CodexConfigRequirementsReadResponse,
-  CodexGoalSnapshot,
   CodexListMcpServerStatusResponse,
   CodexModelListResponse,
   CodexModelProviderCapabilitiesReadResponse,
@@ -200,15 +198,11 @@ import type {
   CodexProviderDeps,
   CodexRateLimitsResponse,
   CodexSkillsListResponse,
-  CodexThreadItem,
-  CommandExecutionOutputDeltaNotificationParams,
-  ItemNotificationParams,
   ThreadGoalGetResponse,
   ThreadResponse,
   ThreadTokenUsageUpdatedNotificationParams,
   TurnResponse,
 } from './types'
-import { projectCodexUiSlotStates } from './projection/ui-slot-projector'
 
 const CODEX_EPHEMERAL_REQUEST_TIMEOUT_MS = 20_000
 function codexEphemeralAppServerScopeId(kind: string, id: string): string {
@@ -236,6 +230,7 @@ export class CodexProvider implements ChatRuntime {
   readonly runtimeKind = RUNTIME_KIND
   readonly metadata = CODEX_RUNTIME_METADATA
   readonly capabilities = CODEX_RUNTIME_CAPABILITIES
+  readonly goalContinuation = createCodexGoalContinuation()
 
   private readonly activeTurns = new CodexActiveTurnRegistry()
   private _lastUsage: TokenUsage | null = null
@@ -868,7 +863,7 @@ export class CodexProvider implements ChatRuntime {
     const providerSessionId = input.runtimeSession.providerSessionId
     if (!providerSessionId) {
       throw new ProviderRuntimeError(
-        ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId)
+        ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId),
       )
     }
 
@@ -1031,7 +1026,7 @@ export class CodexProvider implements ChatRuntime {
       runtimeKind: this.runtimeKind,
       resolveAppServerAuth: (profile, config) => this.resolveAppServerAuth(profile, config),
       resolveSkillPaths: this.resolveSkillPaths,
-      createServerRequestHandler: auth => {
+      createServerRequestHandler: (auth) => {
         const handler: CodexAppServerResourceRequestHandler = request => this.handleCodexServerRequest(input, request, {
           chatgptAuth: readCodexChatgptAuth(auth),
           updateSecretValue: this.deps.updateSecret,
@@ -1484,11 +1479,9 @@ export class CodexProvider implements ChatRuntime {
   ): Promise<unknown> {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     if (isCodexAppServerToolApprovalRequest(request.method)) {
-      if (!this.deps.requestToolApproval) {
-        throw codexRequestError(request.method, 'Chat Runtime does not expose pending tool approval handling')
-      }
       const requestId = String(request.id)
-      const resolution = await this.deps.requestToolApproval({
+      const resolution = await requestProviderToolApproval({
+        deps: this.deps,
         sessionId: input.runtimeSession.chatSessionId,
         runId: input.runId,
         providerRequestId: requestId,
@@ -1886,10 +1879,6 @@ export class CodexProvider implements ChatRuntime {
   }
 }
 
-function readString(value: unknown, fallback: string): string {
-  return typeof value === 'string' ? value : fallback
-}
-
 function toCodexThreadSourceKind(kind: ProviderThreadSourceKind): ThreadSourceKind {
   switch (kind) {
     case 'cli':
@@ -1930,7 +1919,7 @@ function projectCodexThread(thread: Thread): ProviderThread {
 }
 
 function projectCodexBackgroundTerminals(
-  terminals: ThreadBackgroundTerminal[]
+  terminals: ThreadBackgroundTerminal[],
 ): RuntimeBackgroundTerminal[] {
   return terminals.map(terminal => ({
     itemId: terminal.itemId,

@@ -9,14 +9,15 @@ import {
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../../chat-runtime/runtime-provider-types'
-import { isCodexGoalContinuationMessage } from '../../../chat-runtime/ui-message'
-import { extractUiMessageText } from '../../../chat-runtime/ui-message-input'
 import type { CodexConfig } from '../../../provider-contracts/provider-base'
 import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
 import type { RuntimeKind } from '../../../provider-contracts/types'
+import { extractProviderInputText } from '../../kit/input-projector'
+import { readWorkspaceProviderStateSnapshot } from '../../provider-state-snapshot'
+import type { CodexAppServerAuthCarrier, CodexAppServerAuthResolution } from '../app-server/chatgpt-auth'
 import type { CodexAppServerClientOptions } from '../app-server/client'
 import { buildCradleCodexAppServerEnv } from '../app-server/client'
-import type { CodexAppServerAuthCarrier, CodexAppServerAuthResolution } from '../app-server/chatgpt-auth'
+import type { ReasoningEffort } from '../app-server-protocol/ReasoningEffort'
 import type { ThreadForkParams } from '../app-server-protocol/v2/ThreadForkParams'
 import {
   buildCodexAuthEnvironment,
@@ -28,15 +29,14 @@ import {
   writeSystemPromptFile,
 } from '../config/runtime-config'
 import { resolveCodexRuntimeContext } from '../config/runtime-context'
+import type { CodexUserInput } from './input-projector'
 import {
   isCodexCompactCommand,
   projectCodexUserInput,
   readCodexGoalCommandObjective,
 } from './input-projector'
-import type { CodexUserInput } from './input-projector'
+import { isCodexGoalContinuationMessage } from '../goal-continuation'
 import { isLiveCodexSideFork } from './thread-lifecycle'
-import { readWorkspaceProviderStateSnapshot } from '../../provider-state-snapshot'
-import type { ReasoningEffort } from '../app-server-protocol/ReasoningEffort'
 
 export type CodexStreamRuntimeAccess = ReturnType<typeof projectCodexRuntimeAccessMode>
 
@@ -86,7 +86,7 @@ export function resolveCodexStreamTurnContext(
   const auth = deps.resolveAppServerAuth(profile, config)
   const effectiveModel = input.modelId ?? config.model
   const userInput = projectCodexUserInput(input.message, 'Codex provider')
-  const userPromptText = extractUiMessageText(input.message).trim()
+  const userPromptText = extractProviderInputText(input.message).trim()
   const goalContinuationRequested = typeof input.message !== 'string' && isCodexGoalContinuationMessage(input.message)
   const goalCommandObjective = readCodexGoalCommandObjective(input.message)
   const compactCommandRequested = isCodexCompactCommand(input.message)

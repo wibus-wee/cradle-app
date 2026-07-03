@@ -32,7 +32,7 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
+          repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: main
 

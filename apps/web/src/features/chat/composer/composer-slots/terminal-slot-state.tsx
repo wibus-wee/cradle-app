@@ -1,11 +1,12 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   RightSmallLine as ChevronRightIcon,
   StopCircleLine as CircleStopIcon,
-  TerminalLine as TerminalIcon
+  TerminalLine as TerminalIcon,
 } from '@mingcute/react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '~/components/ui/collapsible'
 import { cn } from '~/lib/cn'
 
@@ -51,9 +52,10 @@ export function TerminalSlotState({
     <ComposerSlotShell stateName="terminal" testId="terminal-slot" className={className}>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <button
+          <Button
             type="button"
-            className="flex w-full min-w-0 items-center gap-2 text-left"
+            variant="ghost"
+            className="h-auto w-full min-w-0 justify-start gap-2 p-0 text-left hover:bg-transparent"
           >
             <TerminalIcon
               className="size-3.5 shrink-0 !text-emerald-600 dark:!text-emerald-400"
@@ -68,7 +70,7 @@ export function TerminalSlotState({
               })}
               aria-hidden="true"
             />
-          </button>
+          </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-1.5 grid min-w-0 gap-1.5">

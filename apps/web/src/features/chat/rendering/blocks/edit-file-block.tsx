@@ -9,6 +9,7 @@ import { MultiFileDiff } from '@pierre/diffs/react'
 import { m } from 'motion/react'
 import { useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '~/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
@@ -191,10 +192,11 @@ export function EditFileBlock({
     >
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             className={cn(
-              'group flex w-full min-w-0 items-center gap-2 px-2 py-1.5',
+              'group h-auto w-full min-w-0 justify-start gap-2 px-2 py-1.5',
               'transition-colors duration-100',
               'hover:bg-accent/50 active:bg-accent/70',
               open ? 'rounded-t-md bg-accent/30' : 'rounded-md',
@@ -242,7 +244,7 @@ export function EditFileBlock({
               )}
               aria-hidden
             />
-          </button>
+          </Button>
         </CollapsibleTrigger>
 
         {open && (

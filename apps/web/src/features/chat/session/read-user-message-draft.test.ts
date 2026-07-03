@@ -1,10 +1,9 @@
-import { describe, expect, it } from 'vitest'
 import type { FileUIPart, UIMessage } from 'ai'
-
-import { buildOptimisticUserMessage } from './optimistic-chat-turn'
-import { readUserMessageDraft } from './read-user-message-draft'
+import { describe, expect, it } from 'vitest'
 
 import type { ChatContextPart } from '../context/chat-context-parts'
+import { buildOptimisticUserMessage, readGoalCommandObjective } from './optimistic-chat-turn'
+import { readUserMessageDraft } from './read-user-message-draft'
 
 const skillContext: ChatContextPart = {
   type: 'data-cradle-skill',
@@ -79,5 +78,36 @@ describe('readUserMessageDraft', () => {
       files: draft!.files,
     })
     expect(readUserMessageDraft(rebuilt)).toEqual(draft)
+  })
+})
+
+describe('buildOptimisticUserMessage', () => {
+  it('annotates goal command only when the runtime descriptor supports it', () => {
+    const plainMessage = buildOptimisticUserMessage({
+      messageId: 'm6',
+      text: '/goal Finish the refactor',
+    })
+    expect(readUserMessageDraft(plainMessage)?.text).toBe('/goal Finish the refactor')
+    expect(plainMessage.metadata).toBeUndefined()
+
+    const goalMessage = buildOptimisticUserMessage({
+      messageId: 'm7',
+      text: '/goal Finish the refactor',
+      supportsGoalCommand: true,
+    })
+    expect(readUserMessageDraft(goalMessage)?.text).toBe('Finish the refactor')
+    expect(goalMessage.metadata).toEqual({
+      cradle: {
+        goal: { objective: 'Finish the refactor' },
+      },
+    })
+  })
+})
+
+describe('readGoalCommandObjective', () => {
+  it('requires a goal command boundary', () => {
+    expect(readGoalCommandObjective('/goal Finish it')).toBe('Finish it')
+    expect(readGoalCommandObjective('/goalish Finish it')).toBeNull()
+    expect(readGoalCommandObjective('/goal')).toBeNull()
   })
 })

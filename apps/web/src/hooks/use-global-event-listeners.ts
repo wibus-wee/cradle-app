@@ -10,6 +10,7 @@ import { runtimeSettingsQueryKey } from '~/features/chat/commands/runtime-settin
 import { runtimeSessionStatusQueryKey } from '~/features/chat/runtime/use-runtime-session-status'
 import { onAnyChatRunEvent, onChatRunSettled } from '~/features/chat/transport/sse-chat-transport'
 import { isSessionsQueryKey, updateSessionReadState } from '~/features/workspace/use-session'
+import { useGlobalSessionEventSync } from '~/features/workspace/use-global-session-event-sync'
 import { isElectron, isTearoffWindow, nativeIpc, platform } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
 import { activateAdjacentSurface, closeActiveSurface, openNewChat } from '~/navigation/navigation-commands'
@@ -55,6 +56,7 @@ export function useGlobalEventListeners(options: {
   workspacePath?: string | null
 } = {}) {
   const queryClient = useQueryClient()
+  useGlobalSessionEventSync(queryClient)
   const toggleBottomPanel = useLayoutStore(s => s.toggleBottomPanel)
   const toggleAside = useLayoutStore(s => s.toggleAside)
   const visibleSessionId = chatSessionIdForSurface(useActiveSurface())

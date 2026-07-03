@@ -136,14 +136,16 @@ export function AgentRail({
         <span className="text-[12px] font-medium text-foreground/70">Agent</span>
         <span className="text-[11px] tabular-nums text-muted-foreground/60">{review.agentFixes.length}</span>
         <div className="flex-1" />
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onCollapse}
-          className="flex size-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+          className="size-5 rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
           aria-label="Hide agent"
         >
           <XIcon className="size-3" />
-        </button>
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -179,14 +181,16 @@ export function AgentRail({
           {composer.agents.length === 0 && (
             <div className="rounded-md border border-dashed border-current/15 bg-muted/30 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground/80">
               <p>No agent is configured yet.</p>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => openSettingsSection('agents')}
-                className="mt-1.5 inline-flex items-center gap-1 font-medium text-foreground/80 underline-offset-2 hover:underline"
+                className="mt-1.5 h-auto gap-1 px-0 py-0 text-[11px] text-foreground/80 underline-offset-2 hover:bg-transparent hover:underline"
               >
                 <SettingsIcon className="size-3" />
                 Configure one in Agents
-              </button>
+              </Button>
             </div>
           )}
 
@@ -249,17 +253,19 @@ function ScopeButton({
   children: React.ReactNode
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'h-6 flex-1 rounded-[5px] text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+        'h-6 flex-1 rounded-[5px] px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-40',
         active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       {children}
-    </button>
+    </Button>
   )
 }
 

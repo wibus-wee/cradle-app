@@ -10,6 +10,7 @@ import {
   sendBrowserState,
 } from './browser-ipc'
 import { DesktopBrowserManager } from './browser-manager'
+import { ChatEventTailBroker } from './chat-event-tail-broker'
 import { ChatStreamBroker } from './chat-stream-broker'
 import { DesktopAppBadgeManager } from './desktop-app-badge-manager'
 import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath } from './desktop-assets'
@@ -50,6 +51,7 @@ let trayManager: TrayManager | null = null
 let desktopAppBadgeManager: DesktopAppBadgeManager | null = null
 let macBridgeManager: MacBridgeManager | null = null
 let chatStreamBroker: ChatStreamBroker | null = null
+let chatEventTailBroker: ChatEventTailBroker | null = null
 
 function fetchWithElectronNet(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const requestInput = input instanceof URL ? input.toString() : input
@@ -383,6 +385,8 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   notificationCenterManager = null
   chatStreamBroker?.stop()
   chatStreamBroker = null
+  chatEventTailBroker?.stop()
+  chatEventTailBroker = null
   trayManager?.destroy()
   trayManager = null
   desktopAppBadgeManager?.destroy()
@@ -573,6 +577,7 @@ export async function startDesktopApp(): Promise<void> {
     getUpdateManager: () => updateManager,
     getMacBridgeManager: () => macBridgeManager,
     getChatStreamBroker: () => chatStreamBroker,
+    getChatEventTailBroker: () => chatEventTailBroker,
     getQuitGuard: () => quitGuard,
   })
   updateManager.on('statusChanged', broadcastUpdateStatus)
@@ -594,6 +599,7 @@ export async function startDesktopApp(): Promise<void> {
     startDesktopResourceReporting()
     await syncDesktopPreferencesFromServer(serverUrl)
     chatStreamBroker = new ChatStreamBroker({ serverUrl, fetchFn: fetchWithElectronNet })
+    chatEventTailBroker = new ChatEventTailBroker({ serverUrl, fetchFn: fetchWithElectronNet })
 
     windowManager = new WindowManager(serverUrl)
     appBadgeManager.initialize()

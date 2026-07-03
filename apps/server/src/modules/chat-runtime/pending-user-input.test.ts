@@ -1,7 +1,12 @@
 import type { UIMessageChunk } from 'ai'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AppError } from '../../errors/app-error'
+import type { ChatSessionEvent } from './es/events'
+import {
+  resetRuntimeInteractionEventRecorder,
+  setRuntimeInteractionEventRecorder,
+} from './interaction/event-recorder'
 import {
   listPendingRuntimeUserInputSummaries,
   requestRuntimeUserInput,
@@ -10,6 +15,19 @@ import {
 } from './pending-user-input'
 
 describe('pending runtime user input', () => {
+  const recordedEvents: ChatSessionEvent[] = []
+
+  beforeEach(() => {
+    recordedEvents.length = 0
+    setRuntimeInteractionEventRecorder(async (_sessionId, events) => {
+      recordedEvents.push(...events)
+    })
+  })
+
+  afterEach(() => {
+    resetRuntimeInteractionEventRecorder()
+  })
+
   it('resolves submitted answers and publishes a synthetic resolved tool output', async () => {
     const published: Array<{ runId: string, chunk: UIMessageChunk }> = []
     setRuntimeUserInputPublisher((runId, chunk) => {
@@ -37,7 +55,7 @@ describe('pending runtime user input', () => {
       ],
     })
 
-    const submitted = submitRuntimeUserInput({
+    const submitted = await submitRuntimeUserInput({
       sessionId: 'session-pending-user-input-1',
       requestId: 'request-1',
       answers: { scope: ['Small'] },
@@ -65,23 +83,47 @@ describe('pending runtime user input', () => {
         },
       },
     ])
+    expect(recordedEvents).toMatchObject([
+      {
+        type: 'InteractionRequested',
+        payload: {
+          sessionId: 'session-pending-user-input-1',
+          runId: 'run-pending-user-input-1',
+          requestId: 'request-1',
+          interactionKind: 'userInput',
+          providerMethod: 'item/tool/requestUserInput',
+          toolCallId: 'server-request-request-1',
+          questionCount: 1,
+        },
+      },
+      {
+        type: 'InteractionResolved',
+        payload: {
+          sessionId: 'session-pending-user-input-1',
+          runId: 'run-pending-user-input-1',
+          requestId: 'request-1',
+          interactionKind: 'userInput',
+          resolution: 'submitted',
+          approved: null,
+        },
+      },
+    ])
   })
 
-  it('rejects stale submissions with a not found app error', () => {
-    expect(() => submitRuntimeUserInput({
+  it('rejects stale submissions with a not found app error', async () => {
+    await expect(submitRuntimeUserInput({
       sessionId: 'session-pending-user-input-2',
       requestId: 'missing-request',
       answers: {},
-    })).toThrow(AppError)
+    })).rejects.toThrow(AppError)
 
     try {
-      submitRuntimeUserInput({
+      await submitRuntimeUserInput({
         sessionId: 'session-pending-user-input-2',
         requestId: 'missing-request',
         answers: {},
       })
-    }
-    catch (error) {
+    } catch (error) {
       expect(error).toMatchObject({
         code: 'chat_runtime_user_input_not_found',
         status: 404,
@@ -126,7 +168,7 @@ describe('pending runtime user input', () => {
       }),
     ])
 
-    submitRuntimeUserInput({
+    await submitRuntimeUserInput({
       sessionId: 'session-pending-user-input-summary',
       requestId: 'request-summary',
       answers: { direction: ['A'] },

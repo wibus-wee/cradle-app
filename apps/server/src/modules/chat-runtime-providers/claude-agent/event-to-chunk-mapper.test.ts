@@ -1,6 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { describe, expect, it } from 'vitest'
 
+import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
 import { createClaudeAgentChunkMapperState, mapClaudeAgentMessageToChunks } from './event-to-chunk-mapper'
 
 describe('mapClaudeAgentMessageToChunks', () => {
@@ -913,6 +914,7 @@ describe('mapClaudeAgentMessageToChunks', () => {
       { type: 'text-end', id: 'text-1' },
       { type: 'finish', finishReason: 'stop' },
     ])
+    assertValidProviderChunkSequence(chunks)
   })
 
   it('does not duplicate thinking parts when an assistant snapshot arrives after stream events', async () => {
@@ -996,8 +998,7 @@ describe('mapClaudeAgentMessageToChunks', () => {
     allChunks.push(...snapshotResult.chunks)
 
     expect(allChunks.filter(chunk =>
-      chunk.type === 'text-delta' && chunk.delta === 'Before question.',
-    )).toHaveLength(1)
+      chunk.type === 'text-delta' && chunk.delta === 'Before question.')).toHaveLength(1)
     expect(snapshotResult.chunks).toEqual([
       {
         type: 'tool-input-available',

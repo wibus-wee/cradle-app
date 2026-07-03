@@ -17,6 +17,7 @@ import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
 import { DitheredGradientDecoration } from '~/components/ui/canvas-art'
 import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from '~/components/ui/menu'
+import { runtimeComposerUsesCollapsedInput } from '~/features/agent-runtime/use-runtime-catalog'
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
 import { DraftChatComposerWithState } from '~/features/chat/composer/draft-chat-composer'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
@@ -31,7 +32,6 @@ import { openChatSession } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
 import { useNewChatStore } from '~/store/new-chat'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 /* ─── Constants ───────────────────────────────────────────────────────── */
 
@@ -118,7 +118,7 @@ function useNewChatPageOwner(active: boolean, replaceCurrentSurfaceOnSubmit: boo
   const isReady = !workspacesLoading
     && sessionsReady
   const promptInputCollapsed = composerState.selection.targetMode === 'agent'
-    && composerState.selection.runtimeKind === 'cli-tui'
+    && runtimeComposerUsesCollapsedInput(composerState.runtimeComposer)
 
   const recentSessions = useMemo(() => {
     return sessions.slice(0, 6)
@@ -143,7 +143,7 @@ function useNewChatPageOwner(active: boolean, replaceCurrentSurfaceOnSubmit: boo
   ) => {
     const trimmedText = text.trim()
     try {
-      if (options.runtimeKind === 'cli-tui') {
+      if (runtimeComposerUsesCollapsedInput(options.runtimeComposer)) {
         if (!options.agentId) {
           return false
         }
@@ -160,19 +160,12 @@ function useNewChatPageOwner(active: boolean, replaceCurrentSurfaceOnSubmit: boo
         if (!session?.id) {
           return false
         }
-        useSessionLayoutStore.getState().upsertSession({
-          sessionId: session.id,
-          sessionTitle: trimmedText.slice(0, 80) || options.agentName || options.agentId,
-          workspaceId: session.workspaceId ?? selectedProjectWorkspaceId ?? null,
-          workspacePath: selectedWorkspace?.id === selectedProjectWorkspaceId ? selectedWorkspaceLocalPath : null,
-          runtimeKind: 'cli-tui',
-        })
         updateSessionInSessionLists(queryClient, {
           id: session.id,
           title: trimmedText.slice(0, 80) || options.agentName || options.agentId,
           workspaceId: session.workspaceId ?? selectedProjectWorkspaceId ?? null,
           agentId: options.agentId,
-          runtimeKind: 'cli-tui',
+          runtimeKind: options.runtimeKind,
         }, { promote: true })
         void Promise.all([
           queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
@@ -214,13 +207,6 @@ function useNewChatPageOwner(active: boolean, replaceCurrentSurfaceOnSubmit: boo
       if (!session?.id) {
         return false
       }
-      useSessionLayoutStore.getState().upsertSession({
-        sessionId: session.id,
-        sessionTitle,
-        workspaceId: session.workspaceId ?? selectedProjectWorkspaceId ?? null,
-        workspacePath: selectedWorkspace?.id === selectedProjectWorkspaceId ? selectedWorkspaceLocalPath : null,
-        runtimeKind: options.runtimeKind,
-      })
       updateSessionInSessionLists(queryClient, {
         id: session.id,
         title: sessionTitle,
@@ -232,7 +218,6 @@ function useNewChatPageOwner(active: boolean, replaceCurrentSurfaceOnSubmit: boo
       }, { promote: true })
       startOptimisticChatResponse({
         sessionId: session.id,
-        runtimeKind: options.runtimeKind,
         queryClient,
         body: {
           text: trimmedText,
@@ -264,7 +249,7 @@ function useNewChatPageOwner(active: boolean, replaceCurrentSurfaceOnSubmit: boo
       console.error('[NewChatPage] send failed:', err)
       return false
     }
-  }, [openCreatedChatSession, queryClient, selectedProjectWorkspaceId, selectedWorkspace?.id, selectedWorkspaceLocalPath])
+  }, [openCreatedChatSession, queryClient, selectedProjectWorkspaceId])
 
   const handleSend = useCallback((text: string, files: FileUIPart[], contextParts: ChatContextPart[], options: DraftChatComposerSubmitOptions) => {
     return handleSendToTarget(text, files, contextParts, options, 'tab')

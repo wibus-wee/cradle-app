@@ -4,33 +4,39 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   getChatSessionsBySessionIdMessagesOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
-import { useChatStore } from '~/store/chat'
+import { getServerUrl } from '~/lib/electron'
+import { chatSelectors, useChatStore } from '~/store/chat'
 
+import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
-import { subscribeChatSessionStreamForSession } from '../transport/chat-stream-transport'
-import { ChatStreamingHandler } from '../transport/chat-streaming-handler'
+import { createChatSessionEventSource } from '../transport/chat-event-tail-transport'
+import { openPassiveSessionStream } from './session-passive-stream'
+import { SessionSyncEngine } from './session-sync-engine'
+import {
+  deriveSessionPassiveStreamProjection,
+  deriveSessionSnapshotProjection,
+  deriveStableSessionSnapshotProjection,
+} from './session-snapshot-projection'
 import { readStableMessageRows, writeStableMessageRows } from './stable-message-cache'
 import { useChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 import type { ChatSessionMessageRow } from './use-chat-session-types'
 import {
-  derivePassiveStatus,
-  projectMainMessagesFromSnapshotRows,
-  projectRowsWithoutEmptyStreamingAssistant,
-  projectStreamingMainAssistantMessageIds,
-  QUEUE_DRAIN_SYNC_DELAY_MS,
-  readLatestFailedMainAssistantRow,
-  readStableSnapshotRows,
   detachPassiveSessionStreamingState,
-  isTerminalChatRunStatus,
+  QUEUE_DRAIN_SYNC_DELAY_MS,
+  readStableSnapshotRows,
   releaseSessionStreamingStateForTerminalRun,
-  shouldHoldEmptyStreamingSnapshot,
 } from './use-chat-session-types'
 
 export function useChatSessionDriver(chatSessionId: string | null, active = true): void {
+  const controls = useChatSessionRuntimeControls(chatSessionId)
   const {
     scheduleSnapshotRefresh,
     refreshQueue,
-  } = useChatSessionRuntimeControls(chatSessionId)
+    refreshRuntimeUiSlotStates,
+    refreshSessionLists,
+  } = controls
+  const controlsRef = useRef(controls)
+  controlsRef.current = controls
   const driverEnabled = active && !!chatSessionId
   const generatedSnapshotRowsOptions = useMemo(
     () => getChatSessionsBySessionIdMessagesOptions({ path: { sessionId: chatSessionId ?? '' } }),
@@ -47,7 +53,9 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     enabled: driverEnabled,
     select: data => data as ChatSessionMessageRow[],
   })
-  const runtimeStatusQuery = useRuntimeSessionStatus(driverEnabled ? chatSessionId : null)
+  const runtimeStatusQuery = useRuntimeSessionStatus(driverEnabled ? chatSessionId : null, driverEnabled, {
+    refetchInterval: false,
+  })
   const snapshotRows = snapshotRowsQuery.data
   const runtimeStatus = runtimeStatusQuery.data
   const runtimeActiveRun = runtimeStatus?.activeRun ?? null
@@ -58,15 +66,63 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     && runtimeStatus.status === 'idle'
     && !runtimeStatus.activeRun,
   )
-  const passiveStreamRef = useRef<{
-    sessionId: string
-    messageId: string
-    controller: AbortController
-    handler: ChatStreamingHandler
-  } | null>(null)
-  const requestedRuntimeActiveRunMessageRef = useRef<string | null>(null)
-  const runtimeQueueSignatureRef = useRef<string | null>(null)
-  const latestTerminalRunRefreshRef = useRef<string | null>(null)
+  const syncEngineRef = useRef<SessionSyncEngine | null>(null)
+
+  useEffect(() => {
+    if (!driverEnabled || !chatSessionId) {
+      return
+    }
+
+    const engine = new SessionSyncEngine({
+      sessionId: chatSessionId,
+      serverBaseUrl: getServerUrl(),
+      eventSourceFactory: createChatSessionEventSource,
+      passiveStreamFactory: request => openPassiveSessionStream({
+        request,
+        scheduleSnapshotRefresh: delay => controlsRef.current.scheduleSnapshotRefresh(delay),
+        refreshQueue: delay => controlsRef.current.refreshQueue(delay),
+      }),
+      callbacks: {
+        onMessagesChanged: () => {
+          controlsRef.current.scheduleSnapshotRefresh(0)
+        },
+        onRuntimeStatusChanged: () => {
+          void controlsRef.current.queryClient.invalidateQueries({
+            queryKey: runtimeSessionStatusQueryKey(chatSessionId),
+          })
+        },
+        onRuntimeUiSlotStatesChanged: () => {
+          controlsRef.current.refreshRuntimeUiSlotStates()
+        },
+        onQueueChanged: () => {
+          controlsRef.current.refreshQueue(0)
+        },
+        onSessionSummaryChanged: () => {
+          controlsRef.current.refreshSessionLists()
+          controlsRef.current.scheduleSnapshotRefresh(0)
+        },
+        onSnapshotRequired: () => {
+          controlsRef.current.refreshSessionLists()
+        },
+        onError: (error) => {
+          console.warn('[session-sync-engine] event tail error', error)
+        },
+      },
+    })
+
+    syncEngineRef.current = engine
+    engine.start()
+
+    return () => {
+      if (syncEngineRef.current === engine) {
+        syncEngineRef.current = null
+      }
+      engine.stop()
+    }
+  }, [
+    chatSessionId,
+    driverEnabled,
+  ])
 
   useEffect(() => {
     if (!driverEnabled || !chatSessionId) {
@@ -92,18 +148,14 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
         return
       }
 
-      store.setMessages(chatSessionId, projectMainMessagesFromSnapshotRows(stableRows))
+      const projection = deriveStableSessionSnapshotProjection(stableRows)
+      store.setMessages(chatSessionId, projection.messages)
       store.setSessionHydrated(chatSessionId, true)
-      store.setPassiveStreamingMessageIds(chatSessionId, [])
       store.clearSessionErrors(chatSessionId)
-      store.setSessionMeta(chatSessionId, {
-        cancelling: false,
-        passiveStatus: derivePassiveStatus(stableRows),
-      })
+      store.setPassiveRunState(chatSessionId, projection.passiveRunState)
 
-      const failedRow = readLatestFailedMainAssistantRow(stableRows)
-      if (failedRow?.errorText) {
-        store.failGeneration(failedRow.messageId, failedRow.errorText)
+      if (projection.failedMessage) {
+        store.failGeneration(projection.failedMessage.messageId, projection.failedMessage.errorText)
       }
     })()
 
@@ -116,70 +168,49 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     if (driverEnabled) {
       return
     }
-    if (passiveStreamRef.current) {
-      passiveStreamRef.current.controller.abort()
-      passiveStreamRef.current.handler.dispose()
-      passiveStreamRef.current = null
-    }
+    syncEngineRef.current?.updatePassiveStream({
+      enabled: false,
+      sessionId: chatSessionId,
+      locallyDriven: false,
+      holdEmptyStreamingSnapshot: false,
+      runtimeActiveRunMessageId: null,
+      snapshotStreamingMessageIds: [],
+    })
     if (chatSessionId) {
       detachPassiveSessionStreamingState(chatSessionId)
     }
-    requestedRuntimeActiveRunMessageRef.current = null
-    runtimeQueueSignatureRef.current = null
-    latestTerminalRunRefreshRef.current = null
   }, [chatSessionId, driverEnabled])
 
   useLayoutEffect(() => {
     if (!driverEnabled || !chatSessionId || !snapshotRows) {
       return
     }
-    const meta = useChatStore.getState().sessionMetaMap.get(chatSessionId)
-    if (meta?.locallyDriving) {
-      return
-    }
-    if (passiveStreamRef.current?.sessionId === chatSessionId) {
-      return
-    }
-
-    const holdEmptyStreamingSnapshot = shouldHoldEmptyStreamingSnapshot({
+    const runState = chatSelectors.sessionRunState(chatSessionId)(useChatStore.getState())
+    const store = useChatStore.getState()
+    const projection = deriveSessionSnapshotProjection({
       rows: snapshotRows,
+      runState,
+      existingMessageCount: store.messagesMap.get(chatSessionId)?.length ?? 0,
       runtimeStatusKnown,
       runtimeIdle,
+      runtimeActiveRunMessageId,
       snapshotFetching: snapshotRowsQuery.isFetching,
     })
-    const effectiveRows = holdEmptyStreamingSnapshot
-      ? projectRowsWithoutEmptyStreamingAssistant(snapshotRows)
-      : snapshotRows
-    const projected = projectMainMessagesFromSnapshotRows(effectiveRows)
-    const store = useChatStore.getState()
-    const existingMessageCount = store.messagesMap.get(chatSessionId)?.length ?? 0
-    const snapshotStreamingMessageIds = holdEmptyStreamingSnapshot
-      ? []
-      : projectStreamingMainAssistantMessageIds(effectiveRows)
-    const passiveStreamingMessageIds = runtimeActiveRunMessageId
-      ? [runtimeActiveRunMessageId]
-      : snapshotStreamingMessageIds
-    const passiveStatus = runtimeActiveRunMessageId
-      ? 'streaming'
-      : holdEmptyStreamingSnapshot
-        ? 'idle'
-        : derivePassiveStatus(effectiveRows)
-    if (!holdEmptyStreamingSnapshot || existingMessageCount === 0) {
-      store.setMessages(chatSessionId, projected)
+    if (!projection) {
+      return
+    }
+
+    if (projection.messages) {
+      store.setMessages(chatSessionId, projection.messages)
     }
     store.setSessionHydrated(chatSessionId, true)
-    store.setPassiveStreamingMessageIds(chatSessionId, passiveStreamingMessageIds)
     store.clearSessionErrors(chatSessionId)
-    store.setSessionMeta(chatSessionId, {
-      cancelling: meta?.cancelling && passiveStatus === 'streaming',
-      passiveStatus,
-    })
+    store.setPassiveRunState(chatSessionId, projection.passiveRunState)
 
-    const failedRow = readLatestFailedMainAssistantRow(snapshotRows)
-    if (failedRow?.errorText) {
-      useChatStore.getState().failGeneration(failedRow.messageId, failedRow.errorText)
+    if (projection.failedMessage) {
+      store.failGeneration(projection.failedMessage.messageId, projection.failedMessage.errorText)
     }
-    if (holdEmptyStreamingSnapshot && runtimeIdle) {
+    if (projection.requestSnapshotRefresh) {
       scheduleSnapshotRefresh(0)
     }
   }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.isFetching])
@@ -202,200 +233,64 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       return
     }
     useChatStore.getState().setSessionHydrated(chatSessionId, true)
-    useChatStore.getState().setPassiveStatus(chatSessionId, 'error')
+    useChatStore.getState().setPassiveRunState(chatSessionId, { messageIds: [], status: 'error' })
   }, [chatSessionId, driverEnabled, snapshotRowsQuery.isError])
-
-  useEffect(() => {
-    if (!driverEnabled || !chatSessionId || !runtimeActiveRun?.messageId) {
-      return
-    }
-
-    useChatStore.getState().setRunDisplayId(runtimeActiveRun.messageId, runtimeActiveRun.runId)
-  }, [chatSessionId, driverEnabled, runtimeActiveRun])
-
-  useEffect(() => {
-    if (!driverEnabled || !chatSessionId || !runtimeStatus || runtimeStatus.activeRun) {
-      return
-    }
-
-    const latestRun = runtimeStatus.latestRun
-    if (latestRun?.runId && latestRun.messageId && isTerminalChatRunStatus(latestRun.status)) {
-      const snapshotHasMessage = snapshotRows?.some(row => row.messageId === latestRun.messageId) ?? false
-      const storeHasMessage = (useChatStore.getState().messagesMap.get(chatSessionId) ?? [])
-        .some(message => message.id === latestRun.messageId)
-      if (!snapshotHasMessage && !storeHasMessage && latestTerminalRunRefreshRef.current !== latestRun.runId) {
-        latestTerminalRunRefreshRef.current = latestRun.runId
-        scheduleSnapshotRefresh(0)
-      }
-    }
-
-    const released = releaseSessionStreamingStateForTerminalRun(chatSessionId, runtimeStatus.latestRun)
-    if (released) {
-      scheduleSnapshotRefresh(0)
-      refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
-    }
-  }, [chatSessionId, driverEnabled, refreshQueue, runtimeStatus, scheduleSnapshotRefresh, snapshotRows])
-
-  useEffect(() => {
-    return () => {
-      if (passiveStreamRef.current) {
-        const current = passiveStreamRef.current
-        current.controller.abort()
-        current.handler.dispose()
-        passiveStreamRef.current = null
-        detachPassiveSessionStreamingState(current.sessionId)
-      }
-      requestedRuntimeActiveRunMessageRef.current = null
-      runtimeQueueSignatureRef.current = null
-      latestTerminalRunRefreshRef.current = null
-    }
-  }, [chatSessionId])
-
-  useEffect(() => {
-    if (!driverEnabled || !chatSessionId || !runtimeStatus) {
-      runtimeQueueSignatureRef.current = null
-      return
-    }
-
-    const queueSignature = [
-      runtimeStatus.queue.pending,
-      runtimeStatus.queue.running,
-      runtimeStatus.pendingQueueItemId ?? '',
-      runtimeStatus.activeRun?.queueItemId ?? '',
-    ].join(':')
-    if (runtimeQueueSignatureRef.current === queueSignature) {
-      return
-    }
-    runtimeQueueSignatureRef.current = queueSignature
-
-    if (
-      runtimeStatus.queue.pending > 0
-      || runtimeStatus.queue.running > 0
-      || runtimeStatus.pendingQueueItemId
-      || runtimeStatus.activeRun?.queueItemId
-    ) {
-      refreshQueue(0)
-    }
-  }, [chatSessionId, driverEnabled, refreshQueue, runtimeStatus])
 
   useEffect(() => {
     if (!driverEnabled || !chatSessionId) {
       return
     }
 
-    const activeRunMessageId = runtimeActiveRunMessageId
-    if (!activeRunMessageId) {
-      requestedRuntimeActiveRunMessageRef.current = null
-      return
-    }
-    const snapshotHasMessage = (snapshotRows ?? []).some(row => row.messageId === activeRunMessageId)
-    const storeHasMessage = (useChatStore.getState().messagesMap.get(chatSessionId) ?? []).some(message => message.id === activeRunMessageId)
-    if (snapshotHasMessage || storeHasMessage) {
-      requestedRuntimeActiveRunMessageRef.current = null
-      return
-    }
-    if (requestedRuntimeActiveRunMessageRef.current === activeRunMessageId) {
+    const store = useChatStore.getState()
+    const storeMessageIds = new Set((store.messagesMap.get(chatSessionId) ?? []).map(message => message.id))
+    const snapshotMessageIds = new Set((snapshotRows ?? []).map(row => row.messageId))
+    const action = syncEngineRef.current?.reconcileRuntimeState({
+      runtimeStatus,
+      activeRun: runtimeActiveRun,
+      snapshotMessageIds,
+      storeMessageIds,
+    })
+    if (!action) {
       return
     }
 
-    requestedRuntimeActiveRunMessageRef.current = activeRunMessageId
-    scheduleSnapshotRefresh(0)
-  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, scheduleSnapshotRefresh, snapshotRows])
+    if (action.runDisplay) {
+      store.setRunDisplayId(action.runDisplay.messageId, action.runDisplay.runId)
+    }
+    if (action.requestSnapshotRefresh) {
+      scheduleSnapshotRefresh(0)
+    }
+
+    const released = releaseSessionStreamingStateForTerminalRun(chatSessionId, action.terminalRunReleaseCandidate)
+    if (released) {
+      scheduleSnapshotRefresh(0)
+      refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
+    }
+
+    if (action.requestQueueRefresh) {
+      refreshQueue(0)
+    }
+  }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRun, runtimeStatus, scheduleSnapshotRefresh, snapshotRows])
 
   useEffect(() => {
-    if (!driverEnabled || !chatSessionId || (!runtimeActiveRunMessageId && !snapshotRows)) {
-      return
-    }
+    const runState = chatSessionId
+      ? chatSelectors.sessionRunState(chatSessionId)(useChatStore.getState())
+      : null
+    const projection = deriveSessionPassiveStreamProjection({
+      rows: snapshotRows,
+      runState,
+      runtimeStatusKnown,
+      runtimeIdle,
+      snapshotFetching: snapshotRowsQuery.isFetching,
+    })
 
-    const meta = useChatStore.getState().sessionMetaMap.get(chatSessionId)
-    if (meta?.locallyDriving) {
-      return
-    }
-
-    const holdEmptyStreamingSnapshot = snapshotRows
-      ? shouldHoldEmptyStreamingSnapshot({
-          rows: snapshotRows,
-          runtimeStatusKnown,
-          runtimeIdle,
-          snapshotFetching: snapshotRowsQuery.isFetching,
-        })
-      : false
-    if (holdEmptyStreamingSnapshot) {
-      if (passiveStreamRef.current?.sessionId === chatSessionId) {
-        passiveStreamRef.current.controller.abort()
-        passiveStreamRef.current.handler.dispose()
-        passiveStreamRef.current = null
-        detachPassiveSessionStreamingState(chatSessionId)
-      }
-      return
-    }
-
-    const streamingMessageId = runtimeActiveRunMessageId
-      ?? (snapshotRows ? projectStreamingMainAssistantMessageIds(snapshotRows)[0] : null)
-    if (!streamingMessageId) {
-      if (passiveStreamRef.current?.sessionId === chatSessionId) {
-        passiveStreamRef.current.controller.abort()
-        passiveStreamRef.current.handler.dispose()
-        passiveStreamRef.current = null
-        detachPassiveSessionStreamingState(chatSessionId)
-      }
-      return
-    }
-
-    const current = passiveStreamRef.current
-    if (current?.sessionId === chatSessionId && current.messageId === streamingMessageId) {
-      return
-    }
-    if (current) {
-      current.controller.abort()
-      current.handler.dispose()
-      passiveStreamRef.current = null
-      detachPassiveSessionStreamingState(current.sessionId)
-    }
-
-    const controller = new AbortController()
-    const handler = new ChatStreamingHandler(
-      chatSessionId,
-      streamingMessageId,
-      performance.now(),
-      { mode: 'passive', useStoredMessageSnapshot: false },
-    )
-    handler.start(controller)
-    passiveStreamRef.current = {
+    syncEngineRef.current?.updatePassiveStream({
+      enabled: driverEnabled,
       sessionId: chatSessionId,
-      messageId: streamingMessageId,
-      controller,
-      handler,
-    }
-
-    void (async () => {
-      try {
-        const transport = await subscribeChatSessionStreamForSession({
-          sessionId: chatSessionId,
-          signal: controller.signal,
-        })
-        if (transport.runId) {
-          useChatStore.getState().setRunDisplayId(streamingMessageId, transport.runId)
-        }
-
-        await handler.consume(transport.stream)
-        handler.finish()
-      }
-      catch (err) {
-        if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          handler.fail(err instanceof Error ? err.message : 'Stream failed')
-        }
-      }
-      finally {
-        handler.dispose()
-        if (passiveStreamRef.current?.controller === controller) {
-          passiveStreamRef.current = null
-        }
-        scheduleSnapshotRefresh(0)
-        refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
-      }
-    })()
-
-    return undefined
-  }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.isFetching])
+      locallyDriven: projection.locallyDriven,
+      holdEmptyStreamingSnapshot: projection.holdEmptyStreamingSnapshot,
+      runtimeActiveRunMessageId,
+      snapshotStreamingMessageIds: projection.snapshotStreamingMessageIds,
+    })
+  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, snapshotRows, snapshotRowsQuery.isFetching])
 }

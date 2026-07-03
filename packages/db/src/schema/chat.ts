@@ -1,5 +1,5 @@
-import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { index, int, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 import { agents } from './identity'
@@ -142,6 +142,17 @@ export const chatSessionQueueItems = sqliteTable('chat_session_queue_items', {
   byStartedRun: index('chat_session_queue_items_started_run_id_idx').on(table.startedRunId),
 }))
 
+export const composerDrafts = sqliteTable('composer_drafts', {
+  surfaceId: text('surface_id').primaryKey(),
+  draftJson: text('draft_json').notNull().default('{}'),
+  revision: int('revision').notNull().default(0),
+  deletedAt: int('deleted_at'),
+  ...timestamps(),
+}, table => ({
+  byUpdatedAt: index('composer_drafts_updated_at_idx').on(table.updatedAt),
+  byDeletedAt: index('composer_drafts_deleted_at_idx').on(table.deletedAt),
+}))
+
 // Event Sourcing: append-only log for chat-runtime-owned session lifecycle facts.
 // `messages`, `backend_runs`, `chat_session_queue_items`, and runtime-owned session fields
 // are same-transaction projections. Session metadata creation, archive, and deletion remain
@@ -185,5 +196,7 @@ export type StepUsageRow = typeof stepUsage.$inferSelect
 export type NewStepUsageRow = typeof stepUsage.$inferInsert
 export type ChatSessionQueueItem = typeof chatSessionQueueItems.$inferSelect
 export type NewChatSessionQueueItem = typeof chatSessionQueueItems.$inferInsert
+export type ComposerDraftRow = typeof composerDrafts.$inferSelect
+export type NewComposerDraftRow = typeof composerDrafts.$inferInsert
 export type SessionEvent = typeof sessionEvents.$inferSelect
 export type NewSessionEvent = typeof sessionEvents.$inferInsert

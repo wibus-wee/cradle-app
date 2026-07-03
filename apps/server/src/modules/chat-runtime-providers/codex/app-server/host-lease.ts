@@ -1,23 +1,27 @@
 import type { RuntimeKind } from '../../../provider-contracts/types'
-import type { ProviderRuntimeLease } from '../../../provider-runtime/host-manager'
-import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
-import type { CodexAppServerClientOptions } from './client'
-import { CodexAppServerClient } from './client'
+import type { ProviderProcessHostLease } from '../../kit/process-host'
+import {
+  acquireProviderProcessHostResource,
+  invalidateProviderProcessHostResource,
+  registerProcessHostLeaseCleanup,
+} from '../../kit/process-host'
+import type {
+  CodexAppServerClientLike,
+  CodexAppServerHostResource,
+} from '../types'
 import type { CodexChatgptAuthCredential } from './chatgpt-auth'
 import {
   buildCodexChatgptAuthLoginParams,
   CodexChatgptAuthReauthRequiredError,
   ensureCodexChatgptAuthAccessToken,
 } from './chatgpt-auth'
+import type { CodexAppServerClientOptions } from './client'
+import { CodexAppServerClient } from './client'
 import { createCodexAppServerHostFingerprint } from './host-fingerprint'
 import {
   addCodexAppServerHostRequestHandler,
   createCodexAppServerHostResource,
 } from './host-resource'
-import type {
-  CodexAppServerClientLike,
-  CodexAppServerHostResource,
-} from '../types'
 
 export interface CodexAppServerHostLeaseDeps {
   createAppServerClient?: (options: CodexAppServerClientOptions) => CodexAppServerClientLike
@@ -37,7 +41,7 @@ export interface AcquireCodexAppServerHostLeaseInput {
   pinned?: boolean
 }
 
-export type CodexAppServerHostLease = ProviderRuntimeLease<CodexAppServerHostResource>
+export type CodexAppServerHostLease = ProviderProcessHostLease<CodexAppServerHostResource>
 
 export function codexChatSessionAppServerScopeId(chatSessionId: string): string {
   return `chat-session:${chatSessionId}`
@@ -52,7 +56,7 @@ export async function acquireCodexAppServerHostLease(
 ): Promise<CodexAppServerHostLease> {
   const clientOptions = configureCodexAppServerClientOptions(input.options, input.deps)
   const { serverRequestHandler, ...hostClientOptions } = clientOptions
-  const lease = await providerRuntimeHostManager.acquireResource({
+  const lease = await acquireProviderProcessHostResource({
     runtimeKind: input.runtimeKind,
     providerTargetId: input.providerTargetId,
     scopeId: input.scopeId,
@@ -70,11 +74,9 @@ export async function acquireCodexAppServerHostLease(
   const releaseRequestHandler = serverRequestHandler
     ? addCodexAppServerHostRequestHandler(lease.resource, serverRequestHandler)
     : () => undefined
-  const releaseHost = lease.release.bind(lease)
-  lease.release = () => {
+  registerProcessHostLeaseCleanup(lease, () => {
     releaseRequestHandler()
-    releaseHost()
-  }
+  })
 
   try {
     await initializeCodexAppServerHost(lease.resource, {
@@ -86,14 +88,14 @@ export async function acquireCodexAppServerHostLease(
     return lease
   }
   catch (error) {
-    providerRuntimeHostManager.invalidateResource(lease.hostId)
+    invalidateProviderProcessHostResource(lease.hostId)
     lease.release()
     throw error
   }
 }
 
 export function invalidateCodexAppServerHost(hostId: string): void {
-  providerRuntimeHostManager.invalidateResource(hostId)
+  invalidateProviderProcessHostResource(hostId)
 }
 
 function configureCodexAppServerClientOptions(

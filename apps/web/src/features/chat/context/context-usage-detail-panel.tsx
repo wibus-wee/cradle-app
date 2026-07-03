@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
 import { CloseLine as XIcon } from '@mingcute/react'
+import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, m } from 'motion/react'
 
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 import { clampPercent, formatTokenCount } from '~/lib/number-format'
 import { useBrowserPanelStore } from '~/store/browser-panel'
@@ -145,21 +146,25 @@ export function ContextUsageDetailPanel({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={handleOpenReport}
-            className="h-6 rounded-md px-1.5 text-[11px] text-text-secondary transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="h-6 rounded-md px-1.5 text-[11px] text-text-secondary hover:bg-muted hover:text-foreground"
           >
             View Report
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={onClose}
-            className="grid size-6 place-items-center rounded-md text-text-tertiary transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="size-6 rounded-md text-text-tertiary hover:bg-muted hover:text-foreground"
             aria-label="Close"
           >
             <XIcon className="size-3.5" strokeWidth={1.5} />
-          </button>
+          </Button>
         </div>
       </div>
 

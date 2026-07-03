@@ -21,6 +21,7 @@ import {
 import type { UIMessageChunk } from 'ai'
 
 import { getRegisteredStdioMcpServers } from '../../../plugins/mcp-registry'
+import type { ProviderKind, RuntimeKind } from '../../chat-runtime/runtime-provider-types'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import type { AcpConnectionRecord } from './config'
 import type { AcpProcessManager } from './process-manager'
@@ -31,11 +32,20 @@ export interface AcpSessionState {
   configOptions: SessionConfigOption[]
 }
 
+export interface AcpPromptRuntimeContext {
+  chatSessionId: string
+  runId: string
+  providerKind: ProviderKind
+  runtimeKind: RuntimeKind
+}
+
 export interface AcpPermissionRequest {
   agentId: string
   sessionId: string
+  providerMethod: string
   toolTitle: string
   options: Array<{ optionId: string, name: string, kind: string }>
+  runtimeContext?: AcpPromptRuntimeContext
 }
 
 export interface AcpPermissionResponse {
@@ -133,6 +143,7 @@ export class AcpConnectionManager {
   private readonly pendingConnects = new Map<string, Promise<InitializeResponse>>()
   private readonly sessionTitleHandlers = new Set<(acpSessionId: string, title: string) => void>()
   private readonly usageBySessionKey = new Map<string, TokenUsage | null>()
+  private readonly promptRuntimeContexts = new Map<string, AcpPromptRuntimeContext>()
   private permissionHandler: AcpPermissionHandler | null = null
 
   constructor(private readonly processManager: AcpProcessManager) {}
@@ -234,7 +245,12 @@ export class AcpConnectionManager {
     }
   }
 
-  async* prompt(agentId: string, sessionId: string, message: string): AsyncGenerator<UIMessageChunk, void, void> {
+  async* prompt(
+    agentId: string,
+    sessionId: string,
+    message: string,
+    runtimeContext?: AcpPromptRuntimeContext,
+  ): AsyncGenerator<UIMessageChunk, void, void> {
     const conn = this.getConnection(agentId)
     const mapper = new AcpChunkMapper()
     const queue = new ChunkQueue()
@@ -243,6 +259,9 @@ export class AcpConnectionManager {
 
     const usageKey = toUsageKey(agentId, sessionId)
     this.usageBySessionKey.delete(usageKey)
+    if (runtimeContext) {
+      this.promptRuntimeContexts.set(usageKey, runtimeContext)
+    }
 
     let promptResult: PromptResponse | null = null
     let promptError: Error | null = null
@@ -299,6 +318,11 @@ export class AcpConnectionManager {
         await promptDone.catch(() => {})
       }
       throw error
+    }
+    finally {
+      if (runtimeContext && this.promptRuntimeContexts.get(usageKey) === runtimeContext) {
+        this.promptRuntimeContexts.delete(usageKey)
+      }
     }
   }
 
@@ -437,16 +461,23 @@ export class AcpConnectionManager {
           return { outcome: { outcome: 'cancelled' as const } }
         }
 
-        const response = await this.permissionHandler({
+        const request: AcpPermissionRequest = {
           agentId,
           sessionId: params.sessionId,
+          providerMethod: 'requestPermission',
           toolTitle: params.toolCall?.title ?? 'Unknown operation',
           options: options.map(option => ({
             optionId: option.optionId,
             name: option.name,
             kind: option.kind,
           })),
-        })
+        }
+        const runtimeContext = this.promptRuntimeContexts.get(toUsageKey(agentId, params.sessionId))
+        if (runtimeContext) {
+          request.runtimeContext = runtimeContext
+        }
+
+        const response = await this.permissionHandler(request)
 
         if (response.outcome === 'cancelled') {
           return { outcome: { outcome: 'cancelled' as const } }
@@ -509,9 +540,10 @@ export class AcpConnectionManager {
       throw new Error('ACP file write requires an approval handler before writing client filesystem paths')
     }
 
-    const response = await this.permissionHandler({
+    const request: AcpPermissionRequest = {
       agentId,
       sessionId,
+      providerMethod: 'client.writeTextFile',
       toolTitle: [
         'ACP agent requested a non-Cradle-owned filesystem write.',
         `Target path: ${targetPath}`,
@@ -521,7 +553,13 @@ export class AcpConnectionManager {
         { optionId: 'allow_file_write_once', name: 'Allow write once', kind: 'allow_once' },
         { optionId: 'reject_file_write_once', name: 'Deny write', kind: 'reject_once' },
       ],
-    })
+    }
+    const runtimeContext = this.promptRuntimeContexts.get(toUsageKey(agentId, sessionId))
+    if (runtimeContext) {
+      request.runtimeContext = runtimeContext
+    }
+
+    const response = await this.permissionHandler(request)
 
     if (response.outcome !== 'selected' || response.optionId !== 'allow_file_write_once') {
       throw new Error('User denied ACP client filesystem write')

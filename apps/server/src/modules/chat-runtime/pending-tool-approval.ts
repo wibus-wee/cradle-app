@@ -1,5 +1,9 @@
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
+import {
+  recordRuntimeInteractionRequested,
+  recordRuntimeInteractionResolved,
+} from './interaction/event-recorder'
 import type {
   RuntimeToolApprovalRequest,
   RuntimeToolApprovalResolution
@@ -14,7 +18,7 @@ interface PendingToolApprovalState {
 
 const pendingToolApprovalById = new Map<string, PendingToolApprovalState>()
 
-export function requestRuntimeToolApproval(
+export async function requestRuntimeToolApproval(
   input: RuntimeToolApprovalRequest
 ): Promise<RuntimeToolApprovalResolution> {
   const pendingKey = readPendingKey(input.sessionId, input.providerRequestId)
@@ -29,25 +33,50 @@ export function requestRuntimeToolApproval(
     )
   }
 
-  return new Promise((resolve, reject) => {
+  const createdAt = currentUnixSeconds()
+  const pending = new Promise<RuntimeToolApprovalResolution>((resolve, reject) => {
     pendingToolApprovalById.set(pendingKey, {
       request: input,
-      createdAt: currentUnixSeconds(),
+      createdAt,
       resolve,
       reject
     })
   })
+
+  try {
+    await recordRuntimeInteractionRequested({
+      sessionId: input.sessionId,
+      runId: input.runId,
+      requestId: input.providerRequestId,
+      interactionKind: 'toolApproval',
+      providerKind: input.providerKind,
+      runtimeKind: input.runtimeKind,
+      providerMethod: input.providerMethod,
+      toolCallId: input.toolCallId,
+      createdAt
+    })
+  } catch (error) {
+    const current = pendingToolApprovalById.get(pendingKey)
+    if (current?.request === input) {
+      pendingToolApprovalById.delete(pendingKey)
+      current.reject(error instanceof Error ? error : new Error(String(error)))
+    }
+    throw error
+  }
+
+  return pending
 }
 
-export function submitRuntimeToolApproval(input: {
+export async function submitRuntimeToolApproval(input: {
   sessionId: string
   requestId: string
   approved: boolean
   reason?: string
-}): RuntimeToolApprovalResolution {
-  const resolution = submitRuntimeToolApprovalIfPending(input)
-  if (resolution) {
-    return resolution
+}): Promise<RuntimeToolApprovalResolution> {
+  const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
+  if (submitted) {
+    await submitted.eventRecorded
+    return submitted.resolution
   }
 
   throw new AppError({
@@ -64,6 +93,20 @@ export function submitRuntimeToolApprovalIfPending(input: {
   approved: boolean
   reason?: string
 }): RuntimeToolApprovalResolution | null {
+  const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
+  if (!submitted) {
+    return null
+  }
+  void submitted.eventRecorded.catch(() => undefined)
+  return submitted.resolution
+}
+
+function submitRuntimeToolApprovalIfPendingWithEvent(input: {
+  sessionId: string
+  requestId: string
+  approved: boolean
+  reason?: string
+}): { resolution: RuntimeToolApprovalResolution, eventRecorded: Promise<void> } | null {
   const pendingKey = readPendingKey(input.sessionId, input.requestId)
   const pending = pendingToolApprovalById.get(pendingKey)
   if (!pending || pending.request.sessionId !== input.sessionId) {
@@ -77,7 +120,18 @@ export function submitRuntimeToolApprovalIfPending(input: {
     ...(input.reason ? { reason: input.reason } : {})
   }
   pending.resolve(resolution)
-  return resolution
+  return {
+    resolution,
+    eventRecorded: recordRuntimeInteractionResolved({
+      sessionId: pending.request.sessionId,
+      runId: pending.request.runId,
+      requestId: input.requestId,
+      interactionKind: 'toolApproval',
+      resolution: 'submitted',
+      approved: input.approved,
+      updatedAt: currentUnixSeconds()
+    })
+  }
 }
 
 export function rejectPendingToolApprovalsForRun(runId: string, error: Error): void {
@@ -87,6 +141,14 @@ export function rejectPendingToolApprovalsForRun(runId: string, error: Error): v
     }
     pendingToolApprovalById.delete(requestId)
     pending.reject(error)
+    void recordRuntimeInteractionResolved({
+      sessionId: pending.request.sessionId,
+      runId: pending.request.runId,
+      requestId: pending.request.providerRequestId,
+      interactionKind: 'toolApproval',
+      resolution: 'cancelled',
+      updatedAt: currentUnixSeconds()
+    }).catch(() => undefined)
   }
 }
 

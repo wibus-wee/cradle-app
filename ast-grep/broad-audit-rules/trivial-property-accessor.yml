@@ -1,0 +1,15 @@
+id: trivial-property-accessor
+language: TypeScript
+severity: warning
+message: >
+  Function only returns a property access chain; inline the property
+  access at each call site instead of wrapping it in a named function.
+rule:
+  any:
+    - pattern: 'function $FUNC($$$ARGS) { return $OBJ.$PROP }'
+    - pattern: 'function $FUNC($$$ARGS): $RET { return $OBJ.$PROP }'
+    - pattern: 'function $FUNC($$$ARGS) { return $OBJ.$PROP.$PROP2 }'
+    - pattern: 'function $FUNC($$$ARGS): $RET { return $OBJ.$PROP.$PROP2 }'
+constraints:
+  FUNC:
+    regex: ^(read|get|resolve|extract|to)[A-Z].*

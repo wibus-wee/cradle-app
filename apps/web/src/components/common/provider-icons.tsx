@@ -1,7 +1,6 @@
 import type { ComponentProps } from 'react'
 import { useEffect, useState } from 'react'
 
-import type { BuiltinRuntimeKind, RuntimeKind } from '~/features/agent-runtime/types'
 import { cn } from '~/lib/cn'
 import { getLobeIconUrl } from '~/lib/lobe-icons'
 import { useResolvedThemeMode } from '~/store/theme'
@@ -9,6 +8,7 @@ import { useResolvedThemeMode } from '~/store/theme'
 import hijarvisIconUrl from './assets/hijarvis.png'
 
 type IconProps = ComponentProps<'svg'>
+export type RuntimeIconDescriptor = { key: string } | { svg: string } | { url: string }
 
 // ─── Brand icons (SVG paths sourced from @lobehub/icons-static-svg) ────────────
 // Each icon uses its official brand color.
@@ -91,20 +91,6 @@ function renderPresetIcon(presetId: string | null | undefined, className?: strin
   }
 }
 
-export const RUNTIME_ICON_KEYS: Record<BuiltinRuntimeKind, keyof typeof PROVIDER_ICONS> = {
-  'standard': 'custom',
-  'claude-agent': 'claude-agent',
-  'codex': 'codex',
-  'opencode': 'opencode',
-  'jar-core': 'hijarvis',
-  'acp-chat': 'custom',
-  'cli-tui': 'claude-cli',
-}
-
-export function getRuntimeIconKey(runtimeKind: RuntimeKind): keyof typeof PROVIDER_ICONS {
-  return RUNTIME_ICON_KEYS[runtimeKind as BuiltinRuntimeKind] ?? 'custom'
-}
-
 // ── Unified provider icon component ──
 
 /**
@@ -136,6 +122,34 @@ export function ProviderIcon({
     return <LobeIconImage slug={iconSlug} className={className} />
   }
   return renderPresetIcon(presetId, className) ?? <CustomIcon className={className} />
+}
+
+export function RuntimeIcon({
+  icon,
+  className,
+}: {
+  icon: RuntimeIconDescriptor | null | undefined
+  className?: string
+}) {
+  if (!icon) {
+    return <ProviderIcon iconSlug="custom" presetId={null} className={className} />
+  }
+
+  if ('url' in icon) {
+    return <img src={icon.url} alt="" className={cn('object-contain', className)} />
+  }
+
+  if ('svg' in icon) {
+    return (
+      <img
+        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon.svg)}`}
+        alt=""
+        className={cn('object-contain', className)}
+      />
+    )
+  }
+
+  return <ProviderIcon iconSlug={icon.key} presetId={null} className={className} />
 }
 
 function LobeIconImage({ slug, className }: { slug: string, className?: string }) {

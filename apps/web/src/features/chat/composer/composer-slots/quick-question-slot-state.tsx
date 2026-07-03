@@ -5,18 +5,18 @@
  * persisted message surface.
  */
 import { Streamdown } from '@cradle/streamdown'
-import type { UIMessageChunk } from 'ai'
-import { parseJsonEventStream, uiMessageChunkSchema } from 'ai'
 import {
-  WarningLine as AlertTriangleIcon,
+  CloseLine as XIcon,
   QuestionLine as MessageCircleQuestionIcon,
-  CloseLine as XIcon
+  WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
+import type { UIMessageChunk } from 'ai'
+import { uiMessageChunkSchema } from 'ai'
 import type { AnchorHTMLAttributes } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
+import { postChatSessionsBySessionIdQuickQuestion } from '~/api-gen/sdk.gen'
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
@@ -50,7 +50,6 @@ export function QuickQuestionSlotState({
     setStreaming(true)
 
     void streamQuickQuestion({
-      apiBaseUrl: quickQuestion.apiBaseUrl,
       question,
       sessionId: quickQuestion.sessionId,
       signal: abortController.signal,
@@ -69,7 +68,7 @@ export function QuickQuestionSlotState({
       })
 
     return () => abortController.abort()
-  }, [quickQuestion.apiBaseUrl, quickQuestion.open, quickQuestion.sessionId, question])
+  }, [quickQuestion.open, quickQuestion.sessionId, question])
 
   useEffect(() => {
     const contentElement = contentRef.current
@@ -146,64 +145,32 @@ function readMarkdownAnchorProps(value: unknown): AnchorHTMLAttributes<HTMLAncho
 }
 
 async function streamQuickQuestion({
-  apiBaseUrl,
   question,
   sessionId,
   signal,
   onTextDelta,
 }: {
-  apiBaseUrl?: string
   question: string
   sessionId: string
   signal: AbortSignal
   onTextDelta: (delta: string) => void
 }) {
-  const response = await fetch(buildQuickQuestionUrl(apiBaseUrl, sessionId), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question }),
+  let streamError: unknown
+  const { stream } = await postChatSessionsBySessionIdQuickQuestion({
+    path: { sessionId },
+    body: { question },
     signal,
+    sseMaxRetryAttempts: 1,
+    onSseError: (error) => {
+      streamError = error
+    },
   })
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    throw new Error(`Quick question failed: ${response.status}${body ? ` ${body}` : ''}`)
+  for await (const value of stream) {
+    readQuickQuestionChunk(await parseQuickQuestionChunk(value), onTextDelta)
   }
-  if (!response.body) {
-    throw new Error('Quick question stream is empty.')
-  }
-
-  await readQuickQuestionChunks(response.body, onTextDelta)
-}
-
-function buildQuickQuestionUrl(apiBaseUrl: string | undefined, sessionId: string): string {
-  const path = `/chat/sessions/${encodeURIComponent(sessionId)}/quick-question`
-  return apiBaseUrl ? new URL(path, apiBaseUrl).toString() : path
-}
-
-async function readQuickQuestionChunks(
-  body: ReadableStream<Uint8Array>,
-  onTextDelta: (delta: string) => void,
-): Promise<void> {
-  const reader = parseJsonEventStream({
-    stream: body,
-    schema: uiMessageChunkSchema,
-  }).getReader()
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      if (!value.success) {
-        throw value.error
-      }
-      readQuickQuestionChunk(value.value, onTextDelta)
-    }
-  }
-  finally {
-    reader.releaseLock()
+  if (streamError) {
+    throw toQuickQuestionStreamError(streamError)
   }
 }
 
@@ -214,4 +181,30 @@ function readQuickQuestionChunk(chunk: UIMessageChunk, onTextDelta: (delta: stri
   if (chunk.type === 'error') {
     throw new Error(chunk.errorText)
   }
+}
+
+async function parseQuickQuestionChunk(value: unknown): Promise<UIMessageChunk> {
+  const schema = uiMessageChunkSchema()
+  if (!schema) {
+    throw new Error('Quick question chunk schema is unavailable.')
+  }
+  const validate = schema.validate
+  if (!validate) {
+    throw new Error('Quick question chunk schema validator is unavailable.')
+  }
+  const result = await validate(value)
+  if (!result.success) {
+    throw result.error
+  }
+  return result.value
+}
+
+function toQuickQuestionStreamError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error
+  }
+  if (typeof error === 'string') {
+    return new Error(error)
+  }
+  return new Error('Quick question stream failed.')
 }

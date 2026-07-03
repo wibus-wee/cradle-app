@@ -1,15 +1,15 @@
 import { StaticRender } from '@cradle/streamdown'
 import {
   CheckCircleLine as CheckCircle2Icon,
-  CloseCircleLine as XCircleIcon,
   ClockLine as ClockIcon,
+  CloseCircleLine as XCircleIcon,
   FileLine as FileTextIcon,
   FullscreenLine as Maximize2Icon,
-  RightSmallLine as ChevronRightIcon,
   LayoutTopLine as PanelTopIcon,
+  RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
-import { useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
+import { useState } from 'react'
 
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Button } from '~/components/ui/button'
@@ -24,7 +24,6 @@ import { projectChatTodos, readTodoCompletion } from '../../capabilities/chat-to
 import type { ToolPayload, ToolState, ToolUiDescriptor, WorkflowPhase } from '../tool-ui-classifier'
 import {
   DiffSummary,
-  hasDiffHeroContent,
   KeyValueTable,
   PathList,
   RawValue,
@@ -36,71 +35,6 @@ import {
 
 function isError(state: ToolState): boolean {
   return state === 'output-error' || state === 'output-denied'
-}
-
-// ---------------------------------------------------------------------------
-// Has hero content
-// ---------------------------------------------------------------------------
-
-export function hasHeroContent(
-  descriptor: ToolUiDescriptor,
-  input: ToolPayload,
-  output: ToolPayload,
-  errorText?: string,
-): boolean {
-  if (errorText) {
-    return true
-  }
-  switch (descriptor.kind) {
-    case 'terminal':
-      return !!errorText
-    case 'file-read':
-      return output.file !== null
-    case 'file-diff':
-    case 'notebook-diff':
-      return hasDiffHeroContent(input, output)
-    case 'web':
-      return output.results.some(item => item.content.length > 0)
-    case 'subagent':
-      return !!(
-        output.status
-        || output.contentBlocks.length > 0
-        || output.workflowName
-        || output.workflowDescription
-        || output.workflowPhases.length > 0
-        || output.workflowRunId
-        || output.workflowScriptPath
-        || output.workflowSessionUrl
-        || output.warning
-        || output.error
-      )
-    case 'todo':
-      return (
-        projectChatTodos(input, output).length > 0
-        || output.rawText !== null
-        || input.rawText !== null
-      )
-    case 'plan-implementation':
-      return true
-    case 'plan':
-      return !!(
-        output.planContent
-        ?? input.planContent
-        ?? output.plan
-        ?? input.plan
-        ?? output.text
-        ?? input.text
-        ?? output.rawText
-        ?? input.rawText
-      )
-    default:
-      return (
-        output.rawText !== null
-        || output.outputText !== null
-        || output.contentText !== null
-        || output.text !== null
-      )
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -198,40 +132,41 @@ function FileReadSummary({ output }: { output: ToolPayload }) {
     const segments = (file.filePath ?? '').split('/')
     const fileName = segments.at(-1) ?? file.filePath ?? 'file'
     const dirPath = segments.length > 1 ? `${segments.slice(0, -1).join('/')}/` : ''
-    return (
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              'group flex w-full min-w-0 items-center gap-2 px-2 py-1.5',
-              'rounded-md transition-colors duration-100',
-              'hover:bg-accent/50 active:bg-accent/70',
-              open && 'rounded-b-none bg-accent/30',
-            )}
-          >
-            <FileTextIcon
-              className="size-3.5 shrink-0 !text-muted-foreground/50 transition-colors group-hover:!text-muted-foreground/70"
-              aria-hidden
-            />
-            <span className="min-w-0 flex-1 truncate text-left font-mono text-[12px] leading-none">
-              {dirPath && <span className="text-muted-foreground/45">{dirPath}</span>}
-              <span className="text-foreground/75">{fileName}</span>
-            </span>
-            <ChevronRightIcon
+      return (
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
               className={cn(
-                'size-3 shrink-0 !text-muted-foreground/40',
-                'transition-transform duration-200',
-                open && 'rotate-90',
+                'group h-auto w-full min-w-0 justify-start gap-2 px-2 py-1.5',
+                'rounded-md transition-colors duration-100',
+                'hover:bg-accent/50 active:bg-accent/70',
+                open && 'rounded-b-none bg-accent/30',
               )}
-              aria-hidden
-            />
-          </button>
-        </CollapsibleTrigger>
+            >
+              <FileTextIcon
+                className="size-3.5 shrink-0 !text-muted-foreground/50 transition-colors group-hover:!text-muted-foreground/70"
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1 truncate text-left font-mono text-[12px] leading-none">
+                {dirPath && <span className="text-muted-foreground/45">{dirPath}</span>}
+                <span className="text-foreground/75">{fileName}</span>
+              </span>
+              <ChevronRightIcon
+                className={cn(
+                  'size-3 shrink-0 !text-muted-foreground/40',
+                  'transition-transform duration-200',
+                  open && 'rotate-90',
+                )}
+                aria-hidden
+              />
+            </Button>
+          </CollapsibleTrigger>
         <CollapsibleContent className="overflow-hidden rounded-b-md">
           <RawValue value={file.content} />
         </CollapsibleContent>
-      </Collapsible>
+        </Collapsible>
     )
   }
   return (
@@ -412,7 +347,7 @@ export function WorkflowPhaseList({ phases }: { phases: WorkflowPhase[] }) {
       <div className="grid gap-1">
         {phases.map((phase, index) => (
           <div
-            key={`${index}:${phase.name}`}
+            key={`${phase.name}:${phase.description ?? ''}`}
             className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 rounded-md bg-muted/30 px-2 py-1.5 text-xs"
           >
             <span className="tabular-nums text-muted-foreground">{index + 1}</span>

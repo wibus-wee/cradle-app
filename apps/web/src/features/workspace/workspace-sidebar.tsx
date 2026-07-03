@@ -69,7 +69,8 @@ import type {
   GetRemoteHostsResponse,
   PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
-import { getRuntimeIconKey, ProviderIcon } from '~/components/common/provider-icons'
+import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
+import { RuntimeIcon } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
 import {
   ContextMenu,
@@ -101,6 +102,8 @@ import {
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
+import type { RuntimeKind } from '~/features/agent-runtime/types'
+import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { runtimeSessionStatusQueryOptions } from '~/features/chat/commands/runtime-session-status-command'
 import { prefetchChatSession } from '~/features/chat/session/chat-session-prefetch'
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
@@ -113,6 +116,7 @@ import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { useNow } from '~/hooks/use-now'
 import { cn } from '~/lib/cn'
 import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
@@ -131,7 +135,6 @@ import { getEventScreenCoordinates, isPointerOutsideWindow } from '~/navigation/
 import { chatSurfaceId } from '~/navigation/surface-identity'
 import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
-import { useSessionLayoutStore } from '~/store/session-layout'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
@@ -251,7 +254,7 @@ function useWaitingForUserInputSessionIds(
     queries: activeSessionIds.map(sessionId => ({
       ...runtimeSessionStatusQueryOptions(sessionId),
       staleTime: 1_000,
-      refetchInterval: 1_000,
+      refetchInterval: false as const,
       refetchIntervalInBackground: true,
     })),
   })
@@ -392,6 +395,7 @@ type SessionMenuAnchor
     }
 
 type SessionMenuSurface = 'button' | 'context'
+type RuntimeIconByKind = ReadonlyMap<RuntimeKind, RuntimeIconDescriptor>
 
 type SessionMenuRequest = {
   sessionId: string
@@ -452,7 +456,6 @@ function SessionActionsMenu({
   state,
   session,
   workspaceId,
-  workspacePath,
   onOpenChange,
   onPrepareSessionOpen,
   onStartRename,
@@ -460,7 +463,6 @@ function SessionActionsMenu({
   state: SessionMenuState
   session: WorkspaceSession | null
   workspaceId: string
-  workspacePath: string | null
   onOpenChange: (open: boolean) => void
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onStartRename: (sessionId: string) => void
@@ -468,7 +470,6 @@ function SessionActionsMenu({
   const { t } = useTranslation('workspace')
   const queryClient = useQueryClient()
   const open = state.open && state.anchor !== null && session !== null
-  const sessionTitle = session?.title ?? t('session.fallbackTitle')
 
   const invalidateSessionQueries = useCallback(async () => {
     if (!session) {
@@ -484,28 +485,13 @@ function SessionActionsMenu({
     ])
   }, [queryClient, session, workspaceId])
 
-  const recordSessionLayout = useCallback(() => {
-    if (!session) {
-      return
-    }
-
-    useSessionLayoutStore.getState().upsertSession({
-      sessionId: session.id,
-      sessionTitle,
-      workspaceId: session.workspaceId ?? workspaceId,
-      workspacePath,
-      runtimeKind: session.runtimeKind,
-    })
-  }, [session, sessionTitle, workspaceId, workspacePath])
-
   const handleOpenInNewTab = useCallback(() => {
     if (!session) {
       return
     }
 
-    recordSessionLayout()
     openChatSession(session.id)
-  }, [recordSessionLayout, session])
+  }, [session])
 
   const handleOpenInNewWindow = useCallback(() => {
     if (!session) {
@@ -1563,6 +1549,7 @@ const SessionItem = memo(
     isWaitingForUserInput,
     hasError,
     isRenaming,
+    runtimeIcon,
     t,
     onPrepareSessionOpen,
     onPrefetchSession,
@@ -1575,6 +1562,7 @@ const SessionItem = memo(
     isWaitingForUserInput: boolean
     hasError: boolean
     isRenaming: boolean
+    runtimeIcon: RuntimeIconDescriptor | undefined
     t: WorkspaceTranslation
     onPrepareSessionOpen: (session: WorkspaceSession) => void
     onPrefetchSession: (sessionId: string) => void
@@ -1838,9 +1826,8 @@ const SessionItem = memo(
                 />
               )
 : (
-                <ProviderIcon
-                  iconSlug={getRuntimeIconKey(session.runtimeKind)}
-                  presetId={null}
+                <RuntimeIcon
+                  icon={runtimeIcon}
                   className="size-3.5 shrink-0 text-muted-foreground/70"
                 />
               )}
@@ -1901,6 +1888,7 @@ interface SessionListProps {
   locallyStreamingSessionIds: Set<string>
   waitingForUserInputSessionIds: Set<string>
   locallyErroredSessionIds: Set<string>
+  runtimeIconByKind: RuntimeIconByKind
   t: WorkspaceTranslation
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onPrefetchSession: (sessionId: string) => void
@@ -1916,6 +1904,7 @@ const SessionListRows = memo(
     locallyStreamingSessionIds,
     waitingForUserInputSessionIds,
     locallyErroredSessionIds,
+    runtimeIconByKind,
     t,
     onPrepareSessionOpen,
     onPrefetchSession,
@@ -1938,6 +1927,7 @@ const SessionListRows = memo(
                 && (session.status === 'error' || locallyErroredSessionIds.has(session.id))
               }
               isRenaming={session.id === renamingSessionId}
+              runtimeIcon={runtimeIconByKind.get(session.runtimeKind)}
               t={t}
               onPrepareSessionOpen={onPrepareSessionOpen}
               onPrefetchSession={onPrefetchSession}
@@ -1960,14 +1950,12 @@ function WorkspaceGroupDisclosure({
   workspacePinned,
   workspaceActions,
   overlays,
-  onRecordWorkspaceLayout,
   children,
 }: {
   workspace: Workspace
   workspacePinned: boolean
   workspaceActions: WorkspaceMenuAction[]
   overlays: React.ReactNode
-  onRecordWorkspaceLayout: () => void
   children: React.ReactNode
 }) {
   'use no memo'
@@ -2005,11 +1993,7 @@ function WorkspaceGroupDisclosure({
 
       <button
         type="button"
-        onClick={() => {
-          onRecordWorkspaceLayout()
-          openWorkspaceDetail(workspace.id)
-        }}
-        onPointerDown={onRecordWorkspaceLayout}
+        onClick={() => openWorkspaceDetail(workspace.id)}
         data-testid={`workspace-open-${workspace.id}`}
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
       >
@@ -2074,6 +2058,7 @@ function WorkspaceSessionListSection({
   locallyStreamingSessionIds,
   waitingForUserInputSessionIds,
   locallyErroredSessionIds,
+  runtimeIconByKind,
   t,
   onPrepareSessionOpen,
   onPrefetchSession,
@@ -2088,6 +2073,7 @@ function WorkspaceSessionListSection({
   locallyStreamingSessionIds: Set<string>
   waitingForUserInputSessionIds: Set<string>
   locallyErroredSessionIds: Set<string>
+  runtimeIconByKind: RuntimeIconByKind
   t: WorkspaceTranslation
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onPrefetchSession: (sessionId: string) => void
@@ -2185,6 +2171,7 @@ function WorkspaceSessionListSection({
           locallyStreamingSessionIds={locallyStreamingSessionIds}
           waitingForUserInputSessionIds={waitingForUserInputSessionIds}
           locallyErroredSessionIds={locallyErroredSessionIds}
+          runtimeIconByKind={runtimeIconByKind}
           t={t}
           onPrepareSessionOpen={onPrepareSessionOpen}
           onPrefetchSession={onPrefetchSession}
@@ -2225,12 +2212,14 @@ const WorkspaceGroup = memo(
     workspace,
     sessions,
     projectFilter,
+    runtimeIconByKind,
     onDelete,
     onTogglePin,
   }: {
     workspace: Workspace
     sessions: WorkspaceSession[]
     projectFilter: WorkspaceSidebarProjectFilter
+    runtimeIconByKind: RuntimeIconByKind
     onDelete: (id: string) => void
     onTogglePin: (id: string, pinned: boolean) => void
   }) => {
@@ -2291,7 +2280,8 @@ const WorkspaceGroup = memo(
       ),
       shallow,
     )
-    const currentUnixTimestamp = Math.floor(Date.now() / 1000)
+    const now = useNow()
+    const currentUnixTimestamp = Math.floor(now / 1000)
     const filteredSessions = useMemo(() => {
       return sessions.filter(session =>
         sessionMatchesProjectFilter(
@@ -2379,25 +2369,12 @@ const WorkspaceGroup = memo(
       },
       [queryClient],
     )
-    const recordSessionLayout = useCallback(
-      (session: WorkspaceSession) => {
-        useSessionLayoutStore.getState().upsertSession({
-          sessionId: session.id,
-          sessionTitle: session.title ?? t('session.fallbackTitle'),
-          workspaceId: session.workspaceId ?? workspace.id,
-          workspacePath: workspaceLocalPath,
-          runtimeKind: session.runtimeKind,
-        })
-      },
-      [t, workspace.id, workspaceLocalPath],
-    )
     const handlePrepareSessionOpen = useCallback(
       (session: WorkspaceSession) => {
         handleOpenSession(session.id)
-        recordSessionLayout(session)
         prefetchSession(session.id)
       },
-      [handleOpenSession, prefetchSession, recordSessionLayout],
+      [handleOpenSession, prefetchSession],
     )
     const handleRenameSession = useCallback(
       async (session: WorkspaceSession, nextTitleRaw: string) => {
@@ -2448,20 +2425,12 @@ const WorkspaceGroup = memo(
 
       acknowledgedSessionIdsRef.current! = next
     }, [locallyStreamingSessionIds, sessionsById])
-    const recordWorkspaceLayout = useCallback(() => {
-      useSessionLayoutStore.getState().upsertWorkspace({
-        workspaceId: workspace.id,
-        workspaceName: workspace.name,
-        workspacePath: workspaceLocalPath,
-      })
-    }, [workspace.id, workspace.name, workspaceLocalPath])
     const handleTogglePin = useCallback(() => {
       onTogglePin(workspace.id, !workspacePinned)
     }, [onTogglePin, workspace.id, workspacePinned])
     const handleOpenWorkspace = useCallback(() => {
-      recordWorkspaceLayout()
       openWorkspaceDetail(workspace.id)
-    }, [recordWorkspaceLayout, workspace.id])
+    }, [workspace.id])
     const handleOpenDefault = useCallback(async () => {
       if (!isElectron || !nativeIpc) {
         return
@@ -2684,7 +2653,6 @@ const WorkspaceGroup = memo(
         workspace={workspace}
         workspacePinned={workspacePinned}
         workspaceActions={workspaceActions}
-        onRecordWorkspaceLayout={recordWorkspaceLayout}
         overlays={(
           <>
             <WorkspaceTextInputDialog
@@ -2722,7 +2690,6 @@ const WorkspaceGroup = memo(
               state={sessionMenuState}
               session={activeMenuSession}
               workspaceId={workspace.id}
-              workspacePath={workspaceLocalPath}
               onOpenChange={handleSessionMenuOpenChange}
               onPrepareSessionOpen={handlePrepareSessionOpen}
               onStartRename={handleStartSessionRename}
@@ -2738,6 +2705,7 @@ const WorkspaceGroup = memo(
           locallyStreamingSessionIds={locallyStreamingSessionIds}
           waitingForUserInputSessionIds={waitingForUserInputSessionIds}
           locallyErroredSessionIds={locallyErroredSessionIds}
+          runtimeIconByKind={runtimeIconByKind}
           t={t}
           onPrepareSessionOpen={handlePrepareSessionOpen}
           onPrefetchSession={prefetchSession}
@@ -2902,6 +2870,7 @@ interface WorkspaceSidebarBodyProps {
   workspaces: Workspace[]
   workspacesReady: boolean
   sessionsByWorkspaceId: Map<string, WorkspaceSession[]>
+  runtimeIconByKind: RuntimeIconByKind
   adding: boolean
   multiWorkspaceEnabled: boolean
   onAddFromPicker: () => void
@@ -2915,6 +2884,7 @@ const WorkspaceSidebarBody = memo(
     workspaces,
     workspacesReady,
     sessionsByWorkspaceId,
+    runtimeIconByKind,
     adding,
     multiWorkspaceEnabled,
     onAddFromPicker,
@@ -2956,7 +2926,8 @@ const WorkspaceSidebarBody = memo(
       ),
       shallow,
     )
-    const currentUnixTimestamp = Math.floor(Date.now() / 1000)
+    const now = useNow()
+    const currentUnixTimestamp = Math.floor(now / 1000)
     const visibleWorkspaces = useMemo(() => {
       return workspaces
         .filter(workspace =>
@@ -3245,6 +3216,7 @@ const WorkspaceSidebarBody = memo(
                 workspace={workspace}
                 sessions={sessionsByWorkspaceId.get(workspace.id) ?? EMPTY_WORKSPACE_SESSIONS}
                 projectFilter={projectFilter}
+                runtimeIconByKind={runtimeIconByKind}
                 onDelete={onDelete}
                 onTogglePin={onTogglePin}
               />
@@ -3262,6 +3234,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
   const queryClient = useQueryClient()
   const { workspaces, ready: workspacesReady } = useWorkspaces()
   const { sessions } = useAllSessions()
+  const { runtimes } = useRuntimeCatalog()
   const {
     addFromPicker,
     createFromLocator,
@@ -3299,6 +3272,9 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
     }
     return grouped
   }, [sessions])
+  const runtimeIconByKind = useMemo<RuntimeIconByKind>(() => {
+    return new Map(runtimes.map(runtime => [runtime.runtimeKind, runtime.icon]))
+  }, [runtimes])
   const setSettingsSection = useSettingsOverlayStore(s => s.setSettingsSection)
   const handleOpenSettings = useCallback(() => {
     setSettingsSection('appearance')
@@ -3460,6 +3436,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
             workspaces={workspaces}
             workspacesReady={workspacesReady}
             sessionsByWorkspaceId={sessionsByWorkspaceId}
+            runtimeIconByKind={runtimeIconByKind}
             adding={adding}
             multiWorkspaceEnabled={multiWorkspaceEnabled}
             onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}

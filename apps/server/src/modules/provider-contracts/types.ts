@@ -6,18 +6,6 @@ export const providerTargetKinds = ['manual', 'external'] as const
 
 export type ProviderTargetKind = (typeof providerTargetKinds)[number]
 
-export const runtimeKinds = [
-  'standard',
-  'claude-agent',
-  'codex',
-  'opencode',
-  'jar-core',
-  'acp-chat',
-  'cli-tui',
-] as const
-
-export type BuiltinRuntimeKind = (typeof runtimeKinds)[number]
-
 export type RuntimeKind = string
 
 export interface ProviderRequest {

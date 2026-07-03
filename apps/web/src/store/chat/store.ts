@@ -22,27 +22,28 @@ import type {
   ChatActiveGoal,
   ChatError,
   ChatRunDisplayMeta,
+  ChatRunState,
   ChatState,
   MessagePart,
+  PassiveRunStateInput,
   PublicStatus,
 } from './types'
-import { DEFAULT_SESSION_META, EMPTY_MESSAGES } from './types'
+import { DEFAULT_CHAT_RUN_STATE, EMPTY_MESSAGES } from './types'
 
 enableMapSet()
 
 // ── Store ────────────────────────────────────────────────────
 
-export const useChatStore = createWithEqualityFn<ChatState>()(
-  subscribeWithSelector(
-    (set, get) => ({
+export function createChatStore() {
+  return createWithEqualityFn<ChatState>()(
+    subscribeWithSelector(
+      (set, get) => ({
       messagesMap: new Map(),
       hydratedSessionIds: new Set(),
-      generatingMessageIds: new Set(),
-      passiveStreamingMessageIds: new Set(),
+      runStateMap: new Map(),
       activeAbortControllers: new Map(),
       runDisplayMetaMap: new Map(),
       errorMap: new Map(),
-      sessionMetaMap: new Map(),
       activeGoalMap: new Map(),
       assistantDisplaySplitMap: new Map(),
 
@@ -60,7 +61,12 @@ export const useChatStore = createWithEqualityFn<ChatState>()(
           const nextIds = new Set(displayed.map(m => m.id))
           const removed = [...currentIds].filter(id => !nextIds.has(id))
 
-          if (current === next && !splitsChanged && (removed.length === 0 || state.passiveStreamingMessageIds.size === 0)) {
+          const currentRunState = readSessionRunState(state, sessionId)
+          const removedActiveMessage = currentRunState.phase === 'streaming'
+            && currentRunState.source === 'passive'
+            && removed.includes(currentRunState.messageId)
+
+          if (current === next && !splitsChanged && !removedActiveMessage) {
             return state
           }
 
@@ -69,18 +75,11 @@ export const useChatStore = createWithEqualityFn<ChatState>()(
             if (splitsChanged) {
               draft.assistantDisplaySplitMap = splits as Draft<Map<string, AssistantDisplaySplit>>
             }
-            const removedPassiveStreaming = removed.some(id => state.passiveStreamingMessageIds.has(id))
             for (const id of removed) {
-              draft.passiveStreamingMessageIds.delete(id)
               draft.errorMap.delete(id)
             }
-            const meta = draft.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-            if (
-              removedPassiveStreaming
-              && meta.passiveStatus === 'streaming'
-              && !displayed.some(message => draft.passiveStreamingMessageIds.has(message.id))
-            ) {
-              draft.sessionMetaMap.set(sessionId, { ...meta, passiveStatus: 'idle' })
+            if (removedActiveMessage) {
+              draft.runStateMap.set(sessionId, DEFAULT_CHAT_RUN_STATE)
             }
           })
         })
@@ -127,12 +126,12 @@ export const useChatStore = createWithEqualityFn<ChatState>()(
             return state
           }
 
-          const meta = state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
+          const runState = readSessionRunState(state, sessionId)
+          const activeMessageId = readRunStateMessageId(runState)
           const effectiveSourceId = sourceMessageId ?? findActiveAssistantId(
             messages,
-state.generatingMessageIds,
-state.passiveStreamingMessageIds,
-meta.localDriverMessageId,
+            readStreamingMessageIds(state),
+            activeMessageId,
           )
           const sourceIdx = effectiveSourceId
             ? messages.findIndex(m => m.id === effectiveSourceId && m.role === 'assistant')
@@ -150,9 +149,8 @@ meta.localDriverMessageId,
             const tailMessageId = split?.tailMessageId ?? `${sourceMessage.id}:steer-tail`
             const sourceHead = trimTrailingEmptyParts(split ? sourceMessage.parts : structuredClone(sourceMessage.parts) as MessagePart[])
             const tailMessage = { ...sourceMessage, id: tailMessageId, parts: projectTailFromHead(sourceMessage.parts, sourceHead) }
-            const shouldKeepTail = state.generatingMessageIds.has(sourceMessage.id)
-              || state.passiveStreamingMessageIds.has(sourceMessage.id)
-              || meta.localDriverMessageId === sourceMessage.id
+            const shouldKeepTail = isStreamingMessageId(state, sourceMessage.id)
+              || activeMessageId === sourceMessage.id
 
             const insertedMessageIds = split ? [...split.insertedMessageIds, message.id] : [message.id]
             const insertedQueueItemIds = queueItemId
@@ -192,15 +190,12 @@ meta.localDriverMessageId,
             const draftMsgs = draft.messagesMap.get(sessionId)!
             const idx = draftMsgs.findIndex(m => m.id === messageId)
             if (idx !== -1) { draftMsgs.splice(idx, 1) }
-            draft.generatingMessageIds.delete(messageId)
-            draft.passiveStreamingMessageIds.delete(messageId)
             draft.activeAbortControllers.delete(messageId)
             draft.runDisplayMetaMap.delete(messageId)
             draft.errorMap.delete(messageId)
-            const m = draft.sessionMetaMap.get(sessionId)
-            if (m?.localDriverMessageId === messageId) {
-              m.locallyDriving = false
-              m.localDriverMessageId = undefined
+            const runState = readSessionRunState(draft, sessionId)
+            if (readRunStateMessageId(runState) === messageId) {
+              draft.runStateMap.set(sessionId, DEFAULT_CHAT_RUN_STATE)
             }
           })
         })
@@ -212,38 +207,32 @@ meta.localDriverMessageId,
         set((state) => {
           const nextError = new Map(state.errorMap)
           for (const m of state.messagesMap.get(sessionId) ?? EMPTY_MESSAGES) { nextError.delete(m.id) }
-          const nextGen = new Set(state.generatingMessageIds).add(messageId)
-          const nextPassive = new Set(state.passiveStreamingMessageIds)
-          nextPassive.delete(messageId)
           const nextAbort = new Map(state.activeAbortControllers)
           nextAbort.set(messageId, controller)
-          const nextMeta = new Map(state.sessionMetaMap)
-          nextMeta.set(sessionId, { ...(state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META), cancelling: false, locallyDriving: true, localDriverMessageId: messageId })
-          return { errorMap: nextError, generatingMessageIds: nextGen, passiveStreamingMessageIds: nextPassive, activeAbortControllers: nextAbort, sessionMetaMap: nextMeta }
+          const nextRunState = new Map(state.runStateMap)
+          nextRunState.set(sessionId, { phase: 'streaming', source: 'local', messageId })
+          return { errorMap: nextError, activeAbortControllers: nextAbort, runStateMap: nextRunState }
         })
       },
 
       finishGeneration: (messageId) => {
         set((state) => {
           const ids = getRunMessageIds(state, messageId)
-          const nextGen = new Set(state.generatingMessageIds)
-          const nextPassive = new Set(state.passiveStreamingMessageIds)
           const nextAbort = new Map(state.activeAbortControllers)
           const nextRun = new Map(state.runDisplayMetaMap)
           for (const id of ids) {
-            nextGen.delete(id)
-            nextPassive.delete(id)
             nextAbort.delete(id)
             const rm = nextRun.get(id)
             if (rm && rm.completedAtMs === null) { nextRun.set(id, { ...rm, completedAtMs: performance.now() }) }
           }
-          const nextMeta = new Map(state.sessionMetaMap)
-          for (const [sid, meta] of state.sessionMetaMap) {
-            if (meta.localDriverMessageId && ids.includes(meta.localDriverMessageId)) {
-              nextMeta.set(sid, { ...meta, cancelling: false, locallyDriving: false, localDriverMessageId: undefined })
+          const nextRunState = new Map(state.runStateMap)
+          for (const [sid, runState] of state.runStateMap) {
+            const activeMessageId = readRunStateMessageId(runState)
+            if (activeMessageId && ids.includes(activeMessageId)) {
+              nextRunState.set(sid, DEFAULT_CHAT_RUN_STATE)
             }
           }
-          return { generatingMessageIds: nextGen, passiveStreamingMessageIds: nextPassive, activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, sessionMetaMap: nextMeta }
+          return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, runStateMap: nextRunState }
         })
       },
 
@@ -251,26 +240,23 @@ meta.localDriverMessageId,
         set((state) => {
           const ids = getRunMessageIds(state, messageId)
           const visibleId = ids.at(-1) ?? messageId
-          const nextGen = new Set(state.generatingMessageIds)
-          const nextPassive = new Set(state.passiveStreamingMessageIds)
           const nextAbort = new Map(state.activeAbortControllers)
           const nextRun = new Map(state.runDisplayMetaMap)
           for (const id of ids) {
-            nextGen.delete(id)
-            nextPassive.delete(id)
             nextAbort.delete(id)
             const rm = nextRun.get(id)
             if (rm && rm.completedAtMs === null) { nextRun.set(id, { ...rm, completedAtMs: performance.now() }) }
           }
           const nextError = new Map(state.errorMap)
           nextError.set(visibleId, { message: error, timestamp: Date.now() })
-          const nextMeta = new Map(state.sessionMetaMap)
-          for (const [sid, meta] of state.sessionMetaMap) {
-            if (meta.localDriverMessageId && ids.includes(meta.localDriverMessageId)) {
-              nextMeta.set(sid, { ...meta, cancelling: false, locallyDriving: false, localDriverMessageId: undefined })
+          const nextRunState = new Map(state.runStateMap)
+          for (const [sid, runState] of state.runStateMap) {
+            const activeMessageId = readRunStateMessageId(runState)
+            if (activeMessageId && ids.includes(activeMessageId)) {
+              nextRunState.set(sid, { phase: 'idle', error: true })
             }
           }
-          return { generatingMessageIds: nextGen, passiveStreamingMessageIds: nextPassive, activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, errorMap: nextError, sessionMetaMap: nextMeta }
+          return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, errorMap: nextError, runStateMap: nextRunState }
         })
       },
 
@@ -278,7 +264,18 @@ meta.localDriverMessageId,
         const controller = get().activeAbortControllers.get(messageId)
         if (controller) { controller.abort() }
         get().finishGeneration(messageId)
-        get().setSessionMeta(sessionId, { cancelling: true, locallyDriving: false, localDriverMessageId: undefined, passiveStatus: 'idle' })
+        get().setRunCancelling(sessionId, true)
+      },
+
+      setRunCancelling: (sessionId, cancelling) => {
+        set((state) => {
+          const current = readSessionRunState(state, sessionId)
+          const next = resolveRunCancellingState(current, cancelling)
+          if (isEqual(current, next)) { return state }
+          const nextRunState = new Map(state.runStateMap)
+          nextRunState.set(sessionId, next)
+          return { runStateMap: nextRunState }
+        })
       },
 
       moveStreamingMessage: (sessionId, from, to) => {
@@ -286,58 +283,8 @@ meta.localDriverMessageId,
         set(state => moveStreamingRefs_immutable(state, sessionId, from, to))
       },
 
-      setPassiveStreamingMessageIds: (sessionId, messageIds) => {
-        set((state) => {
-          const sessionMsgIds = new Set((state.messagesMap.get(sessionId) ?? []).map(m => m.id))
-          const next = new Set(state.passiveStreamingMessageIds)
-          for (const id of sessionMsgIds) { next.delete(id) }
-          for (const id of messageIds) {
-            const displayMessageId = resolveStreamingDisplayMessageId(state, id)
-            if (sessionMsgIds.has(displayMessageId) && !state.generatingMessageIds.has(displayMessageId)) { next.add(displayMessageId) }
-          }
-          const currentMeta = state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-          const nextPassiveStatus = readPassiveStatusFromRefs(
-            currentMeta.passiveStatus,
-            hasSetIntersection(sessionMsgIds, next),
-          )
-          const metaChanged = nextPassiveStatus !== currentMeta.passiveStatus
-          if (setsEqual(next, state.passiveStreamingMessageIds) && !metaChanged) { return state }
-          const result: Partial<ChatState> = { passiveStreamingMessageIds: next }
-          if (metaChanged) {
-            const nextMeta = new Map(state.sessionMetaMap)
-            nextMeta.set(sessionId, { ...currentMeta, passiveStatus: nextPassiveStatus })
-            result.sessionMetaMap = nextMeta
-          }
-          return result
-        })
-      },
-
-      setPassiveStreamingMessage: (sessionId, messageId, streaming) => {
-        set((state) => {
-          const sessionMsgIds = new Set((state.messagesMap.get(sessionId) ?? []).map(m => m.id))
-          const next = new Set(state.passiveStreamingMessageIds)
-          for (const id of getRunMessageIds(state, messageId)) {
-            next.delete(id)
-          }
-          const displayMessageId = resolveStreamingDisplayMessageId(state, messageId)
-          if (streaming && sessionMsgIds.has(displayMessageId) && !state.generatingMessageIds.has(displayMessageId)) {
-            next.add(displayMessageId)
-          }
-          const currentMeta = state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-          const nextPassiveStatus = readPassiveStatusFromRefs(
-            currentMeta.passiveStatus,
-            hasSetIntersection(sessionMsgIds, next),
-          )
-          const metaChanged = nextPassiveStatus !== currentMeta.passiveStatus
-          if (setsEqual(next, state.passiveStreamingMessageIds) && !metaChanged) { return state }
-          const result: Partial<ChatState> = { passiveStreamingMessageIds: next }
-          if (metaChanged) {
-            const nextMeta = new Map(state.sessionMetaMap)
-            nextMeta.set(sessionId, { ...currentMeta, passiveStatus: nextPassiveStatus })
-            result.sessionMetaMap = nextMeta
-          }
-          return result
-        })
+      setPassiveRunState: (sessionId, input) => {
+        set(state => applyPassiveRunState(state, sessionId, input))
       },
 
       beginRunDisplayMeta: (messageId, requestStartedAtMs) => {
@@ -424,26 +371,6 @@ meta.localDriverMessageId,
         return projectStreamingThroughSplits(message, get().assistantDisplaySplitMap)
       },
 
-      // ── Session Meta ─────────────────────────────────────
-
-      setSessionMeta: (sessionId, meta) => {
-        set((state) => {
-          const next = new Map(state.sessionMetaMap)
-          next.set(sessionId, { ...(state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META), ...meta })
-          return { sessionMetaMap: next }
-        })
-      },
-
-      setPassiveStatus: (sessionId, status) => {
-        set((state) => {
-          const current = state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-          if (current.passiveStatus === status) { return state }
-          const next = new Map(state.sessionMetaMap)
-          next.set(sessionId, { ...current, passiveStatus: status })
-          return { sessionMetaMap: next }
-        })
-      },
-
       setSessionHydrated: (sessionId, hydrated) => {
         set((state) => {
           if (state.hydratedSessionIds.has(sessionId) === hydrated) { return state }
@@ -461,8 +388,8 @@ meta.localDriverMessageId,
           const current = state.activeGoalMap.get(sessionId)
           const next: ChatActiveGoal = {
             sessionId,
-objective,
-status: input.status ?? 'active',
+            objective,
+            status: input.status ?? 'active',
             sourceMessageId: input.sourceMessageId ?? null,
             tokenBudget: input.tokenBudget ?? null,
             tokensUsed: current?.tokensUsed ?? 0,
@@ -500,11 +427,9 @@ status: input.status ?? 'active',
           return produce(state, (draft) => {
             draft.messagesMap.delete(sessionId)
             draft.hydratedSessionIds.delete(sessionId)
-            draft.sessionMetaMap.delete(sessionId)
+            draft.runStateMap.delete(sessionId)
             draft.activeGoalMap.delete(sessionId)
             for (const id of removed) {
-              draft.generatingMessageIds.delete(id)
-              draft.passiveStreamingMessageIds.delete(id)
               draft.activeAbortControllers.delete(id)
               draft.runDisplayMetaMap.delete(id)
               draft.errorMap.delete(id)
@@ -536,10 +461,13 @@ status: input.status ?? 'active',
           return { errorMap: next }
         })
       },
-    }),
-  ),
-  shallow,
-)
+      }),
+    ),
+    shallow,
+  )
+}
+
+export const useChatStore = createChatStore()
 
 // ── Selectors ────────────────────────────────────────────────
 
@@ -556,9 +484,146 @@ function cachedIds(messages: UIMessage[]): string[] {
   return ids
 }
 
-function hasActiveRunDisplayMeta(state: ChatState, messageId: string): boolean {
-  const meta = state.runDisplayMetaMap.get(messageId)
-  return Boolean(meta?.runId && meta.completedAtMs === null)
+function readSessionRunState(state: Pick<ChatState, 'runStateMap'>, sessionId: string): ChatRunState {
+  return state.runStateMap.get(sessionId) ?? DEFAULT_CHAT_RUN_STATE
+}
+
+function readRunStateMessageId(runState: ChatRunState): string | null {
+  switch (runState.phase) {
+    case 'submitting':
+    case 'streaming':
+      return runState.messageId
+    case 'settling':
+      return runState.messageId
+    case 'idle':
+      return null
+  }
+}
+
+function readStreamingMessageIds(state: ChatState): Set<string> {
+  const ids = new Set<string>()
+  for (const runState of state.runStateMap.values()) {
+    const messageId = readRunStateMessageId(runState)
+    if (messageId && (runState.phase === 'submitting' || runState.phase === 'streaming')) {
+      ids.add(messageId)
+    }
+  }
+  return ids
+}
+
+function isStreamingMessageId(state: ChatState, messageId: string): boolean {
+  for (const runState of state.runStateMap.values()) {
+    if (readRunStateMessageId(runState) === messageId && (runState.phase === 'submitting' || runState.phase === 'streaming')) {
+      return true
+    }
+  }
+  return false
+}
+
+function isLocalStreamingMessageId(state: ChatState, messageId: string): boolean {
+  for (const runState of state.runStateMap.values()) {
+    if (runState.phase === 'streaming' && runState.source === 'local' && runState.messageId === messageId) {
+      return true
+    }
+  }
+  return false
+}
+
+function applyPassiveRunState(
+  state: ChatState,
+  sessionId: string,
+  input: PassiveRunStateInput,
+): ChatState | Partial<ChatState> {
+  const current = readSessionRunState(state, sessionId)
+  const next = resolvePassiveRunState(state, sessionId, current, input)
+  if (isEqual(current, next)) {
+    return state
+  }
+  const nextRunState = new Map(state.runStateMap)
+  nextRunState.set(sessionId, next)
+  return { runStateMap: nextRunState }
+}
+
+function resolvePassiveRunState(
+  state: ChatState,
+  sessionId: string,
+  current: ChatRunState,
+  input: PassiveRunStateInput,
+): ChatRunState {
+  if (
+    current.phase === 'submitting'
+    || (current.phase === 'streaming' && current.source === 'local')
+  ) {
+    return current
+  }
+
+  if (input.cancelling === true) {
+    return {
+      phase: 'settling',
+      messageId: readRunStateMessageId(current),
+      cancelling: true,
+      error: false,
+    }
+  }
+
+  if (input.status === 'error') {
+    return { phase: 'idle', error: true }
+  }
+
+  if (input.status === 'streaming') {
+    const messageId = readPassiveRunMessageId(state, sessionId, input.messageIds, input.allowMissingMessage ?? false)
+    return messageId
+      ? { phase: 'streaming', source: 'passive', messageId }
+      : DEFAULT_CHAT_RUN_STATE
+  }
+
+  return DEFAULT_CHAT_RUN_STATE
+}
+
+function readPassiveRunMessageId(
+  state: ChatState,
+  sessionId: string,
+  messageIds: string[],
+  allowMissingMessage: boolean,
+): string | null {
+  const sessionMessageIds = new Set((state.messagesMap.get(sessionId) ?? []).map(message => message.id))
+  for (const messageId of messageIds) {
+    const displayMessageId = resolveStreamingDisplayMessageId(state, messageId)
+    if (sessionMessageIds.has(displayMessageId)) {
+      return displayMessageId
+    }
+  }
+  if (allowMissingMessage && messageIds[0]) {
+    return resolveStreamingDisplayMessageId(state, messageIds[0])
+  }
+  return null
+}
+
+function resolveRunCancellingState(current: ChatRunState, cancelling: boolean): ChatRunState {
+  if (cancelling) {
+    return {
+      phase: 'settling',
+      messageId: readRunStateMessageId(current),
+      cancelling: true,
+      error: false,
+    }
+  }
+  return current.phase === 'settling'
+    ? DEFAULT_CHAT_RUN_STATE
+    : current
+}
+
+function moveRunStateMessage(runState: ChatRunState, messageId: string): ChatRunState {
+  switch (runState.phase) {
+    case 'submitting':
+      return { ...runState, messageId }
+    case 'streaming':
+      return { ...runState, messageId }
+    case 'settling':
+      return { ...runState, messageId }
+    case 'idle':
+      return runState
+  }
 }
 
 export const chatSelectors = {
@@ -583,34 +648,29 @@ export const chatSelectors = {
   },
 
   isGenerating: (messageId: string) => (s: ChatState) =>
-    s.generatingMessageIds.has(messageId),
+    isLocalStreamingMessageId(s, messageId),
 
   isStreamingMessage: (messageId: string) => (s: ChatState) =>
-    s.generatingMessageIds.has(messageId) || s.passiveStreamingMessageIds.has(messageId) || hasActiveRunDisplayMeta(s, messageId),
+    isStreamingMessageId(s, messageId),
 
   isVisibleStreamingMessage: (sessionId: string, messageId: string) => (s: ChatState) => {
-    const meta = s.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-    return s.generatingMessageIds.has(messageId)
-      || s.passiveStreamingMessageIds.has(messageId)
-      || meta.localDriverMessageId === messageId
-      || hasActiveRunDisplayMeta(s, messageId)
+    const runState = readSessionRunState(s, sessionId)
+    return readRunStateMessageId(runState) === messageId
   },
 
-  isAnyGenerating: (s: ChatState) => s.generatingMessageIds.size > 0,
+  isAnyGenerating: (s: ChatState) =>
+    [...s.runStateMap.values()].some(runState => runState.phase === 'streaming' && runState.source === 'local'),
 
   isSessionGenerating: (sessionId: string) => (s: ChatState) => {
-    const meta = s.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-    if (meta.locallyDriving) { return true }
-    return (s.messagesMap.get(sessionId) ?? EMPTY_MESSAGES).some(m =>
-      s.generatingMessageIds.has(m.id) || hasActiveRunDisplayMeta(s, m.id),
-    )
+    const runState = readSessionRunState(s, sessionId)
+    if (runState.phase === 'streaming' && runState.source === 'local') { return true }
+    return false
   },
 
   isSessionStreaming: (sessionId: string) => (s: ChatState) => {
-    const meta = s.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-    return meta.locallyDriving
-      || meta.passiveStatus === 'streaming'
-      || (s.messagesMap.get(sessionId) ?? EMPTY_MESSAGES).some(m => hasActiveRunDisplayMeta(s, m.id))
+    const runState = readSessionRunState(s, sessionId)
+    return runState.phase === 'submitting'
+      || runState.phase === 'streaming'
   },
 
   error: (messageId: string) => (s: ChatState) => s.errorMap.get(messageId),
@@ -624,8 +684,8 @@ export const chatSelectors = {
     return latest
   },
 
-  sessionMeta: (sessionId: string) => (s: ChatState) =>
-    s.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META,
+  sessionRunState: (sessionId: string) => (s: ChatState) =>
+    readSessionRunState(s, sessionId),
 
   activeGoal: (sessionId: string) => (s: ChatState) =>
     s.activeGoalMap.get(sessionId) ?? null,
@@ -634,23 +694,25 @@ export const chatSelectors = {
     s.hydratedSessionIds.has(sessionId),
 
   visibleStatus: (sessionId: string) => (s: ChatState): PublicStatus => {
-    const meta = s.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
+    const runState = readSessionRunState(s, sessionId)
     if (
-      meta.locallyDriving
-      || meta.passiveStatus === 'streaming'
-      || (s.messagesMap.get(sessionId) ?? EMPTY_MESSAGES).some(m => hasActiveRunDisplayMeta(s, m.id))
+      runState.phase === 'submitting'
+      || runState.phase === 'streaming'
     ) {
       return 'streaming'
     }
-    if (meta.cancelling) { return 'idle' }
-    if (meta.passiveStatus === 'error') { return 'error' }
+    if (runState.phase === 'settling' && runState.cancelling) { return 'idle' }
+    if ((runState.phase === 'idle' || runState.phase === 'settling') && runState.error) { return 'error' }
     const msgs = s.errorMap.size > 0 ? s.messagesMap.get(sessionId) : undefined
     if (msgs?.some(m => s.errorMap.has(m.id))) { return 'error' }
-    return meta.passiveStatus
+    return 'idle'
   },
 
   runDisplayMeta: (messageId: string) => (s: ChatState) =>
     s.runDisplayMetaMap.get(messageId),
+
+  streamingMessageIdSet: (s: ChatState) =>
+    readStreamingMessageIds(s),
 }
 
 // ── Telemetry ────────────────────────────────────────────────
@@ -677,30 +739,6 @@ function resolveStreamingDisplayMessageId(state: ChatState, messageId: string): 
   return getRunMessageIds(state, messageId).at(-1) ?? messageId
 }
 
-function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
-  if (a === b) { return true }
-  if (a.size !== b.size) { return false }
-  for (const v of a) {
-    if (!b.has(v)) { return false }
-  }
-  return true
-}
-
-function hasSetIntersection<T>(left: Set<T>, right: Set<T>): boolean {
-  const [smaller, larger] = left.size <= right.size ? [left, right] : [right, left]
-  for (const value of smaller) {
-    if (larger.has(value)) { return true }
-  }
-  return false
-}
-
-function readPassiveStatusFromRefs(current: PublicStatus, hasPassiveStreamingRefs: boolean): PublicStatus {
-  if (hasPassiveStreamingRefs) {
-    return 'streaming'
-  }
-  return current === 'streaming' ? 'idle' : current
-}
-
 function moveStreamingRefs(
   draft: Draft<ChatState>,
   state: ChatState,
@@ -709,37 +747,23 @@ function moveStreamingRefs(
   to: string,
 ): void {
   if (from === to) { return }
-  const wasGen = state.generatingMessageIds.has(from)
-  const wasPassive = state.passiveStreamingMessageIds.has(from)
   const ctrl = state.activeAbortControllers.get(from)
   const run = state.runDisplayMetaMap.get(from)
 
-  draft.generatingMessageIds.delete(from)
-  draft.passiveStreamingMessageIds.delete(from)
   draft.activeAbortControllers.delete(from)
   draft.runDisplayMetaMap.delete(from)
-  if (wasGen) { draft.generatingMessageIds.add(to) }
-  if (wasPassive) { draft.passiveStreamingMessageIds.add(to) }
   if (ctrl) { draft.activeAbortControllers.set(to, ctrl) }
   if (run && (run.completedAtMs === null || !state.runDisplayMetaMap.has(to))) {
     draft.runDisplayMetaMap.set(to, { ...run } as Draft<ChatRunDisplayMeta>)
   }
 
-  const meta = draft.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-  if (meta.localDriverMessageId === from) {
-    draft.sessionMetaMap.set(sessionId, { ...meta, localDriverMessageId: to })
+  const runState = readSessionRunState(state, sessionId)
+  if (readRunStateMessageId(runState) === from) {
+    draft.runStateMap.set(sessionId, moveRunStateMessage(runState, to) as Draft<ChatRunState>)
   }
 }
 
 function moveStreamingRefs_immutable(state: ChatState, sessionId: string, from: string, to: string): Partial<ChatState> {
-  const nextGen = new Set(state.generatingMessageIds)
-  const wasGen = nextGen.delete(from)
-  if (wasGen) { nextGen.add(to) }
-
-  const nextPassive = new Set(state.passiveStreamingMessageIds)
-  const wasPassive = nextPassive.delete(from)
-  if (wasPassive) { nextPassive.add(to) }
-
   const nextAbort = new Map(state.activeAbortControllers)
   const ctrl = nextAbort.get(from)
   nextAbort.delete(from)
@@ -750,13 +774,13 @@ function moveStreamingRefs_immutable(state: ChatState, sessionId: string, from: 
   nextRun.delete(from)
   if (run && (run.completedAtMs === null || !nextRun.has(to))) { nextRun.set(to, { ...run }) }
 
-  const meta = state.sessionMetaMap.get(sessionId) ?? DEFAULT_SESSION_META
-  const nextMeta = new Map(state.sessionMetaMap)
-  if (meta.localDriverMessageId === from) {
-    nextMeta.set(sessionId, { ...meta, localDriverMessageId: to })
+  const runState = readSessionRunState(state, sessionId)
+  const nextRunState = new Map(state.runStateMap)
+  if (readRunStateMessageId(runState) === from) {
+    nextRunState.set(sessionId, moveRunStateMessage(runState, to))
   }
 
-  return { generatingMessageIds: nextGen, passiveStreamingMessageIds: nextPassive, activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, sessionMetaMap: nextMeta }
+  return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, runStateMap: nextRunState }
 }
 
 function migrateDisplaySplit(state: ChatState, messagesMap: Map<string, UIMessage[]>, from: string, to: string): Partial<ChatState> {
@@ -784,17 +808,15 @@ function migrateDisplaySplit(state: ChatState, messagesMap: Map<string, UIMessag
     result.messagesMap = nextMap
 
     // Migrate streaming refs for tail
-    const nextGen = new Set(state.generatingMessageIds)
-    if (nextGen.delete(split.tailMessageId)) { nextGen.add(nextTailId); result.generatingMessageIds = nextGen }
-    const nextPassive = new Set(state.passiveStreamingMessageIds)
-    if (nextPassive.delete(split.tailMessageId)) { nextPassive.add(nextTailId); result.passiveStreamingMessageIds = nextPassive }
     const ctrl = state.activeAbortControllers.get(split.tailMessageId)
     if (ctrl) { const a = new Map(state.activeAbortControllers); a.delete(split.tailMessageId); a.set(nextTailId, ctrl); result.activeAbortControllers = a }
     const rm = state.runDisplayMetaMap.get(split.tailMessageId)
     if (rm) { const r = new Map(state.runDisplayMetaMap); r.delete(split.tailMessageId); r.set(nextTailId, rm); result.runDisplayMetaMap = r }
-    const meta = state.sessionMetaMap.get(sid) ?? DEFAULT_SESSION_META
-    if (meta.localDriverMessageId === split.tailMessageId) {
-      const nm = new Map(state.sessionMetaMap); nm.set(sid, { ...meta, localDriverMessageId: nextTailId }); result.sessionMetaMap = nm
+    const runState = readSessionRunState(state, sid)
+    if (readRunStateMessageId(runState) === split.tailMessageId) {
+      const nextRunState = new Map(state.runStateMap)
+      nextRunState.set(sid, moveRunStateMessage(runState, nextTailId))
+      result.runStateMap = nextRunState
     }
     break
   }
@@ -810,7 +832,10 @@ function trimTrailingEmptyParts(parts: MessagePart[]): MessagePart[] {
 
 function isEmptyPart(part: MessagePart): boolean {
   if (part.type === 'text') { return !(part as { text: string }).text }
-  if (part.type === 'reasoning') { return !((part as any).text || (part as any).reasoning) }
+  if (part.type === 'reasoning') {
+    const reasoningPart = part as { text?: string, reasoning?: string }
+    return !(reasoningPart.text || reasoningPart.reasoning)
+  }
   return false
 }
 

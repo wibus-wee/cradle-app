@@ -5,15 +5,11 @@ import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import { enrichModelsFromRegistryMappings } from '../model-registry/model-info-registry'
 import * as ModelRegistry from '../model-registry/service'
+import { listRuntimeOwnedProviderTargetModels } from '../provider-contracts/runtime-compatibility'
 import type { ModelDescriptor, ProviderKind, ProviderRequest } from '../provider-contracts/types'
 import type { ResolvedProviderTarget } from '../provider-targets/service'
 import { resolveProviderTarget } from '../provider-targets/service'
 import * as Secrets from '../secrets/service'
-import {
-  isOpenCodeRuntimeNativeProviderTargetId,
-  listOpencodeRuntimeModelsForProviderTarget,
-} from '../chat-runtime-providers/opencode/model-inventory'
-import { OPENCODE_RUNTIME_KIND } from '../chat-runtime-providers/opencode/metadata'
 import * as Workspace from '../workspace/service'
 import { getProviderCatalog } from './catalog'
 import { projectProviderModelListCapabilities } from './model-capabilities'
@@ -125,14 +121,13 @@ function resolveEffectiveProviderRequest(input: ProviderRequest) {
 // ── list models ──
 
 export async function listModels(input: ProviderRequest & { workspaceId?: string | null }): Promise<ModelDescriptor[]> {
-  if (isOpenCodeRuntimeNativeProviderTargetId(input.providerTargetId)) {
-    const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
-    const models = await listOpencodeRuntimeModelsForProviderTarget({
-      runtimeKind: OPENCODE_RUNTIME_KIND,
-      providerTargetId: input.providerTargetId!,
-      workspacePath,
-    })
-    return projectProviderModelListCapabilities(models.map(model => ({
+  const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
+  const runtimeOwnedModels = await listRuntimeOwnedProviderTargetModels({
+    providerTargetId: input.providerTargetId,
+    workspacePath,
+  })
+  if (runtimeOwnedModels) {
+    return projectProviderModelListCapabilities(runtimeOwnedModels.map(model => ({
       id: model.id,
       label: model.label,
       providerKind: model.providerKind,

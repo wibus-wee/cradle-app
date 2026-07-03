@@ -1,4 +1,8 @@
 import { deleteTerminalSessionsShellByPtyId } from '~/api-gen/sdk.gen'
+import {
+  markComposerDraftSurfaceDiscarded,
+  queueServerComposerDraftDelete,
+} from '~/features/chat/commands/composer-draft-command'
 import { stopTerminalPanelOwners } from '~/features/tui/terminal-panel-cleanup'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { useComposerDraftStore } from '~/store/composer-draft'
@@ -108,7 +112,9 @@ function cleanupClosedComposerDrafts(
   const draftStore = useComposerDraftStore.getState()
   for (const surface of previousSurfaces) {
     if (!nextIds.has(surface.id)) {
+      markComposerDraftSurfaceDiscarded(surface.id)
       draftStore.deleteDraft(surface.id)
+      queueServerComposerDraftDelete(surface.id)
     }
   }
 }

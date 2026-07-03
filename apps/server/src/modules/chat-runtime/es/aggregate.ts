@@ -64,6 +64,9 @@ export function reduceChatSessionEvents(events: StoredChatSessionEvent[]): ChatS
           state.activeRun = null
         }
         break
+      case 'InteractionRequested':
+      case 'InteractionResolved':
+        break
       case 'QueueItemEnqueued':
       case 'QueueItemClaimed':
       case 'QueueItemReleased':

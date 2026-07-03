@@ -32,13 +32,13 @@ import {
   runtimeAuditLog,
   sessions,
   usageLogs,
-  workspaces,
+  workspaces
 } from '@cradle/db'
 import { sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import { db, getServerConfig } from '../../infra'
-import { abortAllRuns } from '../chat-runtime/service'
+import { abortAllRuns } from '../chat-runtime/runtime'
 
 const TABLES_IN_DELETION_ORDER = [
   automationEvents,
@@ -70,7 +70,7 @@ const TABLES_IN_DELETION_ORDER = [
   observabilityEvents,
   workspaces,
   agents,
-  agentCredentials,
+  agentCredentials
 ] as const
 
 function isPathInside(parentDir: string, childDir: string): boolean {
@@ -104,9 +104,10 @@ function resolveIsolatedPreferencesDir(): string | null {
 
 export const testReset = new Elysia({
   prefix: '/test/reset',
-  detail: { tags: ['test-reset'] },
-})
-  .post('/', async () => {
+  detail: { tags: ['test-reset'] }
+}).post(
+  '/',
+  async () => {
     await abortAllRuns()
     const d = db()
     d.run(sql`PRAGMA foreign_keys = OFF`)
@@ -114,8 +115,7 @@ export const testReset = new Elysia({
       for (const table of TABLES_IN_DELETION_ORDER) {
         d.delete(table).run()
       }
-    }
-    finally {
+    } finally {
       d.run(sql`PRAGMA foreign_keys = ON`)
     }
 
@@ -124,19 +124,23 @@ export const testReset = new Elysia({
       if (isolatedHomeSkillsDir && fs.existsSync(isolatedHomeSkillsDir)) {
         fs.rmSync(isolatedHomeSkillsDir, { recursive: true, force: true })
       }
+    } catch {
+      /* best effort */
     }
-    catch { /* best effort */ }
 
     const preferencesDir = resolveIsolatedPreferencesDir()
     try {
       if (preferencesDir && fs.existsSync(preferencesDir)) {
         fs.rmSync(preferencesDir, { recursive: true, force: true })
       }
+    } catch {
+      /* best effort */
     }
-    catch { /* best effort */ }
 
     return { ok: true as const }
-  }, {
+  },
+  {
     detail: { summary: 'Reset all tables for testing' },
-    response: { 200: t.Object({ ok: t.Literal(true) }) },
-  })
+    response: { 200: t.Object({ ok: t.Literal(true) }) }
+  }
+)

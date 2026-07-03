@@ -2,12 +2,11 @@ import type { FileUIPart, UIMessage } from 'ai'
 import { lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai'
 import { useCallback, useRef } from 'react'
 
-import { postChatSessionsBySessionIdCodexAppServerInvoke } from '~/api-gen/sdk.gen'
 import { toastManager } from '~/components/ui/toast'
-import { submitSideConversationMessage } from '~/features/browser/side-conversation-panel'
+import { submitSideConversationMessage } from '~/features/browser/side-conversation-message'
 import { updateSessionInSessionLists } from '~/features/workspace/use-session'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useChatStore } from '~/store/chat'
+import { chatSelectors, useChatStore } from '~/store/chat'
 import { useLayoutStore } from '~/store/layout'
 
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
@@ -18,11 +17,13 @@ import { rollbackLastTurn as rollbackLastTurnCommand } from '../commands/rollbac
 import type { RuntimeSessionStatus } from '../commands/runtime-session-status-command'
 import { runtimeSettingsQueryKey, updateSessionRuntimeSettings } from '../commands/runtime-settings-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
+import { setCodexThreadGoal } from '../runtime/codex-app-server-bridge'
 import { runtimeSessionStatusQueryKey, runtimeSessionStatusQueryOptions } from '../runtime/use-runtime-session-status'
 import { startChatResponseStream } from '../transport/chat-stream-transport'
 import { ChatStreamingHandler } from '../transport/chat-streaming-handler'
-import { buildOptimisticUserMessage, readCodexGoalCommandObjective } from './optimistic-chat-turn'
-import { readUserMessageDraft, type UserMessageDraft } from './read-user-message-draft'
+import { buildOptimisticUserMessage, readGoalCommandObjective } from './optimistic-chat-turn'
+import type { UserMessageDraft } from './read-user-message-draft'
+import { readUserMessageDraft } from './read-user-message-draft'
 import type { ChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 import type { RuntimeUserInputSubmitInput, SendMessageOptions, SendMessageResult, ToolApprovalResponseInput } from './use-chat-session-types'
 import {
@@ -31,6 +32,7 @@ import {
   isMatchingApprovalPart,
   isMatchingToolPart,
   QUEUE_DRAIN_SYNC_DELAY_MS,
+  readLocalDriverMessageId,
   readPlanImplementationApprovalRequest,
   readRuntimeToolApprovalRequest,
   readRuntimeUserInputRequestId,
@@ -43,11 +45,12 @@ interface UseChatActionsInput {
   chatSessionId: string | null
   controls: ChatSessionRuntimeControls
   runtimeStatus: RuntimeSessionStatus | null | undefined
-  runtimeKind: string | null
+  supportsGoalCommand: boolean
+  supportsCodexGoalBridge: boolean
 }
 
 export function useChatActions(input: UseChatActionsInput) {
-  const { chatSessionId, controls, runtimeStatus, runtimeKind } = input
+  const { chatSessionId, controls, runtimeStatus, supportsGoalCommand, supportsCodexGoalBridge } = input
   const {
     queryClient,
     sessionBindingQueryKey,
@@ -72,8 +75,8 @@ export function useChatActions(input: UseChatActionsInput) {
     }
     const bangCommand = files.length === 0 && contextParts.length === 0 ? readBangCommand(text) : null
     const sideChatMessage = readSideChatCommand(trimmedText)
-    const codexGoalObjective = files.length === 0 && contextParts.length === 0
-      ? readCodexGoalCommandObjective(text)
+    const goalObjective = supportsGoalCommand && files.length === 0 && contextParts.length === 0
+      ? readGoalCommandObjective(text)
       : null
     const canonicalRuntimeStatus = await queryClient.fetchQuery({
       ...runtimeSessionStatusQueryOptions(chatSessionId),
@@ -223,17 +226,6 @@ export function useChatActions(input: UseChatActionsInput) {
           }
         }
       }
-      finally {
-        if (!isBusy) {
-          const currentPassiveStatus = useChatStore.getState().sessionMetaMap.get(chatSessionId)?.passiveStatus
-          useChatStore.getState().setSessionMeta(chatSessionId, {
-            cancelling: false,
-            locallyDriving: false,
-            localDriverMessageId: undefined,
-            passiveStatus: currentPassiveStatus === 'streaming' ? 'streaming' : 'idle',
-          })
-        }
-      }
       return
     }
 
@@ -245,7 +237,7 @@ export function useChatActions(input: UseChatActionsInput) {
         sourceText: text,
         files,
         contextParts,
-        runtimeKind,
+        supportsGoalCommand,
       }))
       updateSessionInSessionLists(queryClient, { id: chatSessionId }, { promote: true })
 
@@ -305,12 +297,6 @@ export function useChatActions(input: UseChatActionsInput) {
       finally {
         const wasLocallyAborted = controller.signal.aborted
         handlerRef.current = null
-        const currentPassiveStatus = useChatStore.getState().sessionMetaMap.get(chatSessionId)?.passiveStatus
-        useChatStore.getState().setSessionMeta(chatSessionId, {
-          locallyDriving: false,
-          localDriverMessageId: undefined,
-          passiveStatus: currentPassiveStatus === 'streaming' ? 'streaming' : 'idle',
-        })
         if (!wasLocallyAborted && acceptedByServer) {
           scheduleSnapshotRefresh(0)
           void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(chatSessionId) })
@@ -321,30 +307,24 @@ export function useChatActions(input: UseChatActionsInput) {
     }
 
     if (isBusy) {
-      if (codexGoalObjective) {
+      if (goalObjective && supportsCodexGoalBridge) {
         const latestRuntimeStatus = canonicalRuntimeStatus ?? await queryClient.fetchQuery({
           ...runtimeSessionStatusQueryOptions(chatSessionId),
           staleTime: 0,
         })
-        if (latestRuntimeStatus && latestRuntimeStatus.runtimeKind === 'codex') {
+        if (latestRuntimeStatus) {
           const threadId = latestRuntimeStatus.providerSessionId
           if (!threadId) {
             throw new Error('Cannot update Codex goal before the provider thread is available.')
           }
 
-          await postChatSessionsBySessionIdCodexAppServerInvoke({
-            path: { sessionId: chatSessionId },
-            body: {
-              method: 'thread/goal/set',
-              params: {
-                threadId,
-                objective: codexGoalObjective,
-                status: 'active',
-              },
-              providerTargetId: opts?.providerTargetId ?? undefined,
-              modelId: opts?.modelId ?? undefined,
-            },
-            throwOnError: true,
+          await setCodexThreadGoal({
+            sessionId: chatSessionId,
+            threadId,
+            objective: goalObjective,
+            status: 'active',
+            providerTargetId: opts?.providerTargetId,
+            modelId: opts?.modelId,
           })
           scheduleSnapshotRefresh(0)
           void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(chatSessionId) })
@@ -435,7 +415,7 @@ export function useChatActions(input: UseChatActionsInput) {
     }
 
     await startNewResponse()
-  }, [chatSessionId, queryClient, refreshQueue, refreshSessionLists, runtimeKind, runtimeStatus, scheduleSnapshotRefresh, sessionBindingQueryKey])
+  }, [chatSessionId, queryClient, refreshQueue, refreshSessionLists, runtimeStatus, scheduleSnapshotRefresh, sessionBindingQueryKey, supportsCodexGoalBridge, supportsGoalCommand])
 
   // ── Respond to tool approval ──
 
@@ -563,12 +543,6 @@ export function useChatActions(input: UseChatActionsInput) {
     }
     finally {
       handlerRef.current = null
-      const currentPassiveStatus = useChatStore.getState().sessionMetaMap.get(chatSessionId)?.passiveStatus
-      useChatStore.getState().setSessionMeta(chatSessionId, {
-        locallyDriving: false,
-        localDriverMessageId: undefined,
-        passiveStatus: currentPassiveStatus === 'streaming' ? 'streaming' : 'idle',
-      })
       if (!controller.signal.aborted) {
         scheduleSnapshotRefresh(0)
         void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(chatSessionId) })
@@ -650,14 +624,14 @@ export function useChatActions(input: UseChatActionsInput) {
     }
     const store = useChatStore.getState()
     const messages = store.messagesMap.get(chatSessionId) ?? []
-    const activeAssistant = [...messages].reverse().find(m => m.role === 'assistant' && store.generatingMessageIds.has(m.id))
-    const localDriverMessageId = store.sessionMetaMap.get(chatSessionId)?.localDriverMessageId
+    const activeAssistant = [...messages].reverse().find(m => m.role === 'assistant' && chatSelectors.isGenerating(m.id)(store))
+    const localDriverMessageId = readLocalDriverMessageId(chatSelectors.sessionRunState(chatSessionId)(store))
     const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
     const messageId = activeAssistant?.id ?? localDriverMessageId ?? lastAssistant?.id
     if (messageId) {
       store.stopGeneration(messageId, chatSessionId)
     }
-    store.setSessionMeta(chatSessionId, { cancelling: true, locallyDriving: false, localDriverMessageId: undefined, passiveStatus: 'idle' })
+    store.setRunCancelling(chatSessionId, true)
 
     try {
       await cancelChatResponse(chatSessionId)
@@ -666,7 +640,7 @@ export function useChatActions(input: UseChatActionsInput) {
       refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
     }
     catch (error) {
-      store.setSessionMeta(chatSessionId, { cancelling: false })
+      store.setRunCancelling(chatSessionId, false)
       console.warn('[useChatSession] failed to cancel server chat response', error)
     }
   }, [chatSessionId, refreshQueue, scheduleSnapshotRefresh])

@@ -203,6 +203,8 @@ interface Window {
     }
     // eslint-disable-next-line ts/no-explicit-any
     chatStream?: any
+    // eslint-disable-next-line ts/no-explicit-any
+    chatEventTail?: any
     desktopTray: {
       performAction: (actionId: string, payload?: unknown) => Promise<unknown>
       consumePendingActionRequests: () => Promise<unknown>

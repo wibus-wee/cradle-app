@@ -1,8 +1,6 @@
-import { randomUUID } from 'node:crypto'
-
 import type {
-  AssistantMessage as OpencodeAssistantMessage,
   Agent as OpencodeAgent,
+  AssistantMessage as OpencodeAssistantMessage,
   Config,
   Event as OpencodeEvent,
   File as OpencodeFile,
@@ -41,10 +39,10 @@ import type {
   ResumeChatSessionInput,
   RollbackLastTurnInput,
   RollbackLastTurnResult,
+  RuntimeLiveResourceLease,
   RuntimeModelCatalog,
   RuntimePresentationCapabilities,
   RuntimeSession,
-  RuntimeLiveResourceLease,
   RuntimeUiSlotState,
   StartChatSessionInput,
   StreamTurnInput,
@@ -53,6 +51,8 @@ import type {
 } from '../../chat-runtime/runtime-provider-types'
 import { ProviderErrors, ProviderRuntimeError } from '../../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../../provider-contracts/types'
+import { providerChunk } from '../kit/chunk-mapper'
+import { requestProviderToolApproval } from '../kit/permission-bridge'
 import { readProviderStateSnapshot } from '../provider-state-snapshot'
 import { resolveOpencodeConfig } from './config'
 import { OpencodeEventStreamProjector, readOpencodeTerminalAssistantForTurn } from './event-stream'
@@ -67,6 +67,7 @@ import {
   OPENCODE_RUNTIME_METADATA,
 } from './metadata'
 import { listOpencodeRuntimeModels, OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID } from './model-inventory'
+import { OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS } from './owned-provider-targets'
 import { createOpencodeRuntimePresentation } from './presentation'
 import type { OpencodeRuntimeResource } from './runtime-context'
 import { acquireOpencodeRuntimeResource } from './runtime-context'
@@ -100,6 +101,7 @@ export class OpencodeProvider implements ChatRuntime {
   readonly runtimeKind = OPENCODE_RUNTIME_KIND
   readonly metadata = OPENCODE_RUNTIME_METADATA
   readonly capabilities = OPENCODE_RUNTIME_CAPABILITIES
+  readonly ownedProviderTargets = OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS
 
   private _lastUsage: TokenUsage | null = null
   private _lastModelId: string | null = null
@@ -401,9 +403,9 @@ export class OpencodeProvider implements ChatRuntime {
     const sortDirection = input.sortDirection ?? 'desc'
     const searchTerm = normalizeProviderThreadText(input.searchTerm)
     const childCounts = countOpencodeSessionChildren(sessions)
-    const threads = sessions
+    const visibleSessions = input.archived ? [] : sessions
+    const threads = visibleSessions
       .map(session => projectOpencodeProviderThread(session, childCounts.get(session.id) ?? 0))
-      .filter(thread => !input.archived)
       .filter(thread => !searchTerm || opencodeProviderThreadMatchesSearch(thread, searchTerm))
       .sort((left, right) => compareOpencodeProviderThreads(left, right, sortKey, sortDirection))
 
@@ -739,7 +741,7 @@ export class OpencodeProvider implements ChatRuntime {
     let projector = new OpencodeEventStreamProjector(opencodeSessionId)
     const chunks = new AsyncChunkQueue()
     const eventAbortController = new AbortController()
-    let asyncPromptMessageId: string | null = null
+    let asyncPromptBaselineMessageIds: ReadonlySet<string> | null = null
     let asyncPromptDispatchStarted = false
     let asyncPromptSubmitted = false
     let eventStreamEnded = false
@@ -750,12 +752,22 @@ export class OpencodeProvider implements ChatRuntime {
 
     const submitAsyncPromptTurn = async (): Promise<void> => {
       asyncPromptDispatchStarted = true
+      asyncPromptBaselineMessageIds = await this.readAsyncPromptBaselineMessageIds({
+        resource,
+        sessionId: opencodeSessionId,
+        workspacePath: input.workspacePath,
+        chunks,
+      })
+      if (!asyncPromptBaselineMessageIds) {
+        return
+      }
+      projector.ignoreMessages(asyncPromptBaselineMessageIds)
       const submission = await submitOpencodeTurn(resource, {
         sessionId: opencodeSessionId,
         workspacePath: input.workspacePath,
         model: resolved.model,
         agent: readOpencodeTurnAgent(input),
-        asyncPromptMessageId,
+        useAsyncPrompt: true,
         systemPrompt: input.systemPrompt,
         message: input.message,
       })
@@ -811,7 +823,7 @@ export class OpencodeProvider implements ChatRuntime {
       opencodeSessionId = session.id
       input.runtimeSession.providerSessionId = session.id
       projector = new OpencodeEventStreamProjector(opencodeSessionId)
-      asyncPromptMessageId = createOpencodePromptMessageId(`${input.runId}_retry`)
+      asyncPromptBaselineMessageIds = null
       asyncPromptDispatchStarted = false
       asyncPromptSubmitted = false
       asyncPromptSessionBecameBusy = false
@@ -830,15 +842,15 @@ export class OpencodeProvider implements ChatRuntime {
 
     const recoverAsyncPromptIfTerminalSignalObserved = async (): Promise<void> => {
       if (
-        !asyncPromptMessageId
+        !asyncPromptBaselineMessageIds
         || eventStreamRecoveryStarted
         || chunks.done
       ) {
         return
       }
       const shouldRecoverFromEndedStream = eventStreamEnded && asyncPromptSubmitted
-      const shouldRecoverFromIdleSession =
-        asyncPromptDispatchStarted && asyncPromptSessionBecameBusy && asyncPromptSessionBecameIdle
+      const shouldRecoverFromIdleSession
+        = asyncPromptDispatchStarted && asyncPromptSessionBecameBusy && asyncPromptSessionBecameIdle
       if (!shouldRecoverFromEndedStream && !shouldRecoverFromIdleSession) {
         return
       }
@@ -849,7 +861,7 @@ export class OpencodeProvider implements ChatRuntime {
         chunks,
         sessionId: opencodeSessionId,
         workspacePath: input.workspacePath,
-        userMessageId: asyncPromptMessageId,
+        baselineMessageIds: asyncPromptBaselineMessageIds,
       })
       if (recovered) {
         return
@@ -875,7 +887,6 @@ export class OpencodeProvider implements ChatRuntime {
         signal: eventAbortController.signal,
         sseMaxRetryAttempts: 0,
       })
-      asyncPromptMessageId = createOpencodePromptMessageId(input.runId)
       void (async () => {
         try {
           for await (const event of subscription.stream) {
@@ -899,10 +910,12 @@ export class OpencodeProvider implements ChatRuntime {
             for (const chunk of projector.projectEvent(event)) {
               chunks.push(chunk)
             }
-            const terminalAssistant = readOpencodeTerminalAssistantForTurn(event, {
-              sessionId: opencodeSessionId,
-              userMessageId: asyncPromptMessageId!,
-            })
+            const terminalAssistant = asyncPromptBaselineMessageIds
+              ? readOpencodeTerminalAssistantForTurn(event, {
+                  sessionId: opencodeSessionId,
+                  baselineMessageIds: asyncPromptBaselineMessageIds,
+                })
+              : null
             if (terminalAssistant) {
               await this.closeAsyncPromptTurn({
                 resource,
@@ -987,24 +1000,18 @@ export class OpencodeProvider implements ChatRuntime {
       status: 'pending',
     })
 
-    input.chunks.push({ type: 'tool-input-start', toolCallId, toolName: 'server_request_opencode_permission' })
-    input.chunks.push({
-      type: 'tool-input-available',
+    input.chunks.push(providerChunk.toolInputStart(toolCallId, 'server_request_opencode_permission'))
+    input.chunks.push(providerChunk.toolInputAvailable({
       toolCallId,
       toolName: 'server_request_opencode_permission',
       input: buildOpencodePermissionInput(permission),
-    })
-    input.chunks.push({ type: 'tool-approval-request', toolCallId, approvalId: toolCallId })
+    }))
+    input.chunks.push(providerChunk.toolApprovalRequest(toolCallId))
 
     try {
-      if (!this.deps.requestToolApproval) {
-        throw new ProviderRuntimeError(
-          ProviderErrors.requestFailed(this.runtimeKind, 'permission.updated', 'Chat Runtime does not expose pending tool approval handling'),
-        )
-      }
-
       const profileProviderKind = input.input.profile?.providerKind ?? 'universal'
-      const resolution = await this.deps.requestToolApproval({
+      const resolution = await requestProviderToolApproval({
+        deps: this.deps,
         sessionId: input.input.runtimeSession.chatSessionId,
         runId: input.input.runId,
         providerRequestId: permission.id,
@@ -1033,8 +1040,7 @@ export class OpencodeProvider implements ChatRuntime {
         permission,
         status: resolution.approved ? 'approved' : 'denied',
       })
-      input.chunks.push({
-        type: 'tool-output-available',
+      input.chunks.push(providerChunk.toolOutputAvailable({
         toolCallId,
         output: buildOpencodePermissionOutput({
           permission,
@@ -1042,7 +1048,7 @@ export class OpencodeProvider implements ChatRuntime {
           approved: resolution.approved,
           reason: resolution.reason,
         }),
-      })
+      }))
     }
     catch (error) {
       this.recordPermissionApproval({
@@ -1050,11 +1056,7 @@ export class OpencodeProvider implements ChatRuntime {
         permission,
         status: 'denied',
       })
-      input.chunks.push({
-        type: 'tool-output-error',
-        toolCallId,
-        errorText: formatOpencodeError(error),
-      })
+      input.chunks.push(providerChunk.toolOutputError(toolCallId, formatOpencodeError(error)))
       await input.resource.client.postSessionIdPermissionsPermissionId({
         path: {
           id: permission.sessionID,
@@ -1133,7 +1135,7 @@ export class OpencodeProvider implements ChatRuntime {
     chunks: AsyncChunkQueue
     sessionId: string
     workspacePath?: string
-    userMessageId: string
+    baselineMessageIds: ReadonlySet<string>
   }): Promise<boolean> {
     if (input.chunks.done) {
       return true
@@ -1154,7 +1156,7 @@ export class OpencodeProvider implements ChatRuntime {
       return true
     }
 
-    const terminalAssistant = readTerminalAssistantForUserMessage(messages.data ?? [], input.userMessageId)
+    const terminalAssistant = readTerminalAssistantAfterBaseline(messages.data ?? [], input.baselineMessageIds)
     if (!terminalAssistant) {
       return false
     }
@@ -1168,6 +1170,29 @@ export class OpencodeProvider implements ChatRuntime {
       assistant: terminalAssistant,
     })
     return true
+  }
+
+  private async readAsyncPromptBaselineMessageIds(input: {
+    resource: OpencodeRuntimeResource
+    sessionId: string
+    workspacePath?: string
+    chunks: AsyncChunkQueue
+  }): Promise<ReadonlySet<string> | null> {
+    const messages = await input.resource.client.session.messages({
+      path: { id: input.sessionId },
+      query: { directory: input.workspacePath, limit: 50 },
+    })
+    if (messages.error) {
+      input.chunks.fail(new ProviderRuntimeError(
+        ProviderErrors.requestFailed(
+          this.runtimeKind,
+          'session.promptAsync',
+          `opencode async prompt baseline failed: ${formatOpencodeError(messages.error)}`,
+        ),
+      ))
+      return null
+    }
+    return readOpencodeMessageIds(messages.data ?? [])
   }
 
   private recordPermissionApproval(input: {
@@ -1356,7 +1381,7 @@ async function submitOpencodeTurn(
     workspacePath?: string
     model: { providerID: string, modelID: string } | null
     agent: string
-    asyncPromptMessageId: string | null
+    useAsyncPrompt: boolean
     systemPrompt?: string
     message: StreamTurnInput['message']
   },
@@ -1403,12 +1428,11 @@ async function submitOpencodeTurn(
     }
   }
 
-  if (input.asyncPromptMessageId) {
+  if (input.useAsyncPrompt) {
     const result = await resource.client.session.promptAsync({
       path: { id: input.sessionId },
       query: { directory: input.workspacePath },
       body: {
-        messageID: input.asyncPromptMessageId,
         ...(input.model ? { model: input.model } : {}),
         agent: input.agent,
         ...(input.systemPrompt ? { system: input.systemPrompt } : {}),
@@ -1454,11 +1478,6 @@ function normalizeOpencodeTurnResult(result: {
 
 function readOpencodeTurnAgent(input: StreamTurnInput): string {
   return input.providerOptions?.runtimeSettings?.interactionMode === 'plan' ? 'plan' : 'build'
-}
-
-function createOpencodePromptMessageId(runId: string): string {
-  const suffix = (runId || randomUUID()).replace(/[^a-zA-Z0-9]/g, '_')
-  return `msg_cradle_${suffix}`
 }
 
 function isOpencodeSessionStatusEvent(
@@ -1633,8 +1652,7 @@ function projectOpencodeMcpState(
   serversByName: Map<string, OpencodeMcpStatus>,
   updatedAt: number,
 ): RuntimeUiSlotState {
-  const servers = [...serversByName.entries()]
-    .map(([name, status]) => ({
+  const servers = Array.from(serversByName.entries(), ([name, status]) => ({
       name,
       status: projectOpencodeMcpServerStatus(status),
       authStatus: projectOpencodeMcpAuthStatus(status),
@@ -1876,6 +1894,8 @@ function projectOpencodeMessagePartsToUiParts(parts: OpencodePart[]): UIMessage[
       case 'compaction':
       case 'subtask':
         return []
+      default:
+        return []
     }
   })
 }
@@ -1959,15 +1979,21 @@ function readLastAssistantMessage(
   return selected
 }
 
-function readTerminalAssistantForUserMessage(
+function readOpencodeMessageIds(
   messages: Array<{ info: OpencodeMessage, parts: OpencodePart[] }>,
-  userMessageId: string,
+): ReadonlySet<string> {
+  return new Set(messages.map(message => message.info.id))
+}
+
+function readTerminalAssistantAfterBaseline(
+  messages: Array<{ info: OpencodeMessage, parts: OpencodePart[] }>,
+  baselineMessageIds: ReadonlySet<string>,
 ): OpencodeAssistantMessage | null {
   let selected: OpencodeAssistantMessage | null = null
   for (const message of messages) {
     if (
       message.info.role !== 'assistant'
-      || message.info.parentID !== userMessageId
+      || baselineMessageIds.has(message.info.id)
       || !isTerminalOpencodeAssistant(message.info)
     ) {
       continue

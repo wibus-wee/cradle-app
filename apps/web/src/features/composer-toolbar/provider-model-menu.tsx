@@ -9,12 +9,14 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ProviderIcon } from '~/components/common/provider-icons'
+import { Input } from '~/components/ui/input'
 import { MenuItem, MenuSeparator, MenuSub, MenuSubPopup, MenuSubTrigger } from '~/components/ui/menu'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS } from '~/features/browser/native-surface-occlusion'
 import { cn } from '~/lib/cn'
 
 import { presetForProviderKind, providerTargetDisplayIconSlug } from '../agent-management/provider-settings-utils'
+import { filterModelsBySearch } from './provider-model-filter'
 import type { ProviderModelOption } from './types'
 
 export interface ThinkingOption<TThinking extends string | null> {
@@ -86,17 +88,6 @@ function occurrenceKey(id: string, counts: Map<string, number>): string {
   return `${id}:${count}`
 }
 
-export function filterModelsBySearch(models: ModelDescriptor[], search: string): ModelDescriptor[] {
-  const normalizedSearch = search.trim().toLowerCase()
-  if (!normalizedSearch) {
-    return models
-  }
-
-  return models.filter(model =>
-    model.label.toLowerCase().includes(normalizedSearch)
-    || model.id.toLowerCase().includes(normalizedSearch))
-}
-
 export function CurrentProviderModelList<TThinking extends string | null>({
   models,
   selectedModelId,
@@ -132,7 +123,7 @@ export function CurrentProviderModelList<TThinking extends string | null>({
     <>
       {models.length > 0 && (
         <div className="px-1 pt-1 pb-1.5">
-          <input
+          <Input
             aria-label="Search models"
             value={modelSearch}
             onChange={(event) => {
@@ -140,7 +131,7 @@ export function CurrentProviderModelList<TThinking extends string | null>({
               setRenderCount(INITIAL_BATCH)
             }}
             placeholder={t('model.searchPlaceholder')}
-            className="w-full rounded-md border border-border/50 bg-input/30 px-2 py-1 text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-border"
+            className="h-7 rounded-md border-border/50 bg-input/30 px-2 py-1 text-[12px] placeholder:text-muted-foreground/50 focus-visible:border-border focus-visible:ring-0 md:text-[12px]"
             onClick={event => event.stopPropagation()}
             onKeyDown={event => event.stopPropagation()}
           />

@@ -27,6 +27,10 @@ import {
   CENTER_COLUMN_EXPANDED_Y,
 } from '~/components/layout/layout-motion'
 import { ResizeHandle } from '~/components/layout/resize-handle'
+import {
+  useChatSessionLayoutRecord,
+  useWorkspaceLayoutRecord,
+} from '~/components/layout/use-layout-query-records'
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { Skeleton } from '~/components/ui/skeleton'
 import { useJarvisUiStore } from '~/features/system-agent/jarvis-ui-store'
@@ -39,7 +43,6 @@ import { chatSessionIdForSurface } from '~/navigation/surface-identity'
 import type { BrowserTabSource } from '~/store/browser-panel'
 import { DEFAULT_BROWSER_PANEL_OWNER_ID, useBrowserPanelStore } from '~/store/browser-panel'
 import { useLayoutStore } from '~/store/layout'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 const ASIDE = { min: 200, max: 560 }
 const PANEL = { min: 80, max: 480 }
@@ -617,8 +620,7 @@ function AppLayoutContent({
   const activeSessionTitle = activeTab?.type === 'chat' ? activeTab.label : null
   const activeChromeOwnerId = activeSurface?.id ?? null
   const activeBrowserPanelOwnerId = activeChromeOwnerId
-  const activeSessionLayout = useSessionLayoutStore(state =>
-    activeSessionId ? state.sessions[activeSessionId] : undefined)
+  const activeSessionLayout = useChatSessionLayoutRecord(activeSessionId)
   const layoutContract = deriveActiveLayoutContract({
     activeTab,
     slots,
@@ -634,8 +636,7 @@ function AppLayoutContent({
   const resolvedHasAside = layoutContract.hasAside
   const resolvedHasBrowserPanel = layoutContract.hasBrowserPanel
   const resolvedHasPanel = layoutContract.hasPanel
-  const resolvedWorkspaceLayout = useSessionLayoutStore(state =>
-    resolvedAsideWorkspaceId ? state.workspaces[resolvedAsideWorkspaceId] : undefined)
+  const resolvedWorkspaceLayout = useWorkspaceLayoutRecord(resolvedAsideWorkspaceId)
   const resolvedAsideWorkspacePath
     = resolvedWorkspaceLayout?.workspacePath
       ?? (activeSessionLayout?.workspaceId === resolvedAsideWorkspaceId

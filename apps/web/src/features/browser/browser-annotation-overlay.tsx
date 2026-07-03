@@ -15,9 +15,10 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { cn } from '~/lib/cn'
 import type {
@@ -308,6 +309,15 @@ export function BrowserAnnotationOverlay({
   const [popupAnimationState, setPopupAnimationState] = useState<PopupAnimationState>('initial')
   const [isShaking, setIsShaking] = useState(false)
   const [isStylesExpanded, setIsStylesExpanded] = useState(false)
+  const [popupAnchor, setPopupAnchor] = useState(anchor)
+
+  if (anchor !== popupAnchor) {
+    setPopupAnchor(anchor)
+    if (anchor) {
+      setIsShaking(false)
+      setPopupAnimationState('initial')
+    }
+  }
 
   const visibleRegion = drag ? buildRegion(drag) : anchor?.kind === 'region' ? anchor : null
   const selectedElement = anchor?.kind === 'element' ? anchor.element : null
@@ -552,29 +562,33 @@ export function BrowserAnnotationOverlay({
     return true
   }
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        cancelWithExit()
+  const handleOverlayShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelWithExit()
+      return
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault()
+      const input = buildSubmitInput()
+      if (!input) {
+        shakeEditor()
         return
       }
-      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-        event.preventDefault()
-        const input = buildSubmitInput()
-        if (!input) {
-          shakeEditor()
-          return
-        }
-        onSubmit(input)
-      }
+      onSubmit(input)
+    }
+  })
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      handleOverlayShortcut(event)
     }
 
     window.addEventListener('keydown', handleKeyDown, true)
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true)
     }
-  }, [buildSubmitInput, cancelWithExit, onSubmit, shakeEditor])
+  }, [])
 
   useEffect(() => {
     if (!anchor) {
@@ -584,8 +598,6 @@ export function BrowserAnnotationOverlay({
       window.clearTimeout(cancelTimerRef.current)
       cancelTimerRef.current = null
     }
-    setIsShaking(false)
-    setPopupAnimationState('initial')
     const enterTimer = window.setTimeout(() => {
       setPopupAnimationState('enter')
     }, 0)
@@ -756,9 +768,10 @@ export function BrowserAnnotationOverlay({
           >
             {selectedElement && styleRows.length > 0
               ? (
-                  <button
+                  <Button
                     type="button"
-                    className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left text-xs leading-5 text-muted-foreground transition-[color] duration-150 hover:text-foreground"
+                    variant="ghost"
+                    className="h-auto min-w-0 !shrink flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs leading-5 text-muted-foreground hover:bg-transparent hover:text-foreground"
                     onClick={() => setIsStylesExpanded(expanded => !expanded)}
                     aria-expanded={isStylesExpanded}
                   >
@@ -775,7 +788,7 @@ export function BrowserAnnotationOverlay({
                         {anchorTokenLabel(anchor)}
                       </span>
                     </span>
-                  </button>
+                  </Button>
                 )
               : (
                   <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-xs leading-5 text-muted-foreground">
@@ -846,20 +859,23 @@ export function BrowserAnnotationOverlay({
                     key={image.id}
                     className="group relative size-14 shrink-0 overflow-hidden rounded-md bg-muted shadow-[inset_0_0_0_1px_rgba(0,0,0,0.10)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
                   >
-                    <button
+                    <Button
                       type="button"
-                      className="size-full text-left"
+                      variant="ghost"
+                      className="size-full rounded-none p-0 text-left hover:bg-transparent"
                       onClick={() => setPreviewImage(image)}
                       aria-label={`Preview ${label}`}
                     >
                       <img src={image.filePart.url} alt={label} className="size-full object-cover" />
-                    </button>
+                    </Button>
                     <span className="pointer-events-none absolute bottom-1 left-1 flex size-5 items-center justify-center rounded-sm bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
                       <Maximize2Icon className="size-3" />
                     </span>
-                    <button
+                    <Button
                       type="button"
-                      className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-sm bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover:opacity-100"
+                      variant="ghost"
+                      size="icon-xs"
+                      className="absolute right-1 top-1 size-5 rounded-sm bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:bg-background/90 hover:text-foreground group-hover:opacity-100"
                       onClick={(event) => {
                         event.stopPropagation()
                         setAttachedImages(previous => previous.filter(item => item.id !== image.id))
@@ -867,14 +883,14 @@ export function BrowserAnnotationOverlay({
                       aria-label={`Remove ${label}`}
                     >
                       <XIcon className="size-3" />
-                    </button>
+                    </Button>
                   </div>
                 )
               })}
             </div>
           )}
           <div className="mt-2 flex items-center gap-1.5">
-            <input
+            <Input
               ref={imageInputRef}
               type="file"
               aria-label="Attached images"
@@ -941,16 +957,17 @@ export function BrowserAnnotationOverlay({
         </form>
       )}
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
         className={cn(
-          'absolute bottom-3 left-3 rounded-md bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-lg ring-1 ring-border/70 backdrop-blur',
-          'transition-colors hover:bg-background hover:text-foreground',
+          'absolute bottom-3 left-3 h-auto rounded-md bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-lg ring-1 ring-border/70 backdrop-blur',
+          'hover:bg-background hover:text-foreground',
         )}
         onClick={cancelWithExit}
       >
         Exit annotate
-      </button>
+      </Button>
       {previewImage && (
         <dialog
           ref={previewDialogRef}
@@ -959,9 +976,10 @@ export function BrowserAnnotationOverlay({
           onCancel={() => setPreviewImage(null)}
         >
           <div className="relative flex h-full w-full items-center justify-center p-6">
-            <button
+            <Button
               type="button"
-              className="absolute inset-0 cursor-default"
+              variant="ghost"
+              className="absolute inset-0 h-auto w-auto cursor-default rounded-none p-0 hover:bg-transparent"
               onClick={() => setPreviewImage(null)}
               aria-label="Close image preview"
             />
@@ -971,14 +989,16 @@ export function BrowserAnnotationOverlay({
               alt={previewImage.filePart.filename ?? 'Attached image'}
               className="max-h-[calc(100vh-96px)] max-w-[calc(100vw-96px)] rounded-lg object-contain shadow-2xl ring-1 ring-white/20"
             />
-            <button
+            <Button
               type="button"
-              className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-md bg-background/90 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 size-8 rounded-md bg-background/90 text-muted-foreground shadow-sm hover:bg-background/90 hover:text-foreground"
               onClick={() => setPreviewImage(null)}
               aria-label="Close image preview"
             >
               <XIcon className="size-4" />
-            </button>
+            </Button>
             </div>
           </div>
         </dialog>

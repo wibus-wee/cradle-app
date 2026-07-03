@@ -7,6 +7,14 @@ import { app, BrowserWindow, dialog, screen, shell as nativeLauncher, systemPref
 
 import { BrowserTabScriptsService } from './browser-tab-scripts'
 import type {
+  ChatEventTailBroker,
+  DesktopChatEventTailAbortRequest,
+  DesktopChatEventTailDiagnostics,
+  DesktopChatEventTailHandle,
+  DesktopChatSubscribeGlobalSessionEventsRequest,
+  DesktopChatSubscribeSessionEventsRequest,
+} from './chat-event-tail-broker'
+import type {
   ChatStreamBroker,
   DesktopChatAbortRequest,
   DesktopChatStartResponseRequest,
@@ -477,6 +485,7 @@ interface NativeServicesContext {
   getUpdateManager: () => DesktopUpdateManager | null
   getMacBridgeManager: () => MacBridgeManager | null
   getChatStreamBroker: () => ChatStreamBroker | null
+  getChatEventTailBroker: () => ChatEventTailBroker | null
   getQuitGuard: () => QuitGuard
 }
 
@@ -496,6 +505,10 @@ function getMacBridgeManager(): MacBridgeManager | null {
 
 function getChatStreamBroker(): ChatStreamBroker | null {
   return nativeServicesContext?.getChatStreamBroker() ?? null
+}
+
+function getChatEventTailBroker(): ChatEventTailBroker | null {
+  return nativeServicesContext?.getChatEventTailBroker() ?? null
 }
 
 function getQuitGuard(): QuitGuard | null {
@@ -773,6 +786,44 @@ class DesktopChatStreamService extends IpcService {
     const broker = getChatStreamBroker()
     if (!broker) {
       throw new Error('Desktop chat stream broker is not initialized')
+    }
+    return broker
+  }
+}
+
+// ── Desktop Chat Event Tail Service ──────────────────────────────────────────
+
+class DesktopChatEventTailService extends IpcService {
+  static readonly groupName = 'chatEventTail'
+
+  @IpcMethod()
+  async subscribeSessionEvents(
+    request: DesktopChatSubscribeSessionEventsRequest,
+  ): Promise<DesktopChatEventTailHandle> {
+    return this.readBroker().subscribeSessionEvents(getIpcContext().sender, request)
+  }
+
+  @IpcMethod()
+  async subscribeGlobalSessionEvents(
+    request: DesktopChatSubscribeGlobalSessionEventsRequest,
+  ): Promise<DesktopChatEventTailHandle> {
+    return this.readBroker().subscribeGlobalSessionEvents(getIpcContext().sender, request)
+  }
+
+  @IpcMethod()
+  async abort(request: DesktopChatEventTailAbortRequest): Promise<void> {
+    this.readBroker().abortTail(getIpcContext().sender, request)
+  }
+
+  @IpcMethod()
+  async diagnostics(): Promise<DesktopChatEventTailDiagnostics> {
+    return this.readBroker().diagnostics()
+  }
+
+  private readBroker(): ChatEventTailBroker {
+    const broker = getChatEventTailBroker()
+    if (!broker) {
+      throw new Error('Desktop chat event tail broker is not initialized')
     }
     return broker
   }
@@ -1177,6 +1228,7 @@ export function createNativeServices(context: NativeServicesContext) {
     WindowService,
     DesktopUpdateService,
     DesktopChatStreamService,
+    DesktopChatEventTailService,
     MacCaptureService,
     BrowserTabScriptsService,
   ] as const)

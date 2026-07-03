@@ -37,11 +37,7 @@ const spec = {
       "name": "runtimeKind",
       "required": false,
       "target": "body.runtimeKind",
-      "type": "string",
-      "values": [
-        "codex",
-        "claude-agent"
-      ]
+      "type": "string"
     },
     {
       "name": "modelId",

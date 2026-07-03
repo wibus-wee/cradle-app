@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Git ref from wibus-wee/Cradle to checkout'
+        description: 'Git ref from wibus-wee/cradle-app to checkout'
         required: true
         default: 'main'
 
@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
+          repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: ${{ inputs.source_ref }}
 

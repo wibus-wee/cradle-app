@@ -1,0 +1,20 @@
+id: trivial-pass-through-wrapper
+language: TypeScript
+severity: warning
+message: >
+  Function only delegates to another function/method with the same arguments;
+  inline the target call at each call site instead of wrapping it.
+rule:
+  any:
+    # function listX(...args) { return obj.listY(...args) }
+    - pattern: 'function $FUNC($$$ARGS) { return $TARGET.$METHOD($$$ARGS) }'
+    - pattern: 'function $FUNC($$$ARGS): $RET { return $TARGET.$METHOD($$$ARGS) }'
+    # function listX(...args) { return listY(...args) }
+    - pattern: 'function $FUNC($$$ARGS) { return $TARGET($$$ARGS) }'
+    - pattern: 'function $FUNC($$$ARGS): $RET { return $TARGET($$$ARGS) }'
+constraints:
+  FUNC:
+    regex: ^(list|get|read|resolve|fetch|query)[A-Z].*
+  TARGET:
+    not:
+      regex: ^(this|super)$

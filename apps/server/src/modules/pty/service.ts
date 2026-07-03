@@ -10,16 +10,17 @@ import {
 import { getSystemWorkflow } from '../../helpers/system-workflow'
 import { db } from '../../infra'
 import { reportRuntimeSessionTitle } from '../chat-runtime/title-service'
+import { runtimeUsesAgentTerminalLaunch } from '../provider-contracts/runtime-compatibility'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { captureCodexCliSession } from './codex-session-capture'
 import type { PtyClientEvent } from './protocol'
 import type { PtyRuntimeRole } from './pty.runtime'
-import { getDefaultShell, getExecutableCommand } from './pty-platform'
 import { PtyRuntimeRegistry } from './pty.runtime'
 import type { PtyLiveSocket } from './pty.socket'
 import { PtySocketHub } from './pty.socket'
 import { ptyTimeline } from './pty.timeline'
+import { getDefaultShell, getExecutableCommand } from './pty-platform'
 
 const codexCaptureTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellLeaseTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -233,11 +234,11 @@ function hasCodexPositionalArg(args: string[]): boolean {
 
 export function startOrAttach(input: { sessionId: string, cols: number, rows: number }) {
   const context = requireTerminalContext(input.sessionId)
-  if (context.session.runtimeKind !== 'cli-tui') {
+  if (!runtimeUsesAgentTerminalLaunch(context.session.runtimeKind ?? 'standard')) {
     throw new AppError({
       code: 'terminal_profile_not_supported',
       status: 409,
-      message: 'Terminal runtime only supports cli-tui sessions',
+      message: 'Terminal runtime only supports agent terminal sessions',
       details: { sessionId: input.sessionId, runtimeKind: context.session.runtimeKind },
     })
   }

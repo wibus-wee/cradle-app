@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 
 import { AppError } from '../errors/app-error'
 import { db } from '../infra'
+import { readRuntimeDefaultActor } from '../modules/provider-contracts/runtime-compatibility'
 
 export const CRADLE_CHAT_SESSION_ID_HEADER = 'x-cradle-chat-session-id'
 
@@ -57,10 +58,11 @@ export function resolveActorContext(request: Request): MutationActor {
     }
   }
 
-  if (session.runtimeKind === 'jar-core') {
+  const runtimeActor = readRuntimeDefaultActor(session.runtimeKind)
+  if (runtimeActor) {
     return {
-      kind: 'system',
-      id: 'jarvis',
+      kind: runtimeActor.kind,
+      id: runtimeActor.id,
       source: 'chat-session',
       chatSessionId,
     }

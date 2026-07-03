@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai'
 
-import { useChatStore } from '~/store/chat'
+import type { ChatRunState } from '~/store/chat'
+import { chatSelectors, useChatStore } from '~/store/chat'
 
 import type { ChatContinuationMode, ChatQueueItem, ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../commands/chat-response-command'
 import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
@@ -144,6 +145,28 @@ export function isTerminalChatRunStatus(status: RuntimeSessionRunStatus['status'
   return status === 'complete' || status === 'failed' || status === 'aborted'
 }
 
+export function readLocalDriverMessageId(runState: ChatRunState): string | undefined {
+  if (runState.phase === 'submitting') {
+    return runState.messageId
+  }
+  if (runState.phase === 'streaming' && runState.source === 'local') {
+    return runState.messageId
+  }
+  return undefined
+}
+
+export function isChatRunStateLocallyDriven(runState: ChatRunState): boolean {
+  return Boolean(readLocalDriverMessageId(runState))
+}
+
+export function isChatRunStateCancelling(runState: ChatRunState): boolean {
+  return runState.phase === 'settling' && runState.cancelling
+}
+
+export function isChatRunStateStreaming(runState: ChatRunState): boolean {
+  return runState.phase === 'submitting' || runState.phase === 'streaming'
+}
+
 export function releaseSessionStreamingStateForTerminalRun(
   sessionId: string,
   run: RuntimeSessionRunStatus | null | undefined,
@@ -153,10 +176,10 @@ export function releaseSessionStreamingStateForTerminalRun(
   }
 
   const state = useChatStore.getState()
-  const meta = state.sessionMetaMap.get(sessionId)
+  const localDriverMessageId = readLocalDriverMessageId(chatSelectors.sessionRunState(sessionId)(state))
   const sessionMessageIds = new Set((state.messagesMap.get(sessionId) ?? []).map(message => message.id))
-  if (meta?.localDriverMessageId) {
-    sessionMessageIds.add(meta.localDriverMessageId)
+  if (localDriverMessageId) {
+    sessionMessageIds.add(localDriverMessageId)
   }
 
   const candidateMessageIds = new Set<string>()
@@ -176,7 +199,7 @@ export function releaseSessionStreamingStateForTerminalRun(
 
   let released = false
   for (const messageId of candidateMessageIds) {
-    if (!sessionMessageIds.has(messageId) && meta?.localDriverMessageId !== messageId) {
+    if (!sessionMessageIds.has(messageId) && localDriverMessageId !== messageId) {
       continue
     }
     const runDisplayId = state.runDisplayMetaMap.get(messageId)?.runId
@@ -186,9 +209,8 @@ export function releaseSessionStreamingStateForTerminalRun(
     }
     const runMeta = state.runDisplayMetaMap.get(messageId)
     if (
-      state.generatingMessageIds.has(messageId)
-      || state.passiveStreamingMessageIds.has(messageId)
-      || meta?.localDriverMessageId === messageId
+      chatSelectors.isStreamingMessage(messageId)(state)
+      || localDriverMessageId === messageId
       || runMeta?.completedAtMs === null
     ) {
       state.finishGeneration(messageId)
@@ -198,12 +220,11 @@ export function releaseSessionStreamingStateForTerminalRun(
 
   if (released) {
     const nextState = useChatStore.getState()
-    const nextMeta = nextState.sessionMetaMap.get(sessionId)
     const nextSessionMessageIds = new Set((nextState.messagesMap.get(sessionId) ?? []).map(message => message.id))
     const hasRemainingStreamingRefs = [...nextSessionMessageIds].some(messageId =>
-      nextState.generatingMessageIds.has(messageId) || nextState.passiveStreamingMessageIds.has(messageId))
-    if (!hasRemainingStreamingRefs && nextMeta?.passiveStatus === 'streaming') {
-      nextState.setSessionMeta(sessionId, { passiveStatus: 'idle' })
+      chatSelectors.isStreamingMessage(messageId)(nextState))
+    if (!hasRemainingStreamingRefs && isChatRunStateStreaming(chatSelectors.sessionRunState(sessionId)(nextState))) {
+      nextState.setPassiveRunState(sessionId, { messageIds: [], status: 'idle' })
     }
   }
 
@@ -344,11 +365,8 @@ export function readSideChatCommand(text: string): string | null {
 }
 
 export function detachPassiveSessionStreamingState(sessionId: string): void {
-  const state = useChatStore.getState()
-  const meta = state.sessionMetaMap.get(sessionId)
-  state.setPassiveStreamingMessageIds(sessionId, [])
-  state.setSessionMeta(sessionId, {
-    cancelling: Boolean(meta?.cancelling && meta.locallyDriving),
-    passiveStatus: 'idle',
+  useChatStore.getState().setPassiveRunState(sessionId, {
+    messageIds: [],
+    status: 'idle',
   })
 }

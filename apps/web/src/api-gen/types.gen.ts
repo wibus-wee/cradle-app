@@ -5601,38 +5601,6 @@ export type PostSessionsByIdUnreadResponses = {
 
 export type PostSessionsByIdUnreadResponse = PostSessionsByIdUnreadResponses[keyof PostSessionsByIdUnreadResponses];
 
-export type GetSessionsByIdMessagesData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/messages';
-};
-
-export type GetSessionsByIdMessagesResponses = {
-    /**
-     * Response for status 200
-     */
-    200: Array<{
-        id: string;
-        sessionId: string;
-        parentMessageId: string | null;
-        parentToolCallId: string | null;
-        taskId: string | null;
-        depth: number;
-        role: 'user' | 'assistant';
-        status: 'streaming' | 'complete' | 'aborted' | 'failed';
-        content: string;
-        messageJson: string;
-        errorText: string | null;
-        createdAt: number;
-        updatedAt: number;
-    }>;
-};
-
-export type GetSessionsByIdMessagesResponse = GetSessionsByIdMessagesResponses[keyof GetSessionsByIdMessagesResponses];
-
 export type GetSessionsByIdExportMarkdownData = {
     body?: never;
     path: {
@@ -11355,7 +11323,7 @@ export type PutWorkspacesByWorkspaceIdDiffReviewsPreferencesResponse = PutWorksp
 export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateData = {
     body: {
         providerTargetId: string;
-        runtimeKind?: 'codex' | 'claude-agent';
+        runtimeKind?: string;
         modelId?: string | null;
         force?: boolean;
     };
@@ -13667,398 +13635,241 @@ export type GetAcpAgentsByAgentIdInstallPathResponses = {
 
 export type GetAcpAgentsByAgentIdInstallPathResponse = GetAcpAgentsByAgentIdInstallPathResponses[keyof GetAcpAgentsByAgentIdInstallPathResponses];
 
-export type PostChatSessionsBySessionIdResponseData = {
-    body: {
-        text?: string;
-        files?: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts?: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
+export type GetEventsData = {
+    body?: never;
+    path?: never;
+    query: {
+        scope: string;
+        afterSequenceId?: number;
+        workspaceId?: string;
+        limit?: number;
+    };
+    url: '/events';
+};
+
+export type GetEventsResponses = {
+    /**
+     * Server-sent event stream of slim session lifecycle events after the requested global sequence id.
+     */
+    200: string;
+};
+
+export type GetEventsResponse = GetEventsResponses[keyof GetEventsResponses];
+
+export type GetChatSessionsBySessionIdEventsData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: {
+        afterVersion?: number;
+        limit?: number;
+    };
+    url: '/chat/sessions/{sessionId}/events';
+};
+
+export type GetChatSessionsBySessionIdEventsResponses = {
+    /**
+     * Server-sent event stream of slim chat session lifecycle events after the requested aggregate version.
+     */
+    200: string;
+};
+
+export type GetChatSessionsBySessionIdEventsResponse = GetChatSessionsBySessionIdEventsResponses[keyof GetChatSessionsBySessionIdEventsResponses];
+
+export type DeleteChatComposerDraftsBySurfaceIdData = {
+    body?: never;
+    path: {
+        surfaceId: string;
+    };
+    query?: never;
+    url: '/chat/composer-drafts/{surfaceId}';
+};
+
+export type DeleteChatComposerDraftsBySurfaceIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        surfaceId: string;
+        draft: {
+            text: string;
+            contextParts: Array<{
                 type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
                 name: string;
                 path: string;
-            } | null;
-            position?: number;
-        }>;
-        messages?: Array<{
-            id: string;
-            role: 'system' | 'user' | 'assistant';
-            parts: Array<{
+                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+                description: string | null;
+                position?: number;
+            } | {
                 type: string;
-                [key: string]: unknown;
+                provider?: 'cradle' | 'codex';
+                pluginName: string;
+                displayName: string;
+                description: string | null;
+                iconUrl?: string | null;
+                routeSegment: string;
+                capabilities: Array<{
+                    id: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    label: string | null;
+                }>;
+                mcpServers: Array<string>;
+                nativeMention?: {
+                    name: string;
+                    path: string;
+                } | null;
+                position?: number;
             }>;
-            metadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        providerTargetId?: string;
-        modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
-        runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
-        };
+        } | null;
+        revision: number;
+        updatedAt: number | null;
+        deletedAt: number | null;
     };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/response';
 };
 
-export type PostChatSessionsBySessionIdResponseResponses = {
-    /**
-     * Server-sent event stream encoded as AI SDK UIMessageChunk JSON frames. The stream emits chunks such as `start`, `text-start`, `text-delta`, `tool-input-available`, `tool-approval-request`, `tool-output-available`, `finish`, `abort`, and `error`.
-     */
-    200: string;
-};
+export type DeleteChatComposerDraftsBySurfaceIdResponse = DeleteChatComposerDraftsBySurfaceIdResponses[keyof DeleteChatComposerDraftsBySurfaceIdResponses];
 
-export type PostChatSessionsBySessionIdResponseResponse = PostChatSessionsBySessionIdResponseResponses[keyof PostChatSessionsBySessionIdResponseResponses];
-
-export type PostChatSessionsBySessionIdRollbackLastTurnData = {
+export type GetChatComposerDraftsBySurfaceIdData = {
     body?: never;
     path: {
-        sessionId: string;
+        surfaceId: string;
     };
     query?: never;
-    url: '/chat/sessions/{sessionId}/rollback-last-turn';
+    url: '/chat/composer-drafts/{surfaceId}';
 };
 
-export type PostChatSessionsBySessionIdRollbackLastTurnResponses = {
+export type GetChatComposerDraftsBySurfaceIdResponses = {
     /**
      * Response for status 200
      */
     200: {
-        ok: boolean;
-        sessionId: string;
-        messageIds: Array<string>;
-        providerRuntimeKind: string;
-        providerSessionId: string | null;
-        providerRolledBackTurns: number;
-        fileChangesReverted: boolean;
-    };
-};
-
-export type PostChatSessionsBySessionIdRollbackLastTurnResponse = PostChatSessionsBySessionIdRollbackLastTurnResponses[keyof PostChatSessionsBySessionIdRollbackLastTurnResponses];
-
-export type PostChatSessionsBySessionIdBangCommandData = {
-    body: {
-        command: string;
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/bang-command';
-};
-
-export type PostChatSessionsBySessionIdBangCommandResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        command: string;
-        stdout: string;
-        stderr: string;
-        exitCode: number | null;
-        durationMs: number;
-        timedOut: boolean;
-        truncated: boolean;
-        userMessageId: string;
-        resultMessageId: string;
-        userMessage: {
-            id: string;
-            role: 'system' | 'user' | 'assistant';
-            parts: Array<{
+        surfaceId: string;
+        draft: {
+            text: string;
+            contextParts: Array<{
                 type: string;
-                [key: string]: unknown;
-            }>;
-            metadata?: unknown;
-            [key: string]: unknown;
-        };
-        resultMessage: {
-            id: string;
-            role: 'system' | 'user' | 'assistant';
-            parts: Array<{
-                type: string;
-                [key: string]: unknown;
-            }>;
-            metadata?: unknown;
-            [key: string]: unknown;
-        };
-    };
-};
-
-export type PostChatSessionsBySessionIdBangCommandResponse = PostChatSessionsBySessionIdBangCommandResponses[keyof PostChatSessionsBySessionIdBangCommandResponses];
-
-export type PostChatSessionsBySessionIdTitleRegenerateData = {
-    body?: never;
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/title/regenerate';
-};
-
-export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        parentSessionId: string | null;
-        sideContextSource: string | null;
-        workspaceId: string | null;
-        title: string | null;
-        origin: string;
-        providerTargetId: string | null;
-        agentId: string | null;
-        modelId: string | null;
-        thinkingEffort: string | null;
-        linkedIssueId: string | null;
-        runtimeKind: string;
-        status: 'idle' | 'streaming' | 'error';
-        pinned: number;
-        archivedAt: number | null;
-        lastReadAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-        latestUserMessageAt: number | null;
-        latestAssistantMessageAt: number | null;
-        unread: boolean;
-    };
-};
-
-export type PostChatSessionsBySessionIdTitleRegenerateResponse = PostChatSessionsBySessionIdTitleRegenerateResponses[keyof PostChatSessionsBySessionIdTitleRegenerateResponses];
-
-export type PostChatSessionsBySessionIdSideChatData = {
-    body: {
-        providerTargetId?: string;
-        modelId?: string | null;
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/side-chat';
-};
-
-export type PostChatSessionsBySessionIdSideChatResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sideConversationId: string;
-        parentSessionId: string;
-        runtimeKind: string;
-        providerTargetId: string | null;
-        providerSessionId: string | null;
-        title: string;
-    };
-};
-
-export type PostChatSessionsBySessionIdSideChatResponse = PostChatSessionsBySessionIdSideChatResponses[keyof PostChatSessionsBySessionIdSideChatResponses];
-
-export type PostChatSessionsBySessionIdQuickQuestionData = {
-    body: {
-        question: string;
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/quick-question';
-};
-
-export type PostChatSessionsBySessionIdQuickQuestionResponses = {
-    /**
-     * Server-sent event stream with AI SDK UIMessageChunk JSON frames
-     */
-    200: string;
-};
-
-export type PostChatSessionsBySessionIdQuickQuestionResponse = PostChatSessionsBySessionIdQuickQuestionResponses[keyof PostChatSessionsBySessionIdQuickQuestionResponses];
-
-export type PostChatSessionsBySessionIdUserInputByRequestIdData = {
-    body: {
-        answers: {
-            [key: string]: unknown;
-        };
-    };
-    path: {
-        sessionId: string;
-        requestId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/user-input/{requestId}';
-};
-
-export type PostChatSessionsBySessionIdUserInputByRequestIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        requestId: string;
-        answers: {
-            [key: string]: unknown;
-        };
-    };
-};
-
-export type PostChatSessionsBySessionIdUserInputByRequestIdResponse = PostChatSessionsBySessionIdUserInputByRequestIdResponses[keyof PostChatSessionsBySessionIdUserInputByRequestIdResponses];
-
-export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
-    body: {
-        approved: boolean;
-        reason?: string;
-    };
-    path: {
-        sessionId: string;
-        requestId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/tool-approval/{requestId}';
-};
-
-export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        requestId: string;
-        approved: boolean;
-        reason?: string;
-    };
-};
-
-export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponse = PostChatSessionsBySessionIdToolApprovalByRequestIdResponses[keyof PostChatSessionsBySessionIdToolApprovalByRequestIdResponses];
-
-export type PostChatSideConversationsBySideConversationIdResponseData = {
-    body: {
-        text?: string;
-        files?: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts?: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
                 name: string;
                 path: string;
-            } | null;
-            position?: number;
-        }>;
-        messages?: Array<{
-            id: string;
-            role: 'system' | 'user' | 'assistant';
-            parts: Array<{
+                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+                description: string | null;
+                position?: number;
+            } | {
                 type: string;
-                [key: string]: unknown;
+                provider?: 'cradle' | 'codex';
+                pluginName: string;
+                displayName: string;
+                description: string | null;
+                iconUrl?: string | null;
+                routeSegment: string;
+                capabilities: Array<{
+                    id: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    label: string | null;
+                }>;
+                mcpServers: Array<string>;
+                nativeMention?: {
+                    name: string;
+                    path: string;
+                } | null;
+                position?: number;
             }>;
-            metadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        providerTargetId?: string;
-        modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
-        runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
+        } | null;
+        revision: number;
+        updatedAt: number | null;
+        deletedAt: number | null;
+    };
+};
+
+export type GetChatComposerDraftsBySurfaceIdResponse = GetChatComposerDraftsBySurfaceIdResponses[keyof GetChatComposerDraftsBySurfaceIdResponses];
+
+export type PutChatComposerDraftsBySurfaceIdData = {
+    body: {
+        draft: {
+            text: string;
+            contextParts: Array<{
+                type: string;
+                name: string;
+                path: string;
+                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+                description: string | null;
+                position?: number;
+            } | {
+                type: string;
+                provider?: 'cradle' | 'codex';
+                pluginName: string;
+                displayName: string;
+                description: string | null;
+                iconUrl?: string | null;
+                routeSegment: string;
+                capabilities: Array<{
+                    id: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    label: string | null;
+                }>;
+                mcpServers: Array<string>;
+                nativeMention?: {
+                    name: string;
+                    path: string;
+                } | null;
+                position?: number;
+            }>;
         };
     };
     path: {
-        sideConversationId: string;
+        surfaceId: string;
     };
     query?: never;
-    url: '/chat/side-conversations/{sideConversationId}/response';
+    url: '/chat/composer-drafts/{surfaceId}';
 };
 
-export type DeleteChatSideConversationsBySideConversationIdData = {
-    body?: never;
-    path: {
-        sideConversationId: string;
-    };
-    query?: never;
-    url: '/chat/side-conversations/{sideConversationId}';
-};
-
-export type DeleteChatSideConversationsBySideConversationIdResponses = {
+export type PutChatComposerDraftsBySurfaceIdResponses = {
     /**
      * Response for status 200
      */
     200: {
-        ok: boolean;
+        surfaceId: string;
+        draft: {
+            text: string;
+            contextParts: Array<{
+                type: string;
+                name: string;
+                path: string;
+                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+                description: string | null;
+                position?: number;
+            } | {
+                type: string;
+                provider?: 'cradle' | 'codex';
+                pluginName: string;
+                displayName: string;
+                description: string | null;
+                iconUrl?: string | null;
+                routeSegment: string;
+                capabilities: Array<{
+                    id: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    label: string | null;
+                }>;
+                mcpServers: Array<string>;
+                nativeMention?: {
+                    name: string;
+                    path: string;
+                } | null;
+                position?: number;
+            }>;
+        } | null;
+        revision: number;
+        updatedAt: number | null;
+        deletedAt: number | null;
     };
 };
 
-export type DeleteChatSideConversationsBySideConversationIdResponse = DeleteChatSideConversationsBySideConversationIdResponses[keyof DeleteChatSideConversationsBySideConversationIdResponses];
-
-export type GetChatSessionsBySessionIdStreamData = {
-    body?: never;
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/stream';
-};
-
-export type GetChatSessionsBySessionIdStreamResponses = {
-    /**
-     * AI SDK UIMessageChunk SSE stream for the currently active chat run. The stream replays buffered protocol chunks before forwarding live chunks, so late subscribers can rebuild the active assistant message through the AI SDK stream reader.
-     */
-    200: string;
-};
-
-export type GetChatSessionsBySessionIdStreamResponse = GetChatSessionsBySessionIdStreamResponses[keyof GetChatSessionsBySessionIdStreamResponses];
+export type PutChatComposerDraftsBySurfaceIdResponse = PutChatComposerDraftsBySurfaceIdResponses[keyof PutChatComposerDraftsBySurfaceIdResponses];
 
 export type GetChatRuntimesData = {
     body?: never;
@@ -14078,11 +13889,68 @@ export type GetChatRuntimesResponses = {
             description?: string;
             providerKinds: Array<string>;
             providerBinding?: 'required' | 'runtime-owned';
+            sessionLaunchMode: 'runtime-provider' | 'agent-terminal';
             iconKey?: string;
             surfaces?: Array<'chat' | 'jarvis'>;
             sortOrder?: number;
+            stability?: 'stable' | 'experimental';
+            availability: 'stable' | 'preview' | 'dev-only' | 'hidden';
+            degradations?: Array<{
+                capability: string;
+                status: 'unsupported' | 'partial' | 'experimental';
+                reason: string;
+            }>;
+            icon: {
+                key: string;
+            } | {
+                svg: string;
+            } | {
+                url: string;
+            };
+            composer: {
+                inputMode: 'rich' | 'collapsed' | 'none';
+                allowEmptySubmit?: boolean;
+                modelSelection: 'provider-model' | 'runtime-owned' | 'alias-matrix' | 'none';
+                thinking: {
+                    efforts: Array<string>;
+                } | string;
+            };
+            slots: Array<{
+                id: string;
+                name: string;
+                label: string;
+                description: string;
+                argumentHint: string;
+                aliases?: Array<string>;
+                iconKey?: 'alert' | 'approvals' | 'code-review' | 'compact' | 'config' | 'diff' | 'feedback' | 'filesystem' | 'goal' | 'crew' | 'ide-context' | 'mcp' | 'model' | 'personality' | 'plugin' | 'plan' | 'progress' | 'quick-question' | 'user-input' | 'reasoning' | 'search' | 'side-chat' | 'skills' | 'status' | 'terminal' | 'tool-activity' | 'usage';
+                commandText?: string;
+                commandAction?: {
+                    kind: string;
+                } | {
+                    kind: string;
+                    requiresEmptyComposer?: boolean;
+                } | {
+                    kind: string;
+                    actionId: string;
+                };
+                requiresSession?: boolean;
+                surfaces: Array<'slashCommand' | 'toolbarPicker' | 'composerState' | 'messageInline' | 'runtimePanel' | 'streamEvidence' | 'recordOnly'>;
+            }>;
+            settingsSchema?: {
+                [key: string]: unknown;
+            };
             source: 'builtin' | 'plugin';
             pluginOwner: string | null;
+            capabilities: {
+                supportsSteerTurn: boolean;
+                supportsShellExecution: boolean;
+                supportsLastTurnRollback: boolean;
+                supportsRuntimeSettings: boolean;
+                supportsUiSlotStates: boolean;
+                supportsDynamicCapabilities: boolean;
+                supportsTitleGeneration: boolean;
+                sessionModelSwitch: 'in-session' | 'restart-session' | 'unsupported';
+            } | null;
         }>;
     };
 };
@@ -14171,541 +14039,6 @@ export type GetChatRuntimesByRuntimeKindModelsResponses = {
 
 export type GetChatRuntimesByRuntimeKindModelsResponse = GetChatRuntimesByRuntimeKindModelsResponses[keyof GetChatRuntimesByRuntimeKindModelsResponses];
 
-export type GetChatSessionsBySessionIdQueueData = {
-    body?: never;
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/queue';
-};
-
-export type GetChatSessionsBySessionIdQueueResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        items: Array<{
-            id: string;
-            sessionId: string;
-            mode: string;
-            status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
-            text: string;
-            files: Array<{
-                type: string;
-                mediaType: string;
-                filename?: string;
-                url: string;
-                providerMetadata?: unknown;
-                [key: string]: unknown;
-            }>;
-            contextParts: Array<{
-                type: string;
-                name: string;
-                path: string;
-                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-                description: string | null;
-                position?: number;
-            } | {
-                type: string;
-                provider?: 'cradle' | 'codex';
-                pluginName: string;
-                displayName: string;
-                description: string | null;
-                iconUrl?: string | null;
-                routeSegment: string;
-                capabilities: Array<{
-                    id: string;
-                    type: string;
-                    layer: 'server' | 'web' | 'desktop';
-                    label: string | null;
-                }>;
-                mcpServers: Array<string>;
-                nativeMention?: {
-                    name: string;
-                    path: string;
-                } | null;
-                position?: number;
-            }>;
-            providerTargetId: string | null;
-            modelId: string | null;
-            thinkingEffort: string | null;
-            runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
-            };
-            position: number;
-            sourceRunId: string | null;
-            startedRunId: string | null;
-            errorText: string | null;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-    };
-};
-
-export type GetChatSessionsBySessionIdQueueResponse = GetChatSessionsBySessionIdQueueResponses[keyof GetChatSessionsBySessionIdQueueResponses];
-
-export type PostChatSessionsBySessionIdQueueData = {
-    body: {
-        text?: string;
-        files?: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts?: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
-                name: string;
-                path: string;
-            } | null;
-            position?: number;
-        }>;
-        providerTargetId?: string;
-        modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
-        runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
-        };
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/queue';
-};
-
-export type PostChatSessionsBySessionIdQueueResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        sessionId: string;
-        mode: string;
-        status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
-        text: string;
-        files: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
-                name: string;
-                path: string;
-            } | null;
-            position?: number;
-        }>;
-        providerTargetId: string | null;
-        modelId: string | null;
-        thinkingEffort: string | null;
-        runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
-        };
-        position: number;
-        sourceRunId: string | null;
-        startedRunId: string | null;
-        errorText: string | null;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PostChatSessionsBySessionIdQueueResponse = PostChatSessionsBySessionIdQueueResponses[keyof PostChatSessionsBySessionIdQueueResponses];
-
-export type PostChatSessionsBySessionIdSteerData = {
-    body: {
-        text?: string;
-        files?: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts?: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
-                name: string;
-                path: string;
-            } | null;
-            position?: number;
-        }>;
-        providerTargetId?: string;
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/steer';
-};
-
-export type PostChatSessionsBySessionIdSteerResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-        sessionId: string;
-        runId: string;
-        sourceMessageId: string;
-        message: {
-            id: string;
-            role: 'system' | 'user' | 'assistant';
-            parts: Array<{
-                type: string;
-                [key: string]: unknown;
-            }>;
-            metadata?: unknown;
-            [key: string]: unknown;
-        };
-    };
-};
-
-export type PostChatSessionsBySessionIdSteerResponse = PostChatSessionsBySessionIdSteerResponses[keyof PostChatSessionsBySessionIdSteerResponses];
-
-export type PostChatSessionsBySessionIdQueueReorderData = {
-    body: {
-        queueItemIds: Array<string>;
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/queue/reorder';
-};
-
-export type PostChatSessionsBySessionIdQueueReorderResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        items: Array<{
-            id: string;
-            sessionId: string;
-            mode: string;
-            status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
-            text: string;
-            files: Array<{
-                type: string;
-                mediaType: string;
-                filename?: string;
-                url: string;
-                providerMetadata?: unknown;
-                [key: string]: unknown;
-            }>;
-            contextParts: Array<{
-                type: string;
-                name: string;
-                path: string;
-                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-                description: string | null;
-                position?: number;
-            } | {
-                type: string;
-                provider?: 'cradle' | 'codex';
-                pluginName: string;
-                displayName: string;
-                description: string | null;
-                iconUrl?: string | null;
-                routeSegment: string;
-                capabilities: Array<{
-                    id: string;
-                    type: string;
-                    layer: 'server' | 'web' | 'desktop';
-                    label: string | null;
-                }>;
-                mcpServers: Array<string>;
-                nativeMention?: {
-                    name: string;
-                    path: string;
-                } | null;
-                position?: number;
-            }>;
-            providerTargetId: string | null;
-            modelId: string | null;
-            thinkingEffort: string | null;
-            runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
-            };
-            position: number;
-            sourceRunId: string | null;
-            startedRunId: string | null;
-            errorText: string | null;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-    };
-};
-
-export type PostChatSessionsBySessionIdQueueReorderResponse = PostChatSessionsBySessionIdQueueReorderResponses[keyof PostChatSessionsBySessionIdQueueReorderResponses];
-
-export type DeleteChatSessionsBySessionIdQueueByQueueItemIdData = {
-    body?: never;
-    path: {
-        sessionId: string;
-        queueItemId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/queue/{queueItemId}';
-};
-
-export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        sessionId: string;
-        mode: string;
-        status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
-        text: string;
-        files: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
-                name: string;
-                path: string;
-            } | null;
-            position?: number;
-        }>;
-        providerTargetId: string | null;
-        modelId: string | null;
-        thinkingEffort: string | null;
-        runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
-        };
-        position: number;
-        sourceRunId: string | null;
-        startedRunId: string | null;
-        errorText: string | null;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponse = DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses[keyof DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses];
-
-export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
-    body: {
-        text?: string;
-        files?: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts?: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
-                name: string;
-                path: string;
-            } | null;
-            position?: number;
-        }>;
-        providerTargetId?: string;
-        modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
-        runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
-        };
-    };
-    path: {
-        sessionId: string;
-        queueItemId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/queue/{queueItemId}';
-};
-
-export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        sessionId: string;
-        mode: string;
-        status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
-        text: string;
-        files: Array<{
-            type: string;
-            mediaType: string;
-            filename?: string;
-            url: string;
-            providerMetadata?: unknown;
-            [key: string]: unknown;
-        }>;
-        contextParts: Array<{
-            type: string;
-            name: string;
-            path: string;
-            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
-            description: string | null;
-            position?: number;
-        } | {
-            type: string;
-            provider?: 'cradle' | 'codex';
-            pluginName: string;
-            displayName: string;
-            description: string | null;
-            iconUrl?: string | null;
-            routeSegment: string;
-            capabilities: Array<{
-                id: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                label: string | null;
-            }>;
-            mcpServers: Array<string>;
-            nativeMention?: {
-                name: string;
-                path: string;
-            } | null;
-            position?: number;
-        }>;
-        providerTargetId: string | null;
-        modelId: string | null;
-        thinkingEffort: string | null;
-        runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
-        };
-        position: number;
-        sourceRunId: string | null;
-        startedRunId: string | null;
-        errorText: string | null;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponse = PatchChatSessionsBySessionIdQueueByQueueItemIdResponses[keyof PatchChatSessionsBySessionIdQueueByQueueItemIdResponses];
-
 export type GetChatDraftRuntimeCapabilitiesData = {
     body?: never;
     path?: never;
@@ -14736,6 +14069,16 @@ export type GetChatDraftRuntimeCapabilitiesResponses = {
             aliases?: Array<string>;
             iconKey?: 'alert' | 'approvals' | 'code-review' | 'compact' | 'config' | 'diff' | 'feedback' | 'filesystem' | 'goal' | 'crew' | 'ide-context' | 'mcp' | 'model' | 'personality' | 'plugin' | 'plan' | 'progress' | 'quick-question' | 'user-input' | 'reasoning' | 'search' | 'side-chat' | 'skills' | 'status' | 'terminal' | 'tool-activity' | 'usage';
             commandText?: string;
+            commandAction?: {
+                kind: string;
+            } | {
+                kind: string;
+                requiresEmptyComposer?: boolean;
+            } | {
+                kind: string;
+                actionId: string;
+            };
+            requiresSession?: boolean;
             surfaces: Array<'slashCommand' | 'toolbarPicker' | 'composerState' | 'messageInline' | 'runtimePanel' | 'streamEvidence' | 'recordOnly'>;
         }>;
         skills: Array<string>;
@@ -14774,6 +14117,16 @@ export type GetChatSessionsBySessionIdCapabilitiesResponses = {
             aliases?: Array<string>;
             iconKey?: 'alert' | 'approvals' | 'code-review' | 'compact' | 'config' | 'diff' | 'feedback' | 'filesystem' | 'goal' | 'crew' | 'ide-context' | 'mcp' | 'model' | 'personality' | 'plugin' | 'plan' | 'progress' | 'quick-question' | 'user-input' | 'reasoning' | 'search' | 'side-chat' | 'skills' | 'status' | 'terminal' | 'tool-activity' | 'usage';
             commandText?: string;
+            commandAction?: {
+                kind: string;
+            } | {
+                kind: string;
+                requiresEmptyComposer?: boolean;
+            } | {
+                kind: string;
+                actionId: string;
+            };
+            requiresSession?: boolean;
             surfaces: Array<'slashCommand' | 'toolbarPicker' | 'composerState' | 'messageInline' | 'runtimePanel' | 'streamEvidence' | 'recordOnly'>;
         }>;
         skills: Array<string>;
@@ -15598,6 +14951,1010 @@ export type PostChatSessionsBySessionIdCodexAppServerStreamResponses = {
 
 export type PostChatSessionsBySessionIdCodexAppServerStreamResponse = PostChatSessionsBySessionIdCodexAppServerStreamResponses[keyof PostChatSessionsBySessionIdCodexAppServerStreamResponses];
 
+export type PostChatSessionsBySessionIdRollbackLastTurnData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/rollback-last-turn';
+};
+
+export type PostChatSessionsBySessionIdRollbackLastTurnResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+        sessionId: string;
+        messageIds: Array<string>;
+        providerRuntimeKind: string;
+        providerSessionId: string | null;
+        providerRolledBackTurns: number;
+        fileChangesReverted: boolean;
+    };
+};
+
+export type PostChatSessionsBySessionIdRollbackLastTurnResponse = PostChatSessionsBySessionIdRollbackLastTurnResponses[keyof PostChatSessionsBySessionIdRollbackLastTurnResponses];
+
+export type GetChatSessionsBySessionIdQueueData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/queue';
+};
+
+export type GetChatSessionsBySessionIdQueueResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        items: Array<{
+            id: string;
+            sessionId: string;
+            mode: string;
+            status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
+            text: string;
+            files: Array<{
+                type: string;
+                mediaType: string;
+                filename?: string;
+                url: string;
+                providerMetadata?: unknown;
+                [key: string]: unknown;
+            }>;
+            contextParts: Array<{
+                type: string;
+                name: string;
+                path: string;
+                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+                description: string | null;
+                position?: number;
+            } | {
+                type: string;
+                provider?: 'cradle' | 'codex';
+                pluginName: string;
+                displayName: string;
+                description: string | null;
+                iconUrl?: string | null;
+                routeSegment: string;
+                capabilities: Array<{
+                    id: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    label: string | null;
+                }>;
+                mcpServers: Array<string>;
+                nativeMention?: {
+                    name: string;
+                    path: string;
+                } | null;
+                position?: number;
+            }>;
+            providerTargetId: string | null;
+            modelId: string | null;
+            thinkingEffort: string | null;
+            runtimeSettings: {
+                accessMode: 'approval-required' | 'full-access';
+                interactionMode: 'default' | 'plan';
+            };
+            position: number;
+            sourceRunId: string | null;
+            startedRunId: string | null;
+            errorText: string | null;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+    };
+};
+
+export type GetChatSessionsBySessionIdQueueResponse = GetChatSessionsBySessionIdQueueResponses[keyof GetChatSessionsBySessionIdQueueResponses];
+
+export type PostChatSessionsBySessionIdQueueData = {
+    body: {
+        text?: string;
+        files?: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts?: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        providerTargetId?: string;
+        modelId?: string | null;
+        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        runtimeSettings?: {
+            accessMode?: 'approval-required' | 'full-access';
+            interactionMode?: 'default' | 'plan';
+        };
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/queue';
+};
+
+export type PostChatSessionsBySessionIdQueueResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        mode: string;
+        status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
+        text: string;
+        files: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        providerTargetId: string | null;
+        modelId: string | null;
+        thinkingEffort: string | null;
+        runtimeSettings: {
+            accessMode: 'approval-required' | 'full-access';
+            interactionMode: 'default' | 'plan';
+        };
+        position: number;
+        sourceRunId: string | null;
+        startedRunId: string | null;
+        errorText: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostChatSessionsBySessionIdQueueResponse = PostChatSessionsBySessionIdQueueResponses[keyof PostChatSessionsBySessionIdQueueResponses];
+
+export type PostChatSessionsBySessionIdSteerData = {
+    body: {
+        text?: string;
+        files?: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts?: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        providerTargetId?: string;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/steer';
+};
+
+export type PostChatSessionsBySessionIdSteerResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+        sessionId: string;
+        runId: string;
+        sourceMessageId: string;
+        message: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+    };
+};
+
+export type PostChatSessionsBySessionIdSteerResponse = PostChatSessionsBySessionIdSteerResponses[keyof PostChatSessionsBySessionIdSteerResponses];
+
+export type PostChatSessionsBySessionIdQueueReorderData = {
+    body: {
+        queueItemIds: Array<string>;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/queue/reorder';
+};
+
+export type PostChatSessionsBySessionIdQueueReorderResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        items: Array<{
+            id: string;
+            sessionId: string;
+            mode: string;
+            status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
+            text: string;
+            files: Array<{
+                type: string;
+                mediaType: string;
+                filename?: string;
+                url: string;
+                providerMetadata?: unknown;
+                [key: string]: unknown;
+            }>;
+            contextParts: Array<{
+                type: string;
+                name: string;
+                path: string;
+                scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+                description: string | null;
+                position?: number;
+            } | {
+                type: string;
+                provider?: 'cradle' | 'codex';
+                pluginName: string;
+                displayName: string;
+                description: string | null;
+                iconUrl?: string | null;
+                routeSegment: string;
+                capabilities: Array<{
+                    id: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    label: string | null;
+                }>;
+                mcpServers: Array<string>;
+                nativeMention?: {
+                    name: string;
+                    path: string;
+                } | null;
+                position?: number;
+            }>;
+            providerTargetId: string | null;
+            modelId: string | null;
+            thinkingEffort: string | null;
+            runtimeSettings: {
+                accessMode: 'approval-required' | 'full-access';
+                interactionMode: 'default' | 'plan';
+            };
+            position: number;
+            sourceRunId: string | null;
+            startedRunId: string | null;
+            errorText: string | null;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+    };
+};
+
+export type PostChatSessionsBySessionIdQueueReorderResponse = PostChatSessionsBySessionIdQueueReorderResponses[keyof PostChatSessionsBySessionIdQueueReorderResponses];
+
+export type DeleteChatSessionsBySessionIdQueueByQueueItemIdData = {
+    body?: never;
+    path: {
+        sessionId: string;
+        queueItemId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/queue/{queueItemId}';
+};
+
+export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        mode: string;
+        status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
+        text: string;
+        files: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        providerTargetId: string | null;
+        modelId: string | null;
+        thinkingEffort: string | null;
+        runtimeSettings: {
+            accessMode: 'approval-required' | 'full-access';
+            interactionMode: 'default' | 'plan';
+        };
+        position: number;
+        sourceRunId: string | null;
+        startedRunId: string | null;
+        errorText: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponse = DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses[keyof DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses];
+
+export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
+    body: {
+        text?: string;
+        files?: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts?: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        providerTargetId?: string;
+        modelId?: string | null;
+        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        runtimeSettings?: {
+            accessMode?: 'approval-required' | 'full-access';
+            interactionMode?: 'default' | 'plan';
+        };
+    };
+    path: {
+        sessionId: string;
+        queueItemId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/queue/{queueItemId}';
+};
+
+export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        mode: string;
+        status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
+        text: string;
+        files: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        providerTargetId: string | null;
+        modelId: string | null;
+        thinkingEffort: string | null;
+        runtimeSettings: {
+            accessMode: 'approval-required' | 'full-access';
+            interactionMode: 'default' | 'plan';
+        };
+        position: number;
+        sourceRunId: string | null;
+        startedRunId: string | null;
+        errorText: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponse = PatchChatSessionsBySessionIdQueueByQueueItemIdResponses[keyof PatchChatSessionsBySessionIdQueueByQueueItemIdResponses];
+
+export type PostChatSessionsBySessionIdCancelData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/cancel';
+};
+
+export type PostChatSessionsBySessionIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PostChatSessionsBySessionIdCancelResponse = PostChatSessionsBySessionIdCancelResponses[keyof PostChatSessionsBySessionIdCancelResponses];
+
+export type PostChatSessionsBySessionIdTitleRegenerateData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/title/regenerate';
+};
+
+export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        parentSessionId: string | null;
+        sideContextSource: string | null;
+        workspaceId: string | null;
+        title: string | null;
+        origin: string;
+        providerTargetId: string | null;
+        agentId: string | null;
+        modelId: string | null;
+        thinkingEffort: string | null;
+        linkedIssueId: string | null;
+        runtimeKind: string;
+        status: 'idle' | 'streaming' | 'error';
+        pinned: number;
+        archivedAt: number | null;
+        lastReadAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        latestUserMessageAt: number | null;
+        latestAssistantMessageAt: number | null;
+        unread: boolean;
+    };
+};
+
+export type PostChatSessionsBySessionIdTitleRegenerateResponse = PostChatSessionsBySessionIdTitleRegenerateResponses[keyof PostChatSessionsBySessionIdTitleRegenerateResponses];
+
+export type GetChatSessionsBySessionIdRuntimeSettingsData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-settings';
+};
+
+export type GetChatSessionsBySessionIdRuntimeSettingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        runtimeSettings: {
+            accessMode: 'approval-required' | 'full-access';
+            interactionMode: 'default' | 'plan';
+        };
+        claudeAgent: {
+            modelAliases: {
+                haiku: string;
+                sonnet: string;
+                opus: string;
+            };
+        } | null;
+        applied: boolean;
+    };
+};
+
+export type GetChatSessionsBySessionIdRuntimeSettingsResponse = GetChatSessionsBySessionIdRuntimeSettingsResponses[keyof GetChatSessionsBySessionIdRuntimeSettingsResponses];
+
+export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
+    body: {
+        accessMode?: 'approval-required' | 'full-access';
+        interactionMode?: 'default' | 'plan';
+        claudeAgent?: {
+            modelAliases?: {
+                haiku?: string;
+                sonnet?: string;
+                opus?: string;
+            };
+        } | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-settings';
+};
+
+export type PatchChatSessionsBySessionIdRuntimeSettingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        runtimeSettings: {
+            accessMode: 'approval-required' | 'full-access';
+            interactionMode: 'default' | 'plan';
+        };
+        claudeAgent: {
+            modelAliases: {
+                haiku: string;
+                sonnet: string;
+                opus: string;
+            };
+        } | null;
+        applied: boolean;
+    };
+};
+
+export type PatchChatSessionsBySessionIdRuntimeSettingsResponse = PatchChatSessionsBySessionIdRuntimeSettingsResponses[keyof PatchChatSessionsBySessionIdRuntimeSettingsResponses];
+
+export type PostChatSessionsBySessionIdResponseData = {
+    body: {
+        text?: string;
+        files?: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts?: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        messages?: Array<{
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        providerTargetId?: string;
+        modelId?: string | null;
+        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        runtimeSettings?: {
+            accessMode?: 'approval-required' | 'full-access';
+            interactionMode?: 'default' | 'plan';
+        };
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/response';
+};
+
+export type PostChatSessionsBySessionIdResponseResponses = {
+    /**
+     * Server-sent event stream encoded as AI SDK UIMessageChunk JSON frames. The stream emits chunks such as `start`, `text-start`, `text-delta`, `tool-input-available`, `tool-approval-request`, `tool-output-available`, `finish`, `abort`, and `error`.
+     */
+    200: string;
+};
+
+export type PostChatSessionsBySessionIdResponseResponse = PostChatSessionsBySessionIdResponseResponses[keyof PostChatSessionsBySessionIdResponseResponses];
+
+export type PostChatSideConversationsBySideConversationIdResponseData = {
+    body: {
+        text?: string;
+        files?: Array<{
+            type: string;
+            mediaType: string;
+            filename?: string;
+            url: string;
+            providerMetadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        contextParts?: Array<{
+            type: string;
+            name: string;
+            path: string;
+            scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
+            description: string | null;
+            position?: number;
+        } | {
+            type: string;
+            provider?: 'cradle' | 'codex';
+            pluginName: string;
+            displayName: string;
+            description: string | null;
+            iconUrl?: string | null;
+            routeSegment: string;
+            capabilities: Array<{
+                id: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                label: string | null;
+            }>;
+            mcpServers: Array<string>;
+            nativeMention?: {
+                name: string;
+                path: string;
+            } | null;
+            position?: number;
+        }>;
+        messages?: Array<{
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        }>;
+        providerTargetId?: string;
+        modelId?: string | null;
+        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        runtimeSettings?: {
+            accessMode?: 'approval-required' | 'full-access';
+            interactionMode?: 'default' | 'plan';
+        };
+    };
+    path: {
+        sideConversationId: string;
+    };
+    query?: never;
+    url: '/chat/side-conversations/{sideConversationId}/response';
+};
+
+export type PostChatSessionsBySessionIdBangCommandData = {
+    body: {
+        command: string;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/bang-command';
+};
+
+export type PostChatSessionsBySessionIdBangCommandResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        command: string;
+        stdout: string;
+        stderr: string;
+        exitCode: number | null;
+        durationMs: number;
+        timedOut: boolean;
+        truncated: boolean;
+        userMessageId: string;
+        resultMessageId: string;
+        userMessage: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+        resultMessage: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+    };
+};
+
+export type PostChatSessionsBySessionIdBangCommandResponse = PostChatSessionsBySessionIdBangCommandResponses[keyof PostChatSessionsBySessionIdBangCommandResponses];
+
+export type PostChatSessionsBySessionIdSideChatData = {
+    body: {
+        providerTargetId?: string;
+        modelId?: string | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/side-chat';
+};
+
+export type PostChatSessionsBySessionIdSideChatResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sideConversationId: string;
+        parentSessionId: string;
+        runtimeKind: string;
+        providerTargetId: string | null;
+        providerSessionId: string | null;
+        title: string;
+    };
+};
+
+export type PostChatSessionsBySessionIdSideChatResponse = PostChatSessionsBySessionIdSideChatResponses[keyof PostChatSessionsBySessionIdSideChatResponses];
+
+export type PostChatSessionsBySessionIdQuickQuestionData = {
+    body: {
+        question: string;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/quick-question';
+};
+
+export type PostChatSessionsBySessionIdQuickQuestionResponses = {
+    /**
+     * Server-sent event stream with AI SDK UIMessageChunk JSON frames
+     */
+    200: string;
+};
+
+export type PostChatSessionsBySessionIdQuickQuestionResponse = PostChatSessionsBySessionIdQuickQuestionResponses[keyof PostChatSessionsBySessionIdQuickQuestionResponses];
+
+export type PostChatSessionsBySessionIdUserInputByRequestIdData = {
+    body: {
+        answers: {
+            [key: string]: unknown;
+        };
+    };
+    path: {
+        sessionId: string;
+        requestId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/user-input/{requestId}';
+};
+
+export type PostChatSessionsBySessionIdUserInputByRequestIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        requestId: string;
+        answers: {
+            [key: string]: unknown;
+        };
+    };
+};
+
+export type PostChatSessionsBySessionIdUserInputByRequestIdResponse = PostChatSessionsBySessionIdUserInputByRequestIdResponses[keyof PostChatSessionsBySessionIdUserInputByRequestIdResponses];
+
+export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
+    body: {
+        approved: boolean;
+        reason?: string;
+    };
+    path: {
+        sessionId: string;
+        requestId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/tool-approval/{requestId}';
+};
+
+export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        requestId: string;
+        approved: boolean;
+        reason?: string;
+    };
+};
+
+export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponse = PostChatSessionsBySessionIdToolApprovalByRequestIdResponses[keyof PostChatSessionsBySessionIdToolApprovalByRequestIdResponses];
+
+export type DeleteChatSideConversationsBySideConversationIdData = {
+    body?: never;
+    path: {
+        sideConversationId: string;
+    };
+    query?: never;
+    url: '/chat/side-conversations/{sideConversationId}';
+};
+
+export type DeleteChatSideConversationsBySideConversationIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteChatSideConversationsBySideConversationIdResponse = DeleteChatSideConversationsBySideConversationIdResponses[keyof DeleteChatSideConversationsBySideConversationIdResponses];
+
 export type PostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApprovalData = {
     body: {
         approvalId: string;
@@ -15630,6 +15987,24 @@ export type PostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationAppr
 };
 
 export type PostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApprovalResponse = PostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApprovalResponses[keyof PostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApprovalResponses];
+
+export type GetChatSessionsBySessionIdStreamData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/stream';
+};
+
+export type GetChatSessionsBySessionIdStreamResponses = {
+    /**
+     * AI SDK UIMessageChunk SSE stream for the currently active chat run. The stream replays buffered protocol chunks before forwarding live chunks, so late subscribers can rebuild the active assistant message through the AI SDK stream reader.
+     */
+    200: string;
+};
+
+export type GetChatSessionsBySessionIdStreamResponse = GetChatSessionsBySessionIdStreamResponses[keyof GetChatSessionsBySessionIdStreamResponses];
 
 export type GetChatSessionsBySessionIdMessagesData = {
     body?: never;
@@ -15904,100 +16279,6 @@ export type GetChatSessionsBySessionIdRunSnapshotsResponses = {
 };
 
 export type GetChatSessionsBySessionIdRunSnapshotsResponse = GetChatSessionsBySessionIdRunSnapshotsResponses[keyof GetChatSessionsBySessionIdRunSnapshotsResponses];
-
-export type PostChatSessionsBySessionIdCancelData = {
-    body?: never;
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/cancel';
-};
-
-export type PostChatSessionsBySessionIdCancelResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type PostChatSessionsBySessionIdCancelResponse = PostChatSessionsBySessionIdCancelResponses[keyof PostChatSessionsBySessionIdCancelResponses];
-
-export type GetChatSessionsBySessionIdRuntimeSettingsData = {
-    body?: never;
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/runtime-settings';
-};
-
-export type GetChatSessionsBySessionIdRuntimeSettingsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sessionId: string;
-        runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
-        };
-        claudeAgent: {
-            modelAliases: {
-                haiku: string;
-                sonnet: string;
-                opus: string;
-            };
-        } | null;
-        applied: boolean;
-    };
-};
-
-export type GetChatSessionsBySessionIdRuntimeSettingsResponse = GetChatSessionsBySessionIdRuntimeSettingsResponses[keyof GetChatSessionsBySessionIdRuntimeSettingsResponses];
-
-export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
-    body: {
-        accessMode?: 'approval-required' | 'full-access';
-        interactionMode?: 'default' | 'plan';
-        claudeAgent?: {
-            modelAliases?: {
-                haiku?: string;
-                sonnet?: string;
-                opus?: string;
-            };
-        } | null;
-    };
-    path: {
-        sessionId: string;
-    };
-    query?: never;
-    url: '/chat/sessions/{sessionId}/runtime-settings';
-};
-
-export type PatchChatSessionsBySessionIdRuntimeSettingsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sessionId: string;
-        runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
-        };
-        claudeAgent: {
-            modelAliases: {
-                haiku: string;
-                sonnet: string;
-                opus: string;
-            };
-        } | null;
-        applied: boolean;
-    };
-};
-
-export type PatchChatSessionsBySessionIdRuntimeSettingsResponse = PatchChatSessionsBySessionIdRuntimeSettingsResponses[keyof PatchChatSessionsBySessionIdRuntimeSettingsResponses];
 
 export type GetConversationBridgeAdaptersData = {
     body?: never;

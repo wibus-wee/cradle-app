@@ -54,6 +54,7 @@ import type { AgentProfile } from '~/features/agent-runtime/types'
 import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { useAgentProfiles } from '~/features/agent-runtime/use-agent-profiles'
 import { AGENTS_QUERY_KEY } from '~/features/agent-runtime/use-agents'
+import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { cn } from '~/lib/cn'
 
 import { DraftSetupPanel } from './draft-setup-panel'
@@ -74,6 +75,7 @@ import {
   PROVIDER_KIND_LABELS,
   providerListEntryId,
 } from './provider-settings-utils'
+import { listRuntimeSettingsDescriptorsForProviderKind } from './runtime-settings-schema'
 import {
   applyVisibleRangeSelection,
   mergeVisibleSelection,
@@ -215,6 +217,7 @@ export function AgentRuntimeSettings() {
     updateProfile,
     removeProfile,
   } = useAgentProfiles()
+  const { runtimes } = useRuntimeCatalog()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const selectionAnchorIdRef = useRef<string | null>(null)
   const [draft, setDraft] = useState<DraftProvider | null>(null)
@@ -326,8 +329,16 @@ export function AgentRuntimeSettings() {
     () => new Set(providerEntries.map(entry => entry.id)),
     [providerEntries],
   )
+  const draftSelected = !!(draft && selectedIds.has(draft.id))
+  const prunedSelectedIds = draftSelected
+    ? selectedIds
+    : pruneSelectedIds(selectedIds, availableEntryIds)
+  if (prunedSelectedIds !== selectedIds) {
+    setSelectedIds(prunedSelectedIds)
+  }
+  const currentSelectedIds = prunedSelectedIds
 
-  const selectedEntryId = selectedIdFromSet(selectedIds)
+  const selectedEntryId = selectedIdFromSet(currentSelectedIds)
   const selectedEntry = useMemo(
     () => selectedEntryId
       ? (providerEntries.find(entry => entry.id === selectedEntryId) ?? null)
@@ -335,8 +346,8 @@ export function AgentRuntimeSettings() {
     [providerEntries, selectedEntryId],
   )
   const selectedEntries = useMemo(
-    () => selectedRecords(providerEntries, selectedIds),
-    [providerEntries, selectedIds],
+    () => selectedRecords(providerEntries, currentSelectedIds),
+    [providerEntries, currentSelectedIds],
   )
   const selectedProfiles = useMemo(
     () => selectedEntries.flatMap(entry => (entry.kind === 'manual' ? [entry.profile] : [])),
@@ -346,12 +357,18 @@ export function AgentRuntimeSettings() {
     () => selectedEntries.flatMap(entry => (entry.kind === 'external' ? [entry.record] : [])),
     [selectedEntries],
   )
+  const selectedRuntimeSettingsDescriptors = useMemo(
+    () => selectedEntry?.kind === 'manual'
+      ? listRuntimeSettingsDescriptorsForProviderKind(runtimes, selectedEntry.profile.providerKind)
+      : [],
+    [runtimes, selectedEntry],
+  )
   const toggleableSelectedProfiles = selectedProfiles
   const toggleableSelectedExternalRecords = selectedExternalRecords.filter(externalRecordCanToggle)
   const removableSelectedProfiles = selectedProfiles
   const toggleableSelectedCount = toggleableSelectedProfiles.length + toggleableSelectedExternalRecords.length
-  const isDraftSelected = !!(draft && selectedIds.has(draft.id))
-  const allVisibleSelected = visibleRecordsAreSelected(visibleEntries, selectedIds)
+  const isDraftSelected = draftSelected
+  const allVisibleSelected = visibleRecordsAreSelected(visibleEntries, currentSelectedIds)
   const hasFilter = deferredFilter.trim().length > 0
   const providerGroupLabel = (group: (typeof visibleProfileGroups)[number]) => {
       return group.kind === 'manual' ? t('runtime.group.manual') : group.label
@@ -364,16 +381,6 @@ export function AgentRuntimeSettings() {
       return next
     })
   }
-
-  useEffect(() => {
-    if (isDraftSelected) {
-      return
-    }
-    setSelectedIds(prev => pruneSelectedIds(prev, availableEntryIds))
-    if (selectionAnchorIdRef.current && !availableEntryIds.has(selectionAnchorIdRef.current)) {
-      selectionAnchorIdRef.current = null
-    }
-  }, [availableEntryIds, isDraftSelected])
 
   const startDraft = () => {
     const id = `draft-${Date.now()}`
@@ -515,9 +522,11 @@ export function AgentRuntimeSettings() {
         }
         setSelectedIds(new Set())
         selectionAnchorIdRef.current = null
-      }
- finally {
         setBatchBusy(false)
+      }
+      catch (error) {
+        setBatchBusy(false)
+        throw error
       }
     }
 
@@ -539,9 +548,11 @@ export function AgentRuntimeSettings() {
       )
       setSelectedIds(new Set())
       selectionAnchorIdRef.current = null
-    }
- finally {
       setBatchBusy(false)
+    }
+    catch (error) {
+      setBatchBusy(false)
+      throw error
     }
   }
 
@@ -553,7 +564,7 @@ export function AgentRuntimeSettings() {
 
   const selectionShortcutScopeRef = useSettingsSelectionShortcuts({
     hasVisibleRecords: visibleEntries.length > 0,
-    hasSelection: selectedIds.size > 0,
+    hasSelection: currentSelectedIds.size > 0,
     hasDraft: !!draft,
     canDeleteSelection: !batchBusy && removableSelectedProfiles.length > 0,
     onSelectVisible: selectVisibleProfiles,
@@ -589,7 +600,7 @@ export function AgentRuntimeSettings() {
 
   const toolbar = (
     <>
-      {!isDraftSelected && selectedIds.size > 0 && (
+      {!isDraftSelected && currentSelectedIds.size > 0 && (
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
           <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
             <button
@@ -604,7 +615,7 @@ export function AgentRuntimeSettings() {
 : (
                 <SquareIcon className="size-3.5" />
               )}
-              <span>{t('runtime.selection.selected', { selectedCount: selectedIds.size })}</span>
+              <span>{t('runtime.selection.selected', { selectedCount: currentSelectedIds.size })}</span>
             </button>
             <button
               type="button"
@@ -759,7 +770,7 @@ export function AgentRuntimeSettings() {
                           key={entry.id}
                           entry={entry}
                           active={selectedEntryId === entry.id && !isDraftSelected}
-                          selected={selectedIds.has(entry.id)}
+                          selected={currentSelectedIds.has(entry.id)}
                           onOpenEntry={openEntry}
                           onSelectEntry={selectEntry}
                         />
@@ -830,6 +841,7 @@ export function AgentRuntimeSettings() {
         <div key={selectedEntry.profile.id} className="min-w-0 flex-1">
           <ProfileDetailPanel
             profile={selectedEntry.profile}
+            runtimeSettingsDescriptors={selectedRuntimeSettingsDescriptors}
             onRemove={() => void handleRemoveProfile(selectedEntry.profile.id)}
             onToggle={enabled => void handleToggleProfile(selectedEntry.profile, enabled)}
             onSaved={() => {

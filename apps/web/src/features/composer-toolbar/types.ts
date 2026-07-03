@@ -22,6 +22,8 @@ export interface ProviderModelOption {
   providerKind: ProviderKind
   enabled: boolean
   iconSlug: string | null
+  sourceKey?: string | null
+  externalRecordId?: string | null
 }
 
 export type ModelsByProfileId = Record<string, ModelDescriptor[]>

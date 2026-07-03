@@ -8,6 +8,7 @@ import type { CanUseTool, Options, PermissionResult } from '@anthropic-ai/claude
 
 import type { ChatRuntimeSettings, GetCapabilitiesInput, ProviderContext, StreamTurnInput } from '../../chat-runtime/runtime-provider-types'
 import { requireRuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
+import { requestProviderToolApproval } from '../kit/permission-bridge'
 import { CLAUDE_AGENT_RUNTIME_KIND } from './metadata'
 import { CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE, isClaudeAgentExitPlanModeToolName } from './plan-mode'
 import {
@@ -171,7 +172,8 @@ async function handleClaudeAgentToolPermissionRequest(input: {
     agentId: readClaudeAgentPermissionAgentId(input.options),
   })
 
-  const resolution = await input.deps.requestToolApproval({
+  const resolution = await requestProviderToolApproval({
+    deps: input.deps,
     sessionId: input.runtimeInput.runtimeSession.chatSessionId,
     runId: input.runtimeInput.runId,
     providerRequestId: input.options.toolUseID,

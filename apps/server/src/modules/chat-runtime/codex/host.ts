@@ -5,8 +5,11 @@ import { AppError } from '../../../errors/app-error'
 import { db } from '../../../infra'
 import { createChildLogger } from '../../../logging/logger'
 import { readProviderStateSnapshot } from '../../chat-runtime-providers/provider-state-snapshot'
-import { CodexProvider } from '../../chat-runtime-providers/codex/provider'
-import type { CodexAppServerInvokeResponse } from '../../chat-runtime-providers/codex/app-server/bridge'
+import type {
+  CodexAppServerInvokeInput as ProviderCodexAppServerInvokeInput,
+  CodexAppServerInvokeResponse,
+  CodexAppServerStreamInput as ProviderCodexAppServerStreamInput
+} from '../../chat-runtime-providers/codex/app-server/bridge'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
 import {
   assertRuntimeCompatibleTarget,
@@ -17,6 +20,7 @@ import {
   resolveRuntimeSessionForContext
 } from '../runtime-session-context'
 import type {
+  ChatRuntime,
   RuntimeProviderTargetProfile,
   RuntimeSession
 } from '../runtime-provider-types'
@@ -27,6 +31,13 @@ const codexHostLogger = createChildLogger({ module: 'chat-runtime.codex-host' })
 type ProviderBoundSessionRunContext = SessionRunContext & {
   profile: RuntimeProviderTargetProfile
   providerTarget: { id: string; kind: 'manual' | 'external' }
+}
+
+type CodexAppServerRuntime = ChatRuntime & {
+  invokeCodexAppServer(
+    input: ProviderCodexAppServerInvokeInput
+  ): Promise<CodexAppServerInvokeResponse>
+  openCodexAppServerStream(input: ProviderCodexAppServerStreamInput): ReadableStream<Uint8Array>
 }
 
 export interface CodexAppServerInvokeInput {
@@ -218,7 +229,7 @@ async function resolveCodexAppServerContext(input: {
   )
 
   const runtime = getRuntimeRegistry().get('codex')
-  if (!(runtime instanceof CodexProvider)) {
+  if (!isCodexAppServerRuntime(runtime)) {
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
@@ -262,6 +273,15 @@ async function resolveCodexAppServerContext(input: {
     agentId: providerBoundContext.session.agentId,
     modelId: requestedModelId ?? resolvedModelId ?? undefined
   }
+}
+
+function isCodexAppServerRuntime(runtime: ChatRuntime | undefined): runtime is CodexAppServerRuntime {
+  const candidate = runtime as Partial<CodexAppServerRuntime> | undefined
+  return (
+    candidate?.runtimeKind === 'codex' &&
+    typeof candidate.invokeCodexAppServer === 'function' &&
+    typeof candidate.openCodexAppServerStream === 'function'
+  )
 }
 
 function assertCodexProviderBoundContext(context: SessionRunContext): ProviderBoundSessionRunContext {

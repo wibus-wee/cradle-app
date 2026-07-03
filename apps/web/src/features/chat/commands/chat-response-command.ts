@@ -1,6 +1,21 @@
 import type { FileUIPart, UIMessage } from 'ai'
 import { z } from 'zod'
 
+import {
+  deleteChatSessionsBySessionIdQueueByQueueItemId,
+  deleteChatSideConversationsBySideConversationId,
+  getChatSessionsBySessionIdQueue,
+  patchChatSessionsBySessionIdQueueByQueueItemId,
+  postChatSessionsBySessionIdBangCommand,
+  postChatSessionsBySessionIdCancel,
+  postChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApproval,
+  postChatSessionsBySessionIdQueue,
+  postChatSessionsBySessionIdQueueReorder,
+  postChatSessionsBySessionIdSideChat,
+  postChatSessionsBySessionIdSteer,
+  postChatSessionsBySessionIdToolApprovalByRequestId,
+  postChatSessionsBySessionIdUserInputByRequestId,
+} from '~/api-gen/sdk.gen'
 import { getServerUrl } from '~/lib/electron'
 
 import type { ChatContextPart } from '../context/chat-context-parts'
@@ -164,6 +179,40 @@ function parsePlanImplementationApprovalResponse(value: unknown): PlanImplementa
   return PlanImplementationApprovalResponseSchema.parse(value) satisfies PlanImplementationApprovalResult
 }
 
+function stringifySdkError(error: unknown): string {
+  if (typeof error === 'string') {
+    return error
+  }
+  try {
+    return JSON.stringify(error)
+  }
+  catch {
+    return String(error)
+  }
+}
+
+function throwSdkCommandError(prefix: string, response: Response | undefined, error: unknown): never {
+  const bodyText = stringifySdkError(error)
+  throw Object.assign(
+    new Error(`${prefix}: ${response?.status ?? 'unknown'} ${bodyText}`),
+    {
+      bodyText,
+      code: readJsonErrorCodeFromText(bodyText),
+      status: response?.status,
+    },
+  )
+}
+
+function readSdkData<T>(
+  result: { data?: T, error?: unknown, response?: Response },
+  errorPrefix: string,
+): T {
+  if (result.error || result.data === undefined) {
+    throwSdkCommandError(errorPrefix, result.response, result.error)
+  }
+  return result.data
+}
+
 export function readJsonErrorCodeFromText(text: string): string | null {
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
@@ -236,19 +285,12 @@ export async function executeBangCommand(args: {
   command: string
   signal?: AbortSignal
 }): Promise<BangCommandResult> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/bang-command`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ command: args.command }),
+  const result = await postChatSessionsBySessionIdBangCommand({
+    path: { sessionId: args.sessionId },
+    body: { command: args.command },
     signal: args.signal,
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to execute bang command: ${res.status} ${body}`)
-  }
-
-  return await res.json() as BangCommandResult
+  return readSdkData(result, 'Failed to execute bang command') as BangCommandResult
 }
 
 export async function createSideChat(args: {
@@ -257,22 +299,15 @@ export async function createSideChat(args: {
   modelId?: string | null
   signal?: AbortSignal
 }): Promise<SideChatResult> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/side-chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const result = await postChatSessionsBySessionIdSideChat({
+    path: { sessionId: args.sessionId },
+    body: {
       providerTargetId: args.providerTargetId,
       modelId: args.modelId,
-    }),
+    },
     signal: args.signal,
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to create side chat: ${res.status} ${body}`)
-  }
-
-  return await res.json() as SideChatResult
+  return readSdkData(result, 'Failed to create side chat') as SideChatResult
 }
 
 export async function startSideConversationResponse(args: {
@@ -296,84 +331,54 @@ export async function startSideConversationResponse(args: {
 }
 
 export async function releaseSideConversation(sideConversationId: string): Promise<void> {
-  await fetch(`${SERVER_BASE}/chat/side-conversations/${sideConversationId}`, {
-    method: 'DELETE',
+  await deleteChatSideConversationsBySideConversationId({
+    path: { sideConversationId },
   }).catch(() => undefined)
 }
 
 export async function listChatSessionQueue(sessionId: string): Promise<ChatQueueListResponse> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${sessionId}/queue`)
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to list chat queue: ${res.status} ${body}`)
-  }
-
-  return parseChatQueueListResponse(await res.json())
+  const result = await getChatSessionsBySessionIdQueue({
+    path: { sessionId },
+  })
+  return parseChatQueueListResponse(readSdkData(result, 'Failed to list chat queue'))
 }
 
 export async function enqueueChatSessionQueueItem(args: {
   sessionId: string
   body: ChatQueueEnqueueBody
 }): Promise<ChatQueueItem> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/queue`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(args.body),
+  const result = await postChatSessionsBySessionIdQueue({
+    path: { sessionId: args.sessionId },
+    body: buildChatResponseRequestBody(args.body),
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to enqueue chat continuation: ${res.status} ${body}`)
-  }
-
-  return parseChatQueueItem(await res.json())
+  return parseChatQueueItem(readSdkData(result, 'Failed to enqueue chat continuation'))
 }
 
 export async function steerChatSessionTurn(args: {
   sessionId: string
   body: ChatSteerBody
 }): Promise<ChatSteerTurnResponse> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/steer`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const result = await postChatSessionsBySessionIdSteer({
+    path: { sessionId: args.sessionId },
+    body: {
       text: args.body.text,
       files: args.body.files,
       contextParts: args.body.contextParts,
       providerTargetId: args.body.providerTargetId ?? undefined,
-    }),
+    },
   })
 
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => '')
-    throw Object.assign(
-      new Error(`Failed to steer chat turn: ${res.status} ${bodyText}`),
-      {
-        bodyText,
-        code: readJsonErrorCodeFromText(bodyText),
-        status: res.status,
-      },
-    )
-  }
-
-  return parseChatSteerTurnResponse(await res.json())
+  return parseChatSteerTurnResponse(readSdkData(result, 'Failed to steer chat turn'))
 }
 
 export async function cancelChatSessionQueueItem(args: {
   sessionId: string
   queueItemId: string
 }): Promise<ChatQueueItem> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/queue/${args.queueItemId}`, {
-    method: 'DELETE',
+  const result = await deleteChatSessionsBySessionIdQueueByQueueItemId({
+    path: { sessionId: args.sessionId, queueItemId: args.queueItemId },
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to cancel chat queue item: ${res.status} ${body}`)
-  }
-
-  return parseChatQueueItem(await res.json())
+  return parseChatQueueItem(readSdkData(result, 'Failed to cancel chat queue item'))
 }
 
 export async function updateChatSessionQueueItem(args: {
@@ -381,54 +386,30 @@ export async function updateChatSessionQueueItem(args: {
   queueItemId: string
   body: ChatQueueEnqueueBody
 }): Promise<ChatQueueItem> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/queue/${args.queueItemId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(args.body),
+  const result = await patchChatSessionsBySessionIdQueueByQueueItemId({
+    path: { sessionId: args.sessionId, queueItemId: args.queueItemId },
+    body: buildChatResponseRequestBody(args.body),
   })
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw Object.assign(
-      new Error(`Failed to update chat queue item: ${res.status} ${body}`),
-      {
-        bodyText: body,
-        code: readJsonErrorCodeFromText(body),
-        status: res.status,
-      },
-    )
-  }
-
-  return parseChatQueueItem(await res.json())
+  return parseChatQueueItem(readSdkData(result, 'Failed to update chat queue item'))
 }
 
 export async function reorderChatSessionQueue(args: {
   sessionId: string
   queueItemIds: string[]
 }): Promise<ChatQueueListResponse> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/queue/reorder`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ queueItemIds: args.queueItemIds }),
+  const result = await postChatSessionsBySessionIdQueueReorder({
+    path: { sessionId: args.sessionId },
+    body: { queueItemIds: args.queueItemIds },
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to reorder chat queue: ${res.status} ${body}`)
-  }
-
-  return parseChatQueueListResponse(await res.json())
+  return parseChatQueueListResponse(readSdkData(result, 'Failed to reorder chat queue'))
 }
 
 export async function cancelChatResponse(sessionId: string): Promise<void> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${sessionId}/cancel`, {
-    method: 'POST',
+  const result = await postChatSessionsBySessionIdCancel({
+    path: { sessionId },
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to cancel chat response: ${res.status} ${body}`)
-  }
+  readSdkData(result, 'Failed to cancel chat response')
 }
 
 export async function submitRuntimeUserInput(args: {
@@ -437,19 +418,12 @@ export async function submitRuntimeUserInput(args: {
   answers: Record<string, string[]>
   signal?: AbortSignal
 }): Promise<{ requestId: string, answers: Record<string, string[]> }> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/user-input/${args.requestId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers: args.answers }),
+  const result = await postChatSessionsBySessionIdUserInputByRequestId({
+    path: { sessionId: args.sessionId, requestId: args.requestId },
+    body: { answers: args.answers },
     signal: args.signal,
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to submit runtime user input: ${res.status} ${body}`)
-  }
-
-  return await res.json() as { requestId: string, answers: Record<string, string[]> }
+  return readSdkData(result, 'Failed to submit runtime user input') as { requestId: string, answers: Record<string, string[]> }
 }
 
 export async function submitRuntimeToolApproval(args: {
@@ -459,22 +433,15 @@ export async function submitRuntimeToolApproval(args: {
   reason?: string
   signal?: AbortSignal
 }): Promise<{ requestId: string, approved: boolean, reason?: string }> {
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/tool-approval/${args.requestId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const result = await postChatSessionsBySessionIdToolApprovalByRequestId({
+    path: { sessionId: args.sessionId, requestId: args.requestId },
+    body: {
       approved: args.approved,
       ...(args.reason ? { reason: args.reason } : {}),
-    }),
+    },
     signal: args.signal,
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to submit runtime tool approval: ${res.status} ${body}`)
-  }
-
-  return await res.json() as { requestId: string, approved: boolean, reason?: string }
+  return readSdkData(result, 'Failed to submit runtime tool approval')
 }
 
 export async function resolvePlanImplementationApproval(args: {
@@ -484,22 +451,13 @@ export async function resolvePlanImplementationApproval(args: {
   approved: boolean
   signal?: AbortSignal
 }): Promise<PlanImplementationApprovalResult> {
-  const sessionId = encodeURIComponent(args.sessionId)
-  const messageId = encodeURIComponent(args.messageId)
-  const res = await fetch(`${SERVER_BASE}/chat/sessions/${sessionId}/messages/${messageId}/plan-implementation-approval`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const result = await postChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApproval({
+    path: { sessionId: args.sessionId, messageId: args.messageId },
+    body: {
       approvalId: args.approvalId,
       approved: args.approved,
-    }),
+    },
     signal: args.signal,
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to resolve plan implementation approval: ${res.status} ${body}`)
-  }
-
-  return parsePlanImplementationApprovalResponse(await res.json())
+  return parsePlanImplementationApprovalResponse(readSdkData(result, 'Failed to resolve plan implementation approval'))
 }

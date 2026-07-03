@@ -3,8 +3,6 @@ import type { UIMessageChunk } from 'ai'
 import type {
   CancelTurnInput,
   ChatRuntime,
-  ChatRuntimeCapabilities,
-  ChatRuntimeMetadata,
   ProviderContext,
   ResumeChatSessionInput,
   RuntimeSession,
@@ -16,10 +14,15 @@ import {
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../chat-runtime/runtime-provider-types'
-import { projectTextOnlyInput } from '../../chat-runtime/ui-message-input'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
+import { projectTextOnlyInput } from '../kit/input-projector'
 import { buildAcpConnectionRecord } from './config'
 import { AcpConnectionManager } from './connection-manager'
+import {
+  ACP_RUNTIME_CAPABILITIES,
+  ACP_RUNTIME_KIND,
+  ACP_RUNTIME_METADATA,
+} from './metadata'
 import { AcpProcessManager } from './process-manager'
 import { wireAcpIntegration } from './runtime-integration'
 
@@ -27,37 +30,18 @@ interface AcpChatProviderDeps {
   runtime: AcpConnectionManager
 }
 
-const ACP_RUNTIME_METADATA = {
-  label: 'ACP Chat',
-  description: 'Cloud Agent SDK runtime',
-  providerKinds: ['openai-compatible', 'anthropic', 'universal'],
-  iconKey: 'custom',
-  surfaces: ['chat', 'jarvis'],
-  sortOrder: 40,
-} satisfies ChatRuntimeMetadata
-
-const ACP_RUNTIME_CAPABILITIES = {
-  supportsSteerTurn: false,
-  supportsShellExecution: false,
-  supportsLastTurnRollback: false,
-  supportsRuntimeSettings: false,
-  supportsUiSlotStates: false,
-  supportsDynamicCapabilities: false,
-  sessionModelSwitch: 'in-session',
-} satisfies ChatRuntimeCapabilities
-
-export function createAcpProvider(_ctx: ProviderContext, deps?: AcpChatProviderDeps): ChatRuntime {
-  return new AcpChatProvider(deps ?? { runtime: createDefaultAcpRuntime() })
+export function createAcpProvider(ctx: ProviderContext, deps?: AcpChatProviderDeps): ChatRuntime {
+  return new AcpChatProvider(deps ?? { runtime: createDefaultAcpRuntime(ctx) })
 }
 
-function createDefaultAcpRuntime(): AcpConnectionManager {
+function createDefaultAcpRuntime(ctx: ProviderContext): AcpConnectionManager {
   const runtime = new AcpConnectionManager(new AcpProcessManager())
-  wireAcpIntegration(runtime)
+  wireAcpIntegration(runtime, { deps: ctx })
   return runtime
 }
 
 export class AcpChatProvider implements ChatRuntime {
-  readonly runtimeKind = 'acp-chat' as const
+  readonly runtimeKind = ACP_RUNTIME_KIND
   readonly metadata = ACP_RUNTIME_METADATA
   readonly capabilities = ACP_RUNTIME_CAPABILITIES
 
@@ -161,7 +145,12 @@ export class AcpChatProvider implements ChatRuntime {
     this._lastUsage = null
     const userPrompt = projectTextOnlyInput(input.message, 'ACP provider')
 
-    for await (const event of this.deps.runtime.prompt(profile.id, acpSessionId, userPrompt)) {
+    for await (const event of this.deps.runtime.prompt(profile.id, acpSessionId, userPrompt, {
+      chatSessionId: input.runtimeSession.chatSessionId,
+      runId: input.runId,
+      providerKind: profile.providerKind,
+      runtimeKind: this.runtimeKind,
+    })) {
       yield event
     }
 

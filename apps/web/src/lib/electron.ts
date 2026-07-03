@@ -160,6 +160,77 @@ export function readDesktopChatStreamBridge(): DesktopChatStreamBridge | null {
   return window.cradle?.chatStream ?? null
 }
 
+// ── Desktop Chat Event Tail Bridge ───────────────────────────────────────────
+
+export interface DesktopChatSubscribeSessionEventsRequest {
+  sessionId: string
+  afterVersion?: number
+}
+
+export interface DesktopChatSubscribeGlobalSessionEventsRequest {
+  afterSequenceId?: number
+  workspaceId?: string | null
+}
+
+export interface DesktopChatEventTailAbortRequest {
+  tailId: string
+}
+
+export interface DesktopChatEventTailHandle {
+  tailId: string
+  scope: 'session' | 'sessions'
+  sessionId: string | null
+}
+
+export interface DesktopChatEventTailEvent {
+  tailId: string
+  sessionId: string
+  event: unknown
+}
+
+export interface DesktopChatEventTailClosedEvent {
+  tailId: string
+  sessionId: string
+  reason: 'aborted' | 'upstream-closed'
+}
+
+export interface DesktopChatEventTailErrorEvent {
+  tailId: string
+  sessionId: string
+  message: string
+}
+
+export interface DesktopChatEventTailDiagnostics {
+  tails: Array<{
+    scope: 'session' | 'sessions'
+    sessionId: string | null
+    workspaceId: string | null
+    afterVersion: number | null
+    afterSequenceId: number | null
+    subscriberCount: number
+    replayEventCount: number
+    startedAtMs: number
+  }>
+}
+
+export interface DesktopChatEventTailBridge {
+  subscribeSessionEvents: (
+    request: DesktopChatSubscribeSessionEventsRequest,
+  ) => Promise<DesktopChatEventTailHandle>
+  subscribeGlobalSessionEvents: (
+    request: DesktopChatSubscribeGlobalSessionEventsRequest,
+  ) => Promise<DesktopChatEventTailHandle>
+  abort: (request: DesktopChatEventTailAbortRequest) => Promise<void>
+  diagnostics: () => Promise<DesktopChatEventTailDiagnostics>
+  onEvent: (handler: (event: DesktopChatEventTailEvent) => void) => () => void
+  onClosed: (handler: (event: DesktopChatEventTailClosedEvent) => void) => () => void
+  onError: (handler: (event: DesktopChatEventTailErrorEvent) => void) => () => void
+}
+
+export function readDesktopChatEventTailBridge(): DesktopChatEventTailBridge | null {
+  return window.cradle?.chatEventTail ?? null
+}
+
 // ── IPC Proxy (typed) ─────────────────────────────────────────────────────────
 
 interface NativeServiceMethods {

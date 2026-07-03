@@ -133,8 +133,8 @@
 - `FilePartInput` — prompt body 中的文件/图片输入
 
 **当前状态**:
-- 普通 prompt 先订阅 `event.subscribe()`，再用 Cradle 生成的 OpenCode `messageID` 调用 `session.promptAsync()`。
-- adapter 用 assistant `parentID === messageID` 识别当前 turn 的终态 message；终态时再读 `session.message()` 补偿 missed parts，然后发 AI SDK `finish`。
+- 普通 prompt 先订阅 `event.subscribe()`，再读取当前 session 已有 message id 作为 baseline，然后调用不带自定义 `messageID` 的 `session.promptAsync()`。
+- adapter 用“不在 baseline 中的新 assistant message”识别当前 turn 的终态 message；终态时再读 `session.message()` 补偿 missed parts，然后发 AI SDK `finish`。projector 也会忽略 baseline 内的旧 message，避免第二轮复用 session 时重放上一轮文本。
 - `permission.updated` 被投影为 AI SDK `tool-input-*` + `tool-approval-request` chunks，approval id 形如 `server-request-${permission.id}`，builtin apiName 为 `approval.permissions`；用户审批后回复 OpenCode `once` 或 `reject`。
 - `projectOpencodePromptParts()` 支持 text 与 file parts，AI SDK `file.mediaType/filename/url` 会映射到 OpenCode `mime/filename/url`。
 

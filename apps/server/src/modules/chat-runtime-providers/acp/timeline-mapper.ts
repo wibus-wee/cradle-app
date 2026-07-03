@@ -9,6 +9,8 @@ import type {
 } from '@agentclientprotocol/sdk'
 import type { UIMessageChunk } from 'ai'
 
+import { providerChunk } from '../kit/chunk-mapper'
+
 export class AcpChunkMapper {
   private currentMessageItemId: string | null = null
   private currentReasoningItemId: string | null = null
@@ -32,12 +34,12 @@ export class AcpChunkMapper {
     const chunks: UIMessageChunk[] = []
 
     if (this.currentReasoningItemId) {
-      chunks.push({ type: 'reasoning-end', id: this.currentReasoningItemId })
+      chunks.push(providerChunk.reasoningEnd(this.currentReasoningItemId))
       this.currentReasoningItemId = null
     }
 
     if (this.currentMessageItemId) {
-      chunks.push({ type: 'text-end', id: this.currentMessageItemId })
+      chunks.push(providerChunk.textEnd(this.currentMessageItemId))
       this.currentMessageItemId = null
     }
 
@@ -53,12 +55,12 @@ export class AcpChunkMapper {
     if (!this.currentMessageItemId) {
       this.currentMessageItemId = randomUUID()
       return [
-        { type: 'text-start', id: this.currentMessageItemId },
-        { type: 'text-delta', id: this.currentMessageItemId, delta: text },
+        providerChunk.textStart(this.currentMessageItemId),
+        providerChunk.textDelta(this.currentMessageItemId, text),
       ]
     }
 
-    return [{ type: 'text-delta', id: this.currentMessageItemId, delta: text }]
+    return [providerChunk.textDelta(this.currentMessageItemId, text)]
   }
 
   private handleAgentThought(update: ContentChunk): UIMessageChunk[] {
@@ -70,22 +72,22 @@ export class AcpChunkMapper {
     if (!this.currentReasoningItemId) {
       this.currentReasoningItemId = randomUUID()
       return [
-        { type: 'reasoning-start', id: this.currentReasoningItemId },
-        { type: 'reasoning-delta', id: this.currentReasoningItemId, delta: text },
+        providerChunk.reasoningStart(this.currentReasoningItemId),
+        providerChunk.reasoningDelta(this.currentReasoningItemId, text),
       ]
     }
 
-    return [{ type: 'reasoning-delta', id: this.currentReasoningItemId, delta: text }]
+    return [providerChunk.reasoningDelta(this.currentReasoningItemId, text)]
   }
 
   private handleToolCall(update: ToolCall): UIMessageChunk[] {
     const output = stringifyPayload(update.rawOutput)
     const chunks: UIMessageChunk[] = [
-      { type: 'tool-input-start', toolCallId: update.toolCallId, toolName: update.title },
+      providerChunk.toolInputStart(update.toolCallId, update.title),
     ]
 
     if (update.status === 'completed' && output) {
-      chunks.push({ type: 'tool-output-available', toolCallId: update.toolCallId, output })
+      chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output }))
     }
 
     return chunks
@@ -96,11 +98,11 @@ export class AcpChunkMapper {
     const chunks: UIMessageChunk[] = []
 
     if (output) {
-      chunks.push({ type: 'tool-input-delta', toolCallId: update.toolCallId, inputTextDelta: output })
+      chunks.push(providerChunk.toolInputDelta(update.toolCallId, output))
     }
 
     if (update.status === 'completed') {
-      chunks.push({ type: 'tool-output-available', toolCallId: update.toolCallId, output: output || '' })
+      chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output: output || '' }))
     }
 
     return chunks

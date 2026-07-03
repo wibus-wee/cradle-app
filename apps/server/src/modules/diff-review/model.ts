@@ -152,7 +152,7 @@ const event = t.Object({
   createdAt: t.Number(),
 })
 
-const guideRuntimeKind = t.Union([t.Literal('codex'), t.Literal('claude-agent')])
+const guideRuntimeKind = t.String({ minLength: 1 })
 const guideStatus = t.Union([
   t.Literal('pending'),
   t.Literal('running'),

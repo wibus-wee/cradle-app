@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import {
   deleteWorkspacesByWorkspaceIdMutation,
@@ -13,9 +13,6 @@ import {
 import type { PostWorkspacesData, PostWorkspacesInspectDirectoryResponse } from '~/api-gen/types.gen'
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { useAppPreferencesQuery, useUpdateAppPreferencesMutation } from '~/features/settings/use-app-preferences'
-import { useSessionLayoutStore } from '~/store/session-layout'
-
-import { getLocalWorkspacePath } from './types'
 
 export const WORKSPACES_QUERY_KEY = getWorkspacesQueryKey()
 
@@ -37,14 +34,6 @@ export function useWorkspaces() {
   const { data: workspaces = [], isPending: loading, isSuccess: ready } = useQuery({
     ...getWorkspacesOptions(),
   })
-
-  useEffect(() => {
-    useSessionLayoutStore.getState().upsertWorkspaces(workspaces.map(workspace => ({
-      workspaceId: workspace.id,
-      workspaceName: workspace.name,
-      workspacePath: getLocalWorkspacePath(workspace),
-    })))
-  }, [workspaces])
 
   return { workspaces, loading, ready }
 }

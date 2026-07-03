@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { VirtualizerHandle } from 'virtua'
 import { useShallow } from 'zustand/react/shallow'
 
-import { useChatStore } from '~/store/chat'
+import { chatSelectors, useChatStore } from '~/store/chat'
 
 import { clearChatAttentionSnapshot, updateChatAttentionSnapshot } from '../context/chat-context'
 import type { ChatMinimapHandle } from './chat-minimap'
@@ -124,14 +124,10 @@ export function useChatScrollRuntime({
     return () => clearChatAttentionSnapshot(sessionId)
   }, [sessionId])
 
-  const [generatingMessageIds, passiveStreamingMessageIds] = useChatStore(useShallow(state =>
+  const streamingMessageIds = useChatStore(useShallow(state =>
     active
-      ? [state.generatingMessageIds, state.passiveStreamingMessageIds]
-      : [EMPTY_STREAMING_MESSAGE_IDS, EMPTY_STREAMING_MESSAGE_IDS]))
-  const streamingMessageIds = useMemo(
-    () => new Set([...generatingMessageIds, ...passiveStreamingMessageIds]),
-    [generatingMessageIds, passiveStreamingMessageIds],
-  )
+      ? chatSelectors.streamingMessageIdSet(state)
+      : EMPTY_STREAMING_MESSAGE_IDS))
   const keepMountedIndices = useMemo(() => {
     if (!active || streamingMessageIds.size === 0) {
       return undefined

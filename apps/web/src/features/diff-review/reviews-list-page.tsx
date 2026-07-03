@@ -298,13 +298,14 @@ function TextTabs({
       {LIST_TABS.map((item) => {
         const active = tab === item.id
         return (
-          <button
+          <Button
             key={item.id}
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => onChange(item.id)}
             className={cn(
-              'relative flex h-9 items-center gap-1.5 text-[13px] font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+              'relative h-9 gap-1.5 rounded-none px-0 text-[13px] focus-visible:ring-2 focus-visible:ring-ring/40',
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
@@ -316,7 +317,7 @@ function TextTabs({
                 className="absolute inset-x-0 -bottom-px h-[1.5px] bg-foreground"
               />
             )}
-          </button>
+          </Button>
         )
       })}
     </div>
@@ -436,13 +437,14 @@ function WorkingTreeCard({
 }) {
   const { t } = useTranslation('diff-review')
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={() => navigateToReview(workspaceId, WORKING_TREE_REVIEW_ID, { repositoryPath })}
       className={cn(
-        'group flex w-full items-center gap-3 rounded-lg border border-border/60 bg-card px-3.5 py-2.5 text-left shadow-xs transition-colors',
-        'hover:border-border active:scale-[0.998]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+        'group h-auto w-full justify-start gap-3 rounded-lg border border-border/60 bg-card px-3.5 py-2.5 text-left font-normal whitespace-normal shadow-xs',
+        'hover:!bg-card hover:border-border active:scale-[0.998]',
+        'focus-visible:ring-2 focus-visible:ring-ring/40',
       )}
       data-testid="reviews-working-tree-entry"
     >
@@ -474,7 +476,7 @@ function WorkingTreeCard({
         className="size-3.5 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
         aria-hidden
       />
-    </button>
+    </Button>
   )
 }
 
@@ -492,11 +494,12 @@ function GroupSection({
 
   return (
     <section className="px-4 pb-2">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => collapsed.toggle()}
         aria-expanded={!collapsed.value}
-        className="flex w-full items-center gap-1.5 rounded-md px-1 py-2 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="h-auto w-full justify-start gap-1.5 rounded-md px-1 py-2 text-left font-normal hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         <ChevronDownIcon
           className={cn('size-3.5 text-muted-foreground transition-transform', collapsed.value && '-rotate-90')}
@@ -507,7 +510,7 @@ function GroupSection({
           {group.label}
         </span>
         <span className="text-[11px] tabular-nums text-muted-foreground/50">{group.reviews.length}</span>
-      </button>
+      </Button>
 
       {!collapsed.value && (
         <ul role="list" className="divide-y divide-border/50">
@@ -531,12 +534,13 @@ function ReviewRow({ review, onClick }: { review: CradleDiffReview, onClick: () 
   const StatusIcon = statusGlyph(review).icon
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onClick}
       className={cn(
-        'group flex w-full items-center gap-3 px-1 py-2 text-left transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40',
+        'group h-auto w-full justify-start gap-3 rounded-none px-1 py-2 text-left font-normal hover:bg-transparent',
+        'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40',
       )}
       data-testid="reviews-list-row"
     >
@@ -557,7 +561,7 @@ function ReviewRow({ review, onClick }: { review: CradleDiffReview, onClick: () 
         {unviewed > 0 && <span className="text-muted-foreground">{`${unviewed} unviewed`}</span>}
         {openThreads > 0 && <span className="text-foreground/70">{`${openThreads} open`}</span>}
       </div>
-    </button>
+    </Button>
   )
 }
 

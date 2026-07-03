@@ -10,7 +10,7 @@ import type { GetCapabilitiesInput, RuntimeProviderTargetProfile, RuntimeSession
 import { ProviderRuntimeError } from '../../chat-runtime/runtime-provider-types'
 import { readTrustedClaudeAgentConfig } from '../../provider-contracts/provider-base'
 import { createBoundedTextCollector } from '../bounded-text-collector'
-import { buildClaudeQueryOptions } from './input-projector'
+import { buildClaudeQueryOptions, createClaudeStderrSink } from './input-projector'
 import type { ClaudeAgentProviderDeps, ClaudeTitleGenerationThinkingEffort } from './types'
 
 const CLAUDE_SESSION_TITLE_MAX_LENGTH = 60
@@ -45,6 +45,10 @@ export async function generateClaudeSessionTitle(input: {
   const abortTitleRead = () => abortController.abort()
   input.signal.addEventListener('abort', abortTitleRead, { once: true })
 
+  // Declared outside `try` so the catch block can enrich the surfaced error
+  // with the captured stderr when the title-generation process exits non-zero.
+  const stderrSink = createClaudeStderrSink()
+
   try {
     const config = readTrustedClaudeAgentConfig(input.profile.configJson)
     const titleRuntimeInput = {
@@ -69,6 +73,8 @@ export async function generateClaudeSessionTitle(input: {
     queryOptions.tools = []
     delete queryOptions.mcpServers
     delete queryOptions.skills
+
+    queryOptions.stderr = stderrSink.onStderr
 
     const titleQuery = query({
       prompt: titlePrompt,
@@ -123,7 +129,8 @@ export async function generateClaudeSessionTitle(input: {
     return generatedTitle
   }
   catch (error) {
-    if (error instanceof ProviderRuntimeError && error.providerError._tag === 'auth_failed') {
+    const enriched = stderrSink.enrichError(error)
+    if (enriched instanceof ProviderRuntimeError && enriched.providerError._tag === 'auth_failed') {
       input.deps.logger?.warn('claude session title generation skipped: no api key resolved', {
         modelId: input.modelId ?? null,
         profileId: input.profile.id,
@@ -131,7 +138,7 @@ export async function generateClaudeSessionTitle(input: {
       return null
     }
     input.deps.logger?.warn('claude session title generation failed', {
-      err: error,
+      err: enriched,
       modelId: input.modelId ?? null,
     })
     return null

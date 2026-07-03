@@ -1,6 +1,7 @@
 import { Streamdown } from '@cradle/streamdown'
 import { useId, useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
@@ -28,14 +29,16 @@ export function ReasoningBlock({ text, state = 'done' }: ReasoningBlockProps) {
 
   return (
     <div className="py-2">
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         aria-controls={contentId}
         data-testid="chat-reasoning-toggle"
         className={cn(
-          'flex items-center gap-1.5 text-xs transition-colors duration-150',
+          'h-auto gap-1.5 p-0 text-xs hover:bg-transparent',
           expanded ? 'text-muted-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground',
         )}
       >
@@ -47,7 +50,7 @@ export function ReasoningBlock({ text, state = 'done' }: ReasoningBlockProps) {
           )}
         />
         <span>Thinking</span>
-      </button>
+      </Button>
 
       {expanded && (
         <div

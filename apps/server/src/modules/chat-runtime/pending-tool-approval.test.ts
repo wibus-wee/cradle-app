@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import type { ChatSessionEvent } from './es/events'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AppError } from '../../errors/app-error'
+import {
+  resetRuntimeInteractionEventRecorder,
+  setRuntimeInteractionEventRecorder,
+} from './interaction/event-recorder'
 import {
   requestRuntimeToolApproval,
   submitRuntimeToolApprovalIfPending,
@@ -8,6 +13,19 @@ import {
 } from './pending-tool-approval'
 
 describe('pending runtime tool approval', () => {
+  const recordedEvents: ChatSessionEvent[] = []
+
+  beforeEach(() => {
+    recordedEvents.length = 0
+    setRuntimeInteractionEventRecorder(async (_sessionId, events) => {
+      recordedEvents.push(...events)
+    })
+  })
+
+  afterEach(() => {
+    resetRuntimeInteractionEventRecorder()
+  })
+
   it('resolves submitted approval decisions', async () => {
     const pending = requestRuntimeToolApproval({
       sessionId: 'session-pending-tool-approval-1',
@@ -20,7 +38,7 @@ describe('pending runtime tool approval', () => {
       metadata: { files: ['README.md'] },
     })
 
-    const submitted = submitRuntimeToolApproval({
+    const submitted = await submitRuntimeToolApproval({
       sessionId: 'session-pending-tool-approval-1',
       requestId: 'request-1',
       approved: true,
@@ -37,23 +55,47 @@ describe('pending runtime tool approval', () => {
       approved: true,
       reason: 'User approved',
     })
+    expect(recordedEvents).toMatchObject([
+      {
+        type: 'InteractionRequested',
+        payload: {
+          sessionId: 'session-pending-tool-approval-1',
+          runId: 'run-pending-tool-approval-1',
+          requestId: 'request-1',
+          interactionKind: 'toolApproval',
+          providerMethod: 'applyPatchApproval',
+          toolCallId: 'server-request-request-1',
+        },
+      },
+      {
+        type: 'InteractionResolved',
+        payload: {
+          sessionId: 'session-pending-tool-approval-1',
+          runId: 'run-pending-tool-approval-1',
+          requestId: 'request-1',
+          interactionKind: 'toolApproval',
+          resolution: 'submitted',
+          approved: true,
+        },
+      },
+    ])
   })
 
-  it('rejects stale submissions with a not found app error', () => {
+  it('rejects stale submissions with a not found app error', async () => {
     expect(submitRuntimeToolApprovalIfPending({
       sessionId: 'session-pending-tool-approval-2',
       requestId: 'missing-request',
       approved: false,
     })).toBeNull()
 
-    expect(() => submitRuntimeToolApproval({
+    await expect(submitRuntimeToolApproval({
       sessionId: 'session-pending-tool-approval-2',
       requestId: 'missing-request',
       approved: false,
-    })).toThrow(AppError)
+    })).rejects.toThrow(AppError)
 
     try {
-      submitRuntimeToolApproval({
+      await submitRuntimeToolApproval({
         sessionId: 'session-pending-tool-approval-2',
         requestId: 'missing-request',
         approved: false,

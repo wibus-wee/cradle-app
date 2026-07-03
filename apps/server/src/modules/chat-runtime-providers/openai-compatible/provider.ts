@@ -3,8 +3,6 @@ import type { UIMessageChunk } from 'ai'
 import type {
   CancelTurnInput,
   ChatRuntime,
-  ChatRuntimeCapabilities,
-  ChatRuntimeMetadata,
   ProviderContext,
   ResumeChatSessionInput,
   RuntimeSession,
@@ -21,8 +19,12 @@ import { buildModelMessages, executeAiSdkTurn } from '../../chat-runtime-engine/
 import { createLanguageModel, detectApiFormat } from '../../chat-runtime-engine/providers'
 import { lookupContextWindow } from '../../model-registry/model-info-registry'
 import { readTrustedOpenAICompatibleConfig, readTrustedUniversalConfig } from '../../provider-contracts/provider-base'
-import type { RuntimeKind } from '../../provider-contracts/types'
 import { readProviderStateSnapshot } from '../provider-state-snapshot'
+import {
+  STANDARD_RUNTIME_CAPABILITIES,
+  STANDARD_RUNTIME_KIND,
+  STANDARD_RUNTIME_METADATA,
+} from './metadata'
 
 export interface StepUsageEntry {
   stepNumber: number
@@ -31,31 +33,12 @@ export interface StepUsageEntry {
   usage: TokenUsage
 }
 
-const STANDARD_RUNTIME_METADATA = {
-  label: 'Standard',
-  description: 'Direct OpenAI-compatible chat runtime',
-  providerKinds: ['openai-compatible', 'universal'],
-  iconKey: 'custom',
-  surfaces: ['chat', 'jarvis'],
-  sortOrder: 50,
-} satisfies ChatRuntimeMetadata
-
-const STANDARD_RUNTIME_CAPABILITIES = {
-  supportsSteerTurn: false,
-  supportsShellExecution: false,
-  supportsLastTurnRollback: false,
-  supportsRuntimeSettings: false,
-  supportsUiSlotStates: false,
-  supportsDynamicCapabilities: false,
-  sessionModelSwitch: 'in-session',
-} satisfies ChatRuntimeCapabilities
-
 export function createStandardProvider(ctx: ProviderContext): ChatRuntime {
   return new OpenAICompatibleProvider(ctx)
 }
 
 export class OpenAICompatibleProvider implements ChatRuntime {
-  readonly runtimeKind = 'standard' as const satisfies RuntimeKind
+  readonly runtimeKind = STANDARD_RUNTIME_KIND
   readonly metadata = STANDARD_RUNTIME_METADATA
   readonly capabilities = STANDARD_RUNTIME_CAPABILITIES
 

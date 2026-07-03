@@ -1,17 +1,16 @@
 import {
-  RobotLine as BotIcon,
-  RightSmallLine as ChevronRightIcon,
+  CheckboxLine as SquareCheckIcon,
+  CloseLine as XIcon,
+  DeleteLine as Trash2Icon,
   DownloadLine as DownloadIcon,
   PlusLine as PlusIcon,
+  RightSmallLine as ChevronRightIcon,
+  RobotLine as BotIcon,
   SearchLine as SearchIcon,
   SelectorHorizontalLine as SlidersHorizontalIcon,
-  SparklesLine as SparklesIcon,
-  CheckboxLine as SquareCheckIcon,
   SquareLine as SquareIcon,
-  DeleteLine as Trash2Icon,
-  CloseLine as XIcon
 } from '@mingcute/react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ProviderIcon } from '~/components/common/provider-icons'
@@ -39,11 +38,18 @@ import { ScrollArea } from '~/components/ui/scroll-area'
 import { AgentRuntimeConfigJsonSchema } from '~/features/agent-runtime/agent-config-schema'
 import { buildAvatarUrl } from '~/features/agent-runtime/avatar-url'
 import { runtimeSupportsProviderKind } from '~/features/agent-runtime/runtime-compatibility'
+import type { ModelDescriptor, ProviderTarget } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import type { Agent, PreviewLocalConfigImportResult } from '~/features/agent-runtime/use-agents'
 import { useAgents } from '~/features/agent-runtime/use-agents'
 import type { ProviderTargetOption } from '~/features/agent-runtime/use-provider-targets'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/use-runtime-catalog'
+import {
+  runtimeCatalogItemUsesCliLaunchConfig,
+  runtimeCatalogItemUsesModelSelection,
+  useRuntimeCatalog,
+} from '~/features/agent-runtime/use-runtime-catalog'
 import {
   filterThinkingOptionsForModel,
   selectSupportedThinkingValue,
@@ -51,17 +57,16 @@ import {
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
 import { cn } from '~/lib/cn'
-import type { ModelDescriptor, ProviderTarget } from '~/features/agent-runtime/types'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { SettingsMasterDetail } from '../settings/settings-container'
-
 import type { AgentBatchThinkingEffort, AgentProviderBatchSelection } from './agent-batch-configuration'
 import {
   buildAgentProviderBatchPatches,
 } from './agent-batch-configuration'
 import { AgentDetailPage } from './agent-detail'
 import { StatusDot } from './agent-status-dot'
+import { CreateAgentDialog } from './create-agent-dialog'
 import {
   applyVisibleRangeSelection,
   mergeVisibleSelection,
@@ -73,7 +78,6 @@ import {
 } from './settings-multi-selection'
 import { useSettingsSelectionShortcuts } from './settings-selection-shortcuts'
 
-const DRAFT_ID = '__agent-draft__'
 const AGENT_THINKING_EFFORTS: Array<{ value: AgentBatchThinkingEffort }> = [
   { value: 'low' },
   { value: 'medium' },
@@ -109,22 +113,29 @@ function providerTargetFromOption(option: ProviderTargetOption): ProviderTarget 
   return { kind: option.kind, id: option.id }
 }
 
+function agentUsesProviderTarget(agent: Agent, runtimeCatalog: RuntimeCatalogItem[]): boolean {
+  const runtime = runtimeCatalog.find(item => item.runtimeKind === agent.runtimeKind)
+  return runtime ? runtimeCatalogItemUsesModelSelection(runtime) : true
+}
+
 function providerTargetCompatibleWithAgents(
   target: ProviderTargetOption,
   agents: Agent[],
+  runtimeCatalog: RuntimeCatalogItem[],
 ): boolean {
   return agents.every(agent =>
-    agent.runtimeKind === 'cli-tui'
-    || runtimeSupportsProviderKind(agent.runtimeKind, target.providerKind))
+    !agentUsesProviderTarget(agent, runtimeCatalog)
+    || runtimeSupportsProviderKind(agent.runtimeKind, target.providerKind, runtimeCatalog))
 }
 
 function defaultBatchProviderTarget(
   agents: Agent[],
   providerTargets: ProviderTargetOption[],
+  runtimeCatalog: RuntimeCatalogItem[],
 ): ProviderTarget | null {
-  const providerAgents = agents.filter(agent => agent.runtimeKind !== 'cli-tui')
+  const providerAgents = agents.filter(agent => agentUsesProviderTarget(agent, runtimeCatalog))
   const enabledTargets = providerTargets.filter(target =>
-    target.enabled && providerTargetCompatibleWithAgents(target, providerAgents))
+    target.enabled && providerTargetCompatibleWithAgents(target, providerAgents, runtimeCatalog))
   const commonTargetId = commonString(providerAgents.map(agent => agent.providerTargetId))
   const commonTarget = commonTargetId
     ? enabledTargets.find(target => target.id === commonTargetId) ?? null
@@ -136,13 +147,17 @@ function defaultBatchProviderTarget(
   return fallbackTarget ? providerTargetFromOption(fallbackTarget) : null
 }
 
-function defaultBatchModelId(agents: Agent[], providerTarget: ProviderTarget | null): string | null {
+function defaultBatchModelId(
+  agents: Agent[],
+  providerTarget: ProviderTarget | null,
+  runtimeCatalog: RuntimeCatalogItem[],
+): string | null {
   if (!providerTarget) {
     return null
   }
   const matchingAgents = agents.filter(
     agent =>
-      agent.runtimeKind !== 'cli-tui'
+      agentUsesProviderTarget(agent, runtimeCatalog)
       && agent.providerTargetId === providerTarget.id,
   )
   return commonString(matchingAgents.map(agent => agent.modelId))
@@ -165,8 +180,11 @@ function readAgentBatchThinkingEffort(value: unknown): AgentBatchThinkingEffort 
   }
 }
 
-function defaultBatchThinkingEffort(agents: Agent[]): AgentBatchThinkingEffort {
-  const providerAgents = agents.filter(agent => agent.runtimeKind !== 'cli-tui')
+function defaultBatchThinkingEffort(
+  agents: Agent[],
+  runtimeCatalog: RuntimeCatalogItem[],
+): AgentBatchThinkingEffort {
+  const providerAgents = agents.filter(agent => agentUsesProviderTarget(agent, runtimeCatalog))
   if (providerAgents.length === 0) {
     return 'high'
   }
@@ -177,6 +195,7 @@ function defaultBatchThinkingEffort(agents: Agent[]): AgentBatchThinkingEffort {
 function AgentSidebarRow({
   agent,
   providerTargets,
+  runtimeCatalog,
   active,
   selected,
   onClick,
@@ -184,6 +203,7 @@ function AgentSidebarRow({
 }: {
   agent: Agent
   providerTargets: ProviderTargetOption[]
+  runtimeCatalog: RuntimeCatalogItem[]
   active: boolean
   selected: boolean
   onClick: (shiftKey: boolean) => void
@@ -195,15 +215,20 @@ function AgentSidebarRow({
   const providerTarget = agent.providerTargetId
     ? providerTargets.find(target => target.id === agent.providerTargetId) ?? null
     : null
+  const runtime = runtimeCatalog.find(item => item.runtimeKind === agent.runtimeKind)
+  const runtimeConfig = AgentRuntimeConfigJsonSchema.parse(agent.configJson)
+  const usesCliLaunchConfig = runtime
+    ? runtimeCatalogItemUsesCliLaunchConfig(runtime)
+    : runtimeConfig.cliTui !== null
   const cliTuiLaunch
-    = agent.runtimeKind === 'cli-tui'
-      ? AgentRuntimeConfigJsonSchema.parse(agent.configJson).cliTui
+    = usesCliLaunchConfig
+      ? runtimeConfig.cliTui
       : null
   const subtitle
-    = agent.runtimeKind === 'cli-tui'
-      ? ['CLI TUI', cliTuiLaunch?.preset ?? cliTuiLaunch?.executable]
+    = usesCliLaunchConfig
+      ? [runtime?.label ?? agent.runtimeKind, cliTuiLaunch?.preset ?? cliTuiLaunch?.executable]
           .filter(Boolean)
-          .join(' ·\n') || 'CLI TUI'
+          .join(' ·\n') || runtime?.label || agent.runtimeKind
       : [providerTarget?.name, agent.modelId].filter(Boolean).join(' ·\n') || undefined
 
   return (
@@ -280,45 +305,48 @@ function AgentSidebarRow({
 function AgentBatchProviderPanel({
   selectedAgents,
   providerTargets,
+  runtimeCatalog,
   busy,
   onApply,
   onClear,
 }: {
   selectedAgents: Agent[]
   providerTargets: ProviderTargetOption[]
+  runtimeCatalog: RuntimeCatalogItem[]
   busy: boolean
   onApply: (selection: AgentProviderBatchSelection) => void
   onClear: () => void
 }) {
   const { t } = useTranslation('agentManagement')
-  const providerAgents = selectedAgents.filter(agent => agent.runtimeKind !== 'cli-tui')
-  const skippedCliTuiCount = selectedAgents.length - providerAgents.length
+  const providerAgents = selectedAgents.filter(agent => agentUsesProviderTarget(agent, runtimeCatalog))
+  const skippedRuntimeOwnedCount = selectedAgents.length - providerAgents.length
   const selectableProviderTargets = providerTargets.filter(target =>
-      target.enabled && providerTargetCompatibleWithAgents(target, providerAgents))
-  const thinkingOptions: Array<ThinkingOption<AgentBatchThinkingEffort>> = AGENT_THINKING_EFFORTS.map((option) => {
-    const value = option.value
-    return {
-      value,
-      label: t(thinkingLabelKeys[value]),
-      description: t(thinkingDescriptionKeys[value]),
-    }
-  })
+      target.enabled && providerTargetCompatibleWithAgents(target, providerAgents, runtimeCatalog))
+  const thinkingOptions = useMemo<Array<ThinkingOption<AgentBatchThinkingEffort>>>(() =>
+    AGENT_THINKING_EFFORTS.map((option) => {
+      const value = option.value
+      return {
+        value,
+        label: t(thinkingLabelKeys[value]),
+        description: t(thinkingDescriptionKeys[value]),
+      }
+    }), [t])
   const defaultSelection = (() => {
-    const providerTarget = defaultBatchProviderTarget(selectedAgents, providerTargets)
+    const providerTarget = defaultBatchProviderTarget(selectedAgents, providerTargets, runtimeCatalog)
     if (!providerTarget) {
       return null
     }
     return {
       providerTarget,
-      modelId: defaultBatchModelId(selectedAgents, providerTarget),
-      thinkingEffort: defaultBatchThinkingEffort(selectedAgents),
+      modelId: defaultBatchModelId(selectedAgents, providerTarget, runtimeCatalog),
+      thinkingEffort: defaultBatchThinkingEffort(selectedAgents, runtimeCatalog),
     }
   })()
   const [selectionOverride, setSelectionOverride] = useState<AgentProviderBatchSelection | null>(
     null,
   )
   const selection = selectionOverride ?? defaultSelection
-  const initialProviderTargetIds = [selection?.providerTarget.id ?? null]
+  const initialProviderTargetIds = useMemo(() => [selection?.providerTarget.id ?? null], [selection?.providerTarget.id])
   const {
     modelsByProviderTargetId,
     loadingProviderTargetIds,
@@ -328,19 +356,22 @@ function AgentBatchProviderPanel({
     initialProviderTargetIds,
   )
   const selectedProviderTargetId = selection?.providerTarget.id ?? null
-  const selectedModels = selectedProviderTargetId
-    ? (modelsByProviderTargetId[selectedProviderTargetId] ?? [])
-    : []
+  const selectedModels = useMemo(
+    () => selectedProviderTargetId
+      ? (modelsByProviderTargetId[selectedProviderTargetId] ?? [])
+      : [],
+    [modelsByProviderTargetId, selectedProviderTargetId],
+  )
   const selectedModel = selectedModels.find(model => model.id === selection?.modelId) ?? null
   const isLoadingSelectedModels = selectedProviderTargetId
     ? loadingProviderTargetIds.has(selectedProviderTargetId)
     : false
 
-  const resolveThinkingForModel = (
+  const resolveThinkingForModel = useCallback((
     model: ModelDescriptor | null,
     current: AgentBatchThinkingEffort,
   ): AgentBatchThinkingEffort =>
-    selectSupportedThinkingValue(model, thinkingOptions, current, 'high')
+    selectSupportedThinkingValue(model, thinkingOptions, current, 'high'), [thinkingOptions])
 
   const applyProviderTargetSelection = (nextProviderTargetId: string) => {
     requestProviderTargetModels(nextProviderTargetId)
@@ -395,10 +426,10 @@ function AgentBatchProviderPanel({
           </h4>
           <p className="text-[12.5px] leading-relaxed text-muted-foreground">
             {t('batch.provider.description')}
-            {skippedCliTuiCount > 0 && (
+            {skippedRuntimeOwnedCount > 0 && (
               <>
                 {' '}
-                {t('batch.provider.skippedCliTui', { count: skippedCliTuiCount })}
+                {t('batch.provider.skippedRuntimeOwned', { count: skippedRuntimeOwnedCount })}
               </>
             )}
           </p>
@@ -589,10 +620,11 @@ export function AgentList() {
     removeAgent,
   } = useAgents()
   const { providerOptions, isSuccess: providerTargetsReady } = useProviderTargets()
+  const { runtimes: runtimeCatalog } = useRuntimeCatalog()
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const selectionAnchorIdRef = useRef<string | null>(null)
-  const [isDrafting, setIsDrafting] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [filter, setFilter] = useState('')
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -617,19 +649,15 @@ export function AgentList() {
   const selectedAgentId = selectedIdFromSet(selectedIds)
   const selectedAgent = (selectedAgentId ? agents.find(a => a.id === selectedAgentId) : undefined)
   const selectedAgents = selectedRecords(agents, selectedIds)
-  const isDraftSelected = isDrafting && selectedIds.has(DRAFT_ID)
   const allVisibleSelected = visibleRecordsAreSelected(visibleAgents, selectedIds)
 
   useEffect(() => {
-    if (isDraftSelected) {
-      return
-    }
     const available = new Set(agents.map(agent => agent.id))
     setSelectedIds(prev => pruneSelectedIds(prev, available))
     if (selectionAnchorIdRef.current && !available.has(selectionAnchorIdRef.current)) {
       selectionAnchorIdRef.current = null
     }
-  }, [agents, isDraftSelected])
+  }, [agents])
 
   useEffect(() => {
     if (!agentFocusTargetId) {
@@ -640,7 +668,7 @@ export function AgentList() {
     if (focusedAgent) {
       setSelectedIds(new Set([focusedAgent.id]))
       selectionAnchorIdRef.current = focusedAgent.id
-      setIsDrafting(false)
+      setCreateDialogOpen(false)
       setFilter('')
       clearAgentFocusTarget()
       return
@@ -651,14 +679,12 @@ export function AgentList() {
     }
   }, [agentFocusTargetId, agents, agentsReady, clearAgentFocusTarget])
 
-  const startDraft = () => {
-    setIsDrafting(true)
-    setSelectedIds(new Set([DRAFT_ID]))
-    selectionAnchorIdRef.current = null
+  const openCreateDialog = () => {
+    setCreateDialogOpen(true)
   }
 
   const handleCreated = (newAgentId: string) => {
-    setIsDrafting(false)
+    setCreateDialogOpen(false)
     setSelectedIds(new Set([newAgentId]))
     selectionAnchorIdRef.current = newAgentId
   }
@@ -708,7 +734,7 @@ export function AgentList() {
       const selectedImport = result.agents.find(imported => imported.status === 'created' && imported.agent)
         ?? result.agents.find(imported => imported.status === 'existing' && imported.agent)
       if (selectedImport?.agent) {
-        setIsDrafting(false)
+        setCreateDialogOpen(false)
         setSelectedIds(new Set([selectedImport.agent.id]))
         selectionAnchorIdRef.current = selectedImport.agent.id
       }
@@ -734,19 +760,19 @@ export function AgentList() {
   }
 
   const selectVisibleAgents = () => {
-    setIsDrafting(false)
+    setCreateDialogOpen(false)
     setSelectedIds(prev => mergeVisibleSelection(prev, visibleAgents))
     selectionAnchorIdRef.current = visibleAgents.at(-1)?.id ?? null
   }
 
   const clearSelection = () => {
-    setIsDrafting(false)
+    setCreateDialogOpen(false)
     setSelectedIds(new Set())
     selectionAnchorIdRef.current = null
   }
 
   const selectAgent = (agentId: string, selected: boolean, shiftKey: boolean) => {
-      setIsDrafting(false)
+      setCreateDialogOpen(false)
       setSelectedIds((prev) => {
         if (shiftKey) {
           return applyVisibleRangeSelection(
@@ -759,7 +785,6 @@ export function AgentList() {
         }
 
         const next = new Set(prev)
-        next.delete(DRAFT_ID)
         if (selected) {
           next.add(agentId)
         }
@@ -779,7 +804,7 @@ export function AgentList() {
 
       setSelectedIds(new Set([agentId]))
       selectionAnchorIdRef.current = agentId
-      setIsDrafting(false)
+      setCreateDialogOpen(false)
     }
 
   const handleBatchToggle = async (enabled: boolean) => {
@@ -831,7 +856,7 @@ export function AgentList() {
   }
 
   const handleBatchConfigureProvider = async (selection: AgentProviderBatchSelection) => {
-      const { patches } = buildAgentProviderBatchPatches(selectedAgents, selection)
+      const { patches } = buildAgentProviderBatchPatches(selectedAgents, selection, runtimeCatalog)
       if (patches.length === 0) {
         return
       }
@@ -856,7 +881,7 @@ export function AgentList() {
   const selectionShortcutScopeRef = useSettingsSelectionShortcuts({
     hasVisibleRecords: visibleAgents.length > 0,
     hasSelection: selectedIds.size > 0,
-    hasDraft: isDrafting,
+    hasDraft: false,
     canDeleteSelection: !batchBusy && selectedAgents.length > 0,
     onSelectVisible: selectVisibleAgents,
     onClearSelection: clearSelection,
@@ -882,14 +907,14 @@ export function AgentList() {
         <DownloadIcon />
         {previewLocalConfigImport.isPending ? 'Scanning' : 'Import'}
       </Button>
-      <Button data-testid="new-agent-btn" size="sm" onClick={startDraft} disabled={isDrafting}>
+      <Button data-testid="new-agent-btn" size="sm" onClick={openCreateDialog} disabled={createDialogOpen}>
         <PlusIcon />
         Add agent
       </Button>
     </div>
   )
 
-  const toolbar = !isDraftSelected && selectedIds.size > 0
+  const toolbar = selectedIds.size > 0
     ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
@@ -963,45 +988,6 @@ export function AgentList() {
 
       <ScrollArea className="-mx-1 min-h-0 flex-1">
         <div className="flex flex-col gap-0.5 px-1">
-          {isDrafting && (
-            <div
-              className={cn(
-                'group/sidebar-row relative flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left outline-none',
-                'transition-[background-color] duration-150',
-                'focus-within:ring-2 focus-within:ring-ring/50',
-                isDraftSelected
-                  ? 'bg-accent text-accent-foreground'
-                  : 'opacity-90 hover:bg-foreground/[0.035]',
-              )}
-            >
-              <button
-                type="button"
-                onClick={() => setSelectedIds(new Set([DRAFT_ID]))}
-                aria-pressed={isDraftSelected}
-                className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
-              >
-                <span className="flex size-7 items-center justify-center rounded-lg border border-dashed border-foreground/15 text-muted-foreground">
-                  <SparklesIcon className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] leading-tight text-foreground/70">
-                    New agent
-                  </span>
-                  <span className="block truncate text-[10.5px] leading-tight text-muted-foreground/60">
-                    Set up identity
-                  </span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="shrink-0 rounded p-0.5 text-muted-foreground/40 hover:text-muted-foreground"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </div>
-          )}
-
           {visibleAgents.length > 0 && (
             <div className="mb-1 flex items-center justify-between gap-2 px-2 py-0.5 text-[10.5px] text-muted-foreground/60">
               <span>
@@ -1025,7 +1011,8 @@ export function AgentList() {
                 key={agent.id}
                 agent={agent}
                 providerTargets={providerOptions}
-                active={selectedAgentId === agent.id && !isDraftSelected}
+                runtimeCatalog={runtimeCatalog}
+                active={selectedAgentId === agent.id}
                 selected={selectedIds.has(agent.id)}
                 onClick={shiftKey => openAgent(agent.id, shiftKey)}
                 onToggleSelected={(checked, shiftKey) =>
@@ -1033,7 +1020,7 @@ export function AgentList() {
               />
             ))}
 
-          {!isLoading && visibleAgents.length === 0 && !isDrafting && (
+          {!isLoading && visibleAgents.length === 0 && (
             <div className="px-2 py-6 text-center" data-testid="agent-empty-state">
               <p className="text-[11.5px] text-muted-foreground/70">
                 {filter ? 'No matches' : 'No agents yet'}
@@ -1061,21 +1048,13 @@ export function AgentList() {
 
   const detailPane = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col py-5 pl-6 pr-5">
-      {isDraftSelected
-        ? (
-            <div key={DRAFT_ID} className="flex-1">
-              <AgentDetailPage
-                onCreated={handleCreated}
-                onDeleted={handleDeleted}
-              />
-            </div>
-          )
-        : selectedAgents.length > 1
+      {selectedAgents.length > 1
           ? (
               <AgentBatchProviderPanel
                 key={selectedAgents.map(agent => agent.id).join('|')}
                 selectedAgents={selectedAgents}
                 providerTargets={providerOptions}
+                runtimeCatalog={runtimeCatalog}
                 busy={batchBusy}
                 onApply={selection => void handleBatchConfigureProvider(selection)}
                 onClear={clearSelection}
@@ -1104,7 +1083,7 @@ export function AgentList() {
                       </EmptyDescription>
                     </EmptyHeader>
                     <EmptyContent>
-                      <Button size="sm" variant="outline" onClick={startDraft} disabled={isDrafting}>
+                      <Button size="sm" variant="outline" onClick={openCreateDialog}>
                         <PlusIcon />
                         Add agent
                       </Button>
@@ -1126,6 +1105,11 @@ export function AgentList() {
       list={listPane}
       detail={detailPane}
     >
+      <CreateAgentDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreated={handleCreated}
+      />
       <AgentImportDialog
         open={importDialogOpen}
         preview={importPreview}

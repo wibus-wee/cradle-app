@@ -1,3 +1,8 @@
+import {
+  RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_USAGE_COMMAND_ACTION_ID,
+} from '@cradle/chat-runtime-contracts'
+
 import type {
   ChatRuntimeAlertUiSlotState,
   ChatRuntimeApprovalsUiSlotState,
@@ -91,8 +96,10 @@ export interface ChatComposerSlashCommand {
 }
 
 export const CRADLE_APPSHOT_SLASH_ACTION_ID = 'capture-appshot'
-export const CODEX_REVIEW_SLASH_ACTION_ID = 'codex-review-mode'
-export const CODEX_USAGE_SLASH_ACTION_ID = 'codex-usage'
+export {
+  RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_USAGE_COMMAND_ACTION_ID,
+}
 const TOKEN_COUNT_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 export const CRADLE_APPSHOT_SLASH_COMMAND: ChatComposerSlashCommand = {
@@ -138,30 +145,26 @@ function isRuntimeUiSlotSlashCommand(
   slot: ChatRuntimeUiSlot,
   mode: RuntimeComposerSlashCommandMode
 ): boolean {
-  if (mode === 'draft' && slot.id === 'codex:usage') {
+  if (mode === 'draft' && slot.requiresSession) {
     return false
   }
-  if (mode === 'draft' && slot.iconKey === 'quick-question') {
-    return false
-  }
-  return slot.surfaces.includes('slashCommand') || slot.id === 'codex:usage'
+  return slot.surfaces.includes('slashCommand')
 }
 
-function readCodexRuntimeUiSlotAction(
+function readRuntimeUiSlotAction(
   slot: ChatRuntimeUiSlot,
-  commandText: string,
-  mode: RuntimeComposerSlashCommandMode
+  commandText: string
 ): ChatSlashCommandAction {
-  switch (slot.id) {
-    case 'codex:compact':
-      return { kind: 'submitText', text: commandText.trim(), requiresEmptyComposer: true }
-    case 'codex:review':
-      return { kind: 'uiAction', actionId: CODEX_REVIEW_SLASH_ACTION_ID }
-    case 'codex:usage':
-      if (mode === 'draft') {
-        return { kind: 'insertText', text: commandText }
+  switch (slot.commandAction?.kind) {
+    case 'submitText':
+      return {
+        kind: 'submitText',
+        text: commandText.trim(),
+        requiresEmptyComposer: slot.commandAction.requiresEmptyComposer,
       }
-      return { kind: 'uiAction', actionId: CODEX_USAGE_SLASH_ACTION_ID }
+    case 'uiAction':
+      return { kind: 'uiAction', actionId: slot.commandAction.actionId }
+    case 'insertText':
     default:
       return { kind: 'insertText', text: commandText }
   }
@@ -185,8 +188,7 @@ export function createRuntimeSlashCommand(
 
 export function createRuntimeUiSlotCommand(
   slot: ChatRuntimeUiSlot,
-  slotStates: ChatRuntimeUiSlotState[] = [],
-  mode: RuntimeComposerSlashCommandMode = 'session'
+  slotStates: ChatRuntimeUiSlotState[] = []
 ): ChatComposerSlashCommand {
   const name = normalizeCommandName(slot.name)
   const state = readRuntimeUiSlotCommandState(slot, slotStates)
@@ -199,7 +201,7 @@ export function createRuntimeUiSlotCommand(
     argumentHint: slot.argumentHint,
     aliases: slot.aliases,
     source: 'runtime',
-    action: readCodexRuntimeUiSlotAction(slot, commandText, mode),
+    action: readRuntimeUiSlotAction(slot, commandText),
     presentation: 'slot',
     iconKey: slot.iconKey,
     stateLabel: state?.label,
@@ -215,7 +217,7 @@ export function createRuntimeUiSlotCommands(
 ): ChatComposerSlashCommand[] {
   return slots
     .filter((slot) => isRuntimeUiSlotSlashCommand(slot, mode))
-    .map((slot) => createRuntimeUiSlotCommand(slot, slotStates, mode))
+    .map((slot) => createRuntimeUiSlotCommand(slot, slotStates))
 }
 
 export function mergeChatSlashCommands({

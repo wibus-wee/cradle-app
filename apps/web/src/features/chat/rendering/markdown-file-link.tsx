@@ -3,7 +3,8 @@ import type { AnchorHTMLAttributes } from 'react'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { useLayoutStore } from '~/store/layout'
-import { useSessionLayoutStore } from '~/store/session-layout'
+
+import { useSessionBinding } from '../session/use-session-binding'
 
 interface MarkdownFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
@@ -17,8 +18,8 @@ interface MarkdownFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> 
 export function MarkdownFileLink({ href, sessionId, children, ...props }: MarkdownFileLinkProps) {
   const openWorkspaceFileTab = useBrowserPanelStore(state => state.openWorkspaceFileTab)
   const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
-  const workspaceId = useSessionLayoutStore(state =>
-    sessionId ? state.sessions[sessionId]?.workspaceId ?? null : null)
+  const sessionBinding = useSessionBinding(sessionId ?? null, Boolean(sessionId))
+  const workspaceId = sessionBinding?.workspaceId ?? null
 
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     props.onClick?.(event)

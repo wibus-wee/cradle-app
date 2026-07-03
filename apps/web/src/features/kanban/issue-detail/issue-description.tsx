@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query'
 import { z } from 'zod'
 
-import { getIssuesSearch, getSessionsByIdMessages } from '~/api-gen/sdk.gen'
+import { getChatSessionsBySessionIdMessages, getIssuesSearch } from '~/api-gen/sdk.gen'
 import { MarkdownEditor } from '~/components/editor/markdown-editor'
 import { useUploadAsset } from '~/features/assets/use-upload-asset'
 import type {
@@ -187,7 +187,9 @@ export function IssueDescription({ issue, onUpdate, readOnly = false }: IssueDes
     queries: sessions.slice(0, 20).map(session => ({
       queryKey: ['session-message-count', session.id] as const,
       queryFn: async () => {
-        const { data } = await getSessionsByIdMessages({ path: { id: session.id } })
+        const { data } = await getChatSessionsBySessionIdMessages({
+          path: { sessionId: session.id },
+        })
         return SessionMessageListSchema.parse(data).length
       },
       staleTime: 30_000,

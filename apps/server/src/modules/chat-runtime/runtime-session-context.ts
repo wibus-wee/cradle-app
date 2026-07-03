@@ -7,11 +7,13 @@ import { parseJsonObject } from '../../helpers/json-record'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/provider-state-snapshot'
-import { runtimeSupportsProviderKind } from '../provider-contracts/runtime-compatibility'
+import {
+  readRuntimeOwnedProviderTargetOwner,
+  runtimeOwnsProviderTarget,
+  runtimeSupportsProviderKind,
+} from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
 import * as ModelRegistry from '../model-registry/service'
-import { isOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/model-inventory'
-import { OPENCODE_RUNTIME_KIND } from '../chat-runtime-providers/opencode/metadata'
 import {
   persistProviderRuntimeResolution,
   resolveExistingProviderRuntimeSession,
@@ -23,7 +25,7 @@ import * as Workspace from '../workspace/service'
 import { resolveSessionSystemPrompt } from './context/turn-context'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { runRegistry } from './run-registry'
-import type { ActiveRun } from './service'
+import type { ActiveRun } from './run-registry'
 import type {
   ChatRuntime,
   ChatThinkingEffort,
@@ -38,6 +40,29 @@ export interface SessionRunContext {
   workspacePath: string
   profile: RuntimeProviderTargetProfile | null
   providerTarget: { id: string; kind: 'manual' | 'external' } | null
+}
+
+export type ProviderBoundSessionRunContext = SessionRunContext & {
+  profile: RuntimeProviderTargetProfile
+  providerTarget: { id: string; kind: 'manual' | 'external' }
+}
+
+export function assertProviderBoundRunContext(
+  context: SessionRunContext,
+  operation: string
+): ProviderBoundSessionRunContext {
+  if (context.profile && context.providerTarget) {
+    return context as ProviderBoundSessionRunContext
+  }
+  throw new AppError({
+    code: 'chat_provider_target_required',
+    status: 409,
+    message: `${operation} requires a provider target bound runtime`,
+    details: {
+      sessionId: context.session.id,
+      runtimeKind: context.session.runtimeKind ?? 'standard'
+    }
+  })
 }
 
 export function getSessionRunContext(
@@ -58,8 +83,9 @@ export function getSessionRunContext(
   }
 
   const runtimeKind = session.runtimeKind ?? 'standard'
-  if (providerTargetId && isOpenCodeRuntimeNativeProviderTargetId(providerTargetId)) {
-    if (runtimeKind !== OPENCODE_RUNTIME_KIND) {
+  const runtimeOwnedProviderTargetOwner = readRuntimeOwnedProviderTargetOwner(providerTargetId)
+  if (runtimeOwnedProviderTargetOwner) {
+    if (runtimeOwnedProviderTargetOwner !== runtimeKind) {
       return null
     }
     const runtime = getRuntimeRegistry().get(runtimeKind)
@@ -248,7 +274,8 @@ function validateResolvedRuntimeSessionContext(input: {
       message: 'Provider target is no longer available',
       details: {
         sessionId: input.sessionId,
-        providerTargetId: input.requestedProviderTargetId ?? input.originalContext.providerTarget?.id ?? null
+        providerTargetId:
+          input.requestedProviderTargetId ?? input.originalContext.providerTarget?.id ?? null
       }
     })
   }
@@ -270,7 +297,7 @@ function validateResolvedRuntimeSessionContext(input: {
     throw new AppError({
       code: 'chat_provider_target_changed',
       status: 409,
-        message: 'Chat session provider target changed before the run started',
+      message: 'Chat session provider target changed before the run started',
       details: {
         sessionId: input.sessionId,
         previousProviderTargetId: input.originalContext.providerTarget?.id ?? null,
@@ -285,9 +312,9 @@ export function readSessionRequestedModelId(input: {
   requestedProviderTargetId?: string
 }): string | undefined {
   if (
-    input.requestedProviderTargetId
-    && isOpenCodeRuntimeNativeProviderTargetId(input.requestedProviderTargetId)
-    && input.session.providerTargetId === null
+    input.requestedProviderTargetId &&
+    runtimeOwnsProviderTarget(input.session.runtimeKind ?? 'standard', input.requestedProviderTargetId) &&
+    input.session.providerTargetId === null
   ) {
     return SessionService.readSessionModelPreference(input.session.configJson) ?? undefined
   }
@@ -305,9 +332,9 @@ export function readSessionRequestedThinkingEffort(input: {
   requestedProviderTargetId?: string
 }): ChatThinkingEffort | undefined {
   if (
-    input.requestedProviderTargetId
-    && isOpenCodeRuntimeNativeProviderTargetId(input.requestedProviderTargetId)
-    && input.session.providerTargetId === null
+    input.requestedProviderTargetId &&
+    runtimeOwnsProviderTarget(input.session.runtimeKind ?? 'standard', input.requestedProviderTargetId) &&
+    input.session.providerTargetId === null
   ) {
     return SessionService.readSessionThinkingEffortPreference(input.session.configJson) ?? undefined
   }
@@ -456,7 +483,8 @@ export async function resolveRuntimeSessionContext(
 
   const modelId =
     resolved.requestedModelId ??
-    readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models.currentModelId ??
+    readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models
+      .currentModelId ??
     undefined
 
   return {

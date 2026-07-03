@@ -1,16 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import {
+  runtimeCatalogItemHasSlotName,
+  useRuntimeCatalog,
+} from '~/features/agent-runtime/use-runtime-catalog'
 import { chatSelectors, useChatStore } from '~/store/chat'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 import { listChatSessionQueue } from '../commands/chat-response-command'
+import { runtimeSupportsCodexGoalBridge } from '../runtime/codex-app-server-bridge'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
 import { useChatActions } from './use-chat-actions'
 import { useChatQueue } from './use-chat-queue'
 import { useChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 import { EMPTY_QUEUE_ITEMS } from './use-chat-session-types'
+import { useSessionBinding } from './use-session-binding'
 
 // Re-export types and utilities for public API compatibility
 export type {
@@ -23,9 +28,6 @@ export type {
   ToolApprovalResponseInput,
 } from './use-chat-session-types'
 export { projectMainMessagesFromSnapshotRows } from './use-chat-session-types'
-
-// Re-export the driver hook
-export { useChatSessionDriver } from './use-chat-session-driver'
 
 // ── Facade Hook ────────────────────────────────────────────
 
@@ -54,22 +56,28 @@ export function useChatSession(chatSessionId: string | null, active = true) {
     queryKey: queueQueryKey,
     queryFn: () => listChatSessionQueue(chatSessionId!),
     enabled: queryEnabled,
-    refetchInterval: query => visibleStatus === 'streaming'
-      || query.state.data?.items.some(item => item.status === 'pending' || item.status === 'running')
-      ? 1000
-      : false,
+    refetchInterval: false,
   })
-  const runtimeStatusQuery = useRuntimeSessionStatus(queryEnabled ? chatSessionId : null)
+  const runtimeStatusQuery = useRuntimeSessionStatus(queryEnabled ? chatSessionId : null, queryEnabled, {
+    refetchInterval: false,
+  })
   const runtimeStatus = runtimeStatusQuery.data
-  const runtimeKind = useSessionLayoutStore(
-    useShallow(state => chatSessionId ? state.sessions[chatSessionId]?.runtimeKind ?? null : null),
+  const sessionBinding = useSessionBinding(chatSessionId, queryEnabled)
+  const runtimeKind = runtimeStatus?.runtimeKind ?? sessionBinding?.runtimeKind ?? null
+  const { runtimes } = useRuntimeCatalog()
+  const runtimeDescriptor = useMemo(
+    () => runtimes.find(runtime => runtime.runtimeKind === runtimeKind) ?? null,
+    [runtimeKind, runtimes],
   )
+  const supportsGoalCommand = runtimeCatalogItemHasSlotName(runtimeDescriptor, 'goal', 'slashCommand')
+  const supportsCodexGoalBridge = runtimeSupportsCodexGoalBridge(runtimeDescriptor)
 
   const { sendMessage, respondToToolApproval, submitPendingUserInput, rollbackLastTurn, stop } = useChatActions({
     chatSessionId,
     controls,
     runtimeStatus,
-    runtimeKind,
+    supportsGoalCommand,
+    supportsCodexGoalBridge,
   })
 
   const { cancelQueueItem, reorderQueueItems, updateQueueItem } = useChatQueue(chatSessionId, controls)
@@ -87,8 +95,7 @@ export function useChatSession(chatSessionId: string | null, active = true) {
       || runtimeStatus.activeRun
     ),
   )
-  const serverStreaming = Boolean(runtimeStatus && (runtimeStatus.status === 'streaming' || runtimeStatus.activeRun))
-  const resolvedStreaming = serverStreaming || isStreaming
+  const serverStopAvailable = Boolean(runtimeStatus && (runtimeStatus.status === 'streaming' || runtimeStatus.activeRun))
 
   // Last-turn rollback is only available on runtimes that declare support, and
   // only when the session is idle with no active/pending/running work — the
@@ -100,12 +107,12 @@ export function useChatSession(chatSessionId: string | null, active = true) {
     : false
   const canRollbackLastTurn
     = supportsLastTurnRollback
-    && Boolean(runtimeStatus)
-    && !serverBusy
-    && !isStreaming
-    && runtimeStatus!.status === 'idle'
-    && rollbackQueueIdle
-    && messageCount > 0
+      && Boolean(runtimeStatus)
+      && !serverBusy
+      && !isStreaming
+      && runtimeStatus!.status === 'idle'
+      && rollbackQueueIdle
+      && messageCount > 0
 
   useEffect(() => {
     if (latestError) {
@@ -117,9 +124,9 @@ export function useChatSession(chatSessionId: string | null, active = true) {
     messageIds,
     messageCount,
     status: visibleStatus,
-    isStreaming: resolvedStreaming,
+    isStreaming,
     isBusy: serverBusy || isStreaming,
-    canStop: serverStreaming || isStreaming,
+    canStop: serverStopAvailable || isStreaming,
     error: latestError?.message,
     sendMessage,
     respondToToolApproval,

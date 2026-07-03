@@ -2,6 +2,11 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { RuntimeKind } from '~/features/agent-runtime/types'
+import {
+  runtimeComposerSupportsThinking,
+  runtimeComposerUsesAliasMatrixModelSelection,
+  runtimeComposerUsesModelSelection,
+} from '~/features/agent-runtime/use-runtime-catalog'
 import type { ClaudeAgentModelAliasesSlot } from '~/features/chat/runtime/claude-session-model-matrix-control'
 
 import { AgentSelector } from './agent-selector'
@@ -72,7 +77,7 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
   }, [context, runtimeOptions, state.agentSelectionEnabled, t])
   const runtimeSelectorValue = context === 'new-chat'
     && selection.targetMode === 'agent'
-    && selection.runtimeKind !== 'cli-tui'
+    && runtimeComposerUsesModelSelection(state.runtimeComposer)
     ? AGENTS_RUNTIME_SELECTOR_VALUE
     : selection.runtimeKind
   const handleRuntimeChange = (kind: RuntimeKind) => {
@@ -84,7 +89,8 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
   }
 
   const thinkingOptions = useProviderThinkingOptions()
-  const supportedThinkingControlOptions = selection.runtimeKind === 'claude-agent'
+  const usesAliasMatrixModelSelection = runtimeComposerUsesAliasMatrixModelSelection(state.runtimeComposer)
+  const supportedThinkingControlOptions = usesAliasMatrixModelSelection
     ? thinkingOptions
     : filterThinkingOptionsForModel(state.effectiveModel, thinkingOptions)
   const thinkingControlOptions = includeSelectedThinkingOption(
@@ -92,9 +98,9 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
     thinkingOptions,
     selection.thinkingEffort,
   )
-  const showThinkingControl = selection.runtimeKind !== 'cli-tui' && thinkingControlOptions.length > 0
+  const showThinkingControl = runtimeComposerSupportsThinking(state.runtimeComposer) && thinkingControlOptions.length > 0
   const showClaudeModelAliases = selection.targetMode === 'provider'
-    && selection.runtimeKind === 'claude-agent'
+    && usesAliasMatrixModelSelection
     && !!claudeModelAliases
 
   const runtimeControl = (
@@ -118,7 +124,7 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
         />
       )
     : null
-  const providerSelector = selection.targetMode === 'provider' && selection.runtimeKind !== 'cli-tui'
+  const providerSelector = selection.targetMode === 'provider' && runtimeComposerUsesModelSelection(state.runtimeComposer)
     ? (
         <ProviderModelSelector
           profiles={profiles}

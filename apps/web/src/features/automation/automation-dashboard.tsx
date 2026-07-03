@@ -1,10 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import type { TFunction } from 'i18next'
 import {
   ArrowLeftLine as ArrowLeftIcon,
   CalendarTimeAddLine as CalendarClockIcon,
   CheckLine as CheckIcon,
   ClockLine as ClockIcon,
+  CloseLine as XIcon,
   FileLine as FileTextIcon,
   PencilLine as PencilIcon,
   PlayLine as PlayIcon,
@@ -12,9 +11,9 @@ import {
   Refresh1Line as RefreshCwIcon,
   SparklesLine as SparklesIcon,
   WarningLine as TriangleAlertIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
+import { useQuery } from '@tanstack/react-query'
+import type { TFunction } from 'i18next'
 import { m } from 'motion/react'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -48,6 +47,7 @@ import {
   NumberFieldInput,
 } from '~/components/ui/number-field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
+import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { Textarea } from '~/components/ui/textarea'
 import { toastManager } from '~/components/ui/toast'
@@ -56,7 +56,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/comp
 import type { ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
-import { listRuntimeCatalogForSurface, useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { listRuntimeCatalogForSurface, runtimeCatalogItemUsesModelSelection, useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { listSelectableComposerProfiles, pickComposerProfileId } from '~/features/composer-toolbar/composer-profile-selection'
 import { filterThinkingOptionsForModel, selectSupportedThinkingValue, THINKING_EFFORTS } from '~/features/composer-toolbar/constants'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
@@ -159,7 +159,11 @@ interface CreateAutomationDraft {
   artifactName: string
 }
 
-function createDefaultDraft(providerTargetId = '', workspaceId: string | null = null): CreateAutomationDraft {
+function createDefaultDraft(
+  providerTargetId = '',
+  workspaceId: string | null = null,
+  runtimeKind: AutomationRuntimeKind = '',
+): CreateAutomationDraft {
   return {
     title: '',
     description: '',
@@ -169,7 +173,7 @@ function createDefaultDraft(providerTargetId = '', workspaceId: string | null = 
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     misfirePolicy: 'run_latest',
     providerTargetId,
-    runtimeKind: 'codex',
+    runtimeKind,
     modelId: null,
     thinkingEffort: null,
     prompt: '',
@@ -966,12 +970,12 @@ function CreateAutomationPanel({
   const { runtimes } = useRuntimeCatalog()
   const runtimeOptions = useMemo(
     () => listRuntimeCatalogForSurface(runtimes, 'chat')
-      .filter(runtime => runtime.runtimeKind !== 'cli-tui')
+      .filter(runtimeCatalogItemUsesModelSelection)
       .map(runtime => ({
         value: runtime.runtimeKind,
         label: runtime.label,
         description: runtime.description,
-        iconKey: runtime.iconKey,
+        icon: runtime.icon,
       })),
     [runtimes],
   )
@@ -1038,7 +1042,8 @@ function CreateAutomationPanel({
   }, [draft, models, onChange, selectThinkingForModel, selectedProfileId])
 
   const updateRuntimeKind = useCallback((runtimeKind: RuntimeKind) => {
-    if (runtimeKind === 'cli-tui') {
+    const runtime = runtimes.find(item => item.runtimeKind === runtimeKind)
+    if (!runtime || !runtimeCatalogItemUsesModelSelection(runtime)) {
       return
     }
     const nextProfiles = listSelectableComposerProfiles({ profiles: providerOptions, runtimeKind, runtimes })
@@ -1295,6 +1300,12 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   const [workspaceFilter, setWorkspaceFilter] = useState<string | null>(null)
   const definitionsQuery = useAutomationDefinitions(workspaceFilter)
   const definitions = definitionsQuery.data ?? []
+  const { runtimes } = useRuntimeCatalog()
+  const defaultRuntimeKind = useMemo(
+    () => listRuntimeCatalogForSurface(runtimes, 'chat')
+      .filter(runtimeCatalogItemUsesModelSelection)[0]?.runtimeKind ?? '',
+    [runtimes],
+  )
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<CreateAutomationDraft | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -1330,10 +1341,10 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   const locale = i18n.resolvedLanguage ?? i18n.language
 
   const startDraft = useCallback((): void => {
-    setDraft(createDefaultDraft('', workspaceFilter))
+    setDraft(createDefaultDraft('', workspaceFilter, defaultRuntimeKind))
     setDraftError(null)
     setSelectedId(null)
-  }, [workspaceFilter])
+  }, [defaultRuntimeKind, workspaceFilter])
 
   const startEdit = useCallback((definition: AutomationDefinition): void => {
     const trigger = getTrigger(definition)
@@ -1347,7 +1358,7 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
       timezone: trigger?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       misfirePolicy: trigger?.misfirePolicy ?? 'run_latest',
       providerTargetId: recipe?.providerTargetId ?? '',
-      runtimeKind: (recipe?.runtimeKind as AutomationRuntimeKind) ?? 'codex',
+      runtimeKind: (recipe?.runtimeKind as AutomationRuntimeKind | undefined) ?? defaultRuntimeKind,
       modelId: recipe?.modelId ?? null,
       thinkingEffort: recipe?.thinkingEffort ?? null,
       prompt: recipe?.prompt ?? '',
@@ -1355,7 +1366,7 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
     })
     setEditingId(definition.id)
     setDraftError(null)
-  }, [])
+  }, [defaultRuntimeKind])
 
   const cancelDraft = useCallback((): void => {
     setDraft(null)

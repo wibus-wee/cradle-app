@@ -69,6 +69,7 @@ function createTestRuntime() {
       supportsRuntimeSettings: false,
       supportsUiSlotStates: false,
       supportsDynamicCapabilities: false,
+      supportsTitleGeneration: false,
       sessionModelSwitch: 'in-session',
     },
     startChatSession: vi.fn(async (input: StartChatSessionInput): Promise<RuntimeSession> => ({

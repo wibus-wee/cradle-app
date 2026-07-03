@@ -1,0 +1,26 @@
+id: trivial-constructor-wrapper
+language: TypeScript
+severity: warning
+message: >
+  Function only wraps a `new` constructor call with no transformation;
+  inline the constructor at each call site instead of wrapping it in a named function.
+rule:
+  any:
+    # Zero-arg: function createFoo() { return new Foo() }
+    - pattern: 'function $FUNC() { return new $CTOR() }'
+    - pattern: 'function $FUNC(): $RET { return new $CTOR() }'
+    # Single typed param pass-through: function createFoo(x: T) { return new Foo(x) }
+    - pattern: 'function $FUNC($PARAM: $TYPE) { return new $CTOR($PARAM) }'
+    - pattern: 'function $FUNC($PARAM: $TYPE): $RET { return new $CTOR($PARAM) }'
+    # Two typed params pass-through: function createFoo(a: T, b: U) { return new Foo(a, b) }
+    - pattern: 'function $FUNC($P1: $T1, $P2: $T2) { return new $CTOR($P1, $P2) }'
+    - pattern: 'function $FUNC($P1: $T1, $P2: $T2): $RET { return new $CTOR($P1, $P2) }'
+    # Single untyped param: function createFoo(x) { return new Foo(x) }
+    - pattern: 'function $FUNC($PARAM) { return new $CTOR($PARAM) }'
+    - pattern: 'function $FUNC($PARAM): $RET { return new $CTOR($PARAM) }'
+constraints:
+  FUNC:
+    regex: ^(create|build|make|new)[A-Z].*
+  CTOR:
+    not:
+      regex: (Error|Exception|Promise)$

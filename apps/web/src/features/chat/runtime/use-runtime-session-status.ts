@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+
 import { runtimeSessionStatusQueryOptions } from '../commands/runtime-session-status-command'
 
 export {
@@ -6,14 +7,22 @@ export {
   runtimeSessionStatusQueryOptions,
 } from '../commands/runtime-session-status-command'
 
-const RUNTIME_STATUS_REFETCH_INTERVAL_MS = 1_000
+export interface RuntimeSessionStatusQueryOptions {
+  refetchInterval?: number | false
+}
 
-export function useRuntimeSessionStatus(sessionId: string | null, active = true) {
+export function useRuntimeSessionStatus(
+  sessionId: string | null,
+  active = true,
+  options: RuntimeSessionStatusQueryOptions = {},
+) {
+  const refetchInterval = options.refetchInterval ?? false
+
   return useQuery({
     ...runtimeSessionStatusQueryOptions(sessionId),
     enabled: active && !!sessionId,
     staleTime: 1_000,
-    refetchInterval: active ? RUNTIME_STATUS_REFETCH_INTERVAL_MS : false,
+    refetchInterval: active ? refetchInterval : false,
     refetchIntervalInBackground: true,
   })
 }

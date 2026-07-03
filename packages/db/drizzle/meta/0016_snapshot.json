@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b9d3f96e-47da-452e-9512-fb95858a14b8",
+  "id": "a4313c37-92d6-4923-b566-77a7f80c6bdd",
   "prevId": "e3873ac4-ea60-4571-b616-8a1a53ce3770",
   "tables": {
     "acp_agents": {
@@ -2069,6 +2069,77 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "composer_drafts": {
+      "name": "composer_drafts",
+      "columns": {
+        "surface_id": {
+          "name": "surface_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "draft_json": {
+          "name": "draft_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "composer_drafts_updated_at_idx": {
+          "name": "composer_drafts_updated_at_idx",
+          "columns": [
+            "updated_at"
+          ],
+          "isUnique": false
+        },
+        "composer_drafts_deleted_at_idx": {
+          "name": "composer_drafts_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -13114,6 +13185,138 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "remote_host_agentd_session_links": {
+      "name": "remote_host_agentd_session_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "chat_session_id": {
+          "name": "chat_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_host_id": {
+          "name": "remote_host_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_agent_id": {
+          "name": "remote_agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_runtime_kind": {
+          "name": "remote_runtime_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daemon_host_id": {
+          "name": "daemon_host_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "provider_session_id": {
+          "name": "provider_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "state_snapshot_json": {
+          "name": "state_snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "remote_host_agentd_session_links_chat_session_id_unique": {
+          "name": "remote_host_agentd_session_links_chat_session_id_unique",
+          "columns": [
+            "chat_session_id"
+          ],
+          "isUnique": true
+        },
+        "remote_host_agentd_session_links_host_idx": {
+          "name": "remote_host_agentd_session_links_host_idx",
+          "columns": [
+            "remote_host_id"
+          ],
+          "isUnique": false
+        },
+        "remote_host_agentd_session_links_agent_idx": {
+          "name": "remote_host_agentd_session_links_agent_idx",
+          "columns": [
+            "remote_agent_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "remote_host_agentd_session_links_chat_session_id_sessions_id_fk": {
+          "name": "remote_host_agentd_session_links_chat_session_id_sessions_id_fk",
+          "tableFrom": "remote_host_agentd_session_links",
+          "tableTo": "sessions",
+          "columnsFrom": [
+            "chat_session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "remote_host_agentd_session_links_remote_host_id_remote_hosts_id_fk": {
+          "name": "remote_host_agentd_session_links_remote_host_id_remote_hosts_id_fk",
+          "tableFrom": "remote_host_agentd_session_links",
+          "tableTo": "remote_hosts",
+          "columnsFrom": [
+            "remote_host_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

@@ -9,7 +9,6 @@ import type { UIMessage } from 'ai'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'
 import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
-import { isChatSkillContextPart, readChatPluginContextPart, readChatSkillContextPart } from '../../chat-runtime/context-parts'
 import type {
   ChatRuntimeSettings,
   GetCapabilitiesInput,
@@ -22,20 +21,22 @@ import {
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../chat-runtime/runtime-provider-types'
+import { resolveAnthropicWireAuth } from '../../provider-catalog/provider-endpoint-registry'
+import type { ClaudeAgentAuthMode } from '../../provider-contracts/provider-base'
 import {
-  type ClaudeAgentAuthMode,
   readTrustedClaudeAgentConfig,
   readTrustedUniversalConfig,
   resolveApiKey,
 } from '../../provider-contracts/provider-base'
-import { resolveAnthropicWireAuth } from '../../provider-catalog/provider-endpoint-registry'
+import type { ProviderInputPart } from '../kit/input-projector'
+import { projectProviderInputParts } from '../kit/input-projector'
 import { readWorkspaceProviderStateSnapshot } from '../provider-state-snapshot'
+import { createBoundedTextCollector } from '../bounded-text-collector'
 import { CLAUDE_AGENT_RUNTIME_KIND } from './metadata'
+import type { ClaudeAgentPermissionBridgeState, ClaudeAgentToolApprovalRequest } from './permission-bridge'
 import {
   createClaudeAgentCanUseTool,
   createClaudeAgentPermissionBridgeState,
-  type ClaudeAgentPermissionBridgeState,
-  type ClaudeAgentToolApprovalRequest,
   updateClaudeAgentPermissionBridgeState,
 } from './permission-bridge'
 import {
@@ -47,12 +48,14 @@ import type {
   AnthropicImageMediaType,
   ClaudeAgentContentBlock,
   ClaudeAgentUserContent,
-  MessagePart,
   RuntimeMessageInput,
 } from './types'
 
 export const CLAUDE_AGENT_SDK_PERSIST_SESSION = true
 
+type ProviderFileInputPart = Extract<ProviderInputPart, { type: 'file' }>
+type ProviderPluginInputPart = Extract<ProviderInputPart, { type: 'plugin' }>
+type ProviderSkillInputPart = Extract<ProviderInputPart, { type: 'skill' }>
 
 export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLabel: string): ClaudeAgentUserContent {
   if (typeof message === 'string') {
@@ -66,7 +69,7 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
   const skillCommands: string[] = []
   const blocks: ClaudeAgentContentBlock[] = []
   const unsupportedParts: string[] = []
-  for (const part of message.parts) {
+  for (const part of projectProviderInputParts(message)) {
     if (part.type === 'text') {
       const text = part.text.trim()
       if (text) {
@@ -83,19 +86,15 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
       }
       continue
     }
-    if (isChatSkillContextPart(part)) {
-      const skillPart = readChatSkillContextPart(part)
-      if (skillPart) {
-        skillCommands.push(describeSkillMentionForText(skillPart))
-      }
+    if (part.type === 'skill') {
+      skillCommands.push(describeSkillMentionForText(part.skill))
       continue
     }
-    const pluginPart = readChatPluginContextPart(part)
-    if (pluginPart) {
-      blocks.push({ type: 'text', text: describePluginMentionForText(pluginPart) })
+    if (part.type === 'plugin') {
+      blocks.push({ type: 'text', text: describePluginMentionForText(part.plugin) })
       continue
     }
-    unsupportedParts.push(part.type)
+    unsupportedParts.push(part.partType)
   }
 
   if (unsupportedParts.length > 0) {
@@ -116,14 +115,14 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
   return blocks
 }
 
-function describePluginMentionForText(plugin: NonNullable<ReturnType<typeof readChatPluginContextPart>>): string {
+function describePluginMentionForText(plugin: ProviderPluginInputPart['plugin']): string {
   const capabilities = plugin.capabilities.map(capability => `${capability.type}:${capability.layer}`).join(', ')
   const mcpServers = plugin.mcpServers.length > 0 ? ` MCP servers: ${plugin.mcpServers.join(', ')}.` : ''
   const description = plugin.description ? ` ${plugin.description}` : ''
   return `Selected Cradle plugin @${plugin.displayName}.${description}${capabilities ? ` Capabilities: ${capabilities}.` : ''}${mcpServers}`
 }
 
-function describeSkillMentionForText(skill: NonNullable<ReturnType<typeof readChatSkillContextPart>>): string {
+function describeSkillMentionForText(skill: ProviderSkillInputPart['skill']): string {
   return `/${skill.name}`
 }
 
@@ -179,6 +178,7 @@ export function buildClaudeQueryOptions(input: {
   permissionBridgeState?: ClaudeAgentPermissionBridgeState
   emitToolApprovalRequest?: (request: ClaudeAgentToolApprovalRequest) => void
   persistSession?: boolean
+  onStderr?: (chunk: string) => void
 }): Options {
   const profile = requireRuntimeProviderTargetProfile(input.input.profile, CLAUDE_AGENT_RUNTIME_KIND)
   const config = readTrustedClaudeAgentConfig(profile.configJson)
@@ -315,7 +315,49 @@ export function buildClaudeQueryOptions(input: {
   Object.assign(env, buildClaudeAgentModelEnv({ model: effectiveModel, ...config.claudeAgent }))
   queryOptions.env = env
 
+  // Capturing stderr is critical for diagnosability: when the Claude Code
+  // process exits non-zero, the SDK's thrown error only carries the exit code
+  // ("Claude Code process exited with code 1"). Without this callback the SDK
+  // pipes stderr to "ignore" and the real failure reason is lost. The sink
+  // below collects chunks so callers can enrich the surfaced error.
+  if (input.onStderr) {
+    queryOptions.stderr = input.onStderr
+  }
+
   return queryOptions
+}
+
+/**
+ * Collects Claude Code process stderr and enriches errors with the captured
+ * output. The SDK only includes the exit code in its thrown error; this sink
+ * appends the stderr tail so the actual startup/runtime failure is visible.
+ */
+const CLAUDE_STDERR_MAX_LENGTH = 64 * 1024
+
+export interface ClaudeStderrSink {
+  onStderr: (chunk: string) => void
+  enrichError: (error: unknown) => unknown
+}
+
+export function createClaudeStderrSink(): ClaudeStderrSink {
+  const collector = createBoundedTextCollector(CLAUDE_STDERR_MAX_LENGTH)
+  return {
+    onStderr: (chunk) => collector.append(chunk),
+    enrichError: (error) => {
+      const stderr = collector.read()
+      if (!stderr) {
+        return error
+      }
+      // Mutate the existing Error's message to preserve its original stack
+      // (which points at the SDK's exit handler) while making the stderr
+      // visible in the surfaced message and diagnostics errorText.
+      if (error instanceof Error) {
+        error.message = `${error.message}\n\n[Claude Code stderr]\n${stderr}`
+        return error
+      }
+      return new Error(`${String(error)}\n\n[Claude Code stderr]\n${stderr}`)
+    },
+  }
 }
 
 export function resolveClaudeAgentAuthMode(
@@ -505,7 +547,7 @@ function readBangResultMetadata(message: UIMessage): {
   }
 }
 
-function toClaudeAgentImageBlock(part: Extract<MessagePart, { type: 'file' }>, runtimeLabel: string): ClaudeAgentContentBlock {
+function toClaudeAgentImageBlock(part: ProviderFileInputPart, runtimeLabel: string): ClaudeAgentContentBlock {
   const mediaType = toAnthropicImageMediaType(part.mediaType)
   if (!mediaType) {
     throw claudeAgentRequestError('projectImageInput', `${runtimeLabel} only supports jpeg, png, gif, and webp image input; unsupported file: ${describeUnsupportedFilePart(part)}`)
@@ -566,11 +608,11 @@ function isHttpUrl(url: string): boolean {
   return url.startsWith('https://') || url.startsWith('http://')
 }
 
-function describeUnsupportedFilePart(part: Extract<MessagePart, { type: 'file' }>): string {
+function describeUnsupportedFilePart(part: ProviderFileInputPart): string {
   return `${describeFilePart(part)} (${part.mediaType})`
 }
 
-function describeFilePart(part: Extract<MessagePart, { type: 'file' }>): string {
+function describeFilePart(part: ProviderFileInputPart): string {
   const filename = part.filename ? ` (${part.filename})` : ''
   return `file${filename}`
 }
@@ -591,10 +633,7 @@ function readSelectedSkillNames(message: RuntimeMessageInput): string[] {
   if (typeof message === 'string') {
     return []
   }
-  return message.parts.flatMap((part) => {
-    const skillPart = readChatSkillContextPart(part)
-    return skillPart ? [skillPart.name] : []
-  })
+  return projectProviderInputParts(message).flatMap(part => part.type === 'skill' ? [part.skill.name] : [])
 }
 
 function resolveAnthropicBaseUrl(

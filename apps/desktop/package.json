@@ -10,6 +10,7 @@
   },
   "main": "dist/main/index.js",
   "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
     "dev": "pnpm build:mac-bridge && electron-vite dev",
     "sync:codex-runtime": "node scripts/sync-codex-runtime.mjs --current",
     "sync:codex-runtime:all": "node scripts/sync-codex-runtime.mjs --all",

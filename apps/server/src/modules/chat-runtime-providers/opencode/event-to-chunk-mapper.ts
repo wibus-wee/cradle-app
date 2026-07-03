@@ -4,10 +4,11 @@
  * Position: opencode provider package event mapper between SDK-native parts and Chat Runtime chunks.
  */
 
-import type { UIMessageChunk } from 'ai'
 import type { AssistantMessage as OpencodeAssistantMessage, Part as OpencodePart } from '@opencode-ai/sdk'
+import type { UIMessageChunk } from 'ai'
 
 import type { TokenUsage } from '../../chat-runtime/runtime-provider-types'
+import { providerChunk } from '../kit/chunk-mapper'
 import { buildOpencodeToolInput, buildOpencodeToolOutput } from './tools/mapper'
 
 export interface OpencodeChunkMapperResult {
@@ -23,7 +24,7 @@ export function mapOpencodePromptResultToChunks(input: {
   for (const part of input.parts) {
     chunks.push(...mapOpencodePartToChunks(part))
   }
-  chunks.push({ type: 'finish', finishReason: readFinishReason(input.info.finish) })
+  chunks.push(providerChunk.finish(readFinishReason(input.info.finish)))
   return {
     chunks,
     usage: {
@@ -37,23 +38,9 @@ export function mapOpencodePromptResultToChunks(input: {
 function mapOpencodePartToChunks(part: OpencodePart): UIMessageChunk[] {
   switch (part.type) {
     case 'text':
-      if (!part.text) {
-        return []
-      }
-      return [
-        { type: 'text-start', id: part.id },
-        { type: 'text-delta', id: part.id, delta: part.text },
-        { type: 'text-end', id: part.id },
-      ]
+      return providerChunk.textBlock(part.id, part.text)
     case 'reasoning':
-      if (!part.text) {
-        return []
-      }
-      return [
-        { type: 'reasoning-start', id: part.id },
-        { type: 'reasoning-delta', id: part.id, delta: part.text },
-        { type: 'reasoning-end', id: part.id },
-      ]
+      return providerChunk.reasoningBlock(part.id, part.text)
     case 'tool':
       return mapOpencodeToolPartToChunks(part)
     case 'file':
@@ -93,41 +80,34 @@ function mapOpencodePartToChunks(part: OpencodePart): UIMessageChunk[] {
 
 function mapOpencodeToolPartToChunks(part: Extract<OpencodePart, { type: 'tool' }>): UIMessageChunk[] {
   const chunks: UIMessageChunk[] = [
-    { type: 'tool-input-start', toolCallId: part.callID, toolName: part.tool },
-    {
-      type: 'tool-input-available',
+    providerChunk.toolInputStart(part.callID, part.tool),
+    providerChunk.toolInputAvailable({
       toolCallId: part.callID,
       toolName: part.tool,
       input: buildOpencodeToolInput(part),
-    },
+    }),
   ]
 
   switch (part.state.status) {
     case 'completed':
     case 'running':
     case 'pending':
-      chunks.push({
-        type: 'tool-output-available',
+      chunks.push(providerChunk.toolOutputAvailable({
         toolCallId: part.callID,
         output: buildOpencodeToolOutput(part),
-      })
+      }))
       return chunks
     case 'error':
-      chunks.push({
-        type: 'tool-output-error',
-        toolCallId: part.callID,
-        errorText: part.state.error,
-      })
+      chunks.push(providerChunk.toolOutputError(part.callID, part.state.error))
       return chunks
   }
 }
 
 function projectFilePart(part: Extract<OpencodePart, { type: 'file' }>): UIMessageChunk {
-  return {
-    type: 'file',
+  return providerChunk.file({
     mediaType: part.mime,
     url: part.url,
-  }
+  })
 }
 
 function readFinishReason(finish: string | undefined): Extract<UIMessageChunk, { type: 'finish' }>['finishReason'] {

@@ -30,18 +30,18 @@ import {
   normalizeClaudeAgentConfigPatch,
 } from '../provider-contracts/claude-agent-config'
 import { CodexAuthModeSchema, readTrustedUniversalConfig } from '../provider-contracts/provider-base'
-import { runtimeSupportsProviderKind } from '../provider-contracts/runtime-compatibility'
+import {
+  listRuntimeOwnedProviderTargets,
+  projectRuntimeOwnedProviderTarget,
+  readRuntimeOwnedProviderTargetOwner,
+  readRuntimeUniversalProviderKind,
+  runtimeSupportsProviderKind,
+} from '../provider-contracts/runtime-compatibility'
 import type { ModelCapabilities, ProviderKind, RuntimeKind } from '../provider-contracts/types'
 import {
   releaseLiveProviderRuntimeSessionsForProviderTarget,
   unlinkProviderTargetFromDurableProviderRuntimeBindings,
 } from '../provider-runtime/service'
-import {
-  isOpenCodeRuntimeNativeProviderTargetId,
-  listOpencodeRuntimeProviderGroups,
-  readOpenCodeRuntimeNativeProviderId,
-} from '../chat-runtime-providers/opencode/model-inventory'
-import { OPENCODE_RUNTIME_KIND } from '../chat-runtime-providers/opencode/metadata'
 import * as Workspace from '../workspace/service'
 
 const ProviderTargetRefSchema = z.object({
@@ -255,56 +255,6 @@ function toResolvedProviderTarget(row: ProviderTargetRow): ResolvedProviderTarge
   }
 }
 
-async function listOpenCodeRuntimeProviderTargetRows(input: ListProviderTargetsInput): Promise<ProviderTargetRow[]> {
-  const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
-  try {
-    const groups = await listOpencodeRuntimeProviderGroups({
-      runtimeKind: OPENCODE_RUNTIME_KIND,
-      workspacePath,
-    })
-    return groups.map(group => projectOpenCodeRuntimeNativeProviderTargetRow(group.id, {
-      displayName: `OpenCode / ${group.label}`,
-      providerKind: group.providerKind,
-      externalRecordId: group.nativeProviderId,
-    })!)
-  }
-  catch {
-    return []
-  }
-}
-
-function projectOpenCodeRuntimeNativeProviderTargetRow(
-  providerTargetId: string,
-  overrides: {
-    displayName?: string
-    providerKind?: ProviderKind
-    externalRecordId?: string
-  } = {},
-): ProviderTargetRow | null {
-  const nativeProviderId = readOpenCodeRuntimeNativeProviderId(providerTargetId)
-  if (!nativeProviderId) {
-    return null
-  }
-  const now = nowUnix()
-  return {
-    id: providerTargetId,
-    kind: 'external',
-    displayName: overrides.displayName ?? `OpenCode / ${nativeProviderId}`,
-    providerKind: overrides.providerKind ?? 'universal',
-    enabled: true,
-    iconSlug: 'opencode',
-    connectionConfigJson: '{}',
-    credentialRef: null,
-    enabledModelsJson: '[]',
-    customModelsJson: '[]',
-    sourceKey: 'runtime-native:opencode',
-    externalRecordId: overrides.externalRecordId ?? nativeProviderId,
-    sourceFingerprint: providerTargetId,
-    createdAt: now,
-    updatedAt: now,
-  }
-}
-
 type ProviderTargetWriteDb = Pick<ReturnType<typeof db>, 'update'>
 
 function disableAgentsForProviderTargetInDb(providerTargetId: string, d: ProviderTargetWriteDb): void {
@@ -336,31 +286,30 @@ export function listStoredProviderTargets(): ProviderTargetRow[] {
 
 export async function listProviderTargets(input: ListProviderTargetsInput = {}): Promise<ProviderTargetRow[]> {
   const rows = listStoredProviderTargets()
-  if (input.runtimeKind !== OPENCODE_RUNTIME_KIND) {
+  if (!input.runtimeKind) {
     return rows
   }
+  const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
   return [
     ...rows,
-    ...await listOpenCodeRuntimeProviderTargetRows(input),
+    ...await listRuntimeOwnedProviderTargets({
+      runtimeKind: input.runtimeKind,
+      workspacePath,
+      now: nowUnix(),
+    }),
   ]
 }
 
 export function getProviderTarget(id: string): ProviderTargetRow | null {
-  const runtimeNativeTarget = projectOpenCodeRuntimeNativeProviderTargetRow(id)
-  if (runtimeNativeTarget) {
-    return runtimeNativeTarget
+  const runtimeOwnedTarget = projectRuntimeOwnedProviderTarget({ providerTargetId: id, now: nowUnix() })
+  if (runtimeOwnedTarget) {
+    return runtimeOwnedTarget
   }
   return db().select().from(providerTargets).where(eq(providerTargets.id, id)).get() ?? null
 }
 
 export function resolveProviderTarget(input: ProviderTarget | string): ResolvedProviderTarget {
   const id = parseTargetId(input)
-  if (isOpenCodeRuntimeNativeProviderTargetId(id)) {
-    const row = projectOpenCodeRuntimeNativeProviderTargetRow(id)
-    if (row) {
-      return toResolvedProviderTarget(row)
-    }
-  }
   const row = getProviderTarget(id)
   if (!row) {
     throw new AppError({
@@ -373,23 +322,11 @@ export function resolveProviderTarget(input: ProviderTarget | string): ResolvedP
   return toResolvedProviderTarget(row)
 }
 
-function projectUniversalProviderKindForRuntime(runtimeKind: RuntimeKind): ProviderKind | null {
-  switch (runtimeKind) {
-    case 'standard':
-    case 'codex':
-      return 'openai-compatible'
-    case 'claude-agent':
-      return 'anthropic'
-    default:
-      return null
-  }
-}
-
 function projectUniversalProviderTargetForRuntime(
   target: ResolvedProviderTarget,
   runtimeKind: RuntimeKind,
 ): ResolvedProviderTarget {
-  const providerKind = projectUniversalProviderKindForRuntime(runtimeKind)
+  const providerKind = readRuntimeUniversalProviderKind(runtimeKind)
   if (!providerKind) {
     return target
   }
@@ -579,6 +516,23 @@ export function assertProviderTargetCompatibleWithRuntime(
   target: ProviderTarget | string,
   runtimeKind: RuntimeKind,
 ): void {
+  const providerTargetId = parseTargetId(target)
+  const owningRuntimeKind = readRuntimeOwnedProviderTargetOwner(providerTargetId)
+  if (owningRuntimeKind) {
+    if (owningRuntimeKind === runtimeKind) {
+      return
+    }
+    throw new AppError({
+      code: 'invalid_provider_target',
+      status: 400,
+      message: 'Runtime-owned provider target is not compatible with the selected runtime',
+      details: {
+        providerTargetId,
+        runtimeKind,
+        owningRuntimeKind,
+      },
+    })
+  }
   const resolved = resolveProviderTargetForRuntime(target, runtimeKind)
   if (!runtimeSupportsProviderKind(runtimeKind, resolved.providerKind)) {
     throw new AppError({

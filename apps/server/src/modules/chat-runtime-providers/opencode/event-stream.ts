@@ -1,12 +1,13 @@
-import type { UIMessageChunk } from 'ai'
 import type {
   AssistantMessage as OpencodeAssistantMessage,
   Event as OpencodeEvent,
   Part as OpencodePart,
   ToolPart as OpencodeToolPart,
 } from '@opencode-ai/sdk'
+import type { UIMessageChunk } from 'ai'
 
 import type { TokenUsage } from '../../chat-runtime/runtime-provider-types'
+import { providerChunk } from '../kit/chunk-mapper'
 import { buildOpencodeToolInput, buildOpencodeToolOutput } from './tools/mapper'
 
 type OpencodeMessagePartDeltaEvent = {
@@ -34,6 +35,7 @@ interface ToolPartProjection {
 }
 
 export class OpencodeEventStreamProjector {
+  private ignoredMessageIds: ReadonlySet<string> = new Set()
   private readonly messageRoles = new Map<string, 'user' | 'assistant'>()
   private readonly partsById = new Map<string, OpencodePart>()
   private readonly pendingTextDeltas = new Map<string, string>()
@@ -47,10 +49,17 @@ export class OpencodeEventStreamProjector {
     return this._usage
   }
 
+  ignoreMessages(messageIds: ReadonlySet<string>): void {
+    this.ignoredMessageIds = messageIds
+  }
+
   projectEvent(event: OpencodeStreamEvent): UIMessageChunk[] {
     switch (event.type) {
       case 'message.updated':
         if (event.properties.info.sessionID !== this.sessionId) {
+          return []
+        }
+        if (this.ignoredMessageIds.has(event.properties.info.id)) {
           return []
         }
         this.messageRoles.set(event.properties.info.id, event.properties.info.role)
@@ -71,10 +80,16 @@ export class OpencodeEventStreamProjector {
         if (event.properties.sessionID !== this.sessionId || event.properties.delta.length === 0) {
           return []
         }
+        if (this.ignoredMessageIds.has(event.properties.messageID)) {
+          return []
+        }
         return this.projectPartDelta(event.properties.partID, event.properties.delta)
 
       case 'message.part.updated':
         if (event.properties.part.sessionID !== this.sessionId) {
+          return []
+        }
+        if (this.ignoredMessageIds.has(event.properties.part.messageID)) {
           return []
         }
         return this.projectPart(event.properties.part)
@@ -134,7 +149,7 @@ export class OpencodeEventStreamProjector {
   }
 
   finish(input: OpencodeAssistantMessage): UIMessageChunk {
-    return { type: 'finish', finishReason: readFinishReason(input.finish) }
+    return providerChunk.finish(readFinishReason(input.finish))
   }
 
   private projectKnownMessageParts(messageId: string): UIMessageChunk[] {
@@ -156,11 +171,10 @@ export class OpencodeEventStreamProjector {
       case 'tool':
         return this.projectToolPart(part)
       case 'file':
-        return [{
-          type: 'file',
+        return [providerChunk.file({
           mediaType: part.mime,
           url: part.url,
-        }]
+        })]
       case 'patch':
       case 'snapshot':
       case 'step-start':
@@ -223,8 +237,8 @@ export class OpencodeEventStreamProjector {
     if (part.time?.end !== undefined && !projection.ended) {
       projection.ended = true
       chunks.push(part.type === 'text'
-        ? { type: 'text-end', id: part.id }
-        : { type: 'reasoning-end', id: part.id })
+        ? providerChunk.textEnd(part.id)
+        : providerChunk.reasoningEnd(part.id))
     }
     return chunks
   }
@@ -240,13 +254,12 @@ export class OpencodeEventStreamProjector {
     if (!projection.inputAvailable) {
       projection.inputAvailable = true
       chunks.push(
-        { type: 'tool-input-start', toolCallId: part.callID, toolName: part.tool },
-        {
-          type: 'tool-input-available',
+        providerChunk.toolInputStart(part.callID, part.tool),
+        providerChunk.toolInputAvailable({
           toolCallId: part.callID,
           toolName: part.tool,
           input: buildOpencodeToolInput(part),
-        },
+        }),
       )
     }
 
@@ -254,19 +267,14 @@ export class OpencodeEventStreamProjector {
     if (outputKey !== projection.outputKey) {
       projection.outputKey = outputKey
       if (part.state.status === 'error') {
-        chunks.push({
-          type: 'tool-output-error',
-          toolCallId: part.callID,
-          errorText: part.state.error,
-        })
+        chunks.push(providerChunk.toolOutputError(part.callID, part.state.error))
       }
       else if (part.state.status === 'running' || part.state.status === 'completed') {
-        chunks.push({
-          type: 'tool-output-available',
+        chunks.push(providerChunk.toolOutputAvailable({
           toolCallId: part.callID,
           output: buildOpencodeToolOutput(part),
           preliminary: part.state.status === 'running',
-        })
+        }))
       }
     }
     return chunks
@@ -296,8 +304,8 @@ export class OpencodeEventStreamProjector {
     }
     projection.started = true
     return projection.kind === 'text'
-      ? { type: 'text-start', id: part.id }
-      : { type: 'reasoning-start', id: part.id }
+      ? providerChunk.textStart(part.id)
+      : providerChunk.reasoningStart(part.id)
   }
 
   private deltaTextChunk(
@@ -305,8 +313,8 @@ export class OpencodeEventStreamProjector {
     delta: string,
   ): UIMessageChunk {
     return part.type === 'text'
-      ? { type: 'text-delta', id: part.id, delta }
-      : { type: 'reasoning-delta', id: part.id, delta }
+      ? providerChunk.textDelta(part.id, delta)
+      : providerChunk.reasoningDelta(part.id, delta)
   }
 }
 
@@ -314,7 +322,7 @@ export function readOpencodeTerminalAssistantForTurn(
   event: OpencodeStreamEvent,
   input: {
     sessionId: string
-    userMessageId: string
+    baselineMessageIds: ReadonlySet<string>
   },
 ): OpencodeAssistantMessage | null {
   if (event.type !== 'message.updated') {
@@ -324,7 +332,7 @@ export function readOpencodeTerminalAssistantForTurn(
   if (
     info.role !== 'assistant'
     || info.sessionID !== input.sessionId
-    || info.parentID !== input.userMessageId
+    || input.baselineMessageIds.has(info.id)
   ) {
     return null
   }

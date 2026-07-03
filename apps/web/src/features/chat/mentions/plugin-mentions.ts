@@ -1,6 +1,7 @@
+import { getPluginsMentions } from '~/api-gen/sdk.gen'
 import { getServerUrl } from '~/lib/electron'
-import { postChatSessionsBySessionIdCodexAppServerInvoke } from '~/api-gen/sdk.gen'
 
+import { loadCodexInstalledPluginResult } from '../runtime/codex-app-server-bridge'
 import type { PluginMentionItem } from './mention-panel'
 
 function readPluginMentionItems(value: unknown): PluginMentionItem[] {
@@ -59,24 +60,23 @@ function readNativeMention(value: unknown): { name: string, path: string } | nul
 }
 
 export async function searchPluginMentions(query: string, signal?: AbortSignal): Promise<PluginMentionItem[]> {
-  const url = new URL('/plugins/mentions', getServerUrl())
-  const response = await fetch(url, { signal })
-  if (!response.ok) {
-    throw new Error(`Failed to load plugin mentions (${response.status}).`)
+  const result = await getPluginsMentions({ signal })
+  if (result.error || !result.data) {
+    throw new Error(`Failed to load plugin mentions (${result.response?.status ?? 'unknown'}).`)
   }
-  return filterPluginMentionItems(readPluginMentionItems(await response.json()), query)
+  return filterPluginMentionItems(readPluginMentionItems(result.data), query)
 }
 
 export async function searchSessionPluginMentions(input: {
   sessionId: string
-  runtimeKind: string | undefined
+  supportsCodexPluginMentions: boolean
   providerTargetId?: string | null
   modelId?: string | null
   query: string
   signal?: AbortSignal
 }): Promise<PluginMentionItem[]> {
   const cradlePluginsPromise = searchPluginMentions(input.query, input.signal)
-  if (input.runtimeKind !== 'codex') {
+  if (!input.supportsCodexPluginMentions) {
     return cradlePluginsPromise
   }
 
@@ -108,17 +108,8 @@ async function searchCodexPluginMentions(input: {
   modelId?: string | null
   signal?: AbortSignal
 }): Promise<PluginMentionItem[]> {
-  const { data } = await postChatSessionsBySessionIdCodexAppServerInvoke({
-    path: { sessionId: input.sessionId },
-    body: {
-      method: 'plugin/installed',
-      params: {},
-      providerTargetId: input.providerTargetId ?? undefined,
-      modelId: input.modelId ?? undefined,
-    },
-    signal: input.signal,
-  })
-  return readCodexPluginMentionItems(data?.result)
+  const result = await loadCodexInstalledPluginResult(input)
+  return readCodexPluginMentionItems(result)
 }
 
 function readCodexPluginMentionItems(value: unknown): PluginMentionItem[] {
@@ -142,7 +133,7 @@ function readCodexPluginMentionItems(value: unknown): PluginMentionItem[] {
   })
 }
 
-function toCodexPluginMentionItem(value: unknown, marketplaceName: string): PluginMentionItem[] {
+function toCodexPluginMentionItem(value: unknown, _marketplaceName: string): PluginMentionItem[] {
   if (!value || typeof value !== 'object') {
     return []
   }

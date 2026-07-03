@@ -27,12 +27,9 @@ export type ReviewDecision = 'approve' | 'request-changes' | 'comment'
 export type EditableCommitPlanStatus = Extract<ReviewCommitPlan['status'], 'draft' | 'accepted' | 'abandoned'>
 export type DiffStyle = 'split' | 'unified'
 
-/** Runtime that can produce a change walkthrough. */
-export type GuideRuntimeKind = 'codex' | 'claude-agent'
-
 export interface GenerateGuideInput {
   providerTargetId: string
-  runtimeKind?: GuideRuntimeKind
+  runtimeKind?: string
   modelId?: string | null
   force?: boolean
 }

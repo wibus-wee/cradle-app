@@ -11,15 +11,18 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
-import { chatSelectors, useChatStore } from '~/store/chat'
+import { chatSelectors } from '~/store/chat'
+import { useRendererChatStore } from '~/store/renderer-chat'
 
 import { submitRuntimeToolApproval } from '../chat/commands/chat-response-command'
 import { getProviderThread, getProviderThreadTurns, providerThreadQueryKey, providerThreadTurnsQueryKey, subscribeProviderThreadStream } from '../chat/commands/provider-thread-command'
-import { MessageBubble } from '../chat/rendering/message-bubble'
+import { ChatRenderStoreProvider, MessageBubble } from '../chat/rendering/message-bubble'
 import { SubagentIdenticon } from '../chat/rendering/subagent-identicon'
 import { isMatchingApprovalPart, readRuntimeUserInputRequestId } from '../chat/session/use-chat-session-types'
 import { ChatStreamingHandler } from '../chat/transport/chat-streaming-handler'
 import { buildUIMessageChunkStreamFromResponse } from '../chat/transport/sse-chat-transport'
+
+const rendererChatStore = useRendererChatStore
 
 interface SubagentOutputPanelProps {
   sessionId: string
@@ -75,7 +78,7 @@ export function SubagentOutputPanel({
     if (!messages) {
       return
     }
-    const store = useChatStore.getState()
+    const store = useRendererChatStore.getState()
     const hydratedIds = new Set(messages.map(message => message.id))
     const hasHydratedMessages = messages.length > 0
     const liveMessages = (store.messagesMap.get(viewSessionId) ?? [])
@@ -83,7 +86,7 @@ export function SubagentOutputPanel({
         if (hydratedIds.has(message.id) || isProviderThreadLiveFallbackMessageId(message.id, sessionId, threadId)) {
           return false
         }
-        return !hasHydratedMessages || store.passiveStreamingMessageIds.has(message.id)
+        return !hasHydratedMessages || chatSelectors.isStreamingMessage(message.id)(store)
       })
     store.setMessages(viewSessionId, [...messages, ...liveMessages])
   }, [sessionId, threadId, turnsData?.messages, viewSessionId])
@@ -98,7 +101,12 @@ export function SubagentOutputPanel({
       viewSessionId,
       placeholderMessageId,
       performance.now(),
-      { mode: 'passive', useStoredMessageSnapshot: false },
+      {
+        mode: 'passive',
+        useStoredMessageSnapshot: false,
+        store: useRendererChatStore,
+        emitSettledEvents: false,
+      },
     )
     handler.start(controller)
 
@@ -134,8 +142,8 @@ export function SubagentOutputPanel({
     }
   }, [isThreadError, isThreadLoading, queryClient, sessionId, thread?.status, threadId, viewSessionId])
 
-  const messages = useChatStore(useShallow(chatSelectors.messages(viewSessionId)))
-  const streamStatus = useChatStore(chatSelectors.visibleStatus(viewSessionId))
+  const messages = useRendererChatStore(useShallow(chatSelectors.messages(viewSessionId)))
+  const streamStatus = useRendererChatStore(chatSelectors.visibleStatus(viewSessionId))
   const fallbackDisplayName = agentName.trim() || thread?.name || 'Subagent'
   const displayName = thread?.agentNickname ?? fallbackDisplayName
   const displayRole = thread?.agentRole ?? agentRole
@@ -153,7 +161,7 @@ export function SubagentOutputPanel({
     approved: boolean
   }) => {
     const requestId = readRuntimeUserInputRequestId(response.approvalId)
-    useChatStore.getState().updateMessage(viewSessionId, response.messageId, message => ({
+    useRendererChatStore.getState().updateMessage(viewSessionId, response.messageId, message => ({
       ...message,
       parts: message.parts.map(part =>
         isMatchingApprovalPart(part, response.approvalId)
@@ -352,19 +360,21 @@ function ProviderThreadMessage({
     approved: boolean
   }) => void
 }) {
-  const message = useChatStore(chatSelectors.message(viewSessionId, messageId))
-  const isStreaming = useChatStore(chatSelectors.isVisibleStreamingMessage(viewSessionId, messageId))
+  const message = useRendererChatStore(chatSelectors.message(viewSessionId, messageId))
+  const isStreaming = useRendererChatStore(chatSelectors.isVisibleStreamingMessage(viewSessionId, messageId))
   if (!message) {
     return null
   }
   return (
-    <MessageBubble
-      message={message}
-      isStreaming={isStreaming}
-      executionDetailsDefaultOpen={false}
-      sessionId={sessionId}
-      onToolApprovalResponse={onToolApprovalResponse}
-    />
+    <ChatRenderStoreProvider store={rendererChatStore}>
+      <MessageBubble
+        message={message}
+        isStreaming={isStreaming}
+        executionDetailsDefaultOpen={false}
+        sessionId={sessionId}
+        onToolApprovalResponse={onToolApprovalResponse}
+      />
+    </ChatRenderStoreProvider>
   )
 }
 

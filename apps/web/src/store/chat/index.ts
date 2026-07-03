@@ -1,13 +1,14 @@
 // Public API — same exports as before
-export { chatSelectors, getChatStoreTelemetrySnapshot, useChatStore } from './store'
+export { chatSelectors, createChatStore, getChatStoreTelemetrySnapshot, useChatStore } from './store'
 export type {
   AssistantDisplaySplit,
   ChatActiveGoal,
   ChatActiveGoalStatus,
   ChatError,
   ChatRunDisplayMeta,
+  ChatRunState,
   ChatState,
   MessageReconcileChange,
+  PassiveRunStateInput,
   PublicStatus,
-  SessionMeta,
 } from './types'

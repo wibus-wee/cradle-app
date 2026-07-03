@@ -7,6 +7,7 @@ import {
 } from '@mingcute/react'
 import { useMemo, useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { cn } from '~/lib/cn'
 
@@ -171,10 +172,11 @@ function FileRow({
         aria-hidden
       />
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        className="h-auto min-w-0 !shrink flex-1 justify-start gap-2 rounded-none px-0 py-0 text-left font-normal hover:bg-transparent"
       >
         <span className={cn('shrink-0 font-mono text-[11px] font-semibold', STATUS_COLOR[file.status])}>
           {STATUS_LETTER[file.status]}
@@ -185,7 +187,7 @@ function FileRow({
           </span>
           {dir && <span className="ml-1.5 text-[11px] text-muted-foreground/40">{dir}</span>}
         </span>
-      </button>
+      </Button>
 
       <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] tabular-nums text-muted-foreground/50">
         <span className="text-emerald-600/80 dark:text-emerald-400/80">
@@ -198,12 +200,14 @@ function FileRow({
         </span>
       </span>
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={onToggleViewed}
         disabled={viewedPending}
         className={cn(
-          'flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+          'size-4 shrink-0 rounded-full border',
           file.isViewed
             ? 'border-emerald-500 bg-emerald-500 text-white'
             : 'border-border text-transparent opacity-0 hover:border-muted-foreground group-hover:opacity-100',
@@ -212,7 +216,7 @@ function FileRow({
         title={file.isViewed ? 'Mark unviewed' : 'Mark viewed'}
       >
         <CheckIcon className="size-2.5" />
-      </button>
+      </Button>
     </div>
   )
 }

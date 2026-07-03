@@ -2,8 +2,8 @@ import type {
   GetAgentsResponse,
   GetChatRuntimesResponse,
   GetProfilesResponse,
-  GetProviderTargetsResponse,
   GetProvidersTargetsByProviderTargetIdModelsCacheResponse,
+  GetProviderTargetsResponse,
 } from '~/api-gen/types.gen'
 
 export type Agent = GetAgentsResponse[number]
@@ -15,7 +15,6 @@ export type ProviderKind = ProviderTargetRecord['providerKind'] | 'cli-tool'
 export type ApiProviderKind = Exclude<ProviderKind, 'cli-tool'>
 export type ProviderTargetKind = ProviderTargetRecord['kind']
 
-export type BuiltinRuntimeKind = 'standard' | 'claude-agent' | 'codex' | 'opencode' | 'jar-core' | 'acp-chat' | 'cli-tui'
 export type RuntimeKind = string
 
 export interface ProviderTarget {

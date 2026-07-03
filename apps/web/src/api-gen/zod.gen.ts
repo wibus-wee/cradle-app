@@ -1216,10 +1216,6 @@ export const zPostSessionsByIdUnreadPath = z.object({
     id: z.string().min(1)
 });
 
-export const zGetSessionsByIdMessagesPath = z.object({
-    id: z.string().min(1)
-});
-
 export const zGetSessionsByIdExportMarkdownPath = z.object({
     id: z.string().min(1)
 });
@@ -2003,7 +1999,7 @@ export const zPutWorkspacesByWorkspaceIdDiffReviewsPreferencesPath = z.object({
 
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateBody = z.object({
     providerTargetId: z.string().min(1),
-    runtimeKind: z.enum(['codex', 'claude-agent']).optional(),
+    runtimeKind: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
     force: z.boolean().optional()
 });
@@ -2158,220 +2154,77 @@ export const zGetAcpAgentsByAgentIdInstallPathPath = z.object({
     agentId: z.string().min(1)
 });
 
-export const zPostChatSessionsBySessionIdResponseBody = z.object({
-    text: z.string().optional(),
-    files: z.array(z.object({
-        type: z.string(),
-        mediaType: z.string().min(1),
-        filename: z.string().optional(),
-        url: z.string().min(1),
-        providerMetadata: z.unknown().optional()
-    })).optional(),
-    contextParts: z.array(z.union([z.object({
-            type: z.string(),
-            name: z.string().min(1),
-            path: z.string().min(1),
-            scope: z.enum([
-                'builtin',
-                'legacy',
-                'global',
-                'repository',
-                'workspace',
-                'agent'
-            ]),
-            description: z.string().nullable(),
-            position: z.number().gte(0).optional()
-        }), z.object({
-            type: z.string(),
-            provider: z.enum(['cradle', 'codex']).optional(),
-            pluginName: z.string().min(1),
-            displayName: z.string().min(1),
-            description: z.string().nullable(),
-            iconUrl: z.string().min(1).nullish(),
-            routeSegment: z.string().min(1),
-            capabilities: z.array(z.object({
-                id: z.string().min(1),
-                type: z.string().min(1),
-                layer: z.enum([
-                    'server',
-                    'web',
-                    'desktop'
-                ]),
-                label: z.string().nullable()
-            })),
-            mcpServers: z.array(z.string().min(1)),
-            nativeMention: z.object({
+export const zGetEventsQuery = z.object({
+    scope: z.string(),
+    afterSequenceId: z.number().gte(0).optional(),
+    workspaceId: z.string().optional(),
+    limit: z.number().gte(1).lte(500).optional()
+});
+
+export const zGetChatSessionsBySessionIdEventsPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdEventsQuery = z.object({
+    afterVersion: z.number().gte(0).optional(),
+    limit: z.number().gte(1).lte(500).optional()
+});
+
+export const zDeleteChatComposerDraftsBySurfaceIdPath = z.object({
+    surfaceId: z.string().min(1)
+});
+
+export const zGetChatComposerDraftsBySurfaceIdPath = z.object({
+    surfaceId: z.string().min(1)
+});
+
+export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
+    draft: z.object({
+        text: z.string(),
+        contextParts: z.array(z.union([z.object({
+                type: z.string(),
                 name: z.string().min(1),
-                path: z.string().min(1)
-            }).nullish(),
-            position: z.number().gte(0).optional()
-        })])).optional(),
-    messages: z.array(z.object({
-        id: z.string(),
-        role: z.enum([
-            'system',
-            'user',
-            'assistant'
-        ]),
-        parts: z.array(z.object({
-            type: z.string()
-        })),
-        metadata: z.unknown().optional()
-    })).optional(),
-    providerTargetId: z.string().optional(),
-    modelId: z.string().nullish(),
-    thinkingEffort: z.enum([
-        'low',
-        'medium',
-        'high',
-        'xhigh'
-    ]).optional(),
-    runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional()
-    }).optional()
-});
-
-export const zPostChatSessionsBySessionIdResponsePath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdRollbackLastTurnPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdBangCommandBody = z.object({
-    command: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdBangCommandPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdTitleRegeneratePath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdSideChatBody = z.object({
-    providerTargetId: z.string().optional(),
-    modelId: z.string().nullish()
-});
-
-export const zPostChatSessionsBySessionIdSideChatPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdQuickQuestionBody = z.object({
-    question: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdQuickQuestionPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdUserInputByRequestIdBody = z.object({
-    answers: z.record(z.string(), z.unknown())
-});
-
-export const zPostChatSessionsBySessionIdUserInputByRequestIdPath = z.object({
-    sessionId: z.string().min(1),
-    requestId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdToolApprovalByRequestIdBody = z.object({
-    approved: z.boolean(),
-    reason: z.string().optional()
-});
-
-export const zPostChatSessionsBySessionIdToolApprovalByRequestIdPath = z.object({
-    sessionId: z.string().min(1),
-    requestId: z.string().min(1)
-});
-
-export const zPostChatSideConversationsBySideConversationIdResponseBody = z.object({
-    text: z.string().optional(),
-    files: z.array(z.object({
-        type: z.string(),
-        mediaType: z.string().min(1),
-        filename: z.string().optional(),
-        url: z.string().min(1),
-        providerMetadata: z.unknown().optional()
-    })).optional(),
-    contextParts: z.array(z.union([z.object({
-            type: z.string(),
-            name: z.string().min(1),
-            path: z.string().min(1),
-            scope: z.enum([
-                'builtin',
-                'legacy',
-                'global',
-                'repository',
-                'workspace',
-                'agent'
-            ]),
-            description: z.string().nullable(),
-            position: z.number().gte(0).optional()
-        }), z.object({
-            type: z.string(),
-            provider: z.enum(['cradle', 'codex']).optional(),
-            pluginName: z.string().min(1),
-            displayName: z.string().min(1),
-            description: z.string().nullable(),
-            iconUrl: z.string().min(1).nullish(),
-            routeSegment: z.string().min(1),
-            capabilities: z.array(z.object({
-                id: z.string().min(1),
-                type: z.string().min(1),
-                layer: z.enum([
-                    'server',
-                    'web',
-                    'desktop'
+                path: z.string().min(1),
+                scope: z.enum([
+                    'builtin',
+                    'legacy',
+                    'global',
+                    'repository',
+                    'workspace',
+                    'agent'
                 ]),
-                label: z.string().nullable()
-            })),
-            mcpServers: z.array(z.string().min(1)),
-            nativeMention: z.object({
-                name: z.string().min(1),
-                path: z.string().min(1)
-            }).nullish(),
-            position: z.number().gte(0).optional()
-        })])).optional(),
-    messages: z.array(z.object({
-        id: z.string(),
-        role: z.enum([
-            'system',
-            'user',
-            'assistant'
-        ]),
-        parts: z.array(z.object({
-            type: z.string()
-        })),
-        metadata: z.unknown().optional()
-    })).optional(),
-    providerTargetId: z.string().optional(),
-    modelId: z.string().nullish(),
-    thinkingEffort: z.enum([
-        'low',
-        'medium',
-        'high',
-        'xhigh'
-    ]).optional(),
-    runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional()
-    }).optional()
+                description: z.string().nullable(),
+                position: z.number().gte(0).optional()
+            }), z.object({
+                type: z.string(),
+                provider: z.enum(['cradle', 'codex']).optional(),
+                pluginName: z.string().min(1),
+                displayName: z.string().min(1),
+                description: z.string().nullable(),
+                iconUrl: z.string().min(1).nullish(),
+                routeSegment: z.string().min(1),
+                capabilities: z.array(z.object({
+                    id: z.string().min(1),
+                    type: z.string().min(1),
+                    layer: z.enum([
+                        'server',
+                        'web',
+                        'desktop'
+                    ]),
+                    label: z.string().nullable()
+                })),
+                mcpServers: z.array(z.string().min(1)),
+                nativeMention: z.object({
+                    name: z.string().min(1),
+                    path: z.string().min(1)
+                }).nullish(),
+                position: z.number().gte(0).optional()
+            })]))
+    })
 });
 
-export const zPostChatSideConversationsBySideConversationIdResponsePath = z.object({
-    sideConversationId: z.string().min(1)
-});
-
-export const zDeleteChatSideConversationsBySideConversationIdPath = z.object({
-    sideConversationId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdStreamPath = z.object({
-    sessionId: z.string().min(1)
+export const zPutChatComposerDraftsBySurfaceIdPath = z.object({
+    surfaceId: z.string().min(1)
 });
 
 export const zGetChatRuntimesByRuntimeKindModelsPath = z.object({
@@ -2380,6 +2233,111 @@ export const zGetChatRuntimesByRuntimeKindModelsPath = z.object({
 
 export const zGetChatRuntimesByRuntimeKindModelsQuery = z.object({
     workspaceId: z.string().optional()
+});
+
+export const zGetChatDraftRuntimeCapabilitiesQuery = z.object({
+    runtimeKind: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdCapabilitiesPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdUiSlotStatesPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdContextUsagePath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdBackgroundTerminalsPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdBackgroundTerminalsQuery = z.object({
+    cursor: z.string().optional(),
+    limit: z.number().optional()
+});
+
+export const zPostChatSessionsBySessionIdBackgroundTerminalsByProcessIdTerminatePath = z.object({
+    sessionId: z.string().min(1),
+    processId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdProviderThreadsPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdProviderThreadsQuery = z.object({
+    cursor: z.string().optional(),
+    limit: z.number().optional(),
+    sortKey: z.enum(['created_at', 'updated_at']).optional(),
+    sortDirection: z.enum(['asc', 'desc']).optional(),
+    sourceKinds: z.string().optional(),
+    archived: z.boolean().optional(),
+    searchTerm: z.string().optional()
+});
+
+export const zDeleteChatSessionsBySessionIdProviderThreadsByThreadIdPath = z.object({
+    sessionId: z.string().min(1),
+    threadId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdPath = z.object({
+    sessionId: z.string().min(1),
+    threadId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdTurnsPath = z.object({
+    sessionId: z.string().min(1),
+    threadId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdTurnsQuery = z.object({
+    cursor: z.string().optional(),
+    limit: z.number().optional(),
+    sortDirection: z.enum(['asc', 'desc']).optional()
+});
+
+export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdStreamPath = z.object({
+    sessionId: z.string().min(1),
+    threadId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdRuntimeStatusPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdCodexAppServerCapabilitiesPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdCodexAppServerInvokeBody = z.object({
+    method: z.string().min(1),
+    params: z.unknown().optional(),
+    providerTargetId: z.string().optional(),
+    modelId: z.string().optional()
+});
+
+export const zPostChatSessionsBySessionIdCodexAppServerInvokePath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdCodexAppServerStreamBody = z.object({
+    method: z.string().min(1),
+    params: z.unknown().optional(),
+    providerTargetId: z.string().optional(),
+    modelId: z.string().optional(),
+    closeOnMethods: z.array(z.string().min(1)).optional()
+});
+
+export const zPostChatSessionsBySessionIdCodexAppServerStreamPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdRollbackLastTurnPath = z.object({
+    sessionId: z.string().min(1)
 });
 
 export const zGetChatSessionsBySessionIdQueuePath = z.object({
@@ -2587,105 +2545,236 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdPath = z.object({
     queueItemId: z.string().min(1)
 });
 
-export const zGetChatDraftRuntimeCapabilitiesQuery = z.object({
-    runtimeKind: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdCapabilitiesPath = z.object({
+export const zPostChatSessionsBySessionIdCancelPath = z.object({
     sessionId: z.string().min(1)
 });
 
-export const zGetChatSessionsBySessionIdUiSlotStatesPath = z.object({
+export const zPostChatSessionsBySessionIdTitleRegeneratePath = z.object({
     sessionId: z.string().min(1)
 });
 
-export const zGetChatSessionsBySessionIdContextUsagePath = z.object({
+export const zGetChatSessionsBySessionIdRuntimeSettingsPath = z.object({
     sessionId: z.string().min(1)
 });
 
-export const zGetChatSessionsBySessionIdBackgroundTerminalsPath = z.object({
+export const zPatchChatSessionsBySessionIdRuntimeSettingsBody = z.object({
+    accessMode: z.enum(['approval-required', 'full-access']).optional(),
+    interactionMode: z.enum(['default', 'plan']).optional(),
+    claudeAgent: z.object({
+        modelAliases: z.object({
+            haiku: z.string().optional(),
+            sonnet: z.string().optional(),
+            opus: z.string().optional()
+        }).optional()
+    }).nullish()
+});
+
+export const zPatchChatSessionsBySessionIdRuntimeSettingsPath = z.object({
     sessionId: z.string().min(1)
 });
 
-export const zGetChatSessionsBySessionIdBackgroundTerminalsQuery = z.object({
-    cursor: z.string().optional(),
-    limit: z.number().optional()
-});
-
-export const zPostChatSessionsBySessionIdBackgroundTerminalsByProcessIdTerminatePath = z.object({
-    sessionId: z.string().min(1),
-    processId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdProviderThreadsPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdProviderThreadsQuery = z.object({
-    cursor: z.string().optional(),
-    limit: z.number().optional(),
-    sortKey: z.enum(['created_at', 'updated_at']).optional(),
-    sortDirection: z.enum(['asc', 'desc']).optional(),
-    sourceKinds: z.string().optional(),
-    archived: z.boolean().optional(),
-    searchTerm: z.string().optional()
-});
-
-export const zDeleteChatSessionsBySessionIdProviderThreadsByThreadIdPath = z.object({
-    sessionId: z.string().min(1),
-    threadId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdPath = z.object({
-    sessionId: z.string().min(1),
-    threadId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdTurnsPath = z.object({
-    sessionId: z.string().min(1),
-    threadId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdTurnsQuery = z.object({
-    cursor: z.string().optional(),
-    limit: z.number().optional(),
-    sortDirection: z.enum(['asc', 'desc']).optional()
-});
-
-export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdStreamPath = z.object({
-    sessionId: z.string().min(1),
-    threadId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdRuntimeStatusPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdCodexAppServerCapabilitiesPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdCodexAppServerInvokeBody = z.object({
-    method: z.string().min(1),
-    params: z.unknown().optional(),
+export const zPostChatSessionsBySessionIdResponseBody = z.object({
+    text: z.string().optional(),
+    files: z.array(z.object({
+        type: z.string(),
+        mediaType: z.string().min(1),
+        filename: z.string().optional(),
+        url: z.string().min(1),
+        providerMetadata: z.unknown().optional()
+    })).optional(),
+    contextParts: z.array(z.union([z.object({
+            type: z.string(),
+            name: z.string().min(1),
+            path: z.string().min(1),
+            scope: z.enum([
+                'builtin',
+                'legacy',
+                'global',
+                'repository',
+                'workspace',
+                'agent'
+            ]),
+            description: z.string().nullable(),
+            position: z.number().gte(0).optional()
+        }), z.object({
+            type: z.string(),
+            provider: z.enum(['cradle', 'codex']).optional(),
+            pluginName: z.string().min(1),
+            displayName: z.string().min(1),
+            description: z.string().nullable(),
+            iconUrl: z.string().min(1).nullish(),
+            routeSegment: z.string().min(1),
+            capabilities: z.array(z.object({
+                id: z.string().min(1),
+                type: z.string().min(1),
+                layer: z.enum([
+                    'server',
+                    'web',
+                    'desktop'
+                ]),
+                label: z.string().nullable()
+            })),
+            mcpServers: z.array(z.string().min(1)),
+            nativeMention: z.object({
+                name: z.string().min(1),
+                path: z.string().min(1)
+            }).nullish(),
+            position: z.number().gte(0).optional()
+        })])).optional(),
+    messages: z.array(z.object({
+        id: z.string(),
+        role: z.enum([
+            'system',
+            'user',
+            'assistant'
+        ]),
+        parts: z.array(z.object({
+            type: z.string()
+        })),
+        metadata: z.unknown().optional()
+    })).optional(),
     providerTargetId: z.string().optional(),
-    modelId: z.string().optional()
+    modelId: z.string().nullish(),
+    thinkingEffort: z.enum([
+        'low',
+        'medium',
+        'high',
+        'xhigh'
+    ]).optional(),
+    runtimeSettings: z.object({
+        accessMode: z.enum(['approval-required', 'full-access']).optional(),
+        interactionMode: z.enum(['default', 'plan']).optional()
+    }).optional()
 });
 
-export const zPostChatSessionsBySessionIdCodexAppServerInvokePath = z.object({
+export const zPostChatSessionsBySessionIdResponsePath = z.object({
     sessionId: z.string().min(1)
 });
 
-export const zPostChatSessionsBySessionIdCodexAppServerStreamBody = z.object({
-    method: z.string().min(1),
-    params: z.unknown().optional(),
+export const zPostChatSideConversationsBySideConversationIdResponseBody = z.object({
+    text: z.string().optional(),
+    files: z.array(z.object({
+        type: z.string(),
+        mediaType: z.string().min(1),
+        filename: z.string().optional(),
+        url: z.string().min(1),
+        providerMetadata: z.unknown().optional()
+    })).optional(),
+    contextParts: z.array(z.union([z.object({
+            type: z.string(),
+            name: z.string().min(1),
+            path: z.string().min(1),
+            scope: z.enum([
+                'builtin',
+                'legacy',
+                'global',
+                'repository',
+                'workspace',
+                'agent'
+            ]),
+            description: z.string().nullable(),
+            position: z.number().gte(0).optional()
+        }), z.object({
+            type: z.string(),
+            provider: z.enum(['cradle', 'codex']).optional(),
+            pluginName: z.string().min(1),
+            displayName: z.string().min(1),
+            description: z.string().nullable(),
+            iconUrl: z.string().min(1).nullish(),
+            routeSegment: z.string().min(1),
+            capabilities: z.array(z.object({
+                id: z.string().min(1),
+                type: z.string().min(1),
+                layer: z.enum([
+                    'server',
+                    'web',
+                    'desktop'
+                ]),
+                label: z.string().nullable()
+            })),
+            mcpServers: z.array(z.string().min(1)),
+            nativeMention: z.object({
+                name: z.string().min(1),
+                path: z.string().min(1)
+            }).nullish(),
+            position: z.number().gte(0).optional()
+        })])).optional(),
+    messages: z.array(z.object({
+        id: z.string(),
+        role: z.enum([
+            'system',
+            'user',
+            'assistant'
+        ]),
+        parts: z.array(z.object({
+            type: z.string()
+        })),
+        metadata: z.unknown().optional()
+    })).optional(),
     providerTargetId: z.string().optional(),
-    modelId: z.string().optional(),
-    closeOnMethods: z.array(z.string().min(1)).optional()
+    modelId: z.string().nullish(),
+    thinkingEffort: z.enum([
+        'low',
+        'medium',
+        'high',
+        'xhigh'
+    ]).optional(),
+    runtimeSettings: z.object({
+        accessMode: z.enum(['approval-required', 'full-access']).optional(),
+        interactionMode: z.enum(['default', 'plan']).optional()
+    }).optional()
 });
 
-export const zPostChatSessionsBySessionIdCodexAppServerStreamPath = z.object({
+export const zPostChatSideConversationsBySideConversationIdResponsePath = z.object({
+    sideConversationId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdBangCommandBody = z.object({
+    command: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdBangCommandPath = z.object({
     sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdSideChatBody = z.object({
+    providerTargetId: z.string().optional(),
+    modelId: z.string().nullish()
+});
+
+export const zPostChatSessionsBySessionIdSideChatPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdQuickQuestionBody = z.object({
+    question: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdQuickQuestionPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdUserInputByRequestIdBody = z.object({
+    answers: z.record(z.string(), z.unknown())
+});
+
+export const zPostChatSessionsBySessionIdUserInputByRequestIdPath = z.object({
+    sessionId: z.string().min(1),
+    requestId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdToolApprovalByRequestIdBody = z.object({
+    approved: z.boolean(),
+    reason: z.string().optional()
+});
+
+export const zPostChatSessionsBySessionIdToolApprovalByRequestIdPath = z.object({
+    sessionId: z.string().min(1),
+    requestId: z.string().min(1)
+});
+
+export const zDeleteChatSideConversationsBySideConversationIdPath = z.object({
+    sideConversationId: z.string().min(1)
 });
 
 export const zPostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApprovalBody = z.object({
@@ -2696,6 +2785,10 @@ export const zPostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationAp
 export const zPostChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApprovalPath = z.object({
     sessionId: z.string().min(1),
     messageId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdStreamPath = z.object({
+    sessionId: z.string().min(1)
 });
 
 export const zGetChatSessionsBySessionIdMessagesPath = z.object({
@@ -2720,30 +2813,6 @@ export const zGetChatSessionsBySessionIdTracesPath = z.object({
 });
 
 export const zGetChatSessionsBySessionIdRunSnapshotsPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPostChatSessionsBySessionIdCancelPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zGetChatSessionsBySessionIdRuntimeSettingsPath = z.object({
-    sessionId: z.string().min(1)
-});
-
-export const zPatchChatSessionsBySessionIdRuntimeSettingsBody = z.object({
-    accessMode: z.enum(['approval-required', 'full-access']).optional(),
-    interactionMode: z.enum(['default', 'plan']).optional(),
-    claudeAgent: z.object({
-        modelAliases: z.object({
-            haiku: z.string().optional(),
-            sonnet: z.string().optional(),
-            opus: z.string().optional()
-        }).optional()
-    }).nullish()
-});
-
-export const zPatchChatSessionsBySessionIdRuntimeSettingsPath = z.object({
     sessionId: z.string().min(1)
 });
 

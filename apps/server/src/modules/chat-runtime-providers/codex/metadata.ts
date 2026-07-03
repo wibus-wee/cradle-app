@@ -7,11 +7,8 @@
 import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,
-  RuntimePresentationCapabilities,
 } from '../../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../../provider-contracts/types'
-import { CODEX_APP_SERVER_CAPABILITIES } from './app-server/capabilities'
-import { projectCodexUiSlots } from './projection/ui-slot-projector'
 
 export const CODEX_RUNTIME_KIND: RuntimeKind = 'codex'
 
@@ -31,14 +28,6 @@ export const CODEX_RUNTIME_CAPABILITIES = {
   supportsRuntimeSettings: true,
   supportsUiSlotStates: true,
   supportsDynamicCapabilities: false,
+  supportsTitleGeneration: true,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities
-
-export function createCodexRuntimePresentation(): RuntimePresentationCapabilities {
-  return {
-    runtimeKind: CODEX_RUNTIME_KIND,
-    slashCommands: [],
-    uiSlots: projectCodexUiSlots(CODEX_APP_SERVER_CAPABILITIES),
-    skills: [],
-  }
-}

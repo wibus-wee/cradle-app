@@ -1,16 +1,16 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { FileUIPart } from 'ai'
 import {
+  AttachmentLine as PaperclipIcon,
+  CloseLine as XIcon,
+  Cursor2Line as MousePointer2Icon,
   DotCircleLine as CircleDotIcon,
   FolderLine as FolderIcon,
   FullscreenLine as MaximizeIcon,
+  LayoutLine as PanelsTopLeftIcon,
   Message1Line as MessageSquareIcon,
   MinimizeLine as MinimizeIcon,
-  Cursor2Line as MousePointer2Icon,
-  LayoutLine as PanelsTopLeftIcon,
-  AttachmentLine as PaperclipIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { FileUIPart } from 'ai'
 import { m } from 'motion/react'
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
@@ -22,16 +22,15 @@ import { CENTER_COLUMN_EXPANDED_SCALE, CENTER_COLUMN_EXPANDED_Y } from '~/compon
 import { Button } from '~/components/ui/button'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { ChatRuntimeView } from '~/features/chat/chat-runtime-view'
-import { readSessionThinkingEffort } from '~/features/chat/session/session-thinking-effort'
 import type { ChatViewProps } from '~/features/chat/chat-view'
 import type { ComposerSendHandler } from '~/features/chat/composer/composer'
 import { Composer } from '~/features/chat/composer/composer'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
+import { ChatSessionSyncBoundary } from '~/features/chat/session/chat-session-sync-boundary'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
-import { useChatSessionDriver } from '~/features/chat/session/use-chat-session'
+import { readSessionThinkingEffort } from '~/features/chat/session/session-thinking-effort'
 import { cn } from '~/lib/cn'
 import { useActiveSurface } from '~/navigation/active-surface'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 import { stripCradleContextForDisplay } from './display-context'
 import type { ExplicitContextAttachment } from './explicit-context'
@@ -316,28 +315,16 @@ function JarvisRuntimePanel({
     enabled: !!sessionId,
   })
 
-  useChatSessionDriver(sessionId, active)
-
   const runtimeKind = readSessionRuntimeKind(session?.runtimeKind) ?? prefsRuntimeKind
   const workspaceId = session?.workspaceId ?? null
-  const sessionTitle = session?.title ?? 'Jarvis'
   const sessionProviderTargetId = session?.providerTargetId ?? prefsProviderTargetId ?? null
   const sessionModelId = session?.modelId ?? prefsModelId ?? null
   const sessionThinkingEffort = readSessionThinkingEffort(session?.thinkingEffort)
   const agentId = session?.agentId ?? null
 
-  React.useEffect(() => {
-    useSessionLayoutStore.getState().upsertSession({
-      sessionId,
-      sessionTitle,
-      workspaceId,
-      workspacePath: null,
-      runtimeKind,
-    })
-  }, [runtimeKind, sessionId, sessionTitle, workspaceId])
-
   return (
     <div className="min-h-0 flex-1">
+      <ChatSessionSyncBoundary sessionId={sessionId} active={active} />
       <ChatRuntimeView
         sessionId={sessionId}
         sessionProviderTargetId={sessionProviderTargetId}
@@ -525,17 +512,9 @@ export function JarvisPopover({
 
       addSession({ id: session.id, title: trimmedText.slice(0, 40) || 'Jarvis', createdAt: Date.now() })
       setActiveSessionId(session.id)
-      useSessionLayoutStore.getState().upsertSession({
-        sessionId: session.id,
-        sessionTitle: session.title ?? 'Jarvis',
-        workspaceId: session.workspaceId ?? null,
-        workspacePath: null,
-        runtimeKind: session.runtimeKind ?? prefs.runtimeKind,
-      })
       clearExplicitContextAttachments()
       startOptimisticChatResponse({
         sessionId: session.id,
-        runtimeKind: session.runtimeKind ?? prefs.runtimeKind,
         queryClient,
         body: {
           text: preparedText,

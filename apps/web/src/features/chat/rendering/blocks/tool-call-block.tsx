@@ -32,22 +32,8 @@ import {
   readFileDiffTarget,
   TerminalExecutionDetails,
 } from './tool-call-details'
-import { hasHeroContent, ToolHero, WorkflowPhaseList } from './tool-hero'
-
-// ---------------------------------------------------------------------------
-// Re-exports (consumed by grouped-tool-call-block.tsx)
-// ---------------------------------------------------------------------------
-
-export {
-  FileDiffExecutionDetails,
-  hasFileDiffDetails,
-  hasFileDiffInlineContent,
-  hasFileDiffPayloadContent,
-  readEditDiffPreview,
-  readFileDiffPayload,
-  readFileDiffTarget,
-  TerminalExecutionDetails,
-} from './tool-call-details'
+import { ToolHero, WorkflowPhaseList } from './tool-hero'
+import { hasHeroContent } from './tool-hero-content'
 
 // ---------------------------------------------------------------------------
 // Local helpers

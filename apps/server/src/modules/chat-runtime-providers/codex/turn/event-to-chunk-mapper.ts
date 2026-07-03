@@ -8,6 +8,7 @@ import type { UIMessageChunk } from 'ai'
 
 import type { BoundedTextCollector } from '../../bounded-text-collector'
 import { createBoundedTextCollector } from '../../bounded-text-collector'
+import { providerChunk } from '../../kit/chunk-mapper'
 import { isCodexAppServerToolApprovalRequest } from '../app-server/server-request-methods'
 import type { ResponseItem as CodexResponseItem } from '../app-server-protocol/ResponseItem'
 import type { CodexAppServerItem } from '../tools/mapper'
@@ -162,7 +163,7 @@ export function mapCodexAppServerNotificationToChunks(
 export function closeOpenCodexAppServerReasoning(state: CodexAppServerMapperState): UIMessageChunk[] {
   const chunks: UIMessageChunk[] = []
   for (const itemId of state.openReasoningItemIds) {
-    chunks.push({ type: 'reasoning-end', id: itemId })
+    chunks.push(providerChunk.reasoningEnd(itemId))
   }
   state.openReasoningItemIds.clear()
   return chunks
@@ -171,7 +172,7 @@ export function closeOpenCodexAppServerReasoning(state: CodexAppServerMapperStat
 export function closeOpenCodexAppServerText(state: CodexAppServerMapperState): UIMessageChunk[] {
   const chunks: UIMessageChunk[] = []
   for (const itemId of state.startedAgentMessageIds) {
-    chunks.push({ type: 'text-end', id: itemId })
+    chunks.push(providerChunk.textEnd(itemId))
   }
   state.startedAgentMessageIds.clear()
   return chunks
@@ -218,14 +219,14 @@ function mapStartedToolItem(item: CodexAppServerItem, state: CodexAppServerMappe
   if (state.startedToolItemIds.has(item.id)) {
     return [
       ...closeOpenAgentMessageSegments(state),
-      { type: 'tool-input-available', toolCallId: item.id, toolName, input },
+      providerChunk.toolInputAvailable({ toolCallId: item.id, toolName, input }),
     ]
   }
   state.startedToolItemIds.add(item.id)
   return [
     ...closeOpenAgentMessageSegments(state),
-    { type: 'tool-input-start', toolCallId: item.id, toolName },
-    { type: 'tool-input-available', toolCallId: item.id, toolName, input },
+    providerChunk.toolInputStart(item.id, toolName),
+    providerChunk.toolInputAvailable({ toolCallId: item.id, toolName, input }),
   ]
 }
 
@@ -302,22 +303,22 @@ function mapCompletedTurn(rawParams: unknown, state: CodexAppServerMapperState):
   }
   state.startedToolItemIds.add(toolCallId)
   state.toolArgsById.set(toolCallId, buildCodexToolInput(item).args)
+  const toolName = readCodexToolName(item)
 
   return [
     ...closeOpenAgentMessageSegments(state),
-    { type: 'tool-input-start', toolCallId, toolName: readCodexToolName(item) },
-    { type: 'tool-input-available', toolCallId, toolName: readCodexToolName(item), input: buildCodexToolInput(item) },
-    { type: 'tool-approval-request', toolCallId, approvalId: toolCallId },
+    providerChunk.toolInputStart(toolCallId, toolName),
+    providerChunk.toolInputAvailable({ toolCallId, toolName, input: buildCodexToolInput(item) }),
+    providerChunk.toolApprovalRequest(toolCallId),
   ]
 }
 
 function mapCompletedToolItem(item: CodexAppServerItem, state: CodexAppServerMapperState): UIMessageChunk[] {
   const errorText = readCodexToolError(item)
   if (errorText) {
-    return [{ type: 'tool-output-error', toolCallId: item.id, errorText }]
+    return [providerChunk.toolOutputError(item.id, errorText)]
   }
-  const chunks: UIMessageChunk[] = [{
-    type: 'tool-output-available',
+  const chunks: UIMessageChunk[] = [providerChunk.toolOutputAvailable({
     toolCallId: item.id,
     output: buildCodexToolOutput(
       item,
@@ -325,7 +326,7 @@ function mapCompletedToolItem(item: CodexAppServerItem, state: CodexAppServerMap
       state.commandById.get(item.id),
       state.toolArgsById.get(item.id),
     ),
-  }]
+  })]
   const imageChunk = projectCodexImageFileChunk(item)
   if (imageChunk && !state.emittedImageFileItemIds.has(item.id)) {
     state.emittedImageFileItemIds.add(item.id)
@@ -348,7 +349,7 @@ function projectCodexImageFileChunk(item: CodexAppServerItem): UIMessageChunk | 
 function projectCodexImageGenerationFileChunk(item: CodexAppServerItem): UIMessageChunk | null {
   const savedPath = (item as { savedPath?: string | null }).savedPath
   if (savedPath) {
-    return { type: 'file', mediaType: 'image/*', url: `file://${savedPath}` }
+    return providerChunk.file({ mediaType: 'image/*', url: `file://${savedPath}` })
   }
   const result = (item as { result?: string | null }).result
   return projectImageResultStringFileChunk(result)
@@ -356,7 +357,7 @@ function projectCodexImageGenerationFileChunk(item: CodexAppServerItem): UIMessa
 
 function projectCodexImageViewFileChunk(item: CodexAppServerItem): UIMessageChunk | null {
   const path = (item as { path?: string | null }).path
-  return path ? { type: 'file', mediaType: 'image/*', url: `file://${path}` } : null
+  return path ? providerChunk.file({ mediaType: 'image/*', url: `file://${path}` }) : null
 }
 
 function readImageDataUrlMediaType(value: string | null | undefined): string | null {
@@ -373,12 +374,12 @@ function projectImageResultStringFileChunk(value: string | null | undefined): UI
   }
   const mediaType = readImageDataUrlMediaType(value)
   if (mediaType) {
-    return { type: 'file', mediaType, url: value }
+    return providerChunk.file({ mediaType, url: value })
   }
   if (/^https?:\/\//i.test(value)) {
-    return { type: 'file', mediaType: 'image/*', url: value }
+    return providerChunk.file({ mediaType: 'image/*', url: value })
   }
-  return { type: 'file', mediaType: 'image/png', url: `data:image/png;base64,${value}` }
+  return providerChunk.file({ mediaType: 'image/png', url: `data:image/png;base64,${value}` })
 }
 
 function mapAgentMessageDelta(rawParams: unknown, state: CodexAppServerMapperState): UIMessageChunk[] {
@@ -393,9 +394,9 @@ function mapAgentMessageDelta(rawParams: unknown, state: CodexAppServerMapperSta
   const chunks: UIMessageChunk[] = []
   if (!state.startedAgentMessageIds.has(params.itemId)) {
     state.startedAgentMessageIds.add(params.itemId)
-    chunks.push({ type: 'text-start', id: params.itemId })
+    chunks.push(providerChunk.textStart(params.itemId))
   }
-  chunks.push({ type: 'text-delta', id: params.itemId, delta: params.delta })
+  chunks.push(providerChunk.textDelta(params.itemId, params.delta))
   return chunks
 }
 
@@ -458,13 +459,13 @@ function mapReasoningDelta(rawParams: unknown, state: CodexAppServerMapperState)
   const chunks: UIMessageChunk[] = []
   if (!state.openReasoningItemIds.has(params.itemId)) {
     state.openReasoningItemIds.add(params.itemId)
-    chunks.push({ type: 'reasoning-start', id: params.itemId })
+    chunks.push(providerChunk.reasoningStart(params.itemId))
   }
   state.emittedReasoningTextLengthById.set(
     params.itemId,
     (state.emittedReasoningTextLengthById.get(params.itemId) ?? 0) + params.delta.length,
   )
-  chunks.push({ type: 'reasoning-delta', id: params.itemId, delta: params.delta })
+  chunks.push(providerChunk.reasoningDelta(params.itemId, params.delta))
   return chunks
 }
 
@@ -481,8 +482,7 @@ function mapCommandOutputDelta(rawParams: unknown, state: CodexAppServerMapperSt
       id: params.itemId,
       type: 'commandExecution',
     }),
-    {
-      type: 'tool-output-available',
+    providerChunk.toolOutputAvailable({
       toolCallId: params.itemId,
       preliminary: true,
       output: buildCodexToolOutput(
@@ -491,7 +491,7 @@ function mapCommandOutputDelta(rawParams: unknown, state: CodexAppServerMapperSt
         state.commandById.get(params.itemId),
         state.toolArgsById.get(params.itemId),
       ),
-    },
+    }),
   ]
 }
 
@@ -527,7 +527,7 @@ function mapToolProgressDelta(
       id: params.itemId,
       type: itemType,
     }),
-    { type: 'tool-input-delta', toolCallId: params.itemId, inputTextDelta: delta },
+    providerChunk.toolInputDelta(params.itemId, delta),
   ]
 }
 
@@ -554,7 +554,7 @@ function startToolItemForOutOfOrderDelta(
   // authoritative input later via tool-input-available.
   return [
     ...closeOpenAgentMessageSegments(state),
-    { type: 'tool-input-start', toolCallId: item.id, toolName },
+    providerChunk.toolInputStart(item.id, toolName),
   ]
 }
 
@@ -567,8 +567,7 @@ function mapFileChangePatchUpdated(rawParams: unknown): UIMessageChunk[] {
     return []
   }
   const changes = params.changes ?? []
-  return [{
-    type: 'tool-output-available',
+  return [providerChunk.toolOutputAvailable({
     toolCallId: params.itemId,
     preliminary: true,
     output: {
@@ -576,7 +575,7 @@ function mapFileChangePatchUpdated(rawParams: unknown): UIMessageChunk[] {
       ...projectCodexFileChangePatch(changes),
       changes,
     },
-  }]
+  })]
 }
 
 function mapPendingServerRequest(rawParams: unknown, state: CodexAppServerMapperState): UIMessageChunk[] {
@@ -589,16 +588,15 @@ function mapPendingServerRequest(rawParams: unknown, state: CodexAppServerMapper
   const toolCallId = `server-request-${params.id}`
   const toolName = toSafeToolName(`server_request_${params.method}`)
   const chunks: UIMessageChunk[] = [
-    { type: 'tool-input-start', toolCallId, toolName },
-    {
-      type: 'tool-input-available',
+    providerChunk.toolInputStart(toolCallId, toolName),
+    providerChunk.toolInputAvailable({
       toolCallId,
       toolName,
       input: buildCodexServerRequestToolInput(request),
-    },
+    }),
   ]
   if (isCodexAppServerToolApprovalRequest(params.method)) {
-    chunks.push({ type: 'tool-approval-request', toolCallId, approvalId: toolCallId })
+    chunks.push(providerChunk.toolApprovalRequest(toolCallId))
   }
   return chunks
 }
@@ -612,25 +610,22 @@ function mapHandledServerRequest(rawParams: unknown, state: CodexAppServerMapper
   const toolCallId = `server-request-${params.id}`
   const toolName = toSafeToolName(`server_request_${params.method}`)
   if (state.pendingServerRequestIds.delete(params.id)) {
-    return [{
-      type: 'tool-output-available',
+    return [providerChunk.toolOutputAvailable({
       toolCallId,
       output: buildCodexServerRequestToolOutput(request, params.result),
-    }]
+    })]
   }
   return [
-    { type: 'tool-input-start', toolCallId, toolName },
-    {
-      type: 'tool-input-available',
+    providerChunk.toolInputStart(toolCallId, toolName),
+    providerChunk.toolInputAvailable({
       toolCallId,
       toolName,
       input: buildCodexServerRequestToolInput(request),
-    },
-    {
-      type: 'tool-output-available',
+    }),
+    providerChunk.toolOutputAvailable({
       toolCallId,
       output: buildCodexServerRequestToolOutput(request, params.result),
-    },
+    }),
   ]
 }
 
@@ -647,7 +642,7 @@ function mapAgentMessageSnapshot(
   const previousTextLength = state.emittedTextLengthById.get(item.id) ?? 0
   if (text.length <= previousTextLength) {
     if (state.startedAgentMessageIds.delete(item.id)) {
-      return [{ type: 'text-end', id: item.id }]
+      return [providerChunk.textEnd(item.id)]
     }
     return []
   }
@@ -658,7 +653,7 @@ function mapAgentMessageSnapshot(
     delta: text.slice(previousTextLength),
   }, state)
   state.startedAgentMessageIds.delete(item.id)
-  chunks.push({ type: 'text-end', id: item.id })
+  chunks.push(providerChunk.textEnd(item.id))
   return chunks
 }
 
@@ -674,16 +669,16 @@ function mapReasoningSnapshot(
   if (text.length > previousTextLength) {
     if (!state.openReasoningItemIds.has(item.id)) {
       state.openReasoningItemIds.add(item.id)
-      chunks.push({ type: 'reasoning-start', id: item.id })
+      chunks.push(providerChunk.reasoningStart(item.id))
     }
     const delta = text.slice(previousTextLength)
     state.emittedReasoningTextLengthById.set(item.id, text.length)
-    chunks.push({ type: 'reasoning-delta', id: item.id, delta })
+    chunks.push(providerChunk.reasoningDelta(item.id, delta))
   }
 
   if (complete && state.openReasoningItemIds.has(item.id)) {
     state.openReasoningItemIds.delete(item.id)
-    chunks.push({ type: 'reasoning-end', id: item.id })
+    chunks.push(providerChunk.reasoningEnd(item.id))
   }
 
   return chunks
@@ -702,7 +697,7 @@ function mapReasoningSnapshotText(item: CodexAppServerItem): string[] {
 function closeOpenAgentMessageSegments(state: CodexAppServerMapperState): UIMessageChunk[] {
   const chunks: UIMessageChunk[] = []
   for (const itemId of state.startedAgentMessageIds) {
-    chunks.push({ type: 'text-end', id: itemId })
+    chunks.push(providerChunk.textEnd(itemId))
   }
   state.startedAgentMessageIds.clear()
   return chunks

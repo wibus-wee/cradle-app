@@ -1,9 +1,7 @@
+import { postChatSessionsBySessionIdRollbackLastTurn } from '~/api-gen/sdk.gen'
 import type { PostChatSessionsBySessionIdRollbackLastTurnResponse } from '~/api-gen/types.gen'
-import { getServerUrl } from '~/lib/electron'
 
 import { readJsonErrorCodeFromText } from './chat-response-command'
-
-const SERVER_BASE = getServerUrl()
 
 export type RollbackLastTurnResult = PostChatSessionsBySessionIdRollbackLastTurnResponse
 
@@ -24,24 +22,34 @@ export async function rollbackLastTurn(args: {
   sessionId: string
   signal?: AbortSignal
 }): Promise<RollbackLastTurnResult> {
-  const res = await fetch(
-    `${SERVER_BASE}/chat/sessions/${encodeURIComponent(args.sessionId)}/rollback-last-turn`,
-    {
-      method: 'POST',
-      signal: args.signal,
-    },
-  )
+  const result = await postChatSessionsBySessionIdRollbackLastTurn({
+    path: { sessionId: args.sessionId },
+    signal: args.signal,
+  })
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw Object.assign(new Error(`Failed to roll back the last turn: ${res.status} ${body}`), {
+  if (result.error || !result.data) {
+    const body = stringifyRollbackError(result.error)
+    const rollbackError = Object.assign(new Error(`Failed to roll back the last turn: ${result.response?.status ?? 'unknown'} ${body}`), {
       bodyText: body,
       code: readJsonErrorCodeFromText(body),
-      status: res.status,
+      status: result.response?.status ?? 0,
     }) as Error & RollbackLastTurnError
+    throw rollbackError
   }
 
-  return (await res.json()) as RollbackLastTurnResult
+  return result.data
+}
+
+function stringifyRollbackError(error: unknown): string {
+  if (typeof error === 'string') {
+    return error
+  }
+  try {
+    return JSON.stringify(error)
+  }
+  catch {
+    return String(error)
+  }
 }
 
 /** Maps a thrown rollback error code to a human-readable reason, if known. */

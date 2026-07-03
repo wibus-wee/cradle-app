@@ -39,6 +39,5 @@ export interface ComposerQuickQuestionSlotActions {
   open: boolean
   question: string
   sessionId: string
-  apiBaseUrl?: string
   onDismiss: () => void
 }

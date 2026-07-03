@@ -7,6 +7,7 @@ import { useChatStore } from '~/store/chat'
 import { emitChatRunSettled } from './sse-chat-transport'
 
 const STREAM_FLUSH_INTERVAL_MS = 125
+type ChatStreamingStore = Pick<typeof useChatStore, 'getState'>
 
 export class ChatStreamingHandler {
   private readonly sessionId: string
@@ -14,6 +15,8 @@ export class ChatStreamingHandler {
   private readonly requestStartedAtMs: number
   private readonly mode: 'local' | 'passive'
   private readonly useStoredMessageSnapshot: boolean
+  private readonly store: ChatStreamingStore
+  private readonly emitSettledEvents: boolean
   private activeMessageId: string | null = null
   private terminated = false
   private pendingMessages = new Map<string, { message: UIMessage, receivedAtMs: number, dirtyToolCallIds: Set<string> }>()
@@ -28,24 +31,30 @@ export class ChatStreamingHandler {
     sessionId: string,
     messageId: string,
     requestStartedAtMs = performance.now(),
-    options: { mode?: 'local' | 'passive', useStoredMessageSnapshot?: boolean } = {},
+    options: {
+      mode?: 'local' | 'passive'
+      useStoredMessageSnapshot?: boolean
+      store?: ChatStreamingStore
+      emitSettledEvents?: boolean
+    } = {},
   ) {
     this.sessionId = sessionId
     this.messageId = messageId
     this.requestStartedAtMs = requestStartedAtMs
     this.mode = options.mode ?? 'local'
     this.useStoredMessageSnapshot = options.useStoredMessageSnapshot ?? true
+    this.store = options.store ?? useChatStore
+    this.emitSettledEvents = options.emitSettledEvents ?? true
   }
 
   start(controller: AbortController): void {
-    const store = useChatStore.getState()
+    const store = this.store.getState()
     store.beginRunDisplayMeta(this.messageId, this.requestStartedAtMs)
     if (this.mode === 'passive') {
-      store.setPassiveStreamingMessage(this.sessionId, this.messageId, true)
-      store.setSessionMeta(this.sessionId, {
-        passiveStatus: 'streaming',
-        locallyDriving: false,
-        localDriverMessageId: undefined,
+      store.setPassiveRunState(this.sessionId, {
+        messageIds: [this.messageId],
+        allowMissingMessage: true,
+        status: 'streaming',
       })
       return
     }
@@ -56,7 +65,7 @@ export class ChatStreamingHandler {
   async consume(stream: ReadableStream<UIMessageChunk>): Promise<void> {
     const initialMessage = this.useStoredMessageSnapshot
       ? cloneMessageForStreamReader(
-          useChatStore.getState().messagesMap.get(this.sessionId)?.find(message => message.id === (this.activeMessageId ?? this.messageId)),
+          this.store.getState().messagesMap.get(this.sessionId)?.find(message => message.id === (this.activeMessageId ?? this.messageId)),
         )
       : undefined
 
@@ -81,14 +90,13 @@ export class ChatStreamingHandler {
     }
     this.terminated = true
     const messageId = this.activeMessageId ?? this.messageId
-    const store = useChatStore.getState()
+    const store = this.store.getState()
     store.finishGeneration(messageId)
     if (this.mode === 'local' && this.activeMessageId === null) {
       store.removeMessage(this.sessionId, this.messageId)
     }
     if (this.mode === 'passive') {
-      store.setPassiveStreamingMessage(this.sessionId, messageId, false)
-      store.setSessionMeta(this.sessionId, { passiveStatus: 'idle' })
+      store.setPassiveRunState(this.sessionId, { messageIds: [], status: 'idle' })
     }
     this.emitSettled(messageId, 'complete')
   }
@@ -100,11 +108,10 @@ export class ChatStreamingHandler {
     }
     this.terminated = true
     const messageId = this.activeMessageId ?? this.messageId
-    const store = useChatStore.getState()
+    const store = this.store.getState()
     store.failGeneration(messageId, error)
     if (this.mode === 'passive') {
-      store.setPassiveStreamingMessage(this.sessionId, messageId, false)
-      store.setSessionMeta(this.sessionId, { passiveStatus: 'error' })
+      store.setPassiveRunState(this.sessionId, { messageIds: [], status: 'error' })
     }
     this.emitSettled(messageId, 'error')
   }
@@ -137,7 +144,7 @@ export class ChatStreamingHandler {
     if (this.pendingMessages.size === 0) {
       return
     }
-    const store = useChatStore.getState()
+    const store = this.store.getState()
     for (const [messageId, { message, receivedAtMs, dirtyToolCallIds }] of this.pendingMessages) {
       store.markRunFirstEvent(messageId, receivedAtMs)
       if (hasVisibleContent(message)) {
@@ -155,7 +162,7 @@ export class ChatStreamingHandler {
   }
 
   private appendLocalPlaceholder(): void {
-    const store = useChatStore.getState()
+    const store = this.store.getState()
     const existing = store.messagesMap.get(this.sessionId)?.some(message => message.id === this.messageId) ?? false
     if (existing) {
       return
@@ -221,7 +228,7 @@ export class ChatStreamingHandler {
       return
     }
 
-    const store = useChatStore.getState()
+    const store = this.store.getState()
     const existing = store.messagesMap.get(this.sessionId)?.some(message => message.id === messageId) ?? false
     const canReplaceLocalPlaceholder = this.mode === 'local'
       && this.activeMessageId === null
@@ -245,8 +252,11 @@ export class ChatStreamingHandler {
     if (this.activeMessageId === null && messageId !== this.messageId) {
       if (this.mode === 'passive') {
         store.moveRunDisplayMeta(this.messageId, messageId)
-        store.setPassiveStreamingMessage(this.sessionId, this.messageId, false)
-        store.setPassiveStreamingMessage(this.sessionId, messageId, true)
+        store.setPassiveRunState(this.sessionId, {
+          messageIds: [messageId],
+          allowMissingMessage: true,
+          status: 'streaming',
+        })
       }
       else {
         store.moveStreamingMessage(this.sessionId, this.messageId, messageId)
@@ -261,6 +271,9 @@ export class ChatStreamingHandler {
       return
     }
     this.settled = true
+    if (!this.emitSettledEvents) {
+      return
+    }
     emitChatRunSettled({
       chatSessionId: this.sessionId,
       messageId,

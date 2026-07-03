@@ -35,7 +35,7 @@ export function RuntimeUserInputForm({
   questions,
   disabled = false,
   className,
-  onSubmit
+  onSubmit,
 }: RuntimeUserInputFormProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [multiDrafts, setMultiDrafts] = useState<Record<string, string[]>>({})
@@ -50,7 +50,7 @@ export function RuntimeUserInputForm({
   const canGoBack = step > 0 && !submitting
 
   const updateDraft = (questionId: string, value: string) => {
-    setDrafts((current) => ({ ...current, [questionId]: value }))
+    setDrafts(current => ({ ...current, [questionId]: value }))
   }
 
   const toggleMultiDraft = (questionId: string, value: string, checked: boolean) => {
@@ -64,7 +64,7 @@ export function RuntimeUserInputForm({
   }
 
   const updateOtherDraft = (questionId: string, value: string) => {
-    setOtherDrafts((current) => ({ ...current, [questionId]: value }))
+    setOtherDrafts(current => ({ ...current, [questionId]: value }))
   }
 
   const readSingleAnswer = (question: RuntimeUserInputQuestion): string => {
@@ -80,7 +80,7 @@ export function RuntimeUserInputForm({
 
     const selected = multiDrafts[question.id] ?? []
     const other = otherDrafts[question.id]?.trim() ?? ''
-    return selected.flatMap(value => {
+    return selected.flatMap((value) => {
       if (value === OTHER_OPTION_VALUE) {
         return other ? [other] : []
       }
@@ -101,7 +101,7 @@ export function RuntimeUserInputForm({
 
   const buildAnswers = (): Record<string, string[]> => {
     return Object.fromEntries(
-      questions.map((question) => [question.id, readAnswers(question)])
+      questions.map(question => [question.id, readAnswers(question)]),
     )
   }
 
@@ -109,17 +109,18 @@ export function RuntimeUserInputForm({
     setSubmitting(true)
     try {
       await onSubmit(buildAnswers())
-    } finally {
+    }
+ finally {
       setSubmitting(false)
     }
   }
 
   const goBack = () => {
-    setActiveStep((current) => Math.max(0, current - 1))
+    setActiveStep(current => Math.max(0, current - 1))
   }
 
   const goNext = () => {
-    setActiveStep((current) => Math.min(previewStep, current + 1))
+    setActiveStep(current => Math.min(previewStep, current + 1))
   }
 
   return (
@@ -138,37 +139,41 @@ export function RuntimeUserInputForm({
               className={cn(
                 'size-1.5 rounded-full bg-muted-foreground/25',
                 index === step && 'bg-primary',
-                index < step && 'bg-primary/55'
+                index < step && 'bg-primary/55',
               )}
             />
           ))}
           <span
             className={cn(
               'size-1.5 rounded-full bg-muted-foreground/25',
-              isPreview && 'bg-primary'
+              isPreview && 'bg-primary',
             )}
           />
         </div>
       </div>
 
-      {isPreview ? (
+      {isPreview
+? (
         <div className="grid gap-1.5">
           {questions.map((question, index) => (
-            <button
+            <Button
               key={question.id}
               type="button"
+              variant="outline"
               disabled={disabled || submitting}
-              className="grid min-h-10 gap-1 rounded-md border border-border/60 bg-background px-2.5 py-2 text-left shadow-sm transition-[background-color,border-color] hover:border-border hover:bg-muted/35 disabled:pointer-events-none disabled:opacity-60"
+              className="grid h-auto min-h-10 justify-stretch gap-1 rounded-md border-border/60 bg-background px-2.5 py-2 text-left whitespace-normal shadow-sm hover:border-border hover:bg-muted/35 disabled:opacity-60"
               onClick={() => setActiveStep(index)}
             >
               <span className="text-[11px] font-medium text-muted-foreground">
                 {question.header || `Question ${index + 1}`}
               </span>
               <span className="text-xs text-foreground/85">{readPreviewAnswer(question)}</span>
-            </button>
+            </Button>
           ))}
         </div>
-      ) : question ? (
+      )
+: question
+? (
         <div className="grid gap-2">
           <div className="grid gap-0.5">
             {question.header && (
@@ -176,9 +181,11 @@ export function RuntimeUserInputForm({
             )}
             <div className="text-xs text-foreground/85">{question.question}</div>
           </div>
-          {question.options && question.options.length > 0 ? (
+          {question.options && question.options.length > 0
+? (
             <div className="grid gap-2">
-              {question.multiSelect ? (
+              {question.multiSelect
+? (
                 <div className="grid gap-1.5">
                   {question.options.map((option) => {
                     const selected = multiDrafts[question.id]?.includes(option.label) ?? false
@@ -188,16 +195,16 @@ export function RuntimeUserInputForm({
                         className={cn(
                           'flex min-h-10 cursor-pointer items-start gap-2 rounded-md border border-border/60 bg-background px-2.5 py-2 text-left shadow-sm transition-[background-color,border-color,box-shadow]',
                           'hover:border-border hover:bg-muted/35',
-                          selected &&
-                            'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
-                          (disabled || submitting) && 'cursor-not-allowed opacity-60'
+                          selected
+                          && 'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
+                          (disabled || submitting) && 'cursor-not-allowed opacity-60',
                         )}
                       >
                         <Checkbox
                           checked={selected}
                           disabled={disabled || submitting}
                           className="mt-0.5"
-                          onCheckedChange={(checked) => toggleMultiDraft(question.id, option.label, checked === true)}
+                          onCheckedChange={checked => toggleMultiDraft(question.id, option.label, checked === true)}
                         />
                         <span className="grid min-w-0 gap-0.5">
                           <span className="truncate text-xs font-medium text-foreground/90">
@@ -217,36 +224,37 @@ export function RuntimeUserInputForm({
                       className={cn(
                         'flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border/60 bg-background px-2.5 py-2 text-left shadow-sm transition-[background-color,border-color,box-shadow]',
                         'hover:border-border hover:bg-muted/35',
-                        multiDrafts[question.id]?.includes(OTHER_OPTION_VALUE) &&
-                          'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
-                        (disabled || submitting) && 'cursor-not-allowed opacity-60'
+                        multiDrafts[question.id]?.includes(OTHER_OPTION_VALUE)
+                        && 'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
+                        (disabled || submitting) && 'cursor-not-allowed opacity-60',
                       )}
                     >
                       <Checkbox
                         checked={multiDrafts[question.id]?.includes(OTHER_OPTION_VALUE) ?? false}
                         disabled={disabled || submitting}
-                        onCheckedChange={(checked) => toggleMultiDraft(question.id, OTHER_OPTION_VALUE, checked === true)}
+                        onCheckedChange={checked => toggleMultiDraft(question.id, OTHER_OPTION_VALUE, checked === true)}
                       />
                       <span className="text-xs font-medium text-foreground/90">Other</span>
                     </label>
                   )}
                 </div>
-              ) : (
+              )
+: (
                 <RadioGroup
                   value={drafts[question.id] ?? ''}
                   disabled={disabled || submitting}
-                  onValueChange={(value) => updateDraft(question.id, value)}
+                  onValueChange={value => updateDraft(question.id, value)}
                   className="gap-1.5"
                 >
-                  {question.options.map((option) => (
+                  {question.options.map(option => (
                     <label
                       key={option.label}
                       className={cn(
                         'flex min-h-10 cursor-pointer items-start gap-2 rounded-md border border-border/60 bg-background px-2.5 py-2 text-left shadow-sm transition-[background-color,border-color,box-shadow]',
                         'hover:border-border hover:bg-muted/35',
-                        drafts[question.id] === option.label &&
-                          'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
-                        (disabled || submitting) && 'cursor-not-allowed opacity-60'
+                        drafts[question.id] === option.label
+                        && 'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
+                        (disabled || submitting) && 'cursor-not-allowed opacity-60',
                       )}
                     >
                       <RadioGroupItem value={option.label} className="mt-0.5" />
@@ -267,9 +275,9 @@ export function RuntimeUserInputForm({
                       className={cn(
                         'flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border/60 bg-background px-2.5 py-2 text-left shadow-sm transition-[background-color,border-color,box-shadow]',
                         'hover:border-border hover:bg-muted/35',
-                        drafts[question.id] === OTHER_OPTION_VALUE &&
-                          'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
-                        (disabled || submitting) && 'cursor-not-allowed opacity-60'
+                        drafts[question.id] === OTHER_OPTION_VALUE
+                        && 'border-primary/45 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.16)]',
+                        (disabled || submitting) && 'cursor-not-allowed opacity-60',
                       )}
                     >
                       <RadioGroupItem value={OTHER_OPTION_VALUE} />
@@ -288,44 +296,50 @@ export function RuntimeUserInputForm({
                   disabled={disabled || submitting}
                   className="h-8 text-xs"
                   placeholder="Other"
-                  onChange={(event) => updateOtherDraft(question.id, event.target.value)}
+                  onChange={event => updateOtherDraft(question.id, event.target.value)}
                 />
               )}
             </div>
-          ) : question.isSecret ? (
+          )
+: question.isSecret
+? (
             <Input
               type="password"
               value={drafts[question.id] ?? ''}
               disabled={disabled || submitting}
               className="h-8 text-xs"
-              onChange={(event) => updateDraft(question.id, event.target.value)}
+              onChange={event => updateDraft(question.id, event.target.value)}
             />
-          ) : (
+          )
+: (
             <Textarea
               value={drafts[question.id] ?? ''}
               disabled={disabled || submitting}
               rows={3}
               className="min-h-9 resize-none text-xs"
-              onChange={(event) => updateDraft(question.id, event.target.value)}
+              onChange={event => updateDraft(question.id, event.target.value)}
             />
           )}
         </div>
-      ) : null}
+      )
+: null}
 
       <div className="flex items-center justify-between gap-2">
         <Button type="button" variant="ghost" size="xs" disabled={!canGoBack} onClick={goBack}>
           Back
         </Button>
-        {isPreview ? (
+        {isPreview
+? (
           <Button
             type="button"
             size="xs"
-            disabled={disabled || submitting || questions.some((question) => !isAnswered(question))}
+            disabled={disabled || submitting || questions.some(question => !isAnswered(question))}
             onClick={() => void submit()}
           >
             Submit
           </Button>
-        ) : (
+        )
+: (
           <Button
             type="button"
             size="xs"

@@ -8,6 +8,8 @@ import { m } from 'motion/react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { cn } from '~/lib/cn'
 
@@ -225,13 +227,27 @@ interface DragSurfaceProps {
   className?: string
   style?: CSSProperties
   ariaLabel: string
+  ariaValueNow: number
+  ariaValueMin?: number
+  ariaValueMax?: number
   ariaValueText: string
   onPick: (x: number, y: number) => void
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
   children?: ReactNode
 }
 
-function DragSurface({ className, style, ariaLabel, ariaValueText, onPick, onKeyDown, children }: DragSurfaceProps) {
+function DragSurface({
+  className,
+  style,
+  ariaLabel,
+  ariaValueNow,
+  ariaValueMin = 0,
+  ariaValueMax = 100,
+  ariaValueText,
+  onPick,
+  onKeyDown,
+  children,
+}: DragSurfaceProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   const pick = (clientX: number, clientY: number) => {
@@ -250,6 +266,9 @@ function DragSurface({ className, style, ariaLabel, ariaValueText, onPick, onKey
       ref={ref}
       role="slider"
       aria-label={ariaLabel}
+      aria-valuenow={ariaValueNow}
+      aria-valuemin={ariaValueMin}
+      aria-valuemax={ariaValueMax}
       aria-valuetext={ariaValueText}
       tabIndex={0}
       className={cn('relative touch-none outline-none', className)}
@@ -287,37 +306,36 @@ export interface BrowserColorPaletteProps {
 export function BrowserColorPalette({ value, onChange, label = 'Color', className }: BrowserColorPaletteProps) {
   const [open, setOpen] = useState(false)
   const [hsva, setHsva] = useState<Hsva>(() => rgbToHsv(parseColor(value) ?? { r: 0, g: 0, b: 0, a: 1 }))
-  const [hexDraft, setHexDraft] = useState('')
-  const [supportsEyeDropper, setSupportsEyeDropper] = useState(false)
+  const [controlledValue, setControlledValue] = useState(value)
+  const [hexDraft, setHexDraft] = useState(() => {
+    const initialRgba = hsvToRgb(rgbToHsv(parseColor(value) ?? { r: 0, g: 0, b: 0, a: 1 }))
+    return rgbToHex(initialRgba.r, initialRgba.g, initialRgba.b).replace('#', '').toUpperCase()
+  })
+  const [syncedHexDraft, setSyncedHexDraft] = useState(hexDraft)
+  const [supportsEyeDropper] = useState(() => typeof window !== 'undefined' && typeof window.EyeDropper === 'function')
   const eyeDropperAbortRef = useRef<AbortController | null>(null)
   const hexInputId = useId()
 
-  useEffect(() => {
-    setSupportsEyeDropper(typeof window !== 'undefined' && typeof window.EyeDropper === 'function')
-  }, [])
-
-  // Keep internal HSV in sync with the controlled value, but never clobber an
-  // in-progress edit (parsing greyscale RGB would otherwise lose the hue).
-  useEffect(() => {
+  if (value !== controlledValue) {
+    setControlledValue(value)
     const parsed = parseColor(value)
-    if (!parsed) {
-      return
-    }
-    if (!rgbaEqual(parsed, hsvToRgb(hsva))) {
+    if (parsed && !rgbaEqual(parsed, hsvToRgb(hsva))) {
       setHsva(rgbToHsv(parsed))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
+  }
 
   const rgba = hsvToRgb(hsva)
   const opaqueHex = rgbToHex(rgba.r, rgba.g, rgba.b)
   const displayColor = hsva.a <= 0 ? 'transparent' : toCssRgb(rgba, hsva.a)
+  const normalizedHexDraft = opaqueHex.replace('#', '').toUpperCase()
+
+  if (normalizedHexDraft !== syncedHexDraft) {
+    setSyncedHexDraft(normalizedHexDraft)
+    setHexDraft(normalizedHexDraft)
+  }
 
   useEffect(() => {
-    setHexDraft(opaqueHex.replace('#', '').toUpperCase())
-  }, [opaqueHex])
-
-  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-doctor/exhaustive-deps
     return () => eyeDropperAbortRef.current?.abort()
   }, [])
 
@@ -341,6 +359,11 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
     }
     const controller = new AbortController()
     eyeDropperAbortRef.current = controller
+    const releaseController = () => {
+      if (eyeDropperAbortRef.current === controller) {
+        eyeDropperAbortRef.current = null
+      }
+    }
     try {
       const dropper = new window.EyeDropper()
       const result = await dropper.open({ signal: controller.signal })
@@ -348,12 +371,11 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
       if (parsed) {
         commit({ ...rgbToHsv(parsed), a: hsva.a })
       }
+      releaseController()
     }
     catch {
       // User dismissed the eyedropper — nothing to do.
-    }
-    finally {
-      eyeDropperAbortRef.current = null
+      releaseController()
     }
   }
 
@@ -433,6 +455,7 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
           <div>
             <DragSurface
               ariaLabel={`${label} saturation and brightness`}
+              ariaValueNow={Math.round(hsva.s * 100)}
               ariaValueText={`Saturation ${Math.round(hsva.s * 100)}%, brightness ${Math.round(hsva.v * 100)}%`}
               className="h-32 w-full cursor-crosshair overflow-hidden rounded-xl ring-1 ring-foreground/10 focus-visible:ring-2 focus-visible:ring-primary/60"
               style={{
@@ -463,6 +486,8 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <DragSurface
                 ariaLabel={`${label} hue`}
+                ariaValueNow={Math.round(hsva.h)}
+                ariaValueMax={360}
                 ariaValueText={`Hue ${Math.round(hsva.h)} degrees`}
                 className="h-3.5 w-full cursor-pointer rounded-full ring-1 ring-foreground/10 focus-visible:ring-2 focus-visible:ring-primary/60"
                 style={{ backgroundImage: HUE_GRADIENT }}
@@ -473,6 +498,7 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
               </DragSurface>
               <DragSurface
                 ariaLabel={`${label} opacity`}
+                ariaValueNow={Math.round(hsva.a * 100)}
                 ariaValueText={`Opacity ${Math.round(hsva.a * 100)}%`}
                 className="relative h-3.5 w-full cursor-pointer overflow-hidden rounded-full ring-1 ring-foreground/10 focus-visible:ring-2 focus-visible:ring-primary/60"
                 style={CHECKERBOARD_STYLE}
@@ -493,38 +519,40 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
           <div className="flex items-center gap-2">
             <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-lg bg-foreground/5 px-2 ring-1 ring-foreground/10 focus-within:ring-primary/55 dark:bg-white/6">
               <span className="text-[11px] font-medium text-muted-foreground">#</span>
-              <input
+              <Input
                 id={hexInputId}
                 type="text"
                 spellCheck={false}
                 value={hexDraft}
                 aria-label={`${label} hex value`}
-                className="min-w-0 flex-1 bg-transparent font-mono text-[11px] uppercase tracking-wide text-foreground outline-none"
+                className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 font-mono text-[11px] uppercase tracking-wide shadow-none focus-visible:ring-0 md:text-[11px]"
                 onChange={event => handleHexChange(event.target.value)}
               />
             </div>
             <div className="flex h-8 w-14 items-center gap-0.5 rounded-lg bg-foreground/5 px-2 ring-1 ring-foreground/10 focus-within:ring-primary/55 dark:bg-white/6">
-              <input
+              <Input
                 type="number"
                 min={0}
                 max={100}
                 value={Math.round(hsva.a * 100)}
                 aria-label={`${label} opacity percent`}
-                className="min-w-0 flex-1 bg-transparent font-mono text-[11px] tabular-nums text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 font-mono text-[11px] tabular-nums shadow-none [appearance:textfield] focus-visible:ring-0 md:text-[11px] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 onChange={event => commit({ ...hsva, a: clamp(Number(event.target.value) / 100, 0, 1) })}
               />
               <span className="text-[11px] text-muted-foreground">%</span>
             </div>
             {supportsEyeDropper && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 aria-label="Pick color from screen"
                 title="Pick color from screen"
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground/5 text-muted-foreground ring-1 ring-foreground/10 transition-[background-color,color,transform] duration-150 ease-out hover:bg-foreground/10 hover:text-foreground active:scale-95 dark:bg-white/6"
+                className="size-8 shrink-0 rounded-lg bg-foreground/5 text-muted-foreground ring-1 ring-foreground/10 hover:bg-foreground/10 hover:text-foreground active:scale-95 dark:bg-white/6"
                 onClick={handleEyeDropper}
               >
                 <PipetteIcon className="size-3.5" />
-              </button>
+              </Button>
             )}
           </div>
 

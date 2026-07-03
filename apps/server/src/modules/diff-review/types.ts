@@ -1,4 +1,5 @@
 import type { GitFileStatusKind } from '../git/service'
+import type { RuntimeKind } from '../provider-contracts/types'
 
 export interface DiffRevisionView {
   id: string
@@ -219,14 +220,13 @@ export interface ReviewGuideStepView {
   order: number
 }
 
-export type GuideRuntimeKind = 'codex' | 'claude-agent'
 export type ReviewGuideStatus = 'pending' | 'running' | 'ready' | 'failed' | 'cancelled'
 
 export interface ReviewGuideView {
   revisionId: string | null
   status: ReviewGuideStatus | null
   providerTargetId: string | null
-  runtimeKind: GuideRuntimeKind | null
+  runtimeKind: RuntimeKind | null
   modelId: string | null
   sessionId: string | null
   runId: string | null
@@ -239,7 +239,7 @@ export interface ReviewGuideView {
 
 export interface ReviewGuideGenerateInput {
   providerTargetId: string
-  runtimeKind?: GuideRuntimeKind
+  runtimeKind?: RuntimeKind
   modelId?: string | null
   force?: boolean
 }

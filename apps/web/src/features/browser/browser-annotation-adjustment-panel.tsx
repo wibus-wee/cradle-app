@@ -25,6 +25,7 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import { cn } from '~/lib/cn'
 import type { BrowserAnnotationDesignChange, BrowserAnnotationElement } from '~/store/browser-panel'
 import { useBrowserPanelStore } from '~/store/browser-panel'
@@ -238,11 +239,13 @@ function SegmentControl({ value, options, onChange }: SegmentControlProps) {
       {options.map(({ value: optionValue, label, icon: Icon }) => {
         const selected = value === optionValue
         return (
-          <button
+          <Button
             key={optionValue}
             type="button"
+            variant="ghost"
+            size="sm"
             className={cn(
-              'flex min-w-0 items-center justify-center rounded-full text-muted-foreground transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96]',
+              'h-7 min-w-0 rounded-full px-2 text-muted-foreground active:scale-[0.96]',
               selected && 'bg-primary text-primary-foreground shadow-[0_1px_3px_rgba(0,0,0,0.16),inset_0_0_0_1px_rgba(255,255,255,0.10)]',
             )}
             onClick={() => onChange(optionValue)}
@@ -250,7 +253,7 @@ function SegmentControl({ value, options, onChange }: SegmentControlProps) {
             title={label}
           >
             <Icon className="size-3.5" aria-hidden="true" />
-          </button>
+          </Button>
         )
       })}
     </div>
@@ -324,35 +327,39 @@ function DesignInput({ field, value, originalValue, onChange, onReset }: DesignI
           />
         )}
         {scrubValue && (
-          <button
+          <Button
             type="button"
-            className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-[background-color,color,transform] duration-150 ease-out hover:bg-foreground/7 hover:text-foreground active:scale-[0.96]"
+            variant="ghost"
+            size="icon-sm"
+            className="size-7 shrink-0 rounded-full text-muted-foreground hover:bg-foreground/7 hover:text-foreground active:scale-[0.96]"
             onClick={() => handleScrub(-1)}
             aria-label={`Decrease ${field.label}`}
           >
             <MinusIcon className="size-3.5" />
-          </button>
+          </Button>
         )}
-        <input
+        <Input
           type="text"
           value={value}
           aria-label={field.label}
           placeholder={readableOriginal}
           className={cn(
-            'h-7 min-w-0 flex-1 rounded-lg bg-background/80 px-2 font-mono text-[11px] text-foreground outline-none ring-1 transition-[background-color,box-shadow,color] duration-150 placeholder:text-muted-foreground/45 focus:bg-background focus:ring-primary/55 dark:bg-white/5 dark:focus:bg-white/8',
+            'h-7 min-w-0 flex-1 rounded-lg border-0 bg-background/80 px-2 font-mono text-[11px] ring-1 transition-[background-color,box-shadow,color] duration-150 placeholder:text-muted-foreground/45 focus:bg-background focus-visible:ring-primary/55 md:text-[11px] dark:bg-white/5 dark:focus:bg-white/8',
             changed ? 'ring-primary/55' : 'ring-border/60 dark:ring-white/10',
           )}
           onChange={event => onChange(event.target.value)}
         />
         {scrubValue && (
-          <button
+          <Button
             type="button"
-            className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-[background-color,color,transform] duration-150 ease-out hover:bg-foreground/7 hover:text-foreground active:scale-[0.96]"
+            variant="ghost"
+            size="icon-sm"
+            className="size-7 shrink-0 rounded-full text-muted-foreground hover:bg-foreground/7 hover:text-foreground active:scale-[0.96]"
             onClick={() => handleScrub(1)}
             aria-label={`Increase ${field.label}`}
           >
             <PlusIcon className="size-3.5" />
-          </button>
+          </Button>
         )}
       </span>
     </InspectorRow>
@@ -371,15 +378,17 @@ function InspectorRow({ label, changed = false, onReset, children }: InspectorRo
     <label className="grid grid-cols-[70px_minmax(0,1fr)_28px] items-center gap-2 text-xs">
       <span className={cn('text-muted-foreground transition-colors duration-150', changed && 'text-primary')}>{label}</span>
       <span className="min-w-0">{children}</span>
-      <button
+      <Button
         type="button"
-        className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-[background-color,color,opacity,transform] duration-150 ease-out hover:bg-foreground/7 hover:text-foreground active:scale-[0.96] disabled:opacity-25 disabled:active:scale-100"
+        variant="ghost"
+        size="icon-sm"
+        className="size-7 shrink-0 rounded-full text-muted-foreground hover:bg-foreground/7 hover:text-foreground active:scale-[0.96] disabled:opacity-25 disabled:active:scale-100"
         disabled={!changed}
         onClick={onReset}
         aria-label={`Reset ${label}`}
       >
         <RotateCcwIcon className="size-3.5" />
-      </button>
+      </Button>
     </label>
   )
 }
@@ -520,10 +529,12 @@ export function BrowserAnnotationAdjustmentPanel() {
 
       <div className="flex h-10 shrink-0 items-center border-b border-border/60 px-3 dark:border-white/6">
         <div className="grid h-8 grid-cols-2 rounded-full bg-foreground/5 p-0.5 dark:bg-white/6">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             className={cn(
-              'flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96]',
+              'h-7 gap-1.5 rounded-full px-2.5 text-xs active:scale-[0.96]',
               activeTab === 'design'
                 ? 'bg-background text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.16),inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:bg-white/10'
                 : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground',
@@ -532,11 +543,13 @@ export function BrowserAnnotationAdjustmentPanel() {
           >
             <SlidersHorizontalIcon className="size-3.5" />
             Design
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             className={cn(
-              'flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96]',
+              'h-7 gap-1.5 rounded-full px-2.5 text-xs active:scale-[0.96]',
               activeTab === 'css'
                 ? 'bg-background text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.16),inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:bg-white/10'
                 : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground',
@@ -545,7 +558,7 @@ export function BrowserAnnotationAdjustmentPanel() {
           >
             <Code2Icon className="size-3.5" />
             CSS
-          </button>
+          </Button>
         </div>
       </div>
 

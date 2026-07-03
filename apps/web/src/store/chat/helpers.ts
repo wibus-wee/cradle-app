@@ -3,6 +3,21 @@ import isEqual from 'fast-deep-equal'
 
 import type { AssistantDisplaySplit, MessagePart, MessageReconcileChange } from './types'
 
+interface CradleMessageMetadata {
+  continuation?: {
+    mode?: string
+    queueItemId?: unknown
+    sourceMessageId?: unknown
+    splitParts?: unknown
+  }
+}
+
+type ReasoningMessagePart = MessagePart & {
+  reasoning?: string
+  state?: string
+  text?: string
+}
+
 // ── Message Reconciliation ───────────────────────────────────
 // Preserves object identity for unchanged messages/parts to avoid
 // unnecessary React re-renders.
@@ -271,13 +286,12 @@ export function hasVisibleParts(parts: MessagePart[]): boolean {
 
 export function findActiveAssistantId(
   messages: UIMessage[],
-  generatingIds: Set<string>,
-  passiveIds: Set<string>,
-  localDriverId?: string,
+  streamingIds: Set<string>,
+  activeMessageId?: string | null,
 ): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
-    if (m.role === 'assistant' && (generatingIds.has(m.id) || passiveIds.has(m.id) || localDriverId === m.id)) {
+    if (m.role === 'assistant' && (streamingIds.has(m.id) || activeMessageId === m.id)) {
       return m.id
     }
   }
@@ -292,7 +306,7 @@ export function findActiveAssistantId(
 
 // ── Internal Helpers ─────────────────────────────────────────
 
-function readCradleMetadata(msg: UIMessage): Record<string, any> | null {
+function readCradleMetadata(msg: UIMessage): CradleMessageMetadata | null {
   const metadata = (msg as { metadata?: unknown }).metadata
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return null
@@ -301,7 +315,7 @@ function readCradleMetadata(msg: UIMessage): Record<string, any> | null {
   if (!cradle || typeof cradle !== 'object' || Array.isArray(cradle)) {
     return null
   }
-  return cradle as Record<string, any>
+  return cradle as CradleMessageMetadata
 }
 
 function buildTailMessage(source: UIMessage, splitParts: MessagePart[], tailId: string): UIMessage {
@@ -344,13 +358,15 @@ function getPartRemainder(source: MessagePart, split: MessagePart): MessagePart 
     return rest ? { ...source, text: rest } as MessagePart : null
   }
   if (source.type === 'reasoning' && split.type === 'reasoning') {
-    const sText = (source as any).text ?? (source as any).reasoning ?? ''
-    const pText = (split as any).text ?? (split as any).reasoning ?? ''
+    const sourceReasoningPart = source as ReasoningMessagePart
+    const splitReasoningPart = split as ReasoningMessagePart
+    const sText = sourceReasoningPart.text ?? sourceReasoningPart.reasoning ?? ''
+    const pText = splitReasoningPart.text ?? splitReasoningPart.reasoning ?? ''
     const rest = sText.startsWith(pText) ? sText.slice(pText.length) : sText
     if (!rest) {
       return null
     }
-    return (source as any).text !== undefined
+    return sourceReasoningPart.text !== undefined
       ? { ...source, text: rest } as MessagePart
       : { ...source, reasoning: rest } as MessagePart
   }
@@ -362,7 +378,8 @@ function isEmptyPart(part: MessagePart): boolean {
     return !(part as { text: string }).text
   }
   if (part.type === 'reasoning') {
-    return !((part as any).text || (part as any).reasoning)
+    const reasoningPart = part as ReasoningMessagePart
+    return !(reasoningPart.text || reasoningPart.reasoning)
   }
   return false
 }

@@ -9,6 +9,7 @@ import { m } from 'motion/react'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useChatSessionLayoutRecord } from '~/components/layout/use-layout-query-records'
 import { Button } from '~/components/ui/button'
 import { ResourcesPopover } from '~/features/devtool/resources/resources-popover'
 import { cn } from '~/lib/cn'
@@ -17,7 +18,6 @@ import { useActiveSurface } from '~/navigation/active-surface'
 import { SurfaceBar } from '~/navigation/surface-bar'
 import { chatSessionIdForSurface } from '~/navigation/surface-identity'
 import { useLayoutStore } from '~/store/layout'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 interface AppHeaderProps {
   hasAside?: boolean
@@ -72,9 +72,9 @@ export function AppHeader({
   // route), so derive the chat session id from the active surface rather than
   // from a window env flag.
   const scopedSessionId = sessionScoped ? chatSessionIdForSurface(activeSurface) : null
-  const tearoffSessionTitle = useSessionLayoutStore(state =>
-    scopedSessionId ? state.sessions[scopedSessionId]?.sessionTitle : null)
-  const sessionScopedTitle = tearoffSessionTitle || tWorkspace('session.fallbackTitle')
+  const scopedSessionLayout = useChatSessionLayoutRecord(scopedSessionId)
+  const activeChatTitle = scopedSessionId && activeSurface?.kind === 'chat' ? activeSurface.title : null
+  const sessionScopedTitle = scopedSessionLayout?.sessionTitle || activeChatTitle || tWorkspace('session.fallbackTitle')
 
   const handleSidebarToggle = useCallback(() => {
     if (sidebarInSheet) {

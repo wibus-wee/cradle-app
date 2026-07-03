@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import { readSessionTailEvents } from '../src/modules/chat-runtime/es/event-tail'
 import { addHostMcpServer, removeHostMcpServer } from '../src/plugins/mcp-registry'
 
 const acpMocks = vi.hoisted(() => {
@@ -153,6 +154,26 @@ async function waitForMessageStatus(app: ElysiaApp, sessionId: string, expectedS
   throw new Error(`Timed out waiting for assistant status ${expectedStatus}`)
 }
 
+async function waitForToolApprovalRequest(sessionId: string): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const approvalEvent = readSessionTailEvents({ sessionId, afterVersion: 0 }).find((event) => {
+      const payload = event.payload
+      return event.type === 'InteractionRequested'
+        && 'interactionKind' in payload
+        && payload.interactionKind === 'toolApproval'
+    })
+    if (approvalEvent) {
+      const payload = approvalEvent.payload
+      if ('requestId' in payload) {
+        return payload.requestId
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+
+  throw new Error('Timed out waiting for ACP tool approval request')
+}
+
 describe('acp chat runtime capability', () => {
   beforeEach(() => {
     acpMocks.setClient(null)
@@ -230,13 +251,15 @@ describe('acp chat runtime capability', () => {
         },
       })
 
-      await client.requestPermission({
+      await expect(client.requestPermission({
         sessionId,
         toolCall: { title: 'Write workspace file' },
         options: [
           { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
           { optionId: 'reject_once', name: 'Reject once', kind: 'reject_once' },
         ],
+      })).resolves.toEqual({
+        outcome: { outcome: 'selected', optionId: 'allow_once' },
       })
 
       await client.sessionUpdate({
@@ -269,7 +292,7 @@ describe('acp chat runtime capability', () => {
     vi.restoreAllMocks()
   })
 
-  it('runs an ACP turn through server chat-runtime, rejects ACP permission side channels, syncs titles, and writes usage', async () => {
+  it('runs an ACP turn through server chat-runtime, bridges ACP permission side channels, syncs titles, and writes usage', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -283,6 +306,7 @@ describe('acp chat runtime capability', () => {
         id: 'workspace-acp',
         name: 'Workspace ACP',
         path: workspaceRoot,
+        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
       }).run()
 
       await createAcpProfileAndSession(app, 'workspace-acp')
@@ -293,6 +317,14 @@ describe('acp chat runtime capability', () => {
         body: JSON.stringify({ text: 'Explain ACP runtime ownership' }),
       }))
       expect(runRes.status).toBe(200)
+
+      const approvalRequestId = await waitForToolApprovalRequest('session-acp')
+      const approvalRes = await app.handle(new Request(`http://localhost/chat/sessions/session-acp/tool-approval/${approvalRequestId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ approved: true }),
+      }))
+      expect(approvalRes.status).toBe(200)
 
       const timeline = await waitForMessageStatus(app, 'session-acp', 'complete')
       expect(timeline).toHaveLength(2)

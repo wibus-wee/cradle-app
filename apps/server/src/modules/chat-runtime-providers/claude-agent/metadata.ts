@@ -24,6 +24,13 @@ export const CLAUDE_AGENT_RUNTIME_METADATA = {
   iconKey: 'claude-agent',
   surfaces: ['chat', 'jarvis'],
   sortOrder: 30,
+  composer: {
+    inputMode: 'rich',
+    modelSelection: 'alias-matrix',
+    thinking: {
+      efforts: ['low', 'medium', 'high', 'xhigh'],
+    },
+  },
 } satisfies ChatRuntimeMetadata
 
 export const CLAUDE_AGENT_RUNTIME_CAPABILITIES = {
@@ -33,6 +40,7 @@ export const CLAUDE_AGENT_RUNTIME_CAPABILITIES = {
   supportsRuntimeSettings: true,
   supportsUiSlotStates: true,
   supportsDynamicCapabilities: false,
+  supportsTitleGeneration: true,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities
 

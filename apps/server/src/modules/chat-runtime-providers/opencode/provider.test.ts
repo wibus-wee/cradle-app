@@ -513,11 +513,11 @@ describe('OpencodeProvider streamTurn', () => {
     const promptCall = fake.promptAsync.mock.calls[0]
     expect(promptCall).toBeDefined()
     const promptBody = promptCall![0].body
-    expect(promptBody.messageID).toBe('msg_cradle_run_1')
+    expect(promptBody).not.toHaveProperty('messageID')
     expect(promptBody.agent).toBe('build')
     const assistant = assistantMessage({
       id: 'msg_assistant',
-      parentID: promptBody.messageID,
+      parentID: 'msg_user',
       time: { created: 1 },
     })
     events.push({ type: 'message.updated', properties: { info: assistant } })
@@ -567,10 +567,11 @@ describe('OpencodeProvider streamTurn', () => {
     const promptCall = fake.promptAsync.mock.calls[0]
     expect(promptCall).toBeDefined()
     const promptBody = promptCall![0].body
+    expect(promptBody).not.toHaveProperty('messageID')
     expect(promptBody.agent).toBe('plan')
     const assistant = assistantMessage({
       id: 'msg_assistant',
-      parentID: promptBody.messageID,
+      parentID: 'msg_user',
       mode: 'plan',
       time: { created: 1 },
     })
@@ -597,6 +598,14 @@ describe('OpencodeProvider streamTurn', () => {
   it('recovers terminal async prompts from history when the OpenCode event stream ends', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
+    fake.state.sessionMessagesData.push({
+      info: assistantMessage({
+        id: 'msg_previous_assistant',
+        parentID: 'msg_previous_user',
+        time: { created: 1, completed: 2 },
+      }),
+      parts: [textPart({ id: 'part_previous', messageID: 'msg_previous_assistant', text: 'Previous.' })],
+    })
     const provider = new OpencodeProvider({ readSecret: () => 'secret' })
     const stream = provider.streamTurn({
       runId: 'run-stream-ended',
@@ -615,11 +624,12 @@ describe('OpencodeProvider streamTurn', () => {
     const promptCall = fake.promptAsync.mock.calls[0]
     expect(promptCall).toBeDefined()
     const promptBody = promptCall![0].body
+    expect(promptBody).not.toHaveProperty('messageID')
     fake.state.sessionMessagesData.push({
       info: assistantMessage({
         id: 'msg_assistant',
-        parentID: promptBody.messageID,
-        time: { created: 1, completed: 2 },
+        parentID: 'msg_user',
+        time: { created: 3, completed: 4 },
       }),
       parts: [textPart()],
     })
@@ -655,10 +665,11 @@ describe('OpencodeProvider streamTurn', () => {
     const firstChunk = stream.next()
     await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
     const promptBody = fake.promptAsync.mock.calls[0]![0].body
+    expect(promptBody).not.toHaveProperty('messageID')
     fake.state.sessionMessagesData.push({
       info: assistantMessage({
         id: 'msg_assistant',
-        parentID: promptBody.messageID,
+        parentID: 'msg_user',
         time: { created: 1, completed: 2 },
       }),
       parts: [textPart()],
@@ -689,6 +700,136 @@ describe('OpencodeProvider streamTurn', () => {
       path: { id: 'ses_1' },
       query: { directory: '/tmp/workspace', limit: 50 },
     }))
+  })
+
+  it('reuses the native session across consecutive promptAsync turns without custom message IDs', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    const runtimeSession = createRuntimeSession(fake.resource)
+
+    const firstStream = provider.streamTurn({
+      runId: 'run-first',
+      runtimeSession,
+      profile: null,
+      message: {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'First turn' }],
+      },
+      workspacePath: '/tmp/workspace',
+    })
+    const firstChunk = firstStream.next()
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+    expect(fake.promptAsync.mock.calls[0]![0].body).not.toHaveProperty('messageID')
+    const firstAssistant = assistantMessage({
+      id: 'msg_assistant_first',
+      parentID: 'msg_user_first',
+      time: { created: 1 },
+    })
+    fake.state.sessionMessagesData.push({
+      info: {
+        ...firstAssistant,
+        time: { created: 1, completed: 2 },
+        finish: 'stop',
+      },
+      parts: [textPart({
+        id: 'part_text_first',
+        messageID: 'msg_assistant_first',
+        text: 'First.',
+      })],
+    })
+    events.push({ type: 'message.updated', properties: { info: firstAssistant } })
+    events.push({
+      type: 'message.part.updated',
+      properties: {
+        part: textPart({
+          id: 'part_text_first',
+          messageID: 'msg_assistant_first',
+          text: 'First.',
+        }),
+      },
+    })
+    events.push({
+      type: 'message.updated',
+      properties: {
+        info: {
+          ...firstAssistant,
+          time: { created: 1, completed: 2 },
+          finish: 'stop',
+        },
+      },
+    })
+
+    await expect(firstChunk).resolves.toMatchObject({ done: false, value: { type: 'text-start' } })
+    await expect(firstStream.next()).resolves.toMatchObject({ done: false, value: { type: 'text-delta', delta: 'First.' } })
+    await expect(firstStream.next()).resolves.toMatchObject({ done: false, value: { type: 'text-end' } })
+    await expect(firstStream.next()).resolves.toMatchObject({ done: false, value: { type: 'finish' } })
+    await expect(firstStream.next()).resolves.toEqual({ done: true, value: undefined })
+
+    const secondStream = provider.streamTurn({
+      runId: 'run-second',
+      runtimeSession,
+      profile: null,
+      message: {
+        id: 'user-2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Second turn' }],
+      },
+      workspacePath: '/tmp/workspace',
+    })
+    const secondChunk = secondStream.next()
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(2))
+    expect(fake.promptAsync.mock.calls[1]![0]).toMatchObject({
+      path: { id: 'ses_1' },
+      body: { agent: 'build' },
+    })
+    expect(fake.promptAsync.mock.calls[1]![0].body).not.toHaveProperty('messageID')
+    const secondAssistant = assistantMessage({
+      id: 'msg_assistant_second',
+      parentID: 'msg_user_second',
+      time: { created: 3 },
+    })
+    fake.state.sessionMessagesData.push({
+      info: {
+        ...secondAssistant,
+        time: { created: 3, completed: 4 },
+        finish: 'stop',
+      },
+      parts: [textPart({
+        id: 'part_text_second',
+        messageID: 'msg_assistant_second',
+        text: 'Second.',
+      })],
+    })
+    events.push({ type: 'message.updated', properties: { info: secondAssistant } })
+    events.push({
+      type: 'message.part.updated',
+      properties: {
+        part: textPart({
+          id: 'part_text_second',
+          messageID: 'msg_assistant_second',
+          text: 'Second.',
+        }),
+      },
+    })
+    events.push({
+      type: 'message.updated',
+      properties: {
+        info: {
+          ...secondAssistant,
+          time: { created: 3, completed: 4 },
+          finish: 'stop',
+        },
+      },
+    })
+
+    await expect(secondChunk).resolves.toMatchObject({ done: false, value: { type: 'text-start' } })
+    await expect(secondStream.next()).resolves.toMatchObject({ done: false, value: { type: 'text-delta', delta: 'Second.' } })
+    await expect(secondStream.next()).resolves.toMatchObject({ done: false, value: { type: 'text-end' } })
+    await expect(secondStream.next()).resolves.toMatchObject({ done: false, value: { type: 'finish' } })
+    await expect(secondStream.next()).resolves.toEqual({ done: true, value: undefined })
+    expect(fake.session.create).not.toHaveBeenCalled()
   })
 
   it('retries async prompts in a fresh native session when OpenCode goes idle without a terminal assistant', async () => {
@@ -733,14 +874,14 @@ describe('OpencodeProvider streamTurn', () => {
     expect(fake.promptAsync.mock.calls[1]![0]).toMatchObject({
       path: { id: 'ses_recovered' },
       body: {
-        messageID: 'msg_cradle_run_idle_empty_retry',
         agent: 'build',
       },
     })
+    expect(fake.promptAsync.mock.calls[1]![0].body).not.toHaveProperty('messageID')
     const recoveredAssistant = assistantMessage({
       id: 'msg_assistant_recovered',
       sessionID: 'ses_recovered',
-      parentID: fake.promptAsync.mock.calls[1]![0].body.messageID,
+      parentID: 'msg_user_recovered',
       time: { created: 3 },
     })
     fake.state.sessionMessagesData.push({

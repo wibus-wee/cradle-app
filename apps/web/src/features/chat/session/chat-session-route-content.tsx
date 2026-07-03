@@ -6,15 +6,19 @@ import {
   getWorkspacesByWorkspaceIdOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
+import {
+  runtimeComposerUsesCollapsedInput,
+  useRuntimeCatalog,
+} from '~/features/agent-runtime/use-runtime-catalog'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
 import { isElectron, nativeIpc } from '~/lib/electron'
 import { closeSurfaceById } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { chatSurfaceId } from '~/navigation/surface-identity'
 import { useSurfaceStore } from '~/navigation/surface-store'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 import { ChatSessionFrameHost } from './chat-session-frame-host'
+import { CHAT_SESSION_FALLBACK_LABEL } from './chat-session-label'
 import { readSessionThinkingEffort } from './session-thinking-effort'
 
 function loadTerminalPanelView() {
@@ -27,12 +31,6 @@ function loadTuiView() {
 
 const BottomTerminalPanel = lazy(loadTerminalPanelView)
 const TuiView = lazy(loadTuiView)
-
-export const CHAT_SESSION_FALLBACK_LABEL = 'Chat'
-
-export function isGeneratedChatLabel(label: string, sessionId: string): boolean {
-  return label === `Chat: ${sessionId.slice(0, 6)}`
-}
 
 function ChatSessionLayoutSlots({
   sessionId,
@@ -89,7 +87,14 @@ export function ChatSessionRouteContent({ sessionId }: { sessionId: string }) {
   const sessionProviderTargetId = session?.providerTargetId ?? null
   const sessionModelId = session?.modelId ?? null
   const sessionThinkingEffort = readSessionThinkingEffort(session?.thinkingEffort)
-  const isCliTui = session?.runtimeKind === 'cli-tui'
+  const { runtimes } = useRuntimeCatalog()
+  const sessionRuntime = useMemo(
+    () => runtimes.find(runtime => runtime.runtimeKind === session?.runtimeKind) ?? null,
+    [runtimes, session?.runtimeKind],
+  )
+  const usesCollapsedRuntimeView = sessionRuntime
+    ? runtimeComposerUsesCollapsedInput(sessionRuntime.composer)
+    : false
 
   useEffect(() => {
     if (typeof session?.archivedAt !== 'number') {
@@ -129,18 +134,6 @@ export function ChatSessionRouteContent({ sessionId }: { sessionId: string }) {
   })
 
   const workspacePath = getLocalWorkspacePath(workspace)
-  useEffect(() => {
-    if (!session) {
-      return
-    }
-    useSessionLayoutStore.getState().upsertSession({
-      sessionId,
-      sessionTitle: session.title,
-      workspaceId,
-      workspacePath,
-      runtimeKind: session.runtimeKind,
-    })
-  }, [session, sessionId, workspaceId, workspacePath])
 
   useEffect(() => {
     if (workspacePath) {
@@ -149,12 +142,12 @@ export function ChatSessionRouteContent({ sessionId }: { sessionId: string }) {
   }, [workspacePath])
 
   useEffect(() => {
-    if (isCliTui) {
+    if (usesCollapsedRuntimeView) {
       void loadTuiView()
     }
-  }, [isCliTui])
+  }, [usesCollapsedRuntimeView])
 
-  if (isCliTui) {
+  if (usesCollapsedRuntimeView) {
     return (
       <>
         <ChatSessionLayoutSlots sessionId={sessionId} workspaceId={workspaceId} workspacePath={workspacePath} />

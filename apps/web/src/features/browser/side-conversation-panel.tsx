@@ -3,105 +3,31 @@ import {
   RobotLine as BotIcon,
 } from '@mingcute/react'
 import { useQuery } from '@tanstack/react-query'
-import type { FileUIPart, UIMessage } from 'ai'
+import type { FileUIPart } from 'ai'
 import { useCallback, useState } from 'react'
 
 import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { getSkills } from '~/api-gen/sdk.gen'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
+import { ChatRenderStoreProvider, MessageBubbleById } from '~/features/chat/rendering/message-bubble'
 import type { SkillInventoryEntry } from '~/features/skills/types'
-import { chatSelectors, useChatStore } from '~/store/chat'
+import { chatSelectors } from '~/store/chat'
+import { useRendererChatStore } from '~/store/renderer-chat'
 
-import type { ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../chat/commands/chat-response-command'
-import { startSideConversationResponse } from '../chat/commands/chat-response-command'
 import { Composer } from '../chat/composer/composer'
 import type { ChatContextPart } from '../chat/context/chat-context-parts'
-import { toOrderedUserMessageParts } from '../chat/context/chat-context-parts'
 import type { MentionItem } from '../chat/mentions/mention-panel'
 import { searchPluginMentions } from '../chat/mentions/plugin-mentions'
 import type { SkillMentionItem } from '../chat/mentions/skill-mention-panel'
-import { MessageBubble } from '../chat/rendering/message-bubble'
-import { ChatStreamingHandler } from '../chat/transport/chat-streaming-handler'
-import { buildUIMessageChunkStreamFromResponse } from '../chat/transport/sse-chat-transport'
 import { searchWorkspaceFiles } from '../workspace/use-workspace-files'
+import { buildSideConversationViewId, submitSideConversationMessage } from './side-conversation-message'
+
+const rendererChatStore = useRendererChatStore
 
 interface SideConversationPanelProps {
   sideConversationId: string
   parentSessionId: string
   title: string
-}
-
-export interface SubmitSideConversationMessageInput {
-  sideConversationId: string
-  text: string
-  files?: FileUIPart[]
-  contextParts?: ChatContextPart[]
-  modelId?: string
-  thinkingEffort?: ChatThinkingEffort | null | undefined
-  runtimeSettings?: ChatRuntimeSettingsPatch
-}
-
-export function buildSideConversationViewId(sideConversationId: string): string {
-  return `side:${sideConversationId}`
-}
-
-export async function submitSideConversationMessage(input: SubmitSideConversationMessageInput): Promise<void> {
-  const text = input.text.trim()
-  const files = input.files ?? []
-  const contextParts = input.contextParts ?? []
-  if (!text && files.length === 0 && contextParts.length === 0) {
-    return
-  }
-
-  const viewSessionId = buildSideConversationViewId(input.sideConversationId)
-  const userMessageId = `side-user-${Date.now()}`
-  const userParts = toOrderedUserMessageParts(text, contextParts, input.text) as UIMessage['parts']
-  userParts.push(...files)
-  useChatStore.getState().appendMessage(viewSessionId, {
-    id: userMessageId,
-    role: 'user',
-    parts: userParts,
-  })
-
-  const assistantMessageId = `side-assistant-${Date.now()}`
-  const controller = new AbortController()
-  const handler = new ChatStreamingHandler(
-    viewSessionId,
-    assistantMessageId,
-    performance.now(),
-    { mode: 'local', useStoredMessageSnapshot: false },
-  )
-  handler.start(controller)
-
-  try {
-    const response = await startSideConversationResponse({
-      sideConversationId: input.sideConversationId,
-      body: {
-        text,
-        files,
-        contextParts,
-        modelId: input.modelId,
-        thinkingEffort: input.thinkingEffort === null ? undefined : input.thinkingEffort,
-        runtimeSettings: input.runtimeSettings,
-      },
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      const body = await response.text().catch(() => '')
-      throw new Error(`Failed to start side response: ${response.status} ${body}`)
-    }
-    const runId = response.headers.get('x-cradle-run-id')
-    if (runId) {
-      useChatStore.getState().setRunDisplayId(assistantMessageId, runId)
-    }
-    await handler.consume(buildUIMessageChunkStreamFromResponse(response, viewSessionId))
-    handler.finish()
-  }
-  catch (error) {
-    if (!controller.signal.aborted) {
-      handler.fail(error instanceof Error ? error.message : 'Side response failed')
-    }
-  }
 }
 
 export function SideConversationPanel({
@@ -110,9 +36,9 @@ export function SideConversationPanel({
   title: _title,
 }: SideConversationPanelProps) {
   const viewSessionId = buildSideConversationViewId(sideConversationId)
-  const messages = useChatStore(chatSelectors.messages(viewSessionId))
-  const latestError = useChatStore(chatSelectors.latestError(viewSessionId))
-  const isStreaming = useChatStore(chatSelectors.isSessionGenerating(viewSessionId))
+  const messages = useRendererChatStore(chatSelectors.messages(viewSessionId))
+  const latestError = useRendererChatStore(chatSelectors.latestError(viewSessionId))
+  const isStreaming = useRendererChatStore(chatSelectors.isSessionGenerating(viewSessionId))
   const [error, setError] = useState<string | null>(null)
   const errorMessage = error ?? latestError?.message ?? null
 
@@ -245,16 +171,12 @@ function SideConversationMessage({
   viewSessionId: string
   messageId: string
 }) {
-  const message = useChatStore(chatSelectors.message(viewSessionId, messageId))
-  const isStreaming = useChatStore(chatSelectors.isVisibleStreamingMessage(viewSessionId, messageId))
-  if (!message) {
-    return null
-  }
   return (
-    <MessageBubble
-      message={message}
-      isStreaming={isStreaming}
-      executionDetailsDefaultOpen={false}
-    />
+    <ChatRenderStoreProvider store={rendererChatStore}>
+      <MessageBubbleById
+        sessionId={viewSessionId}
+        messageId={messageId}
+      />
+    </ChatRenderStoreProvider>
   )
 }

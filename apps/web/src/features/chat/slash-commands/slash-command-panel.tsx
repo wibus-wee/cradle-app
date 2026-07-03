@@ -1,34 +1,35 @@
 import {
-  HeartbeatLine as ActivityIcon,
-  WarningLine as AlertTriangleIcon,
+  AttachmentLine as PaperclipIcon,
   BoxLine as BoxIcon,
   BrainLine as BrainIcon,
-  DotCircleLine as CircleDotIcon,
-  QuestionLine as CircleHelpIcon,
-  CommandLine as CommandIcon,
-  GitCompareLine as DiffIcon,
-  TreeLine as FolderTreeIcon,
-  Dashboard2Line as GaugeIcon,
-  HammerLine as HammerIcon,
-  ListCheckLine as ListChecksIcon,
   Chat1Line as MessageCircleIcon,
-  QuestionLine as MessageCircleQuestionIcon,
+  CommandLine as CommandIcon,
   Cursor2Line as MousePointer2Icon,
+  Dashboard2Line as GaugeIcon,
+  DotCircleLine as CircleDotIcon,
+  GitCompareLine as DiffIcon,
+  GroupLine as UsersIcon,
+  HammerLine as HammerIcon,
+  HeartbeatLine as ActivityIcon,
+  ListCheckLine as ListChecksIcon,
   PackageLine as PackageIcon,
-  AttachmentLine as PaperclipIcon,
   Plugin2Line,
+  QuestionLine as CircleHelpIcon,
+  QuestionLine as MessageCircleQuestionIcon,
+  SafeShieldLine as ShieldCheckIcon,
   Scan2Line as ScanEyeIcon,
   SearchLine as SearchIcon,
   Settings2Line as SettingsIcon,
-  SafeShieldLine as ShieldCheckIcon,
   SparklesLine as SparklesIcon,
-  TerminalBoxLine as SquareTerminalIcon,
   TargetLine as TargetIcon,
-  GroupLine as UsersIcon
+  TerminalBoxLine as SquareTerminalIcon,
+  TreeLine as FolderTreeIcon,
+  WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 import { clampPercentValue } from '~/lib/number-format'
 
@@ -51,15 +52,15 @@ const UNSAFE_OPTION_ID_CHAR_RE = /[^\w-]/g
 
 function formatCommandSubtitle(
   commands: ChatComposerSlashCommand[],
-  command: ChatComposerSlashCommand
+  command: ChatComposerSlashCommand,
 ): string {
   const aliases = command.aliases?.length
-    ? `Aliases: ${command.aliases.map((alias) => `/${alias}`).join(', ')}`
+    ? `Aliases: ${command.aliases.map(alias => `/${alias}`).join(', ')}`
     : ''
   return [
     command.description,
     command.availability?.enabled === false ? command.availability.reason : '',
-    aliases
+    aliases,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -75,7 +76,7 @@ function formatCommandKey(command: ChatComposerSlashCommand, index: number): str
 
 function getCommandBadge(
   commands: ChatComposerSlashCommand[],
-  command: ChatComposerSlashCommand
+  command: ChatComposerSlashCommand,
 ): string {
   return hasDuplicateSlashCommandName(commands, command) ? getSlashCommandSourceLabel(command) : ''
 }
@@ -102,7 +103,7 @@ function getCommandStateClassName(command: ChatComposerSlashCommand): string {
 
 function formatCommandRowSubtitle(
   commands: ChatComposerSlashCommand[],
-  command: ChatComposerSlashCommand
+  command: ChatComposerSlashCommand,
 ): string {
   if (command.stateVisual?.kind === 'compactUsage' && command.stateLabel) {
     return `${command.description} (${command.stateLabel.toLowerCase()})`
@@ -194,7 +195,7 @@ function renderCommandIcon(command: ChatComposerSlashCommand): ReactNode {
 
 function SlashCommandIcon({
   command,
-  className
+  className,
 }: {
   command: ChatComposerSlashCommand
   className?: string
@@ -208,7 +209,7 @@ function SlashCommandIcon({
 
 function CompactUsageIcon({
   state,
-  className
+  className,
 }: {
   state: ChatSlashCommandStateVisual
   className?: string
@@ -224,7 +225,7 @@ function CompactUsageIcon({
         'relative mt-px grid size-4 shrink-0 place-items-center',
         readCompactRingClassName(state.status),
         state.status === 'running' && 'animate-pulse',
-        className
+        className,
       )}
       aria-hidden="true"
       data-testid="slash-command-compact-state-ring"
@@ -263,7 +264,7 @@ export function SlashCommandPanel({
   query,
   onSelect,
   onClose,
-  visible
+  visible,
 }: SlashCommandPanelProps) {
   const [selection, setSelection] = useState({ activeIndex: 0, query })
   const listRef = useRef<HTMLMenuElement>(null)
@@ -272,12 +273,12 @@ export function SlashCommandPanel({
     () =>
       getSlashCommandPanelItems(commands, query)
         .slice(0, MAX_RESULTS)
-        .map((item) => ({ item })),
-    [commands, query]
+        .map(item => ({ item })),
+    [commands, query],
   )
 
-  const effectiveActiveIndex =
-    results.length === 0
+  const effectiveActiveIndex
+    = results.length === 0
       ? 0
       : Math.min(selection.query === query ? selection.activeIndex : 0, results.length - 1)
 
@@ -301,22 +302,25 @@ export function SlashCommandPanel({
       e.preventDefault()
       setSelection({
         activeIndex: (effectiveActiveIndex + 1) % Math.max(results.length, 1),
-        query
+        query,
       })
-    } else if (e.key === 'ArrowUp') {
+    }
+ else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setSelection({
         activeIndex: (effectiveActiveIndex - 1 + results.length) % Math.max(results.length, 1),
-        query
+        query,
       })
-    } else if (
-      (e.key === 'Enter' || e.key === 'Tab') &&
-      results[effectiveActiveIndex] &&
-      isSlashCommandAvailable(results[effectiveActiveIndex].item)
+    }
+ else if (
+      (e.key === 'Enter' || e.key === 'Tab')
+      && results[effectiveActiveIndex]
+      && isSlashCommandAvailable(results[effectiveActiveIndex].item)
     ) {
       e.preventDefault()
       onSelect(results[effectiveActiveIndex].item)
-    } else if (e.key === 'Escape') {
+    }
+ else if (e.key === 'Escape') {
       e.preventDefault()
       onClose()
     }
@@ -334,7 +338,7 @@ export function SlashCommandPanel({
       }
       onSelect(command)
     },
-    [onSelect]
+    [onSelect],
   )
 
   const activeCommand = results[effectiveActiveIndex]?.item
@@ -359,19 +363,20 @@ export function SlashCommandPanel({
           const isAvailable = isSlashCommandAvailable(item)
           return (
             <li key={formatCommandKey(item, idx)}>
-              <button
+              <Button
                 type="button"
                 id={formatSlashCommandOptionId(item, idx)}
                 aria-label={`${readCommandTitle(item)} ${getSlashCommandSourceLabel(item)}`}
                 data-active={formatSlashCommandOptionId(item, idx) === activeOptionId}
                 disabled={!isAvailable}
+                variant="ghost"
                 className={cn(
-                  'flex w-full items-start gap-2.5 rounded-lg px-2.5 py-1 text-left',
+                  'h-auto w-full items-start justify-start gap-2.5 rounded-lg px-2.5 py-1 text-left whitespace-normal',
                   isAvailable
                     ? idx === effectiveActiveIndex
                       ? 'bg-accent text-accent-foreground'
                       : 'text-foreground/80 hover:bg-accent/40'
-                    : 'cursor-not-allowed text-muted-foreground/45 opacity-75'
+                    : 'cursor-not-allowed text-muted-foreground/45 opacity-75',
                 )}
                 onMouseEnter={() => setSelection({ activeIndex: idx, query })}
                 onFocus={() => setSelection({ activeIndex: idx, query })}
@@ -392,7 +397,7 @@ export function SlashCommandPanel({
                       <span
                         className={cn(
                           'rounded border px-1 py-px text-[9px] font-medium leading-none',
-                          getCommandBadgeClassName(item)
+                          getCommandBadgeClassName(item),
                         )}
                       >
                         {badge}
@@ -402,7 +407,7 @@ export function SlashCommandPanel({
                       <span
                         className={cn(
                           'max-w-28 truncate rounded border px-1 py-px text-[9px] font-medium leading-none tabular-nums',
-                          getCommandStateClassName(item)
+                          getCommandStateClassName(item),
                         )}
                       >
                         {item.stateLabel}
@@ -415,7 +420,7 @@ export function SlashCommandPanel({
                     </span>
                   )}
                 </span>
-              </button>
+              </Button>
             </li>
           )
         })}

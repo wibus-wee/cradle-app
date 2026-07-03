@@ -1,3 +1,4 @@
+import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import type { ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
 
 import type { ThinkingOption } from './provider-model-menu'
@@ -16,27 +17,13 @@ export interface RuntimeKindOption {
   value: RuntimeKind
   label?: string
   description?: string
+  icon?: RuntimeIconDescriptor
   iconKey?: string
 }
 
-export const RUNTIME_KIND_OPTIONS: RuntimeKindOption[] = [
-  { value: 'claude-agent' },
-  { value: 'codex' },
-  ...(import.meta.env.DEV ? [{ value: 'opencode' as const }] : []),
-  { value: 'jar-core' },
-  { value: 'cli-tui' },
-]
-
-export const JARVIS_RUNTIME_KIND_OPTIONS: RuntimeKindOption[] = [
-  { value: 'jar-core' },
-  { value: 'codex' },
-  { value: 'claude-agent' },
-  ...(import.meta.env.DEV ? [{ value: 'opencode' as const }] : []),
-]
-
 export type ThinkingCapabilityTier = 'none' | 'standard' | 'extended'
 
-const EXTENDED_REASONING_MODEL_RE = /(?:^|[\s/:_-])(?:gpt-5(?:\.\d+)?|o1|o3|o4|gpt-oss|codex|claude-(?:3[.-]7|opus-4|sonnet-4)|gemini-2\.5-pro|grok-4|deepseek-r1)(?:$|[\s:._-])/
+const EXTENDED_REASONING_EFFORTS = new Set(['minimal', 'xhigh', 'max'])
 
 function readModelReasoningEfforts(model: ModelDescriptor | null | undefined): Set<string> | null {
   if (model?.capabilities.reasoning === false) {
@@ -51,9 +38,13 @@ export function getThinkingCapabilityTier(model: ModelDescriptor | null | undefi
     return 'none'
   }
 
-  const searchable = `${model.id} ${model.capabilities.family ?? ''}`.toLowerCase()
-  if (EXTENDED_REASONING_MODEL_RE.test(searchable)) {
-    return 'extended'
+  const reasoningEfforts = readModelReasoningEfforts(model)
+  if (reasoningEfforts) {
+    for (const effort of reasoningEfforts) {
+      if (EXTENDED_REASONING_EFFORTS.has(effort)) {
+        return 'extended'
+      }
+    }
   }
 
   return 'standard'

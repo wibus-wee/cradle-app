@@ -21,7 +21,7 @@ on:
         description: 'Version (e.g. 1.2.3 for release, or auto-generated for dev)'
         required: true
       source_ref:
-        description: 'Git ref from wibus-wee/Cradle to checkout'
+        description: 'Git ref from wibus-wee/cradle-app to checkout'
         required: true
         default: 'main'
 
@@ -156,9 +156,24 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
+          repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: ${{ needs.resolve.outputs.source_ref }}
+
+      - name: Verify macOS packaging fix is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checked out source commit: $(git rev-parse HEAD)"
+          if [ ! -f apps/desktop/scripts/fix-macos-framework-symlinks.mjs ]; then
+            echo "source_ref '${{ needs.resolve.outputs.source_ref }}' from wibus-wee/cradle-app does not include apps/desktop/scripts/fix-macos-framework-symlinks.mjs" >&2
+            echo "Sync the macOS framework symlink packaging fix into wibus-wee/cradle-app, or release from a source_ref that contains it." >&2
+            exit 1
+          fi
+          if ! /usr/bin/grep -q 'fixMacOSFrameworkSymlinks' apps/desktop/electron-builder.mjs; then
+            echo "source_ref '${{ needs.resolve.outputs.source_ref }}' from wibus-wee/cradle-app does not run the macOS framework symlink fix from electron-builder.afterPack" >&2
+            exit 1
+          fi
 
       - name: Setup pnpm & Node.js
         uses: ./.github/actions/setup
@@ -240,7 +255,7 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
+          repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: ${{ needs.resolve.outputs.source_ref }}
 
@@ -730,7 +745,7 @@ jobs:
       - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/Cradle
+          repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
           ref: ${{ needs.resolve.outputs.source_ref }}
 

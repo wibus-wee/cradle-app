@@ -3,6 +3,8 @@ import {
   Message4Line as MessagesSquareIcon,
   CloseLine as XIcon
 } from '@mingcute/react'
+
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 
 import type { CradleDiffReview, ReviewFile, ReviewThread } from '../shared/types'
@@ -41,14 +43,16 @@ export function OpenThreadsRail({
         <span className="text-[12px] font-medium text-foreground/70">Threads</span>
         <span className="text-[11px] tabular-nums text-muted-foreground/60">{openThreads.length}</span>
         <div className="flex-1" />
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onCollapse}
-          className="flex size-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+          className="size-5 rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
           aria-label="Hide threads"
         >
           <XIcon className="size-3" />
-        </button>
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -70,10 +74,11 @@ export function OpenThreadsRail({
                       key={thread.id}
                       className="group relative"
                     >
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => onJumpToThread(thread)}
-                        className="flex w-full items-start gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/50"
+                        className="h-auto w-full items-start justify-start rounded-none px-3 py-1.5 text-left font-normal hover:bg-muted/50"
                       >
                         <span
                           className={cn(
@@ -108,25 +113,29 @@ export function OpenThreadsRail({
                           </span>
                         </span>
                         <ChevronRightIcon className="mt-1 size-3 shrink-0 !text-muted-foreground/30" aria-hidden />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon-xs"
                         onClick={() => onResolve(thread.id)}
                         disabled={resolvePending}
-                        className="absolute right-7 top-1.5 hidden size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground group-hover:flex"
+                        className="absolute right-7 top-1.5 hidden size-5 rounded text-muted-foreground hover:bg-muted hover:text-foreground group-hover:flex"
                         aria-label="Resolve thread"
                         title="Resolve"
                       >
                         <XIcon className="size-3" />
-                      </button>
+                      </Button>
                       {onAskAgent && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onAskAgent(thread.id)}
-                          className="ml-8 mb-1 hidden rounded px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground group-hover:inline-flex"
+                          className="ml-8 mb-1 hidden h-auto rounded px-2 py-0.5 text-[11px] font-normal text-muted-foreground hover:bg-muted hover:text-foreground group-hover:inline-flex"
                         >
                           Ask agent
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )

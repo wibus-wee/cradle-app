@@ -16,6 +16,8 @@ describe('runtime catalog', () => {
       label: 'CLI TUI',
       description: 'Launch a configured terminal agent',
       providerKinds: [],
+      providerBinding: 'runtime-owned',
+      sessionLaunchMode: 'agent-terminal',
       iconKey: 'claude-cli',
       surfaces: ['chat'],
       source: 'builtin',

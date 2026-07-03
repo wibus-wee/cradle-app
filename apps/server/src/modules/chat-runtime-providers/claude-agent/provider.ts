@@ -8,6 +8,7 @@ import type { UIMessage, UIMessageChunk } from 'ai'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'
 import { aiTelemetryEnabled } from '../../../telemetry/config'
+import { liveRuntimeSessionRegistry } from '../../chat-runtime/runtime-live-session-registry'
 import type {
   CancelTurnInput,
   ChatRuntime,
@@ -18,20 +19,20 @@ import type {
   ProviderContext,
   ProviderSyntheticTurnEvent,
   ProviderThread,
+  ProviderThreadEvent,
   ProviderThreadListInput,
   ProviderThreadListResult,
   ProviderThreadReadInput,
   ProviderThreadReadResult,
-  ProviderThreadEvent,
   ProviderThreadTurn,
   ProviderThreadTurnsInput,
   ProviderThreadTurnsResult,
   QuickQuestionInput,
   ResumeChatSessionInput,
-  RuntimeProviderTargetProfile,
   RuntimeCompactUiSlotState,
   RuntimeContextUsage,
   RuntimePresentationCapabilities,
+  RuntimeProviderTargetProfile,
   RuntimeSession,
   RuntimeUiSlotState,
   StartChatSessionInput,
@@ -44,12 +45,12 @@ import {
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../chat-runtime/runtime-provider-types'
-import { liveRuntimeSessionRegistry } from '../../chat-runtime/runtime-live-session-registry'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../../chat-runtime/stream-trace'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { readTrustedClaudeAgentConfig } from '../../provider-contracts/provider-base'
 import { AsyncEventQueue } from '../async-event-queue'
 import { createBoundedTextCollector } from '../bounded-text-collector'
+import { providerChunk } from '../kit/chunk-mapper'
 import { readWorkspaceProviderStateSnapshot } from '../provider-state-snapshot'
 import { ClaudeAgentInputStream, emptyClaudeAgentInput } from './async-input-stream'
 import { projectClaudeAgentCompactState, projectClaudeAgentContextUsage } from './context-usage-projector'
@@ -59,30 +60,31 @@ import {
   buildClaudeAgentTurnContent,
   buildClaudeQueryOptions,
   CLAUDE_AGENT_SDK_PERSIST_SESSION,
+  createClaudeStderrSink,
   describeClaudeAgentUserContent,
   projectClaudeAgentInput,
   projectRuntimeSettingsToClaudePermissionMode,
   readClaudeAgentModelId,
   shouldPersistClaudeAgentSdkSession,
 } from './input-projector'
+import type { ClaudeStderrSink } from './input-projector'
 import {
   CLAUDE_AGENT_RUNTIME_CAPABILITIES,
   CLAUDE_AGENT_RUNTIME_KIND,
   CLAUDE_AGENT_RUNTIME_METADATA,
   projectClaudeAgentPresentation,
 } from './metadata'
+import type { ClaudeAgentPermissionBridgeState, ClaudeAgentToolApprovalRequest } from './permission-bridge'
 import {
   createClaudeAgentPermissionBridgeState,
-  type ClaudeAgentPermissionBridgeState,
-  type ClaudeAgentToolApprovalRequest,
   updateClaudeAgentPermissionBridgeState,
 } from './permission-bridge'
 import { generateClaudeSessionTitle, shouldGenerateClaudeSessionTitle } from './provider-title-generation'
 import { activateClaudeAgentSdkConfigDir, resolveClaudeAgentRuntimeContext } from './runtime-context'
 import {
+  CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID,
   clearClaudeAgentCapturedPlan,
   clearClaudeAgentPendingModelSwitch,
-  CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID,
   projectClaudeAgentCrewUiSlotState,
   projectClaudeAgentPlanUiSlotState,
   projectClaudeAgentProgressUiSlotState,
@@ -94,9 +96,9 @@ import {
   writeClaudeAgentAuthStatusSnapshot,
   writeClaudeAgentCapturedPlan,
   writeClaudeAgentCrewCall,
+  writeClaudeAgentPendingModelSwitch,
   writeClaudeAgentProgress,
   writeClaudeAgentRateLimitSnapshot,
-  writeClaudeAgentPendingModelSwitch,
 } from './state-projector'
 import { ClaudeCodeToolName } from './tools/identity'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload } from './tools/mapper'
@@ -117,6 +119,7 @@ type ActiveClaudeQuery = {
   completedProviderThreadParentOutputIds: Set<string>
   onProviderSyntheticTurnEvent: StreamTurnInput['onProviderSyntheticTurnEvent'] | null
   closed: boolean
+  stderrSink: ClaudeStderrSink
 }
 
 type ActiveClaudeTurn = {
@@ -279,12 +282,14 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
   async getPresentation(input: GetCapabilitiesInput): Promise<RuntimePresentationCapabilities> {
     const abortController = new AbortController()
+    const stderrSink = createClaudeStderrSink()
     const queryOptions = buildClaudeQueryOptions({
       deps: this.deps,
       input,
       abortController,
       attachPermissionHandler: false,
       persistSession: false,
+      onStderr: stderrSink.onStderr,
     })
     const activeQuery = query({ prompt: emptyClaudeAgentInput(), options: queryOptions })
 
@@ -293,9 +298,16 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
       return projectClaudeAgentPresentation(slashCommands)
     }
+    catch (error) {
+      throw stderrSink.enrichError(error)
+    }
     finally {
       closeClaudeQuery(activeQuery)
     }
+  }
+
+  getDraftPresentation(): RuntimePresentationCapabilities {
+    return projectClaudeAgentPresentation([])
   }
 
   async getUiSlotStates(input: GetUiSlotStatesInput): Promise<RuntimeUiSlotState[]> {
@@ -332,6 +344,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const effectiveModel = snapshot.models.currentModelId ?? config.model
 
     // Build query options with tools disabled
+    const stderrSink = createClaudeStderrSink()
     const queryOptions = buildClaudeQueryOptions({
       deps: this.deps,
       input: {
@@ -344,6 +357,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       abortController,
       attachPermissionHandler: false,
       persistSession: false,
+      onStderr: stderrSink.onStderr,
     })
 
     // Quick questions are a no-tools, no-persistence side path. Keep the
@@ -383,6 +397,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
         }
       }
     }
+    catch (error) {
+      throw stderrSink.enrichError(error)
+    }
     finally {
       abortController.abort()
       closeClaudeQuery(activeQuery)
@@ -419,6 +436,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
       runtimeSettings: input.providerOptions?.runtimeSettings,
     })
     let turnPermissionMode: 'bypassPermissions' | 'plan' = 'bypassPermissions'
+    // Reuse the long-lived query's stderr sink when the session already exists;
+    // otherwise create one for the new query. The sink must outlive the
+    // pump loop so it can enrich the surfaced error when the process exits.
+    const stderrSink = activeEntry?.stderrSink ?? createClaudeStderrSink()
     const queryOptions = buildClaudeQueryOptions({
       deps: this.deps,
       input,
@@ -426,6 +447,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       attachPermissionHandler: true,
       permissionBridgeState,
       emitToolApprovalRequest: request => this.emitClaudeAgentToolApprovalRequest(sessionId, request),
+      onStderr: stderrSink.onStderr,
     })
     turnPermissionMode = readActiveClaudeQueryPermissionMode(queryOptions.permissionMode)
 
@@ -448,6 +470,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         completedProviderThreadParentOutputIds: new Set(),
         onProviderSyntheticTurnEvent: null,
         closed: false,
+        stderrSink,
       }
       this.activeQueries.set(sessionId, activeEntry)
       const registeredEntry = activeEntry
@@ -456,7 +479,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         runtimeKind: this.runtimeKind,
         providerTargetId: profile.providerTargetId,
         readRuntimeSession: () => registeredEntry.runtimeSession,
-        updateRuntimeSettings: async settings => {
+        updateRuntimeSettings: async (settings) => {
           await this.updateRuntimeSettings({
             runtimeSession: registeredEntry.runtimeSession,
             profile,
@@ -607,8 +630,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     catch (error) {
       const turn = entry.currentTurn
       if (turn) {
-        turn.endGeneration(error)
-        turn.queue.fail(error instanceof Error ? error : new Error(String(error)))
+        const enriched = entry.stderrSink.enrichError(error)
+        const failure = enriched instanceof Error ? enriched : new Error(String(enriched))
+        turn.endGeneration(failure)
+        turn.queue.fail(failure)
       }
     }
     finally {
@@ -770,7 +795,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
   private completeClaudeProviderThreadTurns(entry: ActiveClaudeQuery, turn: ActiveClaudeTurn): void {
     for (const providerThreadTurn of entry.providerThreadTurns.values()) {
       const chunks: UIMessageChunk[] = [
-        { type: 'finish', finishReason: 'stop' },
+        providerChunk.finish('stop'),
       ]
       this.publishClaudeProviderThreadEvent(turn, providerThreadTurn, chunks)
       this.emitClaudeProviderThreadParentOutput(entry, turn, providerThreadTurn.providerThreadId, chunks)
@@ -911,7 +936,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
 
     await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, [
-      { type: 'finish', finishReason: 'stop' },
+      providerChunk.finish('stop'),
     ])
     entry.syntheticTurn = null
   }
@@ -1986,9 +2011,9 @@ function projectClaudeSubagentToolResultPart(
 function hasClaudeSubagentToolResult(message: ClaudeSubagentSessionMessage): boolean {
   const payload = readClaudeTranscriptPayload(message)
   return Boolean(
-    payload &&
-    Array.isArray(payload.content) &&
-    payload.content.some(block => block.type === 'tool_result' && Boolean(block.tool_use_id)),
+    payload
+    && Array.isArray(payload.content)
+    && payload.content.some(block => block.type === 'tool_result' && Boolean(block.tool_use_id)),
   )
 }
 

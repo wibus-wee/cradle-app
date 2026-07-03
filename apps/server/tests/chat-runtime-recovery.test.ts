@@ -17,11 +17,9 @@ import { db, shutdownInfra } from '../src/infra'
 import {
   recoverChatRuntimeSession,
   recoverChatRuntimeProjections
-} from '../src/modules/chat-runtime/es/commands'
-import {
-  getMessageGroups,
-  recoverPersistedRunProjections
-} from '../src/modules/chat-runtime/service'
+} from '../src/modules/chat-runtime/es/recovery'
+import { getMessageGroups } from '../src/modules/chat-runtime/history-api'
+import { recoverPersistedRunProjections } from '../src/modules/chat-runtime/runtime'
 
 const INTERRUPTED_RUN_ERROR_TEXT =
   'Response interrupted because the Cradle server process exited while the run was streaming.'
@@ -435,7 +433,9 @@ describe('chat runtime recovery', () => {
         terminalProjectionDriftsRepaired: 0
       })
       expect(countSessionEvents('session-terminal-drift')).toBe(eventsBefore)
-      expect(db().select().from(messages).where(eq(messages.id, 'message-terminal-drift')).get()).toEqual(
+      expect(
+        db().select().from(messages).where(eq(messages.id, 'message-terminal-drift')).get()
+      ).toEqual(
         expect.objectContaining({
           status: 'failed',
           content: 'failed response',

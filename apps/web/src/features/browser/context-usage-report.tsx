@@ -4,10 +4,10 @@ import { m } from 'motion/react'
 import { useState } from 'react'
 
 import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
+import { Button } from '~/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '~/components/ui/collapsible'
 import { cn } from '~/lib/cn'
 import { clampPercent, formatTokenCount } from '~/lib/number-format'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 import type { ChatRuntimeContextUsage, ChatRuntimeContextUsageItem, ChatRuntimeContextUsageSection } from '../chat/capabilities/chat-capabilities'
 import {
@@ -109,9 +109,6 @@ export function ContextUsageReport({
   sessionTitle,
 }: ContextUsageReportProps) {
   const [expandedSectionKinds, setExpandedSectionKinds] = useState<Set<string>>(() => new Set())
-  const layoutSessionTitle = useSessionLayoutStore(
-    state => state.sessions[sessionId]?.sessionTitle ?? null,
-  )
   const { data: session } = useQuery({
     ...getSessionsByIdOptions({ path: { id: sessionId } }),
     staleTime: 30_000,
@@ -124,7 +121,7 @@ export function ContextUsageReport({
     retry: false,
   })
 
-  const resolvedSessionTitle = session?.title || layoutSessionTitle || sessionTitle
+  const resolvedSessionTitle = session?.title || sessionTitle
   const usage = data?.usage ?? null
   const aggregate = readContextAggregate(usage)
   const sections = readContextSections(usage)
@@ -243,16 +240,18 @@ export function ContextUsageReport({
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-[13px] font-medium text-foreground">Composition</h2>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={toggleAll}
-                className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-text-secondary transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="h-6 shrink-0 gap-1 rounded-md px-1.5 text-[11px] text-text-secondary hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 {expandedAll
                   ? <ChevronRightIcon className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
                   : <ChevronDownIcon className="size-3.5" strokeWidth={1.7} aria-hidden="true" />}
                 <span>{expandedAll ? 'Collapse all' : 'Expand all'}</span>
-              </button>
+              </Button>
             </div>
 
             <SegmentedUsageBar
@@ -478,10 +477,11 @@ function ContextSectionRow({
   return (
     <Collapsible open={open} onOpenChange={hasItems ? onToggle : undefined}>
       <CollapsibleTrigger asChild disabled={!hasItems}>
-        <button
+        <Button
           type="button"
+          variant="ghost"
           className={cn(
-            'grid min-h-10 w-full grid-cols-[16px_minmax(0,1fr)_86px_48px] items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+            'grid h-auto min-h-10 w-full grid-cols-[16px_minmax(0,1fr)_86px_48px] items-center justify-normal gap-2 rounded-md px-1.5 py-1.5 text-left font-normal hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50',
             !hasItems && 'cursor-default hover:bg-transparent',
           )}
         >
@@ -509,7 +509,7 @@ function ContextSectionRow({
           <span className="text-right text-[12px] tabular-nums text-text-tertiary">
             {formatSectionShare(section, shareTotal)}
           </span>
-        </button>
+        </Button>
       </CollapsibleTrigger>
 
       <CollapsibleContent>
@@ -539,10 +539,11 @@ function ContextItemRow({
 
   return (
     <div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         className={cn(
-          'grid min-h-8 w-full grid-cols-[14px_minmax(0,1fr)_72px] items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+          'grid h-auto min-h-8 w-full grid-cols-[14px_minmax(0,1fr)_72px] items-center justify-normal gap-2 rounded-md px-1.5 py-1 text-left font-normal hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50',
           !hasMetadata && 'cursor-default hover:bg-transparent',
         )}
         onClick={() => hasMetadata && setExpanded(current => !current)}
@@ -558,7 +559,7 @@ function ContextItemRow({
         <span className="text-right text-[11px] tabular-nums text-text-secondary">
           {formatApproxTokenCount(item.tokenCount)}
         </span>
-      </button>
+      </Button>
 
       {expanded && hasMetadata && (
         <div className="overflow-hidden">

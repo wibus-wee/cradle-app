@@ -10,9 +10,6 @@ import {
 import type { GetSessionsByIdResponse, GetSessionsData, GetSessionsResponse } from '~/api-gen/types.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
-import { useSessionLayoutStore } from '~/store/session-layout'
-
-const SESSION_LIST_REFRESH_INTERVAL_MS = 5_000
 
 let unreadSessionIdsSnapshot: string[] = []
 
@@ -164,6 +161,7 @@ function createSessionListRow(
   patch: SessionListOptimisticPatch,
   updatedAt: number,
   latestUserMessageAt: number | null,
+  fallbackStatus: SessionListResponseRow['status'],
 ): GetSessionsResponse[number] {
   return {
     workspaceId: null,
@@ -184,7 +182,7 @@ function createSessionListRow(
     id: patch.id,
     updatedAt,
     latestUserMessageAt,
-    status: patch.status ?? existing?.status ?? 'streaming',
+    status: patch.status ?? existing?.status ?? fallbackStatus,
   } as GetSessionsResponse[number]
 }
 
@@ -217,7 +215,8 @@ export function updateSessionInSessionLists(
       const updatedAt = patch.updatedAt ?? optimisticUpdatedAt ?? existing?.updatedAt ?? now
       const latestUserMessageAt
         = patch.latestUserMessageAt ?? optimisticLatestUserMessageAt ?? (existing as SessionListResponseRow | null)?.latestUserMessageAt ?? null
-      const row = createSessionListRow(existing, patch, updatedAt, latestUserMessageAt)
+      const fallbackStatus = options.promote ? 'streaming' : 'idle'
+      const row = createSessionListRow(existing, patch, updatedAt, latestUserMessageAt, fallbackStatus)
 
       if (existing && !options.promote) {
         if (sessionListRowsEqual(existing, row as SessionListResponseRow)) {
@@ -292,15 +291,6 @@ function asWorkspaceSessions(sessions: GetSessionsResponse): WorkspaceSession[] 
   return sessions.map(asWorkspaceSession)
 }
 
-function asSessionLayoutRecords(sessions: WorkspaceSession[]) {
-  return sessions.map(session => ({
-    sessionId: session.id,
-    sessionTitle: session.title,
-    workspaceId: session.workspaceId,
-    runtimeKind: session.runtimeKind,
-  }))
-}
-
 function updateUnreadSessionIdsSnapshot(sessions: WorkspaceSession[]) {
   unreadSessionIdsSnapshot = sessions.filter(session => session.unread).map(session => session.id)
 }
@@ -317,7 +307,7 @@ export function useUnreadSessionIds(): Set<string> {
   const queryOptions = sessionListOptions()
   const { data: unreadSessionIds = [] } = useQuery({
     ...getSessionsOptions(queryOptions),
-    ...queryRefreshPolicy('active', { refetchInterval: SESSION_LIST_REFRESH_INTERVAL_MS }),
+    ...queryRefreshPolicy('active', { refetchInterval: false }),
     select: selectUnreadSessionIds,
   })
 
@@ -332,7 +322,7 @@ export function useRunningSessionIds(): Set<string> {
   const queryOptions = sessionListOptions()
   const { data: runningSessionIds = [] } = useQuery({
     ...getSessionsOptions(queryOptions),
-    ...queryRefreshPolicy('active', { refetchInterval: SESSION_LIST_REFRESH_INTERVAL_MS }),
+    ...queryRefreshPolicy('active', { refetchInterval: false }),
     select: selectRunningSessionIds,
   })
 
@@ -343,12 +333,11 @@ export function useAllSessions(archived?: boolean) {
   const queryOptions = sessionListOptions(null, archived)
   const { data: sessions = [], isPending: loading } = useQuery({
     ...getSessionsOptions(queryOptions),
-    ...queryRefreshPolicy('active', { refetchInterval: SESSION_LIST_REFRESH_INTERVAL_MS }),
+    ...queryRefreshPolicy('active', { refetchInterval: false }),
     select: asWorkspaceSessions,
   })
 
   useEffect(() => {
-    useSessionLayoutStore.getState().upsertSessions(asSessionLayoutRecords(sessions))
     if (archived !== true) {
       updateUnreadSessionIdsSnapshot(sessions)
     }
@@ -361,14 +350,10 @@ export function useWorkspaceSessions(workspaceId: string | null, archived?: bool
   const queryOptions = sessionListOptions(workspaceId, archived)
   const { data: rawSessions = [], isPending: loading } = useQuery({
     ...getSessionsOptions(queryOptions),
-    ...queryRefreshPolicy('active', { refetchInterval: SESSION_LIST_REFRESH_INTERVAL_MS }),
+    ...queryRefreshPolicy('active', { refetchInterval: false }),
     enabled: Boolean(workspaceId),
   })
   const sessions = useMemo(() => rawSessions.map(asWorkspaceSession), [rawSessions])
-
-  useEffect(() => {
-    useSessionLayoutStore.getState().upsertSessions(asSessionLayoutRecords(sessions))
-  }, [sessions])
 
   return { sessions, loading }
 }

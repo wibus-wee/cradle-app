@@ -20,6 +20,7 @@ import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import type { MutationActor, MutationActorKind } from '../../http/actor-context'
 import { db } from '../../infra'
+import { readRuntimeIssueActorLabel } from '../provider-contracts/runtime-compatibility'
 import * as Session from '../session/service'
 
 type StatusCategory = 'triage' | 'backlog' | 'unstarted' | 'started' | 'completed' | 'canceled'
@@ -1338,7 +1339,7 @@ function resolveIssueActor(actor: { kind: IssueActorKind, id: string | null }): 
       id: agent?.id ?? actor.id ?? null,
       displayName: agent?.name ?? 'Unknown agent',
       avatarUrl: agent?.avatarUrl ?? null,
-      label: agent?.runtimeKind === 'jar-core' ? 'AI' : 'Agent',
+      label: readRuntimeIssueActorLabel(agent?.runtimeKind),
     }
   }
 

@@ -77,6 +77,7 @@ describe('runtime capability validation', () => {
         supportsRuntimeSettings: false,
         supportsUiSlotStates: false,
         supportsDynamicCapabilities: false,
+        supportsTitleGeneration: false,
         sessionModelSwitch: 'in-session',
       },
       startChatSession: async input => ({
@@ -114,6 +115,7 @@ describe('runtime capability validation', () => {
       supportsRuntimeSettings: false,
       supportsUiSlotStates: false,
       supportsDynamicCapabilities: false,
+      supportsTitleGeneration: false,
       sessionModelSwitch: 'in-session',
     } satisfies ChatRuntimeCapabilities
     const runtime = {

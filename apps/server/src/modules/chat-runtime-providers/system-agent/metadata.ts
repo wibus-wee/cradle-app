@@ -8,6 +8,7 @@ import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,
 } from '../../chat-runtime/runtime-provider-types'
+import type { RuntimeDefaultActorDescriptor } from '../../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const SYSTEM_AGENT_RUNTIME_KIND: RuntimeKind = 'jar-core'
@@ -21,6 +22,12 @@ export const SYSTEM_AGENT_RUNTIME_METADATA = {
   sortOrder: 10,
 } satisfies ChatRuntimeMetadata
 
+export const SYSTEM_AGENT_RUNTIME_ACTOR = {
+  kind: 'system',
+  id: 'jarvis',
+  issueLabel: 'AI',
+} satisfies RuntimeDefaultActorDescriptor
+
 export const SYSTEM_AGENT_RUNTIME_CAPABILITIES = {
   supportsSteerTurn: false,
   supportsShellExecution: false,
@@ -28,5 +35,6 @@ export const SYSTEM_AGENT_RUNTIME_CAPABILITIES = {
   supportsRuntimeSettings: false,
   supportsUiSlotStates: false,
   supportsDynamicCapabilities: false,
+  supportsTitleGeneration: false,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities

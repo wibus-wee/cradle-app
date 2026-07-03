@@ -4,31 +4,33 @@
  * Position: Codex provider package owner for runtime UI slot projection.
  */
 
-import type {
-  RuntimeAlertUiSlotState,
-  RuntimeApprovalsUiSlotState,
-  RuntimeBackgroundTerminal,
-  RuntimeCompactUiSlotState,
-  RuntimeConfigUiSlotState,
-  RuntimeCrewAgentItem,
-  RuntimeCrewCallItem,
-  RuntimeCrewUiSlotState,
-  RuntimeDiffUiSlotState,
-  RuntimeFilesystemUiSlotState,
-  RuntimeMcpUiSlotState,
-  RuntimeModelUiSlotState,
-  RuntimePlanUiSlotState,
-  RuntimePluginUiSlotState,
-  RuntimeReasoningUiSlotState,
-  RuntimeSearchUiSlotState,
-  RuntimeSkillsUiSlotState,
-  RuntimeStatusUiSlotState,
-  RuntimeTerminalUiSlotState,
-  RuntimeToolActivityStatus,
-  RuntimeToolActivityUiSlotState,
-  RuntimeUiSlot,
-  RuntimeUiSlotState,
-  RuntimeUsageUiSlotState
+import {
+  RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_USAGE_COMMAND_ACTION_ID,
+  type RuntimeAlertUiSlotState,
+  type RuntimeApprovalsUiSlotState,
+  type RuntimeBackgroundTerminal,
+  type RuntimeCompactUiSlotState,
+  type RuntimeConfigUiSlotState,
+  type RuntimeCrewAgentItem,
+  type RuntimeCrewCallItem,
+  type RuntimeCrewUiSlotState,
+  type RuntimeDiffUiSlotState,
+  type RuntimeFilesystemUiSlotState,
+  type RuntimeMcpUiSlotState,
+  type RuntimeModelUiSlotState,
+  type RuntimePlanUiSlotState,
+  type RuntimePluginUiSlotState,
+  type RuntimeReasoningUiSlotState,
+  type RuntimeSearchUiSlotState,
+  type RuntimeSkillsUiSlotState,
+  type RuntimeStatusUiSlotState,
+  type RuntimeTerminalUiSlotState,
+  type RuntimeToolActivityStatus,
+  type RuntimeToolActivityUiSlotState,
+  type RuntimeUiSlot,
+  type RuntimeUiSlotState,
+  type RuntimeUsageUiSlotState,
 } from '../../../chat-runtime/runtime-provider-types'
 import type { CodexAppServerCapabilityManifest } from '../app-server/capabilities'
 import type { Thread } from '../app-server-protocol/v2/Thread'
@@ -261,6 +263,7 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     aliases: ['quick-question'],
     iconKey: 'quick-question',
     commandText: '/btw ',
+    requiresSession: true,
     surfaces: ['slashCommand', 'composerState']
   },
   {
@@ -296,6 +299,11 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     argumentHint: '',
     iconKey: 'usage',
     commandText: '/usage ',
+    commandAction: {
+      kind: 'uiAction',
+      actionId: RUNTIME_USAGE_COMMAND_ACTION_ID
+    },
+    requiresSession: true,
     surfaces: ['slashCommand', 'runtimePanel'],
     anyMethods: ['account/rateLimits/read'],
     anyNotifications: ['account/rateLimits/updated']
@@ -343,6 +351,10 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     aliases: ['code-review'],
     iconKey: 'code-review',
     commandText: '/review ',
+    commandAction: {
+      kind: 'uiAction',
+      actionId: RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID
+    },
     surfaces: ['slashCommand'],
     requiredMethods: ['review/start']
   },
@@ -367,6 +379,10 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     aliases: ['summarize'],
     iconKey: 'compact',
     commandText: '/compact ',
+    commandAction: {
+      kind: 'submitText',
+      requiresEmptyComposer: true
+    },
     surfaces: ['slashCommand', 'runtimePanel'],
     requiredMethods: ['thread/compact/start'],
     anyNotifications: ['thread/compacted']

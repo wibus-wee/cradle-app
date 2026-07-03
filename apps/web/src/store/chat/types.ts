@@ -32,11 +32,17 @@ export interface ChatActiveGoal {
   updatedAt: number
 }
 
-export interface SessionMeta {
-  passiveStatus: PublicStatus
-  locallyDriving: boolean
-  cancelling: boolean
-  localDriverMessageId?: string
+export type ChatRunState
+  = | { phase: 'idle', error: boolean }
+    | { phase: 'submitting', messageId: string }
+    | { phase: 'streaming', messageId: string, source: 'local' | 'passive' }
+    | { phase: 'settling', messageId: string | null, cancelling: boolean, error: boolean }
+
+export interface PassiveRunStateInput {
+  messageIds: string[]
+  status: PublicStatus
+  allowMissingMessage?: boolean
+  cancelling?: boolean
 }
 
 export interface AssistantDisplaySplit {
@@ -56,12 +62,10 @@ export interface MessageReconcileChange {
 export interface ChatState {
   messagesMap: Map<string, UIMessage[]>
   hydratedSessionIds: Set<string>
-  generatingMessageIds: Set<string>
-  passiveStreamingMessageIds: Set<string>
+  runStateMap: Map<string, ChatRunState>
   activeAbortControllers: Map<string, AbortController>
   runDisplayMetaMap: Map<string, ChatRunDisplayMeta>
   errorMap: Map<string, ChatError>
-  sessionMetaMap: Map<string, SessionMeta>
   activeGoalMap: Map<string, ChatActiveGoal>
   assistantDisplaySplitMap: Map<string, AssistantDisplaySplit>
 
@@ -77,9 +81,9 @@ export interface ChatState {
   finishGeneration: (messageId: string) => void
   failGeneration: (messageId: string, error: string) => void
   stopGeneration: (messageId: string, sessionId: string) => void
+  setRunCancelling: (sessionId: string, cancelling: boolean) => void
   moveStreamingMessage: (sessionId: string, fromMessageId: string, toMessageId: string) => void
-  setPassiveStreamingMessageIds: (sessionId: string, messageIds: string[]) => void
-  setPassiveStreamingMessage: (sessionId: string, messageId: string, streaming: boolean) => void
+  setPassiveRunState: (sessionId: string, input: PassiveRunStateInput) => void
   beginRunDisplayMeta: (messageId: string, requestStartedAtMs: number) => void
   setRunDisplayId: (messageId: string, runId: string) => void
   moveRunDisplayMeta: (fromMessageId: string, toMessageId: string) => void
@@ -87,9 +91,7 @@ export interface ChatState {
   markRunFirstContent: (messageId: string, timestampMs: number) => void
   projectStreamingMessageForDisplay: (sessionId: string, message: UIMessage) => UIMessage
 
-  // Session Meta
-  setSessionMeta: (sessionId: string, meta: Partial<SessionMeta>) => void
-  setPassiveStatus: (sessionId: string, status: PublicStatus) => void
+  // Session lifecycle
   setSessionHydrated: (sessionId: string, hydrated: boolean) => void
   setActiveGoal: (sessionId: string, input: {
     objective: string
@@ -108,4 +110,4 @@ export interface ChatState {
 // ── Constants ────────────────────────────────────────────────
 
 export const EMPTY_MESSAGES: UIMessage[] = []
-export const DEFAULT_SESSION_META: SessionMeta = { passiveStatus: 'idle', locallyDriving: false, cancelling: false }
+export const DEFAULT_CHAT_RUN_STATE: ChatRunState = { phase: 'idle', error: false }

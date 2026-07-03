@@ -19,18 +19,18 @@ import {
 import { MarkdownEditor } from '~/components/editor/markdown-editor'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
+import { runtimeComposerUsesCollapsedInput } from '~/features/agent-runtime/use-runtime-catalog'
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
 import { DraftChatComposer } from '~/features/chat/composer/draft-chat-composer'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
-import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getWorkspaceLocationLabel } from '~/features/workspace/types'
 import { sessionsQueryKey, updateSessionInSessionLists } from '~/features/workspace/use-session'
 import { WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 import { openChatSession } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
-import { useSessionLayoutStore } from '~/store/session-layout'
 
 import { useWorkspaceFile } from './use-workspace-file'
 
@@ -433,20 +433,6 @@ function useWorkspaceDetailOwner(workspaceId: string) {
     ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId } }),
     enabled: !!workspaceId,
   })
-  const workspaceLocalPath = getLocalWorkspacePath(workspace)
-
-  useEffect(() => {
-    if (!workspace) {
-      return
-    }
-
-    useSessionLayoutStore.getState().upsertWorkspace({
-      workspaceId: workspace.id,
-      workspaceName: workspace.name,
-      workspacePath: workspaceLocalPath,
-    })
-  }, [workspace, workspaceLocalPath])
-
   const agents = useWorkspaceFile(workspaceId, 'AGENTS.md')
   const { data: workflowRule } = useQuery({
     ...getWorkflowRulesByWorkspaceIdOptions({
@@ -513,7 +499,7 @@ function useWorkspaceDetailOwner(workspaceId: string) {
     if (!workspace) {
       return false
     }
-    if (opts.runtimeKind === 'cli-tui') {
+    if (runtimeComposerUsesCollapsedInput(opts.runtimeComposer)) {
       if (!opts.agentId) {
         return false
       }
@@ -529,19 +515,12 @@ function useWorkspaceDetailOwner(workspaceId: string) {
       if (!session?.id) {
         return false
       }
-      useSessionLayoutStore.getState().upsertSession({
-        sessionId: session.id,
-        sessionTitle,
-        workspaceId,
-        workspacePath: workspaceLocalPath,
-        runtimeKind: 'cli-tui',
-      })
       updateSessionInSessionLists(queryClient, {
         id: session.id,
         title: sessionTitle,
         workspaceId,
         agentId: opts.agentId,
-        runtimeKind: 'cli-tui',
+        runtimeKind: opts.runtimeKind,
       }, { promote: true })
       await openCreatedWorkspaceSession(session.id, target)
       return true
@@ -563,13 +542,6 @@ function useWorkspaceDetailOwner(workspaceId: string) {
     if (!session?.id) {
       return false
     }
-    useSessionLayoutStore.getState().upsertSession({
-      sessionId: session.id,
-      sessionTitle,
-      workspaceId,
-      workspacePath: workspaceLocalPath,
-      runtimeKind: opts.runtimeKind,
-    })
     updateSessionInSessionLists(queryClient, {
       id: session.id,
       title: sessionTitle,
@@ -582,7 +554,6 @@ function useWorkspaceDetailOwner(workspaceId: string) {
 
     startOptimisticChatResponse({
       sessionId: session.id,
-      runtimeKind: opts.runtimeKind,
       queryClient,
       body: {
         text,

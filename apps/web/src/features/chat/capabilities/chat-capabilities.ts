@@ -1,21 +1,26 @@
+import {
+  getChatDraftRuntimeCapabilities,
+  getChatSessionsBySessionIdBackgroundTerminals,
+  getChatSessionsBySessionIdCapabilities,
+  getChatSessionsBySessionIdContextUsage,
+  getChatSessionsBySessionIdUiSlotStates,
+  postChatSessionsBySessionIdBackgroundTerminalsByProcessIdTerminate,
+} from '~/api-gen/sdk.gen'
 import type { GetChatSessionsBySessionIdContextUsageResponse } from '~/api-gen/types.gen'
-import { getServerUrl } from '~/lib/electron'
-
-const SERVER_BASE = getServerUrl()
 
 export function runtimeCapabilitiesQueryKey(sessionId: string | null): readonly unknown[] {
   return ['chat', 'runtime-capabilities', sessionId ?? 'no-session']
 }
 
 export function draftRuntimeCapabilitiesQueryKey(
-  runtimeKind: string | null | undefined
+  runtimeKind: string | null | undefined,
 ): readonly unknown[] {
   return ['chat', 'draft-runtime-capabilities', runtimeKind ?? 'no-runtime']
 }
 
 export function runtimeUiSlotStatesQueryKey(
   sessionId: string | null,
-  runtimeKind?: string | null
+  runtimeKind?: string | null,
 ): readonly unknown[] {
   const key = ['chat', 'runtime-ui-slot-states', sessionId ?? 'no-session'] as const
   return runtimeKind ? [...key, runtimeKind] : key
@@ -28,44 +33,49 @@ export interface ChatSlashCommand {
   aliases?: string[]
 }
 
-export type ChatRuntimeUiSlotSurface =
-  | 'slashCommand'
-  | 'toolbarPicker'
-  | 'composerState'
-  | 'messageInline'
-  | 'runtimePanel'
+export type ChatRuntimeUiSlotSurface
+  = | 'slashCommand'
+    | 'toolbarPicker'
+    | 'composerState'
+    | 'messageInline'
+    | 'runtimePanel'
   // Stream evidence is rendered from provider-emitted message/tool chunks, not from polled slot state.
-  | 'streamEvidence'
-  | 'recordOnly'
+    | 'streamEvidence'
+    | 'recordOnly'
 
-export type ChatRuntimeUiSlotIconKey =
-  | 'alert'
-  | 'approvals'
-  | 'code-review'
-  | 'compact'
-  | 'config'
-  | 'crew'
-  | 'diff'
-  | 'feedback'
-  | 'filesystem'
-  | 'goal'
-  | 'ide-context'
-  | 'mcp'
-  | 'model'
-  | 'personality'
-  | 'plugin'
-  | 'plan'
-  | 'progress'
-  | 'quick-question'
-  | 'user-input'
-  | 'reasoning'
-  | 'search'
-  | 'side-chat'
-  | 'skills'
-  | 'status'
-  | 'terminal'
-  | 'tool-activity'
-  | 'usage'
+export type ChatRuntimeUiSlotIconKey
+  = | 'alert'
+    | 'approvals'
+    | 'code-review'
+    | 'compact'
+    | 'config'
+    | 'crew'
+    | 'diff'
+    | 'feedback'
+    | 'filesystem'
+    | 'goal'
+    | 'ide-context'
+    | 'mcp'
+    | 'model'
+    | 'personality'
+    | 'plugin'
+    | 'plan'
+    | 'progress'
+    | 'quick-question'
+    | 'user-input'
+    | 'reasoning'
+    | 'search'
+    | 'side-chat'
+    | 'skills'
+    | 'status'
+    | 'terminal'
+    | 'tool-activity'
+    | 'usage'
+
+export type ChatRuntimeUiSlotCommandAction =
+  | { kind: 'insertText' }
+  | { kind: 'submitText'; requiresEmptyComposer?: boolean }
+  | { kind: 'uiAction'; actionId: string }
 
 export interface ChatRuntimeUiSlot {
   id: string
@@ -76,6 +86,8 @@ export interface ChatRuntimeUiSlot {
   aliases?: string[]
   iconKey?: ChatRuntimeUiSlotIconKey
   commandText?: string
+  commandAction?: ChatRuntimeUiSlotCommandAction
+  requiresSession?: boolean
   surfaces: ChatRuntimeUiSlotSurface[]
 }
 
@@ -86,24 +98,24 @@ export interface ChatRuntimeCapabilities {
   skills: string[]
 }
 
-export type ChatRuntimeGoalStatus =
-  | 'active'
-  | 'paused'
-  | 'blocked'
-  | 'usageLimited'
-  | 'budgetLimited'
-  | 'complete'
+export type ChatRuntimeGoalStatus
+  = | 'active'
+    | 'paused'
+    | 'blocked'
+    | 'usageLimited'
+    | 'budgetLimited'
+    | 'complete'
 export type ChatRuntimeCompactStatus = 'idle' | 'running' | 'nearLimit' | 'overLimit' | 'compacted'
 export type ChatRuntimeThreadStatus = 'notLoaded' | 'idle' | 'systemError' | 'active'
 export type ChatRuntimePlanStepStatus = 'pending' | 'inProgress' | 'completed'
 export type ChatRuntimeToolActivityStatus = 'running' | 'completed' | 'failed'
 export type ChatRuntimeMcpServerStatus = 'starting' | 'ready' | 'failed' | 'cancelled' | 'unknown'
-export type ChatRuntimeMcpAuthStatus =
-  | 'unsupported'
-  | 'notLoggedIn'
-  | 'bearerToken'
-  | 'oAuth'
-  | 'unknown'
+export type ChatRuntimeMcpAuthStatus
+  = | 'unsupported'
+    | 'notLoggedIn'
+    | 'bearerToken'
+    | 'oAuth'
+    | 'unknown'
 export type ChatRuntimeApprovalStatus = 'pending' | 'approved' | 'denied' | 'timedOut' | 'aborted'
 export type ChatRuntimeAlertSeverity = 'info' | 'warning' | 'error'
 
@@ -175,7 +187,7 @@ export interface ChatRuntimeReasoningUiSlotState {
   threadId: string
   effort: string | null
   summary: string | null
-  supportedEfforts: Array<{ id: string; description: string }>
+  supportedEfforts: Array<{ id: string, description: string }>
   updatedAt: number
 }
 
@@ -468,7 +480,7 @@ export interface ChatRuntimeUserInputQuestion {
   isOther: boolean
   isSecret: boolean
   multiSelect: boolean
-  options: Array<{ label: string; description: string }> | null
+  options: Array<{ label: string, description: string }> | null
 }
 
 export interface ChatRuntimeUserInputUiSlotState {
@@ -485,28 +497,28 @@ export interface ChatRuntimeUserInputUiSlotState {
   updatedAt: number
 }
 
-export type ChatRuntimeUiSlotState =
-  | ChatRuntimeAlertUiSlotState
-  | ChatRuntimeApprovalsUiSlotState
-  | ChatRuntimeCompactUiSlotState
-  | ChatRuntimeConfigUiSlotState
-  | ChatRuntimeCrewUiSlotState
-  | ChatRuntimeDiffUiSlotState
-  | ChatRuntimeFilesystemUiSlotState
-  | ChatRuntimeGoalUiSlotState
-  | ChatRuntimeMcpUiSlotState
-  | ChatRuntimeModelUiSlotState
-  | ChatRuntimePlanUiSlotState
-  | ChatRuntimeProgressUiSlotState
-  | ChatRuntimePluginUiSlotState
-  | ChatRuntimeReasoningUiSlotState
-  | ChatRuntimeSearchUiSlotState
-  | ChatRuntimeSkillsUiSlotState
-  | ChatRuntimeStatusUiSlotState
-  | ChatRuntimeTerminalUiSlotState
-  | ChatRuntimeToolActivityUiSlotState
-  | ChatRuntimeUsageUiSlotState
-  | ChatRuntimeUserInputUiSlotState
+export type ChatRuntimeUiSlotState
+  = | ChatRuntimeAlertUiSlotState
+    | ChatRuntimeApprovalsUiSlotState
+    | ChatRuntimeCompactUiSlotState
+    | ChatRuntimeConfigUiSlotState
+    | ChatRuntimeCrewUiSlotState
+    | ChatRuntimeDiffUiSlotState
+    | ChatRuntimeFilesystemUiSlotState
+    | ChatRuntimeGoalUiSlotState
+    | ChatRuntimeMcpUiSlotState
+    | ChatRuntimeModelUiSlotState
+    | ChatRuntimePlanUiSlotState
+    | ChatRuntimeProgressUiSlotState
+    | ChatRuntimePluginUiSlotState
+    | ChatRuntimeReasoningUiSlotState
+    | ChatRuntimeSearchUiSlotState
+    | ChatRuntimeSkillsUiSlotState
+    | ChatRuntimeStatusUiSlotState
+    | ChatRuntimeTerminalUiSlotState
+    | ChatRuntimeToolActivityUiSlotState
+    | ChatRuntimeUsageUiSlotState
+    | ChatRuntimeUserInputUiSlotState
 
 export interface ChatRuntimeUiSlotStatesResponse {
   runtimeKind: string
@@ -532,91 +544,89 @@ export type ChatRuntimeContextUsage = NonNullable<ChatRuntimeContextUsageRespons
 export type ChatRuntimeContextUsageSection = ChatRuntimeContextUsage['sections'][number]
 export type ChatRuntimeContextUsageItem = ChatRuntimeContextUsageSection['items'][number]
 
+function readChatCapabilityData<T>(
+  result: { data?: T, error?: unknown, response?: Response },
+  errorPrefix: string,
+): T {
+  if (result.error || result.data === undefined) {
+    throw new Error(`${errorPrefix}: ${result.response?.status ?? 'unknown'} ${stringifyChatCapabilityError(result.error)}`)
+  }
+  return result.data
+}
+
+function stringifyChatCapabilityError(error: unknown): string {
+  if (typeof error === 'string') {
+    return error
+  }
+  try {
+    return JSON.stringify(error)
+  }
+  catch {
+    return String(error)
+  }
+}
+
 export async function getChatRuntimeCapabilities(
   sessionId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ChatRuntimeCapabilities> {
-  const res = await fetch(
-    `${SERVER_BASE}/chat/sessions/${encodeURIComponent(sessionId)}/capabilities`,
-    { signal }
-  )
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to load chat capabilities: ${res.status} ${body}`)
-  }
-  return (await res.json()) as ChatRuntimeCapabilities
+  const result = await getChatSessionsBySessionIdCapabilities({
+    path: { sessionId },
+    signal,
+  })
+  return readChatCapabilityData(result, 'Failed to load chat capabilities') as ChatRuntimeCapabilities
 }
 
 export async function getDraftChatRuntimeCapabilities(
   runtimeKind: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ChatRuntimeCapabilities> {
-  const url = new URL(`${SERVER_BASE}/chat/draft-runtime-capabilities`)
-  url.searchParams.set('runtimeKind', runtimeKind)
-  const res = await fetch(url, { signal })
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to load draft chat capabilities: ${res.status} ${body}`)
-  }
-  return (await res.json()) as ChatRuntimeCapabilities
+  const result = await getChatDraftRuntimeCapabilities({
+    query: { runtimeKind },
+    signal,
+  })
+  return readChatCapabilityData(result, 'Failed to load draft chat capabilities') as ChatRuntimeCapabilities
 }
 
 export async function getChatRuntimeUiSlotStates(
   sessionId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ChatRuntimeUiSlotStatesResponse> {
-  const res = await fetch(
-    `${SERVER_BASE}/chat/sessions/${encodeURIComponent(sessionId)}/ui-slot-states`,
-    { signal }
-  )
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to load chat UI slot states: ${res.status} ${body}`)
-  }
-  return (await res.json()) as ChatRuntimeUiSlotStatesResponse
+  const result = await getChatSessionsBySessionIdUiSlotStates({
+    path: { sessionId },
+    signal,
+  })
+  return readChatCapabilityData(result, 'Failed to load chat UI slot states') as ChatRuntimeUiSlotStatesResponse
 }
 
 export async function getChatRuntimeBackgroundTerminals(
   sessionId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ChatRuntimeBackgroundTerminalsResponse> {
-  const res = await fetch(
-    `${SERVER_BASE}/chat/sessions/${encodeURIComponent(sessionId)}/background-terminals`,
-    { signal }
-  )
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to load background terminals: ${res.status} ${body}`)
-  }
-  return (await res.json()) as ChatRuntimeBackgroundTerminalsResponse
+  const result = await getChatSessionsBySessionIdBackgroundTerminals({
+    path: { sessionId },
+    signal,
+  })
+  return readChatCapabilityData(result, 'Failed to load background terminals') as ChatRuntimeBackgroundTerminalsResponse
 }
 
 export async function terminateChatRuntimeBackgroundTerminal(
   sessionId: string,
-  processId: string
+  processId: string,
 ): Promise<ChatRuntimeBackgroundTerminalTerminateResponse> {
-  const res = await fetch(
-    `${SERVER_BASE}/chat/sessions/${encodeURIComponent(sessionId)}/background-terminals/${encodeURIComponent(processId)}/terminate`,
-    { method: 'POST' }
-  )
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to terminate background terminal: ${res.status} ${body}`)
-  }
-  return (await res.json()) as ChatRuntimeBackgroundTerminalTerminateResponse
+  const result = await postChatSessionsBySessionIdBackgroundTerminalsByProcessIdTerminate({
+    path: { sessionId, processId },
+  })
+  return readChatCapabilityData(result, 'Failed to terminate background terminal') as ChatRuntimeBackgroundTerminalTerminateResponse
 }
 
 export async function getChatRuntimeContextUsage(
   sessionId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ChatRuntimeContextUsageResponse> {
-  const res = await fetch(
-    `${SERVER_BASE}/chat/sessions/${encodeURIComponent(sessionId)}/context-usage`,
-    { signal }
-  )
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`Failed to load chat context usage: ${res.status} ${body}`)
-  }
-  return (await res.json()) as ChatRuntimeContextUsageResponse
+  const result = await getChatSessionsBySessionIdContextUsage({
+    path: { sessionId },
+    signal,
+  })
+  return readChatCapabilityData(result, 'Failed to load chat context usage')
 }

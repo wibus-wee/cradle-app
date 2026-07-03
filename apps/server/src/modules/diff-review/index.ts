@@ -1,5 +1,4 @@
-import { Elysia } from 'elysia'
-import { t } from 'elysia'
+import { Elysia, t } from 'elysia'
 
 import { DiffReviewModel } from './model'
 import * as DiffReview from './service'
@@ -269,7 +268,7 @@ export const diffReview = new Elysia({
   .post('/:workspaceId/diff-reviews/:reviewId/guide/generate', async ({ params, body }) => {
     const input = body as {
       providerTargetId: string
-      runtimeKind?: 'codex' | 'claude-agent'
+      runtimeKind?: string
       modelId?: string | null
       force?: boolean
     }

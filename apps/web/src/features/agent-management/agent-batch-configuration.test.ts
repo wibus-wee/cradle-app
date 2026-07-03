@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 import type { Agent } from '~/features/agent-runtime/use-agents'
 
 import { buildAgentProviderBatchPatches } from './agent-batch-configuration'
@@ -23,6 +24,48 @@ function createAgent(overrides: Partial<Agent>): Agent {
   }
 }
 
+function createRuntimeCatalogItem(overrides: Partial<RuntimeCatalogItem> & { runtimeKind: string }): RuntimeCatalogItem {
+  return {
+    runtimeKind: overrides.runtimeKind,
+    label: overrides.label ?? overrides.runtimeKind,
+    description: overrides.description,
+    providerKinds: overrides.providerKinds ?? [],
+    providerBinding: overrides.providerBinding,
+    sessionLaunchMode: overrides.sessionLaunchMode ?? 'runtime-provider',
+    iconKey: overrides.iconKey,
+    surfaces: overrides.surfaces ?? ['chat'],
+    sortOrder: overrides.sortOrder,
+    stability: overrides.stability,
+    availability: overrides.availability ?? 'stable',
+    degradations: overrides.degradations,
+    icon: overrides.icon ?? { key: overrides.iconKey ?? 'custom' },
+    composer: overrides.composer ?? {
+      inputMode: 'rich',
+      modelSelection: 'provider-model',
+      thinking: 'per-model',
+    },
+    slots: overrides.slots ?? [],
+    settingsSchema: overrides.settingsSchema,
+    source: overrides.source ?? 'builtin',
+    pluginOwner: overrides.pluginOwner ?? null,
+    capabilities: overrides.capabilities ?? null,
+  }
+}
+
+const RUNTIME_CATALOG = [
+  createRuntimeCatalogItem({ runtimeKind: 'standard' }),
+  createRuntimeCatalogItem({ runtimeKind: 'claude-agent' }),
+  createRuntimeCatalogItem({
+    runtimeKind: 'terminal-runtime',
+    sessionLaunchMode: 'agent-terminal',
+    composer: {
+      inputMode: 'collapsed',
+      modelSelection: 'none',
+      thinking: 'unsupported',
+    },
+  }),
+]
+
 describe('buildAgentProviderBatchPatches', () => {
   it('updates provider fields while preserving agent identity and runtime config', () => {
     const result = buildAgentProviderBatchPatches(
@@ -41,10 +84,11 @@ describe('buildAgentProviderBatchPatches', () => {
         modelId: 'model-new',
         thinkingEffort: 'high',
       },
+      RUNTIME_CATALOG,
     )
 
     expect(result).toEqual({
-      skippedCliTuiCount: 0,
+      skippedRuntimeOwnedCount: 0,
       patches: [
         {
           id: 'agent-a',
@@ -65,13 +109,13 @@ describe('buildAgentProviderBatchPatches', () => {
     })
   })
 
-  it('skips CLI TUI agents because they are not provider-backed', () => {
+  it('skips runtime-owned agents because they are not provider-backed', () => {
     const result = buildAgentProviderBatchPatches(
       [
         createAgent({ id: 'provider-agent', runtimeKind: 'standard' }),
         createAgent({
           id: 'terminal-agent',
-          runtimeKind: 'cli-tui',
+          runtimeKind: 'terminal-runtime',
           providerTargetId: null,
           modelId: null,
         }),
@@ -81,9 +125,10 @@ describe('buildAgentProviderBatchPatches', () => {
         modelId: 'model-new',
         thinkingEffort: 'high',
       },
+      RUNTIME_CATALOG,
     )
 
-    expect(result.skippedCliTuiCount).toBe(1)
+    expect(result.skippedRuntimeOwnedCount).toBe(1)
     expect(result.patches).toHaveLength(1)
     expect(result.patches[0]?.id).toBe('provider-agent')
   })
@@ -97,6 +142,7 @@ describe('buildAgentProviderBatchPatches', () => {
           modelId: null,
           thinkingEffort: 'high',
         },
+        RUNTIME_CATALOG,
       )).toThrow('resolved model')
   })
 
@@ -108,6 +154,7 @@ describe('buildAgentProviderBatchPatches', () => {
         modelId: 'model-new',
         thinkingEffort: 'medium',
       },
+      RUNTIME_CATALOG,
     )
 
     expect(result.patches[0]?.patch).toEqual(expect.objectContaining({

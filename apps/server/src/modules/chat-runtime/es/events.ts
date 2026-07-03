@@ -20,6 +20,8 @@ export type ChatSessionEventType =
   | 'RunStarted'
   | 'AssistantMessageCompleted'
   | TerminalRunEventType
+  | 'InteractionRequested'
+  | 'InteractionResolved'
   | 'QueueItemEnqueued'
   | 'QueueItemClaimed'
   | 'QueueItemReleased'
@@ -141,11 +143,37 @@ export interface TitleChangedPayload {
   updatedAt: number
 }
 
+export interface InteractionRequestedPayload {
+  sessionId: string
+  runId: string
+  requestId: string
+  interactionKind: 'toolApproval' | 'userInput'
+  providerKind: string
+  runtimeKind: string
+  providerMethod: string
+  toolCallId: string
+  questionCount: number | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface InteractionResolvedPayload {
+  sessionId: string
+  runId: string
+  requestId: string
+  interactionKind: 'toolApproval' | 'userInput'
+  resolution: 'submitted' | 'cancelled'
+  approved: boolean | null
+  updatedAt: number
+}
+
 export type ChatSessionEvent =
   | { type: 'UserMessageAppended'; payload: UserMessageAppendedPayload }
   | { type: 'RunStarted'; payload: RunStartedPayload }
   | { type: 'AssistantMessageCompleted'; payload: AssistantMessageCompletedPayload }
   | { type: TerminalRunEventType; payload: RunTerminalPayload }
+  | { type: 'InteractionRequested'; payload: InteractionRequestedPayload }
+  | { type: 'InteractionResolved'; payload: InteractionResolvedPayload }
   | { type: 'QueueItemEnqueued'; payload: QueueItemEnqueuedPayload }
   | { type: 'QueueItemClaimed'; payload: QueueItemClaimedPayload }
   | { type: 'QueueItemReleased'; payload: QueueItemReleasedPayload }

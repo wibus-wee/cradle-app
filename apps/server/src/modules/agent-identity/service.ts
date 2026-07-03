@@ -17,6 +17,10 @@ import {
   refreshDirectExternalProviderSource,
   refreshExternalProviderSource,
 } from '../external-provider-sources/service'
+import {
+  runtimeOwnsProviderBinding,
+  runtimeUsesAgentTerminalLaunch,
+} from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
 import {
   assertProviderTargetCompatibleWithRuntime,
@@ -153,11 +157,11 @@ const CreateAgentInputSchema = z
     configJson: AgentRuntimeConfigJsonSchema.default(DefaultAgentRuntimeConfig),
   })
   .superRefine((input, ctx) => {
-    if (input.runtimeKind === 'cli-tui') {
+    if (runtimeUsesAgentTerminalLaunch(input.runtimeKind)) {
       if (input.providerTargetId) {
         ctx.addIssue({
           code: 'custom',
-          message: 'CLI TUI agents must not reference a provider target',
+          message: 'Agent terminal runtimes must not reference a provider target',
           path: ['providerTargetId'],
         })
         return
@@ -166,7 +170,7 @@ const CreateAgentInputSchema = z
       if (!input.configJson.cliTui) {
         ctx.addIssue({
           code: 'custom',
-          message: 'CLI TUI agents require launch configuration',
+          message: 'Agent terminal runtimes require launch configuration',
           path: ['configJson'],
         })
       }
@@ -174,11 +178,13 @@ const CreateAgentInputSchema = z
     }
 
     if (!input.providerTargetId) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Provider-backed agents require a provider target',
-        path: ['providerTargetId'],
-      })
+      if (!runtimeOwnsProviderBinding(input.runtimeKind)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Provider-backed agents require a provider target',
+          path: ['providerTargetId'],
+        })
+      }
       return
     }
 
@@ -198,7 +204,7 @@ const CreateAgentInputSchema = z
       ...input,
       configJson: JSON.stringify(input.configJson),
     }
-    return input.runtimeKind === 'cli-tui'
+    return runtimeUsesAgentTerminalLaunch(input.runtimeKind)
       ? {
           ...parsed,
           providerTargetId: null,
@@ -210,11 +216,11 @@ const CreateAgentInputSchema = z
 
 type ParsedAgentInput = z.infer<typeof CreateAgentInputSchema>
 
-function canRunProviderBackedAgent(input: {
+function canRunAgent(input: {
   runtimeKind: ParsedAgentInput['runtimeKind']
   providerTargetId: string | null
 }): boolean {
-  if (input.runtimeKind === 'cli-tui') {
+  if (runtimeUsesAgentTerminalLaunch(input.runtimeKind) || runtimeOwnsProviderBinding(input.runtimeKind)) {
     return true
   }
   if (!input.providerTargetId) {
@@ -228,7 +234,7 @@ function normalizeAgentEnabled(input: {
   runtimeKind: ParsedAgentInput['runtimeKind']
   providerTargetId: string | null
 }): boolean {
-  return input.requestedEnabled && canRunProviderBackedAgent(input)
+  return input.requestedEnabled && canRunAgent(input)
 }
 
 export function list(filters: AgentListFilters = {}): Agent[] {
@@ -335,14 +341,14 @@ function agentNameForLocalApp(app: ImportedAgentResult['app']): string {
 }
 
 function agentNameForLocalImport(app: ImportedAgentResult['app'], runtimeKind: ImportedAgentResult['runtimeKind']): string {
-  if (runtimeKind === 'cli-tui' && (app === 'claude' || app === 'codex' || app === 'gemini')) {
+  if (runtimeUsesAgentTerminalLaunch(runtimeKind) && (app === 'claude' || app === 'codex' || app === 'gemini')) {
     return `${agentNameForLocalApp(app)} CLI`
   }
   return agentNameForLocalApp(app)
 }
 
 function importedAgentDescription(app: ImportedAgentResult['app'], runtimeKind: ImportedAgentResult['runtimeKind']): string {
-  if (runtimeKind === 'cli-tui') {
+  if (runtimeUsesAgentTerminalLaunch(runtimeKind)) {
     switch (app) {
       case 'claude': return 'Imported from local Claude CLI.'
       case 'codex': return 'Imported from local Codex CLI.'
@@ -512,7 +518,7 @@ function candidateFromRecord(input: {
 }): LocalConfigImportCandidate {
   const runtimeKind = runtimeKindForLocalApp(input.app, input.metadata)
   const agent = findAgentForLocalImport(input.app, runtimeKind)
-  const needsProviderTarget = runtimeKind !== 'cli-tui'
+  const needsProviderTarget = !runtimeUsesAgentTerminalLaunch(runtimeKind)
   const importable = (needsProviderTarget ? Boolean(input.providerTargetId) : true) && !input.reason
   const agentName = agentNameForLocalImport(input.app, runtimeKind)
   return {
@@ -648,7 +654,7 @@ function buildAgentRuntimeConfig(candidate: LocalConfigImportCandidate): string 
     },
   }
 
-  if (candidate.runtimeKind === 'cli-tui') {
+  if (runtimeUsesAgentTerminalLaunch(candidate.runtimeKind)) {
     const executable = targetConfig.executable ?? candidate.executable ?? candidate.endpoint ?? candidate.app
     return JSON.stringify(compactRuntimeConfig({
       ...common,
@@ -659,18 +665,11 @@ function buildAgentRuntimeConfig(candidate: LocalConfigImportCandidate): string 
     }))
   }
 
-  if (candidate.runtimeKind === 'claude-agent') {
-    const claudeAgent = targetConfig.claudeAgent
-    return JSON.stringify(compactRuntimeConfig({
-      ...common,
-      model: candidate.modelId ?? targetConfig.model,
-      claudeAgent: claudeAgent && typeof claudeAgent === 'object' ? claudeAgent : undefined,
-    }))
-  }
-
+  const claudeAgentConfig = targetConfig.claudeAgent
   return JSON.stringify(compactRuntimeConfig({
     ...common,
     model: candidate.modelId ?? targetConfig.model,
+    claudeAgent: claudeAgentConfig && typeof claudeAgentConfig === 'object' ? claudeAgentConfig : undefined,
     reasoningEffort: targetConfig.reasoningEffort,
     approvalPolicy: targetConfig.approvalPolicy,
     sandboxMode: targetConfig.sandboxMode,
@@ -684,7 +683,7 @@ export async function importLocalConfig(input: ImportLocalConfigInput = {}): Pro
   const results: ImportedAgentResult[] = []
 
   for (const candidate of preview.candidates.filter(candidate => selectedIds.has(candidate.id))) {
-    const needsProviderTarget = candidate.runtimeKind !== 'cli-tui'
+    const needsProviderTarget = !runtimeUsesAgentTerminalLaunch(candidate.runtimeKind)
     if ((needsProviderTarget && !candidate.providerTargetId) || !candidate.importable) {
       results.push({
         app: candidate.app,

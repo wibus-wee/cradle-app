@@ -8,16 +8,15 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { UIMessage } from 'ai'
-
 import { readObjectRecord as readRecord } from '../../../../helpers/json-record'
-import { readChatPluginContextPart, readChatSkillContextPart } from '../../../chat-runtime/context-parts'
 import { readGoalMessageObjective } from '../../../chat-runtime/ui-message'
-import { extractUiMessageText } from '../../../chat-runtime/ui-message-input'
+import type { ProviderInputPart, RuntimeMessageInput as ProviderRuntimeMessageInput } from '../../kit/input-projector'
+import { extractProviderInputText, projectProviderInputParts } from '../../kit/input-projector'
 import { codexRequestError } from '../provider-errors'
 
-export type CodexRuntimeMessageInput = UIMessage | string
-type MessagePart = UIMessage['parts'][number]
+export type CodexRuntimeMessageInput = ProviderRuntimeMessageInput
+type ProviderFileInputPart = Extract<ProviderInputPart, { type: 'file' }>
+type ProviderPluginInputPart = Extract<ProviderInputPart, { type: 'plugin' }>
 
 export type CodexUserInput = { type: 'text', text: string, text_elements: [] }
   | { type: 'image', detail?: 'high' | 'original', url: string }
@@ -32,7 +31,7 @@ export function readCodexGoalCommandObjective(message: CodexRuntimeMessageInput)
       return metadataObjective
     }
   }
-  const text = extractUiMessageText(message).trim()
+  const text = extractProviderInputText(message).trim()
   if (!text.startsWith('/goal')) {
     return null
   }
@@ -41,7 +40,7 @@ export function readCodexGoalCommandObjective(message: CodexRuntimeMessageInput)
 }
 
 export function isCodexCompactCommand(message: CodexRuntimeMessageInput): boolean {
-  const text = extractUiMessageText(message).trim()
+  const text = extractProviderInputText(message).trim()
   if (!text.startsWith('/compact')) {
     return false
   }
@@ -60,7 +59,7 @@ export function projectCodexUserInput(message: CodexRuntimeMessageInput, runtime
 
   const input: CodexUserInput[] = []
   const unsupportedParts: string[] = []
-  for (const part of message.parts) {
+  for (const part of projectProviderInputParts(message)) {
     if (part.type === 'text') {
       const text = part.text.trim()
       if (text) {
@@ -81,26 +80,24 @@ export function projectCodexUserInput(message: CodexRuntimeMessageInput, runtime
       }
       continue
     }
-    const skillPart = readChatSkillContextPart(part)
-    if (skillPart) {
-      input.push({ type: 'skill', name: skillPart.name, path: resolveCodexSkillFilePath(skillPart.path) })
+    if (part.type === 'skill') {
+      input.push({ type: 'skill', name: part.skill.name, path: resolveCodexSkillFilePath(part.skill.path) })
       continue
     }
-    const pluginPart = readChatPluginContextPart(part)
-    if (pluginPart) {
-      if (pluginPart.provider === 'codex' && pluginPart.nativeMention) {
+    if (part.type === 'plugin') {
+      if (part.plugin.provider === 'codex' && part.plugin.nativeMention) {
         input.push({
           type: 'mention',
-          name: pluginPart.nativeMention.name,
-          path: pluginPart.nativeMention.path,
+          name: part.plugin.nativeMention.name,
+          path: part.plugin.nativeMention.path,
         })
       }
       else {
-        input.push(toTextUserInput(describeCradlePluginContext(pluginPart)))
+        input.push(toTextUserInput(describeCradlePluginContext(part.plugin)))
       }
       continue
     }
-    unsupportedParts.push(part.type)
+    unsupportedParts.push(part.partType)
   }
 
   if (unsupportedParts.length > 0) {
@@ -137,7 +134,7 @@ function resolveCodexSkillFilePath(inputPath: string): string {
   return existsSync(skillFilePath) ? skillFilePath : inputPath
 }
 
-function describeCradlePluginContext(part: NonNullable<ReturnType<typeof readChatPluginContextPart>>): string {
+function describeCradlePluginContext(part: ProviderPluginInputPart['plugin']): string {
   const labels = [
     `@${part.displayName || part.pluginName}`,
     `Cradle plugin: ${part.pluginName}`,
@@ -148,15 +145,15 @@ function describeCradlePluginContext(part: NonNullable<ReturnType<typeof readCha
   return labels.join('\n')
 }
 
-function toCodexImageInput(part: Extract<MessagePart, { type: 'file' }>): CodexUserInput {
+function toCodexImageInput(part: ProviderFileInputPart): CodexUserInput {
   if (part.url.startsWith('file:')) {
     return { type: 'localImage', path: fileURLToPath(part.url) }
   }
   return { type: 'image', url: part.url }
 }
 
-function projectCradleAppshotAccessibilityText(part: Extract<MessagePart, { type: 'file' }>): string | null {
-  const metadata = readRecord(part.providerMetadata)
+function projectCradleAppshotAccessibilityText(part: ProviderFileInputPart): string | null {
+  const metadata = readRecord(part.part.providerMetadata)
   const cradle = readRecord(metadata.cradle)
   const appshot = readRecord(cradle.appshot)
   if (appshot.kind !== 'cradle-appshot') {
@@ -184,7 +181,7 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
-function describeUnsupportedFilePart(part: Extract<MessagePart, { type: 'file' }>): string {
+function describeUnsupportedFilePart(part: ProviderFileInputPart): string {
   const filename = part.filename ? ` (${part.filename})` : ''
   return `file${filename} (${part.mediaType})`
 }

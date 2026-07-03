@@ -10,6 +10,10 @@ import { agentInteractionRuntime } from './modules/agent-interaction-runtime'
 import { assets } from './modules/assets'
 import { automation } from './modules/automation'
 import { chatRuntime } from './modules/chat-runtime'
+import {
+  chatRuntimeEventRoutes,
+  chatRuntimeGlobalEventRoutes
+} from './modules/chat-runtime/http/events.routes'
 import { chronicle } from './modules/chronicle'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
@@ -56,7 +60,7 @@ interface CreateServerContractAppOptions {
 
 const HOSTED_WEB_APP_ORIGINS = new Set([
   'http://app.cradle.wibus.ren',
-  'https://app.cradle.wibus.ren',
+  'https://app.cradle.wibus.ren'
 ])
 
 function isAllowedCorsOriginValue(origin: string | null): boolean {
@@ -71,11 +75,10 @@ function isAllowedCorsOriginValue(origin: string | null): boolean {
 
     const parsed = new URL(origin)
     return (
-      (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
     )
-  }
- catch {
+  } catch {
     return false
   }
 }
@@ -89,13 +92,13 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   const app = new Elysia({
     name: 'cradle.server.elysia',
     adapter: node(),
-    normalize: 'typebox',
+    normalize: 'typebox'
   })
 
   app.onRequest(({ request, set }) => {
     if (
-      request.headers.get('access-control-request-private-network') === 'true'
-      && isAllowedCorsOriginValue(request.headers.get('origin'))
+      request.headers.get('access-control-request-private-network') === 'true' &&
+      isAllowedCorsOriginValue(request.headers.get('origin'))
     ) {
       set.headers['access-control-allow-private-network'] = 'true'
     }
@@ -106,15 +109,15 @@ export async function createServerContractApp(options: CreateServerContractAppOp
       exposeHeaders: [
         'x-cradle-run-id',
         'x-cradle-assistant-message-id',
-        'x-cradle-user-message-id',
-      ],
-    }),
+        'x-cradle-user-message-id'
+      ]
+    })
   )
   app.use(createRequestIdPlugin())
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
       import('./http/request-logger'),
-      import('./http/error-mapping'),
+      import('./http/error-mapping')
     ])
     app.use(createRequestLoggerPlugin())
     app.onError(createErrorHandler())
@@ -150,6 +153,8 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(git)
   app.use(diffReview)
   app.use(acp)
+  app.use(chatRuntimeGlobalEventRoutes)
+  app.use(chatRuntimeEventRoutes)
   app.use(chatRuntime)
   app.use(conversationBridge)
   app.use(chronicle)
@@ -171,7 +176,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 export async function createServerApp(options: CreateServerAppOptions = {}) {
   const {
     recoverPersistedRunsOnCreate = false,
-    startBackgroundTasks = process.env.NODE_ENV !== 'test',
+    startBackgroundTasks = process.env.NODE_ENV !== 'test'
   } = options
   const [
     { shutdownInfra },
@@ -187,10 +192,10 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     conversationBridgeSupervisor,
     { destroyWorkspaceFileIndexes },
     localRelaydSupervisor,
-    { startOpencodeServer, stopOpencodeServer },
+    { startOpencodeServer, stopOpencodeServer }
   ] = await Promise.all([
     import('./infra'),
-    import('./modules/chat-runtime/service'),
+    import('./modules/chat-runtime/runtime'),
     import('./modules/chat-runtime/stream-trace'),
     import('./modules/chronicle/daemon-manager'),
     import('./modules/chronicle/service'),
@@ -202,7 +207,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/conversation-bridge/runtime-supervisor'),
     import('./modules/workspace/files'),
     import('./modules/relay-servers/local-relayd-supervisor'),
-    import('./modules/chat-runtime-providers/opencode/runtime-context'),
+    import('./modules/chat-runtime-providers/opencode/runtime-context')
   ])
   if (recoverPersistedRunsOnCreate) {
     recoverPersistedRunProjections()
@@ -227,7 +232,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     () => chronicleCleanup(),
     () => shutdownTraceStreams(),
     () => destroyWorkspaceFileIndexes(),
-    () => shutdownInfra(),
+    () => shutdownInfra()
   ])
 
   // Start chronicle daemon if enabled
@@ -239,7 +244,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
           if (result.status === 'error') {
             console.error('[external-provider-sources] Source refresh failed:', {
               sourceKey: result.sourceKey,
-              message: result.message ?? 'Unknown sync error',
+              message: result.message ?? 'Unknown sync error'
             })
           }
         }

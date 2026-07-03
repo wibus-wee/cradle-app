@@ -14,12 +14,10 @@ function resetChatStore(): void {
     ...state,
     messagesMap: new Map(),
     hydratedSessionIds: new Set(),
-    generatingMessageIds: new Set(),
-    passiveStreamingMessageIds: new Set(),
+    runStateMap: new Map(),
     activeAbortControllers: new Map(),
     runDisplayMetaMap: new Map(),
     errorMap: new Map(),
-    sessionMetaMap: new Map(),
     assistantDisplaySplitMap: new Map(),
   }))
 }
@@ -234,10 +232,10 @@ describe('chat store messages', () => {
     }
 
     useChatStore.getState().setMessages('session-1', [message])
-    useChatStore.getState().setPassiveStreamingMessageIds('session-1', [
-      'assistant-streaming',
-      'assistant-other-session',
-    ])
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-streaming', 'assistant-other-session'],
+      status: 'streaming',
+    })
 
     const state = useChatStore.getState()
     expect(chatSelectors.isStreamingMessage('assistant-streaming')(state)).toBe(true)
@@ -253,10 +251,49 @@ describe('chat store messages', () => {
     }
 
     useChatStore.getState().setMessages('session-1', [message])
-    useChatStore.getState().setPassiveStreamingMessageIds('session-1', ['assistant-streaming'])
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-streaming'],
+      status: 'streaming',
+    })
     useChatStore.getState().setMessages('session-1', [])
 
     expect(chatSelectors.isStreamingMessage('assistant-streaming')(useChatStore.getState())).toBe(false)
+  })
+
+  it('can represent a passive active run before the message snapshot arrives', () => {
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-pending-snapshot'],
+      allowMissingMessage: true,
+      status: 'streaming',
+    })
+
+    const state = useChatStore.getState()
+    expect(chatSelectors.isSessionStreaming('session-1')(state)).toBe(true)
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-pending-snapshot')(state)).toBe(true)
+  })
+
+  it('does not let passive snapshots replace a local streaming run', () => {
+    useChatStore.getState().setMessages('session-1', [
+      {
+        id: 'assistant-local',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Local' }],
+      },
+      {
+        id: 'assistant-passive',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Passive' }],
+      },
+    ])
+    useChatStore.getState().startGeneration('session-1', 'assistant-local', new AbortController())
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-passive'],
+      status: 'streaming',
+    })
+
+    const state = useChatStore.getState()
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-local')(state)).toBe(true)
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-passive')(state)).toBe(false)
   })
 
   it('drops stale session errors when a new local generation starts', () => {
@@ -382,7 +419,10 @@ describe('chat store messages', () => {
     ])
 
     useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
-    useChatStore.getState().setPassiveStreamingMessageIds('session-1', ['assistant-1'])
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-1'],
+      status: 'streaming',
+    })
 
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(false)
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1:steer-tail')(useChatStore.getState())).toBe(true)
@@ -401,10 +441,13 @@ describe('chat store messages', () => {
     ])
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1:steer-tail')(useChatStore.getState())).toBe(true)
 
-    useChatStore.getState().setPassiveStreamingMessage('session-1', 'assistant-1', false)
-    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1:steer-tail')(useChatStore.getState())).toBe(true)
+    useChatStore.getState().setPassiveRunState('session-1', { messageIds: [], status: 'idle' })
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1:steer-tail')(useChatStore.getState())).toBe(false)
 
-    useChatStore.getState().setPassiveStreamingMessage('session-1', 'assistant-1', true)
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-1'],
+      status: 'streaming',
+    })
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1:steer-tail')(useChatStore.getState())).toBe(true)
 
     expect(releaseSessionStreamingStateForTerminalRun('session-1', runtimeRun({
@@ -415,23 +458,26 @@ describe('chat store messages', () => {
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1:steer-tail')(useChatStore.getState())).toBe(false)
   })
 
-  it('detaches passive stream refs without marking an active run as complete', () => {
+  it('detaches passive run state without marking an active run meta as complete', () => {
     useChatStore.getState().setMessages('session-1', [{
       id: 'assistant-1',
       role: 'assistant',
       parts: [{ type: 'text', text: 'Working' }],
     }])
     useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
-    useChatStore.getState().setPassiveStreamingMessageIds('session-1', ['assistant-1'])
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-1'],
+      status: 'streaming',
+    })
 
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(true)
 
     detachPassiveSessionStreamingState('session-1')
 
     const state = useChatStore.getState()
-    expect(state.passiveStreamingMessageIds.has('assistant-1')).toBe(false)
+    expect(chatSelectors.sessionRunState('session-1')(state)).toMatchObject({ phase: 'idle' })
     expect(chatSelectors.runDisplayMeta('assistant-1')(state)?.completedAtMs).toBeNull()
-    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(state)).toBe(true)
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(state)).toBe(false)
 
     expect(releaseSessionStreamingStateForTerminalRun('session-1', runtimeRun({
       runId: 'run-a',
@@ -441,7 +487,7 @@ describe('chat store messages', () => {
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(false)
   })
 
-  it('reopens stale completed run meta when runtime reports the same run active again', () => {
+  it('reopens stale completed run meta without using it as streaming state', () => {
     useChatStore.getState().setMessages('session-1', [{
       id: 'assistant-1',
       role: 'assistant',
@@ -457,7 +503,13 @@ describe('chat store messages', () => {
 
     const state = useChatStore.getState()
     expect(chatSelectors.runDisplayMeta('assistant-1')(state)?.completedAtMs).toBeNull()
-    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(state)).toBe(true)
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(state)).toBe(false)
+
+    useChatStore.getState().setPassiveRunState('session-1', {
+      messageIds: ['assistant-1'],
+      status: 'streaming',
+    })
+    expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(true)
   })
 
   it('inserts live steer messages before the assistant tail and keeps later deltas in a new bubble', () => {

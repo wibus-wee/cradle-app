@@ -5,15 +5,15 @@ import {
   getChatSessionsBySessionIdMessagesQueryKey,
   getSessionsByIdQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
-import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useChatStore } from '~/store/chat'
+
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
-import { ChatResponseRequestBody, ChatRuntimeSettingsPatch } from '../commands/chat-response-command'
+import type { ChatResponseRequestBody, ChatRuntimeSettingsPatch } from '../commands/chat-response-command'
 import { runtimeSettingsQueryKey } from '../commands/runtime-settings-command'
-import { ChatContextPart, toOrderedUserMessageParts } from '../context/chat-context-parts'
+import type { ChatContextPart } from '../context/chat-context-parts'
+import { toOrderedUserMessageParts } from '../context/chat-context-parts'
 import { startChatResponseStream } from '../transport/chat-stream-transport'
 import { ChatStreamingHandler } from '../transport/chat-streaming-handler'
-
 
 interface OptimisticUserMessageInput {
   messageId: string
@@ -21,7 +21,7 @@ interface OptimisticUserMessageInput {
   sourceText?: string
   files?: FileUIPart[]
   contextParts?: ChatContextPart[]
-  runtimeKind?: RuntimeKind | null
+  supportsGoalCommand?: boolean
 }
 
 interface StartOptimisticChatResponseInput {
@@ -35,14 +35,14 @@ interface StartOptimisticChatResponseInput {
     thinkingEffort?: ChatResponseRequestBody['thinkingEffort']
     runtimeSettings?: ChatRuntimeSettingsPatch
   }
-  runtimeKind?: RuntimeKind | null
+  supportsGoalCommand?: boolean
   queryClient?: QueryClient
   onAccepted?: () => void
   onError?: (error: unknown) => void
   onSettled?: (result: { aborted: boolean, status: 'complete' | 'error' }) => void
 }
 
-export function readCodexGoalCommandObjective(text: string): string | null {
+export function readGoalCommandObjective(text: string): string | null {
   const normalized = text.trimStart()
   if (!normalized.startsWith('/goal')) {
     return null
@@ -61,11 +61,11 @@ export function buildOptimisticUserMessage({
   sourceText = text,
   files = [],
   contextParts = [],
-  runtimeKind,
+  supportsGoalCommand = false,
 }: OptimisticUserMessageInput): UIMessage {
   const trimmedText = text.trim()
-  const goalObjective = runtimeKind === 'codex'
-    ? readCodexGoalCommandObjective(trimmedText)
+  const goalObjective = supportsGoalCommand
+    ? readGoalCommandObjective(trimmedText)
     : null
   const optimisticText = goalObjective ?? trimmedText
   const userParts = toOrderedUserMessageParts(optimisticText, contextParts, sourceText) as UIMessage['parts']
@@ -78,14 +78,14 @@ export function buildOptimisticUserMessage({
   }
 
   return goalObjective
-    ? annotateCodexGoalMessage(message, goalObjective)
+    ? annotateGoalMessage(message, goalObjective)
     : message
 }
 
 export function startOptimisticChatResponse({
   sessionId,
   body,
-  runtimeKind,
+  supportsGoalCommand = false,
   queryClient,
   onAccepted,
   onError,
@@ -102,7 +102,7 @@ export function startOptimisticChatResponse({
     text: body.text,
     files: body.files ?? [],
     contextParts: body.contextParts ?? [],
-    runtimeKind,
+    supportsGoalCommand,
   }))
 
   const handler = new ChatStreamingHandler(sessionId, assistantMessageId, requestStartedAtMs)
@@ -138,12 +138,6 @@ export function startOptimisticChatResponse({
     finally {
       const aborted = controller.signal.aborted
       handler.dispose()
-      const currentPassiveStatus = useChatStore.getState().sessionMetaMap.get(sessionId)?.passiveStatus
-      useChatStore.getState().setSessionMeta(sessionId, {
-        locallyDriving: false,
-        localDriverMessageId: undefined,
-        passiveStatus: currentPassiveStatus === 'streaming' ? 'streaming' : 'idle',
-      })
       if (!aborted) {
         refreshChatResponseQueries(queryClient, sessionId)
       }
@@ -154,7 +148,7 @@ export function startOptimisticChatResponse({
   return controller
 }
 
-function annotateCodexGoalMessage(message: UIMessage, objective: string): UIMessage {
+function annotateGoalMessage(message: UIMessage, objective: string): UIMessage {
   const metadata = message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata)
     ? message.metadata as Record<string, unknown>
     : {}

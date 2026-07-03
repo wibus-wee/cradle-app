@@ -2,30 +2,36 @@ import { useQuery } from '@tanstack/react-query'
 import type { FileUIPart } from 'ai'
 import { useCallback, useMemo } from 'react'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { useProviderTargetModels } from '~/features/agent-runtime/use-agent-models'
 import { useGitRepositories } from '~/features/git/use-git'
 import { useChatPreferencesQuery } from '~/features/settings/use-chat-preferences'
 import { isElectron, platform } from '~/lib/electron'
-import {
+
+import type {
+  ChatRuntimeCompactUiSlotState,
   ChatRuntimeUiSlot,
   ChatRuntimeUiSlotState,
-  ChatRuntimeCompactUiSlotState,
-  runtimeCapabilitiesQueryKey,
-  getChatRuntimeCapabilities,
-  runtimeUiSlotStatesQueryKey,
-  getChatRuntimeUiSlotStates
 } from '../capabilities/chat-capabilities'
-import { ChatContextPart } from '../context/chat-context-parts'
-import { SendMessageOptions, SendMessageResult } from '../session/use-chat-session'
 import {
+  getChatRuntimeCapabilities,
+  getChatRuntimeUiSlotStates,
+  runtimeCapabilitiesQueryKey,
+  runtimeUiSlotStatesQueryKey,
+} from '../capabilities/chat-capabilities'
+import type { ChatContextPart } from '../context/chat-context-parts'
+import type { SendMessageOptions, SendMessageResult } from '../session/use-chat-session'
+import { useSessionBinding } from '../session/use-session-binding'
+import type {
   ChatComposerSlashCommand,
-  withSlashCommandAvailability,
+} from '../slash-commands/chat-slash-commands'
+import {
   CRADLE_APPSHOT_SLASH_COMMAND,
   CRADLE_SIDE_CHAT_SLASH_COMMAND,
-  CODEX_USAGE_SLASH_ACTION_ID,
-  projectRuntimeComposerSlashCommands
+  projectRuntimeComposerSlashCommands,
+  RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_USAGE_COMMAND_ACTION_ID,
+  withSlashCommandAvailability,
 } from '../slash-commands/chat-slash-commands'
 import { modelSupportsAttachments } from './composer-attachment-state'
 
@@ -45,7 +51,7 @@ export interface ChatComposerRuntime {
     options?: {
       invertContinuationMode?: boolean
       runtimeSettings?: SendMessageOptions['runtimeSettings']
-    }
+    },
   ) => SendMessageResult | Promise<SendMessageResult>
   stop: () => void
   slashCommands: ChatComposerSlashCommand[]
@@ -72,30 +78,24 @@ interface UseChatComposerRuntimeOptions {
     text: string,
     opts?: SendMessageOptions,
     files?: FileUIPart[],
-    contextParts?: ChatContextPart[]
+    contextParts?: ChatContextPart[],
   ) => SendMessageResult | Promise<SendMessageResult>
   stop: () => void
-}
-
-interface SessionBinding {
-  providerTargetId: string | null
-  modelId: string | null
-  runtimeKind?: string | null
 }
 
 const EMPTY_RUNTIME_UI_SLOTS: ChatRuntimeUiSlot[] = []
 const EMPTY_RUNTIME_UI_SLOT_STATES: ChatRuntimeUiSlotState[] = []
 
 function invertContinuationMode(
-  mode: NonNullable<SendMessageOptions['continuationMode']>
+  mode: NonNullable<SendMessageOptions['continuationMode']>,
 ): NonNullable<SendMessageOptions['continuationMode']> {
   return mode === 'queue' ? 'steer' : 'queue'
 }
 
-function readCodexReviewAvailability({
+function readRuntimeCodeReviewAvailability({
   workspaceId,
   gitStatusLoading,
-  gitStatusUnavailable
+  gitStatusUnavailable,
 }: {
   workspaceId?: string | null
   gitStatusLoading: boolean
@@ -104,19 +104,19 @@ function readCodexReviewAvailability({
   if (!workspaceId) {
     return {
       enabled: false,
-      reason: 'Requires a workspace-backed Git repository.'
+      reason: 'Requires a workspace-backed Git repository.',
     }
   }
   if (gitStatusLoading) {
     return {
       enabled: false,
-      reason: 'Checking Git repository.'
+      reason: 'Checking Git repository.',
     }
   }
   if (gitStatusUnavailable) {
     return {
       enabled: false,
-      reason: 'Git repository unavailable.'
+      reason: 'Git repository unavailable.',
     }
   }
   return undefined
@@ -132,7 +132,7 @@ export function useChatComposerRuntime({
   runtimeSettings,
   sendOverridesRef,
   sendMessage,
-  stop
+  stop,
 }: UseChatComposerRuntimeOptions): ChatComposerRuntime {
   const { data: chatPreferences } = useChatPreferencesQuery()
   const sessionQueriesEnabled = active && !!sessionId
@@ -141,32 +141,32 @@ export function useChatComposerRuntime({
     queryFn: ({ signal }) => getChatRuntimeCapabilities(sessionId!, signal),
     enabled: sessionQueriesEnabled,
     staleTime: 60_000,
-    retry: false
+    retry: false,
   })
   const { data: runtimeUiSlotStates } = useQuery({
     queryKey: runtimeUiSlotStatesQueryKey(sessionId, runtimeCapabilities?.runtimeKind),
     queryFn: ({ signal }) => getChatRuntimeUiSlotStates(sessionId!, signal),
     enabled: sessionQueriesEnabled,
     staleTime: 2_000,
-    refetchInterval: (query) =>
+    refetchInterval: query =>
       active && (isStreaming || shouldPollRuntimeSlotStates(query.state.data?.states ?? [])) ? 5_000 : false,
-    retry: false
+    retry: false,
   })
-  const { data: sessionBinding } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
-    enabled: sessionQueriesEnabled,
-    staleTime: 60_000,
-    select: (data) => (data ? (data as SessionBinding) : null)
-  })
+  const sessionBinding = useSessionBinding(sessionId, sessionQueriesEnabled)
   const boundProviderTarget = useMemo(() => {
     return sessionBinding?.providerTargetId ? { id: sessionBinding.providerTargetId } : null
   }, [sessionBinding?.providerTargetId])
   const { models: providerSessionModels } = useProviderTargetModels(boundProviderTarget)
   const sessionModels = providerSessionModels
-  const hasCodexReviewSlot = useMemo(() => {
-    return Boolean(runtimeCapabilities?.uiSlots.some((slot) => slot.id === 'codex:review'))
+  const hasRuntimeCodeReviewSlot = useMemo(() => {
+    return Boolean(runtimeCapabilities?.uiSlots.some((slot) => {
+      return (
+        slot.commandAction?.kind === 'uiAction'
+        && slot.commandAction.actionId === RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID
+      )
+    }))
   }, [runtimeCapabilities?.uiSlots])
-  const gitRepositoriesQuery = useGitRepositories(active && hasCodexReviewSlot ? workspaceId : null)
+  const gitRepositoriesQuery = useGitRepositories(active && hasRuntimeCodeReviewSlot ? workspaceId : null)
   const currentSessionModel = useMemo(() => {
     if (composerModel) {
       return composerModel
@@ -174,7 +174,7 @@ export function useChatComposerRuntime({
     if (!sessionBinding?.modelId) {
       return null
     }
-    return sessionModels.find((candidate) => candidate.id === sessionBinding.modelId) ?? null
+    return sessionModels.find(candidate => candidate.id === sessionBinding.modelId) ?? null
   }, [composerModel, sessionBinding?.modelId, sessionModels])
   const supportsAttachments = useMemo(() => {
     return modelSupportsAttachments(currentSessionModel)
@@ -184,13 +184,13 @@ export function useChatComposerRuntime({
       if (!isElectron || platform !== 'darwin') {
         return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, {
           enabled: false,
-          reason: 'Requires the macOS desktop app.'
+          reason: 'Requires the macOS desktop app.',
         })
       }
       if (!supportsAttachments) {
         return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, {
           enabled: false,
-          reason: 'Requires an image-capable model.'
+          reason: 'Requires an image-capable model.',
         })
       }
       return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, undefined)
@@ -200,27 +200,30 @@ export function useChatComposerRuntime({
   }, [supportsAttachments])
   const mapRuntimeUiSlotCommand = useCallback(
     (command: ChatComposerSlashCommand) => {
-      if (command.id === 'codex:review') {
+      if (
+        command.action.kind === 'uiAction'
+        && command.action.actionId === RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID
+      ) {
         return withSlashCommandAvailability(
           command,
-          readCodexReviewAvailability({
+          readRuntimeCodeReviewAvailability({
             workspaceId,
             gitStatusLoading: gitRepositoriesQuery.isLoading,
             gitStatusUnavailable: gitRepositoriesQuery.isError
-              || (gitRepositoriesQuery.isSuccess && (gitRepositoriesQuery.data?.length ?? 0) !== 1)
-          })
+              || (gitRepositoriesQuery.isSuccess && (gitRepositoriesQuery.data?.length ?? 0) !== 1),
+          }),
         )
       }
       if (
-        command.action.kind === 'uiAction' &&
-        command.action.actionId === CODEX_USAGE_SLASH_ACTION_ID
+        command.action.kind === 'uiAction'
+        && command.action.actionId === RUNTIME_USAGE_COMMAND_ACTION_ID
       ) {
-        const usageState = runtimeUiSlotStates?.states.find((state) => state.kind === 'usage')
+        const usageState = runtimeUiSlotStates?.states.find(state => state.kind === 'usage')
         return withSlashCommandAvailability(
           command,
           usageState && isRuntimeUsageSlotStateAvailable(usageState)
             ? undefined
-            : { enabled: false, reason: 'Usage rate limits are unavailable for this session.' }
+            : { enabled: false, reason: 'Usage rate limits are unavailable for this session.' },
         )
       }
       return command
@@ -232,7 +235,7 @@ export function useChatComposerRuntime({
       gitRepositoriesQuery.isSuccess,
       runtimeUiSlotStates?.states,
       workspaceId,
-    ]
+    ],
   )
   const slashCommands = useMemo(
     () =>
@@ -241,15 +244,15 @@ export function useChatComposerRuntime({
         slotStates: runtimeUiSlotStates?.states ?? [],
         mode: 'session',
         cradleCommands: cradleSlashCommands,
-        mapRuntimeUiSlotCommand
+        mapRuntimeUiSlotCommand,
       }),
-    [cradleSlashCommands, mapRuntimeUiSlotCommand, runtimeCapabilities, runtimeUiSlotStates?.states]
+    [cradleSlashCommands, mapRuntimeUiSlotCommand, runtimeCapabilities, runtimeUiSlotStates?.states],
   )
 
   const compactSlotState = useMemo(() => {
     return (
       (runtimeUiSlotStates?.states ?? []).find(
-        (state): state is ChatRuntimeCompactUiSlotState => state.kind === 'compact'
+        (state): state is ChatRuntimeCompactUiSlotState => state.kind === 'compact',
       ) ?? null
     )
   }, [runtimeUiSlotStates?.states])
@@ -261,11 +264,11 @@ export function useChatComposerRuntime({
     // session-cumulative `total` which sums every turn and overflows the window.
     // Mirrors readCompactWindowUsage in context-usage-detail-panel.tsx so the
     // ring and the breakdown panel agree.
-    const windowUsage =
-      compactSlotState.last.totalTokens > 0 ? compactSlotState.last : compactSlotState.total
+    const windowUsage
+      = compactSlotState.last.totalTokens > 0 ? compactSlotState.last : compactSlotState.total
     return {
       tokens: windowUsage.totalTokens,
-      contextWindow: compactSlotState.modelContextWindow
+      contextWindow: compactSlotState.modelContextWindow,
     }
   }, [compactSlotState])
   const uiSlots = runtimeCapabilities?.uiSlots ?? EMPTY_RUNTIME_UI_SLOTS
@@ -279,7 +282,7 @@ export function useChatComposerRuntime({
       options?: {
         invertContinuationMode?: boolean
         runtimeSettings?: SendMessageOptions['runtimeSettings']
-      }
+      },
     ) => {
       if (!isReady || (!text.trim() && files.length === 0 && contextParts.length === 0)) {
         return
@@ -297,13 +300,13 @@ export function useChatComposerRuntime({
           runtimeSettings: options?.runtimeSettings
             ? { ...runtimeSettings, ...options.runtimeSettings }
             : runtimeSettings,
-          continuationMode
+          continuationMode,
         },
         files,
-        contextParts
+        contextParts,
       )
     },
-    [chatPreferences?.continuationBehavior, isReady, runtimeSettings, sendMessage, sendOverridesRef]
+    [chatPreferences?.continuationBehavior, isReady, runtimeSettings, sendMessage, sendOverridesRef],
   )
 
   return {
@@ -322,14 +325,14 @@ export function useChatComposerRuntime({
 
 function isRuntimeUsageSlotStateAvailable(state: ChatRuntimeUiSlotState): boolean {
   return (
-    state.kind === 'usage' &&
-    (state.usedPercent !== null ||
-      state.secondaryUsedPercent !== null ||
-      state.limitName !== null ||
-      state.primaryResetsAt !== null ||
-      state.secondaryResetsAt !== null ||
-      state.creditsBalance !== null ||
-      state.rateLimitReachedType !== null)
+    state.kind === 'usage'
+    && (state.usedPercent !== null
+      || state.secondaryUsedPercent !== null
+      || state.limitName !== null
+      || state.primaryResetsAt !== null
+      || state.secondaryResetsAt !== null
+      || state.creditsBalance !== null
+      || state.rateLimitReachedType !== null)
   )
 }
 
@@ -349,6 +352,9 @@ function shouldPollRuntimeSlotStates(states: ChatRuntimeUiSlotState[]): boolean 
     }
     if (state.kind === 'progress') {
       return state.inProgressCount > 0
+    }
+    if (state.kind === 'crew') {
+      return state.activeCount > 0
     }
     if (state.kind === 'terminal') {
       return state.activeCount > 0 || state.backgroundTerminals.length > 0

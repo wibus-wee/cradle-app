@@ -228,17 +228,19 @@ function LayoutPill({
   children: React.ReactNode
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex h-6 items-center gap-1.5 rounded-[5px] px-2 text-[12px] font-medium transition-colors',
+        'h-6 gap-1.5 rounded-[5px] px-2 text-[12px]',
         active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       {children}
-    </button>
+    </Button>
   )
 }
 
@@ -378,12 +380,14 @@ function DecisionButton({
   children: React.ReactNode
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex h-7 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors disabled:opacity-50',
+        'h-7 gap-1 rounded-md px-2 text-[11px] disabled:opacity-50',
         tone === 'primary' && 'bg-primary text-primary-foreground hover:bg-primary/90',
         tone === 'warn' && 'border border-orange-500/40 bg-orange-500/10 text-orange-600 hover:bg-orange-500/15 dark:text-orange-300',
         tone === 'ghost' && 'border border-border/60 bg-transparent text-foreground/80 hover:bg-muted',
@@ -391,7 +395,7 @@ function DecisionButton({
     >
       {icon}
       <span className="truncate">{children}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -407,11 +411,12 @@ function MenuCheck({
   children: React.ReactNode
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground/80 transition-colors hover:bg-muted disabled:opacity-50"
+      className="h-auto w-full justify-start gap-2 rounded px-2 py-1 text-left text-[12px] font-normal text-foreground/80 hover:bg-muted disabled:opacity-50"
     >
       <span
         className={cn(
@@ -422,6 +427,6 @@ function MenuCheck({
         {active && <CheckIcon className="size-2.5" />}
       </span>
       <span className="flex-1">{children}</span>
-    </button>
+    </Button>
   )
 }

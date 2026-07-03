@@ -20,7 +20,7 @@ import {
   StopLine as StopIcon,
 } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -41,6 +41,7 @@ import {
   postConversationBridgeDeliveryAttemptsRetry,
   putConversationBridgeConnectionsByIdWorkspacesByExternalWorkspaceIdChannelsByExternalChannelIdBinding,
 } from '~/api-gen/sdk.gen'
+import type { GetAgentsResponse, GetChatRuntimesResponse, GetProviderTargetsResponse } from '~/api-gen/types.gen'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '~/components/ui/alert-dialog'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -53,6 +54,7 @@ import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { toastManager } from '~/components/ui/toast'
+import { runtimeCatalogItemRequiresProviderTarget } from '~/features/agent-runtime/use-runtime-catalog'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 
@@ -62,6 +64,100 @@ import { formatTimestamp, healthStatusLabel, PlatformGlyph, queryKeys, StatusDot
 import { SettingsGroup, SettingsMasterDetail, SettingsPage } from './settings-container'
 import { SettingsRow } from './settings-row'
 import { useAppPreferences } from './use-app-preferences'
+
+const EMPTY_ADAPTERS: Adapter[] = []
+const EMPTY_CHANNEL_BINDINGS: ChannelBinding[] = []
+const EMPTY_CONNECTIONS: Connection[] = []
+const EMPTY_DELIVERY_ATTEMPTS: DeliveryAttempt[] = []
+const EMPTY_SECRETS: Secret[] = []
+const EMPTY_THREAD_BINDINGS: ThreadBinding[] = []
+const EMPTY_AGENTS: GetAgentsResponse = []
+const EMPTY_PROVIDER_TARGETS: GetProviderTargetsResponse = []
+const EMPTY_RUNTIMES: GetChatRuntimesResponse['items'] = []
+
+interface RuntimeTargetOption {
+  value: string
+  label: string
+  description: string
+  agentId: string | null
+  providerTargetId: string | null
+  runtimeKind: string | null
+}
+
+type RuntimeTargetTranslationKey
+  = | 'integrations.channelBindings.runtimeTargetAgentPrefix'
+    | 'integrations.channelBindings.runtimeTargetProviderPrefix'
+
+interface RuntimeTargetOptionsInput {
+  agents: GetAgentsResponse
+  providerTargets: GetProviderTargetsResponse
+  runtimes: GetChatRuntimesResponse['items']
+  translate: (key: RuntimeTargetTranslationKey) => string
+}
+
+function buildRuntimeTargetOptions({
+  agents,
+  providerTargets,
+  runtimes,
+  translate,
+}: RuntimeTargetOptionsInput): RuntimeTargetOption[] {
+  const chatRuntimeByKind = new Map<string, GetChatRuntimesResponse['items'][number]>()
+  const runtimesByProviderKind = new Map<string, GetChatRuntimesResponse['items']>()
+  for (const runtime of runtimes) {
+    let supportsChatSurface = !runtime.surfaces
+    for (const surface of runtime.surfaces ?? []) {
+      if (surface === 'chat') {
+        supportsChatSurface = true
+        break
+      }
+    }
+    if (!runtimeCatalogItemRequiresProviderTarget(runtime) || !supportsChatSurface) {
+      continue
+    }
+    chatRuntimeByKind.set(runtime.runtimeKind, runtime)
+    for (const providerKind of runtime.providerKinds) {
+      const providerRuntimes = runtimesByProviderKind.get(providerKind)
+      if (providerRuntimes) {
+        providerRuntimes.push(runtime)
+      }
+      else {
+        runtimesByProviderKind.set(providerKind, [runtime])
+      }
+    }
+  }
+
+  const options: RuntimeTargetOption[] = []
+  for (const agent of agents) {
+    if (agent.enabled && agent.providerTargetId && chatRuntimeByKind.has(agent.runtimeKind)) {
+      options.push({
+        value: `agent:${agent.id}`,
+        label: `${translate('integrations.channelBindings.runtimeTargetAgentPrefix')} ${agent.name}`,
+        description: agent.modelId ?? agent.runtimeKind,
+        agentId: agent.id,
+        providerTargetId: null,
+        runtimeKind: null,
+      })
+    }
+  }
+
+  for (const target of providerTargets) {
+    if (!target.enabled) {
+      continue
+    }
+    const providerRuntimes = runtimesByProviderKind.get(target.providerKind) ?? EMPTY_RUNTIMES
+    for (const runtime of providerRuntimes) {
+      options.push({
+        value: `provider:${target.id}:${runtime.runtimeKind}`,
+        label: `${translate('integrations.channelBindings.runtimeTargetProviderPrefix')} ${target.displayName}`,
+        description: runtime.label,
+        agentId: null,
+        providerTargetId: target.id,
+        runtimeKind: runtime.runtimeKind,
+      })
+    }
+  }
+  return options
+}
 
 // Connections view component
 function ConnectionsView({
@@ -83,7 +179,11 @@ function ConnectionsView({
   const queryClient = useQueryClient()
 
   // Queries
-  const adaptersQuery = useQuery({
+  const {
+    data: adapters = EMPTY_ADAPTERS,
+    isLoading: adaptersLoading,
+    refetch: refetchAdapters,
+  } = useQuery({
     queryKey: queryKeys.adapters,
     queryFn: async () => {
       const { data, error } = await getConversationBridgeAdapters()
@@ -92,7 +192,11 @@ function ConnectionsView({
     },
   })
 
-  const connectionsQuery = useQuery({
+  const {
+    data: connections = EMPTY_CONNECTIONS,
+    isLoading: connectionsLoading,
+    refetch: refetchConnections,
+  } = useQuery({
     queryKey: queryKeys.connections,
     queryFn: async () => {
       const { data, error } = await getConversationBridgeConnections()
@@ -101,7 +205,10 @@ function ConnectionsView({
     },
   })
 
-  const secretsQuery = useQuery({
+  const {
+    data: secrets = EMPTY_SECRETS,
+    isLoading: secretsLoading,
+  } = useQuery({
     queryKey: queryKeys.secrets,
     queryFn: async () => {
       const { data, error } = await getSecrets()
@@ -175,26 +282,15 @@ function ConnectionsView({
     }
   }
 
-  // Derived state
-  const adapters = useMemo(() => adaptersQuery.data ?? [], [adaptersQuery.data])
-  const connections = useMemo(() => connectionsQuery.data ?? [], [connectionsQuery.data])
-  const secrets = useMemo(() => secretsQuery.data ?? [], [secretsQuery.data])
-
-  const selectedConnection = useMemo(
-    () => connections.find(c => c.id === selectedConnectionId) ?? null,
-    [connections, selectedConnectionId],
-  )
+  const selectedConnection = connections.find(c => c.id === selectedConnectionId) ?? null
 
   // Group connections by adapter
-  const connectionsByAdapter = useMemo(() => {
-    const map = new Map<string, Connection[]>()
-    for (const adapter of adapters) {
-      map.set(adapter.id, connections.filter(c => c.adapterId === adapter.id && c.adapterOwner === adapter.owner))
-    }
-    return map
-  }, [adapters, connections])
+  const connectionsByAdapter = new Map<string, Connection[]>()
+  for (const adapter of adapters) {
+    connectionsByAdapter.set(adapter.id, connections.filter(c => c.adapterId === adapter.id && c.adapterOwner === adapter.owner))
+  }
 
-  const isLoading = adaptersQuery.isLoading || connectionsQuery.isLoading || secretsQuery.isLoading
+  const isLoading = adaptersLoading || connectionsLoading || secretsLoading
 
   return (
     <SettingsMasterDetail
@@ -228,8 +324,8 @@ function ConnectionsView({
               variant="ghost"
               size="sm"
               onClick={() => {
-                void adaptersQuery.refetch()
-                void connectionsQuery.refetch()
+                void refetchAdapters()
+                void refetchConnections()
               }}
               className="h-7 gap-1.5 text-xs"
             >
@@ -531,7 +627,10 @@ function ConnectionDetail({
   const [isEditingName, setIsEditingName] = useState(false)
   const [enabled, setEnabled] = useState(connection.enabled)
 
-  const channelBindingsQuery = useQuery({
+  const {
+    data: channelBindings = EMPTY_CHANNEL_BINDINGS,
+    isLoading: channelBindingsLoading,
+  } = useQuery({
     queryKey: queryKeys.channelBindings(connection.id),
     queryFn: async () => {
       const { data, error } = await getConversationBridgeConnectionsByIdChannelBindings({ path: { id: connection.id } })
@@ -540,7 +639,10 @@ function ConnectionDetail({
     },
   })
 
-  const threadsQuery = useQuery({
+  const {
+    data: threads = EMPTY_THREAD_BINDINGS,
+    isLoading: threadsLoading,
+  } = useQuery({
     queryKey: queryKeys.threads(connection.id),
     queryFn: async () => {
       const { data, error } = await getConversationBridgeConnectionsByIdThreads({ path: { id: connection.id } })
@@ -549,7 +651,10 @@ function ConnectionDetail({
     },
   })
 
-  const retryableDeliveriesQuery = useQuery({
+  const {
+    data: retryableDeliveries = EMPTY_DELIVERY_ATTEMPTS,
+    isLoading: retryableDeliveriesLoading,
+  } = useQuery({
     queryKey: queryKeys.retryableDeliveries,
     queryFn: async () => {
       const { data, error } = await getConversationBridgeDeliveryAttemptsRetryable()
@@ -574,6 +679,7 @@ function ConnectionDetail({
     },
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('integrations.connection.toast.updated') })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.connections })
       void onUpdated()
     },
     onError: () => {
@@ -591,6 +697,7 @@ function ConnectionDetail({
     },
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('integrations.connection.toast.started') })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.connections })
       void onUpdated()
     },
     onError: () => {
@@ -606,6 +713,7 @@ function ConnectionDetail({
     },
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('integrations.connection.toast.stopped') })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.connections })
       void onUpdated()
     },
     onError: () => {
@@ -613,9 +721,9 @@ function ConnectionDetail({
     },
   })
 
-  const invalidateBindings = useCallback(() => {
+  const invalidateBindings = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.channelBindings(connection.id) })
-  }, [queryClient, connection.id])
+  }
 
   const isSlack = connection.platform === 'slack'
   const status = connection.healthStatus as HealthStatus
@@ -721,9 +829,9 @@ function ConnectionDetail({
             <TabsTrigger value="threads" className="h-7 px-2.5 text-[12px]">{t('integrations.threads.title')}</TabsTrigger>
             <TabsTrigger value="deliveries" className="h-7 px-2.5 text-[12px]">
               {t('integrations.delivery.title')}
-              {retryableDeliveriesQuery.data && retryableDeliveriesQuery.data.length > 0 && (
+              {retryableDeliveries.length > 0 && (
                 <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-medium text-white">
-                  {retryableDeliveriesQuery.data.length}
+                  {retryableDeliveries.length}
                 </span>
               )}
             </TabsTrigger>
@@ -860,23 +968,23 @@ function ConnectionDetail({
         <TabsContent value="bindings" className="flex-1 px-5 py-5">
           <ChannelBindingsSection
             connectionId={connection.id}
-            bindings={channelBindingsQuery.data ?? []}
-            loading={channelBindingsQuery.isLoading}
+            bindings={channelBindings}
+            loading={channelBindingsLoading}
             onUpdated={invalidateBindings}
           />
         </TabsContent>
 
         <TabsContent value="threads" className="flex-1 px-5 py-5">
           <ThreadsSection
-            threads={threadsQuery.data ?? []}
-            loading={threadsQuery.isLoading}
+            threads={threads}
+            loading={threadsLoading}
           />
         </TabsContent>
 
         <TabsContent value="deliveries" className="flex-1 px-5 py-5">
           <FailedDeliveriesSection
-            deliveries={retryableDeliveriesQuery.data ?? []}
-            loading={retryableDeliveriesQuery.isLoading}
+            deliveries={retryableDeliveries}
+            loading={retryableDeliveriesLoading}
           />
         </TabsContent>
       </Tabs>
@@ -898,6 +1006,7 @@ function ChannelBindingsSection({
   onUpdated: () => void
 }) {
   const { t } = useTranslation('settings')
+  const queryClient = useQueryClient()
   const { workspaces } = useWorkspaces()
 
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -915,6 +1024,7 @@ function ChannelBindingsSection({
     },
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('integrations.channelBindings.toast.removed') })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.channelBindings(connectionId) })
       void onUpdated()
     },
     onError: () => {
@@ -1191,6 +1301,7 @@ function AddChannelBindingDialog({
   onAdded: () => void
 }) {
   const { t } = useTranslation('settings')
+  const queryClient = useQueryClient()
   const { workspaces } = useWorkspaces()
 
   const [externalWorkspaceId, setExternalWorkspaceId] = useState('')
@@ -1198,7 +1309,11 @@ function AddChannelBindingDialog({
   const [cradleWorkspaceId, setCradleWorkspaceId] = useState('')
   const [runtimeTargetValue, setRuntimeTargetValue] = useState('')
 
-  const runtimeTargetsQuery = useQuery({
+  const {
+    data: runtimeTargets,
+    isError: runtimeTargetsError,
+    isLoading: runtimeTargetsLoading,
+  } = useQuery({
     queryKey: queryKeys.runtimeTargets,
     enabled: open,
     queryFn: async () => {
@@ -1218,38 +1333,12 @@ function AddChannelBindingDialog({
     },
   })
 
-  const runtimeTargetOptions = useMemo(() => {
-    const agents = runtimeTargetsQuery.data?.agents ?? []
-    const providerTargets = runtimeTargetsQuery.data?.providerTargets ?? []
-    const chatRuntimes = (runtimeTargetsQuery.data?.runtimes ?? [])
-      .filter(runtime => runtime.runtimeKind !== 'cli-tui')
-      .filter(runtime => runtime.surfaces?.includes('chat') ?? true)
-
-    return [
-      ...agents
-        .filter(agent => agent.enabled && agent.runtimeKind !== 'cli-tui' && agent.providerTargetId)
-        .map(agent => ({
-          value: `agent:${agent.id}`,
-          label: `${t('integrations.channelBindings.runtimeTargetAgentPrefix')} ${agent.name}`,
-          description: agent.modelId ?? agent.runtimeKind,
-          agentId: agent.id,
-          providerTargetId: null as string | null,
-          runtimeKind: null as string | null,
-        })),
-      ...providerTargets
-        .filter(target => target.enabled)
-        .flatMap(target => chatRuntimes
-          .filter(runtime => runtime.providerKinds.includes(target.providerKind))
-          .map(runtime => ({
-            value: `provider:${target.id}:${runtime.runtimeKind}`,
-            label: `${t('integrations.channelBindings.runtimeTargetProviderPrefix')} ${target.displayName}`,
-            description: runtime.label,
-            agentId: null as string | null,
-            providerTargetId: target.id,
-            runtimeKind: runtime.runtimeKind,
-          }))),
-    ]
-  }, [runtimeTargetsQuery.data, t])
+  const runtimeTargetOptions = buildRuntimeTargetOptions({
+    agents: runtimeTargets?.agents ?? EMPTY_AGENTS,
+    providerTargets: runtimeTargets?.providerTargets ?? EMPTY_PROVIDER_TARGETS,
+    runtimes: runtimeTargets?.runtimes ?? EMPTY_RUNTIMES,
+    translate: key => t(key),
+  })
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -1268,6 +1357,7 @@ function AddChannelBindingDialog({
     },
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('integrations.channelBindings.toast.added') })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.channelBindings(connectionId) })
       onAdded()
       setExternalWorkspaceId('')
       setExternalChannelId('')
@@ -1325,10 +1415,10 @@ function AddChannelBindingDialog({
             <Select
               value={runtimeTargetValue}
               onValueChange={setRuntimeTargetValue}
-              disabled={runtimeTargetsQuery.isLoading || runtimeTargetOptions.length === 0}
+              disabled={runtimeTargetsLoading || runtimeTargetOptions.length === 0}
             >
               <SelectTrigger id="runtimeTarget" className="h-8 text-xs">
-                <SelectValue placeholder={runtimeTargetsQuery.isLoading ? t('integrations.channelBindings.runtimeTargetLoading') : t('integrations.channelBindings.runtimeTargetPlaceholder')} />
+                <SelectValue placeholder={runtimeTargetsLoading ? t('integrations.channelBindings.runtimeTargetLoading') : t('integrations.channelBindings.runtimeTargetPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {runtimeTargetOptions.map(option => (
@@ -1340,10 +1430,10 @@ function AddChannelBindingDialog({
                 ))}
               </SelectContent>
             </Select>
-            {runtimeTargetsQuery.isError && (
+            {runtimeTargetsError && (
               <p className="text-[11px] text-destructive">{t('integrations.channelBindings.runtimeTargetError')}</p>
             )}
-            {!runtimeTargetsQuery.isLoading && runtimeTargetOptions.length === 0 && (
+            {!runtimeTargetsLoading && runtimeTargetOptions.length === 0 && (
               <p className="text-[11px] text-muted-foreground">{t('integrations.channelBindings.runtimeTargetEmpty')}</p>
             )}
           </div>
@@ -1655,7 +1745,12 @@ export function IntegrationsSettings() {
   const { t } = useTranslation('settings')
   const queryClient = useQueryClient()
 
-  const adaptersQuery = useQuery({
+  const {
+    data: adapters = EMPTY_ADAPTERS,
+    isFetching: adaptersFetching,
+    isLoading: adaptersLoading,
+    refetch: refetchAdapters,
+  } = useQuery({
     queryKey: queryKeys.adapters,
     queryFn: async () => {
       const { data, error } = await getConversationBridgeAdapters()
@@ -1664,7 +1759,12 @@ export function IntegrationsSettings() {
     },
   })
 
-  const connectionsQuery = useQuery({
+  const {
+    data: connections = EMPTY_CONNECTIONS,
+    isFetching: connectionsFetching,
+    isLoading: connectionsLoading,
+    refetch: refetchConnections,
+  } = useQuery({
     queryKey: queryKeys.connections,
     queryFn: async () => {
       const { data, error } = await getConversationBridgeConnections()
@@ -1678,19 +1778,17 @@ export function IntegrationsSettings() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null)
 
-  const adapters = useMemo(() => adaptersQuery.data ?? [], [adaptersQuery.data])
-  const connections = useMemo(() => connectionsQuery.data ?? [], [connectionsQuery.data])
+  const refreshing = adaptersFetching || connectionsFetching
+  const isLoading = adaptersLoading || connectionsLoading
 
-  const refreshing = adaptersQuery.isFetching || connectionsQuery.isFetching
-  const isLoading = adaptersQuery.isLoading || connectionsQuery.isLoading
-
-  const connectionsByAdapter = useMemo(() => {
-    const map = new Map<string, Connection[]>()
-    for (const adapter of adapters) {
-      map.set(adapter.id, connections.filter(c => c.adapterId === adapter.id && c.adapterOwner === adapter.owner))
-    }
-    return adapters.map(a => ({ adapter: a, connections: map.get(a.id) ?? [] }))
-  }, [adapters, connections])
+  const connectionsByAdapterMap = new Map<string, Connection[]>()
+  for (const adapter of adapters) {
+    connectionsByAdapterMap.set(adapter.id, connections.filter(c => c.adapterId === adapter.id && c.adapterOwner === adapter.owner))
+  }
+  const connectionsByAdapter = adapters.map(adapter => ({
+    adapter,
+    connections: connectionsByAdapterMap.get(adapter.id) ?? EMPTY_CONNECTIONS,
+  }))
 
   const goToLanding = () => {
     setActiveView('landing')
@@ -1752,8 +1850,8 @@ export function IntegrationsSettings() {
               variant="ghost"
               size="icon-sm"
               onClick={() => {
-                void adaptersQuery.refetch()
-                void connectionsQuery.refetch()
+                void refetchAdapters()
+                void refetchConnections()
               }}
               aria-label={t('integrations.console.bridge.refresh')}
             >

@@ -1,5 +1,7 @@
-import type { Agent, UpdateAgentInput } from '~/features/agent-runtime/use-agents'
 import type { ProviderTarget } from '~/features/agent-runtime/types'
+import type { Agent, UpdateAgentInput } from '~/features/agent-runtime/use-agents'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
+import { runtimeCatalogItemUsesModelSelection } from '~/features/agent-runtime/runtime-catalog'
 
 export type AgentBatchThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
 
@@ -16,23 +18,29 @@ export interface AgentBatchProviderPatch {
 
 export interface AgentBatchProviderPatchResult {
   patches: AgentBatchProviderPatch[]
-  skippedCliTuiCount: number
+  skippedRuntimeOwnedCount: number
+}
+
+function agentUsesProviderTarget(agent: Agent, runtimeCatalog: RuntimeCatalogItem[]): boolean {
+  const runtime = runtimeCatalog.find(item => item.runtimeKind === agent.runtimeKind)
+  return runtime ? runtimeCatalogItemUsesModelSelection(runtime) : true
 }
 
 export function buildAgentProviderBatchPatches(
   agents: Agent[],
   selection: AgentProviderBatchSelection,
+  runtimeCatalog: RuntimeCatalogItem[],
 ): AgentBatchProviderPatchResult {
   if (selection.modelId === null) {
     throw new Error('Provider-backed batch configuration requires a resolved model')
   }
 
   const patches: AgentBatchProviderPatch[] = []
-  let skippedCliTuiCount = 0
+  let skippedRuntimeOwnedCount = 0
 
   for (const agent of agents) {
-    if (agent.runtimeKind === 'cli-tui') {
-      skippedCliTuiCount += 1
+    if (!agentUsesProviderTarget(agent, runtimeCatalog)) {
+      skippedRuntimeOwnedCount += 1
       continue
     }
 
@@ -53,5 +61,5 @@ export function buildAgentProviderBatchPatches(
     })
   }
 
-  return { patches, skippedCliTuiCount }
+  return { patches, skippedRuntimeOwnedCount }
 }

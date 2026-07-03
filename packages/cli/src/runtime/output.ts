@@ -19,35 +19,42 @@ const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
     z.boolean(),
     z.null(),
     z.array(JsonValueSchema),
-    z.record(z.string(), JsonValueSchema),
-  ]),
+    z.record(z.string(), JsonValueSchema)
+  ])
 )
 
 const ScalarCellSchema = z.union([
-  z.string().transform(value => ({ text: value, scalar: true, textValue: value })),
-  z.number().transform(value => ({ text: JSON.stringify(value), scalar: true, textValue: null })),
-  z.boolean().transform(value => ({ text: JSON.stringify(value), scalar: true, textValue: null })),
-  z.null().transform(() => ({ text: '', scalar: true, textValue: null })),
+  z.string().transform((value) => ({ text: value, scalar: true, textValue: value })),
+  z.number().transform((value) => ({ text: JSON.stringify(value), scalar: true, textValue: null })),
+  z
+    .boolean()
+    .transform((value) => ({ text: JSON.stringify(value), scalar: true, textValue: null })),
+  z.null().transform(() => ({ text: '', scalar: true, textValue: null }))
 ])
 
 const CellProjectionSchema = z.union([
   ScalarCellSchema,
   z.undefined().transform(() => ({ text: '', scalar: false, textValue: null })),
-  JsonValueSchema.transform(value => ({ text: JSON.stringify(value), scalar: false, textValue: null })),
+  JsonValueSchema.transform((value) => ({
+    text: JSON.stringify(value),
+    scalar: false,
+    textValue: null
+  }))
 ])
 
 const CliRecordSchema = z.record(z.string(), JsonValueSchema)
 
 const RecordProjectionSchema = CliRecordSchema.transform((record) => {
   const cells = Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [key, CellProjectionSchema.parse(value)]),
+    Object.entries(record).map(([key, value]) => [key, CellProjectionSchema.parse(value)])
   )
   const scalarKeys = Object.entries(cells)
     .filter(([, cell]) => cell.scalar)
     .map(([key]) => key)
-  const preferredText = ['markdown', 'content', 'text', 'output', 'message']
-    .map(key => cells[key]?.textValue ?? null)
-    .find(text => text !== null) ?? null
+  const preferredText =
+    ['markdown', 'content', 'text', 'output', 'message']
+      .map((key) => cells[key]?.textValue ?? null)
+      .find((text) => text !== null) ?? null
   const entries = Object.entries(cells)
   const singleText = entries.length === 1 ? entries[0][1].textValue : null
 
@@ -56,21 +63,31 @@ const RecordProjectionSchema = CliRecordSchema.transform((record) => {
     cells,
     scalarKeys,
     textValue: preferredText ?? singleText,
-    keyValueRows: scalarKeys.map(key => [key, cells[key].text] as const),
-    okOnly: record.ok === true && Object.keys(record).length === 1,
+    keyValueRows: scalarKeys.map((key) => [key, cells[key].text] as const),
+    okOnly: record.ok === true && Object.keys(record).length === 1
   }
 })
 
 const ResultItemProjectionSchema = z.union([
-  RecordProjectionSchema.transform(record => ({ kind: 'record' as const, raw: record.raw, record })),
-  JsonValueSchema.transform(value => ({ kind: 'value' as const, raw: value })),
+  RecordProjectionSchema.transform((record) => ({
+    kind: 'record' as const,
+    raw: record.raw,
+    record
+  })),
+  JsonValueSchema.transform((value) => ({ kind: 'value' as const, raw: value }))
 ])
 
 const ResultProjectionSchema = z.union([
-  z.array(ResultItemProjectionSchema).transform(items => ({ kind: 'array' as const, raw: items.map(item => item.raw), items })),
-  RecordProjectionSchema.transform(record => ({ kind: 'record' as const, raw: record.raw, record })),
-  z.string().transform(value => ({ kind: 'string' as const, raw: value, value })),
-  JsonValueSchema.transform(value => ({ kind: 'value' as const, raw: value })),
+  z
+    .array(ResultItemProjectionSchema)
+    .transform((items) => ({ kind: 'array' as const, raw: items.map((item) => item.raw), items })),
+  RecordProjectionSchema.transform((record) => ({
+    kind: 'record' as const,
+    raw: record.raw,
+    record
+  })),
+  z.string().transform((value) => ({ kind: 'string' as const, raw: value, value })),
+  JsonValueSchema.transform((value) => ({ kind: 'value' as const, raw: value }))
 ])
 
 type ResultProjection = z.infer<typeof ResultProjectionSchema>
@@ -94,7 +111,7 @@ function getTableWidthLimit(): number {
   return Math.max(80, Math.min(process.stdout.columns || 120, 160))
 }
 
-function getColumnWidths(rows: string[][]): Record<number, { truncate: number, width: number }> {
+function getColumnWidths(rows: string[][]): Record<number, { truncate: number; width: number }> {
   const columnCount = rows[0]?.length ?? 0
   if (columnCount === 0) {
     return {}
@@ -102,17 +119,22 @@ function getColumnWidths(rows: string[][]): Record<number, { truncate: number, w
 
   const paddingWidth = columnCount * 2
   const borderWidth = columnCount + 1
-  const availableWidth = Math.max(columnCount * 8, getTableWidthLimit() - paddingWidth - borderWidth)
+  const availableWidth = Math.max(
+    columnCount * 8,
+    getTableWidthLimit() - paddingWidth - borderWidth
+  )
   const measuredWidths = Array.from({ length: columnCount }, (_, index) => {
-    return Math.max(...rows.map(row => getDisplayWidth(row[index] ?? '')))
+    return Math.max(...rows.map((row) => getDisplayWidth(row[index] ?? '')))
   })
-  const maximumWidths = measuredWidths.map(width => Math.min(56, width))
-  const minimumWidths = measuredWidths.map(width => Math.min(width, 12))
+  const maximumWidths = measuredWidths.map((width) => Math.min(56, width))
+  const minimumWidths = measuredWidths.map((width) => Math.min(width, 12))
   const minimumTotal = minimumWidths.reduce((sum, width) => sum + width, 0)
   const maximumTotal = maximumWidths.reduce((sum, width) => sum + width, 0)
 
   if (maximumTotal <= availableWidth) {
-    return Object.fromEntries(maximumWidths.map((width, index) => [index, { truncate: width, width }]))
+    return Object.fromEntries(
+      maximumWidths.map((width, index) => [index, { truncate: width, width }])
+    )
   }
 
   const flexibleTotal = maximumWidths.reduce((sum, width, index) => {
@@ -120,14 +142,15 @@ function getColumnWidths(rows: string[][]): Record<number, { truncate: number, w
   }, 0)
   const remainingWidth = Math.max(0, availableWidth - minimumTotal)
 
-  return Object.fromEntries(Array.from({ length: columnCount }, (_, index) => {
-    const flexibleWidth = Math.max(0, maximumWidths[index] - minimumWidths[index])
-    const extraWidth = flexibleTotal === 0
-      ? 0
-      : Math.floor((flexibleWidth / flexibleTotal) * remainingWidth)
-    const width = Math.max(8, Math.min(maximumWidths[index], minimumWidths[index] + extraWidth))
-    return [index, { truncate: width, width }]
-  }))
+  return Object.fromEntries(
+    Array.from({ length: columnCount }, (_, index) => {
+      const flexibleWidth = Math.max(0, maximumWidths[index] - minimumWidths[index])
+      const extraWidth =
+        flexibleTotal === 0 ? 0 : Math.floor((flexibleWidth / flexibleTotal) * remainingWidth)
+      const width = Math.max(8, Math.min(maximumWidths[index], minimumWidths[index] + extraWidth))
+      return [index, { truncate: width, width }]
+    })
+  )
 }
 
 function printTable(rows: ResultItemProjection[], columns: string[]): void {
@@ -138,17 +161,19 @@ function printTable(rows: ResultItemProjection[], columns: string[]): void {
 
   const tableRows = [
     columns,
-    ...rows.map(row => columns.map(column => row.kind === 'record' ? row.record.cells[column]?.text ?? '' : '')),
+    ...rows.map((row) =>
+      columns.map((column) => (row.kind === 'record' ? (row.record.cells[column]?.text ?? '') : ''))
+    )
   ]
   const config = {
     border: getBorderCharacters('norc'),
     columnDefault: {
       paddingLeft: 1,
       paddingRight: 1,
-      wrapWord: false,
+      wrapWord: false
     },
     columns: getColumnWidths(tableRows),
-    drawHorizontalLine: (index: number) => index === 0 || index === 1 || index === tableRows.length,
+    drawHorizontalLine: (index: number) => index === 0 || index === 1 || index === tableRows.length
   } satisfies TableUserConfig
 
   console.log(table(tableRows, config).trimEnd())
@@ -260,9 +285,9 @@ function projectThreadSearchHit(record: JsonRecord): AgentSearchResult | null {
     id: sessionId,
     kind: 'thread',
     metadata,
-    next: `cradle session messages ${sessionId}`,
+    next: `cradle chat messages ${sessionId}`,
     preview: preview ? formatPreview(preview) : null,
-    title: readString(record, 'sessionTitle'),
+    title: readString(record, 'sessionTitle')
   }
 }
 
@@ -302,11 +327,12 @@ function projectChronicleSearchHit(record: JsonRecord): AgentSearchResult | null
     id,
     kind: `chronicle-${type}`,
     metadata,
-    next: type === 'memory'
-      ? `cradle chronicle memories get ${id}`
-      : `cradle chronicle knowledge-cards get ${id}`,
+    next:
+      type === 'memory'
+        ? `cradle chronicle memories get ${id}`
+        : `cradle chronicle knowledge-cards get ${id}`,
     preview: preview ? formatPreview(preview) : null,
-    title: readString(record, 'title'),
+    title: readString(record, 'title')
   }
 }
 
@@ -340,7 +366,7 @@ function projectIssueSearchHit(record: JsonRecord): AgentSearchResult | null {
     metadata,
     next: `cradle issue get ${id}`,
     preview: description ? formatPreview(description).slice(0, 260) : null,
-    title: `#${number} ${title}`,
+    title: `#${number} ${title}`
   }
 }
 
@@ -348,9 +374,11 @@ function projectAgentSearchResult(value: unknown): AgentSearchResult | null {
   if (!isRecord(value)) {
     return null
   }
-  return projectThreadSearchHit(value)
-    ?? projectChronicleSearchHit(value)
-    ?? projectIssueSearchHit(value)
+  return (
+    projectThreadSearchHit(value) ??
+    projectChronicleSearchHit(value) ??
+    projectIssueSearchHit(value)
+  )
 }
 
 function isAgentSearchResult(value: AgentSearchResult | null): value is AgentSearchResult {
@@ -377,23 +405,31 @@ function printAgent(result: unknown): boolean {
 }
 
 function countExistingFields(record: Record<string, unknown>, fields: string[]): number {
-  return fields.filter(field => Object.hasOwn(record, field)).length
+  return fields.filter((field) => Object.hasOwn(record, field)).length
 }
 
-function selectFieldsFromRecord(record: Record<string, unknown>, fields: string[]): Record<string, unknown> {
-  return Object.fromEntries(fields.flatMap((field) => {
-    return Object.hasOwn(record, field) ? [[field, record[field]]] : []
-  }))
+function selectFieldsFromRecord(
+  record: Record<string, unknown>,
+  fields: string[]
+): Record<string, unknown> {
+  return Object.fromEntries(
+    fields.flatMap((field) => {
+      return Object.hasOwn(record, field) ? [[field, record[field]]] : []
+    })
+  )
 }
 
 function selectFieldsFromArray(items: unknown[], fields: string[]): unknown[] {
-  return items.map(item => isRecord(item) ? selectFieldsFromRecord(item, fields) : item)
+  return items.map((item) => (isRecord(item) ? selectFieldsFromRecord(item, fields) : item))
 }
 
-function findWrappedArrayForFields(record: Record<string, unknown>, fields: string[]): unknown[] | null {
+function findWrappedArrayForFields(
+  record: Record<string, unknown>,
+  fields: string[]
+): unknown[] | null {
   const directScore = countExistingFields(record, fields)
   const candidates = Object.values(record).flatMap((value) => {
-    if (!Array.isArray(value) || value.some(item => !isRecord(item))) {
+    if (!Array.isArray(value) || value.some((item) => !isRecord(item))) {
       return []
     }
     const score = value.reduce((highestScore, item) => {

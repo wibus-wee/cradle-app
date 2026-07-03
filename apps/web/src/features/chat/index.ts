@@ -10,4 +10,4 @@ export type {
   SendMessageResult,
   ToolApprovalResponseInput,
 } from './session/use-chat-session'
-export { projectMainMessagesFromSnapshotRows, useChatSession, useChatSessionDriver } from './session/use-chat-session'
+export { projectMainMessagesFromSnapshotRows, useChatSession } from './session/use-chat-session'

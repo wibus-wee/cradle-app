@@ -7,6 +7,7 @@ import { Spinner } from '~/components/ui/spinner'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { useGitBranches, useGitGraph } from '~/features/git/use-git'
@@ -157,15 +158,16 @@ export function GitRefPicker({
                         {group.label}
                       </p>
                       {group.entries.map(item => (
-                        <button
+                        <Button
                           key={item.key}
                           type="button"
+                          variant="ghost"
                           onClick={() => {
                             onValueChange(item.value)
                             setSearch('')
                           }}
                           className={cn(
-                            'flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-accent/60',
+                            'h-auto w-full justify-start gap-2 rounded-none px-2 py-1.5 text-left text-[12px] font-normal hover:bg-accent/60',
                             value === item.value && 'bg-accent/40',
                           )}
                         >
@@ -181,7 +183,7 @@ export function GitRefPicker({
                           {value === item.value && (
                             <CheckIcon className="size-3 shrink-0 !text-primary" aria-hidden />
                           )}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   ))

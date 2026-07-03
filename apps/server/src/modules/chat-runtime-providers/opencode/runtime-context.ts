@@ -32,6 +32,7 @@ import { createOpencodeClient } from '@opencode-ai/sdk'
 import { createChildLogger } from '../../../logging/logger'
 import type { RuntimeLiveResourceLease } from '../../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../../provider-contracts/types'
+import { createDetachedProcessHostLease } from '../kit/process-host'
 
 const logger = createChildLogger({ module: 'chat-runtime.opencode-server' })
 
@@ -380,15 +381,7 @@ export async function acquireOpencodeRuntimeResource(input: {
       close: () => instance.close(),
     },
   }
-  return createSharedLease(resource)
-}
-
-function createSharedLease(resource: OpencodeRuntimeResource): RuntimeLiveResourceLease<OpencodeRuntimeResource> {
-  return {
-    resource,
-    refresh() {},
-    release() {},
-  }
+  return createDetachedProcessHostLease(resource)
 }
 
 async function findAvailablePort(): Promise<number> {

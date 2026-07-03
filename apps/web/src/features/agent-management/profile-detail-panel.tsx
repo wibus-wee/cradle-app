@@ -58,6 +58,7 @@ import {
   writeClaudeAgentModelAliases,
 } from '~/features/agent-runtime/claude-agent-config'
 import { ProfileConfigJsonSchema } from '~/features/agent-runtime/profile-config-schema'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 import type { AgentProfile, ApiProviderKind, ModelDescriptor, ProviderTarget } from '~/features/agent-runtime/types'
 import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { apiErrorMessage } from '~/lib/api-error'
@@ -91,6 +92,16 @@ import {
   presetForProviderKind,
   PROVIDER_KIND_LABELS,
 } from './provider-settings-utils'
+import { RuntimeSettingsSchemaFields } from './runtime-settings-schema-fields'
+import type {
+  RuntimeSettingsFieldDescriptor,
+  RuntimeSettingsFormValue,
+} from './runtime-settings-schema'
+import {
+  listRuntimeSettingsFields,
+  readRuntimeSettingsFormValues,
+  writeRuntimeSettingsConfig,
+} from './runtime-settings-schema'
 import type { EditableCustomModel } from './provider-target-model-settings'
 import {
   CustomModelsJsonSchema,
@@ -110,6 +121,16 @@ import { isChatgptCredentialMetadata, useCredentialMetadata } from './use-creden
 type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 type ProfileTextField = 'name' | 'apiKey' | 'baseUrl' | 'openaiBaseUrl' | 'anthropicBaseUrl' | 'api' | 'authMode' | 'bedrockRegion'
 
+interface BuildProfileConfigOptions {
+  codexAuthMode?: string | null
+  runtimeSettingsFields?: RuntimeSettingsFieldDescriptor[]
+}
+
+interface CustomModelsState {
+  customModelsJson: string
+  models: EditableCustomModel[]
+}
+
 interface ProfileDetailFormValues {
   name: string
   apiKey: string
@@ -123,6 +144,7 @@ interface ProfileDetailFormValues {
   bedrockRegion: string
   claudeAgentAliases: ClaudeAgentModelAliases
   enabledModels: string[]
+  runtimeSettingsValues: Record<string, RuntimeSettingsFormValue>
 }
 
 interface ProfileDetailUiState {
@@ -131,6 +153,11 @@ interface ProfileDetailUiState {
   modelsCachedAt: number | null
   saveState: SaveState
   confirmRemove: boolean
+}
+
+interface ChatgptLoginState {
+  loginId: string | null
+  activeLogin: ChatgptCredentialLoginStart | null
 }
 
 const SecretCreateResponseSchema = z.object({
@@ -146,12 +173,21 @@ type ProfileDetailUiAction
     | { type: 'save/set', state: SaveState }
     | { type: 'remove/set', open: boolean }
 
+type ChatgptLoginAction
+  = | { type: 'start', login: ChatgptCredentialLoginStart }
+    | { type: 'clear' }
+
 const INITIAL_UI_STATE: ProfileDetailUiState = {
   availableModels: [],
   modelsLoading: false,
   modelsCachedAt: null,
   saveState: 'idle',
   confirmRemove: false,
+}
+
+const INITIAL_CHATGPT_LOGIN_STATE: ChatgptLoginState = {
+  loginId: null,
+  activeLogin: null,
 }
 
 const EMPTY_ENABLED_MODELS: string[] = []
@@ -211,11 +247,31 @@ function profileDetailUiReducer(
   }
 }
 
+function chatgptLoginReducer(
+  state: ChatgptLoginState,
+  action: ChatgptLoginAction,
+): ChatgptLoginState {
+  switch (action.type) {
+    case 'start':
+      return {
+        loginId: action.login.loginId,
+        activeLogin: action.login,
+      }
+    case 'clear':
+      return INITIAL_CHATGPT_LOGIN_STATE
+    default:
+      return state
+  }
+}
+
 function getInitialEnabledModels(enabledModels: string[]): string[] {
   return enabledModels
 }
 
-function getProfileFormValues(profile: AgentProfile): ProfileDetailFormValues {
+function getProfileFormValues(
+  profile: AgentProfile,
+  runtimeSettingsFields: RuntimeSettingsFieldDescriptor[] = [],
+): ProfileDetailFormValues {
   const config = ProfileConfigJsonSchema.parse(profile.configJson)
   return {
     name: profile.name,
@@ -232,6 +288,7 @@ function getProfileFormValues(profile: AgentProfile): ProfileDetailFormValues {
     bedrockRegion: config.bedrock?.region ?? '',
     claudeAgentAliases: readClaudeAgentModelAliases(config),
     enabledModels: getInitialEnabledModels(config.enabledModels),
+    runtimeSettingsValues: readRuntimeSettingsFormValues(config, runtimeSettingsFields),
   }
 }
 
@@ -266,7 +323,7 @@ function buildProviderRequestBody(profile: AgentProfile) {
 function buildProfileConfig(
   values: ProfileDetailFormValues,
   currentConfig: Record<string, unknown>,
-  options: { codexAuthMode?: string | null } = {},
+  options: BuildProfileConfigOptions = {},
 ): Record<string, unknown> {
   const {
     enabledModels: _,
@@ -279,16 +336,16 @@ function buildProfileConfig(
     ...rest
   } = currentConfig
   if (values.providerKind === 'universal') {
-    return applyClaudeAgentAliasesToProfileConfig({
+    return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
       ...rest,
       openaiBaseUrl: values.openaiBaseUrl,
       anthropicBaseUrl: values.anthropicBaseUrl,
       model: values.model || undefined,
-    }, values)
+    }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
   }
   if (values.providerKind === 'openai-compatible' && options.codexAuthMode) {
     const codexAuthMode = normalizeCodexAuthMode(options.codexAuthMode)
-    return applyClaudeAgentAliasesToProfileConfig({
+    return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
       ...rest,
       authMode: codexAuthMode,
       baseUrl: codexAuthMode === CODEX_AUTH_MODE_API_KEY ? values.baseUrl : '',
@@ -297,24 +354,24 @@ function buildProfileConfig(
       ...(codexAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY
         ? { bedrock: { region: values.bedrockRegion.trim() } }
         : {}),
-    }, values)
+    }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
   }
   if (values.providerKind === 'anthropic') {
     const claudeAuthMode = normalizeClaudeAuthMode(values.authMode)
-    return applyClaudeAgentAliasesToProfileConfig({
+    return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
       ...rest,
       authMode: claudeAuthMode,
       baseUrl: claudeAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI ? '' : values.baseUrl,
       model: values.model || undefined,
       api: values.api || undefined,
-    }, values)
+    }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
   }
-  return applyClaudeAgentAliasesToProfileConfig({
+  return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
     ...rest,
     baseUrl: values.baseUrl,
     model: values.model || undefined,
     api: values.api || undefined,
-  }, values)
+  }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
 }
 
 function createProfileSignature(values: ProfileDetailFormValues): string {
@@ -331,7 +388,25 @@ function createProfileSignature(values: ProfileDetailFormValues): string {
     bedrockRegion: values.bedrockRegion,
     claudeAgentAliases: values.claudeAgentAliases,
     enabledModels: values.enabledModels,
+    runtimeSettingsValues: values.runtimeSettingsValues,
   })
+}
+
+function createRuntimeSettingsFieldsSignature(fields: RuntimeSettingsFieldDescriptor[]): string {
+  return JSON.stringify(fields.map(field => ({
+    runtimeKind: field.runtimeKind,
+    key: field.key,
+    type: field.type,
+    defaultValue: field.defaultValue,
+    enumOptions: field.enumOptions,
+  })))
+}
+
+function readCustomModelsState(customModelsJson: string): CustomModelsState {
+  return {
+    customModelsJson,
+    models: CustomModelsJsonSchema.parse(customModelsJson),
+  }
 }
 
 function clearTimer(timerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>) {
@@ -345,11 +420,13 @@ function clearTimer(timerRef: MutableRefObject<ReturnType<typeof setTimeout> | n
 
 export function ProfileDetailPanel({
   profile,
+  runtimeSettingsDescriptors,
   onRemove,
   onToggle,
   onSaved,
 }: {
   profile: AgentProfile
+  runtimeSettingsDescriptors?: RuntimeCatalogItem[]
   onRemove: () => void
   onToggle: (enabled: boolean) => void
   onSaved: () => void
@@ -358,9 +435,11 @@ export function ProfileDetailPanel({
   const providerTarget: ProviderTarget = ({ kind: 'manual', id: profile.id })
 
   const supportsModels = true
+  const runtimeSettingsFields = listRuntimeSettingsFields(runtimeSettingsDescriptors ?? [])
+  const runtimeSettingsFieldsSignature = createRuntimeSettingsFieldsSignature(runtimeSettingsFields)
 
   const form = useForm<ProfileDetailFormValues>({
-    defaultValues: getProfileFormValues(profile),
+    defaultValues: getProfileFormValues(profile, runtimeSettingsFields),
   })
   const name = useWatch({ control: form.control, name: 'name' }) ?? ''
   const apiKey = useWatch({ control: form.control, name: 'apiKey' }) ?? ''
@@ -376,6 +455,8 @@ export function ProfileDetailPanel({
     = useWatch({ control: form.control, name: 'claudeAgentAliases' }) ?? DEFAULT_CLAUDE_AGENT_ALIASES
   const enabledModels
     = useWatch({ control: form.control, name: 'enabledModels' }) ?? EMPTY_ENABLED_MODELS
+  const runtimeSettingsValues
+    = useWatch({ control: form.control, name: 'runtimeSettingsValues' }) ?? {}
 
   const [uiState, dispatch] = useReducer(profileDetailUiReducer, INITIAL_UI_STATE)
   const { availableModels, modelsLoading, modelsCachedAt, saveState, confirmRemove } = uiState
@@ -384,13 +465,16 @@ export function ProfileDetailPanel({
   const savedClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const modelsRequestRef = useRef(0)
   const saveRequestRef = useRef(0)
-  const savedSignatureRef = useRef(createProfileSignature(getProfileFormValues(profile)))
+  const savedSignatureRef = useRef(createProfileSignature(getProfileFormValues(profile, runtimeSettingsFields)))
   const latestProfileRef = useRef(profile)
   const selectedProfileIdRef = useRef(profile.id)
-  const [chatgptLoginId, setChatgptLoginId] = useState<string | null>(null)
-  const [activeChatgptLogin, setActiveChatgptLogin] = useState<ChatgptCredentialLoginStart | null>(null)
+  const runtimeSettingsFieldsSignatureRef = useRef(runtimeSettingsFieldsSignature)
+  const [chatgptLogin, dispatchChatgptLogin] = useReducer(
+    chatgptLoginReducer,
+    INITIAL_CHATGPT_LOGIN_STATE,
+  )
   const { startLogin, cancelLogin } = useChatgptCredentialLoginActions()
-  const chatgptLoginStatus = useChatgptCredentialLoginStatus(chatgptLoginId)
+  const chatgptLoginStatus = useChatgptCredentialLoginStatus(chatgptLogin.loginId)
   const credentialMetadata = useCredentialMetadata(profile.credentialRef)
   const showCodexAccountDiagnostics = providerKind === 'openai-compatible'
     && normalizeCodexAuthMode(authMode) === CODEX_AUTH_MODE_CHATGPT
@@ -412,8 +496,7 @@ export function ProfileDetailPanel({
       form.setValue('baseUrl', '', { shouldDirty: false })
       form.setValue('apiKey', '', { shouldDirty: false })
       form.setValue('authMode', CODEX_AUTH_MODE_CHATGPT, { shouldDirty: false })
-      setChatgptLoginId(null)
-      setActiveChatgptLogin(null)
+      dispatchChatgptLogin({ type: 'clear' })
       void putProfilesById({
         path: { id: profile.id },
         body: {
@@ -436,17 +519,16 @@ export function ProfileDetailPanel({
         })
     }
     if (login.state === 'failed') {
-      setActiveChatgptLogin(null)
+      dispatchChatgptLogin({ type: 'clear' })
       dispatch({ type: 'save/set', state: 'error' })
     }
-  }, [chatgptLoginStatus.data, form, onSaved, profile, queryClient])
+  }, [chatgptLoginStatus.data, dispatchChatgptLogin, form, onSaved, profile, queryClient])
 
   const handleChatgptLogin = async () => {
     const reservedWindow = reserveChatgptCredentialLoginWindow()
     try {
       const login = await startLogin.mutateAsync(`${profile.name} ChatGPT`)
-      setChatgptLoginId(login.loginId)
-      setActiveChatgptLogin(login)
+      dispatchChatgptLogin({ type: 'start', login })
       await navigator.clipboard?.writeText(login.userCode).catch(() => undefined)
       await openChatgptCredentialLoginUrl(login.verificationUrl, reservedWindow)
       dispatch({ type: 'save/set', state: 'pending' })
@@ -459,12 +541,11 @@ export function ProfileDetailPanel({
   }
 
   const handleCancelChatgptLogin = async () => {
-    if (!chatgptLoginId) {
+    if (!chatgptLogin.loginId) {
       return
     }
-    await cancelLogin.mutateAsync(chatgptLoginId).catch(() => undefined)
-    setChatgptLoginId(null)
-    setActiveChatgptLogin(null)
+    await cancelLogin.mutateAsync(chatgptLogin.loginId).catch(() => undefined)
+    dispatchChatgptLogin({ type: 'clear' })
     dispatch({ type: 'save/set', state: 'idle' })
   }
 
@@ -493,6 +574,13 @@ export function ProfileDetailPanel({
 
   const handleEnabledModelsChange = (next: string[]) => {
       form.setValue('enabledModels', next, { shouldDirty: true })
+    }
+
+  const handleRuntimeSettingChange = (key: string, value: RuntimeSettingsFormValue) => {
+      form.setValue('runtimeSettingsValues', {
+        ...form.getValues('runtimeSettingsValues'),
+        [key]: value,
+      }, { shouldDirty: true })
     }
 
   const handleClaudeAgentAliasesChange = (next: ClaudeAgentModelAliases) => {
@@ -539,7 +627,7 @@ export function ProfileDetailPanel({
           }
           dispatch({ type: 'models/failed' })
         })
-    }, [queryClient])
+    }, [dispatch, queryClient])
 
   // Reset state when switching profile. Same-profile refetches happen after auto-save
   // and must not clear the already loaded model list.
@@ -552,11 +640,28 @@ export function ProfileDetailPanel({
     clearSavedClearTimer()
     modelsRequestRef.current += 1
     saveRequestRef.current += 1
-    const initialValues = getProfileFormValues(profile)
+    const initialValues = getProfileFormValues(profile, runtimeSettingsFields)
     savedSignatureRef.current = createProfileSignature(initialValues)
     form.reset(initialValues)
     dispatch({ type: 'reset' })
-  }, [form, profile])
+  }, [form, profile, runtimeSettingsFields, runtimeSettingsFieldsSignature])
+
+  useEffect(() => {
+    if (runtimeSettingsFieldsSignatureRef.current === runtimeSettingsFieldsSignature) {
+      return
+    }
+    runtimeSettingsFieldsSignatureRef.current = runtimeSettingsFieldsSignature
+    const currentValues = form.getValues()
+    const nextValues = {
+      ...currentValues,
+      runtimeSettingsValues: readRuntimeSettingsFormValues(
+        ProfileConfigJsonSchema.parse(latestProfileRef.current.configJson),
+        runtimeSettingsFields,
+      ),
+    }
+    savedSignatureRef.current = createProfileSignature(nextValues)
+    form.reset(nextValues)
+  }, [form, runtimeSettingsFields, runtimeSettingsFieldsSignature])
 
   useEffect(() => {
     if (profile.providerKind !== 'openai-compatible') {
@@ -669,7 +774,10 @@ export function ProfileDetailPanel({
           providerKind: currentValues.providerKind,
           enabled: profile.enabled,
           config: supportsModels
-            ? buildProfileConfig(currentValues, ProfileConfigJsonSchema.parse(profile.configJson), { codexAuthMode })
+            ? buildProfileConfig(currentValues, ProfileConfigJsonSchema.parse(profile.configJson), {
+                codexAuthMode,
+                runtimeSettingsFields,
+              })
             : ProfileConfigJsonSchema.parse(profile.configJson),
           credentialRef,
         },
@@ -718,6 +826,7 @@ export function ProfileDetailPanel({
         bedrockRegion,
         claudeAgentAliases,
         enabledModels,
+        runtimeSettingsValues,
       })
 
   // Auto-save with debounce — but skip the very first run after switching profiles
@@ -797,11 +906,17 @@ export function ProfileDetailPanel({
           onProviderKindChange={setProviderKind}
           supportsModels={supportsModels}
           readOnly={false}
-          chatgptLoginPending={!!chatgptLoginId}
+          chatgptLoginPending={!!chatgptLogin.loginId}
           chatgptLoginBusy={startLogin.isPending}
-          activeChatgptLogin={activeChatgptLogin}
+          activeChatgptLogin={chatgptLogin.activeLogin}
           onChatgptLogin={handleChatgptLogin}
           onCancelChatgptLogin={handleCancelChatgptLogin}
+        />
+
+        <RuntimeSettingsSchemaFields
+          fields={runtimeSettingsFields}
+          values={runtimeSettingsValues}
+          onChange={handleRuntimeSettingChange}
         />
 
         {showCodexAccountDiagnostics && (
@@ -1334,18 +1449,26 @@ function ProfileCustomModelsSection({
   onRefreshModels: () => void
 }) {
   const queryClient = useQueryClient()
-  const [models, setModels] = useState<EditableCustomModel[]>(() =>
-    CustomModelsJsonSchema.parse(customModelsJson))
+  const [customModelsState, setCustomModelsState] = useState<CustomModelsState>(() =>
+    readCustomModelsState(customModelsJson))
 
-  // Sync from props when profile changes
-  useEffect(() => {
-    setModels(CustomModelsJsonSchema.parse(customModelsJson))
-  }, [customModelsJson])
+  let models = customModelsState.models
+  if (customModelsState.customModelsJson !== customModelsJson) {
+    const nextState = readCustomModelsState(customModelsJson)
+    setCustomModelsState(nextState)
+    models = nextState.models
+  }
 
   const saveCustomModels = async (next: EditableCustomModel[]) => {
-      setModels(next)
+      setCustomModelsState({
+        customModelsJson,
+        models: next,
+      })
       try {
-        setModels(await updateProviderTargetCustomModels(providerTarget, next))
+        setCustomModelsState({
+          customModelsJson,
+          models: await updateProviderTargetCustomModels(providerTarget, next),
+        })
         void queryClient.invalidateQueries({ queryKey: AGENT_MODELS_QUERY_KEY })
         onRefreshModels()
         onSaved()

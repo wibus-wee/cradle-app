@@ -112,32 +112,6 @@ export function readGoalMessageObjective(message: UIMessage): string | null {
     : null
 }
 
-export function annotateCodexGoalContinuationMessage(message: UIMessage): UIMessage {
-  const metadata = readObjectRecord((message as { metadata?: unknown }).metadata)
-  const cradleMetadata = readObjectRecord(metadata.cradle)
-  const codexMetadata = readObjectRecord(cradleMetadata.codex)
-  return {
-    ...message,
-    metadata: {
-      ...metadata,
-      cradle: {
-        ...cradleMetadata,
-        codex: {
-          ...codexMetadata,
-          goalContinuation: true,
-        },
-      },
-    },
-  } as UIMessage
-}
-
-export function isCodexGoalContinuationMessage(message: UIMessage): boolean {
-  const metadata = readObjectRecord((message as { metadata?: unknown }).metadata)
-  const cradleMetadata = readObjectRecord(metadata.cradle)
-  const codexMetadata = readObjectRecord(cradleMetadata.codex)
-  return codexMetadata.goalContinuation === true
-}
-
 export function extractMessageText(message: UIMessage): string {
   const parsedMessage = normalizeMessageSnapshot(message)
   return parsedMessage.parts

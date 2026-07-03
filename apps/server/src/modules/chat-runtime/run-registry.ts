@@ -1,4 +1,37 @@
-import type { ActiveRun } from './service'
+import type { UIMessage, UIMessageChunk } from 'ai'
+
+import type { FinalMessageProjectionState } from './run/final-message-projection'
+import type { ChatMessageStatus } from './run/stream-chunks'
+import type { ChatRuntime, ChatRuntimeSettings, RuntimeSession } from './runtime-provider-types'
+
+export type TerminalChatMessageStatus = Exclude<ChatMessageStatus, 'streaming'>
+
+export interface ActiveRun {
+  runId: string
+  sessionId: string
+  messageId: string
+  providerTargetKind: 'manual' | 'external' | null
+  providerTargetId: string | null
+  runtime: ChatRuntime
+  runtimeSession: RuntimeSession
+  modelId: string | null
+  chunkBuffer: UIMessageChunk[]
+  chunkBufferIndexByKey: Map<string, number>
+  pendingDeltaChunk: UIMessageChunk | null
+  pendingDeltaFlushTimer: ReturnType<typeof setTimeout> | null
+  snapshotTimer: ReturnType<typeof setInterval> | null
+  finalMessage: UIMessage
+  finalProjection: FinalMessageProjectionState
+  startChunkPublished?: boolean
+  firstTextDeltaSnapshotRecorded?: boolean
+  terminalStatus?: TerminalChatMessageStatus
+  cancelRequested?: boolean
+  queueItemId?: string
+  runtimeSettings: ChatRuntimeSettings
+  internalContinuation?: 'runtimeGoal'
+  runSnapshotId?: string | null
+  runSnapshotSeq: number
+}
 
 /**
  * Per-session in-flight run state. Owned by the run registry so that concern

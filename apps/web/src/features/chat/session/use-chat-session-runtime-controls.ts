@@ -7,6 +7,7 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import { isSessionsQueryKey } from '~/features/workspace/use-session'
 
+import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
 import { SNAPSHOT_SYNC_DEBOUNCE_MS } from './use-chat-session-types'
 
 export interface ChatSessionRuntimeControls {
@@ -15,6 +16,7 @@ export interface ChatSessionRuntimeControls {
   sessionBindingQueryKey: ReturnType<typeof getSessionsByIdQueryKey> | null
   queueQueryKey: readonly ['chat', 'session-queue', string]
   scheduleSnapshotRefresh: (delay?: number) => void
+  refreshRuntimeUiSlotStates: () => void
   refreshSessionLists: () => void
   refreshQueue: (delay?: number) => void
 }
@@ -63,6 +65,10 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
     void queryClient.invalidateQueries({ predicate: query => isSessionsQueryKey(query.queryKey) })
   }, [queryClient])
 
+  const refreshRuntimeUiSlotStates = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(chatSessionId) })
+  }, [chatSessionId, queryClient])
+
   const refreshQueue = useCallback((delay = 0) => {
     if (delay <= 0) {
       void queryClient.invalidateQueries({ queryKey: queueQueryKey })
@@ -91,6 +97,7 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
     sessionBindingQueryKey,
     queueQueryKey,
     scheduleSnapshotRefresh,
+    refreshRuntimeUiSlotStates,
     refreshSessionLists,
     refreshQueue,
   }

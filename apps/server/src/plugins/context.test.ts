@@ -321,6 +321,7 @@ describe('server plugin context lifecycle', () => {
         supportsRuntimeSettings: false,
         supportsUiSlotStates: false,
         supportsDynamicCapabilities: false,
+        supportsTitleGeneration: false,
         sessionModelSwitch: 'unsupported',
       } satisfies ChatRuntimeCapabilities,
       async startChatSession(input) {

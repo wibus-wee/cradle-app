@@ -1,31 +1,30 @@
 import { Streamdown } from '@cradle/streamdown'
+import {
+  AlertLine as AlertCircleIcon,
+  AnticlockwiseLine as RotateCcwIcon,
+  ArrowLeftLine as ArrowLeftIcon,
+  CheckCircleLine as CheckCircle2Icon,
+  Clock2Line as Clock3Icon,
+  CloseCircleLine as XCircleIcon,
+  DownSmallLine as ChevronDownIcon,
+  GitCompareLine as FileDiffIcon,
+  HeartbeatLine as ActivityIcon,
+  RightSmallLine as ChevronRightIcon,
+  SparklesLine as SparklesIcon,
+  TreeLine as ListTreeIcon,
+} from '@mingcute/react'
 import type { CodeViewItem, FileDiffMetadata } from '@pierre/diffs'
 import type { CodeViewHandle } from '@pierre/diffs/react'
 import { CodeView } from '@pierre/diffs/react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  HeartbeatLine as ActivityIcon,
-  AlertLine as AlertCircleIcon,
-  ArrowLeftLine as ArrowLeftIcon,
-  CheckCircleLine as CheckCircle2Icon,
-  DownSmallLine as ChevronDownIcon,
-  RightSmallLine as ChevronRightIcon,
-  Clock2Line as Clock3Icon,
-  GitCompareLine as FileDiffIcon,
-  TreeLine as ListTreeIcon,
-  AnticlockwiseLine as RotateCcwIcon,
-  SparklesLine as SparklesIcon,
-  CloseCircleLine as XCircleIcon
-} from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { getChatSessionsBySessionIdMessagesOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import type { ChatSessionMessageRow } from '~/features/chat/session/use-chat-session-types'
 import { ProviderModelSelector, RuntimeSelector, useComposerState } from '~/features/composer-toolbar'
-import type { RuntimeKindOption } from '~/features/composer-toolbar/constants'
 import { useNow } from '~/hooks/use-now'
 import { cn } from '~/lib/cn'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
@@ -39,7 +38,8 @@ import {
   formatAnchorRange,
   guideAnchorsForPath,
 } from '../shared/diff-items'
-import type { GenerateGuideInput, GuideRuntimeKind, ReviewFile, ReviewGuideAnchor, ReviewGuideStep } from '../shared/types'
+import { useProviderBackedDiffRuntimeSelection } from '../shared/runtime-options'
+import type { GenerateGuideInput, ReviewFile, ReviewGuideAnchor, ReviewGuideStep } from '../shared/types'
 import { useReview } from '../shared/use-review'
 
 interface GuideViewProps {
@@ -48,12 +48,6 @@ interface GuideViewProps {
   reviewId: string
   onBack: () => void
 }
-
-/** Change walkthroughs can only be produced by these runtimes. */
-const GUIDE_RUNTIME_OPTIONS: RuntimeKindOption[] = [
-  { value: 'codex' },
-  { value: 'claude-agent' },
-]
 
 export function GuideView({ workspaceId, repositoryPath, reviewId, onBack }: GuideViewProps) {
   const { review, isLoading, generateGuideMutation, cancelGuideMutation } = useReview({ workspaceId, repositoryPath, reviewId })
@@ -166,8 +160,12 @@ function GuideGenerateGate({
   const runtimeKind = composer.selection.runtimeKind
   const profileId = composer.selection.profileId
   const modelId = composer.selection.modelId
+  const {
+    runtimeKindSet: guideRuntimeKinds,
+    runtimeOptions: guideRuntimeOptions,
+  } = useProviderBackedDiffRuntimeSelection(composer.runtimeOptions)
 
-  const canGenerate = profileId != null && isGuideRuntime(runtimeKind)
+  const canGenerate = profileId != null && guideRuntimeKinds.has(runtimeKind)
   const generationActive = pending || isGuideGenerationActive(review.guide.status)
 
   const handleGenerate = () => {
@@ -176,7 +174,7 @@ function GuideGenerateGate({
     }
     onGenerate({
       providerTargetId: profileId,
-      runtimeKind: runtimeKind as GuideRuntimeKind,
+      runtimeKind,
       modelId: modelId ?? null,
       force,
     })
@@ -204,7 +202,7 @@ function GuideGenerateGate({
             <RuntimeSelector
               value={runtimeKind}
               onChange={composer.setRuntimeKind}
-              options={GUIDE_RUNTIME_OPTIONS}
+              options={guideRuntimeOptions}
               disabled={generationActive}
             />
           </Field>
@@ -337,15 +335,16 @@ function GuideGenerationStatusPanel({
     const row = [...(messagesQuery.data ?? [])]
       .reverse()
       .find(message => message.role === 'assistant' && !message.parentToolCallId)
-    if (!row) return null
+    if (!row) { return null }
     const parts = row.message?.parts ?? []
     let combined = ''
     for (const part of parts) {
       if (part.type === 'text') {
         combined += part.text
-      } else if (part.type === 'reasoning') {
+      }
+      else if (part.type === 'reasoning') {
         const reasoningText = (part as { text?: string }).text
-        if (reasoningText) combined += reasoningText
+        if (reasoningText) { combined += reasoningText }
       }
     }
     return combined.trim() || null
@@ -501,10 +500,6 @@ function Field({ label, children }: { label: string, children: React.ReactNode }
       <div>{children}</div>
     </div>
   )
-}
-
-function isGuideRuntime(kind: string): kind is GuideRuntimeKind {
-  return kind === 'codex' || kind === 'claude-agent'
 }
 
 function GuideReading({
@@ -801,10 +796,11 @@ function CollapsedFileBlock({
   const deletions = file?.deletions ?? 0
   const changeLabel = changeTypeLabel(fileDiff.type)
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onToggle}
-      className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+      className="h-auto w-full justify-start gap-2 rounded-none px-3 py-2 text-left font-normal hover:bg-muted/40"
     >
       {expanded
         ? <ChevronDownIcon className="size-3.5 shrink-0 !text-muted-foreground/60" />
@@ -833,7 +829,7 @@ function CollapsedFileBlock({
 {deletions}
         </span>
       </span>
-    </button>
+    </Button>
   )
 }
 

@@ -1,35 +1,23 @@
 import {
-  RouteLine as RouteIcon,
-  SendPlaneLine as SendHorizonalIcon,
-  SquareLine as SquareIcon,
   TerminalBoxLine as SquareTerminalIcon,
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
 import type { FileUIPart } from 'ai'
 import type { ChangeEvent } from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 
-import { Button } from '~/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
-import { toastManager } from '~/components/ui/toast'
 import { useComposerDraftSync } from '~/hooks/use-composer-draft-sync'
 import { cn } from '~/lib/cn'
 import { isLocalMode } from '~/lib/electron'
-import { formatTokenCount } from '~/lib/number-format'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
-import { useComposerDraftStore } from '~/store/composer-draft'
 
 import type { ChatRuntimeCompactUiSlotState } from '../capabilities/chat-capabilities'
 import { readBangCommand } from '../commands/bang-command'
 import type { ChatRuntimeSettings, ChatRuntimeSettingsPatch } from '../commands/chat-response-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
-import { ContextUsageDetailPanel } from '../context/context-usage-detail-panel'
 import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../mentions/mention-panel'
 import { MentionPanel } from '../mentions/mention-panel'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { SkillMentionPanel } from '../mentions/skill-mention-panel'
-import type { SendMessageResult } from '../session/use-chat-session'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   CHAT_SLASH_COMMAND_LISTBOX_ID,
@@ -48,25 +36,25 @@ import type {
   ComposerSlashCommandActionTools,
 } from './composer-action-context'
 import { readComposerActionContext } from './composer-action-context'
-import type { ComposerAttachmentController } from './composer-attachment-state'
+import { ComposerActions } from './composer-actions'
 import { useComposerAttachments } from './composer-attachment-state'
 import type { PendingAppshotAttachment } from './composer-attachments'
 import {
-  ComposerAttachmentButton,
   ComposerAttachmentInput,
   ComposerAttachmentList,
 } from './composer-attachments'
+import { composerReducer, INITIAL_COMPOSER_STATE } from './composer-state'
+import type { ComposerSendHandler, ComposerSendResult } from './composer-submit'
+import {
+  isComposerSendPromise,
+  readBangCommandDraft,
+  reportComposerSubmitError,
+  submitAndClearDraft,
+} from './composer-submit'
 import type { PromptEditorController, PromptEditorSnapshot, PromptEditorTriggerRange } from './prompt-editor'
 import { PromptEditor } from './prompt-editor'
 
-type ComposerSendResult = SendMessageResult | boolean
-
-export type ComposerSendHandler = (
-  text: string,
-  files: FileUIPart[],
-  contextParts: ChatContextPart[],
-  options?: { invertContinuationMode?: boolean },
-) => ComposerSendResult | Promise<ComposerSendResult>
+export type { ComposerSendHandler } from './composer-submit'
 
 export interface ComposerSendController {
   submit: ComposerSendHandler
@@ -205,535 +193,6 @@ const textareaRowsClasses: Record<number, string> = {
   5: 'min-h-30 max-h-80',
 }
 
-function isComposerSendPromise(
-  result: ComposerSendResult | Promise<ComposerSendResult>,
-): result is Promise<ComposerSendResult> {
-  return typeof result === 'object'
-    && result !== null
-    && 'then' in result
-    && typeof result.then === 'function'
-}
-
-function reportComposerSubmitError(error: unknown) {
-  console.error('[Composer] submit failed:', error)
-  toastManager.add({
-    type: 'error',
-    title: 'Message submit failed',
-    description: error instanceof Error ? error.message : 'Unknown submit error.',
-  })
-}
-
-function clearSubmittedDraft({
-  clearAttachments,
-  dispatch,
-  promptEditor,
-}: {
-  clearAttachments: () => void
-  dispatch: (action: ComposerAction) => void
-  promptEditor: PromptEditorController | null
-}) {
-  clearAttachments()
-  promptEditor?.clear()
-  dispatch({ type: 'input/cleared' })
-}
-
-function restoreSubmittedDraft({
-  appendFileParts,
-  contextParts,
-  dispatch,
-  files,
-  promptEditor,
-  text,
-}: {
-  appendFileParts: (fileParts: FileUIPart[]) => void
-  contextParts: ChatContextPart[]
-  dispatch: (action: ComposerAction) => void
-  files: FileUIPart[]
-  promptEditor: PromptEditorController | null
-  text: string
-}) {
-  if (promptEditor?.getText().trim()) {
-    return
-  }
-
-  if (files.length > 0) {
-    appendFileParts(files)
-  }
-  promptEditor?.setText(text)
-  dispatch({
-    type: 'input/changed',
-    state: {
-      ...INITIAL_COMPOSER_STATE,
-      inputValue: text,
-      contextParts,
-    },
-  })
-}
-
-function submitAndClearDraft({
-  appendFileParts,
-  clearAttachments,
-  contextParts,
-  dispatch,
-  files,
-  options,
-  promptEditor,
-  submit,
-  text,
-}: {
-  appendFileParts: (fileParts: FileUIPart[]) => void
-  clearAttachments: () => void
-  contextParts: ChatContextPart[]
-  dispatch: (action: ComposerAction) => void
-  files: FileUIPart[]
-  options?: { invertContinuationMode?: boolean }
-  promptEditor: PromptEditorController | null
-  submit: ComposerSendHandler
-  text: string
-}) {
-  let result: ComposerSendResult | Promise<ComposerSendResult>
-  try {
-    result = options
-      ? submit(text, files, contextParts, options)
-      : submit(text, files, contextParts)
-  }
-  catch (error) {
-    reportComposerSubmitError(error)
-    return
-  }
-
-  if (result === false) {
-    return
-  }
-
-  clearSubmittedDraft({ clearAttachments, dispatch, promptEditor })
-
-  if (isComposerSendPromise(result)) {
-    void result
-      .then((resolved) => {
-        if (resolved === false) {
-          restoreSubmittedDraft({ appendFileParts, contextParts, dispatch, files, promptEditor, text })
-        }
-      })
-      .catch((error) => {
-        reportComposerSubmitError(error)
-        restoreSubmittedDraft({ appendFileParts, contextParts, dispatch, files, promptEditor, text })
-      })
-  }
-}
-
-function readBangCommandDraft(text: string): string | null {
-  const normalized = text.trimStart()
-  if (!normalized.startsWith('!') || normalized.includes('\n') || normalized.includes('\r')) {
-    return null
-  }
-  const preview = normalized.slice(1).trim()
-  return preview || '!'
-}
-
-interface ComposerState {
-  inputValue: string
-  mentionActive: boolean
-  mentionQuery: string
-  slashActive: boolean
-  slashQuery: string
-  skillActive: boolean
-  skillQuery: string
-  contextParts: ChatContextPart[]
-  selectedSlashCommand: ChatComposerSlashCommand | null
-}
-
-type ComposerAction
-  = | { type: 'input/changed', state: ComposerState }
-  | { type: 'input/cleared' }
-  | { type: 'mention/closed' }
-  | { type: 'mention/selected' }
-  | { type: 'slash/closed' }
-  | { type: 'slash/selected', inputValue: string, command: ChatComposerSlashCommand | null }
-  | { type: 'skill/closed' }
-  | { type: 'skill/selected' }
-  | { type: 'pickers/closed' }
-
-const INITIAL_COMPOSER_STATE: ComposerState = {
-  inputValue: '',
-  mentionActive: false,
-  mentionQuery: '',
-  slashActive: false,
-  slashQuery: '',
-  skillActive: false,
-  skillQuery: '',
-  contextParts: [],
-  selectedSlashCommand: null,
-}
-
-function areStringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index])
-}
-
-function areContextPartsEqual(left: ChatContextPart[], right: ChatContextPart[]): boolean {
-  if (left === right) {
-    return true
-  }
-  if (left.length !== right.length) {
-    return false
-  }
-
-  return left.every((leftPart, index) => {
-    const rightPart = right[index]
-    if (!rightPart || leftPart.type !== rightPart.type || leftPart.position !== rightPart.position) {
-      return false
-    }
-
-    if (leftPart.type === 'data-cradle-skill') {
-      return rightPart.type === 'data-cradle-skill'
-        && leftPart.name === rightPart.name
-        && leftPart.path === rightPart.path
-        && leftPart.scope === rightPart.scope
-        && leftPart.description === rightPart.description
-    }
-
-    if (rightPart.type !== 'data-cradle-plugin') {
-      return false
-    }
-
-    const leftNativeMention = leftPart.nativeMention ?? null
-    const rightNativeMention = rightPart.nativeMention ?? null
-    const nativeMentionEqual = leftNativeMention === rightNativeMention
-      || (
-        leftNativeMention !== null
-        && rightNativeMention !== null
-        && leftNativeMention.name === rightNativeMention.name
-        && leftNativeMention.path === rightNativeMention.path
-      )
-
-    return nativeMentionEqual
-      && leftPart.provider === rightPart.provider
-      && leftPart.pluginName === rightPart.pluginName
-      && leftPart.displayName === rightPart.displayName
-      && leftPart.description === rightPart.description
-      && leftPart.iconUrl === rightPart.iconUrl
-      && leftPart.routeSegment === rightPart.routeSegment
-      && areStringArraysEqual(leftPart.mcpServers, rightPart.mcpServers)
-      && leftPart.capabilities.length === rightPart.capabilities.length
-      && leftPart.capabilities.every((capability, capabilityIndex) => {
-        const rightCapability = rightPart.capabilities[capabilityIndex]
-        return Boolean(rightCapability)
-          && capability.id === rightCapability.id
-          && capability.type === rightCapability.type
-          && capability.layer === rightCapability.layer
-          && capability.label === rightCapability.label
-      })
-  })
-}
-
-function areComposerStatesEqual(left: ComposerState, right: ComposerState): boolean {
-  return left.inputValue === right.inputValue
-    && left.mentionActive === right.mentionActive
-    && left.mentionQuery === right.mentionQuery
-    && left.slashActive === right.slashActive
-    && left.slashQuery === right.slashQuery
-    && left.skillActive === right.skillActive
-    && left.skillQuery === right.skillQuery
-    && left.selectedSlashCommand === right.selectedSlashCommand
-    && areContextPartsEqual(left.contextParts, right.contextParts)
-}
-
-function composerReducer(state: ComposerState, action: ComposerAction): ComposerState {
-  switch (action.type) {
-    case 'input/changed':
-      return areComposerStatesEqual(state, action.state) ? state : action.state
-    case 'input/cleared':
-      return { ...INITIAL_COMPOSER_STATE }
-    case 'mention/closed':
-      return { ...state, mentionActive: false }
-    case 'mention/selected':
-      return {
-        ...state,
-        mentionActive: false,
-        mentionQuery: '',
-        slashActive: false,
-        slashQuery: '',
-        skillActive: false,
-        skillQuery: '',
-      }
-    case 'slash/closed':
-      return { ...state, slashActive: false }
-    case 'slash/selected':
-      return {
-        ...state,
-        inputValue: action.inputValue,
-        slashActive: false,
-        slashQuery: '',
-        mentionActive: false,
-        mentionQuery: '',
-        skillActive: false,
-        skillQuery: '',
-        selectedSlashCommand: action.command,
-      }
-    case 'skill/closed':
-      return { ...state, skillActive: false }
-    case 'skill/selected':
-      return {
-        ...state,
-        mentionActive: false,
-        mentionQuery: '',
-        slashActive: false,
-        slashQuery: '',
-        skillActive: false,
-        skillQuery: '',
-        selectedSlashCommand: null,
-      }
-    case 'pickers/closed':
-      return {
-        ...state,
-        mentionActive: false,
-        slashActive: false,
-        skillActive: false,
-      }
-    default:
-      return state
-  }
-}
-
-const TOKEN_CIRCLE_RADIUS = 7
-const TOKEN_CIRCUMFERENCE = 2 * Math.PI * TOKEN_CIRCLE_RADIUS
-
-function TokenProgress({
-  tokens,
-  contextWindow,
-  sessionId,
-  compactState,
-}: {
-  tokens: number
-  contextWindow: number | null | undefined
-  sessionId?: string | null
-  compactState?: ChatRuntimeCompactUiSlotState | null
-}) {
-  const [open, setOpen] = useState(false)
-
-  if (!tokens || tokens <= 0) {
-    return null
-  }
-  const percent = contextWindow ? Math.min(1, tokens / contextWindow) : 0
-  const offset = TOKEN_CIRCUMFERENCE * (1 - percent)
-  const isWarning = percent > 0.7
-  const isDanger = percent > 0.9
-  const label = contextWindow
-    ? `${formatTokenCount(tokens)} / ${formatTokenCount(contextWindow)} tokens`
-    : `${formatTokenCount(tokens)} tokens`
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-[background-color,color] duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`Context usage: ${label}`}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="9" cy="9" r={TOKEN_CIRCLE_RADIUS} strokeWidth="2" className="stroke-muted" fill="none" />
-            {contextWindow && (
-              <circle
-                cx="9"
-                cy="9"
-                r={TOKEN_CIRCLE_RADIUS}
-                strokeWidth="2"
-                fill="none"
-                className={cn(
-                  'transition-[stroke] duration-150',
-                  isDanger ? 'stroke-destructive/70' : isWarning ? 'stroke-warning/70' : 'stroke-primary/50',
-                )}
-                strokeDasharray={TOKEN_CIRCUMFERENCE}
-                strokeDashoffset={offset}
-                strokeLinecap="round"
-              />
-            )}
-          </svg>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent side="top" align="end" sideOffset={12} className="w-auto p-0 border-0 shadow-none ring-0 bg-transparent">
-        <ContextUsageDetailPanel
-          sessionId={sessionId ?? null}
-          compactState={compactState}
-          onClose={() => setOpen(false)}
-        />
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function ComposerSendIcon({
-  isBangMode,
-  isPlanMode,
-  isSending,
-}: {
-  isBangMode?: boolean
-  isPlanMode?: boolean
-  isSending?: boolean
-}) {
-  if (isSending) {
-    return <Spinner className="size-3" aria-hidden="true" />
-  }
-
-  const iconClassName = (active: boolean) => cn(
-    'absolute inset-0 size-3.5 transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
-    active ? 'scale-100 opacity-100 blur-0' : 'scale-[0.25] opacity-0 blur-[4px]',
-  )
-  const showPlanIcon = Boolean(!isBangMode && isPlanMode)
-
-  return (
-    <span className="relative size-3.5" aria-hidden="true">
-      <SendHorizonalIcon
-        className={iconClassName(!isBangMode && !isPlanMode)}
-      />
-      <RouteIcon
-        className={iconClassName(showPlanIcon)}
-      />
-      <SquareTerminalIcon
-        className={iconClassName(Boolean(isBangMode))}
-      />
-    </span>
-  )
-}
-
-function ComposerActions({
-  actionsClassName,
-  attachButtonClassName,
-  attachIconClassName,
-  contextBar,
-  disabled,
-  hasDraft,
-  isBangMode,
-  isPlanMode,
-  isSending,
-  isStreaming,
-  onSend,
-  onStop,
-  sendDisabled,
-  sendBlocked,
-  attachButtonTestId,
-  sendButtonClassName,
-  sendButtonTestId,
-  stopButtonTestId,
-  attachmentController,
-  sessionId,
-  sessionTokens,
-  sessionContextWindow,
-  compactState,
-  sendButtonAriaLabel,
-}: {
-  actionsClassName?: string
-  attachButtonClassName?: string
-  attachIconClassName?: string
-  contextBar?: React.ReactNode
-  disabled?: boolean
-  hasDraft: boolean
-  isBangMode?: boolean
-  isPlanMode?: boolean
-  isSending?: boolean
-  isStreaming?: boolean
-  onSend: () => void
-  onStop?: () => void
-  sendDisabled?: boolean
-  sendBlocked?: boolean
-  attachButtonTestId: string
-  sendButtonClassName?: string
-  sendButtonTestId: string
-  stopButtonTestId: string
-  attachmentController: ComposerAttachmentController | null
-  sessionId?: string | null
-  sessionTokens?: number
-  sessionContextWindow?: number | null
-  compactState?: ChatRuntimeCompactUiSlotState | null
-  sendButtonAriaLabel?: string
-}) {
-  const isPlanSendMode = Boolean(isPlanMode && !isBangMode)
-  const sendButtonSize = isPlanSendMode ? 'xs' : 'icon-xs'
-  const sendButtonLabel = isBangMode
-    ? 'Run shell command'
-    : isPlanSendMode
-      ? 'Send planning request'
-      : sendButtonAriaLabel
-  const continuationButtonLabel = isBangMode
-    ? 'Run shell command'
-    : isPlanSendMode
-      ? 'Send planning continuation'
-      : (sendButtonAriaLabel ?? 'Send continuation')
-  const sendButtonChrome = cn(
-    sendButtonClassName,
-    isPlanSendMode && [
-      'min-w-14 gap-1 bg-amber-500 px-2 text-amber-950 hover:bg-amber-400',
-      'focus-visible:border-amber-600 focus-visible:ring-amber-500/35',
-      'dark:bg-amber-400 dark:text-amber-950 dark:hover:bg-amber-300',
-    ],
-  )
-
-  return (
-    <div className={cn('flex items-center gap-1', actionsClassName)}>
-      {contextBar}
-      {attachmentController && (
-        <ComposerAttachmentButton
-          disabled={disabled}
-          className={attachButtonClassName}
-          iconClassName={attachIconClassName}
-          onPickFiles={attachmentController.pickFiles}
-          supportsAttachments={attachmentController.supportsAttachments}
-          testId={attachButtonTestId}
-        />
-      )}
-      {sessionTokens != null && sessionTokens > 0 && sessionContextWindow != null && sessionContextWindow > 0 && (
-        <TokenProgress
-          tokens={sessionTokens}
-          contextWindow={sessionContextWindow}
-          sessionId={sessionId}
-          compactState={compactState}
-        />
-      )}
-      {isStreaming && hasDraft && (
-        <Button
-          variant="outline"
-          size={sendButtonSize}
-          disabled={disabled || sendDisabled || sendBlocked}
-          onClick={() => onSend()}
-          aria-label={continuationButtonLabel}
-          className={sendButtonChrome}
-          data-testid={sendButtonTestId}
-        >
-          <ComposerSendIcon isBangMode={isBangMode} isPlanMode={isPlanMode} isSending={isSending} />
-          {isPlanSendMode && <span className="text-[11px] font-semibold">Plan</span>}
-        </Button>
-      )}
-      {isStreaming
-        ? (
-          <Button
-            variant="default"
-            size="icon-xs"
-            onClick={onStop}
-            aria-label="Stop generation"
-            className={sendButtonClassName}
-            data-testid={stopButtonTestId}
-          >
-            <SquareIcon className="size-3" aria-hidden="true" />
-          </Button>
-        )
-        : (
-          <Button
-            variant="default"
-            size={sendButtonSize}
-            disabled={disabled || sendDisabled || sendBlocked || !hasDraft}
-            onClick={() => onSend()}
-            aria-label={sendButtonLabel ?? 'Send message'}
-            className={sendButtonChrome}
-            data-testid={sendButtonTestId}
-          >
-            <ComposerSendIcon isBangMode={isBangMode} isPlanMode={isPlanMode} isSending={isSending} />
-            {isPlanSendMode && <span className="text-[11px] font-semibold">Plan</span>}
-          </Button>
-        )}
-    </div>
-  )
-}
-
 export function Composer({
   send,
   commands,
@@ -776,10 +235,15 @@ export function Composer({
 
   // Per-surface draft persistence — restores draft on remount (e.g. tab switch)
   const surfaceId = view?.surfaceId
-  const draftSync = useComposerDraftSync(surfaceId ?? '')
+  const {
+    clearDraft: clearSyncedDraft,
+    handleDraftPartsChange,
+    replaceDraft: syncedReplaceDraft,
+    replaceDraftKey: syncedReplaceDraftKey,
+  } = useComposerDraftSync(surfaceId ?? '')
   // Parent-provided replaceDraft takes priority (e.g. queue item editing)
-  const replaceDraft = parentReplaceDraft ?? (surfaceId ? draftSync.replaceDraft : undefined)
-  const replaceDraftKey = parentReplaceDraftKey ?? (surfaceId ? draftSync.replaceDraftKey : 0)
+  const replaceDraft = parentReplaceDraft ?? (surfaceId ? syncedReplaceDraft : undefined)
+  const replaceDraftKey = parentReplaceDraftKey ?? (surfaceId ? syncedReplaceDraftKey : 0)
   const {
     placeholder = 'Message...',
     availableFiles = EMPTY_FILES,
@@ -1083,7 +547,7 @@ export function Composer({
     })
     // Clear persisted draft on send
     if (surfaceId) {
-      useComposerDraftStore.getState().deleteDraft(surfaceId)
+      clearSyncedDraft()
     }
   }, [
     allowEmptySend,
@@ -1097,6 +561,7 @@ export function Composer({
     sendBlocked,
     sendDisabled,
     submit,
+    clearSyncedDraft,
     surfaceId,
   ])
 
@@ -1180,7 +645,7 @@ export function Composer({
     promptEditorRef.current?.clear()
     dispatch({ type: 'input/cleared' })
     if (surfaceId) {
-      useComposerDraftStore.getState().deleteDraft(surfaceId)
+      clearSyncedDraft()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearDraftKey])
@@ -1197,9 +662,9 @@ export function Composer({
     onDraftChange?.(state.inputValue)
     onDraftPartsChange?.(state.inputValue, state.contextParts)
     if (!suspendDraftPersistence) {
-      draftSync?.handleDraftPartsChange(state.inputValue, state.contextParts)
+      handleDraftPartsChange(state.inputValue, state.contextParts)
     }
-  }, [onDraftChange, onDraftPartsChange, draftSync, state.inputValue, state.contextParts, suspendDraftPersistence])
+  }, [onDraftChange, onDraftPartsChange, handleDraftPartsChange, state.inputValue, state.contextParts, suspendDraftPersistence])
 
   // Append externally-injected file parts (e.g. from Cmd+Cmd appshot hotkey)
   useLayoutEffect(() => {

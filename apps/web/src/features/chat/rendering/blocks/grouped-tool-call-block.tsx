@@ -7,6 +7,7 @@ import {
 import { m } from 'motion/react'
 import { useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 import { useBrowserPanelStore } from '~/store/browser-panel'
@@ -23,7 +24,7 @@ import {
   readFileDiffPayload,
   readFileDiffTarget,
   TerminalExecutionDetails,
-} from './tool-call-block'
+} from './tool-call-details'
 
 interface ToolCallItem {
   key: string
@@ -220,10 +221,11 @@ export function GroupedToolCallBlock({
                 isLast && 'top-[calc(50%-1px)]',
               )}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className={cn(
-                  'flex min-w-0 w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px]',
+                  'h-auto min-w-0 w-full justify-start gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px] whitespace-normal',
                   interactive && 'transition-colors duration-100 hover:bg-muted/35 active:bg-muted/50',
                 )}
                 disabled={!interactive}
@@ -255,7 +257,7 @@ export function GroupedToolCallBlock({
                   </TooltipTrigger>
                   <TooltipContent>{STATUS_LABELS[item.part.state]}</TooltipContent>
                 </Tooltip>
-              </button>
+              </Button>
               {expandable && expanded && (
                 <div className="mt-1 pr-1.5">
                   {uiKind === 'terminal'

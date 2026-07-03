@@ -94,6 +94,9 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
     case 'RunAborted':
       projectRunTerminal(d, event.payload)
       break
+    case 'InteractionRequested':
+    case 'InteractionResolved':
+      break
     case 'QueueItemEnqueued':
       d.insert(chatSessionQueueItems).values(event.payload.item).run()
       touchSession(d, event.payload.item.sessionId, event.payload.item.updatedAt)

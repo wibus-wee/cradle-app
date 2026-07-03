@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { ResizeHandle } from '~/components/layout/resize-handle'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
+import { Button } from '~/components/ui/button'
 import {
   Empty,
   EmptyDescription,
@@ -153,12 +154,13 @@ export function DiffHomePage({
                           className="absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-r-full bg-foreground"
                         />
                       )}
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => onWorkspaceSelect(item.id)}
                         className={cn(
-                          'flex w-full min-w-0 min-h-[40px] items-center gap-2.5 pl-3.5 pr-3 py-1.5 text-left transition-colors',
-                          'active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+                          'h-auto min-h-[40px] w-full min-w-0 justify-start gap-2.5 rounded-none pl-3.5 pr-3 py-1.5 text-left font-normal whitespace-normal',
+                          'active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-ring/40',
                           selected
                             ? 'bg-muted/70'
                             : 'hover:bg-muted/40',
@@ -187,7 +189,7 @@ export function DiffHomePage({
                             {locationLabel}
                           </span>
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   )
                 })}

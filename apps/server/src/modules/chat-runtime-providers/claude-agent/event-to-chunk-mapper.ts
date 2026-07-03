@@ -19,14 +19,15 @@ import type {
 import type { UIMessageChunk } from 'ai'
 
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
+import { providerChunk } from '../kit/chunk-mapper'
 import { CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE, isClaudeAgentEnterPlanModeToolName, isClaudeAgentExitPlanModeToolName } from './plan-mode'
 import { ClaudeCodeToolName } from './tools/identity'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload, normalizeClaudeCodeToolApiName } from './tools/mapper'
+import type { ClaudeAgentTaskProgressState } from './tools/task-progress-state'
 import {
   captureClaudeAgentTaskToolInput,
   captureClaudeAgentTaskToolResult,
   createClaudeAgentTaskProgressState,
-  type ClaudeAgentTaskProgressState,
 } from './tools/task-progress-state'
 import type { TodoPluginItem } from './tools/todo-plugin-state'
 import { isTodoWriteToolName, synthesizeTodoWritePluginState } from './tools/todo-plugin-state'
@@ -274,9 +275,9 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
       completedAt: null,
     })
     chunks.push(
-      { type: 'text-start', id: textId, providerMetadata: { cradle: { systemEvent: 'task_started', taskId: taskMsg.task_id, agentName } } },
-      { type: 'text-delta', id: textId, delta: `[${agentName} started]` },
-      { type: 'text-end', id: textId },
+      providerChunk.textStart(textId, { cradle: { systemEvent: 'task_started', taskId: taskMsg.task_id, agentName } }),
+      providerChunk.textDelta(textId, `[${agentName} started]`),
+      providerChunk.textEnd(textId),
     )
   }
   else if (systemEvent?.subtype === 'task_progress') {
@@ -319,30 +320,26 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
       completedAt: Date.now(),
     })
     chunks.push(
-      { type: 'text-start', id: textId, providerMetadata: { cradle: { systemEvent: 'task_notification', taskId: taskMsg.task_id, status } } },
-      { type: 'text-delta', id: textId, delta: taskMsg.summary || `[Task ${status}]` },
-      { type: 'text-end', id: textId },
+      providerChunk.textStart(textId, { cradle: { systemEvent: 'task_notification', taskId: taskMsg.task_id, status } }),
+      providerChunk.textDelta(textId, taskMsg.summary || `[Task ${status}]`),
+      providerChunk.textEnd(textId),
       { type: 'finish-step' },
     )
   }
   else if (msg.type === 'tool_progress') {
     const progressMsg = msg as { type: string, tool_use_id?: string, tool_name?: string, content?: string, parent_tool_use_id?: string | null }
     if (progressMsg.content && progressMsg.tool_use_id) {
-      chunks.push({
-        type: 'tool-input-delta',
-        toolCallId: progressMsg.tool_use_id,
-        inputTextDelta: progressMsg.content,
-      })
+      chunks.push(providerChunk.toolInputDelta(progressMsg.tool_use_id, progressMsg.content))
     }
   }
 
   return { ...base, chunks, sessionId }
 }
 
-type ClaudeSystemLifecycleEvent =
-  | { subtype: 'task_started', message: SDKTaskStartedMessage }
-  | { subtype: 'task_progress', message: SDKTaskProgressMessage }
-  | { subtype: 'task_notification', message: SDKTaskNotificationMessage }
+type ClaudeSystemLifecycleEvent
+  = | { subtype: 'task_started', message: SDKTaskStartedMessage }
+    | { subtype: 'task_progress', message: SDKTaskProgressMessage }
+    | { subtype: 'task_notification', message: SDKTaskNotificationMessage }
 
 function readClaudeSystemLifecycleEvent(message: SDKMessage): ClaudeSystemLifecycleEvent | null {
   if (message.type !== 'system') {
@@ -484,7 +481,7 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
             if (isCapturedExitPlanModeError(b.tool_use_id, errorText, state)) {
               continue
             }
-            chunks.push({ type: 'tool-output-error', toolCallId: b.tool_use_id, errorText })
+            chunks.push(providerChunk.toolOutputError(b.tool_use_id, errorText))
           }
           else {
             const output = createClaudeCodeToolResult(
@@ -500,11 +497,10 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
             if (taskCapture) {
               capturedTodos.push(taskCapture)
             }
-            chunks.push({
-              type: 'tool-output-available',
+            chunks.push(providerChunk.toolOutputAvailable({
               toolCallId: b.tool_use_id,
               output,
-            })
+            }))
             chunks.push(...projectClaudeToolResultImageFileChunks(normalizedOutput))
           }
         }
@@ -530,23 +526,23 @@ function mapContentBlock(
     case 'text': {
       const chunks: UIMessageChunk[] = []
       if (!state.assistantStarted) {
-        chunks.push({ type: 'text-start', id: state.textItemId })
+        chunks.push(providerChunk.textStart(state.textItemId))
         state.assistantStarted = true
       }
       if (block.text) {
-        chunks.push({ type: 'text-delta', id: state.textItemId, delta: block.text })
+        chunks.push(providerChunk.textDelta(state.textItemId, block.text))
       }
       return { chunks, capturedPlans: [], capturedTodos: [], capturedInteractionModes: [], capturedCrewCalls: emptyCrew }
     }
     case 'thinking': {
       const itemId = `thinking-${state.textItemId}`
       const chunks: UIMessageChunk[] = [
-        { type: 'reasoning-start', id: itemId },
+        providerChunk.reasoningStart(itemId),
       ]
       if (block.thinking) {
-        chunks.push({ type: 'reasoning-delta', id: itemId, delta: block.thinking })
+        chunks.push(providerChunk.reasoningDelta(itemId, block.thinking))
       }
-      chunks.push({ type: 'reasoning-end', id: itemId })
+      chunks.push(providerChunk.reasoningEnd(itemId))
       return { chunks, capturedPlans: [], capturedTodos: [], capturedInteractionModes: [], capturedCrewCalls: emptyCrew }
     }
     case 'tool_use':
@@ -579,7 +575,7 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
       const stopReason = messageDeltaEvent.delta?.stop_reason
       if (stopReason && isTerminalClaudeStopReason(stopReason)) {
         chunks.push(...finishOpenTextBlocks(state))
-        chunks.push({ type: 'finish', finishReason: 'stop' })
+        chunks.push(providerChunk.finish('stop'))
       }
       break
     }
@@ -589,18 +585,18 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
         chunks.push(...ensureTextBlockStarted(state, deltaEvent.index))
         const textDelta = deltaEvent.delta.text ?? ''
         appendEmittedText(state, state.textItemId, textDelta)
-        chunks.push({ type: 'text-delta', id: state.textItemId, delta: textDelta })
+        chunks.push(providerChunk.textDelta(state.textItemId, textDelta))
       }
       else if (deltaEvent.delta.type === 'thinking_delta') {
         const itemId = `thinking-${deltaEvent.index}`
-        chunks.push({ type: 'reasoning-delta', id: itemId, delta: deltaEvent.delta.thinking ?? '' })
+        chunks.push(providerChunk.reasoningDelta(itemId, deltaEvent.delta.thinking ?? ''))
       }
       else if (deltaEvent.delta.type === 'input_json_delta') {
         const partialJson = (deltaEvent.delta as { type: 'input_json_delta', partial_json: string }).partial_json
         const toolId = state.activeToolBlockIds.get(deltaEvent.index)
         if (toolId && partialJson) {
           appendToolInputText(state, toolId, partialJson)
-          chunks.push({ type: 'tool-input-delta', toolCallId: toolId, inputTextDelta: partialJson })
+          chunks.push(providerChunk.toolInputDelta(toolId, partialJson))
         }
       }
       break
@@ -611,13 +607,13 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
         chunks.push(...ensureTextBlockStarted(state, startEvent.index))
         if (startEvent.content_block.text) {
           appendEmittedText(state, state.textItemId, startEvent.content_block.text)
-          chunks.push({ type: 'text-delta', id: state.textItemId, delta: startEvent.content_block.text })
+          chunks.push(providerChunk.textDelta(state.textItemId, startEvent.content_block.text))
         }
       }
       else if (startEvent.content_block.type === 'thinking') {
         const itemId = `thinking-${startEvent.index}`
         state.activeThinkingBlockByIndex.set(startEvent.index, itemId)
-        chunks.push({ type: 'reasoning-start', id: itemId })
+        chunks.push(providerChunk.reasoningStart(itemId))
       }
       else if (startEvent.content_block.type === 'tool_use') {
         if (!startEvent.content_block.id || !startEvent.content_block.name) {
@@ -647,14 +643,14 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
         if (state.textItemId === textItemId) {
           state.assistantStarted = false
         }
-        chunks.push({ type: 'text-end', id: textItemId })
+        chunks.push(providerChunk.textEnd(textItemId))
         break
       }
       const thinkingItemId = state.activeThinkingBlockByIndex.get(stopEvent.index)
       if (thinkingItemId !== undefined) {
         state.activeThinkingBlockByIndex.delete(stopEvent.index)
         state.completedThinkingBlockIndices.add(stopEvent.index)
-        chunks.push({ type: 'reasoning-end', id: thinkingItemId })
+        chunks.push(providerChunk.reasoningEnd(thinkingItemId))
         break
       }
       const toolId = state.activeToolBlockIds.get(stopEvent.index)
@@ -701,7 +697,7 @@ function ensureTextBlockStarted(state: ClaudeAgentChunkMapperState, blockIndex: 
   }
 
   state.assistantStarted = true
-  return [{ type: 'text-start', id: state.textItemId }]
+  return [providerChunk.textStart(state.textItemId)]
 }
 
 function finishOpenTextBlocks(state: ClaudeAgentChunkMapperState): UIMessageChunk[] {
@@ -713,7 +709,7 @@ function finishOpenTextBlocks(state: ClaudeAgentChunkMapperState): UIMessageChun
   const seenTextItemIds = new Set<string>()
   if (state.activeTextBlockByIndex.size === 0 && state.assistantStarted) {
     seenTextItemIds.add(state.textItemId)
-    chunks.push({ type: 'text-end', id: state.textItemId })
+    chunks.push(providerChunk.textEnd(state.textItemId))
     state.assistantStarted = false
     return chunks
   }
@@ -723,7 +719,7 @@ function finishOpenTextBlocks(state: ClaudeAgentChunkMapperState): UIMessageChun
     }
     seenTextItemIds.add(textItemId)
     state.completedTextBlockIndices.add(blockIndex)
-    chunks.push({ type: 'text-end', id: textItemId })
+    chunks.push(providerChunk.textEnd(textItemId))
     if (state.textItemId === textItemId) {
       state.assistantStarted = false
     }
@@ -748,7 +744,7 @@ function mapResult(msg: SDKResultMessage, state: ClaudeAgentChunkMapperState): C
   return {
     chunks: [
       ...finishOpenTextBlocks(state),
-      { type: 'finish', finishReason: 'stop' },
+      providerChunk.finish('stop'),
     ],
     sessionId: msg.session_id,
     usage,
@@ -777,11 +773,11 @@ function emitAssistantTextSegment(
 
   const chunks: UIMessageChunk[] = []
   if (!state.assistantStarted) {
-    chunks.push({ type: 'text-start', id: state.textItemId })
+    chunks.push(providerChunk.textStart(state.textItemId))
     state.assistantStarted = true
   }
   appendEmittedText(state, state.textItemId, nextText)
-  chunks.push({ type: 'text-delta', id: state.textItemId, delta: nextText })
+  chunks.push(providerChunk.textDelta(state.textItemId, nextText))
   return { chunks }
 }
 
@@ -826,19 +822,18 @@ function emitToolUseChunks(
   state.toolNamesByToolCallId.set(toolCallId, toolName)
 
   if (!current.started) {
-    chunks.push({ type: 'tool-input-start', toolCallId, toolName })
+    chunks.push(providerChunk.toolInputStart(toolCallId, toolName))
     current.started = true
   }
 
   if (input !== undefined && !current.inputAvailable) {
     state.toolArgsByToolCallId.set(toolCallId, input)
     captureClaudePlanFileWrite(toolName, input, state)
-    chunks.push({
-      type: 'tool-input-available',
+    chunks.push(providerChunk.toolInputAvailable({
       toolCallId,
       toolName,
       input: createClaudeCodeToolInputPayload(toolName, input),
-    })
+    }))
     current.inputAvailable = true
     const todoPluginState = isTodoWriteToolName(toolName) ? synthesizeTodoWritePluginState(input) : null
     if (todoPluginState) {
@@ -882,15 +877,14 @@ function emitToolUseChunks(
   if (exitPlan && !current.outputAvailable) {
     state.capturedExitPlanToolCallIds.add(toolCallId)
     capturedPlans.push({ toolCallId, content: exitPlan })
-    chunks.push({
-      type: 'tool-output-available',
+    chunks.push(providerChunk.toolOutputAvailable({
       toolCallId,
       output: createClaudeCodeToolResultPayload({
         apiName: toolName,
         args: input,
         result: { plan: exitPlan },
       }),
-    })
+    }))
     current.outputAvailable = true
   }
 
@@ -978,23 +972,22 @@ function emitPlanImplementationApprovalChunks(
   const current = state.emittedToolStateByToolCallId.get(toolCallId) ?? { started: false, inputAvailable: false }
   const chunks: UIMessageChunk[] = []
   if (!current.started) {
-    chunks.push({ type: 'tool-input-start', toolCallId, toolName: PLAN_IMPLEMENTATION_TOOL_NAME })
+    chunks.push(providerChunk.toolInputStart(toolCallId, PLAN_IMPLEMENTATION_TOOL_NAME))
     current.started = true
   }
   if (!current.inputAvailable) {
-    chunks.push({
-      type: 'tool-input-available',
+    chunks.push(providerChunk.toolInputAvailable({
       toolCallId,
       toolName: PLAN_IMPLEMENTATION_TOOL_NAME,
       input: createClaudeCodeToolInputPayload(PLAN_IMPLEMENTATION_TOOL_NAME, {
         turnId: sourceToolCallId,
         planContent,
       }),
-    })
+    }))
     current.inputAvailable = true
   }
   if (!current.approvalRequested) {
-    chunks.push({ type: 'tool-approval-request', toolCallId, approvalId: toolCallId })
+    chunks.push(providerChunk.toolApprovalRequest(toolCallId))
     current.approvalRequested = true
   }
   state.emittedToolStateByToolCallId.set(toolCallId, current)
@@ -1192,12 +1185,12 @@ function projectClaudeToolResultImageFileChunk(block: unknown): UIMessageChunk[]
       const mediaType = typeof source.media_type === 'string' ? source.media_type : null
       const data = typeof source.data === 'string' ? source.data : null
       return mediaType && data
-        ? [{ type: 'file', mediaType, url: `data:${mediaType};base64,${data}` }]
+        ? [providerChunk.file({ mediaType, url: `data:${mediaType};base64,${data}` })]
         : []
     }
     case 'url': {
       const url = typeof source.url === 'string' ? source.url : null
-      return url ? [{ type: 'file', mediaType: 'image/*', url }] : []
+      return url ? [providerChunk.file({ mediaType: 'image/*', url })] : []
     }
     default:
       return []

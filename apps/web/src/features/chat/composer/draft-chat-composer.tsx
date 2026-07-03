@@ -5,19 +5,25 @@ import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSkills } from '~/api-gen/sdk.gen'
+import { getSkills, getWorkspacesByWorkspaceIdGitMergeBase } from '~/api-gen/sdk.gen'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
 import type { ClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
 import { hasClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
 import type { ApiProviderKind, RuntimeKind } from '~/features/agent-runtime/types'
+import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
+import {
+  runtimeComposerAllowsEmptySubmit,
+  runtimeComposerUsesAliasMatrixModelSelection,
+  runtimeComposerUsesCollapsedInput,
+} from '~/features/agent-runtime/use-runtime-catalog'
 import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
-import type { ComposerStateResult } from '~/features/composer-toolbar/use-composer-state'
 import type { RuntimeProviderBinding } from '~/features/composer-toolbar/types'
+import type { ComposerStateResult } from '~/features/composer-toolbar/use-composer-state'
 import type { SkillInventoryEntry } from '~/features/skills/types'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { cn } from '~/lib/cn'
-import { getServerUrl, isElectron, platform } from '~/lib/electron'
+import { isElectron, platform } from '~/lib/electron'
 import { openSettingsSection as openSettingsRouteSection } from '~/navigation/navigation-commands'
 import { useNewChatStore } from '~/store/new-chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
@@ -31,7 +37,12 @@ import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { useDraftClaudeAgentModelAliases, useProviderTargetClaudeAgentModelAliases } from '../runtime/claude-session-model-matrix-control'
 import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
-import { CODEX_REVIEW_SLASH_ACTION_ID, CRADLE_APPSHOT_SLASH_ACTION_ID, CRADLE_APPSHOT_SLASH_COMMAND, withSlashCommandAvailability } from '../slash-commands/chat-slash-commands'
+import {
+  CRADLE_APPSHOT_SLASH_ACTION_ID,
+  CRADLE_APPSHOT_SLASH_COMMAND,
+  RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  withSlashCommandAvailability,
+} from '../slash-commands/chat-slash-commands'
 import { useRuntimeComposerSlashCommands } from '../slash-commands/use-runtime-composer-slash-commands'
 import { Composer } from './composer'
 import type { ComposerSlashCommandActionContext, ComposerSlashCommandActionResult, ComposerSlashCommandActionTools } from './composer-action-context'
@@ -60,6 +71,7 @@ const PLACEHOLDER_HINT_KEYS = [
 export interface DraftChatComposerSubmitOptions {
   runtimeKind: RuntimeKind
   providerBinding: RuntimeProviderBinding
+  runtimeComposer: RuntimeCatalogComposer
   agentId?: string
   agentName?: string
   providerTargetId?: string
@@ -226,16 +238,18 @@ function DraftChatComposerContent({
     ? selectedProviderKind
     : null
   const claudeAgent = selection.profileId ? claudeAgentByProfile[selection.profileId] ?? null : null
-  const inputCollapsed = selection.targetMode === 'agent' && selection.runtimeKind === 'cli-tui'
+  const inputCollapsed = selection.targetMode === 'agent' && runtimeComposerUsesCollapsedInput(composerState.runtimeComposer)
+  const allowEmptySubmit = runtimeComposerAllowsEmptySubmit(composerState.runtimeComposer)
+  const usesAliasMatrixModelSelection = runtimeComposerUsesAliasMatrixModelSelection(composerState.runtimeComposer)
 
   const providerTargetAliases = useProviderTargetClaudeAgentModelAliases({
     providerTargetId: selection.profileId,
     providerKind: selectedApiProviderKind,
-    enabled: selection.targetMode === 'provider' && selection.runtimeKind === 'claude-agent',
+    enabled: selection.targetMode === 'provider' && usesAliasMatrixModelSelection,
   })
   const claudeModelAliasesSlot = useDraftClaudeAgentModelAliases({
     active,
-    runtimeKind: selection.runtimeKind,
+    enabled: usesAliasMatrixModelSelection,
     providerTargetId: selection.profileId,
     providerKind: selectedApiProviderKind,
     aliases: claudeAgent?.modelAliases ?? providerTargetAliases.aliases,
@@ -269,7 +283,7 @@ function DraftChatComposerContent({
 
     return [appshotCommand]
   })()
-  const slashCommands = useRuntimeComposerSlashCommands(selection.runtimeKind, cradleSlashCommands)
+  const slashCommands = useRuntimeComposerSlashCommands(selection.runtimeKind, composerState.runtimeComposer, cradleSlashCommands)
   const sendDisabled = selection.targetMode === 'agent'
     ? !effectiveAgent || sending
     : !effectiveProfile || sending
@@ -311,7 +325,7 @@ function DraftChatComposerContent({
     const trimmedText = text.trim()
     const hasDraft = trimmedText.length > 0 || files.length > 0 || contextParts.length > 0
     const canSubmit = selection.targetMode === 'agent'
-      ? !!effectiveAgent && (selection.runtimeKind === 'cli-tui' || hasDraft) && !sending
+      ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
       : !!effectiveProfile && hasDraft && !sending
 
     if (!canSubmit) {
@@ -321,11 +335,12 @@ function DraftChatComposerContent({
     setSending(true)
     const submitRuntimeSettings: DraftChatRuntimeSettings = {
       ...runtimeSettings,
-      ...(selection.targetMode === 'provider' && selection.runtimeKind === 'claude-agent' && claudeAgent ? { claudeAgent } : {}),
+      ...(selection.targetMode === 'provider' && usesAliasMatrixModelSelection && claudeAgent ? { claudeAgent } : {}),
     }
     const submitOptions: DraftChatComposerSubmitOptions = {
       runtimeKind: selection.runtimeKind,
       providerBinding: composerState.providerBinding,
+      runtimeComposer: composerState.runtimeComposer,
       ...(effectiveAgent
         ? {
             agentId: effectiveAgent.id,
@@ -334,7 +349,7 @@ function DraftChatComposerContent({
         : {
             providerTargetId: effectiveProfile?.id,
             providerTargetName: effectiveProfile?.name,
-            modelId: selection.runtimeKind === 'claude-agent'
+            modelId: usesAliasMatrixModelSelection
               ? selection.modelId ?? undefined
               : selection.modelId ?? effectiveModel?.id,
             thinkingEffort: selection.thinkingEffort ?? undefined,
@@ -368,7 +383,7 @@ function DraftChatComposerContent({
     if (command.action.kind !== 'uiAction') {
       return
     }
-    if (command.action.actionId === CODEX_REVIEW_SLASH_ACTION_ID) {
+    if (command.action.actionId === RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID) {
       setReviewModeOpen(true)
       return { insertText: '' }
     }
@@ -413,17 +428,17 @@ function DraftChatComposerContent({
     if (!workspaceId) {
       return null
     }
-    const url = new URL(`/workspaces/${encodeURIComponent(workspaceId)}/git/merge-base`, getServerUrl())
-    url.searchParams.set('baseBranch', baseBranch)
-    if (repositoryPath) {
-      url.searchParams.set('repo', repositoryPath)
+    const result = await getWorkspacesByWorkspaceIdGitMergeBase({
+      path: { workspaceId },
+      query: {
+        baseBranch,
+        ...(repositoryPath ? { repo: repositoryPath } : {}),
+      },
+    })
+    if (result.error || !result.data) {
+      throw new Error(`Failed to resolve merge base (${result.response?.status ?? 'unknown'}).`)
     }
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error(`Failed to resolve merge base (${response.status}).`)
-    }
-    const payload = await response.json() as { mergeBaseSha?: unknown }
-    return typeof payload.mergeBaseSha === 'string' ? payload.mergeBaseSha : null
+    return result.data.mergeBaseSha
   }
 
   const reviewSlot = ({
@@ -447,7 +462,7 @@ function DraftChatComposerContent({
           submitInNewWindow: handleSendInNewWindow,
           isSending: sending,
           sendDisabled,
-          allowEmptySend: selection.runtimeKind === 'cli-tui',
+          allowEmptySend: allowEmptySubmit,
         }}
         commands={{
           commands: slashCommands,

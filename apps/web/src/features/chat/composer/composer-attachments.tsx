@@ -8,6 +8,7 @@ import { m } from 'motion/react'
 import type { ChangeEvent, RefObject } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
@@ -54,7 +55,7 @@ export function ComposerAttachmentInput({
   testId = 'chat-file-input',
 }: ComposerAttachmentInputProps) {
   return (
-    <input
+    <Input
       ref={fileInputRef}
       type="file"
       multiple

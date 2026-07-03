@@ -48,10 +48,11 @@ export function InlineThread({
       data-testid="inline-thread"
       data-thread-state={thread.state}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={toggle}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/50"
+        className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-left font-normal hover:bg-muted/50"
       >
         <span
           className={cn(
@@ -66,7 +67,7 @@ export function InlineThread({
         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
           {thread.comments.length}
         </span>
-      </button>
+      </Button>
 
       {expanded && (
         <div className="space-y-1.5 px-3 pb-2 pl-5">
@@ -154,34 +155,40 @@ export function InlineThread({
                 )
               : (
                   <div className="flex items-center gap-2 pt-0.5">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setReplying(true)}
-                      className="text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                      className="h-auto px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
                     >
                       Reply
-                    </button>
+                    </Button>
                     {onAskAgent && (
                       <>
                         <span className="text-muted-foreground/30">·</span>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onAskAgent(thread.id)}
-                          className="text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                          className="h-auto px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
                         >
                           Ask agent
-                        </button>
+                        </Button>
                       </>
                     )}
                     <span className="text-muted-foreground/30">·</span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => onResolve(thread.id)}
                       disabled={resolvePending}
-                      className="text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                      className="h-auto px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
                     >
                       Resolve
-                    </button>
+                    </Button>
                   </div>
                 )}
         </div>

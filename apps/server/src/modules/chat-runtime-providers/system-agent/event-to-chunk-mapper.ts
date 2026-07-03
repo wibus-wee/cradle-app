@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { UIMessageChunk } from 'ai'
 
+import { providerChunk } from '../kit/chunk-mapper'
 import type { SystemAgentAssistantMessageEvent } from './types'
 
 export interface SystemAgentBridgeState {
@@ -46,7 +47,7 @@ export function mapSystemAgentEventToChunks(
         openTextBlock(state, out, event.delta)
       }
       else if (event.delta) {
-        out.push({ type: 'text-delta', id: state.currentTextId, delta: event.delta })
+        out.push(providerChunk.textDelta(state.currentTextId, event.delta))
       }
       break
     case 'thinking_start':
@@ -57,7 +58,7 @@ export function mapSystemAgentEventToChunks(
         openReasoningBlock(state, out, event.delta)
       }
       else if (event.delta) {
-        out.push({ type: 'reasoning-delta', id: state.currentReasoningId, delta: event.delta })
+        out.push(providerChunk.reasoningDelta(state.currentReasoningId, event.delta))
       }
       break
     case 'thinking_end':
@@ -67,7 +68,7 @@ export function mapSystemAgentEventToChunks(
       if (!state.currentTextId) {
         openTextBlock(state, out)
       }
-      out.push({ type: 'text-delta', id: state.currentTextId!, delta: '\n\n[Error occurred]' })
+      out.push(providerChunk.textDelta(state.currentTextId!, '\n\n[Error occurred]'))
       break
   }
 
@@ -76,14 +77,14 @@ export function mapSystemAgentEventToChunks(
 
 function closeTextBlock(state: SystemAgentBridgeState, out: UIMessageChunk[]): void {
   if (state.currentTextId) {
-    out.push({ type: 'text-end', id: state.currentTextId })
+    out.push(providerChunk.textEnd(state.currentTextId))
     state.currentTextId = null
   }
 }
 
 function closeReasoningBlock(state: SystemAgentBridgeState, out: UIMessageChunk[]): void {
   if (state.currentReasoningId) {
-    out.push({ type: 'reasoning-end', id: state.currentReasoningId })
+    out.push(providerChunk.reasoningEnd(state.currentReasoningId))
     state.currentReasoningId = null
   }
 }
@@ -92,9 +93,9 @@ function openTextBlock(state: SystemAgentBridgeState, out: UIMessageChunk[], del
   closeReasoningBlock(state, out)
   const id = randomUUID()
   state.currentTextId = id
-  out.push({ type: 'text-start', id })
+  out.push(providerChunk.textStart(id))
   if (delta) {
-    out.push({ type: 'text-delta', id, delta })
+    out.push(providerChunk.textDelta(id, delta))
   }
   state.assistantStarted = true
 }
@@ -103,8 +104,8 @@ function openReasoningBlock(state: SystemAgentBridgeState, out: UIMessageChunk[]
   closeTextBlock(state, out)
   const id = randomUUID()
   state.currentReasoningId = id
-  out.push({ type: 'reasoning-start', id })
+  out.push(providerChunk.reasoningStart(id))
   if (delta) {
-    out.push({ type: 'reasoning-delta', id, delta })
+    out.push(providerChunk.reasoningDelta(id, delta))
   }
 }

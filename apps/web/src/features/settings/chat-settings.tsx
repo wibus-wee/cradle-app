@@ -7,7 +7,7 @@ import {
   Message1Line as MessageSquareIcon,
   SearchLine as SearchIcon
 } from '@mingcute/react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
@@ -19,10 +19,11 @@ import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
+import { runtimeCatalogItemUsesModelSelection } from '~/features/agent-runtime/runtime-catalog'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
-import { listSelectableComposerProfiles } from '~/features/composer-toolbar/composer-profile-selection'
+import { listSelectableComposerProfilesForRuntimes } from '~/features/composer-toolbar/composer-profile-selection'
 import { filterThinkingOptionsForModel, selectSupportedThinkingValue } from '~/features/composer-toolbar/constants'
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
@@ -320,7 +321,22 @@ function TitleGenerationSettings({
   const [pendingProviderTargetId, setPendingProviderTargetId] = useState<string | null>(null)
   const { providerOptions } = useProviderTargets()
   const { runtimes } = useRuntimeCatalog()
-  const profiles = listSelectableComposerProfiles({ profiles: providerOptions, runtimeKind: 'codex', runtimes })
+  const titleGenerationRuntimeKinds = useMemo(
+    () => runtimes
+      .filter(runtime =>
+        runtime.capabilities?.supportsTitleGeneration === true
+        && runtimeCatalogItemUsesModelSelection(runtime))
+      .map(runtime => runtime.runtimeKind),
+    [runtimes],
+  )
+  const profiles = useMemo(
+    () => listSelectableComposerProfilesForRuntimes({
+      profiles: providerOptions,
+      runtimeKinds: titleGenerationRuntimeKinds,
+      runtimes,
+    }),
+    [providerOptions, runtimes, titleGenerationRuntimeKinds],
+  )
   const selectedProviderTargetId = pendingProviderTargetId ?? prefs.providerTargetId
   const initialModelProfileIds = [prefs.providerTargetId, pendingProviderTargetId]
   const {
@@ -338,11 +354,14 @@ function TitleGenerationSettings({
     : null
   const selectedModelId = pendingProviderTargetId ? null : prefs.modelId
   const selectedModel = selectedModels.find(model => model.id === selectedModelId) ?? null
-  const thinkingOptions = TITLE_GENERATION_THINKING_LEVELS.map(value => ({
-    value,
-    label: t(titleGenerationThinkingLabelKeys[value]),
-    description: t(titleGenerationThinkingDescriptionKeys[value]),
-  }))
+  const thinkingOptions = useMemo(
+    () => TITLE_GENERATION_THINKING_LEVELS.map(value => ({
+      value,
+      label: t(titleGenerationThinkingLabelKeys[value]),
+      description: t(titleGenerationThinkingDescriptionKeys[value]),
+    })),
+    [t],
+  )
   const supportedThinkingOptions = selectedProviderTargetId && selectedModel ? filterThinkingOptionsForModel(selectedModel, thinkingOptions) : thinkingOptions
   const selectedThinkingEffort = selectedProviderTargetId && selectedModel
     ? selectTitleGenerationThinkingEffort(selectedModel, thinkingOptions, prefs.thinkingEffort)
@@ -353,13 +372,13 @@ function TitleGenerationSettings({
     }
     return selectTitleGenerationThinkingEffort(selectedModel, thinkingOptions, thinkingEffort)
   }
-  const saveResolvedModel = (providerTargetId: string, model: ModelDescriptor) => {
+  const saveResolvedModel = useCallback((providerTargetId: string, model: ModelDescriptor) => {
     save({
       providerTargetId,
       modelId: model.id,
       thinkingEffort: selectTitleGenerationThinkingEffort(model, thinkingOptions, prefs.thinkingEffort),
     })
-  }
+  }, [prefs.thinkingEffort, save, thinkingOptions])
 
   useEffect(() => {
     if (!pendingProviderTargetId) {

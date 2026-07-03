@@ -2,7 +2,7 @@ import { backendSessionBindings, sessions } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { db } from '../../infra'
-import { toOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/model-inventory'
+import { toOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/native-provider-target-id'
 import { get } from './service'
 
 afterEach(() => {

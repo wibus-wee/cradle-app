@@ -28,6 +28,9 @@ const surfaceRoute = parseSurfaceRoute(getArg('surface-route'))
 const CHAT_STREAM_CHUNK_CHANNEL = 'chat-stream:chunk'
 const CHAT_STREAM_CLOSED_CHANNEL = 'chat-stream:closed'
 const CHAT_STREAM_ERROR_CHANNEL = 'chat-stream:error'
+const CHAT_EVENT_TAIL_EVENT_CHANNEL = 'chat-event-tail:event'
+const CHAT_EVENT_TAIL_CLOSED_CHANNEL = 'chat-event-tail:closed'
+const CHAT_EVENT_TAIL_ERROR_CHANNEL = 'chat-event-tail:error'
 const BROWSER_STATE_CHANNEL = 'desktop:browser-state'
 const BROWSER_PROMPT_REQUESTED_CHANNEL = 'desktop:browser-prompt-requested'
 const BROWSER_ANNOTATION_RUNTIME_EVENTED_CHANNEL = 'desktop:browser-annotation-runtime-evented'
@@ -118,6 +121,22 @@ const cradleElectron = {
     onClosed: (handler: (event: unknown) => void) =>
       subscribeIpc(CHAT_STREAM_CLOSED_CHANNEL, handler),
     onError: (handler: (event: unknown) => void) => subscribeIpc(CHAT_STREAM_ERROR_CHANNEL, handler),
+  },
+
+  /** Desktop-owned chat event tail bridge */
+  chatEventTail: {
+    subscribeSessionEvents: (request: unknown) =>
+      ipcRenderer.invoke('chatEventTail.subscribeSessionEvents', request),
+    subscribeGlobalSessionEvents: (request: unknown) =>
+      ipcRenderer.invoke('chatEventTail.subscribeGlobalSessionEvents', request),
+    abort: (request: unknown) => ipcRenderer.invoke('chatEventTail.abort', request),
+    diagnostics: () => ipcRenderer.invoke('chatEventTail.diagnostics'),
+    onEvent: (handler: (event: unknown) => void) =>
+      subscribeIpc(CHAT_EVENT_TAIL_EVENT_CHANNEL, handler),
+    onClosed: (handler: (event: unknown) => void) =>
+      subscribeIpc(CHAT_EVENT_TAIL_CLOSED_CHANNEL, handler),
+    onError: (handler: (event: unknown) => void) =>
+      subscribeIpc(CHAT_EVENT_TAIL_ERROR_CHANNEL, handler),
   },
 
   /** Native BrowserPanel bridge backed by Electron WebContentsView. */

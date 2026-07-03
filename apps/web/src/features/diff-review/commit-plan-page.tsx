@@ -12,18 +12,18 @@ import {
   RightSmallLine as ChevronRightIcon,
   SparklesLine as SparklesIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { Spinner } from '~/components/ui/spinner'
 import { Textarea } from '~/components/ui/textarea'
 import { toastManager } from '~/components/ui/toast'
 import { ProviderModelSelector, RuntimeSelector, useComposerState } from '~/features/composer-toolbar'
-import type { RuntimeKindOption } from '~/features/composer-toolbar/constants'
 import { cn } from '~/lib/cn'
 
 import { navigateToReview } from './shared/navigation'
+import { useProviderBackedDiffRuntimeSelection } from './shared/runtime-options'
 import type {
   CradleDiffReview,
   EditableCommitPlanStatus,
@@ -39,11 +39,6 @@ interface CommitPlanPageProps {
   repositoryPath?: string | null
   reviewId: string
 }
-
-const COMMIT_PLAN_RUNTIME_OPTIONS: RuntimeKindOption[] = [
-  { value: 'codex' },
-  { value: 'claude-agent' },
-]
 
 interface StatusBadge {
   label: string
@@ -78,7 +73,7 @@ export function CommitPlanPage({ workspaceId, repositoryPath, reviewId }: Commit
     && (commitPlanningActive || latestCommitPlanningFix?.status === 'failed')
 
   const handlePlanInChat = async (profileId: string | null, runtimeKind: string, modelId: string | null) => {
-    if (!review || !profileId || !isCommitPlanRuntime(runtimeKind)) {
+    if (!review || !profileId || runtimeKind.trim().length === 0) {
       return
     }
     const beforeIds = new Set(review.agentFixes.map(fix => fix.id))
@@ -93,7 +88,7 @@ export function CommitPlanPage({ workspaceId, repositoryPath, reviewId }: Commit
     await startAgentFixMutation.mutateAsync({
       agentFixId: created.id,
       providerTargetId: profileId,
-      runtimeKind: runtimeKind as 'codex' | 'claude-agent',
+      runtimeKind,
       modelId,
     })
   }
@@ -413,10 +408,11 @@ function ConflictsNotice({
   const groupIndexById = useMemo(() => new Map(groups.map((g, i) => [g.id, i + 1])), [groups])
   return (
     <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen(value => !value)}
-        className="flex w-full items-center gap-2 text-left text-[12px] font-medium text-amber-700 dark:text-amber-400"
+        className="h-auto w-full justify-start gap-2 px-0 py-0 text-left text-[12px] text-amber-700 hover:bg-transparent dark:text-amber-400"
       >
         {open ? <ChevronDownIcon className="size-3.5" /> : <ChevronRightIcon className="size-3.5" />}
         <span>
@@ -430,7 +426,7 @@ appear in more than one commit
         <span className="text-[11px] font-normal text-amber-600/80 dark:text-amber-400/80">
           — committed in the earliest one, later groups skip it.
         </span>
-      </button>
+      </Button>
       {open && (
         <div className="mt-2 space-y-1 border-t border-amber-500/20 pt-2">
           {conflicts.map(conflict => (
@@ -733,8 +729,9 @@ function PlanGenerateGate({
   const runtimeKind = composer.selection.runtimeKind
   const profileId = composer.selection.profileId
   const modelId = composer.selection.modelId
+  const { runtimeKindSet } = useProviderBackedDiffRuntimeSelection(composer.runtimeOptions)
 
-  const canPlan = profileId != null && isCommitPlanRuntime(runtimeKind)
+  const canPlan = profileId != null && runtimeKindSet.has(runtimeKind)
   const fileCount = review.currentRevision?.fileCount ?? review.files.length
 
   return (
@@ -779,13 +776,15 @@ function PlanConfigCard({
   busy: boolean
   className?: string
 }) {
+  const { runtimeOptions: commitPlanRuntimeOptions } = useProviderBackedDiffRuntimeSelection(composer.runtimeOptions)
+
   return (
     <div className={cn('space-y-4 rounded-xl border border-border bg-sidebar/40 p-4', className)}>
       <Field label="Tool runtime">
         <RuntimeSelector
           value={composer.selection.runtimeKind}
           onChange={composer.setRuntimeKind}
-          options={COMMIT_PLAN_RUNTIME_OPTIONS}
+          options={commitPlanRuntimeOptions}
           disabled={busy}
         />
       </Field>
@@ -884,7 +883,8 @@ function RegenerateDialog({
   const runtimeKind = composer.selection.runtimeKind
   const profileId = composer.selection.profileId
   const modelId = composer.selection.modelId
-  const canPlan = profileId != null && isCommitPlanRuntime(runtimeKind)
+  const { runtimeKindSet } = useProviderBackedDiffRuntimeSelection(composer.runtimeOptions)
+  const canPlan = profileId != null && runtimeKindSet.has(runtimeKind)
   const disabled = busy || filesCount === 0 || !canPlan
 
   const handleGenerate = async () => {
@@ -987,8 +987,4 @@ function latestCommitAgentFix(review: CradleDiffReview | null | undefined): Revi
     }
   }
   return latest
-}
-
-function isCommitPlanRuntime(kind: string): kind is 'codex' | 'claude-agent' {
-  return kind === 'codex' || kind === 'claude-agent'
 }

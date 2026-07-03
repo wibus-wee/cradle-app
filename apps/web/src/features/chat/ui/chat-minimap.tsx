@@ -1,8 +1,9 @@
 import type { UIMessage } from 'ai'
 import { clamp } from 'es-toolkit'
 import type { Ref } from 'react'
-import { useImperativeHandle, useReducer, useRef } from 'react'
+import { useCallback, useImperativeHandle, useReducer, useRef } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 import { clampRatio } from '~/lib/number-format'
 import { chatSelectors, useChatStore } from '~/store/chat'
@@ -179,7 +180,7 @@ function ChatMinimapInner({
   const scrollable = Math.max(scrollHeight - viewportHeight, 1)
   const anchorCount = anchors.length
 
-  const setActiveMessageIndex = (messageIndex: number) => {
+  const setActiveMessageIndex = useCallback((messageIndex: number) => {
     if (anchorCount === 0) {
       activeAnchorRef.current = 0
       activeAnchorValueRef.current = null
@@ -208,7 +209,7 @@ function ChatMinimapInner({
       }
       bar.dataset.active = index === activeAnchor ? 'true' : 'false'
     }
-  }
+  }, [anchorCount, anchors])
 
   const setAnchorNode = (index: number, node: HTMLSpanElement | null) => {
     anchorNodesRef.current[index] = node
@@ -296,8 +297,9 @@ function ChatMinimapInner({
     <div
       className="pointer-events-none absolute right-1 top-0 bottom-0 z-10 flex items-center justify-center"
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
         ref={containerRef}
         aria-label="Chat minimap"
         onKeyDown={(e) => {
@@ -311,7 +313,7 @@ function ChatMinimapInner({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onClick={e => scrollToEventMessage(e.clientY)}
-        className="pointer-events-auto relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-full bg-transparent p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="pointer-events-auto relative flex h-auto cursor-pointer flex-col items-center justify-center gap-3 rounded-full bg-transparent p-0 hover:bg-transparent focus-visible:ring-1 focus-visible:ring-ring"
       >
         {anchors.map((anchor, i) => {
           return (
@@ -324,7 +326,7 @@ function ChatMinimapInner({
             />
           )
         })}
-      </button>
+      </Button>
     </div>
   )
 }

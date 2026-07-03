@@ -17,10 +17,11 @@ import {
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../chat-runtime/runtime-provider-types'
-import { projectTextOnlyInput } from '../../chat-runtime/ui-message-input'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import type { RuntimeKind } from '../../provider-contracts/types'
 import { createClaudeAgentChunkMapperState, mapClaudeAgentMessageToChunks } from '../claude-agent/event-to-chunk-mapper'
+import { providerChunk } from '../kit/chunk-mapper'
+import { projectTextOnlyInput } from '../kit/input-projector'
 import { readWorkspaceProviderStateSnapshot } from '../provider-state-snapshot'
 
 const RUNTIME_KIND = 'claude-agent' as RuntimeKind
@@ -43,6 +44,7 @@ const MOCK_CLAUDE_AGENT_RUNTIME_CAPABILITIES = {
   supportsRuntimeSettings: false,
   supportsUiSlotStates: false,
   supportsDynamicCapabilities: false,
+  supportsTitleGeneration: false,
   sessionModelSwitch: 'restart-session',
 } satisfies ChatRuntimeCapabilities
 
@@ -167,7 +169,7 @@ export class MockClaudeAgentProvider implements ChatRuntime {
       }
 
       if (mapperState.assistantStarted) {
-        yield { type: 'text-end', id: mapperState.textItemId }
+        yield providerChunk.textEnd(mapperState.textItemId)
       }
     }
     finally {

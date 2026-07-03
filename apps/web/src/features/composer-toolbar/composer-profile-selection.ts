@@ -1,5 +1,5 @@
 import { runtimeSupportsProviderKind } from '~/features/agent-runtime/runtime-compatibility'
-import type { RuntimeCatalogItem } from '~/features/agent-runtime/use-runtime-catalog'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 
 import type { ProviderModelOption } from './types'
@@ -7,6 +7,12 @@ import type { ProviderModelOption } from './types'
 interface SelectableProfilesInput {
   profiles: ProviderModelOption[]
   runtimeKind: RuntimeKind
+  runtimes?: RuntimeCatalogItem[]
+}
+
+interface SelectableProfilesForRuntimesInput {
+  profiles: ProviderModelOption[]
+  runtimeKinds: RuntimeKind[]
   runtimes?: RuntimeCatalogItem[]
 }
 
@@ -22,6 +28,16 @@ export function listSelectableComposerProfiles({
 }: SelectableProfilesInput): ProviderModelOption[] {
   return profiles.filter(profile =>
     profile.enabled && runtimeSupportsProviderKind(runtimeKind, profile.providerKind, runtimes))
+}
+
+export function listSelectableComposerProfilesForRuntimes({
+  profiles,
+  runtimeKinds,
+  runtimes,
+}: SelectableProfilesForRuntimesInput): ProviderModelOption[] {
+  return profiles.filter(profile =>
+    profile.enabled
+    && runtimeKinds.some(runtimeKind => runtimeSupportsProviderKind(runtimeKind, profile.providerKind, runtimes)))
 }
 
 export function pickComposerProfileId({

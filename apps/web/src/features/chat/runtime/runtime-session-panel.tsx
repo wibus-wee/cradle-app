@@ -1,19 +1,19 @@
+import {
+  CheckCircleLine as CheckCircle2Icon,
+  EyeLine as EyeIcon,
+  HeartbeatLine as ActivityIcon,
+  ListCheckLine as ListChecksIcon,
+  RobotLine as BotIcon,
+  RoundLine as CircleIcon,
+  StopwatchLine as TimerIcon,
+  ToolLine as WrenchIcon,
+} from '@mingcute/react'
 import { useQuery } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
-import {
-  HeartbeatLine as ActivityIcon,
-  RobotLine as BotIcon,
-  CheckCircleLine as CheckCircle2Icon,
-  RoundLine as CircleIcon,
-  EyeLine as EyeIcon,
-  ListCheckLine as ListChecksIcon,
-  StopwatchLine as TimerIcon,
-  ToolLine as WrenchIcon
-} from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
 import { useSyncExternalStore } from 'react'
 
+import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { cn } from '~/lib/cn'
 import { formatElapsedRangeMs, formatPercentFromRatio } from '~/lib/number-format'
@@ -27,11 +27,11 @@ import type {
   ChatRuntimeCrewUiSlotState,
   ChatRuntimePlanUiSlotState,
   ChatRuntimeProgressUiSlotState,
-  ChatRuntimeUiSlotState
+  ChatRuntimeUiSlotState,
 } from '../capabilities/chat-capabilities'
 import {
   getChatRuntimeUiSlotStates,
-  runtimeUiSlotStatesQueryKey
+  runtimeUiSlotStatesQueryKey,
 } from '../capabilities/chat-capabilities'
 import type { ChatTodoItem, SessionTodoSnapshot } from '../capabilities/chat-todo-projection'
 import type { RuntimeSessionStatusKind } from '../commands/runtime-session-status-command'
@@ -58,7 +58,7 @@ const TOOL_STATE_LABELS: Record<ToolState, string> = {
   'approval-responded': 'Approved',
   'output-available': 'Done',
   'output-error': 'Error',
-  'output-denied': 'Denied'
+  'output-denied': 'Denied',
 }
 
 const EMPTY_MESSAGES: UIMessage[] = []
@@ -77,17 +77,19 @@ export function RuntimeSessionPanel({
   sessionId,
   runtimeKind,
   providerTargetId,
-  active = true
+  active = true,
 }: RuntimeSessionPanelProps) {
   const activeSessionId = active ? sessionId : null
   const visibleStatus = useChatStore(
-    activeSessionId ? chatSelectors.visibleStatus(activeSessionId) : () => 'idle' as const
+    activeSessionId ? chatSelectors.visibleStatus(activeSessionId) : () => 'idle' as const,
   )
-  const { data: runtimeStatus } = useRuntimeSessionStatus(activeSessionId, active)
+  const { data: runtimeStatus } = useRuntimeSessionStatus(activeSessionId, active, {
+    refetchInterval: false,
+  })
   const attentionSnapshot = useSyncExternalStore(
     active ? subscribeChatAttentionSnapshots : subscribeInactiveChatAttentionSnapshots,
     () => (active ? readChatAttentionSnapshot(sessionId) : null),
-    () => null
+    () => null,
   )
   const { data: runtimeUiSlotStates, isLoading: runtimeUiSlotStatesLoading } = useQuery({
     queryKey: runtimeUiSlotStatesQueryKey(activeSessionId, runtimeKind),
@@ -98,23 +100,23 @@ export function RuntimeSessionPanel({
       if (!active) {
         return false
       }
-      return statusShouldPoll(runtimeStatus?.status) ||
-        shouldPollRuntimeSlotStates(query.state.data?.states ?? [])
+      return statusShouldPoll(runtimeStatus?.status)
+        || shouldPollRuntimeSlotStates(query.state.data?.states ?? [])
         ? 2_000
         : false
     },
-    retry: false
+    retry: false,
   })
   const todoSnapshot = useSessionTodos(sessionId, active)
   const lastAssistantId = useChatStore(
-    activeSessionId ? chatSelectors.lastAssistantId(activeSessionId) : () => undefined
+    activeSessionId ? chatSelectors.lastAssistantId(activeSessionId) : () => undefined,
   )
   const messages = useChatStore(
-    activeSessionId ? chatSelectors.messages(activeSessionId) : () => EMPTY_MESSAGES
+    activeSessionId ? chatSelectors.messages(activeSessionId) : () => EMPTY_MESSAGES,
   )
   const tools = collectSessionToolParts(messages)
   const runMeta = useChatStore(
-    active && lastAssistantId ? chatSelectors.runDisplayMeta(lastAssistantId) : () => undefined
+    active && lastAssistantId ? chatSelectors.runDisplayMeta(lastAssistantId) : () => undefined,
   )
   const toolCounts = countToolStates(tools)
   const recentTools = tools.slice(-6).reverse()
@@ -142,7 +144,8 @@ export function RuntimeSessionPanel({
 
       <section className="space-y-2">
         <PanelHeading icon={EyeIcon} label="Attention" />
-        {attentionSnapshot ? (
+        {attentionSnapshot
+? (
           <div className="grid grid-cols-2 gap-2">
             <Metric label="Visible" value={formatAttentionRange(attentionSnapshot)} />
             <Metric label="Scroll" value={formatPercentFromRatio(attentionSnapshot.scrollRatio)} />
@@ -152,7 +155,8 @@ export function RuntimeSessionPanel({
               value={formatSnapshotFreshness(attentionSnapshot.updatedAt)}
             />
           </div>
-        ) : (
+        )
+: (
           <p className="rounded-md bg-muted/30 p-2 text-[11px] text-muted-foreground">
             No chat attention snapshot for this session
           </p>
@@ -234,7 +238,7 @@ export function RuntimeSessionPanel({
                   <CircleIcon
                     className={cn(
                       'size-2.5 shrink-0 fill-current',
-                      tool.state === 'output-error' ? '!text-destructive' : '!text-muted-foreground'
+                      tool.state === 'output-error' ? '!text-destructive' : '!text-muted-foreground',
                     )}
                   />
                   <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
@@ -258,7 +262,7 @@ export function RuntimeSessionPanel({
   )
 }
 
-function PanelHeading({ icon: Icon, label }: { icon: typeof ActivityIcon; label: string }) {
+function PanelHeading({ icon: Icon, label }: { icon: typeof ActivityIcon, label: string }) {
   return (
     <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
       <Icon className="size-3.5" aria-hidden="true" />
@@ -267,7 +271,7 @@ function PanelHeading({ icon: Icon, label }: { icon: typeof ActivityIcon; label:
   )
 }
 
-function ProgressPanel({ items, loading }: { items: ProgressTaskItem[]; loading: boolean }) {
+function ProgressPanel({ items, loading }: { items: ProgressTaskItem[], loading: boolean }) {
   if (items.length === 0) {
     return null
   }
@@ -275,13 +279,15 @@ function ProgressPanel({ items, loading }: { items: ProgressTaskItem[]; loading:
     <section className="space-y-2">
       <PanelHeading icon={ListChecksIcon} label="Progress" />
       <div className="space-y-2 rounded-md bg-muted/35 px-1 py-2 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-        {items.length > 0 ? (
+        {items.length > 0
+? (
           <div className="space-y-1">
-            {items.map((item) => (
+            {items.map(item => (
               <ProgressTaskRow key={item.id} item={item} />
             ))}
           </div>
-        ) : (
+        )
+: (
           <p className="rounded bg-background/45 px-2 py-1.5 text-[11px] text-muted-foreground">
             {loading ? 'Loading session progress...' : 'No Plan or TODO state for this session'}
           </p>
@@ -292,8 +298,8 @@ function ProgressPanel({ items, loading }: { items: ProgressTaskItem[]; loading:
 }
 
 function ProgressTaskRow({ item }: { item: ProgressTaskItem }) {
-  const Icon =
-    item.status === 'completed'
+  const Icon
+    = item.status === 'completed'
       ? CheckCircle2Icon
       : item.status === 'inProgress'
         ? Spinner
@@ -306,14 +312,14 @@ function ProgressTaskRow({ item }: { item: ProgressTaskItem }) {
           'mt-0.5 size-3.5 shrink-0',
           item.status === 'completed' && '!text-emerald-600 dark:!text-emerald-400',
           item.status === 'inProgress' && 'animate-spin !text-primary',
-          item.status === 'pending' && '!text-muted-foreground'
+          item.status === 'pending' && '!text-muted-foreground',
         )}
       />
       <span
         className={cn(
           'min-w-0 flex-1 text-[11px] leading-4 text-foreground/85',
-          item.status === 'completed' &&
-            'text-muted-foreground line-through decoration-muted-foreground/50'
+          item.status === 'completed'
+          && 'text-muted-foreground line-through decoration-muted-foreground/50',
         )}
       >
         {item.label}
@@ -324,14 +330,14 @@ function ProgressTaskRow({ item }: { item: ProgressTaskItem }) {
 
 function SubagentsPanel({
   sessionId,
-  crewState
+  crewState,
 }: {
   sessionId: string
   crewState: ChatRuntimeCrewUiSlotState | null
 }) {
-  const openSubagentTab = useBrowserPanelStore((state) => state.openSubagentTab)
-  const browserPanelOwnerId = useLayoutStore((state) => state.activeBrowserPanelOwnerId)
-  const setBrowserPanelOpen = useLayoutStore((state) => state.setBrowserPanelOpen)
+  const openSubagentTab = useBrowserPanelStore(state => state.openSubagentTab)
+  const browserPanelOwnerId = useLayoutStore(state => state.activeBrowserPanelOwnerId)
+  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
   const agents = crewState ? readCrewAgents(crewState) : []
   const openAgent = (agent: ChatRuntimeCrewAgentItem) => {
     openSubagentTab({
@@ -339,7 +345,7 @@ function SubagentsPanel({
       threadId: agent.threadId,
       agentName: readCrewAgentLabel(agent),
       agentRole: agent.agentRole,
-      ownerId: browserPanelOwnerId
+      ownerId: browserPanelOwnerId,
     })
     setBrowserPanelOpen(true, browserPanelOwnerId)
   }
@@ -353,7 +359,7 @@ function SubagentsPanel({
       <PanelHeading icon={BotIcon} label="Subagents" />
       <div className="space-y-2 rounded-md bg-muted/35 p-2 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
         <div className="space-y-1">
-          {agents.map((agent) => (
+          {agents.map(agent => (
             <SubagentRow key={agent.threadId} agent={agent} onOpen={openAgent} />
           ))}
         </div>
@@ -364,7 +370,7 @@ function SubagentsPanel({
 
 function SubagentRow({
   agent,
-  onOpen
+  onOpen,
 }: {
   agent: ChatRuntimeCrewAgentItem
   onOpen: (agent: ChatRuntimeCrewAgentItem) => void
@@ -373,9 +379,10 @@ function SubagentRow({
   const isActive = isActiveCrewAgentStatus(agent.status)
 
   return (
-    <button
+    <Button
       type="button"
-      className="flex h-10 min-w-0 w-full items-center gap-2 rounded bg-background/45 px-2 text-left transition-colors hover:bg-background/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      variant="ghost"
+      className="h-10 min-w-0 w-full justify-start gap-2 rounded bg-background/45 px-2 text-left hover:bg-background/70 focus-visible:ring-1 focus-visible:ring-ring"
       onClick={() => onOpen(agent)}
       aria-label={`Open ${label} output`}
     >
@@ -388,7 +395,7 @@ function SubagentRow({
       <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
         {label}
       </span>
-    </button>
+    </Button>
   )
 }
 
@@ -396,7 +403,7 @@ function Metric({
   label,
   value,
   tone = 'idle',
-  className
+  className,
 }: {
   label: string
   value: string
@@ -414,7 +421,7 @@ function Metric({
           tone === 'waitingForUserInput' && 'text-amber-600 dark:text-amber-400',
           tone === 'cancelling' && 'text-amber-600 dark:text-amber-400',
           tone === 'error' && 'text-destructive',
-          tone === 'idle' && 'text-foreground'
+          tone === 'idle' && 'text-foreground',
         )}
       >
         {value}
@@ -423,7 +430,7 @@ function Metric({
   )
 }
 
-function KeyValue({ label, value }: { label: string; value: string }) {
+function KeyValue({ label, value }: { label: string, value: string }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <span className="shrink-0 text-muted-foreground">{label}</span>
@@ -449,7 +456,7 @@ function isRuntimeCrewState(state: ChatRuntimeUiSlotState): state is ChatRuntime
 function buildProgressItems(
   planState: ChatRuntimePlanUiSlotState | null,
   progressStates: ChatRuntimeProgressUiSlotState[],
-  todoSnapshot: SessionTodoSnapshot | null
+  todoSnapshot: SessionTodoSnapshot | null,
 ): ProgressTaskItem[] {
   const itemByKey = new Map<string, ProgressTaskItem>()
 
@@ -458,7 +465,7 @@ function buildProgressItems(
       id: `plan:${index}:${step.step}`,
       label: step.step,
       status: step.status,
-      order: index
+      order: index,
     })
   })
 
@@ -468,7 +475,7 @@ function buildProgressItems(
         id: `progress:${state.slotId}:${item.id ?? index}:${item.label}`,
         label: item.label,
         status: item.status,
-        order: (planState?.steps.length ?? 0) + stateIndex * 1_000 + index
+        order: (planState?.steps.length ?? 0) + stateIndex * 1_000 + index,
       })
     })
   })
@@ -479,7 +486,7 @@ function buildProgressItems(
       id: `todo:${todo.id ?? index}:${todo.content}`,
       label: todo.content,
       status: mapTodoProgressStatus(todo),
-      order: (planState?.steps.length ?? 0) + progressStates.length * 1_000 + index
+      order: (planState?.steps.length ?? 0) + progressStates.length * 1_000 + index,
     })
   })
 
@@ -498,7 +505,7 @@ function mergeProgressItem(itemByKey: Map<string, ProgressTaskItem>, item: Progr
     ...existing,
     id: existing.id,
     status: readDominantProgressStatus(existing.status, item.status),
-    order: Math.min(existing.order, item.order)
+    order: Math.min(existing.order, item.order),
   })
 }
 
@@ -520,7 +527,7 @@ function mapTodoProgressStatus(todo: ChatTodoItem): ProgressTaskStatus {
 
 function readDominantProgressStatus(
   left: ProgressTaskStatus,
-  right: ProgressTaskStatus
+  right: ProgressTaskStatus,
 ): ProgressTaskStatus {
   if (left === 'inProgress' || right === 'inProgress') {
     return 'inProgress'
@@ -546,7 +553,7 @@ function readCrewAgents(state: ChatRuntimeCrewUiSlotState): ChatRuntimeCrewAgent
         preview: null,
         modelProvider: null,
         agentNickname: null,
-        agentRole: null
+        agentRole: null,
       })
     }
     for (const agent of readCrewCallAgents(call)) {
@@ -576,7 +583,7 @@ function isActiveCrewAgentStatus(status: string | null): boolean {
   return status === 'pendingInit' || status === 'running' || status === 'active'
 }
 
-function countToolStates(tools: Array<{ state: ToolState }>): { running: number; failed: number } {
+function countToolStates(tools: Array<{ state: ToolState }>): { running: number, failed: number } {
   return tools.reduce(
     (counts, tool) => {
       if (tool.state === 'output-error' || tool.state === 'output-denied') {
@@ -587,7 +594,7 @@ function countToolStates(tools: Array<{ state: ToolState }>): { running: number;
       }
       return counts
     },
-    { running: 0, failed: 0 }
+    { running: 0, failed: 0 },
   )
 }
 
@@ -612,7 +619,7 @@ function formatStatus(status: RuntimeSessionStatusKind | 'error'): string {
 }
 
 function formatRuntimeSettings(
-  settings: { accessMode: string; interactionMode: string } | null | undefined
+  settings: { accessMode: string, interactionMode: string } | null | undefined,
 ): string {
   if (!settings) {
     return 'full-access / default'
@@ -628,7 +635,7 @@ function formatThreadId(threadId: string): string {
 }
 
 function formatAttentionRange(
-  snapshot: NonNullable<ReturnType<typeof readChatAttentionSnapshot>>
+  snapshot: NonNullable<ReturnType<typeof readChatAttentionSnapshot>>,
 ): string {
   if (snapshot.firstVisibleIndex === null || snapshot.lastVisibleIndex === null) {
     return `${snapshot.messageCount} messages`
@@ -648,10 +655,10 @@ function formatSnapshotFreshness(updatedAt: number): string {
 }
 
 function statusShouldPoll(status: RuntimeSessionStatusKind | undefined): boolean {
-  return status === 'streaming' ||
-    status === 'pending' ||
-    status === 'waitingForUserInput' ||
-    status === 'cancelling'
+  return status === 'streaming'
+    || status === 'pending'
+    || status === 'waitingForUserInput'
+    || status === 'cancelling'
 }
 
 function shouldPollRuntimeSlotStates(states: ChatRuntimeUiSlotState[]): boolean {

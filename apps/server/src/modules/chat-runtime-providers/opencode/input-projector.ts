@@ -4,15 +4,17 @@
  * Position: opencode provider package boundary from Cradle message input to opencode session.prompt body.
  */
 
-import type { UIMessage } from 'ai'
 import type { FilePartInput, TextPartInput } from '@opencode-ai/sdk'
+import type { UIMessage } from 'ai'
 
 import type { StreamTurnInput } from '../../chat-runtime/runtime-provider-types'
-import { extractUiMessageText, projectTextOnlyInput } from '../../chat-runtime/ui-message-input'
+import {
+  extractProviderInputText,
+  projectProviderInputParts,
+  projectTextOnlyInput,
+} from '../kit/input-projector'
 
 export type OpencodePromptPartInput = TextPartInput | FilePartInput
-
-type MessagePart = UIMessage['parts'][number]
 
 export function projectOpencodePromptParts(message: StreamTurnInput['message']): OpencodePromptPartInput[] {
   if (typeof message === 'string') {
@@ -22,19 +24,20 @@ export function projectOpencodePromptParts(message: StreamTurnInput['message']):
     }]
   }
 
-  const unsupportedParts = message.parts.filter(part => part.type !== 'text' && part.type !== 'file')
+  const projectedParts = projectProviderInputParts(message)
+  const unsupportedParts = projectedParts.filter(part => part.type !== 'text' && part.type !== 'file')
   if (unsupportedParts.length > 0) {
-    const details = unsupportedParts.map(part => part.type).join(', ')
+    const details = unsupportedParts.map(part => part.type === 'unsupported' ? part.partType : part.type).join(', ')
     throw new Error(`opencode provider only supports text and file input; unsupported parts: ${details}`)
   }
 
   const parts: OpencodePromptPartInput[] = []
-  const text = extractUiMessageText(message).trim()
+  const text = extractProviderInputText(message).trim()
   if (text) {
     parts.push({ type: 'text', text })
   }
-  for (const part of message.parts) {
-    if (isFilePart(part)) {
+  for (const part of projectedParts) {
+    if (part.type === 'file') {
       parts.push(projectOpenCodeFilePart(part))
     }
   }
@@ -46,7 +49,7 @@ export function projectOpencodePromptParts(message: StreamTurnInput['message']):
 
 export function readOpencodeSlashCommandInvocation(
   message: StreamTurnInput['message'],
-): { command: string; arguments: string } | null {
+): { command: string, arguments: string } | null {
   const text = projectTextOnlyInput(message, 'opencode slash command').trim()
   if (!text.startsWith('/')) {
     return null
@@ -84,21 +87,17 @@ export function projectOpencodeQuickQuestionParts(input: {
 }
 
 function formatTranscriptMessage(message: UIMessage): string {
-  const text = extractUiMessageText(message).trim()
+  const text = extractProviderInputText(message).trim()
   if (!text) {
     return `${message.role}: [non-text content omitted]`
   }
   return `${message.role}: ${text}`
 }
 
-function isFilePart(part: MessagePart): part is Extract<MessagePart, { type: 'file' }> {
-  return part.type === 'file'
-}
-
-function projectOpenCodeFilePart(part: Extract<MessagePart, { type: 'file' }>): FilePartInput {
+function projectOpenCodeFilePart(part: Extract<ReturnType<typeof projectProviderInputParts>[number], { type: 'file' }>): FilePartInput {
   return {
     type: 'file',
-    mime: part.mediaType,
+    mime: part.part.mediaType,
     ...(part.filename ? { filename: part.filename } : {}),
     url: part.url,
   }

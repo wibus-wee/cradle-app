@@ -13,7 +13,12 @@ import type {
   RuntimeUserInputRequest,
   RuntimeUserInputResolution,
 } from '../../chat-runtime/runtime-provider-types'
+import {
+  RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_USAGE_COMMAND_ACTION_ID,
+} from '../../chat-runtime/runtime-provider-types'
 import { providerRuntimeHostManager } from '../../provider-runtime/host-manager'
+import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
 import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './app-server/client'
 import { codexChatSessionAppServerScopeId } from './app-server/host-lease'
 import { isCodexAppServerInteractiveServerRequest } from './app-server/server-request-methods'
@@ -749,14 +754,40 @@ describe('codexProvider app-server integration', () => {
         expect.objectContaining({ id: 'codex:goal', name: 'goal', iconKey: 'goal', surfaces: ['slashCommand', 'composerState', 'runtimePanel'] }),
         expect.objectContaining({ id: 'codex:plan', name: 'plan', iconKey: 'plan', surfaces: ['composerState', 'runtimePanel'] }),
         expect.objectContaining({ id: 'codex:mcp', name: 'mcp', iconKey: 'mcp', surfaces: ['runtimePanel'] }),
-        expect.objectContaining({ id: 'codex:review', name: 'review', iconKey: 'code-review', surfaces: ['slashCommand'] }),
-        expect.objectContaining({ id: 'codex:quick-question', name: 'btw', iconKey: 'quick-question', surfaces: ['slashCommand', 'composerState'] }),
-        expect.objectContaining({ id: 'codex:compact', name: 'compact', iconKey: 'compact', surfaces: ['slashCommand', 'runtimePanel'] }),
+        expect.objectContaining({
+          id: 'codex:review',
+          name: 'review',
+          iconKey: 'code-review',
+          commandAction: { kind: 'uiAction', actionId: RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID },
+          surfaces: ['slashCommand'],
+        }),
+        expect.objectContaining({
+          id: 'codex:quick-question',
+          name: 'btw',
+          iconKey: 'quick-question',
+          requiresSession: true,
+          surfaces: ['slashCommand', 'composerState'],
+        }),
+        expect.objectContaining({
+          id: 'codex:compact',
+          name: 'compact',
+          iconKey: 'compact',
+          commandAction: { kind: 'submitText', requiresEmptyComposer: true },
+          surfaces: ['slashCommand', 'runtimePanel'],
+        }),
         expect.objectContaining({ id: 'codex:model', name: 'model', iconKey: 'model', surfaces: ['toolbarPicker', 'runtimePanel'] }),
         expect.objectContaining({ id: 'codex:reasoning', name: 'reasoning', iconKey: 'reasoning', surfaces: ['toolbarPicker', 'runtimePanel'] }),
         expect.objectContaining({ id: 'codex:approvals', name: 'approvals', iconKey: 'approvals', surfaces: ['runtimePanel'] }),
         expect.objectContaining({ id: 'codex:user-input', name: 'ask-user', iconKey: 'user-input', surfaces: ['composerState', 'runtimePanel', 'streamEvidence'] }),
         expect.objectContaining({ id: 'codex:alerts', name: 'alerts', iconKey: 'alert', surfaces: ['runtimePanel'] }),
+        expect.objectContaining({
+          id: 'codex:usage',
+          name: 'usage',
+          iconKey: 'usage',
+          commandAction: { kind: 'uiAction', actionId: RUNTIME_USAGE_COMMAND_ACTION_ID },
+          requiresSession: true,
+          surfaces: ['slashCommand', 'runtimePanel'],
+        }),
         expect.objectContaining({ id: 'codex:status', name: 'status', iconKey: 'status', surfaces: ['runtimePanel'] }),
       ]),
     })
@@ -942,9 +973,27 @@ describe('codexProvider app-server integration', () => {
       uiSlots: expect.arrayContaining([
         expect.objectContaining({ id: 'codex:goal', name: 'goal', iconKey: 'goal', surfaces: ['slashCommand', 'composerState', 'runtimePanel'] }),
         expect.objectContaining({ id: 'codex:plan', name: 'plan', iconKey: 'plan', surfaces: ['composerState', 'runtimePanel'] }),
-        expect.objectContaining({ id: 'codex:compact', name: 'compact', iconKey: 'compact', surfaces: ['slashCommand', 'runtimePanel'] }),
-        expect.objectContaining({ id: 'codex:review', name: 'review', iconKey: 'code-review', surfaces: ['slashCommand'] }),
-        expect.objectContaining({ id: 'codex:quick-question', name: 'btw', iconKey: 'quick-question', surfaces: ['slashCommand', 'composerState'] }),
+        expect.objectContaining({
+          id: 'codex:compact',
+          name: 'compact',
+          iconKey: 'compact',
+          commandAction: { kind: 'submitText', requiresEmptyComposer: true },
+          surfaces: ['slashCommand', 'runtimePanel'],
+        }),
+        expect.objectContaining({
+          id: 'codex:review',
+          name: 'review',
+          iconKey: 'code-review',
+          commandAction: { kind: 'uiAction', actionId: RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID },
+          surfaces: ['slashCommand'],
+        }),
+        expect.objectContaining({
+          id: 'codex:quick-question',
+          name: 'btw',
+          iconKey: 'quick-question',
+          requiresSession: true,
+          surfaces: ['slashCommand', 'composerState'],
+        }),
         expect.objectContaining({ id: 'codex:approvals', name: 'approvals', iconKey: 'approvals', surfaces: ['runtimePanel'] }),
         expect.objectContaining({ id: 'codex:user-input', name: 'ask-user', iconKey: 'user-input', surfaces: ['composerState', 'runtimePanel', 'streamEvidence'] }),
       ]),
@@ -5970,10 +6019,14 @@ describe('codexProvider app-server integration', () => {
       },
     })
 
-    await expect(firstChunkPromise).resolves.toEqual({
+    const firstChunk = await firstChunkPromise
+    expect(firstChunk).toEqual({
       done: false,
       value: { type: 'text-start', id: 'assistant-message-1' },
     })
+    if (firstChunk.done) {
+      throw new Error('Expected first text-start chunk')
+    }
 
     client.pushNotification({
       method: 'item/started',
@@ -6027,11 +6080,13 @@ describe('codexProvider app-server integration', () => {
       { type: 'text-end', id: 'assistant-message-1' },
       { type: 'tool-input-start', toolCallId: 'tool-1', toolName: 'command_execution' },
       { type: 'tool-input-available', toolCallId: 'tool-1', toolName: 'command_execution', input: codexInput('command_execution', { command: 'pwd' }) },
+      { type: 'tool-output-available', toolCallId: 'tool-1', preliminary: true, output: codexOutput('command_execution', { command: 'pwd' }, { command: 'pwd', output: '/tmp', exitCode: null, code: null, status: 'inProgress' }) },
       { type: 'tool-output-available', toolCallId: 'tool-1', output: codexOutput('command_execution', { command: 'pwd' }, { command: 'pwd', output: '/tmp', exitCode: 0, code: 0 }) },
       { type: 'text-start', id: 'assistant-message-2' },
       { type: 'text-delta', id: 'assistant-message-2', delta: 'After tool' },
       { type: 'text-end', id: 'assistant-message-2' },
     ])
+    assertValidProviderChunkSequence([firstChunk.value, ...chunks])
   })
 
   it('emits Codex plan items as structured tool output', async () => {

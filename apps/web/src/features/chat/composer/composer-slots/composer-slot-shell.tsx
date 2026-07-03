@@ -3,6 +3,7 @@
  */
 import type { ReactNode } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
@@ -47,15 +48,17 @@ export function ComposerSlotIconAction({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          className="flex size-5 items-center justify-center rounded-sm text-muted-foreground/75 transition-[background-color,color,opacity,transform] hover:bg-muted hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-40"
+          className="size-5 rounded-sm text-muted-foreground/75 hover:bg-muted hover:text-foreground active:scale-[0.96] disabled:opacity-40"
         >
           {children}
-        </button>
+        </Button>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>

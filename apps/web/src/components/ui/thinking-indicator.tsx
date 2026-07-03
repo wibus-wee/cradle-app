@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useState, useEffect, type HTMLAttributes } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { cn } from "~/lib/cn";
 import { fontWeights } from "~/lib/font-weight";
 

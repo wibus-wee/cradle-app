@@ -12,7 +12,7 @@ Every feature must have a clear owner responsible for its semantics, configurati
 
 ### Architecture First
 
-- **Prefer breaking refactors over compatibility shims.** No stable versions are published yet — clean, well-structured code matters more than backward compatibility. If a fix requires a breaking change, make it.
+- **Prefer breaking refactors over compatibility shims.** Some versions are published yet, but clean, well-structured code matters more than backward compatibility. If a fix requires a breaking change, make it.
 - **Upgrade architecture without hesitation.** If a better approach exists, adopt it. Don't accumulate technical debt for the sake of incremental compatibility.
 
 ### Code Quality

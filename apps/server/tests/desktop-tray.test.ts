@@ -165,7 +165,7 @@ describe('desktop tray projection', () => {
         }),
       ])
 
-      submitRuntimeUserInput({
+      await submitRuntimeUserInput({
         sessionId,
         requestId: 'request-desktop-user-input',
         answers: { choice: ['Option A'] },

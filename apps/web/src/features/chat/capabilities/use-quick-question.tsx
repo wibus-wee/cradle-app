@@ -2,19 +2,17 @@ import { useState } from 'react'
 
 export interface UseQuickQuestionOptions {
   sessionId: string
-  apiBaseUrl?: string
 }
 
 export interface QuickQuestionController {
   open: boolean
   question: string
   sessionId: string
-  apiBaseUrl?: string
   openQuickQuestion: (question: string) => void
   closeQuickQuestion: () => void
 }
 
-export function useQuickQuestion({ sessionId, apiBaseUrl }: UseQuickQuestionOptions): QuickQuestionController {
+export function useQuickQuestion({ sessionId }: UseQuickQuestionOptions): QuickQuestionController {
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState('')
 
@@ -31,7 +29,6 @@ export function useQuickQuestion({ sessionId, apiBaseUrl }: UseQuickQuestionOpti
     open,
     question,
     sessionId,
-    apiBaseUrl,
     openQuickQuestion,
     closeQuickQuestion,
   }

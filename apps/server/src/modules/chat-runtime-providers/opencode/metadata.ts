@@ -29,5 +29,6 @@ export const OPENCODE_RUNTIME_CAPABILITIES = {
   supportsRuntimeSettings: true,
   supportsUiSlotStates: true,
   supportsDynamicCapabilities: false,
+  supportsTitleGeneration: true,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities

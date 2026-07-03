@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
+import { Button } from '~/components/ui/button'
 import { DelayedSpinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 import type { FuzzyRankField } from '~/lib/fuzzy-rank'
@@ -227,11 +228,12 @@ export function AutocompletePanel<TItem extends AutocompletePanelItem>({
                   {header}
                 </div>
               )}
-              <button
+              <Button
                 type="button"
                 data-active={idx === effectiveActiveIndex}
+                variant="ghost"
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs',
+                  'h-auto w-full justify-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs whitespace-normal',
                   idx === effectiveActiveIndex
                     ? 'bg-accent text-accent-foreground'
                     : 'text-foreground/80 hover:bg-accent/40',
@@ -247,7 +249,7 @@ export function AutocompletePanel<TItem extends AutocompletePanelItem>({
                   index: idx,
                   previousItem,
                 })}
-              </button>
+              </Button>
             </li>
           )
         })}

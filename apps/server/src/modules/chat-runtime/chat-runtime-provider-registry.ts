@@ -13,49 +13,38 @@ import { createSystemAgentProvider } from '../chat-runtime-providers/system-agen
 import * as ModelRegistry from '../model-registry/service'
 import { record as recordObservability } from '../observability/service'
 import * as Preferences from '../preferences/service'
-import { registerRuntimeProviderBinding, registerRuntimeProviderKinds } from '../provider-contracts/runtime-compatibility'
+import {
+  readRuntimeSessionLaunchMode,
+  registerRuntimeGoalContinuationReader,
+  registerRuntimeOwnedProviderTargets,
+  registerRuntimeProviderBinding,
+  registerRuntimeProviderKinds,
+  registerRuntimeSessionLaunchMode,
+} from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
 import { resolveProviderTargetForRuntime } from '../provider-targets/service'
 import * as Secrets from '../secrets/service'
 import { resolveNativeSkillPackageDir } from '../skills/native-skill-projection'
 import { resolveScopeRoot } from '../skills/skills-paths'
+import {
+  CATALOG_ONLY_BUILTIN_RUNTIME_KINDS,
+  CATALOG_ONLY_BUILTIN_RUNTIMES,
+} from './catalog-only-runtime-metadata'
 import { requestRuntimeToolApproval } from './pending-tool-approval'
 import { requestRuntimeUserInput } from './pending-user-input'
 import type {
   ChatRuntime,
+  ChatRuntimeCapabilities,
   ChatRuntimeCatalogItem,
   ChatRuntimeHealthItem,
   ChatRuntimeMetadata,
   ProviderContext,
   ProviderHealthStatus,
+  RuntimeComposerDescriptor,
 } from './runtime-provider-types'
 import { updateSessionRuntimeSettings as updateChatSessionRuntimeSettings } from './runtime-settings-api'
 
 const SKILL_PATH_CACHE_TTL_MS = 30_000
-
-// CLI TUI sessions are launched by session/PTY; the catalog entry only feeds launch selectors.
-const CLI_TUI_RUNTIME_METADATA = {
-  label: 'CLI TUI',
-  description: 'Launch a configured terminal agent',
-  providerKinds: [],
-  iconKey: 'claude-cli',
-  surfaces: ['chat'],
-  sortOrder: 60,
-} satisfies ChatRuntimeMetadata
-
-const CATALOG_ONLY_BUILTIN_RUNTIMES: Array<{
-  runtimeKind: RuntimeKind
-  metadata: ChatRuntimeMetadata
-}> = [
-  {
-    runtimeKind: 'cli-tui',
-    metadata: CLI_TUI_RUNTIME_METADATA,
-  },
-]
-
-const CATALOG_ONLY_BUILTIN_RUNTIME_KINDS = new Set<RuntimeKind>(
-  CATALOG_ONLY_BUILTIN_RUNTIMES.map(runtime => runtime.runtimeKind),
-)
 
 interface SkillPathCacheEntry {
   paths: string[]
@@ -85,15 +74,14 @@ export class RuntimeRegistry {
     }
     this.runtimes.set(runtime.runtimeKind, {
       runtime,
-      metadata: {
-        ...resolvedMetadata,
-        providerKinds: [...resolvedMetadata.providerKinds],
-        surfaces: resolvedMetadata.surfaces ? [...resolvedMetadata.surfaces] : ['chat'],
-      },
+      metadata: normalizeRuntimeMetadata(resolvedMetadata),
       pluginOwner,
     })
     registerRuntimeProviderKinds(runtime.runtimeKind, resolvedMetadata.providerKinds)
     registerRuntimeProviderBinding(runtime.runtimeKind, resolvedMetadata.providerBinding ?? 'required')
+    registerRuntimeSessionLaunchMode(runtime.runtimeKind, resolvedMetadata.sessionLaunchMode ?? 'runtime-provider')
+    registerRuntimeGoalContinuationReader(runtime.runtimeKind, runtime.goalContinuation)
+    registerRuntimeOwnedProviderTargets(runtime.runtimeKind, runtime.ownedProviderTargets)
   }
 
   get(runtimeKind: RuntimeKind): ChatRuntime | undefined {
@@ -106,35 +94,55 @@ export class RuntimeRegistry {
       this.runtimes.delete(runtimeKind)
       registerRuntimeProviderKinds(runtimeKind, [])
       registerRuntimeProviderBinding(runtimeKind, 'required')
+      registerRuntimeSessionLaunchMode(runtimeKind, 'runtime-provider')
+      registerRuntimeGoalContinuationReader(runtimeKind, null)
+      registerRuntimeOwnedProviderTargets(runtimeKind, null)
     }
   }
 
   list(): ChatRuntimeCatalogItem[] {
-    const items = Array.from(this.runtimes.entries(), ([runtimeKind, entry]) => ({
-      runtimeKind,
-      ...entry.metadata,
-      source: entry.pluginOwner ? 'plugin' as const : 'builtin' as const,
-      pluginOwner: entry.pluginOwner,
-    }))
+    const items: ChatRuntimeCatalogItem[] = Array.from(this.runtimes.entries(), ([runtimeKind, entry]) =>
+      createRuntimeCatalogItem({
+        runtimeKind,
+        metadata: entry.metadata,
+        capabilities: cloneRuntimeCapabilities(entry.runtime.capabilities),
+        source: entry.pluginOwner ? 'plugin' as const : 'builtin' as const,
+        pluginOwner: entry.pluginOwner,
+      }))
 
     const registeredRuntimeKinds = new Set(items.map(item => item.runtimeKind))
     for (const runtime of CATALOG_ONLY_BUILTIN_RUNTIMES) {
       if (registeredRuntimeKinds.has(runtime.runtimeKind)) {
         continue
       }
-      items.push({
+      items.push(createRuntimeCatalogItem({
         runtimeKind: runtime.runtimeKind,
-        ...runtime.metadata,
+        metadata: runtime.metadata,
+        capabilities: null,
         source: 'builtin',
         pluginOwner: null,
-      })
+      }))
     }
 
-    return items
-      .sort((left, right) =>
-        (left.sortOrder ?? 1000) - (right.sortOrder ?? 1000)
-        || left.label.localeCompare(right.label)
-        || left.runtimeKind.localeCompare(right.runtimeKind))
+    return sortRuntimeCatalogItems(items)
+  }
+
+  async listDescriptors(): Promise<ChatRuntimeCatalogItem[]> {
+    const items = this.list()
+    const enriched = await Promise.all(items.map(async (item) => {
+      const runtime = this.runtimes.get(item.runtimeKind)?.runtime
+      if (!runtime?.getDraftPresentation) {
+        return item
+      }
+
+      const presentation = await runtime.getDraftPresentation()
+      return {
+        ...item,
+        slots: presentation.uiSlots,
+      }
+    }))
+
+    return sortRuntimeCatalogItems(enriched)
   }
 
   async listHealth(): Promise<ChatRuntimeHealthItem[]> {
@@ -176,6 +184,65 @@ export class RuntimeRegistry {
       left.source.localeCompare(right.source)
       || left.runtimeKind.localeCompare(right.runtimeKind))
   }
+}
+
+function createRuntimeCatalogItem(input: {
+  runtimeKind: RuntimeKind
+  metadata: ChatRuntimeMetadata
+  capabilities: ChatRuntimeCapabilities | null
+  source: 'builtin' | 'plugin'
+  pluginOwner: string | null
+}): ChatRuntimeCatalogItem {
+  const metadata = normalizeRuntimeMetadata(input.metadata)
+  return {
+    runtimeKind: input.runtimeKind,
+    ...metadata,
+    providerBinding: metadata.providerBinding ?? 'required',
+    sessionLaunchMode: metadata.sessionLaunchMode ?? readRuntimeSessionLaunchMode(input.runtimeKind),
+    icon: metadata.icon ?? { key: metadata.iconKey ?? 'custom' },
+    availability: metadata.availability ?? (metadata.stability === 'experimental' ? 'preview' : 'stable'),
+    composer: metadata.composer ?? createDefaultRuntimeComposer(metadata),
+    slots: metadata.slots ?? [],
+    capabilities: input.capabilities,
+    source: input.source,
+    pluginOwner: input.pluginOwner,
+  }
+}
+
+function sortRuntimeCatalogItems(items: ChatRuntimeCatalogItem[]): ChatRuntimeCatalogItem[] {
+  return [...items].sort((left, right) =>
+    (left.sortOrder ?? 1000) - (right.sortOrder ?? 1000)
+    || left.label.localeCompare(right.label)
+    || left.runtimeKind.localeCompare(right.runtimeKind))
+}
+
+function createDefaultRuntimeComposer(metadata: ChatRuntimeMetadata): RuntimeComposerDescriptor {
+  const providerBinding = metadata.providerBinding ?? 'required'
+  return {
+    inputMode: 'rich',
+    modelSelection: providerBinding === 'runtime-owned' ? 'runtime-owned' : 'provider-model',
+    thinking: 'per-model',
+  }
+}
+
+function normalizeRuntimeMetadata(metadata: ChatRuntimeMetadata): ChatRuntimeMetadata {
+  return {
+    ...metadata,
+    stability: metadata.stability ?? 'stable',
+    providerKinds: [...metadata.providerKinds],
+    surfaces: metadata.surfaces ? [...metadata.surfaces] : ['chat'],
+    degradations: metadata.degradations?.map(degradation => ({ ...degradation })),
+    slots: metadata.slots?.map(slot => ({
+      ...slot,
+      aliases: slot.aliases ? [...slot.aliases] : undefined,
+      commandAction: slot.commandAction ? { ...slot.commandAction } : undefined,
+      surfaces: [...slot.surfaces],
+    })),
+  }
+}
+
+function cloneRuntimeCapabilities(capabilities: ChatRuntimeCapabilities): ChatRuntimeCapabilities {
+  return { ...capabilities }
 }
 
 export function assertChatRuntime(runtime: unknown): asserts runtime is ChatRuntime {
@@ -220,6 +287,7 @@ function assertRuntimeCapabilities(runtime: Partial<ChatRuntime>): void {
     'supportsRuntimeSettings',
     'supportsUiSlotStates',
     'supportsDynamicCapabilities',
+    'supportsTitleGeneration',
   ] as const
   for (const key of booleanKeys) {
     if (typeof capabilities[key] !== 'boolean') {
@@ -236,6 +304,7 @@ function assertRuntimeCapabilities(runtime: Partial<ChatRuntime>): void {
   assertCapabilityHook(runtime, capabilities.supportsRuntimeSettings, 'updateRuntimeSettings')
   assertCapabilityHook(runtime, capabilities.supportsUiSlotStates, 'getUiSlotStates')
   assertCapabilityHook(runtime, capabilities.supportsDynamicCapabilities, 'getDynamicCapabilities')
+  assertCapabilityHook(runtime, capabilities.supportsTitleGeneration, 'generateSessionTitle')
 }
 
 function assertCapabilityHook(runtime: Partial<ChatRuntime>, supported: boolean, key: keyof ChatRuntime): void {
@@ -391,6 +460,10 @@ export function unregisterRuntime(runtimeKind: RuntimeKind, pluginOwner: string)
 
 export function listRuntimeCatalog(): ChatRuntimeCatalogItem[] {
   return getRuntimeRegistry().list()
+}
+
+export async function listRuntimeDescriptors(): Promise<ChatRuntimeCatalogItem[]> {
+  return await getRuntimeRegistry().listDescriptors()
 }
 
 export async function listRuntimeHealth(): Promise<ChatRuntimeHealthItem[]> {

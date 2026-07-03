@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { getRuntimeRegistry, registerRuntime } from '../src/modules/chat-runtime/chat-runtime-provider-registry'
+import { getRuntimeRegistry, registerRuntime, unregisterRuntime } from '../src/modules/chat-runtime/chat-runtime-provider-registry'
 import type {
   ChatRuntime,
   ChatRuntimeCapabilities,
@@ -34,8 +34,18 @@ const TEST_DIFF_REVIEW_RUNTIME_CAPABILITIES = {
   supportsRuntimeSettings: false,
   supportsUiSlotStates: false,
   supportsDynamicCapabilities: false,
+  supportsTitleGeneration: false,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities
+
+const DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND = 'diff-review-guide-test'
+
+function localWorkspaceRow(input: { id: string, name: string, path: string }) {
+  return {
+    ...input,
+    locatorJson: JSON.stringify({ hostId: 'local', path: input.path }),
+  }
+}
 
 class TestDiffReviewRuntime implements ChatRuntime {
   readonly runtimeKind = 'standard' as const
@@ -82,11 +92,13 @@ class TestDiffReviewRuntime implements ChatRuntime {
 }
 
 class TestDiffReviewGuideRuntime implements ChatRuntime {
-  readonly runtimeKind = 'codex' as const
+  readonly runtimeKind = DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND
   readonly metadata = {
     label: 'Diff Review Guide Test Runtime',
     providerKinds: ['openai-compatible'],
+    sortOrder: 5,
   } satisfies ChatRuntimeMetadata
+
   readonly capabilities = TEST_DIFF_REVIEW_RUNTIME_CAPABILITIES
   readonly streamInputs: StreamTurnInput[] = []
   responseText = '{"steps":[]}'
@@ -96,7 +108,7 @@ class TestDiffReviewGuideRuntime implements ChatRuntime {
       id: input.chatSessionId,
       chatSessionId: input.chatSessionId,
       providerTargetId: input.profile.providerTargetId,
-      runtimeKind: 'codex',
+      runtimeKind: DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND,
       providerSessionId: `diff-review-guide-test-${input.chatSessionId}`,
       providerStateSnapshot: input.previousProviderStateSnapshot ?? null,
     }
@@ -203,7 +215,7 @@ interface DiffReviewResponse {
     revisionId: string | null
     status: 'pending' | 'running' | 'ready' | 'failed' | null
     providerTargetId: string | null
-    runtimeKind: 'codex' | 'claude-agent' | null
+    runtimeKind: string | null
     modelId: string | null
     errorMessage: string | null
     createdAt: number | null
@@ -329,6 +341,23 @@ async function postJson<T>(
   return await response.json() as T
 }
 
+async function postJsonWithStatus<T>(
+  app: Awaited<ReturnType<typeof createServerApp>>,
+  path: string,
+  body: unknown,
+  status: number,
+): Promise<T> {
+  const response = await app.handle(
+    new Request(`http://localhost${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  )
+  expect(response.status).toBe(status)
+  return await response.json() as T
+}
+
 async function putJson<T>(
   app: Awaited<ReturnType<typeof createServerApp>>,
   path: string,
@@ -424,11 +453,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review',
           name: 'Workspace Diff Review',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const first = await refreshLocalReview(app, 'workspace-diff-review')
@@ -486,11 +515,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-lifecycle',
           name: 'Workspace Diff Review Lifecycle',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const review = await refreshLocalReview(app, 'workspace-diff-review-lifecycle')
@@ -642,12 +671,13 @@ describe('diff-review capability', () => {
         paths: ['app.ts'],
       })
 
-      const closed = await postJson<DiffReviewResponse>(
+      const closeError = await postJsonWithStatus<{ code: string }>(
         app,
         `/workspaces/workspace-diff-review-lifecycle/diff-reviews/${review.id}/close`,
         {},
+        400,
       )
-      expect(closed.status).toBe('closed')
+      expect(closeError.code).toBe('diff_review_live_working_tree_cannot_close')
 
       const readiness = await getJson<Array<{ sourceKind: string, state: string }>>(
         app,
@@ -665,7 +695,7 @@ describe('diff-review capability', () => {
         `/workspaces/workspace-diff-review-lifecycle/diff-reviews/${review.id}`,
       )
       expect(reloaded.files.find(item => item.id === file!.id)?.isViewed).toBe(true)
-      expect(reloaded.status).toBe('closed')
+      expect(reloaded.status).toBe('open')
       expect(reloaded.threads[0]?.state).toBe('resolved')
       expect(reloaded.preferences).toMatchObject({ diffStyle: 'unified', fontSize: 13 })
       expect(reloaded.events).toEqual(
@@ -676,7 +706,6 @@ describe('diff-review capability', () => {
           expect.objectContaining({ eventKind: 'review_submitted' }),
           expect.objectContaining({ eventKind: 'agent_fix_created' }),
           expect.objectContaining({ eventKind: 'commit_plan_updated' }),
-          expect.objectContaining({ eventKind: 'review_closed' }),
         ]),
       )
     }
@@ -687,15 +716,14 @@ describe('diff-review capability', () => {
     }
   })
 
-  it('generates and persists a change walkthrough with a codex agent runtime', async () => {
+  it('generates and persists a change walkthrough with a catalog-selected agent runtime', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-diff-review-workspace-')
     const previousEnv = useIsolatedTestInfra(dataDir)
     const runtime = new TestDiffReviewGuideRuntime()
-    const originalCodexRuntime = getRuntimeRegistry().get('codex')
 
     try {
-      registerRuntime(runtime)
+      registerRuntime(runtime, undefined, 'diff-review-test')
       initGitRepository(workspaceRoot)
       commitFile(workspaceRoot, 'README.md', '# Diff Review Fixture', 'repo: initial commit')
       writeFileSync(join(workspaceRoot, 'README.md'), '# Diff Review Fixture\nneeds review guide\n', 'utf8')
@@ -704,11 +732,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-guide',
           name: 'Workspace Diff Review Guide',
           path: workspaceRoot,
-        })
+        }))
         .run()
       db().insert(providerTargets).values({
         id: 'provider-target-diff-review-guide',
@@ -750,7 +778,6 @@ describe('diff-review capability', () => {
         `/workspaces/workspace-diff-review-guide/diff-reviews/${review.id}/guide/generate`,
         {
           providerTargetId: 'provider-target-diff-review-guide',
-          runtimeKind: 'codex',
           modelId: 'gpt-5-codex',
         },
       )
@@ -759,7 +786,7 @@ describe('diff-review capability', () => {
         revisionId: review.currentRevisionId,
         status: 'running',
         providerTargetId: 'provider-target-diff-review-guide',
-        runtimeKind: 'codex',
+        runtimeKind: DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND,
         modelId: 'gpt-5-codex',
         errorMessage: null,
         steps: [],
@@ -795,7 +822,7 @@ describe('diff-review capability', () => {
         revisionId: review.currentRevisionId,
         status: 'ready',
         providerTargetId: 'provider-target-diff-review-guide',
-        runtimeKind: 'codex',
+        runtimeKind: DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND,
         modelId: 'gpt-5-codex',
         errorMessage: null,
         steps: [
@@ -839,9 +866,7 @@ describe('diff-review capability', () => {
       expect(reloaded.guide).toEqual(completed.guide)
     }
     finally {
-      if (originalCodexRuntime) {
-        registerRuntime(originalCodexRuntime)
-      }
+      unregisterRuntime(DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND, 'diff-review-test')
       restoreTestInfra(previousEnv)
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
@@ -861,11 +886,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-guide-legacy',
           name: 'Workspace Diff Review Guide Legacy',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const review = await refreshLocalReview(app, 'workspace-diff-review-guide-legacy')
@@ -931,11 +956,11 @@ describe('diff-review capability', () => {
       const now = Math.floor(Date.now() / 1000)
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-agent-fix',
           name: 'Workspace Diff Review Agent Fix',
           path: workspaceRoot,
-        })
+        }))
         .run()
       db().insert(providerTargets).values({
         id: 'provider-target-diff-review-agent-fix',
@@ -1078,11 +1103,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-commit-plan-agent',
           name: 'Workspace Diff Review Commit Plan Agent',
           path: workspaceRoot,
-        })
+        }))
         .run()
       db().insert(providerTargets).values({
         id: 'provider-target-diff-review-commit-plan-agent',
@@ -1220,11 +1245,11 @@ describe('diff-review capability', () => {
       const now = Math.floor(Date.now() / 1000)
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-agent-fix-control',
           name: 'Workspace Diff Review Agent Fix Control',
           path: workspaceRoot,
-        })
+        }))
         .run()
       db().insert(providerTargets).values({
         id: 'provider-target-diff-review-agent-fix-control',
@@ -1354,11 +1379,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-anchors',
           name: 'Workspace Diff Review Anchors',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const review = await refreshLocalReview(app, 'workspace-diff-review-anchors')
@@ -1444,11 +1469,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-apply',
           name: 'Workspace Diff Review Apply',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const review = await refreshLocalReview(app, 'workspace-diff-review-apply')
@@ -1550,11 +1575,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-branch-compare',
           name: 'Workspace Diff Review Branch Compare',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const review = await postJson<DiffReviewResponse>(
@@ -1607,11 +1632,11 @@ describe('diff-review capability', () => {
       const app = await createServerApp()
       db()
         .insert(workspaces)
-        .values({
+        .values(localWorkspaceRow({
           id: 'workspace-diff-review-local-commit',
           name: 'Workspace Diff Review Local Commit',
           path: workspaceRoot,
-        })
+        }))
         .run()
 
       const review = await postJson<DiffReviewResponse>(
