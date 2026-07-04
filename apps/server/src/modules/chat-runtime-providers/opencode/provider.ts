@@ -12,7 +12,7 @@ import type {
   Todo as OpencodeTodo,
   ToolPart as OpencodeToolPart,
 } from '@opencode-ai/sdk'
-import type { QuestionV2Request } from '@opencode-ai/sdk/v2'
+import type { QuestionV2Info, QuestionV2Request, SessionMessage } from '@opencode-ai/sdk/v2'
 import type { UIMessage, UIMessageChunk } from 'ai'
 
 import type {
@@ -23,6 +23,7 @@ import type {
   ForkRuntimeSessionInput,
   GenerateSessionTitleInput,
   GetCapabilitiesInput,
+  GetContextUsageInput,
   GetUiSlotStatesInput,
   ListRuntimeModelsInput,
   ProviderContext,
@@ -45,9 +46,12 @@ import type {
   RuntimePresentationCapabilities,
   RuntimeSession,
   RuntimeUiSlotState,
+  RuntimeContextUsage,
   RuntimeUserInputQuestion,
+  RuntimeUserInputResolution,
   StartChatSessionInput,
   StreamTurnInput,
+  SubmitRuntimeUserInputInput,
   TokenUsage,
   UpdateRuntimeSettingsInput,
 } from '../../chat-runtime/runtime-provider-types'
@@ -175,13 +179,14 @@ export class OpencodeProvider implements ChatRuntime {
     const providerModel = parseOpenCodeModelRef(modelId)
     const updatedAt = Date.now()
     const subagentRegistry = this.readSubagentRegistry(input.runtimeSession.chatSessionId)
-    const [status, todos, diff, mcpStatus, fileStatus, taskBindings] = await Promise.all([
+    const [status, todos, diff, mcpStatus, fileStatus, taskBindings, questionRequests] = await Promise.all([
       readOpencodeSessionStatus(handle, input.workspacePath, providerSessionId),
       readOpencodeSessionTodo(handle, input.workspacePath, providerSessionId),
       readOpencodeSessionDiff(handle, input.workspacePath, providerSessionId),
       readOpencodeMcpStatus(handle, input.workspacePath),
       readOpencodeFileStatus(handle, input.workspacePath),
       readOpencodeParentTaskBindings(handle, input.workspacePath, providerSessionId),
+      readOpencodeSessionQuestionRequests(handle, providerSessionId),
     ])
     for (const binding of taskBindings) {
       subagentRegistry.register(binding)
@@ -260,7 +265,72 @@ export class OpencodeProvider implements ChatRuntime {
     if (subagentBindings.length > 0) {
       states.push(projectOpencodeCrewState(providerSessionId, subagentBindings, updatedAt))
     }
+    for (const request of questionRequests) {
+      states.push(projectOpencodeQuestionRequestState({
+        request,
+        threadId: providerSessionId,
+        updatedAt,
+      }))
+    }
     return states
+  }
+
+  async getContextUsage(input: GetContextUsageInput): Promise<RuntimeContextUsage | null> {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return null
+    }
+
+    const handle = readOpencodeRuntimeHandle(this.runtimeKind, input.runtimeSession)
+    const result = await handle.v2Client.v2.session.context({
+      sessionID: providerSessionId,
+    })
+    if (result.error) {
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(this.runtimeKind, 'session.context', formatOpencodeError(result.error)),
+      )
+    }
+
+    return projectOpencodeContextUsage({
+      runtimeKind: this.runtimeKind,
+      providerSessionId,
+      modelId: input.modelId ?? null,
+      messages: result.data?.data ?? [],
+    })
+  }
+
+  async submitUserInput(input: SubmitRuntimeUserInputInput): Promise<RuntimeUserInputResolution | null> {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return null
+    }
+
+    const handle = readOpencodeRuntimeHandle(this.runtimeKind, input.runtimeSession)
+    const request = await resolveOpencodeQuestionRequestById({
+      resource: handle,
+      sessionId: providerSessionId,
+      requestId: input.requestId,
+    })
+    if (!request) {
+      return null
+    }
+
+    const result = await handle.v2Client.v2.session.question.reply({
+      sessionID: providerSessionId,
+      requestID: input.requestId,
+      questionV2Reply: {
+        answers: request.questions.map((_, index) => input.answers[`question-${index + 1}`] ?? []),
+      },
+    })
+    if (result.error) {
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(this.runtimeKind, 'session.question.reply', formatOpencodeError(result.error)),
+      )
+    }
+    return {
+      requestId: input.requestId,
+      answers: input.answers,
+    }
   }
 
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
@@ -1305,7 +1375,7 @@ export class OpencodeProvider implements ChatRuntime {
           },
         },
       })
-      const reply = await input.resource.v2Client.session.question.reply({
+      const reply = await input.resource.v2Client.v2.session.question.reply({
         sessionID: input.sessionId,
         requestID: request.id,
         questionV2Reply: {
@@ -1321,7 +1391,7 @@ export class OpencodeProvider implements ChatRuntime {
     catch (error) {
       input.chunks.push(providerChunk.toolOutputError(input.part.callID, formatOpencodeError(error)))
       if (requestID) {
-        await input.resource.v2Client.session.question.reject({
+        await input.resource.v2Client.v2.session.question.reject({
           sessionID: input.sessionId,
           requestID,
         }).catch(() => undefined)
@@ -2365,7 +2435,7 @@ async function resolveOpencodeQuestionRequest(input: {
   sessionId: string
   toolCallId: string
 }): Promise<QuestionV2Request | null> {
-  const result = await input.resource.v2Client.session.question.list({
+  const result = await input.resource.v2Client.v2.session.question.list({
     sessionID: input.sessionId,
   })
   if (result.error) {
@@ -2376,18 +2446,69 @@ async function resolveOpencodeQuestionRequest(input: {
   return result.data?.data.find(request => request.tool?.callID === input.toolCallId) ?? null
 }
 
+async function resolveOpencodeQuestionRequestById(input: {
+  resource: OpencodeRuntimeResource
+  sessionId: string
+  requestId: string
+}): Promise<QuestionV2Request | null> {
+  const requests = await readOpencodeSessionQuestionRequests(input.resource, input.sessionId)
+  return requests.find(request => request.id === input.requestId) ?? null
+}
+
+async function readOpencodeSessionQuestionRequests(
+  resource: OpencodeRuntimeResource,
+  sessionId: string
+): Promise<QuestionV2Request[]> {
+  const result = await resource.v2Client.v2.session.question.list({
+    sessionID: sessionId,
+  })
+  if (result.error) {
+    throw new ProviderRuntimeError(
+      ProviderErrors.requestFailed('opencode', 'session.question.list', formatOpencodeError(result.error)),
+    )
+  }
+  return result.data?.data ?? []
+}
+
+function projectOpencodeQuestionRequestState(input: {
+  request: QuestionV2Request
+  threadId: string
+  updatedAt: number
+}): RuntimeUiSlotState {
+  const createdAt = input.updatedAt
+  return {
+    kind: 'userInput',
+    slotId: 'opencode:user-input',
+    threadId: input.threadId,
+    runId: `recovered:${input.request.id}`,
+    requestId: input.request.id,
+    providerMethod: 'question',
+    toolCallId: input.request.tool?.callID ?? `question:${input.request.id}`,
+    questionCount: input.request.questions.length,
+    questions: projectOpencodeQuestionInfos(input.request.questions),
+    createdAt,
+    updatedAt: input.updatedAt,
+  }
+}
+
 function projectOpencodeQuestionToolQuestions(part: OpencodeToolPart): RuntimeUserInputQuestion[] {
   const input = readOpencodeQuestionToolInput(part)
   if (!input) {
     return []
   }
-  return input.questions.map((question, index) => ({
+  return projectOpencodeQuestionInfos(input.questions)
+}
+
+function projectOpencodeQuestionInfos(
+  questions: Array<QuestionV2Info | OpencodeQuestionToolQuestion>
+): RuntimeUserInputQuestion[] {
+  return questions.map((question, index) => ({
     id: `question-${index + 1}`,
     header: question.header,
     question: question.question,
-    isOther: question.custom,
+    isOther: question.custom ?? false,
     isSecret: false,
-    multiSelect: question.multiple,
+    multiSelect: question.multiple ?? false,
     options: question.options.length > 0
       ? question.options.map(option => ({
           label: option.label,
@@ -2395,6 +2516,214 @@ function projectOpencodeQuestionToolQuestions(part: OpencodeToolPart): RuntimeUs
         }))
       : null,
   }))
+}
+
+function projectOpencodeContextUsage(input: {
+  runtimeKind: RuntimeKind
+  providerSessionId: string
+  modelId: string | null
+  messages: SessionMessage[]
+}): RuntimeContextUsage {
+  const sectionsByKind = new Map<string, RuntimeContextUsage['sections'][number]>()
+  const messageCounts: Record<string, number> = {}
+  const tokenBreakdown = {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: 0,
+    reasoningOutputTokens: 0,
+  }
+
+  for (const message of input.messages) {
+    const kind = message.type
+    messageCounts[kind] = (messageCounts[kind] ?? 0) + 1
+    const tokenCount = readOpencodeContextMessageTokenCount(message)
+    if (message.type === 'assistant' && message.tokens) {
+      tokenBreakdown.inputTokens += message.tokens.input
+      tokenBreakdown.cachedInputTokens += message.tokens.cache.read
+      tokenBreakdown.cacheWriteTokens += message.tokens.cache.write
+      tokenBreakdown.outputTokens += message.tokens.output
+      tokenBreakdown.reasoningOutputTokens += message.tokens.reasoning
+    }
+
+    const section = sectionsByKind.get(kind) ?? {
+      kind,
+      label: labelOpencodeContextSection(kind),
+      tokenCount: 0,
+      color: colorOpencodeContextSection(kind),
+      isDeferred: false,
+      items: [],
+      raw: null,
+    }
+    section.tokenCount += tokenCount
+    section.items.push({
+      kind,
+      label: labelOpencodeContextMessage(message),
+      tokenCount,
+      metadata: readOpencodeContextMessageMetadata(message),
+      raw: message,
+    })
+    sectionsByKind.set(kind, section)
+  }
+
+  const totalTokens =
+    tokenBreakdown.inputTokens
+    + tokenBreakdown.cachedInputTokens
+    + tokenBreakdown.cacheWriteTokens
+    + tokenBreakdown.outputTokens
+    + tokenBreakdown.reasoningOutputTokens
+  const model = input.modelId ?? readLatestOpencodeContextModel(input.messages)
+
+  return {
+    runtimeKind: input.runtimeKind,
+    providerSessionId: input.providerSessionId,
+    source: 'opencode-v2-session-context',
+    model,
+    totalTokens,
+    maxTokens: null,
+    rawMaxTokens: null,
+    percentage: null,
+    sections: Array.from(sectionsByKind.values()),
+    messageBreakdown: {
+      messageCounts,
+      tokenBreakdown,
+    },
+    apiUsage: null,
+    raw: input.messages,
+    updatedAt: Date.now(),
+  }
+}
+
+function readOpencodeContextMessageTokenCount(message: SessionMessage): number {
+  if (message.type !== 'assistant' || !message.tokens) {
+    return 0
+  }
+  return message.tokens.input
+    + message.tokens.output
+    + message.tokens.reasoning
+    + message.tokens.cache.read
+    + message.tokens.cache.write
+}
+
+function labelOpencodeContextSection(kind: string): string {
+  switch (kind) {
+    case 'assistant':
+      return 'Assistant messages'
+    case 'user':
+      return 'User messages'
+    case 'system':
+      return 'System messages'
+    case 'synthetic':
+      return 'Synthetic messages'
+    case 'shell':
+      return 'Shell commands'
+    case 'compaction':
+      return 'Compaction summaries'
+    case 'agent-switched':
+      return 'Agent switches'
+    case 'model-switched':
+      return 'Model switches'
+    default:
+      return kind
+  }
+}
+
+function colorOpencodeContextSection(kind: string): string | null {
+  switch (kind) {
+    case 'assistant':
+      return '#2563eb'
+    case 'user':
+      return '#16a34a'
+    case 'system':
+    case 'synthetic':
+      return '#9333ea'
+    case 'shell':
+      return '#ea580c'
+    case 'compaction':
+      return '#0891b2'
+    default:
+      return null
+  }
+}
+
+function labelOpencodeContextMessage(message: SessionMessage): string {
+  switch (message.type) {
+    case 'assistant':
+      return `Assistant ${message.model.providerID}/${message.model.id}`
+    case 'user':
+      return trimContextLabel(message.text) || 'User message'
+    case 'system':
+    case 'synthetic':
+      return trimContextLabel(message.text) || labelOpencodeContextSection(message.type)
+    case 'shell':
+      return message.command
+    case 'compaction':
+      return `${message.reason} compaction`
+    case 'agent-switched':
+      return `Agent ${message.agent}`
+    case 'model-switched':
+      return `Model ${message.model.providerID}/${message.model.id}`
+  }
+}
+
+function readOpencodeContextMessageMetadata(message: SessionMessage): Record<string, unknown> {
+  const base = {
+    id: message.id,
+    createdAt: message.time.created,
+  }
+  switch (message.type) {
+    case 'assistant':
+      return {
+        ...base,
+        agent: message.agent,
+        model: `${message.model.providerID}/${message.model.id}`,
+        finish: message.finish ?? null,
+        contentCount: message.content.length,
+        fileCount: message.snapshot?.files?.length ?? 0,
+      }
+    case 'user':
+      return {
+        ...base,
+        fileCount: message.files?.length ?? 0,
+        agentCount: message.agents?.length ?? 0,
+      }
+    case 'shell':
+      return {
+        ...base,
+        callId: message.callID,
+        completedAt: message.time.completed ?? null,
+      }
+    case 'compaction':
+      return {
+        ...base,
+        reason: message.reason,
+      }
+    case 'agent-switched':
+      return {
+        ...base,
+        agent: message.agent,
+      }
+    case 'model-switched':
+      return {
+        ...base,
+        model: `${message.model.providerID}/${message.model.id}`,
+      }
+    default:
+      return base
+  }
+}
+
+function readLatestOpencodeContextModel(messages: SessionMessage[]): string | null {
+  for (const message of [...messages].reverse()) {
+    if (message.type === 'assistant' || message.type === 'model-switched') {
+      return `${message.model.providerID}/${message.model.id}`
+    }
+  }
+  return null
+}
+
+function trimContextLabel(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').slice(0, 80)
 }
 
 interface OpencodeQuestionToolInput {

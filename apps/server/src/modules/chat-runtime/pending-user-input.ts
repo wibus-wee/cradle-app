@@ -202,7 +202,16 @@ export function appendPendingRuntimeUserInputSlotStates(
     slotId: `${input.runtimeKind}:user-input`,
     threadId: input.threadId
   })
-  return pendingStates.length > 0 ? [...states, ...pendingStates] : states
+  if (pendingStates.length === 0) {
+    return states
+  }
+  const pendingRequestIds = new Set(pendingStates.map(state => state.requestId))
+  return [
+    ...states.filter(state =>
+      state.kind !== 'userInput' || !pendingRequestIds.has(state.requestId)
+    ),
+    ...pendingStates
+  ]
 }
 
 export function rejectPendingUserInputsForRun(runId: string, error: Error): void {

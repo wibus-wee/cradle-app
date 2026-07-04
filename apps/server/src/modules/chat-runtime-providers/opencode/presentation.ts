@@ -128,7 +128,7 @@ const OPENCODE_CREW_SLOT: RuntimeUiSlot = {
   id: 'opencode:crew',
   name: 'agents',
   label: 'Agents',
-  description: 'Show opencode native agents.',
+  description: 'Show opencode subagents created by the current session.',
   argumentHint: '',
   iconKey: 'crew',
   commandText: '/agents ',

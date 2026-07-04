@@ -11,6 +11,7 @@ import type {
   RuntimeToolApprovalRequest,
   RuntimeToolApprovalResolution,
   RuntimeUserInputRequest,
+  RuntimeUserInputResolution,
 } from '../../chat-runtime/runtime-provider-types'
 import type { OpencodeRuntimeResource } from './runtime-context'
 import { formatOpencodeAssistantError, OpencodeProvider } from './provider'
@@ -118,6 +119,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     sessionCreateData: unknown
     sessionChildrenData: unknown[]
     sessionQuestionRequestsData: unknown[]
+    sessionContextMessagesData: unknown[]
     mcpStatusData: Record<string, unknown>
     fileStatusData: unknown[]
     appAgentsData: unknown[]
@@ -132,6 +134,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     sessionCreateData: { id: 'ses_recovered' },
     sessionChildrenData: [],
     sessionQuestionRequestsData: [],
+    sessionContextMessagesData: [],
     mcpStatusData: {},
     fileStatusData: [],
     appAgentsData: [],
@@ -197,11 +200,14 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
       postSessionIdPermissionsPermissionId: postPermission,
     },
     v2Client: {
-      session: {
-        question: {
-          list: vi.fn(async () => ({ data: { data: state.sessionQuestionRequestsData }, error: undefined })),
-          reply: questionReply,
-          reject: questionReject,
+      v2: {
+        session: {
+          context: vi.fn(async () => ({ data: { data: state.sessionContextMessagesData }, error: undefined })),
+          question: {
+            list: vi.fn(async () => ({ data: { data: state.sessionQuestionRequestsData }, error: undefined })),
+            reply: questionReply,
+            reject: questionReject,
+          },
         },
       },
     },
@@ -666,6 +672,196 @@ describe('OpencodeProvider UI slot states', () => {
         ],
       }),
     ]))
+  })
+
+  it('projects pending v2 session questions as recovered user-input slot state', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    fake.state.sessionQuestionRequestsData.push({
+      id: 'question-request-recovered',
+      sessionID: 'ses_1',
+      questions: [{
+        question: '怎么继续？',
+        header: 'Next step',
+        multiple: false,
+        custom: true,
+        options: [
+          { label: '跑测试', description: '先验证当前变更' },
+        ],
+      }],
+      tool: {
+        messageID: 'msg_question',
+        callID: 'call_question_recovered',
+      },
+    })
+
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    await expect(provider.getUiSlotStates({
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      workspacePath: '/tmp/workspace',
+      modelId: 'openai/gpt-5',
+    })).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'userInput',
+        slotId: 'opencode:user-input',
+        requestId: 'question-request-recovered',
+        toolCallId: 'call_question_recovered',
+        questionCount: 1,
+        questions: [
+          expect.objectContaining({
+            id: 'question-1',
+            header: 'Next step',
+            question: '怎么继续？',
+            isOther: true,
+            multiSelect: false,
+          }),
+        ],
+      }),
+    ]))
+  })
+})
+
+describe('OpencodeProvider native user-input submission', () => {
+  it('replies to pending v2 session questions by request id', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    fake.state.sessionQuestionRequestsData.push({
+      id: 'question-request-native',
+      sessionID: 'ses_1',
+      questions: [
+        {
+          question: '第一步？',
+          header: 'First',
+          multiple: false,
+          custom: false,
+          options: [{ label: 'A', description: 'Option A' }],
+        },
+        {
+          question: '第二步？',
+          header: 'Second',
+          multiple: true,
+          custom: false,
+          options: [{ label: 'B', description: 'Option B' }],
+        },
+      ],
+      tool: {
+        messageID: 'msg_question',
+        callID: 'call_question_native',
+      },
+    })
+
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    await expect(provider.submitUserInput?.({
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      workspacePath: '/tmp/workspace',
+      requestId: 'question-request-native',
+      answers: {
+        'question-1': ['A'],
+        'question-2': ['B', 'Other'],
+      },
+    })).resolves.toEqual({
+      requestId: 'question-request-native',
+      answers: {
+        'question-1': ['A'],
+        'question-2': ['B', 'Other'],
+      },
+    })
+    expect(fake.questionReply).toHaveBeenCalledWith({
+      sessionID: 'ses_1',
+      requestID: 'question-request-native',
+      questionV2Reply: {
+        answers: [['A'], ['B', 'Other']],
+      },
+    })
+  })
+})
+
+describe('OpencodeProvider context usage', () => {
+  it('projects v2 session context messages into context usage sections', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    fake.state.sessionContextMessagesData.push(
+      {
+        id: 'ctx_user_1',
+        type: 'user',
+        time: { created: 1 },
+        text: '请检查 package.json',
+        files: [{ type: 'file', url: 'file:///tmp/workspace/package.json', filename: 'package.json' }],
+        agents: [{ name: 'build' }],
+      },
+      {
+        id: 'ctx_shell_1',
+        type: 'shell',
+        time: { created: 2, completed: 3 },
+        callID: 'shell_1',
+        command: 'pnpm test',
+        output: 'ok',
+      },
+      {
+        id: 'ctx_assistant_1',
+        type: 'assistant',
+        time: { created: 4, completed: 5 },
+        agent: 'build',
+        model: { providerID: 'openai', id: 'gpt-5' },
+        content: [{ type: 'text', id: 'text_1', text: 'Done' }],
+        tokens: {
+          input: 10,
+          output: 4,
+          reasoning: 2,
+          cache: { read: 3, write: 1 },
+        },
+      },
+    )
+
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    await expect(provider.getContextUsage({
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      workspacePath: '/tmp/workspace',
+      modelId: 'openai/gpt-5',
+    })).resolves.toMatchObject({
+      runtimeKind: 'opencode',
+      providerSessionId: 'ses_1',
+      source: 'opencode-v2-session-context',
+      model: 'openai/gpt-5',
+      totalTokens: 20,
+      sections: expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'assistant',
+          tokenCount: 20,
+        }),
+        expect.objectContaining({
+          kind: 'user',
+          tokenCount: 0,
+          items: [
+            expect.objectContaining({
+              metadata: expect.objectContaining({ fileCount: 1, agentCount: 1 }),
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          kind: 'shell',
+          items: [
+            expect.objectContaining({
+              label: 'pnpm test',
+              metadata: expect.objectContaining({ callId: 'shell_1' }),
+            }),
+          ],
+        }),
+      ]),
+      messageBreakdown: {
+        messageCounts: { user: 1, shell: 1, assistant: 1 },
+        tokenBreakdown: {
+          inputTokens: 10,
+          cachedInputTokens: 3,
+          cacheWriteTokens: 1,
+          outputTokens: 4,
+          reasoningOutputTokens: 2,
+        },
+      },
+    })
   })
 })
 
@@ -1320,10 +1516,10 @@ describe('OpencodeProvider streamTurn', () => {
       },
     })
     const userInputResolver: {
-      resolve?: (resolution: { requestId: string, answers: Record<string, string[]> }) => void
+      resolve?: (resolution: RuntimeUserInputResolution) => void
     } = {}
     const requestUserInput = vi.fn((_request: RuntimeUserInputRequest) =>
-      new Promise(resolve => {
+      new Promise<RuntimeUserInputResolution>(resolve => {
         userInputResolver.resolve = resolve
       }))
     const provider = new OpencodeProvider({

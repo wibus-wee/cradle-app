@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia'
 
 import { releaseSideConversation } from '../../provider-runtime/side-conversation-registry'
+import { submitChatRuntimeUserInput } from '../interaction/user-input'
 import { ChatRuntimeModel } from '../model'
 import { submitRuntimeToolApproval } from '../pending-tool-approval'
-import { submitRuntimeUserInput } from '../pending-user-input'
 import { readOptionalModelId } from './request-normalizers'
 import { loadChatRuntime } from './runtime-loader'
 
@@ -94,7 +94,7 @@ export const chatRuntimeInteractionRoutes = new Elysia({
   .post(
     '/sessions/:sessionId/user-input/:requestId',
     async ({ params, body }) => {
-      return await submitRuntimeUserInput({
+      return await submitChatRuntimeUserInput({
         sessionId: params.sessionId,
         requestId: params.requestId,
         answers: body.answers

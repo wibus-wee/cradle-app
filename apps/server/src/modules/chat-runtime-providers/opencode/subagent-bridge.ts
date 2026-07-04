@@ -108,7 +108,7 @@ export function readOpencodeTaskChildSessionId(part: OpencodeToolPart): string |
   if (part.tool !== 'task') {
     return null
   }
-  const metadataSessionId = readMetadataSessionId(part.state.metadata)
+  const metadataSessionId = part.state.status === 'pending' ? null : readMetadataSessionId(part.state.metadata)
   if (metadataSessionId) {
     return metadataSessionId
   }
@@ -171,7 +171,9 @@ export function readOpencodeEventSessionId(event: OpencodeStreamEvent): string |
     case 'command.executed':
     case 'permission.updated':
     case 'permission.replied':
-      return 'sessionID' in event.properties ? event.properties.sessionID : null
+      return 'sessionID' in event.properties && typeof event.properties.sessionID === 'string'
+        ? event.properties.sessionID
+        : null
     default:
       return null
   }
@@ -381,7 +383,7 @@ function readTaskSessionIdFromText(text: string): string | null {
 }
 
 function readTaskDescription(part: OpencodeToolPart, input: unknown): string | null {
-  if (part.state.status === 'running' || part.state.status === 'completed' || part.state.status === 'error') {
+  if (part.state.status === 'running' || part.state.status === 'completed') {
     const title = part.state.title?.trim()
     if (title) {
       return title
