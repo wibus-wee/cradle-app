@@ -351,6 +351,41 @@ describe('chat store messages', () => {
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(false)
   })
 
+  it('does not synthesize accept timing when a run id is reconciled', () => {
+    useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
+
+    const meta = chatSelectors.runDisplayMeta('assistant-1')(useChatStore.getState())
+    expect(meta?.runId).toBe('run-a')
+    expect(meta?.acceptedAtMs).toBeNull()
+    expect(meta?.completedAtMs).toBeNull()
+  })
+
+  it('records accept timing only through the local accept marker', () => {
+    const store = useChatStore.getState()
+    store.beginRunDisplayMeta('assistant-1', 100)
+    store.setRunDisplayId('assistant-1', 'run-a')
+
+    expect(chatSelectors.runDisplayMeta('assistant-1')(useChatStore.getState())?.acceptedAtMs).toBeNull()
+
+    store.markRunAccepted('assistant-1', 225)
+    store.markRunAccepted('assistant-1', 300)
+
+    const meta = chatSelectors.runDisplayMeta('assistant-1')(useChatStore.getState())
+    expect(meta?.requestStartedAtMs).toBe(100)
+    expect(meta?.acceptedAtMs).toBe(225)
+  })
+
+  it('keeps local accept timing when a missing run id is later reconciled', () => {
+    const store = useChatStore.getState()
+    store.beginRunDisplayMeta('assistant-1', 100)
+    store.markRunAccepted('assistant-1', 225)
+    store.setRunDisplayId('assistant-1', 'run-a')
+
+    const meta = chatSelectors.runDisplayMeta('assistant-1')(useChatStore.getState())
+    expect(meta?.runId).toBe('run-a')
+    expect(meta?.acceptedAtMs).toBe(225)
+  })
+
   it('releases a live steer tail only when the source run is terminal', () => {
     useChatStore.getState().setMessages('session-1', [{
       id: 'assistant-1',
@@ -493,7 +528,9 @@ describe('chat store messages', () => {
       role: 'assistant',
       parts: [{ type: 'text', text: 'Working' }],
     }])
+    useChatStore.getState().beginRunDisplayMeta('assistant-1', 100)
     useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
+    useChatStore.getState().markRunAccepted('assistant-1', 175)
     useChatStore.getState().finishGeneration('assistant-1')
 
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(false)
@@ -502,6 +539,7 @@ describe('chat store messages', () => {
     useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
 
     const state = useChatStore.getState()
+    expect(chatSelectors.runDisplayMeta('assistant-1')(state)?.acceptedAtMs).toBe(175)
     expect(chatSelectors.runDisplayMeta('assistant-1')(state)?.completedAtMs).toBeNull()
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(state)).toBe(false)
 

@@ -7,32 +7,13 @@ import {
 import { useQuery } from '@tanstack/react-query'
 
 import { getChatRunsByRunIdSnapshotOptions } from '~/api-gen/@tanstack/react-query.gen'
-import type { GetChatRunsByRunIdSnapshotResponse } from '~/api-gen/types.gen'
 import { Badge } from '~/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { formatShortDurationMs } from '~/lib/number-format'
-import type { ChatRunDisplayMeta } from '~/store/chat'
 import { chatSelectors } from '~/store/chat'
 
 import { useChatRenderStore } from './chat-render-store'
-
-type RunTimingMetrics = {
-  ttfbMs: number | null
-  ttftMs: number | null
-  totalMs: number | null
-}
-
-type RunSnapshotEvent = GetChatRunsByRunIdSnapshotResponse['events'][number]
-
-const TERMINAL_CHUNK_TYPES = new Set(['finish', 'abort', 'error'])
-const NON_RESPONSE_SNAPSHOT_PHASES = new Set([
-  'run_started',
-  'stream_finished',
-  'stream_failed',
-  'run_finalized',
-  'usage',
-  'step_usage',
-])
+import { readLocalRunTimings, readRunSnapshotTimings } from './run-debug-timings'
 
 export function RunDebugCaption({ messageId }: { messageId: string }) {
   const meta = useChatRenderStore(chatSelectors.runDisplayMeta(messageId), (a, b) => a === b)
@@ -47,6 +28,7 @@ export function RunDebugCaption({ messageId }: { messageId: string }) {
 
   const localTimings = readLocalRunTimings(meta)
   const snapshotTimings = runSnapshot ? readRunSnapshotTimings(runSnapshot) : null
+  const acceptMs = localTimings.acceptMs
   const ttfbMs = snapshotTimings ? snapshotTimings.ttfbMs : localTimings.ttfbMs
   const ttftMs = snapshotTimings ? snapshotTimings.ttftMs : localTimings.ttftMs
   const totalMs = snapshotTimings?.totalMs ?? localTimings.totalMs
@@ -72,6 +54,11 @@ export function RunDebugCaption({ messageId }: { messageId: string }) {
           </TooltipContent>
         </Tooltip>
         <MetricBadge
+          icon={<TimerIcon className="size-3" aria-hidden="true" />}
+          label="Accept"
+          value={acceptMs}
+        />
+        <MetricBadge
           icon={<ActivityIcon className="size-3" aria-hidden="true" />}
           label="TTFB"
           value={ttfbMs}
@@ -90,32 +77,6 @@ export function RunDebugCaption({ messageId }: { messageId: string }) {
         )}
       </div>
     </TooltipProvider>
-  )
-}
-
-function readLocalRunTimings(meta: ChatRunDisplayMeta): RunTimingMetrics {
-  return {
-    ttfbMs: meta.firstEventAtMs === null ? null : Math.max(0, meta.firstEventAtMs - meta.requestStartedAtMs),
-    ttftMs: meta.firstContentAtMs === null ? null : Math.max(0, meta.firstContentAtMs - meta.requestStartedAtMs),
-    totalMs: meta.completedAtMs === null ? null : Math.max(0, meta.completedAtMs - meta.requestStartedAtMs),
-  }
-}
-
-function readRunSnapshotTimings(snapshot: GetChatRunsByRunIdSnapshotResponse): RunTimingMetrics {
-  const firstResponseEvent = snapshot.events.find(isResponseSnapshotEvent)
-  const firstTextDeltaEvent = snapshot.events.find(event => event.phase === 'model_text_first_delta')
-  return {
-    ttfbMs: firstResponseEvent ? Math.max(0, firstResponseEvent.occurredAt - snapshot.startedAt) : null,
-    ttftMs: firstTextDeltaEvent ? Math.max(0, firstTextDeltaEvent.occurredAt - snapshot.startedAt) : null,
-    totalMs: snapshot.completedAt == null ? null : Math.max(0, snapshot.completedAt - snapshot.startedAt),
-  }
-}
-
-function isResponseSnapshotEvent(event: RunSnapshotEvent): boolean {
-  return Boolean(
-    event.chunkType
-    && !TERMINAL_CHUNK_TYPES.has(event.chunkType)
-    && !NON_RESPONSE_SNAPSHOT_PHASES.has(event.phase),
   )
 }
 

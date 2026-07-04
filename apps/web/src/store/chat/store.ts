@@ -299,7 +299,7 @@ export function createChatStore() {
           if (displayMessageId !== messageId) {
             next.delete(messageId)
           }
-          next.set(displayMessageId, { runId: c?.runId ?? null, requestStartedAtMs, firstEventAtMs: c?.firstEventAtMs ?? null, firstContentAtMs: c?.firstContentAtMs ?? null, completedAtMs: null })
+          next.set(displayMessageId, { runId: c?.runId ?? null, requestStartedAtMs, acceptedAtMs: c?.acceptedAtMs ?? null, firstEventAtMs: c?.firstEventAtMs ?? null, firstContentAtMs: c?.firstContentAtMs ?? null, completedAtMs: null })
           return { runDisplayMetaMap: next }
         })
       },
@@ -312,11 +312,36 @@ export function createChatStore() {
           const c = displayMeta ?? sourceMeta
           const needsMigration = displayMessageId !== messageId && state.runDisplayMetaMap.has(messageId)
           if (c?.runId === runId && c.completedAtMs === null && !needsMigration) { return state }
+          const now = performance.now()
           const next = new Map(state.runDisplayMetaMap)
           if (displayMessageId !== messageId) {
             next.delete(messageId)
           }
-          next.set(displayMessageId, { runId, requestStartedAtMs: c?.requestStartedAtMs ?? performance.now(), firstEventAtMs: c?.firstEventAtMs ?? null, firstContentAtMs: c?.firstContentAtMs ?? null, completedAtMs: null })
+          next.set(displayMessageId, {
+            runId,
+            requestStartedAtMs: c?.requestStartedAtMs ?? now,
+            acceptedAtMs: c && (c.runId === null || c.runId === runId) ? c.acceptedAtMs : null,
+            firstEventAtMs: c?.firstEventAtMs ?? null,
+            firstContentAtMs: c?.firstContentAtMs ?? null,
+            completedAtMs: null,
+          })
+          return { runDisplayMetaMap: next }
+        })
+      },
+
+      markRunAccepted: (messageId, ts) => {
+        set((state) => {
+          const displayMessageId = resolveStreamingDisplayMessageId(state, messageId)
+          const displayMeta = state.runDisplayMetaMap.get(displayMessageId)
+          const sourceMeta = state.runDisplayMetaMap.get(messageId)
+          const c = displayMeta ?? sourceMeta
+          const needsMigration = displayMessageId !== messageId && state.runDisplayMetaMap.has(messageId)
+          if (!c || (c.acceptedAtMs !== null && !needsMigration)) { return state }
+          const next = new Map(state.runDisplayMetaMap)
+          if (displayMessageId !== messageId) {
+            next.delete(messageId)
+          }
+          next.set(displayMessageId, { ...c, acceptedAtMs: c.acceptedAtMs ?? ts })
           return { runDisplayMetaMap: next }
         })
       },

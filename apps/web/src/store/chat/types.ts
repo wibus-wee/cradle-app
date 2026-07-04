@@ -13,6 +13,7 @@ export interface ChatError {
 export interface ChatRunDisplayMeta {
   runId: string | null
   requestStartedAtMs: number
+  acceptedAtMs: number | null
   firstEventAtMs: number | null
   firstContentAtMs: number | null
   completedAtMs: number | null
@@ -86,6 +87,7 @@ export interface ChatState {
   setPassiveRunState: (sessionId: string, input: PassiveRunStateInput) => void
   beginRunDisplayMeta: (messageId: string, requestStartedAtMs: number) => void
   setRunDisplayId: (messageId: string, runId: string) => void
+  markRunAccepted: (messageId: string, timestampMs: number) => void
   moveRunDisplayMeta: (fromMessageId: string, toMessageId: string) => void
   markRunFirstEvent: (messageId: string, timestampMs: number) => void
   markRunFirstContent: (messageId: string, timestampMs: number) => void

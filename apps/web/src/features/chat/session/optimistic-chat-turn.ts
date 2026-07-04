@@ -117,9 +117,12 @@ export function startOptimisticChatResponse({
         signal: controller.signal,
       })
 
+      const acceptedAtMs = performance.now()
+      const store = useChatStore.getState()
       if (transport.runId) {
-        useChatStore.getState().setRunDisplayId(assistantMessageId, transport.runId)
+        store.setRunDisplayId(assistantMessageId, transport.runId)
       }
+      store.markRunAccepted(assistantMessageId, acceptedAtMs)
       onAccepted?.()
 
       await handler.consume(transport.stream)

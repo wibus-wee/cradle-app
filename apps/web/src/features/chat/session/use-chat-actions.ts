@@ -265,9 +265,12 @@ export function useChatActions(input: UseChatActionsInput) {
 
         scheduleSnapshotRefresh(0)
 
+        const acceptedAtMs = performance.now()
+        const store = useChatStore.getState()
         if (transport.runId) {
-          useChatStore.getState().setRunDisplayId(assistantMessageId, transport.runId)
+          store.setRunDisplayId(assistantMessageId, transport.runId)
         }
+        store.markRunAccepted(assistantMessageId, acceptedAtMs)
 
         if (sessionBindingQueryKey) {
           void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })
@@ -486,9 +489,12 @@ export function useChatActions(input: UseChatActionsInput) {
 
       scheduleSnapshotRefresh(0)
 
+      const acceptedAtMs = performance.now()
+      const store = useChatStore.getState()
       if (transport.runId) {
-        useChatStore.getState().setRunDisplayId(response.messageId, transport.runId)
+        store.setRunDisplayId(response.messageId, transport.runId)
       }
+      store.markRunAccepted(response.messageId, acceptedAtMs)
 
       if (sessionBindingQueryKey) {
         void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })
