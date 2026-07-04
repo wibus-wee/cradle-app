@@ -16870,6 +16870,8 @@ export type GetChatRunsByRunIdSnapshotResponses = {
                 [key: string]: unknown;
             };
         }>;
+        eventCount: number;
+        eventsTruncated: boolean;
     };
 };
 
@@ -16975,6 +16977,8 @@ export type GetChatSessionsBySessionIdRunSnapshotsResponses = {
                     [key: string]: unknown;
                 };
             }>;
+            eventCount: number;
+            eventsTruncated: boolean;
         }>;
     };
 };

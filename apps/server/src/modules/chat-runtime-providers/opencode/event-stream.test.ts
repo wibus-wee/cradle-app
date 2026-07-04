@@ -104,6 +104,64 @@ describe('opencodeEventStreamProjector', () => {
     assertValidProviderChunkSequence(chunks)
   })
 
+  it('re-emits tool input when OpenCode updates pending empty input with runnable arguments', () => {
+    const projector = new OpencodeEventStreamProjector('ses_1')
+    const pendingToolPart = {
+      id: 'part_tool',
+      sessionID: 'ses_1',
+      messageID: 'msg_assistant',
+      type: 'tool',
+      callID: 'call_1',
+      tool: 'bash',
+      state: {
+        status: 'pending',
+        input: {},
+        raw: '',
+      },
+    } satisfies OpencodeToolPart
+    const runningToolPart = {
+      ...pendingToolPart,
+      state: {
+        status: 'running',
+        input: { command: 'pnpm typecheck', workdir: '/tmp/workspace' },
+        title: 'Running command',
+        metadata: {},
+        time: { start: 1 },
+      },
+    } satisfies OpencodeToolPart
+
+    const chunks = [
+      ...projector.projectEvent({
+        type: 'message.updated',
+        properties: { info: assistantMessage() },
+      }),
+      ...projector.projectEvent({
+        type: 'message.part.updated',
+        properties: { part: pendingToolPart },
+      }),
+      ...projector.projectEvent({
+        type: 'message.part.updated',
+        properties: { part: runningToolPart },
+      }),
+    ]
+
+    expect(chunks.map(chunk => chunk.type)).toEqual([
+      'tool-input-start',
+      'tool-input-available',
+      'tool-input-available',
+      'tool-output-available',
+    ])
+    expect(chunks.filter(chunk => chunk.type === 'tool-input-available').at(-1)).toMatchObject({
+      toolCallId: 'call_1',
+      input: expect.objectContaining({
+        args: expect.objectContaining({
+          command: 'pnpm typecheck',
+          workdir: '/tmp/workspace',
+        }),
+      }),
+    })
+  })
+
   it('buffers text deltas until the assistant message role is known', () => {
     const projector = new OpencodeEventStreamProjector('ses_1')
     const textPart = {

@@ -1421,6 +1421,13 @@ export interface TokenUsage {
   totalTokens: number
 }
 
+export interface RuntimeStepUsage {
+  stepNumber: number
+  stepType: string
+  modelId?: string
+  usage: TokenUsage
+}
+
 export interface ChatRuntime {
   readonly runtimeKind: RuntimeKind
   readonly metadata: ChatRuntimeMetadata
@@ -1429,6 +1436,8 @@ export interface ChatRuntime {
   readonly lastUsage?: TokenUsage | null
   readonly totalUsage?: TokenUsage | null
   readonly lastModelId?: string | null
+  /** Per-step usage recorded during the most recently streamed turn, if the runtime tracks it. */
+  readonly lastStepUsages?: RuntimeStepUsage[]
   readonly goalContinuation?: RuntimeGoalContinuation
   startChatSession: (input: StartChatSessionInput) => Promise<RuntimeSession>
   resumeChatSession: (input: ResumeChatSessionInput) => Promise<RuntimeSession>

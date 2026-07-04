@@ -6,6 +6,10 @@ import { createSubscriberRegistry } from '../stream/subscriber-registry'
 import type { SubscriberRegistry } from '../stream/subscriber-registry'
 
 const DEFAULT_PROVIDER_THREAD_REPLAY_CHUNKS = 1_000
+/** How long a terminal stream's replay buffer is kept around for late reconnects before eviction. */
+const DEFAULT_PROVIDER_THREAD_STREAM_TTL_MS = 10 * 60 * 1000
+/** Minimum spacing between opportunistic sweeps, so a busy store doesn't scan on every publish. */
+const PROVIDER_THREAD_STREAM_PRUNE_INTERVAL_MS = 60 * 1000
 
 interface ProviderThreadStreamState {
   sessionId: string
@@ -13,17 +17,51 @@ interface ProviderThreadStreamState {
   startedTurnIds: Set<string>
   chunks: UIMessageChunk[]
   terminal: boolean
+  /** Set once `terminal` flips true; drives TTL-based eviction from `store.streams`. */
+  terminalAt: number | null
 }
 
 export interface ProviderThreadStreamStore {
   streams: Map<string, ProviderThreadStreamState>
   subscribers: SubscriberRegistry
+  /** Wall-clock time of the last eviction sweep, gating how often `pruneExpiredProviderThreadStreams` does work. */
+  lastPrunedAt: number
 }
 
 export function createProviderThreadStreamStore(): ProviderThreadStreamStore {
   return {
     streams: new Map(),
-    subscribers: createSubscriberRegistry()
+    subscribers: createSubscriberRegistry(),
+    lastPrunedAt: 0
+  }
+}
+
+/**
+ * Evict terminal provider-thread streams whose grace period has elapsed.
+ * Without this, `store.streams` grows without bound for the lifetime of the
+ * process: every `(sessionId, threadId)` pair ever seen keeps its replay
+ * buffer (up to `providerThreadReplayChunkLimit()` chunks) and its
+ * `startedTurnIds` set forever, since nothing else ever deletes the entry.
+ * Only terminal streams are eligible — a stream that's still receiving
+ * chunks must never be evicted out from under a reconnecting subscriber.
+ * Called opportunistically from the publish hot path, gated by
+ * `PROVIDER_THREAD_STREAM_PRUNE_INTERVAL_MS` so it stays cheap.
+ */
+function pruneExpiredProviderThreadStreams(store: ProviderThreadStreamStore): void {
+  const now = Date.now()
+  if (now - store.lastPrunedAt < PROVIDER_THREAD_STREAM_PRUNE_INTERVAL_MS) {
+    return
+  }
+  store.lastPrunedAt = now
+
+  const ttlMs = readPositiveIntegerEnv(
+    'CRADLE_CHAT_PROVIDER_THREAD_STREAM_TTL_MS',
+    DEFAULT_PROVIDER_THREAD_STREAM_TTL_MS
+  )
+  for (const [key, state] of store.streams) {
+    if (state.terminal && state.terminalAt !== null && now - state.terminalAt > ttlMs) {
+      store.streams.delete(key)
+    }
   }
 }
 
@@ -70,13 +108,16 @@ export function publishProviderThreadChunk(input: {
   terminal: boolean
   providerTurnId: string | null
 }): void {
+  pruneExpiredProviderThreadStreams(input.store)
+
   const key = providerThreadStreamKey(input.sessionId, input.threadId)
   const state = input.store.streams.get(key) ?? {
     sessionId: input.sessionId,
     threadId: input.threadId,
     startedTurnIds: new Set<string>(),
     chunks: [],
-    terminal: false
+    terminal: false,
+    terminalAt: null
   }
   input.store.streams.set(key, state)
 
@@ -93,8 +134,9 @@ export function publishProviderThreadChunk(input: {
       state.chunks.shift()
     }
   }
-  if (input.terminal) {
+  if (input.terminal && !state.terminal) {
     state.terminal = true
+    state.terminalAt = Date.now()
   }
 
   input.store.subscribers.publish(key, input.chunk, input.terminal)

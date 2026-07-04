@@ -26,6 +26,8 @@ import { join } from 'node:path'
 
 import type { Config, OpencodeClient } from '@opencode-ai/sdk'
 import { createOpencodeClient } from '@opencode-ai/sdk'
+import type { OpencodeClient as OpencodeV2Client } from '@opencode-ai/sdk/v2'
+import { createOpencodeClient as createOpencodeV2Client } from '@opencode-ai/sdk/v2'
 
 import { createChildLogger } from '../../../logging/logger'
 import type { RuntimeLiveResourceLease } from '../../chat-runtime/runtime-provider-types'
@@ -43,6 +45,7 @@ const OPENCODE_CONFIG_DIR_NAME = 'config'
 
 export interface OpencodeRuntimeResource {
   client: OpencodeClient
+  v2Client: OpencodeV2Client
   server: {
     url: string
     close: () => void
@@ -51,6 +54,7 @@ export interface OpencodeRuntimeResource {
 
 interface OpencodeServerInstance {
   client: OpencodeClient
+  v2Client: OpencodeV2Client
   process: ChildProcess
   url: string
   startedAt: number
@@ -161,9 +165,11 @@ async function spawnOpencodeServerInstance(): Promise<OpencodeServerInstance> {
   const port = await findAvailablePort()
   const { process: proc, url } = await launchOpencodeServer(port)
   const client = createOpencodeClient({ baseUrl: url })
+  const v2Client = createOpencodeV2Client({ baseUrl: url })
   const startedAt = Date.now()
   const instance: OpencodeServerInstance = {
     client,
+    v2Client,
     process: proc,
     url,
     startedAt,
@@ -382,6 +388,7 @@ export async function acquireOpencodeRuntimeResource(input: {
   const instance = await getOpencodeServer()
   const resource: OpencodeRuntimeResource = {
     client: instance.client,
+    v2Client: instance.v2Client,
     server: {
       url: instance.url,
       close: () => instance.close(),

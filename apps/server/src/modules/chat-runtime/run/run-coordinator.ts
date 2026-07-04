@@ -306,6 +306,7 @@ export async function createRun(
       modelId: runtimeResolution.requestedModelId,
       chunkBuffer: [],
       chunkBufferIndexByKey: new Map(),
+      chunkBufferDroppedCount: 0,
       pendingDeltaChunk: null,
       pendingDeltaFlushTimer: null,
       snapshotTimer: null,
@@ -320,7 +321,10 @@ export async function createRun(
       runtimeSettings,
       internalContinuation: input.internalContinuation,
       runSnapshotId: null,
-      runSnapshotSeq: 0
+      runSnapshotSeq: 0,
+      snapshotEventIdByCoalesceKey: new Map(),
+      runSnapshotTruncatedEventId: null,
+      runSnapshotDroppedEventCount: 0
     }
     runRegistry.setActiveRun(run.id, activeRun)
     deps.startActiveRunSnapshot(activeRun, {

@@ -1,9 +1,19 @@
 import type { UIMessageChunk } from 'ai'
 
-import { appendRunSnapshotEvent, finalizeRunSnapshot } from '../run-snapshot'
+import type { SnapshotCoalesceEntry } from '../run-registry'
 import type { RunSnapshotStatus } from '../run-snapshot'
+import {
+  appendRunSnapshotEvent,
+  finalizeRunSnapshot,
+  readMaxRunSnapshotEvents,
+  updateRunSnapshotEventPayload,
+} from '../run-snapshot'
 import type { TerminalChatMessageStatus } from './stream-chunks'
-import { readTerminalStatus } from './stream-chunks'
+import { readReplayCoalesceKey, readTerminalStatus } from './stream-chunks'
+
+const SNAPSHOT_EVENTS_TRUNCATED_PHASE = 'snapshot_events_truncated'
+/** Phases that must always be recorded even after the per-run event cap is hit. */
+const ALWAYS_RECORDED_SNAPSHOT_PHASES = new Set(['run_finalized'])
 
 export interface SnapshotEventRun {
   runSnapshotId?: string | null
@@ -14,6 +24,9 @@ export interface SnapshotEventRun {
   runtimeSession: {
     providerSessionId: string | null
   }
+  snapshotEventIdByCoalesceKey: Map<string, SnapshotCoalesceEntry>
+  runSnapshotTruncatedEventId?: string | null
+  runSnapshotDroppedEventCount: number
 }
 
 export interface RuntimeProfileSummaryInput {
@@ -92,13 +105,38 @@ export function recordActiveRunSnapshotEvent(
     durationMs?: number | null
     payload?: Record<string, unknown>
     truncatePayload: (value: unknown) => unknown
-  }
+  },
 ): void {
   if (!activeRun.runSnapshotId) {
     return
   }
   const chunk = input.chunk
-  appendRunSnapshotEvent({
+  const payload = input.payload ?? (chunk ? summarizeSnapshotChunk(chunk, input.truncatePayload) : {})
+
+  // Coalesce repeated chunks for the same logical event (e.g. a tool output
+  // re-pushed by the runtime) onto one row, mirroring the replay buffer's
+  // `readReplayCoalesceKey` semantics instead of appending a row per push.
+  const coalesceKey = chunk ? readReplayCoalesceKey(chunk) : null
+  const existingCoalesce = coalesceKey ? activeRun.snapshotEventIdByCoalesceKey.get(coalesceKey) : undefined
+  if (existingCoalesce) {
+    existingCoalesce.coalescedCount += 1
+    updateRunSnapshotEventPayload({
+      eventId: existingCoalesce.eventId,
+      payload: { ...payload, coalescedCount: existingCoalesce.coalescedCount },
+      durationMs: input.durationMs,
+    })
+    return
+  }
+
+  if (
+    activeRun.runSnapshotSeq >= readMaxRunSnapshotEvents()
+    && !ALWAYS_RECORDED_SNAPSHOT_PHASES.has(input.phase)
+  ) {
+    recordTruncatedSnapshotEvent(activeRun)
+    return
+  }
+
+  const event = appendRunSnapshotEvent({
     snapshotId: activeRun.runSnapshotId,
     chatSessionId: activeRun.sessionId,
     runId: activeRun.runId,
@@ -113,9 +151,63 @@ export function recordActiveRunSnapshotEvent(
     totalTokens: input.usage?.totalTokens,
     estimatedCostUsd: input.estimatedCostUsd,
     durationMs: input.durationMs,
-    payload: input.payload ?? (chunk ? summarizeSnapshotChunk(chunk, input.truncatePayload) : {})
+    payload: coalesceKey ? { ...payload, coalescedCount: 1 } : payload,
   })
+  if (!event) {
+    // Insert failed (e.g. a late write after the snapshot row was already
+    // finalized/deleted): leave `runSnapshotSeq` untouched so it keeps
+    // matching the actual number of durable rows instead of drifting ahead
+    // and leaving a gap in the sequence.
+    return
+  }
   activeRun.runSnapshotSeq += 1
+  if (coalesceKey) {
+    activeRun.snapshotEventIdByCoalesceKey.set(coalesceKey, { eventId: event.id, coalescedCount: 1 })
+  }
+}
+
+/**
+ * Record that a snapshot event was dropped after the per-run event cap was
+ * hit. Writes the `snapshot_events_truncated` marker row exactly once (the
+ * first time the cap is crossed); every subsequent drop only bumps an
+ * in-memory counter, so an upstream chunk storm costs at most one extra
+ * durable write, not one per dropped chunk. The marker's `droppedEventCount`
+ * is refreshed with the final tally when the run finalizes.
+ */
+function recordTruncatedSnapshotEvent(activeRun: SnapshotEventRun): void {
+  activeRun.runSnapshotDroppedEventCount += 1
+  if (activeRun.runSnapshotTruncatedEventId || !activeRun.runSnapshotId) {
+    return
+  }
+  const event = appendRunSnapshotEvent({
+    snapshotId: activeRun.runSnapshotId,
+    chatSessionId: activeRun.sessionId,
+    runId: activeRun.runId,
+    seq: activeRun.runSnapshotSeq,
+    phase: SNAPSHOT_EVENTS_TRUNCATED_PHASE,
+    payload: {
+      maxEvents: readMaxRunSnapshotEvents(),
+      droppedEventCount: activeRun.runSnapshotDroppedEventCount,
+    },
+  })
+  if (!event) {
+    return
+  }
+  activeRun.runSnapshotSeq += 1
+  activeRun.runSnapshotTruncatedEventId = event.id
+}
+
+function flushTruncatedSnapshotEventCount(activeRun: SnapshotEventRun): void {
+  if (!activeRun.runSnapshotTruncatedEventId) {
+    return
+  }
+  updateRunSnapshotEventPayload({
+    eventId: activeRun.runSnapshotTruncatedEventId,
+    payload: {
+      maxEvents: readMaxRunSnapshotEvents(),
+      droppedEventCount: activeRun.runSnapshotDroppedEventCount,
+    },
+  })
 }
 
 export function finalizeActiveRunSnapshot(
@@ -127,7 +219,7 @@ export function finalizeActiveRunSnapshot(
     profile: RuntimeProfileSummaryInput
     replayBuffer: Record<string, unknown>
     truncatePayload: (value: unknown) => unknown
-  }
+  },
 ): void {
   if (!activeRun.runSnapshotId) {
     return
@@ -142,7 +234,7 @@ export function finalizeActiveRunSnapshot(
       input.profile.finalizeFinishedAtMs && input.profile.finalizeStartedAtMs
         ? Math.round(input.profile.finalizeFinishedAtMs - input.profile.finalizeStartedAtMs)
         : null,
-    finalMessageJsonBytes: input.profile.finalMessageJsonBytes
+    finalMessageJsonBytes: input.profile.finalMessageJsonBytes,
   }
   recordActiveRunSnapshotEvent(activeRun, {
     phase: 'run_finalized',
@@ -154,9 +246,10 @@ export function finalizeActiveRunSnapshot(
       terminalChunk: summarizeSnapshotChunk(finalChunk, input.truncatePayload),
       replayBuffer: input.replayBuffer,
       diagnostics: input.diagnostics,
-      profile: profileSummary
-    }
+      profile: profileSummary,
+    },
   })
+  flushTruncatedSnapshotEventCount(activeRun)
   finalizeRunSnapshot({
     snapshotId: activeRun.runSnapshotId,
     status,
@@ -167,14 +260,14 @@ export function finalizeActiveRunSnapshot(
     summary: {
       diagnostics: input.diagnostics,
       profile: profileSummary,
-      replayBuffer: input.replayBuffer
-    }
+      replayBuffer: input.replayBuffer,
+    },
   })
 }
 
 export function summarizeSnapshotChunk(
   chunk: UIMessageChunk,
-  truncatePayload: (value: unknown) => unknown
+  truncatePayload: (value: unknown) => unknown,
 ): Record<string, unknown> {
   switch (chunk.type) {
     case 'text-delta':
@@ -182,35 +275,35 @@ export function summarizeSnapshotChunk(
       return {
         id: chunk.id,
         deltaChars: chunk.delta.length,
-        providerMetadata: chunk.providerMetadata ?? null
+        providerMetadata: chunk.providerMetadata ?? null,
       }
     case 'tool-input-delta':
       return {
         toolCallId: chunk.toolCallId,
-        inputDeltaChars: chunk.inputTextDelta.length
+        inputDeltaChars: chunk.inputTextDelta.length,
       }
     case 'tool-input-available':
       return {
         toolCallId: chunk.toolCallId,
         toolName: chunk.toolName,
-        input: truncatePayload(chunk.input)
+        input: truncatePayload(chunk.input),
       }
     case 'tool-output-available':
       return {
         toolCallId: chunk.toolCallId,
-        output: truncatePayload(chunk.output)
+        output: truncatePayload(chunk.output),
       }
     case 'error':
       return {
-        errorText: chunk.errorText
+        errorText: chunk.errorText,
       }
     case 'finish':
       return {
-        finishReason: chunk.finishReason
+        finishReason: chunk.finishReason,
       }
     case 'abort':
       return {
-        reason: chunk.reason
+        reason: chunk.reason,
       }
     default:
       return truncatePayload(chunk) as Record<string, unknown>

@@ -26,7 +26,7 @@ import {
   estimateRunUsageCost,
   insertRunUsage,
   insertRuntimeStepUsages,
-  type RuntimeStepUsageInput
+  UNKNOWN_MODEL_ID
 } from './usage'
 import type { ActiveRun } from '../run-registry'
 import type {
@@ -45,6 +45,7 @@ import {
   summarizeSnapshotChunk
 } from './snapshot-events'
 import { isTerminalUIMessageChunk } from './stream-chunks'
+import { terminalChunkForStatus } from './terminal-finalizer'
 
 export interface ExecuteRunInput {
   message: UIMessage
@@ -250,9 +251,18 @@ async function pumpRuntimeStream(
     }
 
     deps.stream.flushPendingRunDelta(activeRun)
-    finalChunk = resolveTerminalChunkWithDiagnostics(finalChunk, diagnostics, {
-    allowEmptyAssistantOutput: isRuntimeGoalNoOutputCommandTurn(activeRun, input.message)
-    })
+    // If `activeRun.terminalStatus` is already set here, the loop above hit
+    // `if (activeRun.terminalStatus) break` before the runtime produced (or
+    // we processed) a real terminal chunk for *this* turn — a concurrent
+    // cancel/abort flow already decided the outcome. Trust that outcome
+    // instead of running the stale default `finalChunk` (still
+    // `{ type: 'finish', ... }`) through empty-output validation, which
+    // would otherwise mislabel an early-cancelled turn as a failure.
+    finalChunk = activeRun.terminalStatus
+      ? terminalChunkForStatus(activeRun.terminalStatus)
+      : resolveTerminalChunkWithDiagnostics(finalChunk, diagnostics, {
+          allowEmptyAssistantOutput: isRuntimeGoalNoOutputCommandTurn(activeRun, input.message)
+        })
     deps.recordSnapshotEvent(activeRun, {
       phase: 'stream_finished',
       chunk: finalChunk,
@@ -265,7 +275,7 @@ async function pumpRuntimeStream(
   } catch (error) {
     deps.stream.flushPendingRunDelta(activeRun)
     profile.streamFinishedAtMs = performance.now()
-    if (isAbortError(error)) {
+    if (isAbortError(error, activeRun)) {
       finalChunk = { type: 'abort', reason: 'user' }
     } else {
       const serializedError = serializeChatError(error)
@@ -354,12 +364,9 @@ async function persistRunTerminalAndUsage(
         })
       }
 
-      const runtimeWithSteps = activeRun.runtime as {
-        lastStepUsages?: RuntimeStepUsageInput[]
-      }
-      const steps = runtimeWithSteps.lastStepUsages ?? []
+      const steps = activeRun.runtime.lastStepUsages ?? []
       if (steps.length > 0) {
-        const fallbackModelId = actualModelId ?? 'gpt-4o'
+        const fallbackModelId = actualModelId ?? UNKNOWN_MODEL_ID
         const recordedSteps = insertRuntimeStepUsages({
           runId: activeRun.runId,
           sessionId: activeRun.sessionId,
@@ -474,9 +481,27 @@ function isTokenDeltaChunk(chunk: UIMessageChunk): boolean {
     || chunk.type === 'tool-input-delta'
 }
 
-function isAbortError(error: unknown): boolean {
+/**
+ * Whether `error` represents a cancellation we ourselves requested, not a real
+ * provider/network failure. Trusts our own `cancelRequested` flag (set before
+ * `runtime.cancelTurn()` is invoked) rather than sniffing the error message —
+ * matching on substrings like "aborted" would misclassify legitimate failures
+ * (e.g. "stream aborted by remote", proxy disconnects) as user cancellation
+ * and silently drop their failure payload/observability record.
+ */
+function isAbortError(error: unknown, activeRun: ActiveRun): boolean {
+  if (activeRun.cancelRequested) {
+    return true
+  }
+  return isNamedAbortError(error)
+}
+
+function isNamedAbortError(error: unknown): boolean {
   return (
-    error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
   )
 }
 

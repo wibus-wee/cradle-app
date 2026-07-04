@@ -404,6 +404,8 @@ export const runSnapshotSchema = t.Object({
   errorText: t.Optional(t.String()),
   summary: t.Record(t.String(), t.Unknown()),
   events: t.Array(runSnapshotEventSchema),
+  eventCount: t.Number(),
+  eventsTruncated: t.Boolean(),
 })
 
 export const completedRunSchema = t.Object({

@@ -10,6 +10,7 @@ import type {
   RuntimeSession,
   RuntimeToolApprovalRequest,
   RuntimeToolApprovalResolution,
+  RuntimeUserInputRequest,
 } from '../../chat-runtime/runtime-provider-types'
 import type { OpencodeRuntimeResource } from './runtime-context'
 import { formatOpencodeAssistantError, OpencodeProvider } from './provider'
@@ -116,6 +117,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     sessionGetData: unknown
     sessionCreateData: unknown
     sessionChildrenData: unknown[]
+    sessionQuestionRequestsData: unknown[]
     mcpStatusData: Record<string, unknown>
     fileStatusData: unknown[]
     appAgentsData: unknown[]
@@ -129,6 +131,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     sessionGetData: null,
     sessionCreateData: { id: 'ses_recovered' },
     sessionChildrenData: [],
+    sessionQuestionRequestsData: [],
     mcpStatusData: {},
     fileStatusData: [],
     appAgentsData: [],
@@ -155,6 +158,8 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     error: undefined,
   }))
   const postPermission = vi.fn(async () => ({ data: true, error: undefined }))
+  const questionReply = vi.fn(async () => ({ data: undefined, error: undefined }))
+  const questionReject = vi.fn(async () => ({ data: undefined, error: undefined }))
   const session = {
     promptAsync,
     create: vi.fn(async () => ({ data: state.sessionCreateData, error: undefined })),
@@ -191,6 +196,15 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
       },
       postSessionIdPermissionsPermissionId: postPermission,
     },
+    v2Client: {
+      session: {
+        question: {
+          list: vi.fn(async () => ({ data: { data: state.sessionQuestionRequestsData }, error: undefined })),
+          reply: questionReply,
+          reject: questionReject,
+        },
+      },
+    },
     server: {
       url: 'http://127.0.0.1:1234',
       close() {},
@@ -202,6 +216,8 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     promptAsync,
     message,
     postPermission,
+    questionReply,
+    questionReject,
     session,
     state,
   }
@@ -1281,6 +1297,131 @@ describe('OpencodeProvider streamTurn', () => {
         output: expect.objectContaining({ apiName: 'approval.permissions' }),
       },
     })
+    await stream.return(undefined)
+  })
+
+  it('bridges OpenCode question tools through runtime user input and replies to the session question request', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    fake.state.sessionQuestionRequestsData.push({
+      id: 'question-request-1',
+      sessionID: 'ses_1',
+      questions: [{
+        question: '你想怎么尝试？',
+        header: '尝试 subAgent',
+        options: [
+          { label: '跑测试验证', description: '运行 provider.test.ts 和 subagent-bridge.test.ts 确认所有测试通过' },
+          { label: '提交后试', description: '先提交改动，再在运行的 app 里试' },
+        ],
+      }],
+      tool: {
+        messageID: 'msg_assistant',
+        callID: 'call_question_1',
+      },
+    })
+    const userInputResolver: {
+      resolve?: (resolution: { requestId: string, answers: Record<string, string[]> }) => void
+    } = {}
+    const requestUserInput = vi.fn((_request: RuntimeUserInputRequest) =>
+      new Promise(resolve => {
+        userInputResolver.resolve = resolve
+      }))
+    const provider = new OpencodeProvider({
+      readSecret: () => 'secret',
+      requestUserInput,
+    })
+    const stream = provider.streamTurn({
+      runId: 'run-question',
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      message: {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Ask before continuing' }],
+      },
+      workspacePath: '/tmp/workspace',
+    })
+
+    const firstChunk = stream.next()
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+    events.push({
+      type: 'message.updated',
+      properties: { info: assistantMessage({ time: { created: 1 }, finish: undefined }) },
+    })
+    events.push({
+      type: 'message.part.updated',
+      properties: {
+        part: {
+          id: 'part_question',
+          sessionID: 'ses_1',
+          messageID: 'msg_assistant',
+          type: 'tool',
+          callID: 'call_question_1',
+          tool: 'question',
+          state: {
+            status: 'running',
+            input: {
+              questions: [{
+                question: '你想怎么尝试？',
+                header: '尝试 subAgent',
+                options: [
+                  { label: '跑测试验证', description: '运行 provider.test.ts 和 subagent-bridge.test.ts 确认所有测试通过' },
+                  { label: '提交后试', description: '先提交改动，再在运行的 app 里试' },
+                ],
+              }],
+            },
+            time: { start: 10 },
+          },
+        } satisfies OpencodePart,
+      },
+    })
+
+    await expect(firstChunk).resolves.toMatchObject({
+      done: false,
+      value: { type: 'tool-input-start', toolCallId: 'call_question_1', toolName: 'question' },
+    })
+    await expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: {
+        type: 'tool-input-available',
+        toolCallId: 'call_question_1',
+        input: expect.objectContaining({
+          args: expect.objectContaining({
+            questions: expect.any(Array),
+          }),
+        }),
+      },
+    })
+    await vi.waitFor(() => expect(requestUserInput).toHaveBeenCalledWith(expect.objectContaining({
+      providerRequestId: 'question-request-1',
+      providerMethod: 'question',
+      toolCallId: 'call_question_1',
+      questions: [{
+        id: 'question-1',
+        header: '尝试 subAgent',
+        question: '你想怎么尝试？',
+        isOther: false,
+        isSecret: false,
+        multiSelect: false,
+        options: [
+          { label: '跑测试验证', description: '运行 provider.test.ts 和 subagent-bridge.test.ts 确认所有测试通过' },
+          { label: '提交后试', description: '先提交改动，再在运行的 app 里试' },
+        ],
+      }],
+    })))
+
+    userInputResolver.resolve?.({
+      requestId: 'question-request-1',
+      answers: { 'question-1': ['跑测试验证'] },
+    })
+    await vi.waitFor(() => expect(fake.questionReply).toHaveBeenCalledWith({
+      sessionID: 'ses_1',
+      requestID: 'question-request-1',
+      questionV2Reply: {
+        answers: [['跑测试验证']],
+      },
+    }))
+    expect(fake.questionReject).not.toHaveBeenCalled()
     await stream.return(undefined)
   })
 })

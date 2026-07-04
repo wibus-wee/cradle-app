@@ -12,6 +12,7 @@ import type {
   Todo as OpencodeTodo,
   ToolPart as OpencodeToolPart,
 } from '@opencode-ai/sdk'
+import type { QuestionV2Request } from '@opencode-ai/sdk/v2'
 import type { UIMessage, UIMessageChunk } from 'ai'
 
 import type {
@@ -44,6 +45,7 @@ import type {
   RuntimePresentationCapabilities,
   RuntimeSession,
   RuntimeUiSlotState,
+  RuntimeUserInputQuestion,
   StartChatSessionInput,
   StreamTurnInput,
   TokenUsage,
@@ -123,6 +125,7 @@ export class OpencodeProvider implements ChatRuntime {
   private _lastUsage: TokenUsage | null = null
   private _lastModelId: string | null = null
   private readonly activePermissionIds = new Set<string>()
+  private readonly activeQuestionToolCallIds = new Set<string>()
   private readonly permissionApprovalsByChatSessionId = new Map<string, OpencodePermissionApprovalRecord[]>()
   private readonly subagentRegistriesByChatSessionId = new Map<string, OpencodeSubagentRegistry>()
 
@@ -1073,6 +1076,15 @@ export class OpencodeProvider implements ChatRuntime {
             for (const chunk of projector.projectEvent(event)) {
               chunks.push(chunk)
             }
+            if (event.type === 'message.part.updated' && event.properties.part.type === 'tool') {
+              await this.handleOpencodeQuestionToolPart({
+                input,
+                resource,
+                chunks,
+                part: event.properties.part,
+                sessionId: opencodeSessionId,
+              })
+            }
             const terminalAssistant = asyncPromptBaselineMessageIds
               ? readOpencodeTerminalAssistantForTurn(event, {
                   sessionId: opencodeSessionId,
@@ -1231,6 +1243,92 @@ export class OpencodeProvider implements ChatRuntime {
     }
     finally {
       this.activePermissionIds.delete(toolCallId)
+    }
+  }
+
+  private async handleOpencodeQuestionToolPart(input: {
+    input: StreamTurnInput
+    resource: OpencodeRuntimeResource
+    chunks: AsyncChunkQueue
+    part: OpencodeToolPart
+    sessionId: string
+  }): Promise<void> {
+    if (input.part.sessionID !== input.sessionId || input.part.tool !== 'question') {
+      return
+    }
+
+    const questions = projectOpencodeQuestionToolQuestions(input.part)
+    if (questions.length === 0 || this.activeQuestionToolCallIds.has(input.part.callID)) {
+      return
+    }
+    if (!this.deps.requestUserInput) {
+      input.chunks.push(providerChunk.toolOutputError(
+        input.part.callID,
+        'Chat Runtime does not expose pending user input handling for OpenCode questions.',
+      ))
+      return
+    }
+
+    this.activeQuestionToolCallIds.add(input.part.callID)
+    let requestID: string | null = null
+    try {
+      const request = await resolveOpencodeQuestionRequest({
+        resource: input.resource,
+        sessionId: input.sessionId,
+        toolCallId: input.part.callID,
+      })
+      if (!request) {
+        throw new ProviderRuntimeError(
+          ProviderErrors.requestFailed(
+            this.runtimeKind,
+            'session.question.list',
+            `OpenCode did not expose a pending question request for tool call ${input.part.callID}`,
+          ),
+        )
+      }
+      requestID = request.id
+      const resolution = await this.deps.requestUserInput({
+        sessionId: input.input.runtimeSession.chatSessionId,
+        runId: input.input.runId,
+        providerRequestId: request.id,
+        providerKind: input.input.profile?.providerKind ?? 'universal',
+        runtimeKind: this.runtimeKind,
+        providerMethod: 'question',
+        toolCallId: input.part.callID,
+        questions,
+        metadata: {
+          params: input.part.state.input,
+          opencode: {
+            sessionID: input.sessionId,
+            requestID: request.id,
+            messageID: input.part.messageID,
+          },
+        },
+      })
+      const reply = await input.resource.v2Client.session.question.reply({
+        sessionID: input.sessionId,
+        requestID: request.id,
+        questionV2Reply: {
+          answers: questions.map(question => resolution.answers[question.id] ?? []),
+        },
+      })
+      if (reply.error) {
+        throw new ProviderRuntimeError(
+          ProviderErrors.requestFailed(this.runtimeKind, 'session.question.reply', formatOpencodeError(reply.error)),
+        )
+      }
+    }
+    catch (error) {
+      input.chunks.push(providerChunk.toolOutputError(input.part.callID, formatOpencodeError(error)))
+      if (requestID) {
+        await input.resource.v2Client.session.question.reject({
+          sessionID: input.sessionId,
+          requestID,
+        }).catch(() => undefined)
+      }
+    }
+    finally {
+      this.activeQuestionToolCallIds.delete(input.part.callID)
     }
   }
 
@@ -2260,6 +2358,96 @@ function readTerminalAssistantAfterBaseline(
     }
   }
   return selected
+}
+
+async function resolveOpencodeQuestionRequest(input: {
+  resource: OpencodeRuntimeResource
+  sessionId: string
+  toolCallId: string
+}): Promise<QuestionV2Request | null> {
+  const result = await input.resource.v2Client.session.question.list({
+    sessionID: input.sessionId,
+  })
+  if (result.error) {
+    throw new ProviderRuntimeError(
+      ProviderErrors.requestFailed('opencode', 'session.question.list', formatOpencodeError(result.error)),
+    )
+  }
+  return result.data?.data.find(request => request.tool?.callID === input.toolCallId) ?? null
+}
+
+function projectOpencodeQuestionToolQuestions(part: OpencodeToolPart): RuntimeUserInputQuestion[] {
+  const input = readOpencodeQuestionToolInput(part)
+  if (!input) {
+    return []
+  }
+  return input.questions.map((question, index) => ({
+    id: `question-${index + 1}`,
+    header: question.header,
+    question: question.question,
+    isOther: question.custom,
+    isSecret: false,
+    multiSelect: question.multiple,
+    options: question.options.length > 0
+      ? question.options.map(option => ({
+          label: option.label,
+          description: option.description,
+        }))
+      : null,
+  }))
+}
+
+interface OpencodeQuestionToolInput {
+  questions: OpencodeQuestionToolQuestion[]
+}
+
+interface OpencodeQuestionToolQuestion {
+  question: string
+  header: string
+  multiple: boolean
+  custom: boolean
+  options: Array<{
+    label: string
+    description: string
+  }>
+}
+
+function readOpencodeQuestionToolInput(part: OpencodeToolPart): OpencodeQuestionToolInput | null {
+  if (part.tool !== 'question' || !Array.isArray(part.state.input.questions)) {
+    return null
+  }
+  const questions = part.state.input.questions.flatMap(readOpencodeQuestionToolQuestion)
+  return questions.length > 0 ? { questions } : null
+}
+
+function readOpencodeQuestionToolQuestion(value: unknown): OpencodeQuestionToolQuestion[] {
+  if (!isRecord(value) || typeof value.question !== 'string' || value.question.trim().length === 0) {
+    return []
+  }
+  const options = Array.isArray(value.options)
+    ? value.options.flatMap(readOpencodeQuestionToolOption)
+    : []
+  return [{
+    question: value.question,
+    header: typeof value.header === 'string' ? value.header : '',
+    multiple: value.multiple === true || value.multiSelect === true,
+    custom: value.custom === true || value.isOther === true,
+    options,
+  }]
+}
+
+function readOpencodeQuestionToolOption(value: unknown): Array<{ label: string, description: string }> {
+  if (!isRecord(value) || typeof value.label !== 'string') {
+    return []
+  }
+  return [{
+    label: value.label,
+    description: typeof value.description === 'string' ? value.description : '',
+  }]
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function projectOpencodeShellResult(parts: OpencodePart[]): {

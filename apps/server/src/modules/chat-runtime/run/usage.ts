@@ -5,14 +5,18 @@ import { stepUsage as stepUsageTable, usageLogs } from '@cradle/db'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import { estimateCost } from '../../usage/pricing'
-import type { TokenUsage } from '../runtime-provider-types'
+import type { RuntimeStepUsage, TokenUsage } from '../runtime-provider-types'
 
-export interface RuntimeStepUsageInput {
-  stepNumber: number
-  stepType: string
-  modelId?: string
-  usage: TokenUsage
-}
+export type RuntimeStepUsageInput = RuntimeStepUsage
+
+/**
+ * Sentinel used when the actual model for a usage record is unknown. Never
+ * matches a real pricing table entry (see `estimateCost`), so cost estimation
+ * correctly degrades to 0 instead of silently billing at some other model's
+ * rate (e.g. a stand-in like `'gpt-4o'` would under- or over-estimate cost
+ * for whatever model actually ran, and would mislabel the stored row).
+ */
+export const UNKNOWN_MODEL_ID = 'unknown'
 
 export interface RecordedRuntimeStepUsage {
   stepNumber: number
@@ -46,7 +50,7 @@ export function insertRunUsage(input: {
 }
 
 export function estimateRunUsageCost(modelId: string | null, usage: TokenUsage): number | null {
-  return estimateCost(modelId ?? 'gpt-4o', usage)
+  return estimateCost(modelId ?? UNKNOWN_MODEL_ID, usage)
 }
 
 export function insertRuntimeStepUsages(input: {

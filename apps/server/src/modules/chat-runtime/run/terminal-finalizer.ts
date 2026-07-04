@@ -202,14 +202,25 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
 export function terminalChunkForFence(fence: RunWriteFence): UIMessageChunk {
   switch (fence.status) {
     case 'streaming':
+      return { type: 'finish', finishReason: 'stop' }
+    case 'missing':
+      return { type: 'error', errorText: 'Chat run is no longer available' }
+    case 'failed':
+      return { type: 'error', errorText: fence.errorText ?? 'Chat run failed' }
+    default:
+      return terminalChunkForStatus(fence.status)
+  }
+}
+
+/** Canonical terminal chunk for a settled run status, independent of any locally-computed chunk. */
+export function terminalChunkForStatus(status: TerminalChatMessageStatus): UIMessageChunk {
+  switch (status) {
     case 'complete':
       return { type: 'finish', finishReason: 'stop' }
     case 'aborted':
       return { type: 'abort', reason: 'user' }
     case 'failed':
-      return { type: 'error', errorText: fence.errorText ?? 'Chat run failed' }
-    case 'missing':
-      return { type: 'error', errorText: 'Chat run is no longer available' }
+      return { type: 'error', errorText: 'Chat run failed' }
   }
 }
 

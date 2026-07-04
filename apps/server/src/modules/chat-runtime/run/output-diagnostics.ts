@@ -7,9 +7,13 @@ export interface TurnOutputDiagnostics {
   reasoningTextCharCount: number
   toolInputDeltaCharCount: number
   toolEventCount: number
-  commandEventCount: number
-  commandOutputCharCount: number
-  fileChangeEventCount: number
+  /**
+   * Count of output-bearing chunk types that aren't text/reasoning/the core
+   * tool lifecycle events above: tool failures/denials, source citations,
+   * generated files, and custom `data-*` parts. A turn that only produces
+   * these should still count as having real output.
+   */
+  otherOutputEventCount: number
 }
 
 interface TurnOutputValidationResult {
@@ -25,9 +29,7 @@ export function createTurnOutputDiagnostics(): TurnOutputDiagnostics {
     reasoningTextCharCount: 0,
     toolInputDeltaCharCount: 0,
     toolEventCount: 0,
-    commandEventCount: 0,
-    commandOutputCharCount: 0,
-    fileChangeEventCount: 0
+    otherOutputEventCount: 0
   }
 }
 
@@ -55,7 +57,22 @@ export function accumulateDiagnostics(
     case 'tool-output-available':
       diagnostics.toolEventCount += 1
       break
+    case 'tool-input-error':
+    case 'tool-output-error':
+    case 'tool-output-denied':
+    case 'tool-approval-request':
+    case 'source-url':
+    case 'source-document':
+    case 'file':
+      diagnostics.otherOutputEventCount += 1
+      break
     default:
+      // Custom `data-*` parts (e.g. Cradle skill/plugin context) are also
+      // real output; every other chunk type left here is purely structural
+      // (start/finish/start-step/finish-step/message-metadata/error/abort).
+      if (chunk.type.startsWith('data-')) {
+        diagnostics.otherOutputEventCount += 1
+      }
       break
   }
 }
@@ -85,15 +102,12 @@ function validateTurnOutput(
   const hasTextOutput =
     diagnostics.assistantTextCharCount > 0 || diagnostics.reasoningTextCharCount > 0
   const hasToolOutput = diagnostics.toolEventCount > 0
-  const hasCommandOutput =
-    diagnostics.commandEventCount > 0 || diagnostics.commandOutputCharCount > 0
-  const hasFileChangeOutput = diagnostics.fileChangeEventCount > 0
+  const hasOtherOutput = diagnostics.otherOutputEventCount > 0
 
   if (
     hasTextOutput ||
     hasToolOutput ||
-    hasCommandOutput ||
-    hasFileChangeOutput ||
+    hasOtherOutput ||
     options.allowEmptyAssistantOutput
   ) {
     return { ok: true, errorText: null }
@@ -101,6 +115,6 @@ function validateTurnOutput(
 
   return {
     ok: false,
-    errorText: `Provider finished without any assistant output events (events=${diagnostics.emittedEventCount}, assistant_boundaries=${diagnostics.assistantBoundaryCount}, assistant_text_chars=${diagnostics.assistantTextCharCount}, reasoning_chars=${diagnostics.reasoningTextCharCount}, tool_events=${diagnostics.toolEventCount}, command_events=${diagnostics.commandEventCount}, command_output_chars=${diagnostics.commandOutputCharCount}, file_change_events=${diagnostics.fileChangeEventCount})`
+    errorText: `Provider finished without any assistant output events (events=${diagnostics.emittedEventCount}, assistant_boundaries=${diagnostics.assistantBoundaryCount}, assistant_text_chars=${diagnostics.assistantTextCharCount}, reasoning_chars=${diagnostics.reasoningTextCharCount}, tool_events=${diagnostics.toolEventCount}, other_output_events=${diagnostics.otherOutputEventCount})`
   }
 }

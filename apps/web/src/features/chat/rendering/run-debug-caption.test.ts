@@ -50,6 +50,8 @@ function buildSnapshot(input: {
     completedAt: null,
     summary: {},
     events: input.events,
+    eventCount: input.events.length,
+    eventsTruncated: false,
     runtimeKind: 'test',
   }
 }

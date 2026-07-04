@@ -25,6 +25,7 @@ import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
 import {
   DEFAULT_RUN_DELTA_FLUSH_CHARS,
   DEFAULT_RUN_DELTA_FLUSH_MS,
+  DEFAULT_RUN_REPLAY_CHUNKS,
   DEFAULT_SNAPSHOT_INTERVAL_MS
 } from './constants'
 import { runSubscribers } from './live-run-streams'
@@ -229,11 +230,48 @@ export function createActiveRunStreamController(
 
   function bufferReplayChunk(activeRun: ActiveRun, chunk: UIMessageChunk): void {
     const coalesced = coalesceReplayChunk(activeRun, chunk)
-    if (coalesced) {
-      return
+    if (!coalesced) {
+      activeRun.chunkBuffer.push(chunk)
     }
+    enforceChunkBufferCap(activeRun)
+  }
 
-    activeRun.chunkBuffer.push(chunk)
+  /**
+   * Evict from the front once the replay buffer exceeds its cap. Only
+   * increments `chunkBufferDroppedCount` (a base offset) instead of
+   * rewriting every stored coalesce-key index — `logicalToPhysicalIndex`
+   * lazily resolves stale (already-evicted) indices as "not found" the next
+   * time that key is looked up.
+   */
+  function enforceChunkBufferCap(activeRun: ActiveRun): void {
+    const cap = readPositiveIntegerEnv('CRADLE_CHAT_RUN_REPLAY_CHUNKS', DEFAULT_RUN_REPLAY_CHUNKS)
+    while (activeRun.chunkBuffer.length > cap) {
+      activeRun.chunkBuffer.shift()
+      activeRun.chunkBufferDroppedCount += 1
+    }
+  }
+
+  function logicalToPhysicalIndex(activeRun: ActiveRun, logicalIndex: number): number {
+    return logicalIndex - activeRun.chunkBufferDroppedCount
+  }
+
+  function currentTailLogicalIndex(activeRun: ActiveRun): number {
+    return activeRun.chunkBuffer.length + activeRun.chunkBufferDroppedCount
+  }
+
+  /**
+   * Whether a coalesced update to `chunk`'s slot should move to the tail of
+   * the buffer instead of staying at its original position. Deltas
+   * (text/reasoning/tool-input) represent one span growing in place, so
+   * their original position (where the span started) stays correct as they
+   * accumulate. `tool-output-available` is different: a `preliminary` push
+   * followed by the final push are genuinely separate points in time, often
+   * with unrelated text/reasoning chunks emitted in between — pinning the
+   * final output to the *first* preliminary's position would replay it
+   * before content that actually preceded it live.
+   */
+  function shouldMoveToTailOnCoalesce(chunk: UIMessageChunk): boolean {
+    return chunk.type === 'tool-output-available'
   }
 
   function coalesceReplayChunk(activeRun: ActiveRun, chunk: UIMessageChunk): boolean {
@@ -242,24 +280,52 @@ export function createActiveRunStreamController(
       return false
     }
 
-    const existingIndex = activeRun.chunkBufferIndexByKey.get(key)
-    if (existingIndex === undefined) {
-      activeRun.chunkBufferIndexByKey.set(key, activeRun.chunkBuffer.length)
+    const existingLogicalIndex = activeRun.chunkBufferIndexByKey.get(key)
+    const physicalIndex =
+      existingLogicalIndex === undefined
+        ? -1
+        : logicalToPhysicalIndex(activeRun, existingLogicalIndex)
+    const existing =
+      physicalIndex >= 0 && physicalIndex < activeRun.chunkBuffer.length
+        ? activeRun.chunkBuffer[physicalIndex]
+        : undefined
+    if (existing === undefined) {
+      // No live slot to coalesce into (first occurrence, or the previous
+      // slot already fell off the front of the capped buffer): reserve the
+      // position this chunk is about to be pushed to.
+      activeRun.chunkBufferIndexByKey.set(key, currentTailLogicalIndex(activeRun))
       return false
     }
 
-    const existing = activeRun.chunkBuffer[existingIndex]
     const merged = mergeBufferedStreamChunk(
       existing,
       chunk,
       readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS', DEFAULT_RUN_DELTA_FLUSH_CHARS)
     )
     if (!merged) {
-      activeRun.chunkBufferIndexByKey.set(key, activeRun.chunkBuffer.length)
+      activeRun.chunkBufferIndexByKey.set(key, currentTailLogicalIndex(activeRun))
       return false
     }
-    activeRun.chunkBuffer[existingIndex] = merged
+
+    if (shouldMoveToTailOnCoalesce(chunk)) {
+      activeRun.chunkBuffer.splice(physicalIndex, 1)
+      reindexCoalesceKeysAfterRemoval(activeRun, physicalIndex)
+      activeRun.chunkBufferIndexByKey.set(key, currentTailLogicalIndex(activeRun))
+      activeRun.chunkBuffer.push(merged)
+    } else {
+      activeRun.chunkBuffer[physicalIndex] = merged
+    }
     return true
+  }
+
+  /** After physically removing a slot, every stored index past it shifts down by one. */
+  function reindexCoalesceKeysAfterRemoval(activeRun: ActiveRun, removedPhysicalIndex: number): void {
+    for (const [key, logicalIndex] of activeRun.chunkBufferIndexByKey) {
+      const physicalIndex = logicalToPhysicalIndex(activeRun, logicalIndex)
+      if (physicalIndex > removedPhysicalIndex) {
+        activeRun.chunkBufferIndexByKey.set(key, logicalIndex - 1)
+      }
+    }
   }
 
   function publishRunStartChunk(activeRun: ActiveRun): void {

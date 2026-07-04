@@ -48,6 +48,8 @@ export function createActiveRunReleaseController(
     activeRun.pendingDeltaChunk = null
     activeRun.chunkBuffer = []
     activeRun.chunkBufferIndexByKey.clear()
+    activeRun.chunkBufferDroppedCount = 0
+    activeRun.snapshotEventIdByCoalesceKey.clear()
     activeRun.finalMessage.parts = []
     activeRun.finalProjection.activeTextParts.clear()
     activeRun.finalProjection.activeReasoningParts.clear()

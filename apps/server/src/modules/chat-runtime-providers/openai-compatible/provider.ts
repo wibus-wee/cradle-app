@@ -6,6 +6,7 @@ import type {
   ProviderContext,
   ResumeChatSessionInput,
   RuntimeSession,
+  RuntimeStepUsage,
   StartChatSessionInput,
   StreamTurnInput,
 } from '../../chat-runtime/runtime-provider-types'
@@ -26,13 +27,6 @@ import {
   STANDARD_RUNTIME_METADATA,
 } from './metadata'
 
-export interface StepUsageEntry {
-  stepNumber: number
-  stepType: string
-  modelId?: string
-  usage: TokenUsage
-}
-
 export function createStandardProvider(ctx: ProviderContext): ChatRuntime {
   return new OpenAICompatibleProvider(ctx)
 }
@@ -44,13 +38,13 @@ export class OpenAICompatibleProvider implements ChatRuntime {
 
   private readonly activeTurns = new Map<string, AbortController>()
   private _lastUsage: TokenUsage | null = null
-  private _lastStepUsages: StepUsageEntry[] = []
+  private _lastStepUsages: RuntimeStepUsage[] = []
 
   get lastUsage(): TokenUsage | null {
     return this._lastUsage
   }
 
-  get lastStepUsages(): StepUsageEntry[] {
+  get lastStepUsages(): RuntimeStepUsage[] {
     return this._lastStepUsages
   }
 
@@ -206,21 +200,20 @@ function createAbortError(): Error {
   return error
 }
 
+/**
+ * Whether `error` is the `AbortError` produced by our own `abortController`
+ * (created above and only ever aborted from `cancelTurn`). Checking the
+ * standard `name` is sufficient because that's the contract `AbortController`
+ * signals guarantee for fetch/stream consumers — matching on message
+ * substrings like "abort"/"aborted" instead would also catch real provider
+ * failures (e.g. "stream aborted by remote") and misreport them as a user
+ * cancellation, dropping the actual error.
+ */
 function isAbortError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false
-  }
-  // Standard AbortError (DOMException or custom)
-  if (error.name === 'AbortError') {
-    return true
-  }
-  // AI SDK wraps abort as various error messages
-  if (error.message.includes('aborted') || error.message.includes('abort')) {
-    return true
-  }
-  // AI SDK's AbortError from node-fetch or undici
-  if (error.message.includes('This operation was aborted')) {
-    return true
-  }
-  return false
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
+  )
 }

@@ -9,11 +9,11 @@ import type {
 } from '@cradle/db'
 import { backendRunSnapshotEvents, backendRunSnapshots } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
-import { and, desc, eq, gte, lt, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, lt, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { db } from '../../infra'
 import { readNonNegativeIntegerEnv, readPositiveIntegerEnv } from '../../helpers/env'
+import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { OBSERVABILITY_CODES } from '../observability/contract'
 import * as Observability from '../observability/service'
@@ -42,6 +42,10 @@ export interface ChatRunSnapshot {
   errorText?: string
   summary: Record<string, unknown>
   events: ChatRunSnapshotEvent[]
+  /** Total number of durable event rows recorded for this snapshot (independent of how many `events` were hydrated). */
+  eventCount: number
+  /** True when `events` was cut off by the read-side limit and does not contain every row. */
+  eventsTruncated: boolean
 }
 
 export interface ChatRunSnapshotEvent {
@@ -99,6 +103,13 @@ export interface AppendRunSnapshotEventInput {
   payload?: Record<string, unknown>
 }
 
+export interface UpdateRunSnapshotEventPayloadInput {
+  eventId: string
+  payload: Record<string, unknown>
+  occurredAt?: number
+  durationMs?: number | null
+}
+
 export interface FinalizeRunSnapshotInput {
   snapshotId: string
   status: RunSnapshotStatus
@@ -116,12 +127,33 @@ export interface RunSnapshotFilter {
   traceId?: string
   since?: number
   limit?: number
+  /**
+   * Hydrate each snapshot's full `events` array. Defaults to false: listing
+   * snapshots should stay a cheap summary read, not N full event-log reads.
+   */
+  includeEvents?: boolean
 }
 
 const SCHEMA_VERSION = 1
 const DEFAULT_PAYLOAD_LIMIT = 64_000
 const DEFAULT_RETENTION_DAYS = 30
 const RETENTION_PRUNE_INTERVAL_MS = 60 * 60 * 1000
+const DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT = 2_000
+const DEFAULT_SNAPSHOT_EVENTS_MAX = 2_000
+
+/**
+ * Hard cap on how many event rows a single run snapshot may accumulate.
+ * Defense against upstream chunk storms (e.g. a runtime re-pushing the same
+ * tool output thousands of times) that would otherwise write unbounded rows
+ * even after coalescing known-repeatable chunk types.
+ */
+export function readMaxRunSnapshotEvents(): number {
+  return readPositiveIntegerEnv('CRADLE_CHAT_RUN_SNAPSHOT_MAX_EVENTS', DEFAULT_SNAPSHOT_EVENTS_MAX)
+}
+
+function readRunSnapshotEventsReadLimit(): number {
+  return readPositiveIntegerEnv('CRADLE_CHAT_RUN_SNAPSHOT_EVENTS_READ_LIMIT', DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT)
+}
 const SnapshotRecordSchema = z.string()
   .transform(raw => JSON.parse(raw))
   .pipe(z.record(z.string(), z.unknown()))
@@ -192,6 +224,29 @@ export function appendRunSnapshotEvent(input: AppendRunSnapshotEventInput): Chat
   }
 }
 
+/**
+ * Update an existing snapshot event row in place instead of appending a new
+ * row. Used to coalesce repeated chunks for the same logical event (see
+ * `readReplayCoalesceKey`) so a misbehaving runtime that re-pushes the same
+ * tool output thousands of times produces one durable row, not thousands.
+ */
+export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPayloadInput): void {
+  try {
+    db()
+      .update(backendRunSnapshotEvents)
+      .set({
+        payloadJson: stringifySnapshotRecord(input.payload),
+        occurredAt: input.occurredAt ?? Date.now(),
+        durationMs: input.durationMs ?? null,
+      })
+      .where(eq(backendRunSnapshotEvents.id, input.eventId))
+      .run()
+  }
+  catch (error) {
+    logger.error('failed to update run snapshot event payload', { input, error })
+  }
+}
+
 export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
   const values: Partial<NewBackendRunSnapshot> = {
     status: input.status,
@@ -219,7 +274,7 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
       .update(backendRunSnapshots)
       .set(values)
       .where(
-        and(eq(backendRunSnapshots.id, input.snapshotId), eq(backendRunSnapshots.status, 'running'))
+        and(eq(backendRunSnapshots.id, input.snapshotId), eq(backendRunSnapshots.status, 'running')),
       )
       .run()
     if (result.changes === 0 && previous && previous.status !== 'running') {
@@ -277,7 +332,7 @@ export function getRunSnapshots(filter: RunSnapshotFilter = {}): ChatRunSnapshot
         .limit(limit)
         .all()
 
-  return rows.map(row => toChatRunSnapshot(row, getSnapshotEvents(row.id)))
+  return rows.map(row => toChatRunSnapshot(row, filter.includeEvents ? getSnapshotEvents(row.id) : []))
 }
 
 export function getRunSnapshot(runId: string): ChatRunSnapshot | null {
@@ -289,16 +344,33 @@ export function getRunSnapshot(runId: string): ChatRunSnapshot | null {
   return row ? toChatRunSnapshot(row, getSnapshotEvents(row.id)) : null
 }
 
-function getSnapshotEvents(snapshotId: string): BackendRunSnapshotEvent[] {
+/**
+ * Read snapshot event rows ordered by `seq`, bounded at the SQL layer so a
+ * snapshot with a pathological number of rows can't be pulled fully into
+ * memory just to render a debug view. Pair with `countSnapshotEvents` to
+ * detect truncation.
+ */
+function getSnapshotEvents(snapshotId: string, limit = readRunSnapshotEventsReadLimit()): BackendRunSnapshotEvent[] {
   return db()
     .select()
     .from(backendRunSnapshotEvents)
     .where(eq(backendRunSnapshotEvents.snapshotId, snapshotId))
+    .orderBy(asc(backendRunSnapshotEvents.seq))
+    .limit(limit)
     .all()
-    .sort((a, b) => a.seq - b.seq)
+}
+
+function countSnapshotEvents(snapshotId: string): number {
+  return db()
+    .select({ count: sql<number>`count(*)` })
+    .from(backendRunSnapshotEvents)
+    .where(eq(backendRunSnapshotEvents.snapshotId, snapshotId))
+    .get()
+?.count ?? 0
 }
 
 function toChatRunSnapshot(row: BackendRunSnapshot, events: BackendRunSnapshotEvent[]): ChatRunSnapshot {
+  const eventCount = countSnapshotEvents(row.id)
   return {
     id: row.id,
     schemaVersion: row.schemaVersion,
@@ -319,6 +391,8 @@ function toChatRunSnapshot(row: BackendRunSnapshot, events: BackendRunSnapshotEv
     errorText: row.errorText ?? undefined,
     summary: SnapshotRecordSchema.parse(row.summaryJson),
     events: events.map(toChatRunSnapshotEvent),
+    eventCount,
+    eventsTruncated: events.length < eventCount,
   }
 }
 

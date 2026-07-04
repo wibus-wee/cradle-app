@@ -6,6 +6,11 @@ import type { ChatRuntime, ChatRuntimeSettings, RuntimeSession } from './runtime
 
 export type TerminalChatMessageStatus = Exclude<ChatMessageStatus, 'streaming'>
 
+export interface SnapshotCoalesceEntry {
+  eventId: string
+  coalescedCount: number
+}
+
 export interface ActiveRun {
   runId: string
   sessionId: string
@@ -16,7 +21,16 @@ export interface ActiveRun {
   runtimeSession: RuntimeSession
   modelId: string | null
   chunkBuffer: UIMessageChunk[]
+  /**
+   * Coalesce key -> *logical* index into `chunkBuffer` (i.e. offset by
+   * `chunkBufferDroppedCount`, not a direct array index). Logical indexing
+   * lets old chunks be evicted from the front of `chunkBuffer` (see
+   * `chunkBufferDroppedCount`) without having to rewrite every stored index
+   * on each eviction.
+   */
   chunkBufferIndexByKey: Map<string, number>
+  /** Number of chunks ever evicted from the front of `chunkBuffer` once it exceeded its cap. */
+  chunkBufferDroppedCount: number
   pendingDeltaChunk: UIMessageChunk | null
   pendingDeltaFlushTimer: ReturnType<typeof setTimeout> | null
   snapshotTimer: ReturnType<typeof setInterval> | null
@@ -32,6 +46,17 @@ export interface ActiveRun {
   internalContinuation?: 'runtimeGoal'
   runSnapshotId?: string | null
   runSnapshotSeq: number
+  /**
+   * Coalesce key (mirrors {@link readReplayCoalesceKey}) -> durable snapshot
+   * event id + how many times it has been coalesced. Lets repeated chunks for
+   * the same logical event (e.g. a tool output pushed thousands of times by a
+   * misbehaving provider) update one row instead of appending a new row per push.
+   */
+  snapshotEventIdByCoalesceKey: Map<string, SnapshotCoalesceEntry>
+  /** Id of the single `snapshot_events_truncated` marker row for this run, once the event cap is hit. */
+  runSnapshotTruncatedEventId?: string | null
+  /** Count of events dropped after the per-run snapshot event cap was hit. */
+  runSnapshotDroppedEventCount: number
 }
 
 /**

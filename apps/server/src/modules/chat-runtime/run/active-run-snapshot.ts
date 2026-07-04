@@ -88,9 +88,7 @@ function toDiagnosticsSnapshot(diagnostics: TurnOutputDiagnostics): Record<strin
     reasoningTextCharCount: diagnostics.reasoningTextCharCount,
     toolInputDeltaCharCount: diagnostics.toolInputDeltaCharCount,
     toolEventCount: diagnostics.toolEventCount,
-    commandEventCount: diagnostics.commandEventCount,
-    commandOutputCharCount: diagnostics.commandOutputCharCount,
-    fileChangeEventCount: diagnostics.fileChangeEventCount
+    otherOutputEventCount: diagnostics.otherOutputEventCount
   }
 }
 
