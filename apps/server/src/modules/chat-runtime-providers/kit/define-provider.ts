@@ -30,6 +30,15 @@ type RequireWhen<T, Key extends keyof T, Required_> = Required_ extends true
   ? T & { [K in Key]-?: NonNullable<T[K]> }
   : T
 
+type CapabilityHookRequirements<C extends ChatRuntimeCapabilities> =
+  (C['steer'] extends 'native' ? { steerTurn: NonNullable<ChatRuntime['steerTurn']> } : {}) &
+  (C['supportsShellExecution'] extends true ? { executeShellCommand: NonNullable<ChatRuntime['executeShellCommand']> } : {}) &
+  (C['supportsLastTurnRollback'] extends true ? { rollbackLastTurn: NonNullable<ChatRuntime['rollbackLastTurn']> } : {}) &
+  (C['supportsRuntimeSettings'] extends true ? { updateRuntimeSettings: NonNullable<ChatRuntime['updateRuntimeSettings']> } : {}) &
+  (C['supportsUiSlotStates'] extends true ? { getUiSlotStates: NonNullable<ChatRuntime['getUiSlotStates']> } : {}) &
+  (C['supportsDynamicCapabilities'] extends true ? { getDynamicCapabilities: NonNullable<ChatRuntime['getDynamicCapabilities']> } : {}) &
+  (C['supportsTitleGeneration'] extends true ? { generateSessionTitle: NonNullable<ChatRuntime['generateSessionTitle']> } : {})
+
 /**
  * Given a specific (literal) `ChatRuntimeCapabilities`, computes the `ChatRuntime` shape with
  * each capability-gated hook narrowed from optional to required exactly when its governing
@@ -74,7 +83,7 @@ export type ChatRuntimeDefinition<C extends ChatRuntimeCapabilities> = RequireWh
  * a type error at this call site, not just a runtime assertion when the provider registers.
  */
 export function defineChatRuntime<const C extends ChatRuntimeCapabilities>(
-  definition: ChatRuntimeDefinition<C>
+  definition: Omit<ChatRuntime, 'capabilities'> & { capabilities: C } & CapabilityHookRequirements<C>
 ): ChatRuntime {
   return definition as ChatRuntime
 }

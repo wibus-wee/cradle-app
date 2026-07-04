@@ -23,6 +23,7 @@ import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServer
 import { codexChatSessionAppServerScopeId } from './app-server/host-lease'
 import { isCodexAppServerInteractiveServerRequest } from './app-server/server-request-methods'
 import { CodexProvider } from './provider'
+import { classifyCodexToolKind } from './tools/mapper'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -625,20 +626,22 @@ async function drainStream(stream: AsyncGenerator<UIMessageChunk, void, void>): 
   }
 }
 
-function codexInput(apiName: string, args: unknown) {
+function codexInput(apiName: string, args: unknown, itemType?: string) {
   return {
     type: 'cradle.builtin-tool-call.input.v1',
     identifier: 'codex',
     apiName,
+    kind: classifyCodexToolKind(apiName, itemType),
     args,
   }
 }
 
-function codexOutput(apiName: string, args: unknown, result: unknown) {
+function codexOutput(apiName: string, args: unknown, result: unknown, itemType?: string) {
   return {
     type: 'cradle.builtin-tool-call.result.v1',
     identifier: 'codex',
     apiName,
+    kind: classifyCodexToolKind(apiName, itemType),
     args,
     result,
   }
@@ -6297,8 +6300,8 @@ describe('codexProvider app-server integration', () => {
       { type: 'tool-output-available', toolCallId: 'file-1', preliminary: true, output: { type: 'cradle.codex.file-change.patch-updated.v1', ...fileChangePatch, changes: fileChanges } },
       { type: 'tool-output-available', toolCallId: 'file-1', output: codexOutput('file_change', { filenames: ['src/app.ts'], status: 'started', type: 'fileChange' }, { ...fileChangePatch, changes: fileChanges, status: 'completed', type: 'fileChange' }) },
       { type: 'tool-input-start', toolCallId: 'mcp-1', toolName: 'github_search' },
-      { type: 'tool-input-available', toolCallId: 'mcp-1', toolName: 'github_search', input: codexInput('github/search', { query: 'cradle' }) },
-      { type: 'tool-output-available', toolCallId: 'mcp-1', output: codexOutput('github/search', { query: 'cradle' }, { server: 'github', tool: 'search', result: { content: [{ type: 'text', text: 'ok' }] }, content: [{ type: 'text', text: 'ok' }] }) },
+      { type: 'tool-input-available', toolCallId: 'mcp-1', toolName: 'github_search', input: codexInput('github/search', { query: 'cradle' }, 'mcpToolCall') },
+      { type: 'tool-output-available', toolCallId: 'mcp-1', output: codexOutput('github/search', { query: 'cradle' }, { server: 'github', tool: 'search', result: { content: [{ type: 'text', text: 'ok' }] }, content: [{ type: 'text', text: 'ok' }] }, 'mcpToolCall') },
       { type: 'tool-input-start', toolCallId: 'web-1', toolName: 'web_search' },
       { type: 'tool-input-available', toolCallId: 'web-1', toolName: 'web_search', input: codexInput('web_search', { query: 'Cradle', action: { type: 'search', query: 'Cradle' } }) },
       { type: 'tool-output-available', toolCallId: 'web-1', output: codexOutput('web_search', { query: 'Cradle', action: { type: 'search', query: 'Cradle' } }, { query: 'Cradle', action: { type: 'search', query: 'Cradle' } }) },
