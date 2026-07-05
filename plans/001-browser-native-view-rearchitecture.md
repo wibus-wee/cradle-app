@@ -160,7 +160,7 @@ Cradle 的浏览器要支持：任意站点、CDP 命令（`desktop:browser-exec
 
 ## 状态
 
-- [ ] Step 1 re-attach 闪烁修复
-- [ ] Step 2 逐帧 bounds 跟随
-- [ ] Step 3 suppression API
-- [ ] Step 4 清理与回归
+- [x] Step 1 re-attach 闪烁修复
+- [x] Step 2 逐帧 bounds 跟随
+- [x] Step 3 suppression API
+- [x] Step 4 清理与回归

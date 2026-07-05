@@ -1,129 +1,138 @@
-# Tsuki — guide for LLMs and coding agents
+# Cradle Server Agent Guide
 
-Use this file when you edit the Tsuki monorepo or scaffold/extend an application that depends on `@tsuki-hono/*`. It is tool-agnostic (Cursor, Claude Code, Codex, etc.). Human-oriented docs: package READMEs under `packages/*/README.md`. This repo also has `CLAUDE.md` with overlapping maintainer notes.
+本文件描述 `apps/server` 的当前实现。编辑 server 代码时，以这里的 Elysia 架构、目录边界和验证命令为准。
 
-## What Tsuki is
+## 当前架构
 
-- TypeScript libraries that layer NestJS-like modules, decorators, and a request pipeline on top of Hono (HTTP) and tsyringe (DI).
-- Not a single deployable server: consumers compose `@Module` / `@Controller` classes and call `createApplication` from `@tsuki-hono/core`.
+Cradle server 是一个 Elysia 应用：
 
-## Cradle server architecture philosophy
+- `src/app.ts` 负责创建 Elysia app、注册 HTTP 插件、组合业务模块，并挂载运行期 `onStop` 清理。
+- `src/index.ts` 负责进程启动、配置读取、监听端口、fatal handler、telemetry 初始化与 graceful shutdown。
+- `src/infra.ts` 提供懒加载基础设施单例，包括 server config、logger、Drizzle database provider 和迁移执行。
+- `src/http/` 放跨模块 HTTP concerns：auth、request id、request logger、OpenAPI、error mapping、validation、actor context。
+- `src/modules/*` 放业务能力模块。每个模块拥有自己的 route composition、model/schema、service/business logic 和模块 README。
+- `src/errors/app-error.ts` 是业务错误契约，`src/http/error-mapping.ts` 是 HTTP 响应映射边界。
+- `src/config/`、`src/database/`、`src/logging/`、`src/telemetry/`、`src/observability/` 是横切基础设施。
+- `src/plugins/` 是 server plugin loading/runtime support，不属于普通业务模块。
 
-The server is organized as **technical primitives + business modules** (二维结构), prioritizing explicit ownership and dependency direction.
+`createServerContractApp()` 组合纯 HTTP contract surface；`createServerApp()` 在 contract app 之上启动 runtime-only concerns，例如 plugins、background tasks、provider runtime、relay host connector 和 cleanup hooks。
 
-**Target layout (conceptual):**
+## 目录职责
 
-```
+```text
 apps/server/src/
-	app.module.ts
-	app.factory.ts
-	index.ts
-
-	modules/                 # business capabilities (domain)
-		health/
-		workspace/
-		session/
-		agent-identity/
-
-	database/                # runtime DB access (infra only)
-	redis/                   # runtime Redis access
-	filters/
-	guards/
-	interceptors/
-	middlewares/
-	pipes/
-	errors/
-	logging/
-	config/
-	helpers/
-	openapi/
+  app.ts                    # Elysia app composition
+  index.ts                  # process bootstrap and shutdown
+  infra.ts                  # lazy infra singletons
+  config/                   # server configuration
+  database/                 # Drizzle provider and migrations runner
+  errors/                   # AppError contract
+  http/                     # HTTP plugins, auth, error mapping, validation, OpenAPI
+  logging/                  # logger setup
+  modules/                  # business capabilities
+  observability/            # event contracts and service
+  plugins/                  # plugin loading and trust/runtime helpers
+  telemetry/                # OpenTelemetry bootstrap
 ```
 
-**Non-negotiable dependency rules:**
+模块内部通常按以下方式拆分：
 
-- `modules/*` **may depend on** `database/redis/filters/guards/...`.
-- `database/redis/*` **must not depend on** `modules/*` (no feature imports).
-- Request context (tenant/workspace/user) is **written in middleware/interceptor** and **read by infra**.
-- `app.module.ts` is composition only: assemble imports, never business logic.
+```text
+modules/<capability>/
+  index.ts                  # Elysia routes and OpenAPI metadata
+  model.ts                  # TypeBox schemas and response models
+  service.ts                # business logic
+  README.md                 # module ownership and behavior notes
+```
 
-**Why this shape:**
+大型模块可以继续拆分子目录，但需要保持 ownership 清晰：route 文件只负责 HTTP shape，service 文件负责业务语义，infra/database access 不应散落在 route handler 中。
 
-- Technical folders keep cross-cutting concerns visible and consistent.
-- `modules/` owns domain semantics, keeping capabilities cohesive.
-- Dependency direction stays clean, preventing infra from being polluted by feature logic.
+## Elysia 模块组合规则
 
-## Package dependency graph
+- 业务模块导出一个 `new Elysia({ prefix, detail })` 实例或一个注册函数，并在 `src/app.ts` 中通过 `app.use(module)` 或显式 register 函数组合。
+- `src/app.ts` 是 composition root：可以排序、组合、注册全局插件，但不要放业务逻辑。
+- 新 HTTP route 应使用 Elysia + TypeBox 的 schema 约束 `body`、`query`、`params`、`response`。
+- OpenAPI metadata 放在 route `detail` 中，至少包含稳定 `summary`；CLI 暴露的 route 使用 `x-cradle-cli` metadata。
+- 需要生成 CLI 命令的 API，应复用现有 route metadata 模式，而不是在 CLI 层手写另一个协议。
 
-- `@tsuki-hono/common` — decorators, metadata, `HttpContext`, exceptions, pipes (e.g. Zod), logger helpers, enhancer interfaces. Peer foundation: `reflect-metadata`, `tsyringe`, `zod` (as used by pipes/OpenAPI).
-- `@tsuki-hono/core` — `createApplication`, `HonoHttpApplication`, route registration, container wiring, global enhancers. Depends on `common` + `hono`.
-- `@tsuki-hono/event-emitter` — Redis pub/sub events (`@OnEvent`, `@EmitEvent`, `EventModule`). Depends on `common` + `core`; peer: `ioredis`.
-- `@cradle/openapi` — Cradle-owned OpenAPI 3.1 generation from Tsuki decorator metadata. Depends on `@tsuki-hono/common` + `zod`.
+示例模式：
 
-Lower layers must not import higher layers (e.g. `common` must not import `core`).
+```ts
+export const workspace = new Elysia({
+  prefix: '/workspaces',
+  detail: { tags: ['workspace'] },
+})
+  .get('', () => Workspace.list(), {
+    detail: {
+      summary: 'List workspaces',
+      'x-cradle-cli': {
+        command: ['workspace', 'list'],
+      },
+    },
+    response: { 200: t.Array(WorkspaceModel.record) },
+  })
+```
 
-## Request pipeline (mental model)
+## 依赖方向
 
-Order matters for debugging and for where to attach behavior:
+目标依赖方向：
 
-Request → `HttpContext.run()` → Guards → Interceptors (pre) → Pipes → Route handler → Interceptors (post) → (on error) Exception filters → Response
+- `modules/*` 可以读取 `infra.ts`、`database/`、`http/`、`errors/`、`logging/`、`config/` 等基础设施。
+- 基础设施目录不应依赖业务模块；`infra.ts`、`database/`、`http/`、`logging/` 应保持 feature-agnostic。
+- `app.ts` 可以导入所有模块，因为它是 composition root。
+- 模块之间应优先通过明确 service API 或 shared contract 交互，避免隐式循环依赖。
+- 持久化 schema 变更必须谨慎处理，优先用 Drizzle schema/migration 路径，不要绕过现有 database provider。
 
-Global enhancers are registered with tokens: `APP_GUARD`, `APP_PIPE`, `APP_INTERCEPTOR`, `APP_FILTER`, `APP_MIDDLEWARE` (from `@tsuki-hono/common`).
+已知状态：当前代码里 `http/` 和 `lib/` 仍有少量 feature imports，计划 021 会处理这些依赖方向漂移。不要扩大这类反向依赖。
 
-## How consumers bootstrap an app
+## 错误处理
 
-1. Ensure `reflect-metadata` is loaded before any decorator-using module (first import in entry).
-2. Define `@injectable()` services and `@Controller('path')` classes with `@Get` / `@Post` / etc.
-3. Define a root `@Module({ imports?, controllers?, providers? })` class.
-4. `const app = await createApplication(AppModule, options?, optionalHonoInstance?)`.
-5. Expose Hono: `app.getInstance().fetch` (e.g. pass to `@hono/node-server` `serve`, or workers adapters).
-6. On shutdown: `await app.close(...)`.
+- 业务可预期错误使用 `AppError`，提供稳定 `code`、HTTP `status`、用户可读 `message` 和可选 `details`。
+- Elysia validation error、not found、unknown error 统一由 `createErrorHandler()` 映射。
+- 不要在 route handler 中手写一套错误 JSON 格式；抛 `AppError` 或让 validation 进入统一 handler。
+- 未预期错误会记录 logger 和 observability event；不要吞掉会影响状态一致性的异常。
 
-`ApplicationOptions` includes optional `container`, `globalPrefix`, `logger`.
+## Auth 和 request context
 
-Handlers should return plain objects/values suitable for framework serialization; do not assume manual `Response` unless the pattern in code/docs requires it.
+- HTTP auth 由 `src/http/auth.ts` 作为 Elysia plugin 注册。
+- Request id 由 `src/http/request-id.ts` 设置。
+- Actor/request-scoped 信息应通过 `src/http/actor-context.ts` 等 HTTP 边界读取，不要在模块静态初始化时读取 request state。
 
-## Module metadata (authoring rules)
+## OpenAPI 和 CLI metadata
 
-`@Module` accepts:
+- OpenAPI plugin 在 `src/http/openapi.ts`。
+- Route schema 使用 Elysia `t` / TypeBox-compatible models。
+- CLI 生成依赖 route `detail['x-cradle-cli']`，新增 CLI-facing endpoint 时必须确认 metadata shape 与现有 route 一致。
+- 修改 route schema 或 metadata 后，按需运行 web/API generation workflow；不要手改生成文件来掩盖 server contract 不一致。
 
-- `imports` — other module classes (supports `forwardRef(() => Module)` for cycles).
-- `controllers` — controller classes.
-- `providers` — constructors or provider objects: `useClass`, `useValue`, `useExisting`, `useFactory` (+ `inject`, `singleton` where applicable).
+## Background tasks 和 lifecycle
 
-Register tokens in module `providers` before injecting them. tsyringe is used in strict mode: missing registrations throw at runtime.
+- `createServerApp()` 启动 runtime concerns，例如 plugin activation、external provider refresh、Chronicle background sync、relay connector、provider runtime cleanup。
+- 长生命周期资源必须注册到 `app.onStop()`，并保证 shutdown path 不依赖请求上下文。
+- Boot-time background work 必须显式处理 rejection；不要留下 floating promise 造成 unhandled rejection。
 
-## Non-negotiable rules (common agent mistakes)
+## Testing and verification
 
-1. **DI tokens need runtime imports** — use `import { MyService } from './my.service'`, never `import type { MyService }` for anything passed to `@inject`, constructor parameter types resolved by tsyringe, or `providers` arrays. If emitDecoratorMetadata is on, TypeScript erases type-only imports and injection breaks silently or at runtime.
-2. **`reflect-metadata` first** — entry file and tests must load it before decorators. Package `common` re-exports after importing it; app entry should still `import 'reflect-metadata'` explicitly at the top.
-3. **TypeScript** — The project uses TC39 standard decorators (not legacy `experimentalDecorators`). TypeScript 5.x handles these natively.
-4. **`@Controller()`** on HTTP classes (it applies tsyringe `@injectable()` internally). Other injectable services need **`@injectable()`** from `tsyringe` on the class.
-5. **`HttpContext`** is AsyncLocalStorage-scoped to the request: do not read it during module static init or before request middleware establishes context.
+Server package scripts 是真实验证入口：
 
-## Working inside this monorepo
+```bash
+pnpm --filter @cradle/server typecheck
+pnpm --filter @cradle/server test
+pnpm --filter @cradle/server build
+```
 
-- **Package manager**: pnpm 10.x workspaces.
-- **Verify before claiming done**: `pnpm test`, `pnpm typecheck`, and for broad edits `pnpm build`. Per package: `cd packages/<name> && pnpm test`.
-- **Tests**: Vitest + SWC; each package has `vitest.setup.ts` importing `reflect-metadata`. Integration style: `createApplication(Module)` → `app.getInstance().request(path, init?)` → assert; `await app.close()` in `afterEach` / teardown.
-- **Lint/format**: `pnpm lint`, `pnpm format`. Pre-commit runs lint-staged.
-- **When changing behavior**: prefer tests in the package that owns the code (`core` for runtime, `common` for decorators/interfaces, etc.).
+常用策略：
 
-## OpenAPI and events
+- HTTP contract 或 service 行为变更：优先添加/更新 Vitest 覆盖。
+- 只改文档：至少检查 diff，确认文档中的路径和命令真实存在。
+- 改 OpenAPI route schema：运行 server typecheck，并考虑运行依赖生成 API 的下游检查。
+- 改 runtime lifecycle：运行相关 focused tests 后再跑完整 server test。
 
-- OpenAPI: use `@cradle/openapi` alongside route/OpenAPI decorators from `common` as per `packages/openapi` README; keep Zod schemas aligned with handler inputs when documenting.
-- Events: import `EventModule` and Redis configuration from `@tsuki-hono/event-emitter`; do not duplicate pub/sub logic in `core`.
+## Agent checklist
 
-## Summary for agents
-
-- Treat Tsuki as **metadata-driven composition over Hono**, not a Nest fork.
-- Preserve **package boundaries** and **strict DI** semantics.
-- After code changes, **run the relevant package tests and repo typecheck** before concluding the task is complete.
-
-## Packages
-
-| Package                     | Description                                                            |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `@tsuki-hono/common`        | Decorators, interfaces, exceptions, pipes, logger, and request context |
-| `@tsuki-hono/core`          | Application runtime, DI container utils, route registration            |
-| `@tsuki-hono/event-emitter` | Redis pub/sub event system with `@OnEvent` / `@EmitEvent`              |
-| `@cradle/openapi`           | Cradle-owned OpenAPI 3.1 document generation from Tsuki metadata       |
+- 先确认 owner：route、service、model、runtime helper 分别属于哪个模块。
+- 读 across，写 within：可以读取其他 namespace，但不要把别的模块私有语义复制到当前模块。
+- 不要把业务逻辑塞进 `app.ts` 或 HTTP plugin。
+- 不要新增未验证的全局 singleton；优先复用 `infra.ts` 模式。
+- 不要引入新的反向依赖；如果无法避免，先说明原因和替代方案。
+- 完成后说明实际运行过的验证命令；没有运行就明确说没有运行。
