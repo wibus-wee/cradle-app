@@ -44,6 +44,76 @@ Cradle is a desktop-first platform for managing AI agents and their workflows. I
 - **Plugin System** — Extend Cradle with official and community plugins
 - **Multi-provider Support** — Anthropic, OpenAI, and any OpenAI-compatible endpoint
 
+## Details
+
+<table>
+  <tr>
+    <td>
+      <h3>Workspace</h3>
+      <p>Unified workspace for managing all your agents, sessions, and projects in one place. Navigate between contexts seamlessly with a clean, organized interface.</p>
+    </td>
+    <td>
+      <img src=".github/readme/Workspace.png" alt="Workspace" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src=".github/readme/kanban.png" alt="Kanban Board" />
+    </td>
+    <td>
+      <h3>Issue Tracking</h3>
+      <p>Built-in Kanban board with workflow statuses, milestones, comments, and agent delegation. Track issues visually and assign tasks to AI agents.</p>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <h3>Cradle Diffs</h3>
+      <p>Visual diff viewer for reviewing code changes made by agents. Understand what changed, why, and approve or reject modifications with confidence.</p>
+    </td>
+    <td>
+      <img src=".github/readme/diffs.png" alt="Cradle Diffs" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src=".github/readme/session-await.png" alt="Session Await" />
+    </td>
+    <td>
+      <h3>Session Await</h3>
+      <p>Persistent sessions with await support for external events like CI pipelines or human approval. Pause and resume agent workflows across time.</p>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <h3>Design Mode</h3>
+      <p>Visual design mode for customizing the look and feel of your workspace. Tailor the interface to match your workflow preferences.</p>
+    </td>
+    <td>
+      <img src=".github/readme/design-mode.png" alt="Design Mode" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src=".github/readme/plugins.png" alt="Plugins" />
+    </td>
+    <td>
+      <h3>Plugin System</h3>
+      <p>Extend Cradle with official and community plugins. Build your own with the Plugin SDK to add new capabilities and integrations.</p>
+      <p>You can enjoy CC-Switch, Nowledge Mem, and other plugins in the Cradle plugin marketplace.</p>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <h3>Your Data, Your Control</h3>
+      <p>Your data stays on your machine. Cradle is built with a privacy-first approach — no telemetry, no cloud dependency, full local control over your agents and conversations.</p>
+      <p>Cradle will faithfully record all the data it may access, and your data should not be modified without reason!</p>
+    </td>
+    <td>
+      <img src=".github/readme/about-data-care.png" alt="About Data Care" />
+    </td>
+  </tr>
+</table>
+
 ## Builtin Plugins
 
 | Plugin | Description | Status |
