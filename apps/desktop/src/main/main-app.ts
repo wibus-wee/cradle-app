@@ -4,6 +4,11 @@ import { app, BrowserWindow, dialog, ipcMain, net, screen } from 'electron'
 import windowStateKeeper from 'electron-window-state'
 
 import {
+  initializeIpcDevtool,
+  subscribeAcpDevtool,
+  subscribeIpcDevtool,
+} from './ipc-devtool'
+import {
   registerBrowserIpcHandlers,
   sendBrowserAnnotationRuntimeEvent,
   sendBrowserPromptRequest,
@@ -38,7 +43,7 @@ import {
 } from './plugin-loader'
 import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import { QuitGuard } from './quit-guard'
-import { detachServer, startServer, stopServer } from './server-process'
+import { startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
@@ -109,6 +114,8 @@ async function readRendererRuntimeDiagnostics(): Promise<Array<Record<string, un
 
 setDesktopRuntimeDiagnosticsProvider(async () => ({
   browser: browserManager.getPerformanceSnapshot(),
+  chatEventTail: chatEventTailBroker?.diagnostics() ?? null,
+  chatStream: chatStreamBroker?.diagnostics() ?? null,
   renderers: await readRendererRuntimeDiagnostics(),
 }))
 
@@ -207,11 +214,6 @@ function setMainWindow(win: BrowserWindow): void {
     }
     event.preventDefault()
     win.hide()
-    // External close requests (installer WM_CLOSE, task manager) are also
-    // delivered as 'close' events.  By calling app.quit() here we ensure the
-    // process actually terminates instead of hiding forever.
-    quitGuard.allowNextQuit()
-    app.quit()
   })
 
   win.on('closed', () => {
@@ -376,7 +378,7 @@ function processPendingPluginInstallUrls(): void {
 
 async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): Promise<void> {
   if (!options.stopServerRuntime) {
-    detachServer()
+    console.warn('[desktop] stopServerRuntime=false is ignored; desktop-owned server will be stopped')
   }
 
   browserManager.dispose()
@@ -394,9 +396,7 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   await macBridgeManager?.stop()
   macBridgeManager = null
   await deactivateDesktopPlugins()
-  if (options.stopServerRuntime) {
-    await stopServer()
-  }
+  await stopServer()
 }
 
 function requestDesktopExit(input: { reason: string, exitCode: number, stopServerRuntime: boolean }): void {
@@ -510,6 +510,7 @@ export async function startDesktopApp(): Promise<void> {
   registerProcessShutdownHandlers()
   registerPluginInstallProtocol()
   registerBrowserIpcHandlers(ipcMain, browserManager)
+  initializeIpcDevtool()
   browserManager.subscribe((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {

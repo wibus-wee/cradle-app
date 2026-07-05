@@ -3,7 +3,17 @@ import { useEffect, useState } from 'react'
 import { Kbd, KbdGroup } from '~/components/ui/kbd'
 import { cn } from '~/lib/cn'
 
+import { AcpEventDetail } from './acp/acp-event-detail'
+import { AcpEventsTable } from './acp/acp-events-table'
+import { AcpFilterBar } from './acp/acp-filter-bar'
+import { useAcpDevtoolStore } from './acp/use-acp-events'
+import { useAcpKeyboard } from './acp/use-acp-keyboard'
 import { HealthPanel } from './health/health-panel'
+import { IpcEventDetail } from './ipc/ipc-event-detail'
+import { IpcEventsTable } from './ipc/ipc-events-table'
+import { IpcFilterBar } from './ipc/ipc-filter-bar'
+import { useIpcDevtoolStore } from './ipc/use-ipc-events'
+import { useIpcKeyboard } from './ipc/use-ipc-keyboard'
 import { MemoryPanel } from './memory/memory-panel'
 import { ObservabilityEventDetail } from './observability/observability-event-detail'
 import { ObservabilityEventsTable } from './observability/observability-events-table'
@@ -11,9 +21,19 @@ import { useObservabilityDevtoolStore } from './observability/use-observability-
 import { PluginsPanel } from './plugins/plugins-panel'
 import { SurfacesPanel } from './surfaces/surfaces-panel'
 
-type DevtoolTab = 'observability' | 'health' | 'memory' | 'surfaces' | 'plugins'
+type DevtoolTab = 'ipc' | 'acp' | 'observability' | 'health' | 'memory' | 'surfaces' | 'plugins'
 
 const DEVTOOL_TABS: { id: DevtoolTab, label: string, description: string }[] = [
+  {
+    id: 'ipc',
+    label: 'IPC',
+    description: 'IPC trace inspection — request/response lifecycle and payload',
+  },
+  {
+    id: 'acp',
+    label: 'ACP',
+    description: 'ACP runtime output — agent process stdout/stderr and lifecycle',
+  },
   {
     id: 'observability',
     label: 'Observability',
@@ -43,11 +63,18 @@ function getShortcutIndex(event: KeyboardEvent): number | null {
 
 export function DevtoolPage() {
   const loadObservability = useObservabilityDevtoolStore(s => s.load)
-  const [tab, setTab] = useState<DevtoolTab>('observability')
+  const initializeIpc = useIpcDevtoolStore(s => s.initialize)
+  const initializeAcp = useAcpDevtoolStore(s => s.initialize)
+  const [tab, setTab] = useState<DevtoolTab>('ipc')
 
   useEffect(() => {
     void loadObservability()
-  }, [loadObservability])
+    void initializeIpc()
+    void initializeAcp()
+  }, [loadObservability, initializeIpc, initializeAcp])
+
+  useIpcKeyboard(tab === 'ipc')
+  useAcpKeyboard(tab === 'acp')
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -105,12 +132,40 @@ export function DevtoolPage() {
 
         <KbdGroup className="hidden shrink-0 font-mono text-[10px] text-muted-foreground md:inline-flex">
           <Kbd>Cmd</Kbd>
-          <Kbd>1-5</Kbd>
+          <Kbd>1-7</Kbd>
           <span>or</span>
           <Kbd>Ctrl</Kbd>
-          <Kbd>1-5</Kbd>
+          <Kbd>1-7</Kbd>
         </KbdGroup>
       </div>
+
+      {tab === 'ipc' && (
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <IpcFilterBar />
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex-3 overflow-hidden border-r border-border">
+              <IpcEventsTable />
+            </div>
+            <div className="flex-2 overflow-hidden">
+              <IpcEventDetail />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'acp' && (
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <AcpFilterBar />
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex-3 overflow-hidden border-r border-border">
+              <AcpEventsTable />
+            </div>
+            <div className="flex-2 overflow-hidden">
+              <AcpEventDetail />
+            </div>
+          </div>
+        </div>
+      )}
 
       {tab === 'observability' && (
         <div className="flex flex-1 overflow-hidden">

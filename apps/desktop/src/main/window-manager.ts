@@ -4,6 +4,7 @@ import { app, BrowserWindow, screen } from 'electron'
 
 import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath, resolveDesktopRendererTearoffPath } from './desktop-assets'
 import { installExternalLinkPolicy } from './external-link-policy'
+import { subscribeAcpDevtool, subscribeIpcDevtool } from './ipc-devtool'
 import { readStoredWindowSize, resolveWindowBoundsNearPoint, resolveWindowSize, writeStoredWindowSize } from './window-state'
 
 const TEAROFF_WINDOW_DEFAULT_WIDTH = 720
@@ -264,6 +265,11 @@ export class WindowManager {
     this.devtoolWindow = win
     win.on('closed', () => {
       this.devtoolWindow = null
+    })
+
+    win.webContents.once('did-finish-load', () => {
+      subscribeIpcDevtool(win.webContents)
+      subscribeAcpDevtool(win.webContents)
     })
 
     return win

@@ -35,6 +35,9 @@ const BROWSER_STATE_CHANNEL = 'desktop:browser-state'
 const BROWSER_PROMPT_REQUESTED_CHANNEL = 'desktop:browser-prompt-requested'
 const BROWSER_ANNOTATION_RUNTIME_EVENTED_CHANNEL = 'desktop:browser-annotation-runtime-evented'
 
+const IPC_DEVTOOL_EVENT_CHANNEL = 'ipc-devtool:event'
+const IPC_DEVTOOL_ACP_EVENT_CHANNEL = 'ipc-devtool:acp-event'
+
 function subscribeIpc<T>(channel: string, handler: (payload: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T) => handler(payload)
   ipcRenderer.on(channel, listener)
@@ -193,6 +196,29 @@ const cradleElectron = {
 }
 
 contextBridge.exposeInMainWorld('cradle', cradleElectron)
+
+const ipcDevtool = {
+  getSnapshot: () => ipcRenderer.invoke('ipcDevtool.getSnapshot'),
+  clear: () => ipcRenderer.invoke('ipcDevtool.clear'),
+  onEvent: (listener: (event: unknown) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: unknown) => listener(payload)
+    ipcRenderer.on(IPC_DEVTOOL_EVENT_CHANNEL, wrapped)
+    return () => {
+      ipcRenderer.removeListener(IPC_DEVTOOL_EVENT_CHANNEL, wrapped)
+    }
+  },
+  getAcpSnapshot: () => ipcRenderer.invoke('ipcDevtool.getAcpSnapshot'),
+  clearAcp: () => ipcRenderer.invoke('ipcDevtool.clearAcp'),
+  onAcpEvent: (listener: (event: unknown) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: unknown) => listener(payload)
+    ipcRenderer.on(IPC_DEVTOOL_ACP_EVENT_CHANNEL, wrapped)
+    return () => {
+      ipcRenderer.removeListener(IPC_DEVTOOL_ACP_EVENT_CHANNEL, wrapped)
+    }
+  },
+}
+
+contextBridge.exposeInMainWorld('ipcDevtool', ipcDevtool)
 
 // Type declaration for renderer access
 export type CradleElectronAPI = typeof cradleElectron
