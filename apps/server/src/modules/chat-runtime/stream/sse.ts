@@ -16,6 +16,7 @@ export interface BufferedChunkStreamInput {
 }
 
 const encoder = new TextEncoder()
+const STREAM_OPEN_COMMENT = ': cradle-stream-open\n\n'
 
 export function bindReadableStreamToAbortSignal<T>(
   stream: ReadableStream<T>,
@@ -115,6 +116,9 @@ function encodeChunkStreamAsSse(stream: ReadableStream<UIMessageChunk>): Readabl
     .pipeThrough(new JsonToSseTransformStream())
     .pipeThrough(
       new TransformStream<string, Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(STREAM_OPEN_COMMENT))
+        },
         transform: (chunk, controller) => {
           controller.enqueue(encoder.encode(chunk))
         }
