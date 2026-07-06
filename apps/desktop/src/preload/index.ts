@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+import { resolveWindowControlsSafeArea } from '../shared/window-controls-safe-area'
+
 // Parse --server-url, --surface and --surface-route from additionalArguments
 function getArg(name: string): string | null {
   const prefix = `--${name}=`
@@ -69,6 +71,7 @@ const cradleElectron = {
     surfaceRoute,
     platform: process.platform as 'darwin' | 'win32' | 'linux',
     isElectron: true as const,
+    windowControlsSafeArea: resolveWindowControlsSafeArea(process.platform),
   },
 
   /** Window controls (for custom titlebar if needed) */

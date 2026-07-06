@@ -1,11 +1,16 @@
 import { join } from 'node:path'
 
-import { app, BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, nativeTheme, screen } from 'electron'
 
 import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath, resolveDesktopRendererTearoffPath } from './desktop-assets'
 import { installExternalLinkPolicy } from './external-link-policy'
 import { subscribeAcpDevtool, subscribeIpcDevtool } from './ipc-devtool'
 import { readStoredWindowSize, resolveWindowBoundsNearPoint, resolveWindowSize, writeStoredWindowSize } from './window-state'
+import {
+  resolveWindowControlsSafeArea,
+  resolveTrafficLightPosition,
+  resolveWindowControlsOverlay,
+} from '../shared/window-controls-safe-area'
 
 const TEAROFF_WINDOW_DEFAULT_WIDTH = 720
 const TEAROFF_WINDOW_DEFAULT_HEIGHT = 640
@@ -80,20 +85,20 @@ export class WindowManager {
     const targetBounds = resolveWindowBoundsNearPoint(targetSize, releasePoint, targetDisplay.workArea)
 
     const isMacOS = process.platform === 'darwin'
+    const windowControlsSafeArea = resolveWindowControlsSafeArea(process.platform)
+    const windowControlsOverlay = resolveWindowControlsOverlay(
+      nativeTheme.shouldUseDarkColors,
+      windowControlsSafeArea,
+    )
 
     const win = new BrowserWindow({
       ...targetBounds,
       minWidth: TEAROFF_WINDOW_MIN_WIDTH,
       minHeight: TEAROFF_WINDOW_MIN_HEIGHT,
       titleBarStyle: isMacOS ? 'hiddenInset' : 'hidden',
-      titleBarOverlay: isMacOS
-        ? true
-        : {
-            color: '#00000000',
-            symbolColor: '#ffffff',
-            height: 36,
-          },
-      ...(isMacOS && { trafficLightPosition: { x: 16, y: 18 } }),
+      backgroundColor: windowControlsOverlay.color,
+      titleBarOverlay: isMacOS ? true : windowControlsOverlay,
+      ...(isMacOS && { trafficLightPosition: resolveTrafficLightPosition(windowControlsSafeArea) }),
       webPreferences: {
         preload: resolveDesktopPreloadPath(__dirname),
         contextIsolation: true,

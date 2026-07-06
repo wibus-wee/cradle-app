@@ -73,6 +73,27 @@ export const tearoffSurfaceRoute = (window.cradle?.env?.surfaceRoute ?? null) as
  */
 export const platform = window.cradle?.env?.platform ?? 'darwin'
 
+export interface WindowControlsSafeArea {
+  side: 'left' | 'right' | 'none'
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export const windowControlsSafeArea: WindowControlsSafeArea = window.cradle?.env?.windowControlsSafeArea ?? {
+  side: 'none',
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+}
+
+interface WindowTitleBarOverlayInput {
+  color: string
+  symbolColor: string
+}
+
 type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
 type ChatRuntimeAccessMode = 'approval-required' | 'full-access'
 type ChatRuntimeInteractionMode = 'default' | 'plan'
@@ -320,6 +341,7 @@ interface WindowServiceMethods {
   startPointerMonitor: () => Promise<void>
   stopPointerMonitor: () => Promise<void>
   focusCurrent: () => Promise<boolean>
+  setTitleBarOverlay: (input: WindowTitleBarOverlayInput) => Promise<void>
   close: () => Promise<void>
 }
 
@@ -617,6 +639,85 @@ interface CradleIpcServices {
 export const nativeIpc = createIpcProxy<CradleIpcServices>(
   window.cradle?.ipc ?? null,
 )
+
+let lastSyncedWindowControlsOverlay: string | null = null
+
+const RGB_COLOR_RE = /^rgba?\(\s*(\d+(?:\.\d+)?)(?:\s*,\s*|\s+)(\d+(?:\.\d+)?)(?:\s*,\s*|\s+)(\d+(?:\.\d+)?)/
+const SRGB_COLOR_RE = /^color\(srgb\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)/
+
+function readWindowControlsOverlayColors(): WindowTitleBarOverlayInput | null {
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  const probe = document.createElement('span')
+  probe.style.position = 'fixed'
+  probe.style.pointerEvents = 'none'
+  probe.style.visibility = 'hidden'
+  probe.style.backgroundColor = 'var(--sidebar)'
+  probe.style.color = 'var(--foreground)'
+
+  document.documentElement.append(probe)
+  const computed = window.getComputedStyle(probe)
+  const color = normalizeCssColor(computed.backgroundColor.trim())
+  const symbolColor = normalizeCssColor(computed.color.trim())
+  probe.remove()
+
+  return color && symbolColor ? { color, symbolColor } : null
+}
+
+function normalizeCssColor(computed: string): string | null {
+  const rgbMatch = computed.match(RGB_COLOR_RE)
+  if (rgbMatch) {
+    return formatHexColor(
+      Number(rgbMatch[1]),
+      Number(rgbMatch[2]),
+      Number(rgbMatch[3]),
+    )
+  }
+
+  const srgbMatch = computed.match(SRGB_COLOR_RE)
+  if (srgbMatch) {
+    return formatHexColor(
+      Number(srgbMatch[1]) * 255,
+      Number(srgbMatch[2]) * 255,
+      Number(srgbMatch[3]) * 255,
+    )
+  }
+
+  return computed.startsWith('#') ? computed : null
+}
+
+function formatHexColor(red: number, green: number, blue: number): string {
+  const channels = [red, green, blue].map(channel =>
+    Math.max(0, Math.min(255, Math.round(channel)))
+      .toString(16)
+      .padStart(2, '0'))
+  return `#${channels.join('')}`
+}
+
+export function syncDesktopWindowControlsOverlay(): void {
+  if (!isElectron || !nativeIpc) {
+    return
+  }
+
+  window.requestAnimationFrame(() => {
+    const overlayColors = readWindowControlsOverlayColors()
+    if (!overlayColors) {
+      return
+    }
+
+    const syncKey = `${overlayColors.color}:${overlayColors.symbolColor}`
+    if (syncKey === lastSyncedWindowControlsOverlay) {
+      return
+    }
+    lastSyncedWindowControlsOverlay = syncKey
+
+    void nativeIpc.window.setTitleBarOverlay(overlayColors).catch(() => {
+      lastSyncedWindowControlsOverlay = null
+    })
+  })
+}
 
 export interface DangerousActionAuthorizationOptions {
   action: 'delete' | 'remove'

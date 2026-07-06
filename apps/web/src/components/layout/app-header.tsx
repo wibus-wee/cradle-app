@@ -9,12 +9,13 @@ import { m } from 'motion/react'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { CHROME_COLLAPSED_SIDEBAR_WIDTH } from '~/components/layout/layout-responsive'
 import { useChatSessionLayoutRecord } from '~/components/layout/use-layout-query-records'
 import { Button } from '~/components/ui/button'
 import { ResourcesPopover } from '~/features/devtool/resources/resources-popover'
 import { SessionIsolationChrome } from '~/features/session/session-isolation-chrome'
 import { cn } from '~/lib/cn'
-import { isTearoffWindow, platform } from '~/lib/electron'
+import { isTearoffWindow, windowControlsSafeArea } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
 import { SurfaceBar } from '~/navigation/surface-bar'
 import { chatSessionIdForSurface } from '~/navigation/surface-identity'
@@ -67,7 +68,16 @@ export function AppHeader({
     : sidebarCollapsed
       ? t('header.action.expandSidebar')
       : t('header.action.collapseSidebar')
-  const reserveTrafficLightSpace = platform === 'darwin' && (isTearoffWindow || sidebarInSheet)
+  const reserveLeftWindowControls = windowControlsSafeArea.side === 'left'
+    && windowControlsSafeArea.width > 0
+    && (isTearoffWindow || sidebarInSheet)
+  const reserveRightWindowControls = windowControlsSafeArea.side === 'right'
+    && windowControlsSafeArea.width > 0
+  const collapsedSidebarWindowControlsOffset = !sidebarInSheet
+    && sidebarCollapsed
+    && windowControlsSafeArea.side === 'left'
+    ? Math.max(0, windowControlsSafeArea.width - CHROME_COLLAPSED_SIDEBAR_WIDTH - 2)
+    : 0
   const asidePresentationOpen = asideOpen
   // In a tear-off window the surface is router-driven (navigated to the torn-off
   // route), so derive the chat session id from the active surface rather than
@@ -99,10 +109,11 @@ export function AppHeader({
       className="relative flex h-11 shrink-0 items-center bg-sidebar pe-1 pl-1 mt-1 mb-0"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      {reserveTrafficLightSpace && (
+      {reserveLeftWindowControls && (
         <div
           aria-hidden="true"
-          className="h-full w-20 shrink-0"
+          className="h-full shrink-0"
+          style={{ width: windowControlsSafeArea.width }}
         />
       )}
 
@@ -110,14 +121,13 @@ export function AppHeader({
       {(!isDrillIn || sidebarInSheet) && !isTearoffWindow && (
         <m.div
           initial={false}
-          animate={{ marginLeft: !sidebarInSheet && sidebarCollapsed ? 24 : 0 }}
+          animate={{ marginLeft: collapsedSidebarWindowControlsOffset }}
           transition={{ duration: 0.2 }}
           className="overflow-hidden flex items-center"
         >
           <Button
             variant="ghost"
             size="icon-xs"
-            // , sidebarCollapsed && 'ml-6'
             className={cn('shrink-0 text-muted-foreground', sidebarInSheet && sidebarSheetOpen && 'text-foreground')}
             onClick={handleSidebarToggle}
             aria-label={sidebarToggleLabel}
@@ -204,6 +214,13 @@ export function AppHeader({
           >
             <PanelRightIcon aria-hidden="true" />
           </Button>
+        )}
+        {reserveRightWindowControls && (
+          <div
+            aria-hidden="true"
+            className="h-full shrink-0"
+            style={{ width: windowControlsSafeArea.width }}
+          />
         )}
       </div>
     </div>

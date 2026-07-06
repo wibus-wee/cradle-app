@@ -30,6 +30,13 @@ interface Window {
       surfaceRoute: unknown
       platform: 'darwin' | 'win32' | 'linux'
       isElectron: true
+      windowControlsSafeArea?: {
+        side: 'left' | 'right' | 'none'
+        x: number
+        y: number
+        width: number
+        height: number
+      }
     }
     window: {
       minimize: () => Promise<unknown>
