@@ -42,22 +42,21 @@ export function resolveTrafficLightPosition(safeArea = MACOS_WINDOW_CONTROLS_SAF
   }
 }
 
-export type DesktopWindowControlsTheme = 'light' | 'dark'
-
-export const DESKTOP_WINDOW_CONTROLS_BACKGROUND: Record<DesktopWindowControlsTheme, string> = {
+const DESKTOP_WINDOW_CONTROLS_BACKGROUND = {
   light: '#efefef',
   dark: '#141414'
-}
+} as const
 
-export const DESKTOP_WINDOW_CONTROLS_SYMBOL: Record<DesktopWindowControlsTheme, string> = {
+const DESKTOP_WINDOW_CONTROLS_SYMBOL = {
   light: '#262626',
   dark: '#f5f5f5'
-}
+} as const
 
 export function resolveWindowControlsOverlay(
-  theme: DesktopWindowControlsTheme,
+  shouldUseDarkColors: boolean,
   safeArea: DesktopWindowControlsSafeArea
 ): { color: string; symbolColor: string; height: number } {
+  const theme = shouldUseDarkColors ? 'dark' : 'light'
   return {
     color: DESKTOP_WINDOW_CONTROLS_BACKGROUND[theme],
     symbolColor: DESKTOP_WINDOW_CONTROLS_SYMBOL[theme],

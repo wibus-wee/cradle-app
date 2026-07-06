@@ -62,5 +62,7 @@ export function useThemeClass(): void {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', resolvedMode === 'dark')
     syncDesktopWindowControlsOverlay()
+    const timeout = window.setTimeout(syncDesktopWindowControlsOverlay, 100)
+    return () => window.clearTimeout(timeout)
   }, [resolvedMode])
 }
