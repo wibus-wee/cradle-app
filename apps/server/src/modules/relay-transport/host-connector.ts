@@ -1,18 +1,18 @@
 import net from 'node:net'
 
-import WebSocket from 'ws'
-import { eq } from 'drizzle-orm'
-
 import { relayHostEnrollments } from '@cradle/db'
+import { eq } from 'drizzle-orm'
+import WebSocket from 'ws'
 
 import { AppError } from '../../errors/app-error'
+import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
-import { readSecret, upsertSecret } from '../secrets/service'
 import { relayAssertionHeaders, signRelayAssertion } from '../relay-servers/relay-signature-service'
-import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
+import { readSecret, upsertSecret } from '../secrets/service'
 import { loadPrivateKeyBytes, publicKeyFromPrivate } from './crypto'
-import { relayEnvelopeSchema, type RelayEnvelope } from './protocol'
+import type { RelayEnvelope } from './protocol'
+import { relayEnvelopeSchema } from './protocol'
 import { readOrCreateHostRelayAuthToken } from './relay-auth-token-service'
 import { RelaySession } from './session'
 
@@ -230,13 +230,13 @@ class HostConnection {
               learnedControllerSigningPubkey = info.signingPubkey
             }
           },
-          onStreamOpen: (streamId) => this.openLocalStream(streamId, enrollment.relayAuthToken),
+          onStreamOpen: streamId => this.openLocalStream(streamId, enrollment.relayAuthToken),
           onStreamData: (streamId, data) => this.handleStreamData(streamId, data),
-          onStreamClose: (streamId) => this.handleStreamClose(streamId),
+          onStreamClose: streamId => this.handleStreamClose(streamId),
           onPeerClosed: () => drop(new Error('controller peer closed')),
           onError: error => drop(error),
-          onPauseStream: (streamId) => this.streams.get(streamId)?.socket.pause(),
-          onResumeStream: (streamId) => this.streams.get(streamId)?.socket.resume(),
+          onPauseStream: streamId => this.streams.get(streamId)?.socket.pause(),
+          onResumeStream: streamId => this.streams.get(streamId)?.socket.resume(),
         },
       )
       this.session = session
@@ -531,7 +531,7 @@ class RelayHttpRequestWriter {
 export function rewriteRelayHttpRequestHead(headerBlock: string, relayAuthToken: string): string | null {
   const lines = headerBlock.split('\r\n')
   const requestLine = lines[0]
-  if (!requestLine || !/^[A-Z!#$%&'*+.^_`|~-]+ [^\s]+ HTTP\/1\.[01]$/.test(requestLine)) {
+  if (!requestLine || !/^[A-Z!#$%&'*+.^_`|~-]+ \S+ HTTP\/1\.[01]$/.test(requestLine)) {
     return null
   }
 

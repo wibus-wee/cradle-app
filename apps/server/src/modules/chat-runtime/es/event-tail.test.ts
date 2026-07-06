@@ -7,14 +7,14 @@ import { sessionEvents, sessions, workspaces } from '@cradle/db'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
-import type { StoredChatSessionEvent } from './events'
 import {
   openGlobalSessionEventTailStream,
-  openTailStream,
   openSessionEventTailStream,
+  openTailStream,
   publishSessionTailEvents,
   toChatSessionTailEvent,
 } from './event-tail'
+import type { StoredChatSessionEvent } from './events'
 
 function storedEvent(
   overrides: Partial<StoredChatSessionEvent> & Pick<StoredChatSessionEvent, 'type' | 'payload'>,
@@ -44,7 +44,8 @@ async function withTempDataDir<T>(callback: () => Promise<T> | T): Promise<T> {
 
   try {
     return await callback()
-  } finally {
+  }
+ finally {
     shutdownInfra()
     rmSync(dataDir, { recursive: true, force: true })
     restoreEnv('CRADLE_DATA_DIR', previousDataDir)
@@ -121,7 +122,8 @@ async function readSseMessages(
       messages.push(JSON.parse(dataLine.slice('data: '.length)) as unknown)
     }
     return messages
-  } finally {
+  }
+ finally {
     await reader.cancel()
   }
 }

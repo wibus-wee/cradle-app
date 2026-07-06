@@ -1,4 +1,5 @@
 import { PluginLine as PlugIcon } from '@mingcute/react'
+
 import { cn } from '~/lib/cn'
 
 export function PluginMentionIcon({

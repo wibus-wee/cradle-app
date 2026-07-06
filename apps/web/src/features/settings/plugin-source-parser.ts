@@ -67,7 +67,7 @@ function isAbsoluteLocalPath(input: string): boolean {
   if (input.startsWith('/') || input.startsWith('~')) {
     return true
   }
-  return /^[A-Za-z]:[\\/]/.test(input)
+  return /^[A-Z]:[\\/]/i.test(input)
 }
 
 function parseCradleDeepLink(input: string): ParsedPluginSource | null {

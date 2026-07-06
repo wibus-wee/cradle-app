@@ -6,7 +6,7 @@ import type { ChatSessionEvent, StoredChatSessionEvent } from './events'
 
 function stored(
   version: number,
-  event: ChatSessionEvent
+  event: ChatSessionEvent,
 ): StoredChatSessionEvent {
   return {
     sequenceId: version,
@@ -16,7 +16,7 @@ function stored(
     type: event.type,
     payload: event.payload,
     subjectRunId: event.type === 'RunStarted' ? event.payload.run.id : null,
-    occurredAt: 100 + version
+    occurredAt: 100 + version,
   } as StoredChatSessionEvent
 }
 
@@ -34,7 +34,7 @@ function runStarted(runId: string, messageId: string): Extract<ChatSessionEvent,
         stopReason: null,
         errorText: null,
         startedAt: 100,
-        finishedAt: null
+        finishedAt: null,
       },
       assistantMessage: {
         id: messageId,
@@ -49,10 +49,10 @@ function runStarted(runId: string, messageId: string): Extract<ChatSessionEvent,
         messageJson: JSON.stringify({ id: messageId, role: 'assistant', parts: [] }),
         errorText: null,
         createdAt: 100,
-        updatedAt: 100
+        updatedAt: 100,
       },
-      queueItemId: null
-    }
+      queueItemId: null,
+    },
   }
 }
 
@@ -79,9 +79,9 @@ function queueItemEnqueued(queueItemId: string): Extract<ChatSessionEvent, { typ
         startedRunId: null,
         errorText: null,
         createdAt: 100,
-        updatedAt: 100
-      }
-    }
+        updatedAt: 100,
+      },
+    },
   }
 }
 
@@ -91,8 +91,8 @@ function queueItemClaimed(queueItemId: string): Extract<ChatSessionEvent, { type
     payload: {
       queueItemId,
       sessionId: 'session-1',
-      updatedAt: 110
-    }
+      updatedAt: 110,
+    },
   }
 }
 
@@ -107,19 +107,19 @@ function runCompleted(runId: string): Extract<ChatSessionEvent, { type: 'RunComp
       status: 'complete',
       stopReason: 'response.completed',
       errorText: null,
-      finishedAt: 120
-    }
+      finishedAt: 120,
+    },
   }
 }
 
 function assistantSnapshotted(
   runId: string,
-  messageId: string
+  messageId: string,
 ): Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }> {
   const messageJson = JSON.stringify({
     id: messageId,
     role: 'assistant',
-    parts: [{ type: 'text', text: 'partial' }]
+    parts: [{ type: 'text', text: 'partial' }],
   })
   return {
     type: 'AssistantMessageSnapshotted',
@@ -132,10 +132,10 @@ function assistantSnapshotted(
         messageJson,
         status: 'streaming',
         errorText: null,
-        updatedAt: 110
+        updatedAt: 110,
       },
-      messageJsonBytes: Buffer.byteLength(messageJson)
-    }
+      messageJsonBytes: Buffer.byteLength(messageJson),
+    },
   }
 }
 
@@ -146,15 +146,15 @@ describe('decide', () => {
 
     const result = decide(state, {
       type: 'startRun',
-      event: runStarted('run-2', 'assistant-2')
+      event: runStarted('run-2', 'assistant-2'),
     })
 
     expect(result).toMatchObject({
       ok: false,
       error: {
         code: 'run_already_active',
-        details: { activeRunId: 'run-1', runId: 'run-2' }
-      }
+        details: { activeRunId: 'run-1', runId: 'run-2' },
+      },
     })
   })
 
@@ -164,15 +164,15 @@ describe('decide', () => {
 
     const result = decide(state, {
       type: 'completeRun',
-      event: runCompleted('run-2')
+      event: runCompleted('run-2'),
     })
 
     expect(result).toMatchObject({
       ok: false,
       error: {
         code: 'run_not_active',
-        details: { activeRunId: 'run-1', runId: 'run-2' }
-      }
+        details: { activeRunId: 'run-1', runId: 'run-2' },
+      },
     })
   })
 
@@ -183,7 +183,7 @@ describe('decide', () => {
 
     expect(decide(state, { type: 'snapshotAssistantMessage', event })).toEqual({
       ok: true,
-      events: [event]
+      events: [event],
     })
   })
 
@@ -194,15 +194,15 @@ describe('decide', () => {
 
     const result = decide(state, {
       type: 'snapshotAssistantMessage',
-      event: assistantSnapshotted('run-1', 'assistant-1')
+      event: assistantSnapshotted('run-1', 'assistant-1'),
     })
 
     expect(result).toMatchObject({
       ok: false,
       error: {
         code: 'run_not_active',
-        details: { activeRunId: null, runId: 'run-1' }
-      }
+        details: { activeRunId: null, runId: 'run-1' },
+      },
     })
   })
 
@@ -212,7 +212,7 @@ describe('decide', () => {
 
     const result = decide(state, {
       type: 'snapshotAssistantMessage',
-      event: assistantSnapshotted('run-1', 'assistant-2')
+      event: assistantSnapshotted('run-1', 'assistant-2'),
     })
 
     expect(result).toMatchObject({
@@ -222,9 +222,9 @@ describe('decide', () => {
         details: {
           runId: 'run-1',
           messageId: 'assistant-2',
-          expectedMessageId: 'assistant-1'
-        }
-      }
+          expectedMessageId: 'assistant-1',
+        },
+      },
     })
   })
 
@@ -235,16 +235,16 @@ describe('decide', () => {
       payload: {
         queueItemId: 'queue-1',
         sessionId: 'session-1',
-        updatedAt: 120
-      }
+        updatedAt: 120,
+      },
     }
 
     expect(decide(state, { type: 'claimQueueItem', event: claim })).toMatchObject({
       ok: false,
       error: {
         code: 'queue_item_not_pending',
-        details: { queueItemId: 'queue-1', status: 'missing' }
-      }
+        details: { queueItemId: 'queue-1', status: 'missing' },
+      },
     })
   })
 
@@ -257,7 +257,7 @@ describe('decide', () => {
 
     expect(decide(state, { type: 'startRun', event })).toEqual({
       ok: true,
-      events: [event]
+      events: [event],
     })
   })
 
@@ -266,14 +266,14 @@ describe('decide', () => {
     const events = [
       runStarted('run-1', 'assistant-1'),
       assistantSnapshotted('run-1', 'assistant-1'),
-      runCompleted('run-1')
+      runCompleted('run-1'),
     ]
 
     const result = decideChatSessionEvents(state, events)
 
     expect(result).toEqual({
       ok: true,
-      events
+      events,
     })
   })
 })

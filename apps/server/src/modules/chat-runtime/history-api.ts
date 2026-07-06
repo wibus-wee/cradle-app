@@ -9,7 +9,7 @@ import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
 import {
   extractMessageText,
-  parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot
+  parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot,
 } from './ui-message'
 
 const messageInsertOrder = sql`messages.rowid`
@@ -56,7 +56,7 @@ export function listCompletedRuns(input: {
       messageId: backendRuns.messageId,
       messageContent: messages.content,
       startedAt: backendRuns.startedAt,
-      finishedAt: backendRuns.finishedAt
+      finishedAt: backendRuns.finishedAt,
     })
     .from(backendRuns)
     .innerJoin(sessions, eq(sessions.id, backendRuns.chatSessionId))
@@ -65,8 +65,8 @@ export function listCompletedRuns(input: {
       and(
         eq(backendRuns.status, 'complete'),
         sql`${backendRuns.finishedAt} IS NOT NULL`,
-        sql`${backendRuns.finishedAt} > ${since}`
-      )
+        sql`${backendRuns.finishedAt} > ${since}`,
+      ),
     )
     .orderBy(desc(backendRuns.finishedAt), desc(backendRuns.startedAt))
     .limit(limit)
@@ -74,8 +74,8 @@ export function listCompletedRuns(input: {
 
   return {
     runs: rows
-      .filter((row) => row.finishedAt !== null)
-      .map((row) => ({
+      .filter(row => row.finishedAt !== null)
+      .map(row => ({
         runId: row.runId,
         sessionId: row.sessionId,
         sessionTitle: row.sessionTitle,
@@ -83,8 +83,8 @@ export function listCompletedRuns(input: {
         responseBody: row.messageContent || null,
         messagePreview: row.messageContent ? row.messageContent.slice(0, 200) : null,
         startedAt: row.startedAt,
-        finishedAt: row.finishedAt ?? row.startedAt
-      }))
+        finishedAt: row.finishedAt ?? row.startedAt,
+      })),
   }
 }
 
@@ -103,7 +103,7 @@ export async function getMessageGroups(sessionId: string): Promise<ChatMessageSn
     const parsedMessage = parseStoredMessageSnapshot(row, role)
     const message = compactStoredMessageSnapshotForRead({
       rawJson: row.messageJson,
-      message: parsedMessage
+      message: parsedMessage,
     })
     if (message.id !== row.id || message.role !== role) {
       throw new AppError({
@@ -116,8 +116,8 @@ export async function getMessageGroups(sessionId: string): Promise<ChatMessageSn
           reason:
             message.id !== row.id
               ? 'message_json.id must match messages.id'
-              : 'message_json.role must match messages.role'
-        }
+              : 'message_json.role must match messages.role',
+        },
       })
     }
 
@@ -131,18 +131,19 @@ export async function getMessageGroups(sessionId: string): Promise<ChatMessageSn
       parentMessageId: row.parentMessageId,
       parentToolCallId: row.parentToolCallId,
       taskId: row.taskId,
-      depth: row.depth
+      depth: row.depth,
     }
   })
 }
 
 function parseStoredMessageSnapshot(
   row: typeof messages.$inferSelect,
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant',
 ): ChatMessageSnapshotRow['message'] {
   try {
     return parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageSnapshotRow['message']
-  } catch (error) {
+  }
+ catch (error) {
     throw new AppError({
       code: 'chat_message_snapshot_invalid',
       status: 500,
@@ -153,8 +154,8 @@ function parseStoredMessageSnapshot(
         reason:
           error instanceof Error
             ? `Invalid UIMessage snapshot: ${error.message}`
-            : 'Invalid UIMessage snapshot'
-      }
+            : 'Invalid UIMessage snapshot',
+      },
     })
   }
 }

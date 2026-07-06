@@ -44,7 +44,7 @@ export function insertRunUsage(input: {
       promptTokens: input.usage.promptTokens,
       completionTokens: input.usage.completionTokens,
       totalTokens: input.usage.totalTokens,
-      createdAt: currentUnixSeconds()
+      createdAt: currentUnixSeconds(),
     })
     .run()
 }
@@ -75,7 +75,7 @@ export function insertRuntimeStepUsages(input: {
         completionTokens: step.usage.completionTokens,
         totalTokens: step.usage.totalTokens,
         estimatedCostUsd,
-        createdAt: currentUnixSeconds()
+        createdAt: currentUnixSeconds(),
       })
       .run()
     return {
@@ -83,7 +83,7 @@ export function insertRuntimeStepUsages(input: {
       stepType: step.stepType,
       modelId,
       usage: step.usage,
-      estimatedCostUsd
+      estimatedCostUsd,
     }
   })
 }

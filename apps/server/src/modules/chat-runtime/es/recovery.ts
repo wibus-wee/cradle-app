@@ -1,10 +1,10 @@
 import type { BackendRun, ChatSessionQueueItem, Message } from '@cradle/db'
 import {
-  backendRunSnapshots,
   backendRuns,
+  backendRunSnapshots,
   chatSessionQueueItems,
   messages,
-  sessionEvents
+  sessionEvents,
 } from '@cradle/db'
 import { and, desc, eq, or, sql } from 'drizzle-orm'
 
@@ -12,21 +12,21 @@ import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import { DEFAULT_RUNTIME_SETTINGS } from '../runtime-settings'
 import { parseStoredMessageSnapshot } from '../ui-message'
+import {
+  appendDecidedSessionEvents,
+  commitSessionEventsInTransaction,
+  readRunStopReason,
+  readRunTerminalEventType,
+} from './commands'
 import { publishSessionTailEvents } from './event-tail'
 import type { ChatSessionEvent, StoredChatSessionEvent, TerminalRunEventType } from './events'
 import { parseStoredChatSessionEvent } from './events'
 import { projectSessionEvent } from './projectors'
 import { runSessionActorTask } from './session-actor'
-import {
-  appendDecidedSessionEvents,
-  commitSessionEventsInTransaction,
-  readRunStopReason,
-  readRunTerminalEventType
-} from './commands'
 
 const INTERRUPTED_RUN_STOP_REASON = 'response.interrupted'
-const INTERRUPTED_RUN_ERROR_TEXT =
-  'Response interrupted because the Cradle server process exited while the run was streaming.'
+const INTERRUPTED_RUN_ERROR_TEXT
+  = 'Response interrupted because the Cradle server process exited while the run was streaming.'
 const RECOVERY_BATCH_SIZE = 100
 
 export interface ChatRuntimeRecoveryResult {
@@ -39,17 +39,17 @@ export async function recoverChatRuntimeProjections(): Promise<ChatRuntimeRecove
   return {
     interruptedRunsFinalized: await finalizeInterruptedSessionEventStreams(),
     terminalFactsProjected: await projectTerminalRunFacts(),
-    terminalProjectionDriftsRepaired: await repairTerminalProjectionDrifts()
+    terminalProjectionDriftsRepaired: await repairTerminalProjectionDrifts(),
   }
 }
 
 export async function recoverChatRuntimeSession(
-  sessionId: string
+  sessionId: string,
 ): Promise<ChatRuntimeRecoveryResult> {
   return {
     interruptedRunsFinalized: await finalizeInterruptedRunsForSession(sessionId),
     terminalFactsProjected: await projectTerminalRunFactsForSession(sessionId),
-    terminalProjectionDriftsRepaired: await repairTerminalProjectionDrifts(sessionId)
+    terminalProjectionDriftsRepaired: await repairTerminalProjectionDrifts(sessionId),
   }
 }
 
@@ -105,8 +105,7 @@ export async function projectTerminalRunFactsForSession(sessionId: string): Prom
 
 export async function projectTerminalRunFact(run: BackendRun): Promise<boolean> {
   const storedEvents = await runSessionActorTask(run.chatSessionId, () =>
-    projectTerminalRunFactInActor(run.chatSessionId, run.id)
-  )
+    projectTerminalRunFactInActor(run.chatSessionId, run.id))
   publishSessionTailEvents(storedEvents)
   return storedEvents.length > 0
 }
@@ -135,9 +134,9 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
           messageJson: normalizeTerminalMessageJson(message),
           status: run.status,
           errorText: run.errorText,
-          updatedAt: finishedAt
-        }
-      }
+          updatedAt: finishedAt,
+        },
+      },
     })
   }
   events.push({
@@ -150,12 +149,12 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
       status: run.status,
       stopReason: run.stopReason ?? readRunStopReason(run.status),
       errorText: run.errorText,
-      finishedAt
-    }
+      finishedAt,
+    },
   })
   return commitRecoverySessionEventsInTransaction(run.chatSessionId, {
     events,
-    alreadyProjectedCount: bootstrapEvents.length
+    alreadyProjectedCount: bootstrapEvents.length,
   })
 }
 
@@ -175,8 +174,7 @@ export async function repairTerminalProjectionDrifts(sessionId?: string): Promis
 
 async function repairTerminalProjectionDrift(sessionId: string, runId: string): Promise<boolean> {
   return await runSessionActorTask(sessionId, () =>
-    repairTerminalProjectionDriftInActor(sessionId, runId)
-  )
+    repairTerminalProjectionDriftInActor(sessionId, runId))
 }
 
 function repairTerminalProjectionDriftInActor(sessionId: string, runId: string): boolean {
@@ -223,8 +221,8 @@ function hasTerminalRunFact(sessionId: string, runId: string): boolean {
         and(
           eq(sessionEvents.aggregateId, sessionId),
           eq(sessionEvents.subjectRunId, runId),
-          terminalRunFactEventPredicate()
-        )
+          terminalRunFactEventPredicate(),
+        ),
       )
       .limit(1)
       .get() !== undefined
@@ -240,8 +238,8 @@ function hasRunStartedFact(sessionId: string, runId: string): boolean {
         and(
           eq(sessionEvents.aggregateId, sessionId),
           eq(sessionEvents.subjectRunId, runId),
-          eq(sessionEvents.eventType, 'RunStarted')
-        )
+          eq(sessionEvents.eventType, 'RunStarted'),
+        ),
       )
       .limit(1)
       .get() !== undefined
@@ -257,8 +255,8 @@ function hasQueueItemEnqueuedFact(sessionId: string, queueItemId: string): boole
         and(
           eq(sessionEvents.aggregateId, sessionId),
           eq(sessionEvents.eventType, 'QueueItemEnqueued'),
-          sql`json_extract(${sessionEvents.payload}, '$.item.id') = ${queueItemId}`
-        )
+          sql`json_extract(${sessionEvents.payload}, '$.item.id') = ${queueItemId}`,
+        ),
       )
       .limit(1)
       .get() !== undefined
@@ -267,8 +265,7 @@ function hasQueueItemEnqueuedFact(sessionId: string, queueItemId: string): boole
 
 export async function finalizeInterruptedRun(sessionId: string, runId: string): Promise<boolean> {
   const storedEvents = await runSessionActorTask(sessionId, () =>
-    finalizeInterruptedRunInActor(sessionId, runId)
-  )
+    finalizeInterruptedRunInActor(sessionId, runId))
   publishSessionTailEvents(storedEvents)
   return storedEvents.length > 0
 }
@@ -295,9 +292,9 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
           messageJson: normalizeTerminalMessageJson(message),
           status: 'failed',
           errorText: INTERRUPTED_RUN_ERROR_TEXT,
-          updatedAt: finishedAt
-        }
-      }
+          updatedAt: finishedAt,
+        },
+      },
     })
   }
   events.push({
@@ -310,12 +307,12 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
       status: 'failed',
       stopReason: INTERRUPTED_RUN_STOP_REASON,
       errorText: INTERRUPTED_RUN_ERROR_TEXT,
-      finishedAt
-    }
+      finishedAt,
+    },
   })
   return commitRecoverySessionEventsInTransaction(sessionId, {
     events,
-    alreadyProjectedCount: bootstrapEvents.length
+    alreadyProjectedCount: bootstrapEvents.length,
   })
 }
 
@@ -324,7 +321,7 @@ function commitRecoverySessionEventsInTransaction(
   input: {
     events: ChatSessionEvent[]
     alreadyProjectedCount: number
-  }
+  },
 ): StoredChatSessionEvent[] {
   if (input.events.length === 0) {
     return []
@@ -338,8 +335,8 @@ function commitRecoverySessionEventsInTransaction(
         projectEvent: () => {
           appended += 1
           return appended > input.alreadyProjectedCount
-        }
-      })
+        },
+      }),
     )
   })
   return storedEvents
@@ -382,9 +379,9 @@ function readMissingRunBootstrapEvents(input: {
           startedRunId: null,
           errorText: null,
           createdAt: queueItem.createdAt,
-          updatedAt: queueItem.createdAt
-        }
-      }
+          updatedAt: queueItem.createdAt,
+        },
+      },
     })
   }
 
@@ -401,7 +398,7 @@ function readMissingRunBootstrapEvents(input: {
         stopReason: null,
         errorText: null,
         startedAt: input.run.startedAt,
-        finishedAt: null
+        finishedAt: null,
       },
       assistantMessage:
         input.message?.role === 'assistant'
@@ -418,26 +415,25 @@ function readMissingRunBootstrapEvents(input: {
               messageJson: normalizeTerminalMessageJson(input.message),
               errorText: null,
               createdAt: input.message.createdAt,
-              updatedAt: input.run.startedAt
+              updatedAt: input.run.startedAt,
             }
           : null,
-      queueItemId: queueItem?.id ?? null
-    }
+      queueItemId: queueItem?.id ?? null,
+    },
   })
   return events
 }
 
 export async function abortProjectedStreamingRun(run: BackendRun): Promise<boolean> {
   const storedEvents = await runSessionActorTask(run.chatSessionId, () =>
-    abortProjectedStreamingRunInActor(run.chatSessionId, run.id)
-  )
+    abortProjectedStreamingRunInActor(run.chatSessionId, run.id))
   publishSessionTailEvents(storedEvents)
   return storedEvents.length > 0
 }
 
 function abortProjectedStreamingRunInActor(
   sessionId: string,
-  runId: string
+  runId: string,
 ): StoredChatSessionEvent[] {
   const run = readRun(sessionId, runId)
   if (!run || run.status !== 'streaming') {
@@ -457,9 +453,9 @@ function abortProjectedStreamingRunInActor(
           messageJson: normalizeTerminalMessageJson(message),
           status: 'aborted',
           errorText: null,
-          updatedAt: finishedAt
-        }
-      }
+          updatedAt: finishedAt,
+        },
+      },
     })
   }
   events.push({
@@ -472,8 +468,8 @@ function abortProjectedStreamingRunInActor(
       status: 'aborted',
       stopReason: 'response.cancelled',
       errorText: null,
-      finishedAt
-    }
+      finishedAt,
+    },
   })
   return commitSessionEventsInTransaction(run.chatSessionId, events)
 }
@@ -501,13 +497,13 @@ function readStreamingRuns(sessionId?: string, limit = RECOVERY_BATCH_SIZE): Bac
 
 function readTerminalRunsMissingTerminalFact(
   sessionId: string | undefined,
-  limit: number
+  limit: number,
 ): BackendRun[] {
   const predicate = sessionId
     ? and(
         eq(backendRuns.chatSessionId, sessionId),
         terminalRunStatusPredicate(),
-        missingTerminalRunFactPredicate()
+        missingTerminalRunFactPredicate(),
       )
     : and(terminalRunStatusPredicate(), missingTerminalRunFactPredicate())
 
@@ -522,19 +518,19 @@ function readTerminalRunsMissingTerminalFact(
 
 function readTerminalProjectionDriftRuns(
   sessionId: string | undefined,
-  limit: number
+  limit: number,
 ): BackendRun[] {
   const predicate = sessionId
     ? and(
         eq(backendRuns.chatSessionId, sessionId),
         terminalRunStatusPredicate(),
         hasTerminalRunFactPredicate(),
-        terminalProjectionDriftPredicate()
+        terminalProjectionDriftPredicate(),
       )
     : and(
         terminalRunStatusPredicate(),
         hasTerminalRunFactPredicate(),
-        terminalProjectionDriftPredicate()
+        terminalProjectionDriftPredicate(),
       )
 
   return db()
@@ -548,7 +544,7 @@ function readTerminalProjectionDriftRuns(
       stopReason: backendRuns.stopReason,
       errorText: backendRuns.errorText,
       startedAt: backendRuns.startedAt,
-      finishedAt: backendRuns.finishedAt
+      finishedAt: backendRuns.finishedAt,
     })
     .from(backendRuns)
     .leftJoin(messages, eq(messages.id, backendRuns.messageId))
@@ -563,7 +559,7 @@ function terminalRunStatusPredicate() {
   return or(
     eq(backendRuns.status, 'complete'),
     eq(backendRuns.status, 'aborted'),
-    eq(backendRuns.status, 'failed')
+    eq(backendRuns.status, 'failed'),
   )
 }
 
@@ -596,14 +592,14 @@ function terminalProjectionDriftPredicate() {
     eq(messages.status, 'streaming'),
     and(
       sql`${backendRunSnapshots.id} is not null`,
-      sql`${backendRunSnapshots.status} != ${backendRuns.status}`
-    )
+      sql`${backendRunSnapshots.status} != ${backendRuns.status}`,
+    ),
   )
 }
 
 function readTerminalRunFact(
   sessionId: string,
-  runId: string
+  runId: string,
 ): Extract<StoredChatSessionEvent, { type: TerminalRunEventType }> | undefined {
   const row = db()
     .select()
@@ -612,8 +608,8 @@ function readTerminalRunFact(
       and(
         eq(sessionEvents.aggregateId, sessionId),
         eq(sessionEvents.subjectRunId, runId),
-        terminalRunFactEventPredicate()
-      )
+        terminalRunFactEventPredicate(),
+      ),
     )
     .limit(1)
     .get()
@@ -628,7 +624,7 @@ function readTerminalRunFact(
 function readAssistantMessageCompletedFact(
   sessionId: string,
   messageId: string,
-  maxVersion: number
+  maxVersion: number,
 ): Extract<StoredChatSessionEvent, { type: 'AssistantMessageCompleted' }> | undefined {
   const row = db()
     .select()
@@ -638,8 +634,8 @@ function readAssistantMessageCompletedFact(
         eq(sessionEvents.aggregateId, sessionId),
         eq(sessionEvents.eventType, 'AssistantMessageCompleted'),
         sql`${sessionEvents.version} <= ${maxVersion}`,
-        sql`json_extract(${sessionEvents.payload}, '$.message.id') = ${messageId}`
-      )
+        sql`json_extract(${sessionEvents.payload}, '$.message.id') = ${messageId}`,
+      ),
     )
     .orderBy(desc(sessionEvents.version))
     .limit(1)
@@ -669,16 +665,17 @@ function readRunQueueItemId(sessionId: string, runId: string): string | null {
         and(
           eq(chatSessionQueueItems.sessionId, sessionId),
           eq(chatSessionQueueItems.mode, 'queue'),
-          eq(chatSessionQueueItems.startedRunId, runId)
-        )
+          eq(chatSessionQueueItems.startedRunId, runId),
+        ),
       )
-      .get()?.id ?? null
+      .get()
+?.id ?? null
   )
 }
 
 function readQueueItem(
   sessionId: string,
-  queueItemId: string
+  queueItemId: string,
 ): ChatSessionQueueItem | undefined {
   return db()
     .select()
@@ -687,8 +684,8 @@ function readQueueItem(
       and(
         eq(chatSessionQueueItems.id, queueItemId),
         eq(chatSessionQueueItems.sessionId, sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .get()
 }
@@ -697,7 +694,8 @@ function normalizeTerminalMessageJson(message: Message): string {
   try {
     const parsed = parseStoredMessageSnapshot(message.messageJson)
     return JSON.stringify(parsed)
-  } catch {
+  }
+ catch {
     return message.messageJson
   }
 }

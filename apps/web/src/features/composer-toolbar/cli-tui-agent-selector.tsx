@@ -1,4 +1,5 @@
 import { TerminalBoxLine as SquareTerminalIcon } from '@mingcute/react'
+
 import { Button } from '~/components/ui/button'
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from '~/components/ui/menu'
 import type { Agent } from '~/features/agent-runtime/use-agents'

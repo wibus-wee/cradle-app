@@ -345,7 +345,7 @@ export function PluginsSettings() {
                     ))}
                   </ul>
                 )}
-      </SettingsPage>
+    </SettingsPage>
 
       <AddPluginDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </>

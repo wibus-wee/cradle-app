@@ -1,7 +1,9 @@
-import { spawn, type ChildProcess } from 'node:child_process'
-import { createServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
+import type { ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
+import type { Server } from 'node:http'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,15 +11,15 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 
+import type { SignedRelayAssertion } from '../../src/modules/relay-servers/relay-signature-service'
 import {
   createRelayRoomId,
   generateRelaySigningKeyPair,
   relayAssertionHeaders,
   signRelayAssertion,
-  type SignedRelayAssertion,
 } from '../../src/modules/relay-servers/relay-signature-service'
-import { generateRelayKeyPair, relayPublicKeyFingerprint } from '../../src/modules/relay-transport/crypto'
 import { startRelayControllerTransport } from '../../src/modules/relay-transport/controller-transport'
+import { generateRelayKeyPair, relayPublicKeyFingerprint } from '../../src/modules/relay-transport/crypto'
 import { relayEnvelopeSchema } from '../../src/modules/relay-transport/protocol'
 import { RelaySession } from '../../src/modules/relay-transport/session'
 
@@ -346,7 +348,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
 
   afterAll(async () => {
     await stopRelayd(relayd.child)
-    await new Promise<void>((resolve) => fakeHost.server.close(() => resolve()))
+    await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
     rmSync(dataDir, { recursive: true, force: true })
   })
 

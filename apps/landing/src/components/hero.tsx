@@ -13,8 +13,9 @@
 
 import { Download } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
 import FoldGradient from '../foldGradient'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -41,7 +42,7 @@ export function Hero() {
 
   useEffect(() => {
     const el = sectionRef.current
-    if (!el) return
+    if (!el) { return }
     const observer = new IntersectionObserver(
       ([entry]) => setInView(entry.isIntersecting),
       { rootMargin: '50px' },

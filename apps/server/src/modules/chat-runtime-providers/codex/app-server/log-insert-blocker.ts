@@ -9,12 +9,12 @@ import { resolveCodexAppServerHome } from './runtime-home'
 export const CODEX_APP_SERVER_LOG_INSERT_BLOCKER_TRIGGER = 'block_log_inserts'
 const CODEX_APP_SERVER_LOG_DATABASE_NAME = 'logs_2.sqlite'
 
-export type CodexAppServerLogInsertBlockerStatus =
-  | 'applied'
-  | 'dropped'
-  | 'missing-database'
-  | 'missing-logs-table'
-  | 'failed'
+export type CodexAppServerLogInsertBlockerStatus
+  = | 'applied'
+    | 'dropped'
+    | 'missing-database'
+    | 'missing-logs-table'
+    | 'failed'
 
 export interface CodexAppServerLogInsertBlockerResult {
   databasePath: string
@@ -67,7 +67,7 @@ export function setCodexAppServerLogInsertBlocker(
     }
 
     const logsTable = db.prepare(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'logs'",
+      'SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'logs\'',
     ).get()
     if (!logsTable) {
       return { databasePath, enabled, status: 'missing-logs-table' }

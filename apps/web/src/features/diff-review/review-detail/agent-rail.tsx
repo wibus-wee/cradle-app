@@ -8,10 +8,10 @@ import {
   RobotLine as BotIcon,
   Settings3Line as SettingsIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import { useMemo, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import { Textarea } from '~/components/ui/textarea'
 import { AgentSelector, useComposerState } from '~/features/composer-toolbar'
 import { cn } from '~/lib/cn'

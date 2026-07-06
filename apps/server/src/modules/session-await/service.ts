@@ -13,16 +13,16 @@ import {
   fetchCombinedStatus,
   fetchRepo,
   GitHubTargetValidationError,
-  isGitHubMissingTarget
+  isGitHubMissingTarget,
 } from '../../lib/github-api'
 import { enqueueSessionQueueItem } from '../chat-runtime/runtime'
 import {
   CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
-  normalizeCradleIssueAgentAwaitFilter
+  normalizeCradleIssueAgentAwaitFilter,
 } from './sources/cradle-issue-agent'
 import {
   CRADLE_ISSUE_STATUS_AWAIT_SOURCE,
-  normalizeCradleIssueStatusAwaitFilter
+  normalizeCradleIssueStatusAwaitFilter,
 } from './sources/cradle-issue-status'
 import { GitHubCIFilterJsonSchema, validateGitHubCITarget } from './sources/github-ci'
 import { GitHubReviewFilterJsonSchema, validateGitHubReviewTarget } from './sources/github-review'
@@ -31,10 +31,10 @@ import type {
   RetryAwaitDeliveryInput,
   SessionAwait,
   SessionAwaitSummary,
-  TriggerAwaitInput
+  TriggerAwaitInput,
 } from './types'
 
-const SessionAwaitFilterJsonSchema = z.string().transform((raw) => JSON.parse(raw))
+const SessionAwaitFilterJsonSchema = z.string().transform(raw => JSON.parse(raw))
 
 const SupportedAwaitSourceSchema = z.enum([
   'github-ci',
@@ -42,11 +42,11 @@ const SupportedAwaitSourceSchema = z.enum([
   'manual',
   'timer',
   CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
-  CRADLE_ISSUE_STATUS_AWAIT_SOURCE
+  CRADLE_ISSUE_STATUS_AWAIT_SOURCE,
 ])
 const NonBlankResumeTextSchema = z
   .string()
-  .refine((value) => value.trim().length > 0, 'resumeText must include non-whitespace content')
+  .refine(value => value.trim().length > 0, 'resumeText must include non-whitespace content')
 
 const RegisterAwaitInputSchema = z.object({
   chatSessionId: z.string(),
@@ -55,29 +55,29 @@ const RegisterAwaitInputSchema = z.object({
   filterJson: z.string(),
   reason: z.string().nullable().default(null),
   expiresAt: z.number().nullable().default(null),
-  fireAt: z.number().nullable().default(null)
+  fireAt: z.number().nullable().default(null),
 })
 
 const TriggerAwaitInputSchema = z.object({
   awaitId: z.string(),
   resumeText: NonBlankResumeTextSchema,
-  resumePayloadJson: z.string().nullable().default(null)
+  resumePayloadJson: z.string().nullable().default(null),
 })
 
 const RetryAwaitDeliveryInputSchema = z.object({
   awaitId: z.string(),
   resumeText: NonBlankResumeTextSchema.optional(),
-  resumePayloadJson: z.string().nullable().optional()
+  resumePayloadJson: z.string().nullable().optional(),
 })
 
 const LastCheckedInputSchema = z.object({
-  errorText: z.string().nullable().default(null)
+  errorText: z.string().nullable().default(null),
 })
 
 async function enqueueResume(row: SessionAwait, resumeText: string): Promise<void> {
   await enqueueSessionQueueItem({
     sessionId: row.chatSessionId,
-    text: resumeText
+    text: resumeText,
   })
 }
 
@@ -88,7 +88,7 @@ function readDeliveryErrorText(err: unknown): string {
 function markDeliveryFailed(
   awaitId: string,
   errorText: string,
-  checkedAt: number
+  checkedAt: number,
 ): SessionAwait | null {
   db()
     .update(sessionAwaits)
@@ -97,7 +97,7 @@ function markDeliveryFailed(
       failureKind: 'delivery',
       triggeredAt: null,
       lastErrorText: errorText,
-      lastCheckedAt: checkedAt
+      lastCheckedAt: checkedAt,
     })
     .where(eq(sessionAwaits.id, awaitId))
     .run()
@@ -111,10 +111,12 @@ async function validateGitHubAwaitSource(source: string, filterJson: string): Pr
   try {
     if (source === 'github-ci') {
       await validateGitHubCITarget(filterJson)
-    } else if (source === 'github-review') {
+    }
+ else if (source === 'github-review') {
       await validateGitHubReviewTarget(filterJson)
     }
-  } catch (err) {
+  }
+ catch (err) {
     if (err instanceof GitHubTargetValidationError) {
       throw new AppError({
         code:
@@ -122,13 +124,13 @@ async function validateGitHubAwaitSource(source: string, filterJson: string): Pr
             ? 'github_await_target_invalid'
             : 'github_await_validation_unavailable',
         status: err.category === 'invalid' ? 400 : 503,
-        message: err.message
+        message: err.message,
       })
     }
     throw new AppError({
       code: 'github_await_validation_unavailable',
       status: 503,
-      message: 'Unable to validate GitHub await target right now.'
+      message: 'Unable to validate GitHub await target right now.',
     })
   }
 }
@@ -159,7 +161,7 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
       code: 'session_await_source_unsupported',
       status: 400,
       message: `Unsupported session await source: ${input.source}`,
-      details: { supportedSources: SupportedAwaitSourceSchema.options }
+      details: { supportedSources: SupportedAwaitSourceSchema.options },
     })
   }
 
@@ -167,7 +169,7 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
     throw new AppError({
       code: 'session_await_timer_fire_at_required',
       status: 400,
-      message: 'Timer session awaits require fireAt.'
+      message: 'Timer session awaits require fireAt.',
     })
   }
 
@@ -175,15 +177,17 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
     throw new AppError({
       code: 'session_await_fire_at_unsupported',
       status: 400,
-      message: 'fireAt is only supported for timer session awaits.'
+      message: 'fireAt is only supported for timer session awaits.',
     })
   }
 
   if (input.source === 'github-ci') {
     GitHubCIFilterJsonSchema.parse(input.filterJson)
-  } else if (input.source === 'github-review') {
+  }
+ else if (input.source === 'github-review') {
     GitHubReviewFilterJsonSchema.parse(input.filterJson)
-  } else {
+  }
+ else {
     SessionAwaitFilterJsonSchema.parse(input.filterJson)
   }
 
@@ -197,7 +201,7 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
     throw new AppError({
       code: 'session_not_found',
       status: 404,
-      message: 'Chat session not found'
+      message: 'Chat session not found',
     })
   }
 
@@ -215,7 +219,7 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
   const filterJson = normalizeAwaitFilter({
     source: input.source,
     workspaceId: input.workspaceId,
-    filterJson: input.filterJson
+    filterJson: input.filterJson,
   })
 
   const id = randomUUID()
@@ -229,7 +233,7 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
       filterJson,
       reason: input.reason,
       expiresAt: input.expiresAt,
-      fireAt: input.fireAt
+      fireAt: input.fireAt,
     })
     .returning()
     .get()
@@ -283,7 +287,7 @@ export async function trigger(rawInput: TriggerAwaitInput): Promise<SessionAwait
       resumeText: input.resumeText,
       resumePayloadJson: input.resumePayloadJson,
       failureKind: null,
-      lastErrorText: null
+      lastErrorText: null,
     })
     .where(and(eq(sessionAwaits.id, input.awaitId), eq(sessionAwaits.status, 'pending')))
     .returning()
@@ -297,7 +301,8 @@ export async function trigger(rawInput: TriggerAwaitInput): Promise<SessionAwait
   // await result when the target session is currently running.
   try {
     await enqueueResume(row, input.resumeText)
-  } catch (err) {
+  }
+ catch (err) {
     return markDeliveryFailed(input.awaitId, readDeliveryErrorText(err), now)
   }
 
@@ -305,7 +310,7 @@ export async function trigger(rawInput: TriggerAwaitInput): Promise<SessionAwait
 }
 
 export async function retryDelivery(
-  rawInput: RetryAwaitDeliveryInput
+  rawInput: RetryAwaitDeliveryInput,
 ): Promise<SessionAwait | null> {
   const input = RetryAwaitDeliveryInputSchema.parse(rawInput)
   const row = db().select().from(sessionAwaits).where(eq(sessionAwaits.id, input.awaitId)).get()
@@ -327,12 +332,12 @@ export async function retryDelivery(
     throw new AppError({
       code: 'session_await_resume_text_required',
       status: 400,
-      message: 'A resumeText value is required to retry this session await delivery.'
+      message: 'A resumeText value is required to retry this session await delivery.',
     })
   }
 
-  const resumePayloadJson =
-    input.resumePayloadJson === undefined ? row.resumePayloadJson : input.resumePayloadJson
+  const resumePayloadJson
+    = input.resumePayloadJson === undefined ? row.resumePayloadJson : input.resumePayloadJson
   const now = Math.floor(Date.now() / 1000)
 
   const updated = db()
@@ -344,14 +349,14 @@ export async function retryDelivery(
       resumePayloadJson,
       failureKind: null,
       lastErrorText: null,
-      lastCheckedAt: now
+      lastCheckedAt: now,
     })
     .where(
       and(
         eq(sessionAwaits.id, input.awaitId),
         eq(sessionAwaits.status, 'failed'),
-        eq(sessionAwaits.failureKind, 'delivery')
-      )
+        eq(sessionAwaits.failureKind, 'delivery'),
+      ),
     )
     .returning()
     .get()
@@ -364,7 +369,8 @@ export async function retryDelivery(
 
   try {
     await enqueueResume(updated, resumeText)
-  } catch (err) {
+  }
+ catch (err) {
     return markDeliveryFailed(input.awaitId, readDeliveryErrorText(err), now)
   }
 
@@ -379,7 +385,7 @@ export function markFailed(awaitId: string, errorText: string): void {
       status: 'failed',
       failureKind: 'source',
       lastErrorText: errorText,
-      lastCheckedAt: now
+      lastCheckedAt: now,
     })
     .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
     .run()
@@ -392,7 +398,7 @@ export function updateLastChecked(awaitId: string, errorText?: string): void {
     .update(sessionAwaits)
     .set({
       lastCheckedAt: now,
-      lastErrorText: input.errorText
+      lastErrorText: input.errorText,
     })
     .where(eq(sessionAwaits.id, awaitId))
     .run()
@@ -477,7 +483,7 @@ export function getSessionSummary(sessionId: string): SessionAwaitSummary {
       pendingCount: 0,
       primaryAwaitId: null,
       primarySource: null,
-      reason: null
+      reason: null,
     }
   }
 
@@ -487,7 +493,7 @@ export function getSessionSummary(sessionId: string): SessionAwaitSummary {
     pendingCount: pending.length,
     primaryAwaitId: first.id,
     primarySource: first.source,
-    reason: first.reason
+    reason: first.reason,
   }
 }
 
@@ -506,7 +512,7 @@ export function listBypassRules(workspaceId: string): BypassRule[] {
 export function createBypassRule(
   workspaceId: string,
   repo: string,
-  checkPattern: string
+  checkPattern: string,
 ): BypassRule {
   const id = randomUUID()
   return db()
@@ -540,11 +546,11 @@ export function getMatchingBypassPatterns(workspaceId: string, repo: string): st
       and(
         eq(awaitBypassRules.workspaceId, workspaceId),
         eq(awaitBypassRules.repo, repo),
-        eq(awaitBypassRules.enabled, 1)
-      )
+        eq(awaitBypassRules.enabled, 1),
+      ),
     )
     .all()
-  return rules.map((r) => r.checkPattern)
+  return rules.map(r => r.checkPattern)
 }
 
 export function globMatch(name: string, pattern: string): boolean {
@@ -582,7 +588,8 @@ export function listDiscoveredRepos(workspaceId: string): string[] {
         if (typeof parsed.repo === 'string') {
           repos.add(parsed.repo)
         }
-      } catch {
+      }
+ catch {
         /* ignore malformed filterJson */
       }
     }
@@ -605,17 +612,18 @@ export interface AvailableChecksResult {
 
 export async function fetchAvailableChecks(
   owner: string,
-  repo: string
+  repo: string,
 ): Promise<AvailableChecksResult> {
   let repoInfo: Awaited<ReturnType<typeof fetchRepo>>
   try {
     repoInfo = await fetchRepo(owner, repo)
-  } catch (err) {
+  }
+ catch (err) {
     if (isGitHubMissingTarget(err)) {
       throw new AppError({
         code: 'github_repo_not_found',
         status: 404,
-        message: `Repository ${owner}/${repo} not found or inaccessible`
+        message: `Repository ${owner}/${repo} not found or inaccessible`,
       })
     }
     throw err
@@ -624,7 +632,7 @@ export async function fetchAvailableChecks(
     throw new AppError({
       code: 'github_repo_unavailable',
       status: 503,
-      message: `Repository ${owner}/${repo} could not be checked right now`
+      message: `Repository ${owner}/${repo} could not be checked right now`,
     })
   }
 
@@ -632,12 +640,13 @@ export async function fetchAvailableChecks(
   let headInfo: Awaited<ReturnType<typeof fetchBranchHead>>
   try {
     headInfo = await fetchBranchHead(owner, repo, defaultBranch)
-  } catch (err) {
+  }
+ catch (err) {
     if (isGitHubMissingTarget(err)) {
       throw new AppError({
         code: 'github_repo_default_branch_not_found',
         status: 404,
-        message: `Default branch ${defaultBranch} for ${owner}/${repo} not found or inaccessible`
+        message: `Default branch ${defaultBranch} for ${owner}/${repo} not found or inaccessible`,
       })
     }
     throw err
@@ -649,7 +658,7 @@ export async function fetchAvailableChecks(
   const [checkRunsResp, combinedStatus, branchProtection] = await Promise.all([
     fetchCheckRuns(owner, repo, headInfo.sha),
     fetchCombinedStatus(owner, repo, headInfo.sha),
-    fetchBranchProtection(owner, repo, defaultBranch)
+    fetchBranchProtection(owner, repo, defaultBranch),
   ])
 
   const requiredContexts = new Set(branchProtection?.requiredContexts ?? [])
@@ -660,9 +669,10 @@ export async function fetchAvailableChecks(
       seen.set(run.name, {
         name: run.name,
         required: requiredContexts.has(run.name),
-        source: 'check-run'
+        source: 'check-run',
       })
-    } else if (requiredContexts.has(run.name)) {
+    }
+ else if (requiredContexts.has(run.name)) {
       seen.get(run.name)!.required = true
     }
   }
@@ -672,9 +682,10 @@ export async function fetchAvailableChecks(
       seen.set(status.context, {
         name: status.context,
         required: requiredContexts.has(status.context),
-        source: 'status'
+        source: 'status',
       })
-    } else if (requiredContexts.has(status.context)) {
+    }
+ else if (requiredContexts.has(status.context)) {
       seen.get(status.context)!.required = true
     }
   }

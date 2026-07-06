@@ -1,5 +1,17 @@
 [
   {
+    "version": "dev-20260706.1",
+    "date": "2026-07-06",
+    "languages": [
+      "en",
+      "zh"
+    ],
+    "title": {
+      "en": "Open Source! Split Workspace, Plugin Ecosystem, Workspace Migration & Major Stability Hardening",
+      "zh": "正式开源！分屏工作区、插件生态、Workspace 迁移，以及大规模稳定性加固。"
+    }
+  },
+  {
     "version": "dev-20260628.1",
     "date": "2026-06-28",
     "languages": [

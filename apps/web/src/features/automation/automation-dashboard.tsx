@@ -1303,7 +1303,8 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   const { runtimes } = useRuntimeCatalog()
   const defaultRuntimeKind = useMemo(
     () => listRuntimeCatalogForSurface(runtimes, 'chat')
-      .filter(runtimeCatalogItemUsesModelSelection)[0]?.runtimeKind ?? '',
+      .filter(runtimeCatalogItemUsesModelSelection)[0]
+?.runtimeKind ?? '',
     [runtimes],
   )
   const [selectedId, setSelectedId] = useState<string | null>(null)

@@ -3,13 +3,13 @@ import {
   CloseLine as CloseIcon,
   GitCommitLine as GitCommitHorizontalIcon,
   GitCommitLine as GitCommitVerticalIcon,
-  TreeLine as ListTreeIcon,
   Message1Line as MessageSquareIcon,
   Refresh1Line as RefreshCwIcon,
   RobotLine as BotIcon,
   Rows3Line as Rows3Icon,
+  SelectorHorizontalLine as SlidersHorizontalIcon,
   SendLine as SendIcon,
-  SelectorHorizontalLine as SlidersHorizontalIcon
+  TreeLine as ListTreeIcon,
 } from '@mingcute/react'
 import { useState, useTransition } from 'react'
 import { useTranslation } from 'react-i18next'

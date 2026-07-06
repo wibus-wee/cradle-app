@@ -2,8 +2,8 @@ import type { UIMessageChunk } from 'ai'
 
 import { readPositiveIntegerEnv } from '../../../helpers/env'
 import type { ProviderThreadEvent } from '../runtime-provider-types'
-import { createSubscriberRegistry } from '../stream/subscriber-registry'
 import type { SubscriberRegistry } from '../stream/subscriber-registry'
+import { createSubscriberRegistry } from '../stream/subscriber-registry'
 
 const DEFAULT_PROVIDER_THREAD_REPLAY_CHUNKS = 1_000
 /** How long a terminal stream's replay buffer is kept around for late reconnects before eviction. */
@@ -32,7 +32,7 @@ export function createProviderThreadStreamStore(): ProviderThreadStreamStore {
   return {
     streams: new Map(),
     subscribers: createSubscriberRegistry(),
-    lastPrunedAt: 0
+    lastPrunedAt: 0,
   }
 }
 
@@ -56,7 +56,7 @@ function pruneExpiredProviderThreadStreams(store: ProviderThreadStreamStore): vo
 
   const ttlMs = readPositiveIntegerEnv(
     'CRADLE_CHAT_PROVIDER_THREAD_STREAM_TTL_MS',
-    DEFAULT_PROVIDER_THREAD_STREAM_TTL_MS
+    DEFAULT_PROVIDER_THREAD_STREAM_TTL_MS,
   )
   for (const [key, state] of store.streams) {
     if (state.terminal && state.terminalAt !== null && now - state.terminalAt > ttlMs) {
@@ -81,11 +81,11 @@ export function publishProviderThreadEvent(input: {
         messageId: providerThreadAssistantMessageId(
           input.event.providerThreadId,
           input.event.providerTurnId,
-          0
-        )
+          0,
+        ),
       },
       terminal: false,
-      providerTurnId: input.event.providerTurnId
+      providerTurnId: input.event.providerTurnId,
     })
   }
   for (const chunk of input.event.chunks) {
@@ -95,7 +95,7 @@ export function publishProviderThreadEvent(input: {
       threadId: input.event.providerThreadId,
       chunk,
       terminal: input.isTerminalChunk(chunk),
-      providerTurnId: input.event.providerTurnId
+      providerTurnId: input.event.providerTurnId,
     })
   }
 }
@@ -117,7 +117,7 @@ export function publishProviderThreadChunk(input: {
     startedTurnIds: new Set<string>(),
     chunks: [],
     terminal: false,
-    terminalAt: null
+    terminalAt: null,
   }
   input.store.streams.set(key, state)
 
@@ -149,7 +149,7 @@ export function providerThreadStreamKey(sessionId: string, threadId: string): st
 function providerThreadAssistantMessageId(
   threadId: string,
   turnId: string,
-  assistantMessageIndex: number
+  assistantMessageIndex: number,
 ): string {
   return `provider-thread:${threadId}:turn:${turnId}:assistant:${assistantMessageIndex}`
 }
@@ -157,6 +157,6 @@ function providerThreadAssistantMessageId(
 function providerThreadReplayChunkLimit(): number {
   return readPositiveIntegerEnv(
     'CRADLE_CHAT_PROVIDER_THREAD_REPLAY_CHUNKS',
-    DEFAULT_PROVIDER_THREAD_REPLAY_CHUNKS
+    DEFAULT_PROVIDER_THREAD_REPLAY_CHUNKS,
   )
 }

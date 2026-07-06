@@ -43,8 +43,8 @@ export function normalizeUnderscoreEmphasis(input: string): string {
   const fenced = protectSpans(input, /```[\s\S]*?```/g, 'F')
   const inline = protectSpans(fenced.text, /`[^`\n]+`/g, 'C')
   let text = inline.text
-  text = text.replace(/(^|[^\w])__(?=\S)([\s\S]*?\S)__([^\w]|$)/g, '$1**$2**$3')
-  text = text.replace(/(^|[^\w])_(?=\S)([\s\S]*?\S)_([^\w]|$)/g, '$1*$2*$3')
+  text = text.replace(/(^|\W)__(?=\S)([\s\S]*?\S)__(\W|$)/g, '$1**$2**$3')
+  text = text.replace(/(^|\W)_(?=\S)([\s\S]*?\S)_(\W|$)/g, '$1*$2*$3')
   return fenced.restore(inline.restore(text))
 }
 

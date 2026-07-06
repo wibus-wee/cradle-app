@@ -453,7 +453,7 @@ function collectSnapshotToolEvents(rows) {
 }
 
 function summarizeToolCalls(toolEvents) {
-  return [...toolEvents.values()].map(lifecycle => ({
+  return Array.from(toolEvents.values(), lifecycle => ({
     toolCallId: lifecycle.toolCallId,
     toolName: lifecycle.toolName,
     hasStart: lifecycle.hasStart,

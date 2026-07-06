@@ -8,13 +8,13 @@ import { db } from '../../../infra'
 import { appendDecidedSessionEvents } from '../es/commands'
 import { publishSessionTailEvents } from '../es/event-tail'
 import { runSessionActorTask } from '../es/session-actor'
-import {
-  applyPlanImplementationApprovalResponse,
-  assertPlanImplementationApprovalId
-} from './plan-implementation-message'
+import { submitRuntimeToolApprovalIfPending } from '../pending-tool-approval'
 import { assertStoredSession } from '../runtime-session-context'
 import { parseStoredMessageSnapshot } from '../stream/projection'
-import { submitRuntimeToolApprovalIfPending } from '../pending-tool-approval'
+import {
+  applyPlanImplementationApprovalResponse,
+  assertPlanImplementationApprovalId,
+} from './plan-implementation-message'
 
 export async function resolvePlanImplementationApproval(input: {
   sessionId: string
@@ -38,8 +38,8 @@ export async function resolvePlanImplementationApproval(input: {
         message: 'Chat message was not found',
         details: {
           sessionId: input.sessionId,
-          messageId: input.messageId
-        }
+          messageId: input.messageId,
+        },
       })
     }
     if (row.role !== 'assistant') {
@@ -50,8 +50,8 @@ export async function resolvePlanImplementationApproval(input: {
         details: {
           sessionId: input.sessionId,
           messageId: input.messageId,
-          role: row.role
-        }
+          role: row.role,
+        },
       })
     }
 
@@ -60,7 +60,7 @@ export async function resolvePlanImplementationApproval(input: {
       sessionId: input.sessionId,
       messageId: input.messageId,
       approvalId: input.approvalId,
-      approved: input.approved
+      approved: input.approved,
     })
     const storedEvents = appendDecidedSessionEvents(tx, input.sessionId, [
       {
@@ -70,9 +70,9 @@ export async function resolvePlanImplementationApproval(input: {
           messageId: input.messageId,
           approvalId: input.approvalId,
           approved: input.approved,
-          updatedAt: currentUnixSeconds()
-        }
-      }
+          updatedAt: currentUnixSeconds(),
+        },
+      },
     ])
     return { message, storedEvents }
   }))
@@ -84,7 +84,7 @@ export async function resolvePlanImplementationApproval(input: {
     approved: input.approved,
     reason: input.approved
       ? 'User approved plan implementation.'
-      : 'User denied plan implementation.'
+      : 'User denied plan implementation.',
   })
 
   return { message: result.message }

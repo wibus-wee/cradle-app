@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { create } from 'zustand'
 import type { StoreApi, UseBoundStore } from 'zustand'
+import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 const JARVIS_UI_SYNC_CHANNEL_NAME = 'cradle:jarvis-ui:persist-sync'

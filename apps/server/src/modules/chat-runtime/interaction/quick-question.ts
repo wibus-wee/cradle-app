@@ -1,12 +1,12 @@
 import { AppError } from '../../../errors/app-error'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
-import { openDirectChunkStream } from '../stream/sse'
-import { readFullSessionTranscript } from '../transcript'
 import {
   assertRunnableSession,
   assertRuntimeCompatibleTarget,
-  resolveRuntimeSessionForContext
+  resolveRuntimeSessionForContext,
 } from '../runtime-session-context'
+import { openDirectChunkStream } from '../stream/sse'
+import { readFullSessionTranscript } from '../transcript'
 
 export interface QuickQuestionInput {
   sessionId: string
@@ -14,7 +14,7 @@ export interface QuickQuestionInput {
 }
 
 export async function streamQuickQuestion(
-  input: QuickQuestionInput
+  input: QuickQuestionInput,
 ): Promise<ReadableStream<Uint8Array>> {
   const context = assertRuntimeCompatibleTarget(assertRunnableSession(input.sessionId))
   const runtimeKind = context.session.runtimeKind ?? 'standard'
@@ -24,7 +24,7 @@ export async function streamQuickQuestion(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${runtimeKind}`
+      message: `Runtime is not available: ${runtimeKind}`,
     })
   }
 
@@ -33,7 +33,7 @@ export async function streamQuickQuestion(
       code: 'quick_question_not_supported',
       status: 409,
       message: 'This provider does not support quick questions',
-      details: { runtimeKind }
+      details: { runtimeKind },
     })
   }
 
@@ -42,7 +42,7 @@ export async function streamQuickQuestion(
     throw new AppError({
       code: 'chat_message_empty',
       status: 400,
-      message: 'Quick question requires non-empty text'
+      message: 'Quick question requires non-empty text',
     })
   }
 
@@ -50,7 +50,7 @@ export async function streamQuickQuestion(
     sessionId: input.sessionId,
     context,
     runtimeKind,
-    runtime
+    runtime,
   })
 
   const transcript = await readFullSessionTranscript(input.sessionId)
@@ -62,7 +62,7 @@ export async function streamQuickQuestion(
       question,
       transcript,
       workspaceId: context.session.workspaceId,
-      workspacePath: context.workspacePath
-    })
+      workspacePath: context.workspacePath,
+    }),
   )
 }

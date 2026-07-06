@@ -4,11 +4,6 @@ import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import windowStateKeeper from 'electron-window-state'
 
 import {
-  initializeIpcDevtool,
-  subscribeAcpDevtool,
-  subscribeIpcDevtool,
-} from './ipc-devtool'
-import {
   registerBrowserIpcHandlers,
   sendBrowserAnnotationRuntimeEvent,
   sendBrowserPromptRequest,
@@ -20,6 +15,9 @@ import { ChatStreamBroker } from './chat-stream-broker'
 import { DesktopAppBadgeManager } from './desktop-app-badge-manager'
 import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath } from './desktop-assets'
 import { installExternalLinkPolicy } from './external-link-policy'
+import {
+  initializeIpcDevtool,
+} from './ipc-devtool'
 import { MacBridgeManager } from './mac-bridge-manager'
 import type { MacInputBareModifier } from './mac-bridge-protocol'
 import { createNativeServices } from './native-services'
@@ -41,12 +39,12 @@ import {
   deactivateDesktopPlugins,
   notifyWebviewCreated,
 } from './plugin-loader'
+import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import {
   registerPluginSourceSyncIpcHandlers,
   setPluginSourceSyncServerUrl,
   syncAllDesktopLayerSources,
 } from './plugin-source-sync'
-import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import { QuitGuard } from './quit-guard'
 import { startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, cpSync, rmSync, chmodSync, readdirSync, mkdtempSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { arch, tmpdir } from 'node:os'
+import { resolve } from 'node:path'
+
 import appdmg from 'appdmg'
 
 import { fixMacOSFrameworkSymlinks } from '../apps/desktop/scripts/fix-macos-framework-symlinks.mjs'
@@ -21,15 +22,20 @@ function parseArgs(argv) {
     const arg = argv[i]
     if (arg === '--app' && i + 1 < argv.length) {
       args.app = argv[++i]
-    } else if (arg === '--icon' && i + 1 < argv.length) {
+    }
+ else if (arg === '--icon' && i + 1 < argv.length) {
       args.icon = argv[++i]
-    } else if (arg === '--no-icon') {
+    }
+ else if (arg === '--no-icon') {
       args.icon = null
-    } else if (arg === '--output' && i + 1 < argv.length) {
+    }
+ else if (arg === '--output' && i + 1 < argv.length) {
       args.output = argv[++i]
-    } else if (arg === '--keep-stage') {
+    }
+ else if (arg === '--keep-stage') {
       args.keepStage = true
-    } else if (arg === '-h' || arg === '--help') {
+    }
+ else if (arg === '-h' || arg === '--help') {
       console.log(`Usage: installer/build-dmg.mjs --app <path> [options]
 
 Options:
@@ -40,7 +46,8 @@ Options:
   --keep-stage       Keep the temporary staging directory for inspection.
   -h, --help         Show this help.`)
       process.exit(0)
-    } else {
+    }
+ else {
       console.error(`Unknown option: ${arg}`)
       process.exit(1)
     }
@@ -54,14 +61,14 @@ Options:
 }
 
 function findAppInDir(root, depth = 0) {
-  if (depth > 5) return null
+  if (depth > 5) { return null }
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const full = resolve(root, entry.name)
     if (entry.isDirectory()) {
-      if (entry.name === 'Cradle.app') return full
-      if (entry.name.endsWith('.app') && !entry.name.startsWith('.')) return full
+      if (entry.name === 'Cradle.app') { return full }
+      if (entry.name.endsWith('.app') && !entry.name.startsWith('.')) { return full }
       const found = findAppInDir(full, depth + 1)
-      if (found) return found
+      if (found) { return found }
     }
   }
   return null
@@ -129,7 +136,7 @@ function stageCommand(stageDir) {
 }
 
 function applyCommandIcon(commandPath, iconPath) {
-  if (!iconPath || !existsSync(iconPath)) return
+  if (!iconPath || !existsSync(iconPath)) { return }
   const script = `
     ObjC.import('AppKit')
     function run(argv) {
@@ -150,18 +157,23 @@ function hideExtension(dmgPath) {
     if (existsSync(commandFile)) {
       try {
         execFileSync('/usr/bin/SetFile', ['-a', 'E', commandFile], { stdio: 'ignore' })
-      } catch {
+      }
+ catch {
         // SetFile may not be available; extension will still show
       }
     }
-  } finally {
+  }
+ finally {
     try {
       execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-quiet'], { stdio: 'ignore' })
-    } catch {
-      // Force-detach if the normal detach fails (e.g. a background process still holds a handle)
-      try { execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-force', '-quiet'], { stdio: 'ignore' }) } catch {}
     }
-    try { rmSync(mountDir, { recursive: true, force: true }) } catch {}
+ catch {
+      // Force-detach if the normal detach fails (e.g. a background process still holds a handle)
+      try { execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-force', '-quiet'], { stdio: 'ignore' }) }
+ catch {}
+    }
+    try { rmSync(mountDir, { recursive: true, force: true }) }
+ catch {}
   }
 }
 
@@ -171,7 +183,7 @@ async function buildDmg(spec, outputPath) {
     const { basepath, ...cleanSpec } = spec
     const ee = appdmg({ target: outputPath, basepath, specification: cleanSpec })
     ee.on('progress', (info) => {
-      if (info.type === 'step-begin') console.log(`  ${info.title}`)
+      if (info.type === 'step-begin') { console.log(`  ${info.title}`) }
     })
     ee.on('finish', ok)
     ee.on('error', fail)
@@ -200,19 +212,19 @@ async function main() {
     const outputAbs = resolve(REPO_ROOT, args.output)
     const rwDmg = resolve(stageDir, 'rw.dmg')
     await buildDmg({
-      title: VOLUME_NAME,
+      'title': VOLUME_NAME,
       ...(iconStaged ? { icon: iconStaged } : {}),
       'background-color': '#1c1c1c',
       'icon-size': 80,
-      format: 'UDRW',
-      window: {
+      'format': 'UDRW',
+      'window': {
         size: { width: 660, height: 400 },
       },
-      contents: [
+      'contents': [
         { x: 80, y: 320, type: 'file', path: payloadDir, name: '.payload' },
         { x: 330, y: 200, type: 'file', path: commandPath, name: 'Install Cradle' },
       ],
-      basepath: stageDir,
+      'basepath': stageDir,
     }, rwDmg)
 
     console.log('Hiding .command extension in DMG...')
@@ -220,7 +232,8 @@ async function main() {
 
     console.log('Compressing DMG...')
     // Flush filesystem buffers so the rw image is fully written before convert
-    try { execFileSync('/bin/sync', { stdio: 'ignore' }) } catch {}
+    try { execFileSync('/bin/sync', { stdio: 'ignore' }) }
+ catch {}
 
     // hdiutil convert can transiently fail on CI runners when a prior detach
     // hasn't fully released the image.  Retry up to 3 times with a short delay.
@@ -230,7 +243,8 @@ async function main() {
         execFileSync('/usr/bin/hdiutil', ['convert', rwDmg, '-format', 'UDZO', '-o', outputAbs], { stdio: 'pipe' })
         convertErr = null
         break
-      } catch (err) {
+      }
+ catch (err) {
         convertErr = err
         const stderr = err.stderr?.toString?.() ?? ''
         console.error(`hdiutil convert attempt ${attempt} failed${stderr ? `: ${stderr.trim()}` : ''}`)
@@ -240,10 +254,11 @@ async function main() {
         }
       }
     }
-    if (convertErr) throw convertErr
+    if (convertErr) { throw convertErr }
 
     console.log(`Wrote ${outputAbs}`)
-  } finally {
+  }
+ finally {
     if (!args.keepStage) {
       rmSync(stageDir, { recursive: true, force: true })
     }

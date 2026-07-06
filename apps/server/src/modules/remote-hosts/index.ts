@@ -96,7 +96,7 @@ export const remoteHosts = new Elysia({
   })
   .post('/:hostId/cradle-server/test', ({ params }) => RemoteHosts.testRemoteHostCradleServer(params.hostId), {
     detail: {
-      'summary': 'Test remote Cradle Server connectivity and health',
+      summary: 'Test remote Cradle Server connectivity and health',
     },
     params: RemoteHostsModel.hostIdParams,
     response: { 200: RemoteHostsModel.cradleServerHealth },

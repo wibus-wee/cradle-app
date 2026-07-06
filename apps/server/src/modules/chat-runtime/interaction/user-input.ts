@@ -1,10 +1,10 @@
 import { AppError } from '../../../errors/app-error'
 import { submitRuntimeUserInput } from '../pending-user-input'
+import type { RuntimeUserInputResolution } from '../runtime-provider-types'
 import {
   buildRuntimeProviderInput,
   resolveRuntimeSessionContext,
 } from '../runtime-session-context'
-import type { RuntimeUserInputResolution } from '../runtime-provider-types'
 
 export interface SubmitChatRuntimeUserInputInput {
   sessionId: string
@@ -13,11 +13,12 @@ export interface SubmitChatRuntimeUserInputInput {
 }
 
 export async function submitChatRuntimeUserInput(
-  input: SubmitChatRuntimeUserInputInput
+  input: SubmitChatRuntimeUserInputInput,
 ): Promise<RuntimeUserInputResolution> {
   try {
     return await submitRuntimeUserInput(input)
-  } catch (error) {
+  }
+ catch (error) {
     if (!(error instanceof AppError) || error.code !== 'chat_runtime_user_input_not_found') {
       throw error
     }
@@ -29,14 +30,14 @@ export async function submitChatRuntimeUserInput(
       code: 'chat_runtime_user_input_not_found',
       status: 404,
       message: 'Pending runtime user input request was not found',
-      details: { requestId: input.requestId, sessionId: input.sessionId }
+      details: { requestId: input.requestId, sessionId: input.sessionId },
     })
   }
 
   const resolution = await resolved.runtime.submitUserInput({
     ...buildRuntimeProviderInput(resolved),
     requestId: input.requestId,
-    answers: input.answers
+    answers: input.answers,
   })
   if (!resolution) {
     throw new AppError({
@@ -47,8 +48,8 @@ export async function submitChatRuntimeUserInput(
         requestId: input.requestId,
         sessionId: input.sessionId,
         runtimeKind: resolved.runtimeKind,
-        providerSessionId: resolved.runtimeSession.providerSessionId
-      }
+        providerSessionId: resolved.runtimeSession.providerSessionId,
+      },
     })
   }
   return resolution

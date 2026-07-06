@@ -2,9 +2,8 @@
 // Output: IpcDevtoolStore ring buffer with live subscriber fan-out
 // Position: Main-process backend store for IPC devtool consumers
 
-import type { WebContents } from 'electron'
-
 import type { AcpDevtoolEvent, IpcObservedEvent } from '@cradle/ipc'
+import type { WebContents } from 'electron'
 
 export interface IpcDevtoolStoreOptions {
   maxEvents?: number

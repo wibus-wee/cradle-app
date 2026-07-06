@@ -24,7 +24,8 @@ async function withTempDataDir<T>(callback: () => Promise<T> | T): Promise<T> {
 
   try {
     return await callback()
-  } finally {
+  }
+ finally {
     shutdownInfra()
     rmSync(dataDir, { recursive: true, force: true })
     restoreEnv('CRADLE_DATA_DIR', previousDataDir)
@@ -45,9 +46,9 @@ describe('appendSessionEvent', () => {
               sessionId: 'session-1',
               title: 'First',
               titleSource: 'provider',
-              updatedAt: 100
-            }
-          }
+              updatedAt: 100,
+            },
+          },
         })
         expect(stored.version).toBe(1)
         expect(stored.payload.v).toBe(2)
@@ -62,19 +63,18 @@ describe('appendSessionEvent', () => {
                 sessionId: 'session-1',
                 title: 'Stale',
                 titleSource: 'provider',
-                updatedAt: 101
-              }
-            }
-          })
-        ).toThrow(expect.objectContaining({
+                updatedAt: 101,
+              },
+            },
+          })).toThrow(expect.objectContaining({
           code: 'chat_session_concurrency_conflict',
           status: 409,
           details: expect.objectContaining({
             kind: 'concurrency_conflict',
             aggregateId: 'session-1',
             expectedVersion: 0,
-            actualVersion: 1
-          })
+            actualVersion: 1,
+          }),
         }))
       })
     })

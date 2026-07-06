@@ -17,7 +17,6 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { resolveGitHubToken } from '../../lib/github-api'
 import {
-  deriveExternalIssueSourceKey,
   getExternalIssueSource,
   listExternalIssueSources as listRegisteredExternalIssueSources,
 } from '../../plugins/external-issue-source-registry'
@@ -590,14 +589,12 @@ export function createExternalIssueSourceBinding(input: {
         },
       })
       .run()
-    return tx.select().from(externalIssueSourceBindings)
-      .where(and(
+    return tx.select().from(externalIssueSourceBindings).where(and(
         eq(externalIssueSourceBindings.workspaceId, input.workspaceId),
         eq(externalIssueSourceBindings.sourceKey, input.sourceKey),
         eq(externalIssueSourceBindings.repositoryOwner, repositoryOwner),
         eq(externalIssueSourceBindings.repositoryName, repositoryName),
-      ))
-      .get()!
+      )).get()!
   })
   if (input.refreshNow) {
     return refreshExternalIssueSourceBinding(row.id).then(() => toBindingView(
@@ -634,18 +631,14 @@ export function updateExternalIssueSourceBinding(bindingId: string, input: {
     throw new AppError({ code: 'external_issue_binding_not_found', status: 404, message: 'External issue source binding not found', details: { bindingId } })
   }
 
-  const updated = db().update(externalIssueSourceBindings)
-    .set({
+  const updated = db().update(externalIssueSourceBindings).set({
       enabled: input.enabled ?? binding.enabled,
       scheduleEnabled: input.scheduleEnabled ?? binding.scheduleEnabled,
       refreshIntervalSeconds: input.refreshIntervalSeconds === undefined
         ? binding.refreshIntervalSeconds
         : normalizeRefreshInterval(input.refreshIntervalSeconds),
       updatedAt: currentUnixSeconds(),
-    })
-    .where(eq(externalIssueSourceBindings.id, bindingId))
-    .returning()
-    .get()
+    }).where(eq(externalIssueSourceBindings.id, bindingId)).returning().get()
 
   return toBindingView(updated)
 }
@@ -934,13 +927,11 @@ export async function refreshExternalIssueSourceBinding(bindingId: string, input
 
 export async function refreshExternalIssueSource(sourceKey: string, input: { workspaceId: string, force?: boolean }): Promise<ExternalIssueRefreshResult[]> {
   ensureRegisteredSource(sourceKey)
-  const bindings = db().select().from(externalIssueSourceBindings)
-    .where(and(
+  const bindings = db().select().from(externalIssueSourceBindings).where(and(
       eq(externalIssueSourceBindings.sourceKey, sourceKey),
       eq(externalIssueSourceBindings.workspaceId, input.workspaceId),
       eq(externalIssueSourceBindings.enabled, true),
-    ))
-    .all()
+    )).all()
   const results: ExternalIssueRefreshResult[] = []
   for (const binding of bindings) {
     results.push(await refreshExternalIssueSourceBinding(binding.id, { force: input.force }))
@@ -984,10 +975,6 @@ export function updateExternalIssueItemStatus(itemId: string, input: { statusId:
   if (!validStatus) {
     throw new AppError({ code: 'external_issue_status_not_found', status: 404, message: 'Status not found', details: { workspaceId: item.workspaceId, statusId: input.statusId } })
   }
-  const updated = db().update(externalIssueItems)
-    .set({ statusId: input.statusId, updatedAt: currentUnixSeconds() })
-    .where(eq(externalIssueItems.id, itemId))
-    .returning()
-    .get()
+  const updated = db().update(externalIssueItems).set({ statusId: input.statusId, updatedAt: currentUnixSeconds() }).where(eq(externalIssueItems.id, itemId)).returning().get()
   return toItemView(updated)
 }

@@ -253,20 +253,20 @@ export function SettingsSidebar({ activeSection, onSetSection, onClose }: Settin
   const normalizedQuery = query.trim().toLowerCase()
 
   const filteredSections = useMemo(() => {
-    if (!normalizedQuery) return SETTINGS_SECTIONS
+    if (!normalizedQuery) { return SETTINGS_SECTIONS }
 
     return SETTINGS_SECTIONS.map((section) => {
       const sectionLabel = t(section.labelKey).toLowerCase()
       const sectionMatches = sectionLabel.includes(normalizedQuery)
 
       const matchedItems = section.items.filter((item) => {
-        if (sectionMatches) return true
+        if (sectionMatches) { return true }
 
         const itemLabel = t(item.labelKey).toLowerCase()
-        if (itemLabel.includes(normalizedQuery)) return true
+        if (itemLabel.includes(normalizedQuery)) { return true }
 
         const keyMatch = item.labelKey.toLowerCase().includes(normalizedQuery)
-        if (keyMatch) return true
+        if (keyMatch) { return true }
 
         if (item.searchKeys) {
           return item.searchKeys.some((searchKey) => {
@@ -304,7 +304,7 @@ export function SettingsSidebar({ activeSection, onSetSection, onClose }: Settin
         <SearchIcon className="size-3.5 shrink-0 !text-muted-foreground/60" />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={e => setQuery(e.target.value)}
           placeholder={t('sidebar.search')}
           className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/45"
           data-testid="settings-search"

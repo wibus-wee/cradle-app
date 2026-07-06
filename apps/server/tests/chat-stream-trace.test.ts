@@ -8,12 +8,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import {
   readChatRunTrace,
   recordChatStreamTrace,
   resolveChatStreamTracePath,
 } from '../src/modules/chat-runtime/stream-trace'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 describe('chat stream trace', () => {
   const previous = {

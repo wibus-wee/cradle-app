@@ -1,6 +1,5 @@
-import type { UIMessageChunk } from 'ai'
-
 import { backendRuns } from '@cradle/db'
+import type { UIMessageChunk } from 'ai'
 import { eq } from 'drizzle-orm'
 
 import { AppError } from '../../../errors/app-error'
@@ -8,13 +7,13 @@ import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { db } from '../../../infra'
 import {
   createProviderThreadStreamStore,
-  providerThreadStreamKey
+  providerThreadStreamKey,
 } from '../provider-threads/live-streams'
 import { runRegistry } from '../run-registry'
+import { DEFAULT_RUN_DELTA_FLUSH_CHARS, DEFAULT_RUN_WAIT_TIMEOUT_MS } from './constants'
+import { openBufferedChunkStream } from './sse'
 import type { ChunkSubscriber } from './subscriber-registry'
 import { createSubscriberRegistry } from './subscriber-registry'
-import { openBufferedChunkStream } from './sse'
-import { DEFAULT_RUN_DELTA_FLUSH_CHARS, DEFAULT_RUN_WAIT_TIMEOUT_MS } from './constants'
 
 export const runSubscribers = createSubscriberRegistry()
 export const providerThreadStreamStore = createProviderThreadStreamStore()
@@ -31,7 +30,7 @@ export const providerThreadStreamStore = createProviderThreadStreamStore()
 function createRunInterruptedChunk(): UIMessageChunk {
   return {
     type: 'error',
-    errorText: 'This run was interrupted before it finished streaming (the server may have restarted).'
+    errorText: 'This run was interrupted before it finished streaming (the server may have restarted).',
   }
 }
 
@@ -42,7 +41,7 @@ export function openRunEventStream(runId: string): ReadableStream<Uint8Array> {
       code: 'chat_run_not_found',
       status: 404,
       message: 'Chat run not found',
-      details: { runId }
+      details: { runId },
     })
   }
   const active = runRegistry.getActiveRun(runId)
@@ -54,15 +53,15 @@ export function openRunEventStream(runId: string): ReadableStream<Uint8Array> {
     terminal: run.status !== 'streaming' || !active,
     coalesceMaxChars: readPositiveIntegerEnv(
       'CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS',
-      DEFAULT_RUN_DELTA_FLUSH_CHARS
+      DEFAULT_RUN_DELTA_FLUSH_CHARS,
     ),
-    subscribe: (subscriber: ChunkSubscriber) => runSubscribers.subscribe(runId, subscriber)
+    subscribe: (subscriber: ChunkSubscriber) => runSubscribers.subscribe(runId, subscriber),
   })
 }
 
 export function openProviderThreadStream(
   sessionId: string,
-  providerThreadId: string
+  providerThreadId: string,
 ): ReadableStream<Uint8Array> {
   const key = providerThreadStreamKey(sessionId, providerThreadId)
   const state = providerThreadStreamStore.streams.get(key)
@@ -71,10 +70,10 @@ export function openProviderThreadStream(
     terminal: state?.terminal,
     coalesceMaxChars: readPositiveIntegerEnv(
       'CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS',
-      DEFAULT_RUN_DELTA_FLUSH_CHARS
+      DEFAULT_RUN_DELTA_FLUSH_CHARS,
     ),
     subscribe: (subscriber: ChunkSubscriber) =>
-      providerThreadStreamStore.subscribers.subscribe(key, subscriber)
+      providerThreadStreamStore.subscribers.subscribe(key, subscriber),
   })
 }
 
@@ -85,7 +84,7 @@ export function waitForRunCompletion(runId: string): Promise<typeof backendRuns.
       code: 'chat_run_not_found',
       status: 404,
       message: 'Chat run not found',
-      details: { runId }
+      details: { runId },
     })
   }
   if (run.status !== 'streaming') {
@@ -94,7 +93,7 @@ export function waitForRunCompletion(runId: string): Promise<typeof backendRuns.
 
   const timeoutMs = readPositiveIntegerEnv(
     'CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS',
-    DEFAULT_RUN_WAIT_TIMEOUT_MS
+    DEFAULT_RUN_WAIT_TIMEOUT_MS,
   )
 
   return new Promise((resolve, reject) => {
@@ -115,7 +114,7 @@ export function waitForRunCompletion(runId: string): Promise<typeof backendRuns.
         code: 'chat_run_wait_timeout',
         status: 504,
         message: `Timed out after ${timeoutMs}ms waiting for chat run ${runId} to complete.`,
-        details: { runId, timeoutMs }
+        details: { runId, timeoutMs },
       }))
     }, timeoutMs)
 

@@ -8,9 +8,9 @@ import type { IpcMain, WebContents } from 'electron'
 import type {
   BrowserAnnotationDesignInput,
   BrowserAnnotationElement,
-  BrowserAnnotationRuntimeNotificationInput,
   BrowserAnnotationRuntimeEvent,
   BrowserAnnotationRuntimeInput,
+  BrowserAnnotationRuntimeNotificationInput,
   BrowserCaptureScreenshotResult,
   BrowserExecuteCdpInput,
   BrowserLocalServer,

@@ -13,11 +13,11 @@ import type {
 } from '@cradle/plugin-sdk'
 
 import { AppError } from '../../errors/app-error'
-import { deletePluginSource, listPluginSources, addPluginSource, readPluginSource } from '../../plugins/source-registry'
-import type { AddPluginSourceInput } from '../../plugins/source-registry'
-import { discoverAndActivateSource, disablePlugin, enablePlugin, removeDiscoveredSource } from '../../plugins/loader'
+import { disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from '../../plugins/loader'
 import { getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
 import { resolvePluginSourceDirectory } from '../../plugins/source-installer'
+import type { AddPluginSourceInput } from '../../plugins/source-registry'
+import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource } from '../../plugins/source-registry'
 
 export interface PluginMentionCapability {
   id: string

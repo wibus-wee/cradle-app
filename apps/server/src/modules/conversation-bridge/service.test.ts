@@ -11,28 +11,28 @@ import {
   providerTargetModelCache,
   providerTargets,
   sessions,
-  workspaces
+  workspaces,
 } from '@cradle/db'
+import type { ConversationBridgeDeliveryInput } from '@cradle/plugin-sdk/server'
 import {
   CONVERSATION_BRIDGE_WORKSPACE_SELECT_ACTION,
-  type ConversationBridgeDeliveryInput
 } from '@cradle/plugin-sdk/server'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
-import { localWorkspaceLocator, serializeWorkspaceLocator } from '../workspace/workspace-locator'
 import {
   registerConversationBridgeAdapter,
-  resetConversationBridgeAdapterRegistry
+  resetConversationBridgeAdapterRegistry,
 } from '../../plugins/conversation-adapter-registry'
 import { resetPluginRuntimeRegistry } from '../../plugins/runtime-registry'
+import { localWorkspaceLocator, serializeWorkspaceLocator } from '../workspace/workspace-locator'
 import { stopAllConversationBridgeConnections } from './runtime-supervisor'
 import * as ConversationBridge from './service'
 
 const chatRuntimeMock = vi.hoisted(() => ({
   streamResponse: vi.fn(),
-  waitForRunCompletion: vi.fn()
+  waitForRunCompletion: vi.fn(),
 }))
 
 vi.mock('../chat-runtime/runtime', () => chatRuntimeMock)
@@ -42,7 +42,7 @@ let dataDir: string
 let deliveredMessages: ConversationBridgeDeliveryInput[]
 
 function makeInboundEvent(
-  overrides: Partial<Parameters<typeof ConversationBridge.handleInboundMessage>[0]> = {}
+  overrides: Partial<Parameters<typeof ConversationBridge.handleInboundMessage>[0]> = {},
 ) {
   return {
     connectionId: 'connection-1',
@@ -56,7 +56,7 @@ function makeInboundEvent(
     mentionedAdapter: true,
     eventType: 'message',
     payload: { source: 'test' },
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -70,7 +70,7 @@ function seedCradleRuntimeTarget(): void {
       locatorJson: serializeWorkspaceLocator(localWorkspaceLocator(dataDir)),
       gitIdentityJson: '{}',
       createdAt: timestamp,
-      updatedAt: timestamp
+      updatedAt: timestamp,
     })
     .run()
   db()
@@ -85,7 +85,7 @@ function seedCradleRuntimeTarget(): void {
       enabledModelsJson: '[]',
       customModelsJson: '[]',
       createdAt: timestamp,
-      updatedAt: timestamp
+      updatedAt: timestamp,
     })
     .run()
 }
@@ -100,10 +100,10 @@ function seedProviderModelCache(): void {
           id: 'gpt-5',
           label: 'GPT-5',
           providerKind: 'openai-compatible',
-          capabilities: {}
-        }
+          capabilities: {},
+        },
       ]),
-      fetchedAt: Math.floor(Date.now() / 1000)
+      fetchedAt: Math.floor(Date.now() / 1000),
     })
     .run()
 }
@@ -119,8 +119,8 @@ function registerFakeAdapter(): void {
       async sendMessage(input) {
         deliveredMessages.push(input)
         return { externalMessageId: `delivered-${deliveredMessages.length}` }
-      }
-    })
+      },
+    }),
   })
 }
 
@@ -144,10 +144,10 @@ describe('conversation bridge service', () => {
             messageJson: JSON.stringify({
               id: 'assistant-message-1',
               role: 'assistant',
-              parts: [{ type: 'text', text: 'Bridge response' }]
+              parts: [{ type: 'text', text: 'Bridge response' }],
             }),
             createdAt: timestamp,
-            updatedAt: timestamp
+            updatedAt: timestamp,
           })
           .run()
         return {
@@ -157,14 +157,14 @@ describe('conversation bridge service', () => {
           stream: new ReadableStream<Uint8Array>({
             start(controller) {
               controller.close()
-            }
-          })
+            },
+          }),
         }
-      }
+      },
     )
     chatRuntimeMock.waitForRunCompletion.mockResolvedValue({
       id: 'run-1',
-      status: 'completed'
+      status: 'completed',
     })
   })
 
@@ -177,7 +177,8 @@ describe('conversation bridge service', () => {
     rmSync(dataDir, { recursive: true, force: true })
     if (previousDataDir === undefined) {
       delete process.env.CRADLE_DATA_DIR
-    } else {
+    }
+ else {
       process.env.CRADLE_DATA_DIR = previousDataDir
     }
   })
@@ -188,7 +189,7 @@ describe('conversation bridge service', () => {
       adapterOwner: '@cradle/test-conversation-adapter',
       adapterId: 'fake',
       displayName: 'Fake',
-      enabled: true
+      enabled: true,
     })
 
     await ConversationBridge.handleInboundMessage(makeInboundEvent({ connectionId: connection.id }))
@@ -201,8 +202,8 @@ describe('conversation bridge service', () => {
     expect(event).toEqual(
       expect.objectContaining({
         status: 'ignored',
-        reason: 'external channel is not bound to a Cradle workspace'
-      })
+        reason: 'external channel is not bound to a Cradle workspace',
+      }),
     )
     expect(db().select().from(conversationBridgeThreadBindings).all()).toHaveLength(0)
     expect(deliveredMessages).toHaveLength(0)
@@ -216,7 +217,7 @@ describe('conversation bridge service', () => {
       adapterOwner: '@cradle/test-conversation-adapter',
       adapterId: 'fake',
       displayName: 'Fake',
-      enabled: true
+      enabled: true,
     })
 
     const workspaceSelectResponse = await ConversationBridge.handleControl({
@@ -226,12 +227,12 @@ describe('conversation bridge service', () => {
       externalActorId: 'external-user-1',
       kind: 'command',
       command: '/cradle',
-      text: 'bind workspace'
+      text: 'bind workspace',
     })
 
     expect(workspaceSelectResponse).toMatchObject({
       visibility: 'ephemeral',
-      text: expect.stringContaining('Choose a Cradle workspace')
+      text: expect.stringContaining('Choose a Cradle workspace'),
     })
     expect(workspaceSelectResponse.blocks).toEqual(
       expect.arrayContaining([
@@ -244,13 +245,13 @@ describe('conversation bridge service', () => {
               options: expect.arrayContaining([
                 expect.objectContaining({
                   label: 'Workspace 1',
-                  value: 'workspace-1'
-                })
-              ])
-            })
-          ])
-        })
-      ])
+                  value: 'workspace-1',
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      ]),
     )
     expect(db().select().from(conversationBridgeChannelBindings).all()).toHaveLength(0)
 
@@ -261,13 +262,13 @@ describe('conversation bridge service', () => {
       externalActorId: 'external-user-1',
       kind: 'action',
       actionId: CONVERSATION_BRIDGE_WORKSPACE_SELECT_ACTION,
-      selectedValue: 'workspace-1'
+      selectedValue: 'workspace-1',
     })
 
     expect(bindResponse).toMatchObject({
       visibility: 'ephemeral',
       replaceOriginal: true,
-      text: expect.stringContaining('workspace-1')
+      text: expect.stringContaining('workspace-1'),
     })
     expect(db().select().from(conversationBridgeChannelBindings).all()).toEqual([
       expect.objectContaining({
@@ -276,8 +277,8 @@ describe('conversation bridge service', () => {
         externalChannelId: 'external-channel-1',
         cradleWorkspaceId: 'workspace-1',
         boundByExternalActorId: 'external-user-1',
-        sessionProviderTargetId: null
-      })
+        sessionProviderTargetId: null,
+      }),
     ])
 
     const runtimeResponse = await ConversationBridge.handleControl({
@@ -287,21 +288,21 @@ describe('conversation bridge service', () => {
       externalActorId: 'external-user-1',
       kind: 'action',
       actionId: 'cradle_session_target_select',
-      selectedValue: 'provider-target:standard:target-1'
+      selectedValue: 'provider-target:standard:target-1',
     })
 
     expect(runtimeResponse).toMatchObject({
       visibility: 'ephemeral',
       replaceOriginal: true,
-      text: expect.stringContaining('workspace-1')
+      text: expect.stringContaining('workspace-1'),
     })
     expect(db().select().from(conversationBridgeChannelBindings).all()).toEqual([
       expect.objectContaining({
         sessionAgentId: null,
         sessionProviderTargetId: 'target-1',
         sessionRuntimeKind: 'standard',
-        sessionModelId: null
-      })
+        sessionModelId: null,
+      }),
     ])
 
     const modelResponse = await ConversationBridge.handleControl({
@@ -311,15 +312,15 @@ describe('conversation bridge service', () => {
       externalActorId: 'external-user-1',
       kind: 'action',
       actionId: 'cradle_session_model_select',
-      selectedValue: 'gpt-5'
+      selectedValue: 'gpt-5',
     })
     expect(modelResponse.text).toContain('GPT-5')
     expect(db().select().from(conversationBridgeChannelBindings).all()).toEqual([
       expect.objectContaining({
         sessionProviderTargetId: 'target-1',
         sessionRuntimeKind: 'standard',
-        sessionModelId: 'gpt-5'
-      })
+        sessionModelId: 'gpt-5',
+      }),
     ])
 
     const statusResponse = await ConversationBridge.handleControl({
@@ -329,17 +330,17 @@ describe('conversation bridge service', () => {
       externalActorId: 'external-user-1',
       kind: 'command',
       command: '/cradle',
-      text: 'status'
+      text: 'status',
     })
     expect(statusResponse).toMatchObject({
       visibility: 'ephemeral',
-      text: expect.stringContaining('workspace-1')
+      text: expect.stringContaining('workspace-1'),
     })
     expect(statusResponse.blocks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'header' }),
-        expect.objectContaining({ type: 'actions' })
-      ])
+        expect.objectContaining({ type: 'actions' }),
+      ]),
     )
 
     const unbindResponse = await ConversationBridge.handleControl({
@@ -349,11 +350,11 @@ describe('conversation bridge service', () => {
       externalActorId: 'external-user-1',
       kind: 'command',
       command: '/cradle',
-      text: 'unbind'
+      text: 'unbind',
     })
     expect(unbindResponse).toMatchObject({
       visibility: 'in_channel',
-      text: 'Removed the Cradle workspace binding for this channel.'
+      text: 'Removed the Cradle workspace binding for this channel.',
     })
     expect(db().select().from(conversationBridgeChannelBindings).all()).toHaveLength(0)
   })
@@ -365,7 +366,7 @@ describe('conversation bridge service', () => {
       adapterOwner: '@cradle/test-conversation-adapter',
       adapterId: 'fake',
       displayName: 'Fake',
-      enabled: true
+      enabled: true,
     })
     ConversationBridge.bindChannel({
       connectionId: connection.id,
@@ -373,7 +374,7 @@ describe('conversation bridge service', () => {
       externalChannelId: 'external-channel-1',
       cradleWorkspaceId: 'workspace-1',
       sessionProviderTargetId: 'target-1',
-      sessionRuntimeKind: 'standard'
+      sessionRuntimeKind: 'standard',
     })
     const inboundEvent = makeInboundEvent({ connectionId: connection.id })
 
@@ -384,39 +385,39 @@ describe('conversation bridge service', () => {
       expect.objectContaining({
         origin: 'conversation-bridge',
         workspaceId: 'workspace-1',
-        providerTargetId: 'target-1'
-      })
+        providerTargetId: 'target-1',
+      }),
     ])
     expect(db().select().from(conversationBridgeThreadBindings).all()).toEqual([
       expect.objectContaining({
         connectionId: connection.id,
-        externalThreadId: 'external-thread-1'
-      })
+        externalThreadId: 'external-thread-1',
+      }),
     ])
     expect(db().select().from(conversationBridgeInboundEvents).all()).toHaveLength(1)
     expect(db().select().from(conversationBridgeDeliveryAttempts).all()).toEqual([
       expect.objectContaining({
         status: 'delivered',
-        externalMessageId: 'delivered-1'
-      })
+        externalMessageId: 'delivered-1',
+      }),
     ])
     expect(deliveredMessages).toEqual([
       expect.objectContaining({
         connectionId: connection.id,
         externalThreadId: 'external-thread-1',
-        text: 'Bridge response'
-      })
+        text: 'Bridge response',
+      }),
     ])
     expect(chatRuntimeMock.streamResponse).toHaveBeenCalledTimes(1)
     expect(chatRuntimeMock.streamResponse).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.stringContaining('hello bridge')
-      })
+        text: expect.stringContaining('hello bridge'),
+      }),
     )
     expect(chatRuntimeMock.streamResponse).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.stringContaining('External channel: external-channel-1')
-      })
+        text: expect.stringContaining('External channel: external-channel-1'),
+      }),
     )
   })
 })

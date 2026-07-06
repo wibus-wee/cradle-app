@@ -5,12 +5,12 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*'  # release; SemVer is validated in the resolve job
-      - 'dev-*'   # dev
+      - 'v*.*.*' # release; SemVer is validated in the resolve job
+      - 'dev-*' # dev
   workflow_dispatch:
     inputs:
       channel:
-        description: 'Release channel'
+        description: Release channel
         required: true
         type: choice
         options:
@@ -21,9 +21,9 @@ on:
         description: 'Version (e.g. 1.2.3 for release, or auto-generated for dev)'
         required: true
       source_ref:
-        description: 'Git ref from wibus-wee/cradle-app to checkout'
+        description: Git ref from wibus-wee/cradle-app to checkout
         required: true
-        default: 'main'
+        default: main
 
 permissions:
   contents: write
@@ -664,7 +664,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve.outputs.release_tag }}
-          name: "${{ needs.resolve.outputs.release_tag }} (${{ needs.resolve.outputs.channel }})"
+          name: '${{ needs.resolve.outputs.release_tag }} (${{ needs.resolve.outputs.channel }})'
           prerelease: ${{ needs.resolve.outputs.channel == 'dev' }}
           make_latest: ${{ needs.resolve.outputs.channel == 'release' }}
           body_path: release-body.md
@@ -699,8 +699,8 @@ jobs:
         with:
           tag_name: ${{ needs.resolve.outputs.dev_feed_tag }}
           target_commitish: ${{ github.sha }}
-          name: "Feed dev"
-          body: "Rolling desktop dev update feed for ${{ needs.resolve.outputs.release_tag }}."
+          name: Feed dev
+          body: 'Rolling desktop dev update feed for ${{ needs.resolve.outputs.release_tag }}.'
           prerelease: true
           make_latest: false
           files: |
@@ -734,8 +734,8 @@ jobs:
         with:
           tag_name: ${{ needs.resolve.outputs.bleeding_edge_feed_tag }}
           target_commitish: ${{ github.sha }}
-          name: "Feed bleeding edge"
-          body: "Rolling desktop bleeding-edge update feed (commit ${{ github.sha }})."
+          name: Feed bleeding edge
+          body: 'Rolling desktop bleeding-edge update feed (commit ${{ github.sha }}).'
           prerelease: true
           make_latest: false
           files: |

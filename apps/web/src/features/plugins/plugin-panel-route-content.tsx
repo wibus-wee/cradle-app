@@ -1,8 +1,8 @@
 import { createElement, useEffect } from 'react'
 
+import { usePluginStore } from '~/lib/plugin-store'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { useSurfaceStore } from '~/navigation/surface-store'
-import { usePluginStore } from '~/lib/plugin-store'
 
 export function PluginPanelRouteContent({
   routeSegment,

@@ -147,7 +147,7 @@ export function useChatComposerRuntime({
   const { runtimes } = useRuntimeCatalog()
   const runtimeSteerCapability = useMemo(() => {
     const runtimeKind = runtimeCapabilities?.runtimeKind
-    if (!runtimeKind) return 'queue-fallback'
+    if (!runtimeKind) { return 'queue-fallback' }
     return runtimes.find(r => r.runtimeKind === runtimeKind)?.capabilities?.steer ?? 'queue-fallback'
   }, [runtimeCapabilities?.runtimeKind, runtimes])
 

@@ -7,31 +7,31 @@ import { parseJsonObject } from '../../helpers/json-record'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-snapshot'
+import * as ModelRegistry from '../model-registry/service'
 import {
   readRuntimeOwnedProviderTargetOwner,
   runtimeOwnsProviderTarget,
   runtimeSupportsProviderKind,
 } from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
-import * as ModelRegistry from '../model-registry/service'
 import {
   persistProviderRuntimeResolution,
   resolveExistingProviderRuntimeSession,
-  resolveProviderRuntimeSession
+  resolveProviderRuntimeSession,
 } from '../provider-runtime/service'
 import { getProviderTarget, resolveProviderTargetForRuntime } from '../provider-targets/service'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
-import { resolveSessionExecutionRoot, assertIsolationExecutionReady } from '../worktree/service'
-import { resolveSessionSystemPrompt } from './context/turn-context'
+import { assertIsolationExecutionReady, resolveSessionExecutionRoot } from '../worktree/service'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
-import { runRegistry } from './run-registry'
+import { resolveSessionSystemPrompt } from './context/turn-context'
 import type { ActiveRun } from './run-registry'
+import { runRegistry } from './run-registry'
 import type {
   ChatRuntime,
   ChatThinkingEffort,
   RuntimeProviderTargetProfile,
-  RuntimeSession
+  RuntimeSession,
 } from './runtime-provider-types'
 
 const runtimeSessionLogger = createChildLogger({ module: 'chat-runtime.runtime-session' })
@@ -40,17 +40,17 @@ export interface SessionRunContext {
   session: Session
   workspacePath: string
   profile: RuntimeProviderTargetProfile | null
-  providerTarget: { id: string; kind: 'manual' | 'external' } | null
+  providerTarget: { id: string, kind: 'manual' | 'external' } | null
 }
 
 export type ProviderBoundSessionRunContext = SessionRunContext & {
   profile: RuntimeProviderTargetProfile
-  providerTarget: { id: string; kind: 'manual' | 'external' }
+  providerTarget: { id: string, kind: 'manual' | 'external' }
 }
 
 export function assertProviderBoundRunContext(
   context: SessionRunContext,
-  operation: string
+  operation: string,
 ): ProviderBoundSessionRunContext {
   if (context.profile && context.providerTarget) {
     return context as ProviderBoundSessionRunContext
@@ -61,14 +61,14 @@ export function assertProviderBoundRunContext(
     message: `${operation} requires a provider target bound runtime`,
     details: {
       sessionId: context.session.id,
-      runtimeKind: context.session.runtimeKind ?? 'standard'
-    }
+      runtimeKind: context.session.runtimeKind ?? 'standard',
+    },
   })
 }
 
 export function getSessionRunContext(
   sessionId: string,
-  input: { providerTargetId?: string } = {}
+  input: { providerTargetId?: string } = {},
 ): SessionRunContext | null {
   const session = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) {
@@ -99,7 +99,7 @@ export function getSessionRunContext(
       session,
       workspacePath: workspacePath ?? '',
       profile: null,
-      providerTarget: null
+      providerTarget: null,
     }
   }
   if (!providerTarget) {
@@ -111,14 +111,14 @@ export function getSessionRunContext(
       session,
       workspacePath: workspacePath ?? '',
       profile: null,
-      providerTarget: null
+      providerTarget: null,
     }
   }
 
   const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind)
   const profileConfig = parseJsonObject(resolvedTarget.configJson)
   const targetModelRegistryConfig = {
-    modelRegistryMappings: ModelRegistry.listMappingEntries()
+    modelRegistryMappings: ModelRegistry.listMappingEntries(),
   }
   const agent = session.agentId
     ? db().select().from(agents).where(eq(agents.id, session.agentId)).get()
@@ -134,20 +134,20 @@ export function getSessionRunContext(
       ...profileConfig,
       ...targetModelRegistryConfig,
       ...agentConfig,
-      ...sessionConfig
+      ...sessionConfig,
     }),
     credentialRef: resolvedTarget.credentialRef,
     customModels: resolvedTarget.customModelsJson,
     iconSlug: resolvedTarget.iconSlug,
     providerTargetKind: resolvedTarget.target.kind,
-    providerTargetId: resolvedTarget.target.id
+    providerTargetId: resolvedTarget.target.id,
   }
 
   return {
     session,
     workspacePath: workspacePath ?? '',
     profile: effectiveProfile,
-    providerTarget: resolvedTarget.target
+    providerTarget: resolvedTarget.target,
   }
 }
 
@@ -171,7 +171,7 @@ export function attachBinding(input: {
     runtimeKind: input.runtimeKind,
     runtimeSession: input.runtimeSession,
     requestedModelId: input.requestedModelId,
-    durable: true
+    durable: true,
   })
 }
 
@@ -193,12 +193,12 @@ export async function resolveExistingRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId
+    modelId: input.modelId,
   })
   return resolution
     ? {
         runtimeSession: resolution.runtimeSession,
-        requestedModelId: resolution.requestedModelId
+        requestedModelId: resolution.requestedModelId,
       }
     : null
 }
@@ -222,33 +222,35 @@ export async function resolveRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId
+    modelId: input.modelId,
   })
   try {
     validateResolvedRuntimeSessionContext({
       sessionId: input.sessionId,
       originalContext: input.context,
       requestedProviderTargetId: input.requestedProviderTargetId,
-      runtimeKind: input.runtimeKind
+      runtimeKind: input.runtimeKind,
     })
-  } catch (error) {
+  }
+ catch (error) {
     try {
       await input.runtime.cancelTurn({
         runtimeSession: resolution.runtimeSession,
-        profile: input.context.profile
+        profile: input.context.profile,
       })
-    } catch (cancelError) {
+    }
+ catch (cancelError) {
       runtimeSessionLogger.warn('runtime session cancellation failed after context invalidation', {
         error: cancelError,
         sessionId: input.sessionId,
-        providerTargetId: input.context.providerTarget?.id ?? null
+        providerTargetId: input.context.providerTarget?.id ?? null,
       })
     }
     throw error
   }
   return {
     runtimeSession: resolution.runtimeSession,
-    requestedModelId: resolution.requestedModelId
+    requestedModelId: resolution.requestedModelId,
   }
 }
 
@@ -264,11 +266,11 @@ function validateResolvedRuntimeSessionContext(input: {
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
   const latestContext = getSessionRunContext(input.sessionId, {
-    providerTargetId: input.requestedProviderTargetId
+    providerTargetId: input.requestedProviderTargetId,
   })
   if (!latestContext) {
     throw new AppError({
@@ -278,8 +280,8 @@ function validateResolvedRuntimeSessionContext(input: {
       details: {
         sessionId: input.sessionId,
         providerTargetId:
-          input.requestedProviderTargetId ?? input.originalContext.providerTarget?.id ?? null
-      }
+          input.requestedProviderTargetId ?? input.originalContext.providerTarget?.id ?? null,
+      },
     })
   }
   assertRuntimeCompatibleTarget(latestContext, input.requestedProviderTargetId)
@@ -289,13 +291,13 @@ function validateResolvedRuntimeSessionContext(input: {
       status: 409,
       message: 'Provider target is disabled',
       details: {
-        providerTargetId: latestContext.providerTarget?.id ?? null
-      }
+        providerTargetId: latestContext.providerTarget?.id ?? null,
+      },
     })
   }
   if (
-    input.requestedProviderTargetId === undefined &&
-    latestContext.session.providerTargetId !== (input.originalContext.providerTarget?.id ?? null)
+    input.requestedProviderTargetId === undefined
+    && latestContext.session.providerTargetId !== (input.originalContext.providerTarget?.id ?? null)
   ) {
     throw new AppError({
       code: 'chat_provider_target_changed',
@@ -304,8 +306,8 @@ function validateResolvedRuntimeSessionContext(input: {
       details: {
         sessionId: input.sessionId,
         previousProviderTargetId: input.originalContext.providerTarget?.id ?? null,
-        providerTargetId: latestContext.session.providerTargetId
-      }
+        providerTargetId: latestContext.session.providerTargetId,
+      },
     })
   }
 }
@@ -315,15 +317,15 @@ export function readSessionRequestedModelId(input: {
   requestedProviderTargetId?: string
 }): string | undefined {
   if (
-    input.requestedProviderTargetId &&
-    runtimeOwnsProviderTarget(input.session.runtimeKind ?? 'standard', input.requestedProviderTargetId) &&
-    input.session.providerTargetId === null
+    input.requestedProviderTargetId
+    && runtimeOwnsProviderTarget(input.session.runtimeKind ?? 'standard', input.requestedProviderTargetId)
+    && input.session.providerTargetId === null
   ) {
     return SessionService.readSessionModelPreference(input.session.configJson) ?? undefined
   }
   if (
-    input.requestedProviderTargetId &&
-    input.requestedProviderTargetId !== input.session.providerTargetId
+    input.requestedProviderTargetId
+    && input.requestedProviderTargetId !== input.session.providerTargetId
   ) {
     return undefined
   }
@@ -335,15 +337,15 @@ export function readSessionRequestedThinkingEffort(input: {
   requestedProviderTargetId?: string
 }): ChatThinkingEffort | undefined {
   if (
-    input.requestedProviderTargetId &&
-    runtimeOwnsProviderTarget(input.session.runtimeKind ?? 'standard', input.requestedProviderTargetId) &&
-    input.session.providerTargetId === null
+    input.requestedProviderTargetId
+    && runtimeOwnsProviderTarget(input.session.runtimeKind ?? 'standard', input.requestedProviderTargetId)
+    && input.session.providerTargetId === null
   ) {
     return SessionService.readSessionThinkingEffortPreference(input.session.configJson) ?? undefined
   }
   if (
-    input.requestedProviderTargetId &&
-    input.requestedProviderTargetId !== input.session.providerTargetId
+    input.requestedProviderTargetId
+    && input.requestedProviderTargetId !== input.session.providerTargetId
   ) {
     return undefined
   }
@@ -357,7 +359,7 @@ export function assertRunnableSession(sessionId: string): SessionRunContext {
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
   return context
@@ -370,7 +372,7 @@ export function assertStoredSession(sessionId: string): Session {
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
   return session
@@ -378,7 +380,7 @@ export function assertStoredSession(sessionId: string): Session {
 
 export function assertRuntimeCompatibleTarget(
   context: SessionRunContext,
-  requestedProviderTargetId?: string
+  requestedProviderTargetId?: string,
 ): SessionRunContext {
   const runtimeKind = context.session.runtimeKind ?? 'standard'
   if (!context.profile) {
@@ -392,8 +394,8 @@ export function assertRuntimeCompatibleTarget(
       message: 'Chat runtime requires a provider target',
       details: {
         runtimeKind,
-        providerTargetId: requestedProviderTargetId ?? null
-      }
+        providerTargetId: requestedProviderTargetId ?? null,
+      },
     })
   }
   if (runtimeSupportsProviderKind(runtimeKind, context.profile.providerKind)) {
@@ -407,8 +409,8 @@ export function assertRuntimeCompatibleTarget(
     details: {
       runtimeKind,
       providerKind: context.profile.providerKind,
-      providerTargetId: requestedProviderTargetId ?? context.providerTarget?.id ?? null
-    }
+      providerTargetId: requestedProviderTargetId ?? context.providerTarget?.id ?? null,
+    },
   })
 }
 
@@ -429,7 +431,7 @@ export interface ResolvedRuntimeSessionContext {
  * session has no resolvable runtime context or no started provider session.
  */
 export async function resolveRuntimeSessionContext(
-  sessionId: string
+  sessionId: string,
 ): Promise<ResolvedRuntimeSessionContext> {
   const context = getSessionRunContext(sessionId)
   if (!context) {
@@ -438,7 +440,7 @@ export async function resolveRuntimeSessionContext(
       code: 'chat_session_not_runnable',
       status: 404,
       message: 'Chat session runtime context was not found',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
 
@@ -449,7 +451,7 @@ export async function resolveRuntimeSessionContext(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${runtimeKind}`
+      message: `Runtime is not available: ${runtimeKind}`,
     })
   }
 
@@ -464,8 +466,7 @@ export async function resolveRuntimeSessionContext(
       runtime: activeRun.runtime,
       runtimeSession: activeRun.runtimeSession,
       modelId:
-        readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models
-          .currentModelId ?? undefined
+        readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models.currentModelId ?? undefined,
     }
   }
 
@@ -473,29 +474,28 @@ export async function resolveRuntimeSessionContext(
     sessionId,
     context,
     runtimeKind,
-    runtime
+    runtime,
   })
   if (!resolved) {
     throw new AppError({
       code: 'chat_runtime_session_not_started',
       status: 404,
       message: 'Chat session has no provider runtime session',
-      details: { sessionId, runtimeKind }
+      details: { sessionId, runtimeKind },
     })
   }
 
-  const modelId =
-    resolved.requestedModelId ??
-    readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models
-      .currentModelId ??
-    undefined
+  const modelId
+    = resolved.requestedModelId
+      ?? readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models.currentModelId
+      ?? undefined
 
   return {
     context,
     runtimeKind,
     runtime,
     runtimeSession: resolved.runtimeSession,
-    modelId
+    modelId,
   }
 }
 
@@ -511,6 +511,6 @@ export function buildRuntimeProviderInput(resolved: ResolvedRuntimeSessionContex
     workspacePath: resolved.context.workspacePath,
     agentId: resolved.context.session.agentId,
     modelId: resolved.modelId,
-    systemPrompt: resolveSessionSystemPrompt(resolved.context.session)
+    systemPrompt: resolveSessionSystemPrompt(resolved.context.session),
   }
 }

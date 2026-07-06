@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useResolvedThemeMode } from '~/store/theme'
+
 import { useOnboardingStore } from './onboarding-store'
 
 // Silky springs — low stiffness for slow, flowing motion; tuned damping for

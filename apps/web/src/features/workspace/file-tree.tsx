@@ -1,12 +1,12 @@
-import { prepareFileTreeInput } from '@pierre/trees'
-import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react'
-import { useQuery } from '@tanstack/react-query'
 import {
+  CloseLine as XIcon,
   FileNewLine as FilePlusIcon,
   NewFolderLine as FolderPlusIcon,
   SearchLine as SearchIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
+import { prepareFileTreeInput } from '@pierre/trees'
+import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -350,7 +350,8 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
       let message: WorkspaceFileEvent
       try {
         message = WorkspaceFileEventSchema.parse(JSON.parse(event.data))
-      } catch (error) {
+      }
+ catch (error) {
         if (!malformedFrameReported) {
           malformedFrameReported = true
           console.warn('[file-tree] dropped malformed workspace file event', error)

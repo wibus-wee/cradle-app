@@ -27,45 +27,45 @@ import type {
   ChatRuntimeUiSlotState,
   ChatRuntimeUsageUiSlotState,
   ChatRuntimeUserInputUiSlotState,
-  ChatSlashCommand
+  ChatSlashCommand,
 } from '../capabilities/chat-capabilities'
 
 export type ChatSlashCommandSource = 'runtime' | 'cradle'
 export type ChatSlashCommandPresentation = 'command' | 'slot'
-export type ChatSlashCommandIconKey =
-  | 'appshot'
-  | 'alert'
-  | 'approvals'
-  | 'code-review'
-  | 'compact'
-  | 'config'
-  | 'crew'
-  | 'diff'
-  | 'feedback'
-  | 'filesystem'
-  | 'goal'
-  | 'ide-context'
-  | 'mcp'
-  | 'model'
-  | 'personality'
-  | 'plugin'
-  | 'plan'
-  | 'progress'
-  | 'quick-question'
-  | 'user-input'
-  | 'reasoning'
-  | 'search'
-  | 'side-chat'
-  | 'skills'
-  | 'status'
-  | 'terminal'
-  | 'tool-activity'
-  | 'usage'
+export type ChatSlashCommandIconKey
+  = | 'appshot'
+    | 'alert'
+    | 'approvals'
+    | 'code-review'
+    | 'compact'
+    | 'config'
+    | 'crew'
+    | 'diff'
+    | 'feedback'
+    | 'filesystem'
+    | 'goal'
+    | 'ide-context'
+    | 'mcp'
+    | 'model'
+    | 'personality'
+    | 'plugin'
+    | 'plan'
+    | 'progress'
+    | 'quick-question'
+    | 'user-input'
+    | 'reasoning'
+    | 'search'
+    | 'side-chat'
+    | 'skills'
+    | 'status'
+    | 'terminal'
+    | 'tool-activity'
+    | 'usage'
 
-export type ChatSlashCommandAction =
-  | { kind: 'insertText'; text: string }
-  | { kind: 'submitText'; text: string; requiresEmptyComposer?: boolean }
-  | { kind: 'uiAction'; actionId: string }
+export type ChatSlashCommandAction
+  = | { kind: 'insertText', text: string }
+    | { kind: 'submitText', text: string, requiresEmptyComposer?: boolean }
+    | { kind: 'uiAction', actionId: string }
 
 export type RuntimeComposerSlashCommandMode = 'session' | 'draft'
 
@@ -109,7 +109,7 @@ export const CRADLE_APPSHOT_SLASH_COMMAND: ChatComposerSlashCommand = {
   argumentHint: '',
   source: 'cradle',
   action: { kind: 'uiAction', actionId: CRADLE_APPSHOT_SLASH_ACTION_ID },
-  iconKey: 'appshot'
+  iconKey: 'appshot',
 }
 
 export const CRADLE_SIDE_CHAT_SLASH_COMMAND: ChatComposerSlashCommand = {
@@ -120,7 +120,7 @@ export const CRADLE_SIDE_CHAT_SLASH_COMMAND: ChatComposerSlashCommand = {
   aliases: ['branch-chat'],
   source: 'cradle',
   action: { kind: 'insertText', text: '/side ' },
-  iconKey: 'side-chat'
+  iconKey: 'side-chat',
 }
 
 export interface MergeChatSlashCommandsInput {
@@ -143,7 +143,7 @@ function normalizeCommandName(name: string): string {
 
 function isRuntimeUiSlotSlashCommand(
   slot: ChatRuntimeUiSlot,
-  mode: RuntimeComposerSlashCommandMode
+  mode: RuntimeComposerSlashCommandMode,
 ): boolean {
   if (mode === 'draft' && slot.requiresSession) {
     return false
@@ -153,7 +153,7 @@ function isRuntimeUiSlotSlashCommand(
 
 function readRuntimeUiSlotAction(
   slot: ChatRuntimeUiSlot,
-  commandText: string
+  commandText: string,
 ): ChatSlashCommandAction {
   switch (slot.commandAction?.kind) {
     case 'submitText':
@@ -172,7 +172,7 @@ function readRuntimeUiSlotAction(
 
 export function createRuntimeSlashCommand(
   command: ChatSlashCommand,
-  index = 0
+  index = 0,
 ): ChatComposerSlashCommand {
   const name = normalizeCommandName(command.name)
   return {
@@ -182,13 +182,13 @@ export function createRuntimeSlashCommand(
     argumentHint: command.argumentHint,
     aliases: command.aliases,
     source: 'runtime',
-    action: { kind: 'insertText', text: `/${name} ` }
+    action: { kind: 'insertText', text: `/${name} ` },
   }
 }
 
 export function createRuntimeUiSlotCommand(
   slot: ChatRuntimeUiSlot,
-  slotStates: ChatRuntimeUiSlotState[] = []
+  slotStates: ChatRuntimeUiSlotState[] = [],
 ): ChatComposerSlashCommand {
   const name = normalizeCommandName(slot.name)
   const state = readRuntimeUiSlotCommandState(slot, slotStates)
@@ -206,36 +206,36 @@ export function createRuntimeUiSlotCommand(
     iconKey: slot.iconKey,
     stateLabel: state?.label,
     stateTone: state?.tone,
-    stateVisual: state?.visual ?? readDefaultRuntimeUiSlotCommandVisual(slot)
+    stateVisual: state?.visual ?? readDefaultRuntimeUiSlotCommandVisual(slot),
   }
 }
 
 export function createRuntimeUiSlotCommands(
   slots: ChatRuntimeUiSlot[],
   slotStates: ChatRuntimeUiSlotState[] = [],
-  mode: RuntimeComposerSlashCommandMode = 'session'
+  mode: RuntimeComposerSlashCommandMode = 'session',
 ): ChatComposerSlashCommand[] {
   return slots
-    .filter((slot) => isRuntimeUiSlotSlashCommand(slot, mode))
-    .map((slot) => createRuntimeUiSlotCommand(slot, slotStates))
+    .filter(slot => isRuntimeUiSlotSlashCommand(slot, mode))
+    .map(slot => createRuntimeUiSlotCommand(slot, slotStates))
 }
 
 export function mergeChatSlashCommands({
   runtimeCommands,
   runtimeUiSlotCommands = [],
-  cradleCommands
+  cradleCommands,
 }: MergeChatSlashCommandsInput): ChatComposerSlashCommand[] {
   const enabledCradleCommands = cradleCommands.filter(
-    (command) => command.availability?.enabled !== false
+    command => command.availability?.enabled !== false,
   )
   const disabledCradleCommands = cradleCommands.filter(
-    (command) => command.availability?.enabled === false
+    command => command.availability?.enabled === false,
   )
   return [
     ...runtimeUiSlotCommands,
     ...enabledCradleCommands,
     ...runtimeCommands.map(createRuntimeSlashCommand),
-    ...disabledCradleCommands
+    ...disabledCradleCommands,
   ]
 }
 
@@ -244,35 +244,35 @@ export function projectRuntimeComposerSlashCommands({
   slotStates = [],
   mode = 'session',
   cradleCommands = [],
-  mapRuntimeUiSlotCommand
+  mapRuntimeUiSlotCommand,
 }: ProjectRuntimeComposerSlashCommandsInput): ChatComposerSlashCommand[] {
   const runtimeUiSlotCommands = createRuntimeUiSlotCommands(
     capabilities?.uiSlots ?? [],
     slotStates,
-    mode
-  ).map((command) => (mapRuntimeUiSlotCommand ? mapRuntimeUiSlotCommand(command) : command))
+    mode,
+  ).map(command => (mapRuntimeUiSlotCommand ? mapRuntimeUiSlotCommand(command) : command))
 
   return mergeChatSlashCommands({
     runtimeCommands: capabilities?.slashCommands ?? [],
     runtimeUiSlotCommands,
-    cradleCommands
+    cradleCommands,
   })
 }
 
 export function withSlashCommandAvailability(
   command: ChatComposerSlashCommand,
-  availability: ChatComposerSlashCommand['availability']
+  availability: ChatComposerSlashCommand['availability'],
 ): ChatComposerSlashCommand {
   return { ...command, availability }
 }
 
 export function hasDuplicateSlashCommandName(
   commands: ChatComposerSlashCommand[],
-  command: ChatComposerSlashCommand
+  command: ChatComposerSlashCommand,
 ): boolean {
   const name = command.name.toLowerCase()
   return commands.some(
-    (candidate) => candidate !== command && candidate.name.toLowerCase() === name
+    candidate => candidate !== command && candidate.name.toLowerCase() === name,
   )
 }
 
@@ -282,13 +282,13 @@ export function getSlashCommandSourceLabel(command: ChatComposerSlashCommand): s
 
 function readRuntimeUiSlotCommandState(
   slot: ChatRuntimeUiSlot,
-  states: ChatRuntimeUiSlotState[]
+  states: ChatRuntimeUiSlotState[],
 ): {
   label: string
   tone?: ChatComposerSlashCommand['stateTone']
   visual?: ChatSlashCommandStateVisual
 } | null {
-  const state = states.find((candidate) => candidate.slotId === slot.id)
+  const state = states.find(candidate => candidate.slotId === slot.id)
   if (!state) {
     return null
   }
@@ -339,7 +339,7 @@ function readRuntimeUiSlotCommandState(
 }
 
 function readDefaultRuntimeUiSlotCommandVisual(
-  slot: ChatRuntimeUiSlot
+  slot: ChatRuntimeUiSlot,
 ): ChatSlashCommandStateVisual | undefined {
   if (slot.iconKey !== 'compact') {
     return undefined
@@ -347,12 +347,12 @@ function readDefaultRuntimeUiSlotCommandVisual(
   return {
     kind: 'compactUsage',
     percent: null,
-    status: 'idle'
+    status: 'idle',
   }
 }
 
 function readCompactCommandState(
-  state: ChatRuntimeCompactUiSlotState
+  state: ChatRuntimeCompactUiSlotState,
 ): {
   label: string
   tone?: ChatComposerSlashCommand['stateTone']
@@ -362,7 +362,7 @@ function readCompactCommandState(
   const visual: ChatSlashCommandStateVisual = {
     kind: 'compactUsage',
     percent,
-    status: state.status
+    status: state.status,
   }
   if (state.status === 'running') {
     return { label: 'Compacting', tone: 'neutral', visual }
@@ -378,7 +378,7 @@ function readCompactCommandState(
             : state.status === 'compacted'
               ? 'success'
               : 'neutral',
-      visual
+      visual,
     }
   }
   if (state.status === 'compacted') {
@@ -388,15 +388,15 @@ function readCompactCommandState(
     return {
       label: `${TOKEN_COUNT_FORMATTER.format(state.total.totalTokens)} tokens`,
       tone: 'neutral',
-      visual
+      visual,
     }
   }
   return null
 }
 
 function readDiffCommandState(
-  state: ChatRuntimeDiffUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeDiffUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (!state.hasDiff) {
     return null
   }
@@ -404,16 +404,16 @@ function readDiffCommandState(
 }
 
 function readFilesystemCommandState(
-  state: ChatRuntimeFilesystemUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeFilesystemUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   return state.changedPathCount > 0
     ? { label: `${state.changedPathCount} changed`, tone: 'neutral' }
     : null
 }
 
 function readSkillsCommandState(
-  state: ChatRuntimeSkillsUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeSkillsUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.errorCount > 0) {
     return { label: `${state.errorCount} errors`, tone: 'warning' }
   }
@@ -421,8 +421,8 @@ function readSkillsCommandState(
 }
 
 function readPluginCommandState(
-  state: ChatRuntimePluginUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimePluginUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.errorCount > 0) {
     return { label: `${state.errorCount} errors`, tone: 'warning' }
   }
@@ -430,8 +430,8 @@ function readPluginCommandState(
 }
 
 function readSearchCommandState(
-  state: ChatRuntimeSearchUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeSearchUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.fuzzySessionActive) {
     return { label: 'Searching', tone: 'neutral' }
   }
@@ -441,8 +441,8 @@ function readSearchCommandState(
 }
 
 function readCrewCommandState(
-  state: ChatRuntimeCrewUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeCrewUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.failedCount > 0) {
     return { label: `${state.failedCount} failed`, tone: 'danger' }
   }
@@ -456,15 +456,15 @@ function readCrewCommandState(
 }
 
 function readUsageCommandState(
-  state: ChatRuntimeUsageUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeUsageUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.rateLimitReachedType) {
     return { label: 'Limited', tone: 'danger' }
   }
   if (state.usedPercent !== null) {
     return {
       label: `${state.usedPercent}% used`,
-      tone: state.usedPercent >= 90 ? 'warning' : 'neutral'
+      tone: state.usedPercent >= 90 ? 'warning' : 'neutral',
     }
   }
   return state.creditsBalance
@@ -473,15 +473,15 @@ function readUsageCommandState(
 }
 
 function readConfigCommandState(
-  state: ChatRuntimeConfigUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeConfigUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   const label = state.approvalPolicy ?? state.sandboxMode ?? state.modelId
   return label ? { label: formatRuntimePhrase(label), tone: 'neutral' } : null
 }
 
 function readTerminalCommandState(
-  state: ChatRuntimeTerminalUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeTerminalUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.failedCount > 0) {
     return { label: `${state.failedCount} failed`, tone: 'danger' }
   }
@@ -495,8 +495,8 @@ function readTerminalCommandState(
 }
 
 function readApprovalsCommandState(
-  state: ChatRuntimeApprovalsUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeApprovalsUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.pendingCount > 0) {
     return { label: `${state.pendingCount} pending`, tone: 'warning' }
   }
@@ -510,8 +510,8 @@ function readApprovalsCommandState(
 }
 
 function readAlertCommandState(
-  state: ChatRuntimeAlertUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeAlertUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.errorCount > 0) {
     return { label: `${state.errorCount} errors`, tone: 'danger' }
   }
@@ -530,26 +530,26 @@ function readGoalCommandState(state: ChatRuntimeGoalUiSlotState): {
     tone:
       state.status === 'complete'
         ? 'success'
-        : state.status === 'blocked' ||
-            state.status === 'usageLimited' ||
-            state.status === 'budgetLimited'
+        : state.status === 'blocked'
+          || state.status === 'usageLimited'
+          || state.status === 'budgetLimited'
           ? 'danger'
           : state.status === 'paused'
             ? 'warning'
-            : 'neutral'
+            : 'neutral',
   }
 }
 
 function readModelCommandState(
-  state: ChatRuntimeModelUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeModelUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   const label = state.modelLabel ?? state.modelId
   return label ? { label, tone: 'neutral' } : null
 }
 
 function readPlanCommandState(
-  state: ChatRuntimePlanUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimePlanUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.inProgressCount > 0) {
     return { label: `${state.inProgressCount} active`, tone: 'neutral' }
   }
@@ -563,8 +563,8 @@ function readPlanCommandState(
 }
 
 function readToolActivityCommandState(
-  state: ChatRuntimeToolActivityUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeToolActivityUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.failedCount > 0) {
     return { label: `${state.failedCount} failed`, tone: 'danger' }
   }
@@ -578,8 +578,8 @@ function readToolActivityCommandState(
 }
 
 function readMcpCommandState(
-  state: ChatRuntimeMcpUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeMcpUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.failedCount > 0) {
     return { label: `${state.failedCount} failed`, tone: 'danger' }
   }
@@ -593,8 +593,8 @@ function readMcpCommandState(
 }
 
 function readReasoningCommandState(
-  state: ChatRuntimeReasoningUiSlotState
-): { label: string; tone?: ChatComposerSlashCommand['stateTone'] } | null {
+  state: ChatRuntimeReasoningUiSlotState,
+): { label: string, tone?: ChatComposerSlashCommand['stateTone'] } | null {
   if (state.effort) {
     return { label: formatRuntimePhrase(state.effort), tone: 'neutral' }
   }
@@ -616,10 +616,10 @@ function readStatusCommandState(state: ChatRuntimeStatusUiSlotState): {
     tone:
       state.status === 'systemError'
         ? 'danger'
-        : state.activeFlags.includes('waitingOnApproval') ||
-            state.activeFlags.includes('waitingOnUserInput')
+        : state.activeFlags.includes('waitingOnApproval')
+          || state.activeFlags.includes('waitingOnUserInput')
           ? 'warning'
-          : 'neutral'
+          : 'neutral',
   }
 }
 
@@ -629,7 +629,7 @@ function readUserInputCommandState(state: ChatRuntimeUserInputUiSlotState): {
 } {
   return {
     label: state.questionCount === 1 ? '1 Question' : `${state.questionCount} Questions`,
-    tone: 'warning'
+    tone: 'warning',
   }
 }
 
@@ -637,5 +637,5 @@ function formatRuntimePhrase(value: string): string {
   return value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/\b\w/g, char => char.toUpperCase())
 }

@@ -3,8 +3,8 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Spinner } from '~/components/ui/spinner'
-import { router } from '~/router'
 import { useSurfaceStore } from '~/navigation/surface-store'
+import { router } from '~/router'
 
 import { KanbanView } from './index'
 import { useBoard, useIssue } from './use-kanban'

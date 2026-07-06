@@ -24,10 +24,10 @@ import {
 } from '../git/worktree-ops'
 import * as Workspace from '../workspace/service'
 import { ensureWorktreeCheckoutParentDir, resolveWorktreeCheckoutPath } from './worktree-paths'
+import type { WorktreeHealth } from './worktree-reconcile'
 import {
   assessWorktreeHealthSync,
   reconcileWorktreeRecord,
-  type WorktreeHealth,
 } from './worktree-reconcile'
 import { runWorktreeSetupHooks } from './worktree-setup'
 import {
@@ -193,7 +193,7 @@ function readIsolationBoundaryConfig(configJson: string): { required: boolean } 
 
 function writeIsolationBoundaryConfig(
   configJson: string,
-  boundary: { required: boolean; pendingWorktreeId?: string | null } | null,
+  boundary: { required: boolean, pendingWorktreeId?: string | null } | null,
 ): string {
   const config = parseJsonObjectOrEmpty(configJson)
   if (!boundary) {
@@ -261,7 +261,7 @@ export function listWorktreesByWorkspace(sourceWorkspaceId: string): WorktreeVie
     .map(toWorktreeView)
 }
 
-export async function listManagedWorktrees(): Promise<{ worktrees: ManagedWorktreeView[]; totalSizeBytes: number }> {
+export async function listManagedWorktrees(): Promise<{ worktrees: ManagedWorktreeView[], totalSizeBytes: number }> {
   const workspaceNames = new Map(
     db()
       .select({ id: workspaces.id, name: workspaces.name })
@@ -541,7 +541,7 @@ export async function bindSessionWorktree(input: {
 export async function startSessionIsolation(input: {
   sessionId: string
   slug?: string
-}): Promise<{ worktree: WorktreeView; pending: boolean }> {
+}): Promise<{ worktree: WorktreeView, pending: boolean }> {
   const session = db().select().from(sessions).where(eq(sessions.id, input.sessionId)).get()
   if (!session?.workspaceId) {
     throw new AppError({

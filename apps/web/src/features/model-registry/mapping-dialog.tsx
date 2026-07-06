@@ -5,11 +5,11 @@
  * manual entry form. Used by both the agent-management models panel
  * and the settings model-registry page.
  */
-import { useQueryClient } from '@tanstack/react-query'
 import {
   SearchLine as SearchIcon,
-  SelectorHorizontalLine as SlidersHorizontalIcon
+  SelectorHorizontalLine as SlidersHorizontalIcon,
 } from '@mingcute/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'

@@ -1,7 +1,8 @@
 import net from 'node:net'
 
 import { AppError } from '../../errors/app-error'
-import { spawnManagedProcess, type ManagedChildProcess } from '../../infra/managed-process'
+import type { ManagedChildProcess } from '../../infra/managed-process'
+import { spawnManagedProcess } from '../../infra/managed-process'
 import type { RemoteHostSshProfile, SshProfileLaunchConfig } from './service'
 
 export interface RemoteCradleServerTunnelOptions {
@@ -20,8 +21,8 @@ export interface RemoteCradleServerTunnelHandle {
   readonly localBaseUrl: string
   readonly pid: number | null
   readonly stderr: string
-  onExit(listener: (exit: { code: number | null, signal: NodeJS.Signals | null }) => void): void
-  close(): Promise<void>
+  onExit: (listener: (exit: { code: number | null, signal: NodeJS.Signals | null }) => void) => void
+  close: () => Promise<void>
 }
 
 export async function allocateLocalPort(): Promise<number> {

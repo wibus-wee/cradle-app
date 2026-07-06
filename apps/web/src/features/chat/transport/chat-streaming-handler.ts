@@ -4,8 +4,8 @@ import { readUIMessageStream } from 'ai'
 import type { MessageReconcileChange } from '~/store/chat'
 import { useChatStore } from '~/store/chat'
 
-import { emitChatRunSettled } from './sse-chat-transport'
 import type { ChatStreamChunk } from './chat-stream-types'
+import { emitChatRunSettled } from './sse-chat-transport'
 
 const STREAM_FLUSH_INTERVAL_MS = 125
 type ChatStreamingStore = Pick<typeof useChatStore, 'getState'>

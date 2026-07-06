@@ -9,9 +9,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import { resetTokenCache } from '../src/lib/github-api'
 import { registerExternalIssueSource } from '../src/plugins/external-issue-source-registry'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))

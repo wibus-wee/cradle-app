@@ -37,7 +37,7 @@ export function createInitialChatSessionState(aggregateId = ''): ChatSessionStat
     queueItemById: new Map(),
     runOriginById: new Map(),
     runMessageIdById: new Map(),
-    runStatusById: new Map()
+    runStatusById: new Map(),
   }
 }
 
@@ -53,7 +53,7 @@ export function reduceChatSessionEvents(events: StoredChatSessionEvent[]): ChatS
 
 export function evolveChatSessionState(
   state: ChatSessionState,
-  event: StoredChatSessionEvent
+  event: StoredChatSessionEvent,
 ): ChatSessionState {
   state.aggregateId = event.aggregateId
   state.version = Math.max(state.version, event.version)
@@ -67,7 +67,7 @@ export function evolveChatSessionState(
       state.runOriginById.set(event.payload.run.id, event.payload.run.origin)
       state.runMessageIdById.set(
         event.payload.run.id,
-        event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null
+        event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null,
       )
       state.runStatusById.set(event.payload.run.id, 'streaming')
       if (event.payload.run.origin !== 'system') {
@@ -75,7 +75,7 @@ export function evolveChatSessionState(
           runId: event.payload.run.id,
           messageId: event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null,
           queueItemId: event.payload.queueItemId ?? null,
-          startedAt: event.payload.run.startedAt
+          startedAt: event.payload.run.startedAt,
         }
       }
       if (event.payload.assistantMessage) {
@@ -84,7 +84,7 @@ export function evolveChatSessionState(
       if (event.payload.queueItemId) {
         state.queueItemById.set(event.payload.queueItemId, {
           status: 'running',
-          startedRunId: event.payload.run.id
+          startedRunId: event.payload.run.id,
         })
       }
       break
@@ -94,9 +94,10 @@ export function evolveChatSessionState(
       try {
         state.assistantMessageById.set(
           event.payload.message.id,
-          JSON.parse(event.payload.message.messageJson) as UIMessage
+          JSON.parse(event.payload.message.messageJson) as UIMessage,
         )
-      } catch {
+      }
+ catch {
         // Decision-making only needs the run/message status; malformed snapshots
         // should not prevent terminal recovery from applying later facts.
       }
@@ -106,9 +107,10 @@ export function evolveChatSessionState(
       try {
         state.assistantMessageById.set(
           event.payload.message.id,
-          JSON.parse(event.payload.message.messageJson) as UIMessage
+          JSON.parse(event.payload.message.messageJson) as UIMessage,
         )
-      } catch {
+      }
+ catch {
         // Recovery can still terminate the run even if a projection snapshot is malformed.
       }
       break
@@ -127,7 +129,7 @@ export function evolveChatSessionState(
               : event.payload.status === 'aborted'
                 ? 'cancelled'
                 : 'failed',
-          startedRunId: event.payload.runId
+          startedRunId: event.payload.runId,
         })
       }
       break
@@ -138,25 +140,25 @@ export function evolveChatSessionState(
     case 'QueueItemEnqueued':
       state.queueItemById.set(event.payload.item.id, {
         status: event.payload.item.status,
-        startedRunId: event.payload.item.startedRunId
+        startedRunId: event.payload.item.startedRunId,
       })
       break
     case 'QueueItemClaimed':
       state.queueItemById.set(event.payload.queueItemId, {
         status: 'running',
-        startedRunId: event.payload.startedRunId ?? null
+        startedRunId: event.payload.startedRunId ?? null,
       })
       break
     case 'QueueItemReleased':
       state.queueItemById.set(event.payload.queueItemId, {
         status: 'pending',
-        startedRunId: null
+        startedRunId: null,
       })
       break
     case 'QueueItemFailed':
       state.queueItemById.set(event.payload.queueItemId, {
         status: 'failed',
-        startedRunId: state.queueItemById.get(event.payload.queueItemId)?.startedRunId ?? null
+        startedRunId: state.queueItemById.get(event.payload.queueItemId)?.startedRunId ?? null,
       })
       break
     case 'QueueItemReordered':
@@ -166,7 +168,7 @@ export function evolveChatSessionState(
     case 'QueueItemCancelled':
       state.queueItemById.set(event.payload.queueItemId, {
         status: 'cancelled',
-        startedRunId: state.queueItemById.get(event.payload.queueItemId)?.startedRunId ?? null
+        startedRunId: state.queueItemById.get(event.payload.queueItemId)?.startedRunId ?? null,
       })
       break
     case 'LastTurnRolledBack':
@@ -175,8 +177,8 @@ export function evolveChatSessionState(
         state.assistantMessageById.delete(messageId)
       }
       if (
-        state.activeRun?.messageId &&
-        event.payload.messageIds.includes(state.activeRun.messageId)
+        state.activeRun?.messageId
+        && event.payload.messageIds.includes(state.activeRun.messageId)
       ) {
         state.activeRun = null
       }

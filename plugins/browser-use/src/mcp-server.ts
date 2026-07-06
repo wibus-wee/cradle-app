@@ -35,9 +35,9 @@ const BrowserEvalResultTextSchema = z.union([
 
 // ─── Backend Client ─────────────────────────────────────────────────────────
 
-type BrowserBackendEndpoint =
-  | { kind: 'socket', path: string }
-  | { kind: 'tcp', host: string, port: number }
+type BrowserBackendEndpoint
+  = | { kind: 'socket', path: string }
+    | { kind: 'tcp', host: string, port: number }
 
 function parseBackendEndpoint(value: string): BrowserBackendEndpoint {
   if (value.startsWith('tcp://')) {

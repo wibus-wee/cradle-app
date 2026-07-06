@@ -12,9 +12,9 @@ on:
         required: false
         default: ''
       source_ref:
-        description: 'Git ref from wibus-wee/cradle-app to test'
+        description: Git ref from wibus-wee/cradle-app to test
         required: false
-        default: 'main'
+        default: main
 
 permissions:
   contents: read

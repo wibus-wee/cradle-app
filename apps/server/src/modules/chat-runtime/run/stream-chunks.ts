@@ -32,34 +32,34 @@ export function readRunDeltaCoalesceKey(chunk: UIMessageChunk): string | null {
 
 export function mergeRuntimeDeltaChunk(
   existing: UIMessageChunk,
-  next: UIMessageChunk
+  next: UIMessageChunk,
 ): UIMessageChunk | null {
   if (existing.type === 'text-delta' && next.type === 'text-delta' && existing.id === next.id) {
     return {
       ...next,
       delta: `${existing.delta}${next.delta}`,
-      providerMetadata: next.providerMetadata ?? existing.providerMetadata
+      providerMetadata: next.providerMetadata ?? existing.providerMetadata,
     }
   }
   if (
-    existing.type === 'reasoning-delta' &&
-    next.type === 'reasoning-delta' &&
-    existing.id === next.id
+    existing.type === 'reasoning-delta'
+    && next.type === 'reasoning-delta'
+    && existing.id === next.id
   ) {
     return {
       ...next,
       delta: `${existing.delta}${next.delta}`,
-      providerMetadata: next.providerMetadata ?? existing.providerMetadata
+      providerMetadata: next.providerMetadata ?? existing.providerMetadata,
     }
   }
   if (
-    existing.type === 'tool-input-delta' &&
-    next.type === 'tool-input-delta' &&
-    existing.toolCallId === next.toolCallId
+    existing.type === 'tool-input-delta'
+    && next.type === 'tool-input-delta'
+    && existing.toolCallId === next.toolCallId
   ) {
     return {
       ...next,
-      inputTextDelta: `${existing.inputTextDelta}${next.inputTextDelta}`
+      inputTextDelta: `${existing.inputTextDelta}${next.inputTextDelta}`,
     }
   }
   return null
@@ -95,7 +95,7 @@ export function readReplayCoalesceKey(chunk: UIMessageChunk): string | null {
 export function mergeBufferedStreamChunk(
   existing: UIMessageChunk,
   next: UIMessageChunk,
-  maxDeltaChars: number
+  maxDeltaChars: number,
 ): UIMessageChunk | null {
   if (existing.type === 'text-delta' && next.type === 'text-delta' && existing.id === next.id) {
     if (existing.delta.length + next.delta.length > maxDeltaChars) {
@@ -104,13 +104,13 @@ export function mergeBufferedStreamChunk(
     return {
       ...next,
       delta: `${existing.delta}${next.delta}`,
-      providerMetadata: next.providerMetadata ?? existing.providerMetadata
+      providerMetadata: next.providerMetadata ?? existing.providerMetadata,
     }
   }
   if (
-    existing.type === 'reasoning-delta' &&
-    next.type === 'reasoning-delta' &&
-    existing.id === next.id
+    existing.type === 'reasoning-delta'
+    && next.type === 'reasoning-delta'
+    && existing.id === next.id
   ) {
     if (existing.delta.length + next.delta.length > maxDeltaChars) {
       return null
@@ -118,26 +118,26 @@ export function mergeBufferedStreamChunk(
     return {
       ...next,
       delta: `${existing.delta}${next.delta}`,
-      providerMetadata: next.providerMetadata ?? existing.providerMetadata
+      providerMetadata: next.providerMetadata ?? existing.providerMetadata,
     }
   }
   if (
-    existing.type === 'tool-input-delta' &&
-    next.type === 'tool-input-delta' &&
-    existing.toolCallId === next.toolCallId
+    existing.type === 'tool-input-delta'
+    && next.type === 'tool-input-delta'
+    && existing.toolCallId === next.toolCallId
   ) {
     if (existing.inputTextDelta.length + next.inputTextDelta.length > maxDeltaChars) {
       return null
     }
     return {
       ...next,
-      inputTextDelta: `${existing.inputTextDelta}${next.inputTextDelta}`
+      inputTextDelta: `${existing.inputTextDelta}${next.inputTextDelta}`,
     }
   }
   if (
-    existing.type === 'tool-output-available' &&
-    next.type === 'tool-output-available' &&
-    existing.toolCallId === next.toolCallId
+    existing.type === 'tool-output-available'
+    && next.type === 'tool-output-available'
+    && existing.toolCallId === next.toolCallId
   ) {
     return next
   }

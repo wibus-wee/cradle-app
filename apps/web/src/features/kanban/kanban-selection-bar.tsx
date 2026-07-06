@@ -1,8 +1,8 @@
 import {
   CheckLine as CheckIcon,
   CircleDashLine as CircleDashedIcon,
+  CloseLine as XIcon,
   Flag2Line as FlagIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
 import { AnimatePresence, m } from 'motion/react'
 import { useTranslation } from 'react-i18next'

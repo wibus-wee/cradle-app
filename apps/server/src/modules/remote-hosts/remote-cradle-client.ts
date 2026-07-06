@@ -66,12 +66,12 @@ export interface RemoteCradleServerHealthPayload {
 }
 
 export interface RemoteCradleClient {
-  readHealth(): Promise<RemoteCradleServerHealthPayload>
-  listWorkspaces(): Promise<RemoteWorkspaceView[]>
-  listWorkspaceFiles(remoteWorkspaceId: string): Promise<RemoteWorkspaceFileEntry[]>
-  listWorkspaceFileChildren(remoteWorkspaceId: string, relativePath: string): Promise<RemoteWorkspaceFileEntry[]>
-  readWorkspaceFileContent(remoteWorkspaceId: string, relativePath: string): Promise<RemoteWorkspaceFileContent>
-  readWorkspaceFileInfo(remoteWorkspaceId: string, relativePath: string): Promise<RemoteWorkspaceFileInfo | null>
+  readHealth: () => Promise<RemoteCradleServerHealthPayload>
+  listWorkspaces: () => Promise<RemoteWorkspaceView[]>
+  listWorkspaceFiles: (remoteWorkspaceId: string) => Promise<RemoteWorkspaceFileEntry[]>
+  listWorkspaceFileChildren: (remoteWorkspaceId: string, relativePath: string) => Promise<RemoteWorkspaceFileEntry[]>
+  readWorkspaceFileContent: (remoteWorkspaceId: string, relativePath: string) => Promise<RemoteWorkspaceFileContent>
+  readWorkspaceFileInfo: (remoteWorkspaceId: string, relativePath: string) => Promise<RemoteWorkspaceFileInfo | null>
 }
 
 export function createRemoteCradleClient(baseUrl: string): RemoteCradleClient {

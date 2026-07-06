@@ -1,3 +1,11 @@
+import {
+  Box3Line as BoxesIcon,
+  FileLine as FileIcon,
+  Flag2Line as FlagIcon,
+  GitPullRequestLine as GitPullRequestIcon,
+  Message1Line as MessageSquareIcon,
+  RobotLine as BotIcon,
+} from '@mingcute/react'
 import type { Editor, Range } from '@tiptap/core'
 import { mergeAttributes, Node } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
@@ -5,14 +13,6 @@ import type { ReactNodeViewProps } from '@tiptap/react'
 import { NodeViewWrapper, ReactNodeViewRenderer, ReactRenderer } from '@tiptap/react'
 import type { SuggestionKeyDownProps, SuggestionOptions } from '@tiptap/suggestion'
 import Suggestion from '@tiptap/suggestion'
-import {
-  RobotLine as BotIcon,
-  Box3Line as BoxesIcon,
-  FileLine as FileIcon,
-  Flag2Line as FlagIcon,
-  GitPullRequestLine as GitPullRequestIcon,
-  Message1Line as MessageSquareIcon
-} from '@mingcute/react'
 import { useState } from 'react'
 import type { MarkdownNodeSpec } from 'tiptap-markdown'
 

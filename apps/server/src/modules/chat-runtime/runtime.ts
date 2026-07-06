@@ -64,15 +64,15 @@ import {
   recordActiveRunSnapshotEvent,
   startActiveRunSnapshot,
 } from './run/active-run-snapshot'
-import {
-  scheduleRuntimeGoalContinuation,
-  type RuntimeGoalContinuationSchedulerDeps,
-} from './run/runtime-goal-continuation'
 import { serializeChatError } from './run/errors'
 import type { CreateRunInput, RunCoordinatorDeps } from './run/run-coordinator'
 import {
   createRun as createRunFromCoordinator,
 } from './run/run-coordinator'
+import type { RuntimeGoalContinuationSchedulerDeps } from './run/runtime-goal-continuation'
+import {
+  scheduleRuntimeGoalContinuation,
+} from './run/runtime-goal-continuation'
 import { isTerminalUIMessageChunk } from './run/stream-chunks'
 import { createTerminalRunFinalizer } from './run/terminal-finalizer'
 import type { TurnExecutorDeps } from './run/turn-executor'

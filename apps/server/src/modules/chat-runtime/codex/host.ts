@@ -4,40 +4,40 @@ import { eq } from 'drizzle-orm'
 import { AppError } from '../../../errors/app-error'
 import { db } from '../../../infra'
 import { createChildLogger } from '../../../logging/logger'
-import { readProviderStateSnapshot } from '../../chat-runtime-providers/kit/state-snapshot'
 import type {
   CodexAppServerInvokeInput as ProviderCodexAppServerInvokeInput,
   CodexAppServerInvokeResponse,
-  CodexAppServerStreamInput as ProviderCodexAppServerStreamInput
+  CodexAppServerStreamInput as ProviderCodexAppServerStreamInput,
 } from '../../chat-runtime-providers/codex/app-server/bridge'
+import { readProviderStateSnapshot } from '../../chat-runtime-providers/kit/state-snapshot'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
+import type {
+  ChatRuntime,
+  RuntimeProviderTargetProfile,
+  RuntimeSession,
+} from '../runtime-provider-types'
+import type { SessionRunContext } from '../runtime-session-context'
 import {
   assertRuntimeCompatibleTarget,
   attachBinding,
   getSessionRunContext,
   isProviderTargetAvailable,
   readSessionRequestedModelId,
-  resolveRuntimeSessionForContext
+  resolveRuntimeSessionForContext,
 } from '../runtime-session-context'
-import type {
-  ChatRuntime,
-  RuntimeProviderTargetProfile,
-  RuntimeSession
-} from '../runtime-provider-types'
-import type { SessionRunContext } from '../runtime-session-context'
 
 const codexHostLogger = createChildLogger({ module: 'chat-runtime.codex-host' })
 
 type ProviderBoundSessionRunContext = SessionRunContext & {
   profile: RuntimeProviderTargetProfile
-  providerTarget: { id: string; kind: 'manual' | 'external' }
+  providerTarget: { id: string, kind: 'manual' | 'external' }
 }
 
 type CodexAppServerRuntime = ChatRuntime & {
-  invokeCodexAppServer(
-    input: ProviderCodexAppServerInvokeInput
-  ): Promise<CodexAppServerInvokeResponse>
-  openCodexAppServerStream(input: ProviderCodexAppServerStreamInput): ReadableStream<Uint8Array>
+  invokeCodexAppServer: (
+    input: ProviderCodexAppServerInvokeInput,
+  ) => Promise<CodexAppServerInvokeResponse>
+  openCodexAppServerStream: (input: ProviderCodexAppServerStreamInput) => ReadableStream<Uint8Array>
 }
 
 export interface CodexAppServerInvokeInput {
@@ -53,41 +53,41 @@ export interface CodexAppServerStreamInput extends CodexAppServerInvokeInput {
 }
 
 export async function invokeCodexAppServer(
-  input: CodexAppServerInvokeInput
+  input: CodexAppServerInvokeInput,
 ): Promise<CodexAppServerInvokeResponse> {
   const context = await resolveCodexAppServerContext(input)
   const response = await context.runtime.invokeCodexAppServer({
     ...context,
     method: input.method,
-    params: input.params
+    params: input.params,
   })
   persistCodexAppServerRuntimeSession({
     sessionId: input.sessionId,
     runtimeSession: context.runtimeSession,
     providerTargetId: readRequiredCodexProviderTargetId(context.runtimeSession),
     requestedModelId:
-      input.modelId ??
-      readProviderStateSnapshot(context.runtimeSession.providerStateSnapshot).models.currentModelId
+      input.modelId
+      ?? readProviderStateSnapshot(context.runtimeSession.providerStateSnapshot).models.currentModelId,
   })
   return response
 }
 
 export async function openCodexAppServerStream(
-  input: CodexAppServerStreamInput
+  input: CodexAppServerStreamInput,
 ): Promise<ReadableStream<Uint8Array>> {
   const context = await resolveCodexAppServerContext(input)
   const stream = context.runtime.openCodexAppServerStream({
     ...context,
     method: input.method,
     params: input.params,
-    closeOnMethods: input.closeOnMethods
+    closeOnMethods: input.closeOnMethods,
   })
   return persistCodexAppServerRuntimeSessionAfterStream({
     stream,
     sessionId: input.sessionId,
     runtimeSession: context.runtimeSession,
     providerTargetId: readRequiredCodexProviderTargetId(context.runtimeSession),
-    modelId: input.modelId
+    modelId: input.modelId,
   })
 }
 
@@ -96,7 +96,7 @@ function readRequiredCodexProviderTargetId(runtimeSession: RuntimeSession): stri
     throw new AppError({
       code: 'codex_provider_target_required',
       status: 409,
-      message: 'Codex app-server bridge requires a provider target binding.'
+      message: 'Codex app-server bridge requires a provider target binding.',
     })
   }
   return runtimeSession.providerTargetId
@@ -114,15 +114,15 @@ function persistCodexAppServerRuntimeSession(input: {
     .where(eq(sessions.id, input.sessionId))
     .get()
   if (
-    session?.providerTargetId !== input.providerTargetId ||
-    !isProviderTargetAvailable(input.providerTargetId)
+    session?.providerTargetId !== input.providerTargetId
+    || !isProviderTargetAvailable(input.providerTargetId)
   ) {
     codexHostLogger.warn(
       'skipped app-server runtime session persistence after provider target changed',
       {
         sessionId: input.sessionId,
-        providerTargetId: input.providerTargetId
-      }
+        providerTargetId: input.providerTargetId,
+      },
     )
     return
   }
@@ -131,7 +131,7 @@ function persistCodexAppServerRuntimeSession(input: {
     providerTargetId: input.providerTargetId,
     runtimeKind: input.runtimeSession.runtimeKind,
     runtimeSession: input.runtimeSession,
-    requestedModelId: input.requestedModelId
+    requestedModelId: input.requestedModelId,
   })
 }
 
@@ -164,8 +164,8 @@ function persistCodexAppServerRuntimeSessionAfterStream(input: {
       runtimeSession: input.runtimeSession,
       providerTargetId: input.providerTargetId,
       requestedModelId:
-        input.modelId ??
-        readProviderStateSnapshot(input.runtimeSession.providerStateSnapshot).models.currentModelId
+        input.modelId
+        ?? readProviderStateSnapshot(input.runtimeSession.providerStateSnapshot).models.currentModelId,
     })
   }
 
@@ -180,7 +180,8 @@ function persistCodexAppServerRuntimeSessionAfterStream(input: {
           return
         }
         controller.enqueue(chunk.value)
-      } catch (error) {
+      }
+ catch (error) {
         persist()
         releaseReader()
         controller.error(error)
@@ -189,11 +190,12 @@ function persistCodexAppServerRuntimeSessionAfterStream(input: {
     async cancel(reason) {
       try {
         await reader.cancel(reason)
-      } finally {
+      }
+ finally {
         persist()
         releaseReader()
       }
-    }
+    },
   })
 }
 
@@ -203,14 +205,14 @@ async function resolveCodexAppServerContext(input: {
   modelId?: string
 }) {
   const context = getSessionRunContext(input.sessionId, {
-    providerTargetId: input.providerTargetId
+    providerTargetId: input.providerTargetId,
   })
   if (!context) {
     throw new AppError({
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
   if ((context.session.runtimeKind ?? 'standard') !== 'codex') {
@@ -220,12 +222,12 @@ async function resolveCodexAppServerContext(input: {
       message: 'Codex app-server calls require a Codex chat runtime session',
       details: {
         sessionId: input.sessionId,
-        runtimeKind: context.session.runtimeKind ?? 'standard'
-      }
+        runtimeKind: context.session.runtimeKind ?? 'standard',
+      },
     })
   }
   const providerBoundContext = assertCodexProviderBoundContext(
-    assertRuntimeCompatibleTarget(context, input.providerTargetId)
+    assertRuntimeCompatibleTarget(context, input.providerTargetId),
   )
 
   const runtime = getRuntimeRegistry().get('codex')
@@ -233,24 +235,24 @@ async function resolveCodexAppServerContext(input: {
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: 'Runtime is not available: codex'
+      message: 'Runtime is not available: codex',
     })
   }
 
-  const requestedModelId =
-    input.modelId ??
-    readSessionRequestedModelId({
+  const requestedModelId
+    = input.modelId
+      ?? readSessionRequestedModelId({
       session: context.session,
-      requestedProviderTargetId: input.providerTargetId
+      requestedProviderTargetId: input.providerTargetId,
     })
-  const { runtimeSession, requestedModelId: resolvedModelId } =
-    await resolveRuntimeSessionForContext({
+  const { runtimeSession, requestedModelId: resolvedModelId }
+    = await resolveRuntimeSessionForContext({
       sessionId: input.sessionId,
       context: providerBoundContext,
       runtimeKind: 'codex',
       runtime,
       modelId: requestedModelId,
-      requestedProviderTargetId: input.providerTargetId
+      requestedProviderTargetId: input.providerTargetId,
     })
 
   attachBinding({
@@ -259,9 +261,9 @@ async function resolveCodexAppServerContext(input: {
     runtimeKind: runtimeSession.runtimeKind,
     runtimeSession,
     requestedModelId:
-      requestedModelId ??
-      resolvedModelId ??
-      readProviderStateSnapshot(runtimeSession.providerStateSnapshot).models.currentModelId
+      requestedModelId
+      ?? resolvedModelId
+      ?? readProviderStateSnapshot(runtimeSession.providerStateSnapshot).models.currentModelId,
   })
 
   return {
@@ -271,16 +273,16 @@ async function resolveCodexAppServerContext(input: {
     workspaceId: providerBoundContext.session.workspaceId,
     workspacePath: providerBoundContext.workspacePath,
     agentId: providerBoundContext.session.agentId,
-    modelId: requestedModelId ?? resolvedModelId ?? undefined
+    modelId: requestedModelId ?? resolvedModelId ?? undefined,
   }
 }
 
 function isCodexAppServerRuntime(runtime: ChatRuntime | undefined): runtime is CodexAppServerRuntime {
   const candidate = runtime as Partial<CodexAppServerRuntime> | undefined
   return (
-    candidate?.runtimeKind === 'codex' &&
-    typeof candidate.invokeCodexAppServer === 'function' &&
-    typeof candidate.openCodexAppServerStream === 'function'
+    candidate?.runtimeKind === 'codex'
+    && typeof candidate.invokeCodexAppServer === 'function'
+    && typeof candidate.openCodexAppServerStream === 'function'
   )
 }
 
@@ -294,7 +296,7 @@ function assertCodexProviderBoundContext(context: SessionRunContext): ProviderBo
     message: 'Codex app-server bridge requires a provider target binding.',
     details: {
       sessionId: context.session.id,
-      runtimeKind: context.session.runtimeKind ?? 'standard'
-    }
+      runtimeKind: context.session.runtimeKind ?? 'standard',
+    },
   })
 }

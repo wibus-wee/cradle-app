@@ -1,5 +1,6 @@
-import { readFileSync, readdirSync, mkdirSync, cpSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
@@ -12,9 +13,9 @@ interface ChangelogEntry {
   languages: string[]
 }
 
-function parseFrontmatter(content: string): { meta: Record<string, string>; body: string } {
+function parseFrontmatter(content: string): { meta: Record<string, string>, body: string } {
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(content)
-  if (!match) return { meta: {}, body: content }
+  if (!match) { return { meta: {}, body: content } }
   const meta: Record<string, string> = {}
   for (const line of match[1].split('\n')) {
     const idx = line.indexOf(':')
@@ -35,14 +36,14 @@ function changelogIndexPlugin(): Plugin {
       const files = readdirSync(changelogDir).filter(f => f.endsWith('.md'))
 
       // Group files by version: version.zh.md / version.en.md → version
-      const versionMap = new Map<string, { languages: string[]; title: Record<string, string>; date: string }>()
+      const versionMap = new Map<string, { languages: string[], title: Record<string, string>, date: string }>()
 
       mkdirSync(outDir, { recursive: true })
 
       for (const file of files) {
         const content = readFileSync(join(changelogDir, file), 'utf-8')
         const { meta } = parseFrontmatter(content)
-        if (!meta.version || !meta.date) continue
+        if (!meta.version || !meta.date) { continue }
 
         // Extract locale from filename: dev-20260621.1.zh.md → zh
         const localeMatch = /^(.+)\.(\w+)\.md$/.exec(file)
@@ -52,7 +53,8 @@ function changelogIndexPlugin(): Plugin {
         if (existing) {
           existing.languages.push(locale)
           existing.title[locale] = meta.title || ''
-        } else {
+        }
+ else {
           versionMap.set(meta.version, {
             date: meta.date,
             languages: [locale],
@@ -65,8 +67,7 @@ function changelogIndexPlugin(): Plugin {
       }
 
       // Build sorted index
-      const entries: ChangelogEntry[] = [...versionMap.entries()]
-        .map(([version, data]) => ({ version, ...data }))
+      const entries: ChangelogEntry[] = Array.from(versionMap.entries(), ([version, data]) => ({ version, ...data }))
         .sort((a, b) => b.date.localeCompare(a.date))
 
       const indexPath = join(outDir, 'index.json')

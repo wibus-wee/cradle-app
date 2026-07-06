@@ -1,12 +1,12 @@
 import {
-  CalendarLine as CalendarIcon,
-  RightSmallLine as ChevronRightIcon,
-  FullscreenLine as MaximizeIcon,
   AttachmentLine as PaperclipIcon,
+  CalendarLine as CalendarIcon,
+  CloseLine as XIcon,
+  FullscreenLine as MaximizeIcon,
+  RightSmallLine as ChevronRightIcon,
   SearchLine as SearchIcon,
   TagLine as TagsIcon,
   UserXLine as UserRoundXIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
 import { AnimatePresence, m } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
@@ -22,9 +22,9 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
+import type { KanbanIssue, KanbanStatus } from '~/features/kanban/types'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
-import type { KanbanIssue, KanbanStatus } from '~/features/kanban/types'
 
 import { AssigneeAvatar } from './shared/assignee-avatar'
 import { priorityOptions } from './shared/issue-metadata'

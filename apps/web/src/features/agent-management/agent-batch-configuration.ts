@@ -1,7 +1,7 @@
-import type { ProviderTarget } from '~/features/agent-runtime/types'
-import type { Agent, UpdateAgentInput } from '~/features/agent-runtime/use-agents'
 import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 import { runtimeCatalogItemUsesModelSelection } from '~/features/agent-runtime/runtime-catalog'
+import type { ProviderTarget } from '~/features/agent-runtime/types'
+import type { Agent, UpdateAgentInput } from '~/features/agent-runtime/use-agents'
 
 export type AgentBatchThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
 

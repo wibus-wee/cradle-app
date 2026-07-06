@@ -29,13 +29,13 @@ import {
   writeSystemPromptFile,
 } from '../config/runtime-config'
 import { resolveCodexRuntimeContext } from '../config/runtime-context'
+import { isCodexGoalContinuationMessage } from '../goal-continuation'
 import type { CodexUserInput } from './input-projector'
 import {
   isCodexCompactCommand,
   projectCodexUserInput,
   readCodexGoalCommandObjective,
 } from './input-projector'
-import { isCodexGoalContinuationMessage } from '../goal-continuation'
 import { isLiveCodexSideFork } from './thread-lifecycle'
 
 export type CodexStreamRuntimeAccess = ReturnType<typeof projectCodexRuntimeAccessMode>

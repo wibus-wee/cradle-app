@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto'
 
 import { xchacha20poly1305 } from '@noble/ciphers/chacha'
 import { x25519 } from '@noble/curves/ed25519'
-import { hmac } from '@noble/hashes/hmac.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
+import { hmac } from '@noble/hashes/hmac.js'
 import { sha512 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@noble/hashes/utils.js'
 

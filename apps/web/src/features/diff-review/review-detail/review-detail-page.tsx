@@ -1,5 +1,5 @@
-import type { CodeViewItem } from '@pierre/diffs'
 import { GitCompareLine as FileDiffIcon } from '@mingcute/react'
+import type { CodeViewItem } from '@pierre/diffs'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ResizeHandle } from '~/components/layout/resize-handle'

@@ -2,11 +2,11 @@
  * App-wide React error boundary for isolating renderer crashes behind a stable fallback.
  */
 import {
-  WarningLine as AlertTriangleIcon,
   ArrowLeftLine as ArrowLeftIcon,
+  ClockwiseLine as RotateCwIcon,
   RefreshAnticlockwise1Line as RefreshCcwIcon,
-  ClockwiseLine as RotateCwIcon
-} from '@mingcute/react';
+  WarningLine as AlertTriangleIcon,
+} from '@mingcute/react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { Component } from 'react'
 import { Translation } from 'react-i18next'

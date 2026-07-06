@@ -12,7 +12,7 @@ function getRequestUrl(input: Parameters<typeof fetch>[0]): string {
   return new Request(input).url
 }
 
-describe('ProviderCatalog', () => {
+describe('providerCatalog', () => {
   afterEach(() => {
     setCodexChatgptModelListClientFactoryForTests(null)
     vi.restoreAllMocks()
@@ -164,7 +164,7 @@ describe('ProviderCatalog', () => {
 
       expect(init?.headers).toMatchObject({
         'anthropic-version': '2023-06-01',
-        Authorization: 'Bearer volcengine-token',
+        'Authorization': 'Bearer volcengine-token',
       })
       expect(init?.headers).not.toHaveProperty('x-api-key')
       return new Response(JSON.stringify({ data: [{ id: 'glm-5.2', display_name: 'GLM 5.2' }] }), {

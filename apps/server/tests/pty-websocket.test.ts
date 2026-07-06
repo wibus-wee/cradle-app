@@ -11,8 +11,8 @@ import { z } from 'zod'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import type { PtyServerEvent } from '../src/modules/pty/protocol'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 

@@ -1,5 +1,6 @@
 import { StaticRender } from '@cradle/streamdown'
 import { LayoutTopLine as PanelTopIcon } from '@mingcute/react'
+
 interface PlanDocumentViewerProps {
   title: string
   text: string

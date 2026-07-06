@@ -9,10 +9,11 @@ import { app, dialog } from 'electron'
 import getPort from 'get-port'
 import { z } from 'zod'
 
+import type { ManagedChildProcess } from './managed-process'
+import { spawnManagedProcess } from './managed-process'
 import { resolveDesktopInstalledPluginsDir } from './plugin-install-links'
 import { getPluginEnvVars } from './plugin-loader'
 import { resolveDesktopPrimaryPluginsDir, resolveDesktopPrimaryPluginsSourceKind } from './plugin-paths'
-import { spawnManagedProcess, type ManagedChildProcess } from './managed-process'
 
 let serverProcess: ManagedChildProcess | null = null
 let restartCount = 0

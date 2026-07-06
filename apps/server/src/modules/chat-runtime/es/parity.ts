@@ -1,10 +1,8 @@
+import type { BackendRun, ChatSessionQueueItem, Message } from '@cradle/db'
 import {
   backendRuns,
   chatSessionQueueItems,
   messages,
-  type BackendRun,
-  type ChatSessionQueueItem,
-  type Message
 } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
@@ -14,10 +12,10 @@ import { projectSessionEvent } from './projectors'
 
 export type ChatEsProjectionTable = 'messages' | 'backend_runs' | 'chat_session_queue_items'
 
-export type ChatEsParityDiffKind =
-  | 'extra_projection_row'
-  | 'missing_projection_row'
-  | 'changed_projection_row'
+export type ChatEsParityDiffKind
+  = | 'extra_projection_row'
+    | 'missing_projection_row'
+    | 'changed_projection_row'
 
 export type ChatEsParityClassification = 'expected_logless_write' | 'unexplained_drift'
 
@@ -67,7 +65,7 @@ export function checkChatSessionProjectionParity(sessionId: string): ChatEsParit
     diffCount: diffs.length,
     expectedLoglessDiffs: diffs.filter(diff => diff.classification === 'expected_logless_write'),
     unexplainedDiffs: diffs.filter(diff => diff.classification === 'unexplained_drift'),
-    diffs
+    diffs,
   }
 }
 
@@ -91,7 +89,8 @@ function replayProjectionRows(sessionId: string): ProjectionRows {
 
       throw new ProjectionReplayRollback(readProjectionRows(sessionId, tx))
     })
-  } catch (error) {
+  }
+ catch (error) {
     if (error instanceof ProjectionReplayRollback) {
       return error.rows
     }
@@ -103,7 +102,7 @@ function replayProjectionRows(sessionId: string): ProjectionRows {
 
 function readProjectionRows(
   sessionId: string,
-  d: Pick<ReturnType<typeof db>, 'select'> = db()
+  d: Pick<ReturnType<typeof db>, 'select'> = db(),
 ): ProjectionRows {
   return {
     messages: d.select().from(messages).where(eq(messages.sessionId, sessionId)).all(),
@@ -112,7 +111,7 @@ function readProjectionRows(
       .select()
       .from(chatSessionQueueItems)
       .where(eq(chatSessionQueueItems.sessionId, sessionId))
-      .all()
+      .all(),
   }
 }
 
@@ -123,15 +122,15 @@ function diffProjectionRows(actualRows: ProjectionRows, replayedRows: Projection
     ...diffTable(
       'chat_session_queue_items',
       actualRows.chat_session_queue_items,
-      replayedRows.chat_session_queue_items
-    )
+      replayedRows.chat_session_queue_items,
+    ),
   ]
 }
 
 function diffTable(
   table: ChatEsProjectionTable,
   actualRows: ProjectionRow[],
-  replayedRows: ProjectionRow[]
+  replayedRows: ProjectionRow[],
 ): ChatEsParityDiff[] {
   const actualById = rowsById(actualRows)
   const replayedById = rowsById(replayedRows)
@@ -148,7 +147,7 @@ function diffTable(
         kind: 'extra_projection_row',
         changedFields: Object.keys(actual).sort(),
         actual,
-        replayed
+        replayed,
       }))
       continue
     }
@@ -159,7 +158,7 @@ function diffTable(
         kind: 'missing_projection_row',
         changedFields: Object.keys(replayed).sort(),
         actual,
-        replayed
+        replayed,
       }))
       continue
     }
@@ -175,7 +174,7 @@ function diffTable(
         kind: 'changed_projection_row',
         changedFields,
         actual,
-        replayed
+        replayed,
       }))
     }
   }
@@ -192,17 +191,17 @@ function readChangedFields(actual: ProjectionRow, replayed: ProjectionRow): stri
   return [...fieldNames]
     .filter(fieldName => !Object.is(
       actual[fieldName as keyof ProjectionRow],
-      replayed[fieldName as keyof ProjectionRow]
+      replayed[fieldName as keyof ProjectionRow],
     ))
     .sort()
 }
 
 function classifyDiff(
-  input: Omit<ChatEsParityDiff, 'classification' | 'category'>
+  input: Omit<ChatEsParityDiff, 'classification' | 'category'>,
 ): ChatEsParityDiff {
   return {
     ...input,
     classification: 'unexplained_drift',
-    category: 'unexplained_projection_drift'
+    category: 'unexplained_projection_drift',
   }
 }

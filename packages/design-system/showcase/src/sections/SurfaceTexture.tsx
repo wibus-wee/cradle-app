@@ -161,7 +161,8 @@ export default function SurfaceTexture({ lang }: SurfaceTextureProps) {
               color: 'var(--color-neutral-7)',
             }}
             >
-              shadow-{name}
+              shadow-
+{name}
             </div>
             <p style={{ margin: 0, fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--color-neutral-6)' }}>{use}</p>
           </div>

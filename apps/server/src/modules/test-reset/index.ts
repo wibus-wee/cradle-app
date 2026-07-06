@@ -32,7 +32,7 @@ import {
   runtimeAuditLog,
   sessions,
   usageLogs,
-  workspaces
+  workspaces,
 } from '@cradle/db'
 import { sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
@@ -70,7 +70,7 @@ const TABLES_IN_DELETION_ORDER = [
   observabilityEvents,
   workspaces,
   agents,
-  agentCredentials
+  agentCredentials,
 ] as const
 
 function isPathInside(parentDir: string, childDir: string): boolean {
@@ -104,7 +104,7 @@ function resolveIsolatedPreferencesDir(): string | null {
 
 export const testReset = new Elysia({
   prefix: '/test/reset',
-  detail: { tags: ['test-reset'] }
+  detail: { tags: ['test-reset'] },
 }).post(
   '/',
   async () => {
@@ -115,7 +115,8 @@ export const testReset = new Elysia({
       for (const table of TABLES_IN_DELETION_ORDER) {
         d.delete(table).run()
       }
-    } finally {
+    }
+ finally {
       d.run(sql`PRAGMA foreign_keys = ON`)
     }
 
@@ -124,7 +125,8 @@ export const testReset = new Elysia({
       if (isolatedHomeSkillsDir && fs.existsSync(isolatedHomeSkillsDir)) {
         fs.rmSync(isolatedHomeSkillsDir, { recursive: true, force: true })
       }
-    } catch {
+    }
+ catch {
       /* best effort */
     }
 
@@ -133,7 +135,8 @@ export const testReset = new Elysia({
       if (preferencesDir && fs.existsSync(preferencesDir)) {
         fs.rmSync(preferencesDir, { recursive: true, force: true })
       }
-    } catch {
+    }
+ catch {
       /* best effort */
     }
 
@@ -141,6 +144,6 @@ export const testReset = new Elysia({
   },
   {
     detail: { summary: 'Reset all tables for testing' },
-    response: { 200: t.Object({ ok: t.Literal(true) }) }
-  }
+    response: { 200: t.Object({ ok: t.Literal(true) }) },
+  },
 )

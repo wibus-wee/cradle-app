@@ -49,8 +49,8 @@ export const runtimeUiSlotSchema = t.Object({
       t.Literal('status'),
       t.Literal('terminal'),
       t.Literal('tool-activity'),
-      t.Literal('usage')
-    ])
+      t.Literal('usage'),
+    ]),
   ),
   commandText: t.Optional(t.String()),
   commandAction: t.Optional(runtimeUiSlotCommandActionSchema),
@@ -63,9 +63,9 @@ export const runtimeUiSlotSchema = t.Object({
       t.Literal('messageInline'),
       t.Literal('runtimePanel'),
       t.Literal('streamEvidence'),
-      t.Literal('recordOnly')
-    ])
-  )
+      t.Literal('recordOnly'),
+    ]),
+  ),
 })
 
 export const runtimeGoalStatusSchema = t.Union([
@@ -74,7 +74,7 @@ export const runtimeGoalStatusSchema = t.Union([
   t.Literal('blocked'),
   t.Literal('usageLimited'),
   t.Literal('budgetLimited'),
-  t.Literal('complete')
+  t.Literal('complete'),
 ])
 
 export const runtimeGoalUiSlotStateSchema = t.Object({
@@ -87,7 +87,7 @@ export const runtimeGoalUiSlotStateSchema = t.Object({
   tokensUsed: t.Number(),
   timeUsedSeconds: t.Number(),
   createdAt: t.Number(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeTokenUsageBreakdownSchema = t.Object({
@@ -95,7 +95,7 @@ export const runtimeTokenUsageBreakdownSchema = t.Object({
   inputTokens: t.Number(),
   cachedInputTokens: t.Number(),
   outputTokens: t.Number(),
-  reasoningOutputTokens: t.Number()
+  reasoningOutputTokens: t.Number(),
 })
 
 export const runtimeCompactStatusSchema = t.Union([
@@ -103,7 +103,7 @@ export const runtimeCompactStatusSchema = t.Union([
   t.Literal('running'),
   t.Literal('nearLimit'),
   t.Literal('overLimit'),
-  t.Literal('compacted')
+  t.Literal('compacted'),
 ])
 
 export const runtimeCompactUiSlotStateSchema = t.Object({
@@ -121,7 +121,7 @@ export const runtimeCompactUiSlotStateSchema = t.Object({
   autoCompactPercent: t.Union([t.Number(), t.Null()]),
   lastCompactedAt: t.Union([t.Number(), t.Null()]),
   compactionItemId: t.Union([t.String(), t.Null()]),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeStatusUiSlotStateSchema = t.Object({
@@ -132,10 +132,10 @@ export const runtimeStatusUiSlotStateSchema = t.Object({
     t.Literal('notLoaded'),
     t.Literal('idle'),
     t.Literal('systemError'),
-    t.Literal('active')
+    t.Literal('active'),
   ]),
   activeFlags: t.Array(t.String()),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeModelUiSlotStateSchema = t.Object({
@@ -149,7 +149,7 @@ export const runtimeModelUiSlotStateSchema = t.Object({
   supportsImages: t.Union([t.Boolean(), t.Null()]),
   supportsWebSearch: t.Union([t.Boolean(), t.Null()]),
   supportsNamespaceTools: t.Union([t.Boolean(), t.Null()]),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeReasoningUiSlotStateSchema = t.Object({
@@ -161,16 +161,16 @@ export const runtimeReasoningUiSlotStateSchema = t.Object({
   supportedEfforts: t.Array(
     t.Object({
       id: t.String(),
-      description: t.String()
-    })
+      description: t.String(),
+    }),
   ),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimePlanStepStatusSchema = t.Union([
   t.Literal('pending'),
   t.Literal('inProgress'),
-  t.Literal('completed')
+  t.Literal('completed'),
 ])
 
 export const runtimePlanUiSlotStateSchema = t.Object({
@@ -183,14 +183,14 @@ export const runtimePlanUiSlotStateSchema = t.Object({
   steps: t.Array(
     t.Object({
       step: t.String(),
-      status: runtimePlanStepStatusSchema
-    })
+      status: runtimePlanStepStatusSchema,
+    }),
   ),
   currentStep: t.Union([t.String(), t.Null()]),
   pendingCount: t.Number(),
   inProgressCount: t.Number(),
   completedCount: t.Number(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeProgressUiSlotStateSchema = t.Object({
@@ -204,14 +204,14 @@ export const runtimeProgressUiSlotStateSchema = t.Object({
       id: t.Union([t.String(), t.Null()]),
       label: t.String(),
       status: runtimePlanStepStatusSchema,
-      sourceStatus: t.Union([t.String(), t.Null()])
-    })
+      sourceStatus: t.Union([t.String(), t.Null()]),
+    }),
   ),
   currentItem: t.Union([t.String(), t.Null()]),
   pendingCount: t.Number(),
   inProgressCount: t.Number(),
   completedCount: t.Number(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeUserInputQuestionSchema = t.Object({
@@ -225,11 +225,11 @@ export const runtimeUserInputQuestionSchema = t.Object({
     t.Array(
       t.Object({
         label: t.String(),
-        description: t.String()
-      })
+        description: t.String(),
+      }),
     ),
-    t.Null()
-  ])
+    t.Null(),
+  ]),
 })
 
 export const runtimeUserInputUiSlotStateSchema = t.Object({
@@ -243,13 +243,13 @@ export const runtimeUserInputUiSlotStateSchema = t.Object({
   questionCount: t.Number(),
   questions: t.Array(runtimeUserInputQuestionSchema),
   createdAt: t.Number(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeToolActivityStatusSchema = t.Union([
   t.Literal('running'),
   t.Literal('completed'),
-  t.Literal('failed')
+  t.Literal('failed'),
 ])
 
 export const runtimeToolActivityUiSlotStateSchema = t.Object({
@@ -267,10 +267,10 @@ export const runtimeToolActivityUiSlotStateSchema = t.Object({
       label: t.String(),
       status: runtimeToolActivityStatusSchema,
       startedAt: t.Union([t.Number(), t.Null()]),
-      completedAt: t.Union([t.Number(), t.Null()])
-    })
+      completedAt: t.Union([t.Number(), t.Null()]),
+    }),
   ),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeMcpServerStatusSchema = t.Union([
@@ -278,7 +278,7 @@ export const runtimeMcpServerStatusSchema = t.Union([
   t.Literal('ready'),
   t.Literal('failed'),
   t.Literal('cancelled'),
-  t.Literal('unknown')
+  t.Literal('unknown'),
 ])
 
 export const runtimeMcpAuthStatusSchema = t.Union([
@@ -286,7 +286,7 @@ export const runtimeMcpAuthStatusSchema = t.Union([
   t.Literal('notLoggedIn'),
   t.Literal('bearerToken'),
   t.Literal('oAuth'),
-  t.Literal('unknown')
+  t.Literal('unknown'),
 ])
 
 export const runtimeMcpUiSlotStateSchema = t.Object({
@@ -305,10 +305,10 @@ export const runtimeMcpUiSlotStateSchema = t.Object({
       authStatus: runtimeMcpAuthStatusSchema,
       toolCount: t.Number(),
       resourceCount: t.Number(),
-      error: t.Union([t.String(), t.Null()])
-    })
+      error: t.Union([t.String(), t.Null()]),
+    }),
   ),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeDiffUiSlotStateSchema = t.Object({
@@ -320,7 +320,7 @@ export const runtimeDiffUiSlotStateSchema = t.Object({
   addedLines: t.Number(),
   removedLines: t.Number(),
   hasDiff: t.Boolean(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeBackgroundTerminalSchema = t.Object({
@@ -330,7 +330,7 @@ export const runtimeBackgroundTerminalSchema = t.Object({
   cwd: t.String(),
   osPid: t.Union([t.Number(), t.Null()]),
   cpuPercent: t.Union([t.Number(), t.Null()]),
-  rssKb: t.Union([t.Number(), t.Null()])
+  rssKb: t.Union([t.Number(), t.Null()]),
 })
 
 export const runtimeTerminalUiSlotStateSchema = t.Object({
@@ -344,7 +344,7 @@ export const runtimeTerminalUiSlotStateSchema = t.Object({
   lastCommand: t.Union([t.String(), t.Null()]),
   lastOutputPreview: t.Union([t.String(), t.Null()]),
   backgroundTerminals: t.Array(runtimeBackgroundTerminalSchema),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeApprovalStatusSchema = t.Union([
@@ -352,7 +352,7 @@ export const runtimeApprovalStatusSchema = t.Union([
   t.Literal('approved'),
   t.Literal('denied'),
   t.Literal('timedOut'),
-  t.Literal('aborted')
+  t.Literal('aborted'),
 ])
 
 export const runtimeApprovalsUiSlotStateSchema = t.Object({
@@ -372,16 +372,16 @@ export const runtimeApprovalsUiSlotStateSchema = t.Object({
       riskLevel: t.Union([t.String(), t.Null()]),
       rationale: t.Union([t.String(), t.Null()]),
       startedAt: t.Union([t.Number(), t.Null()]),
-      completedAt: t.Union([t.Number(), t.Null()])
-    })
+      completedAt: t.Union([t.Number(), t.Null()]),
+    }),
   ),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeAlertSeveritySchema = t.Union([
   t.Literal('info'),
   t.Literal('warning'),
-  t.Literal('error')
+  t.Literal('error'),
 ])
 
 export const runtimeAlertUiSlotStateSchema = t.Object({
@@ -396,10 +396,10 @@ export const runtimeAlertUiSlotStateSchema = t.Object({
       severity: runtimeAlertSeveritySchema,
       message: t.String(),
       source: t.String(),
-      updatedAt: t.Number()
-    })
+      updatedAt: t.Number(),
+    }),
   ),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeFilesystemUiSlotStateSchema = t.Object({
@@ -408,7 +408,7 @@ export const runtimeFilesystemUiSlotStateSchema = t.Object({
   threadId: t.String(),
   changedPathCount: t.Number(),
   recentPaths: t.Array(t.String()),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeSkillsUiSlotStateSchema = t.Object({
@@ -419,7 +419,7 @@ export const runtimeSkillsUiSlotStateSchema = t.Object({
   disabledCount: t.Number(),
   errorCount: t.Number(),
   roots: t.Array(t.String()),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimePluginUiSlotStateSchema = t.Object({
@@ -431,7 +431,7 @@ export const runtimePluginUiSlotStateSchema = t.Object({
   appCount: t.Number(),
   marketplaceCount: t.Number(),
   errorCount: t.Number(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeSearchUiSlotStateSchema = t.Object({
@@ -441,14 +441,14 @@ export const runtimeSearchUiSlotStateSchema = t.Object({
   recentResultCount: t.Number(),
   recentQuery: t.Union([t.String(), t.Null()]),
   fuzzySessionActive: t.Boolean(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeCrewCollaborationModeSchema = t.Object({
   name: t.String(),
   mode: t.Union([t.String(), t.Null()]),
   model: t.Union([t.String(), t.Null()]),
-  reasoningEffort: t.Union([t.String(), t.Null()])
+  reasoningEffort: t.Union([t.String(), t.Null()]),
 })
 
 export const runtimeCrewAgentItemSchema = t.Object({
@@ -459,7 +459,7 @@ export const runtimeCrewAgentItemSchema = t.Object({
   preview: t.Union([t.String(), t.Null()]),
   modelProvider: t.Union([t.String(), t.Null()]),
   agentNickname: t.Union([t.String(), t.Null()]),
-  agentRole: t.Union([t.String(), t.Null()])
+  agentRole: t.Union([t.String(), t.Null()]),
 })
 
 export const runtimeCrewCallItemSchema = t.Object({
@@ -473,7 +473,7 @@ export const runtimeCrewCallItemSchema = t.Object({
   reasoningEffort: t.Union([t.String(), t.Null()]),
   agents: t.Array(runtimeCrewAgentItemSchema),
   startedAt: t.Union([t.Number(), t.Null()]),
-  completedAt: t.Union([t.Number(), t.Null()])
+  completedAt: t.Union([t.Number(), t.Null()]),
 })
 
 export const runtimeCrewUiSlotStateSchema = t.Object({
@@ -490,14 +490,14 @@ export const runtimeCrewUiSlotStateSchema = t.Object({
       label: t.String(),
       status: runtimeToolActivityStatusSchema,
       startedAt: t.Union([t.Number(), t.Null()]),
-      completedAt: t.Union([t.Number(), t.Null()])
-    })
+      completedAt: t.Union([t.Number(), t.Null()]),
+    }),
   ),
   agents: t.Array(runtimeCrewAgentItemSchema),
   collaborationModeCount: t.Number(),
   collaborationModes: t.Array(runtimeCrewCollaborationModeSchema),
   calls: t.Array(runtimeCrewCallItemSchema),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeUsageUiSlotStateSchema = t.Object({
@@ -515,7 +515,7 @@ export const runtimeUsageUiSlotStateSchema = t.Object({
   hasCredits: t.Union([t.Boolean(), t.Null()]),
   rateLimitReachedType: t.Union([t.String(), t.Null()]),
   planType: t.Union([t.String(), t.Null()]),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeConfigUiSlotStateSchema = t.Object({
@@ -529,7 +529,7 @@ export const runtimeConfigUiSlotStateSchema = t.Object({
   allowedSandboxModeCount: t.Union([t.Number(), t.Null()]),
   featureRequirementCount: t.Union([t.Number(), t.Null()]),
   webSearchModeCount: t.Union([t.Number(), t.Null()]),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeContextUsageItemSchema = t.Object({
@@ -537,7 +537,7 @@ export const runtimeContextUsageItemSchema = t.Object({
   label: t.String(),
   tokenCount: t.Number(),
   metadata: t.Optional(t.Record(t.String(), t.Any())),
-  raw: t.Optional(t.Any())
+  raw: t.Optional(t.Any()),
 })
 
 export const runtimeContextUsageSectionSchema = t.Object({
@@ -547,7 +547,7 @@ export const runtimeContextUsageSectionSchema = t.Object({
   color: t.Union([t.String(), t.Null()]),
   isDeferred: t.Boolean(),
   items: t.Array(runtimeContextUsageItemSchema),
-  raw: t.Optional(t.Any())
+  raw: t.Optional(t.Any()),
 })
 
 export const runtimeContextUsageSchema = t.Object({
@@ -563,7 +563,7 @@ export const runtimeContextUsageSchema = t.Object({
   messageBreakdown: t.Union([t.Record(t.String(), t.Any()), t.Null()]),
   apiUsage: t.Union([t.Record(t.String(), t.Any()), t.Null()]),
   raw: t.Any(),
-  updatedAt: t.Number()
+  updatedAt: t.Number(),
 })
 
 export const runtimeUiSlotStateSchema = t.Union([
@@ -587,5 +587,5 @@ export const runtimeUiSlotStateSchema = t.Union([
   runtimeSearchUiSlotStateSchema,
   runtimeCrewUiSlotStateSchema,
   runtimeUsageUiSlotStateSchema,
-  runtimeConfigUiSlotStateSchema
+  runtimeConfigUiSlotStateSchema,
 ])

@@ -3,12 +3,12 @@ import {
   Heading1Line as Heading1Icon,
   Heading2Line as Heading2Icon,
   Heading3Line as Heading3Icon,
-  PlaylistLine as ListIcon,
   ListOrderedLine as ListOrderedIcon,
-  ToDoLine as ListTodoIcon,
-  SubtractLine as MinusIcon,
+  PlaylistLine as ListIcon,
   QuoteLeftLine as QuoteIcon,
-  TextLine as TextIcon
+  SubtractLine as MinusIcon,
+  TextLine as TextIcon,
+  ToDoLine as ListTodoIcon,
 } from '@mingcute/react'
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 

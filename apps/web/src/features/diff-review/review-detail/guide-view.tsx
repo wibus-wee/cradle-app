@@ -38,8 +38,8 @@ import {
   formatAnchorRange,
   guideAnchorsForPath,
 } from '../shared/diff-items'
-import { useProviderBackedDiffRuntimeSelection } from '../shared/runtime-options'
 import { navigateToReview, navigateToReviewAtAnchor } from '../shared/navigation'
+import { useProviderBackedDiffRuntimeSelection } from '../shared/runtime-options'
 import type { GenerateGuideInput, ReviewFile, ReviewGuideAnchor, ReviewGuideStep, ReviewThread } from '../shared/types'
 import { useReview } from '../shared/use-review'
 
@@ -195,7 +195,9 @@ function GuideRegenBanner({
           onClick={() => setShowOutput(value => !value)}
           className="ml-1 rounded px-1.5 py-0.5 text-[10px] text-current/70 transition-colors hover:bg-orange-500/10"
         >
-          {showOutput ? 'Hide' : 'Show'} output
+          {showOutput ? 'Hide' : 'Show'}
+{' '}
+output
         </button>
         <Button
           type="button"
@@ -417,10 +419,22 @@ function ProvenanceLine({
     parts.push({ key: 'model', node: <span className="font-mono">{guide.modelId}</span> })
   }
   if (relativeTime) {
-    parts.push({ key: 'time', node: <span>generated {relativeTime}</span> })
+    parts.push({ key: 'time', node: (
+<span>
+generated
+{relativeTime}
+</span>
+) })
   }
   if (fileCount != null) {
-    parts.push({ key: 'files', node: <span>{fileCount} file{fileCount === 1 ? '' : 's'}</span> })
+    parts.push({ key: 'files', node: (
+<span>
+{fileCount}
+{' '}
+file
+{fileCount === 1 ? '' : 's'}
+</span>
+) })
   }
   if (parts.length === 0) {
     return null
@@ -1205,7 +1219,8 @@ function CollapsedFileBlock({
       )}
       {focusLabel && anchorCount > 1 && (
         <span className="shrink-0 rounded bg-orange-500/8 px-1.5 py-0.5 font-mono text-[9px] font-medium text-orange-600/80 dark:text-orange-400/80">
-          +{anchorCount - 1}
+          +
+{anchorCount - 1}
         </span>
       )}
       {changeLabel && (

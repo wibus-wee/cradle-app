@@ -1,7 +1,7 @@
-import type { RuntimeKind } from '../provider-contracts/types'
 import { createChildLogger } from '../../logging/logger'
 import { OBSERVABILITY_CODES } from '../observability/contract'
 import * as Observability from '../observability/service'
+import type { RuntimeKind } from '../provider-contracts/types'
 
 export interface ProviderRuntimeHostKey {
   runtimeKind: RuntimeKind

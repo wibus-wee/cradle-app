@@ -6,10 +6,8 @@ import type { AccountInfo } from '@anthropic-ai/claude-agent-sdk'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ResolvedProviderTarget } from '../../provider-targets/service'
+import type { ClaudeAgentAccountProbeQuery, ClaudeAgentAccountProbeQueryFactory, ClaudeAgentAuthDiagnostics } from './account-diagnostics'
 import {
-  type ClaudeAgentAccountProbeQuery,
-  type ClaudeAgentAccountProbeQueryFactory,
-  type ClaudeAgentAuthDiagnostics,
   readClaudeAgentAuthDiagnostics,
 } from './account-diagnostics'
 

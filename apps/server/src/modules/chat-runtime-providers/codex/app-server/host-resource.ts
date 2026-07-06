@@ -1,10 +1,10 @@
-import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './client'
 import type {
   CodexAppServerClientLike,
   CodexAppServerHostResource,
   CodexAppServerNotificationSubscriber,
   CodexAppServerResourceRequestHandler,
 } from '../types'
+import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './client'
 
 export function createCodexAppServerHostResource(input: {
   clientOptions: CodexAppServerClientOptions

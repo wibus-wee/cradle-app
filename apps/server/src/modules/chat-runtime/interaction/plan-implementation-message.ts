@@ -24,7 +24,7 @@ export function assertPlanImplementationApprovalId(approvalId: string): void {
       code: 'chat_plan_implementation_approval_invalid',
       status: 400,
       message: 'Plan implementation approval id is invalid',
-      details: { approvalId }
+      details: { approvalId },
     })
   }
 }
@@ -45,22 +45,22 @@ export function applyPlanImplementationApprovalResponse(input: {
       details: {
         sessionId: input.sessionId,
         messageId: input.messageId,
-        approvalId: input.approvalId
-      }
+        approvalId: input.approvalId,
+      },
     })
   }
 
   part.state = 'approval-responded'
   part.approval = {
     id: input.approvalId,
-    approved: input.approved
+    approved: input.approved,
   }
   return input.message
 }
 
 function findPlanImplementationApprovalPart(
   message: UIMessage,
-  approvalId: string
+  approvalId: string,
 ): MutableApprovalToolPart | null {
   for (const part of message.parts) {
     if (!isToolPartWithApproval(part, approvalId)) {
@@ -82,7 +82,7 @@ function findPlanImplementationApprovalPart(
 
 function isToolPartWithApproval(
   part: UIMessage['parts'][number],
-  approvalId: string
+  approvalId: string,
 ): part is MutableApprovalToolPart {
   if (!('toolCallId' in part) || typeof part.toolCallId !== 'string') {
     return false

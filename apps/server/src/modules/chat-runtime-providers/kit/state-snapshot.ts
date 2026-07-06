@@ -26,7 +26,7 @@ export interface WorkspaceProviderStateSnapshot extends ProviderStateSnapshot {
 }
 
 export type ProviderStateSnapshotMigration = (
-  snapshot: ProviderStateSnapshot
+  snapshot: ProviderStateSnapshot,
 ) => ProviderStateSnapshot
 
 const migrations = new Map<number, ProviderStateSnapshotMigration>()
@@ -34,7 +34,7 @@ const migrations = new Map<number, ProviderStateSnapshotMigration>()
 /** Register a migration that upgrades a snapshot from `fromSchemaVersion` to the next version. */
 export function registerProviderStateSnapshotMigration(
   fromSchemaVersion: number,
-  migrate: ProviderStateSnapshotMigration
+  migrate: ProviderStateSnapshotMigration,
 ): void {
   migrations.set(fromSchemaVersion, migrate)
 }
@@ -68,7 +68,7 @@ export function readProviderStateSnapshot(raw: string | null | undefined): Provi
 }
 
 export function readWorkspaceProviderStateSnapshot(
-  raw: string | null | undefined
+  raw: string | null | undefined,
 ): WorkspaceProviderStateSnapshot {
   return readProviderStateSnapshot(raw) as WorkspaceProviderStateSnapshot
 }

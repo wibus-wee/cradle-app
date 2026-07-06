@@ -6,7 +6,7 @@ import type { StoredChatSessionEvent } from './events'
 function event(
   version: number,
   type: StoredChatSessionEvent['type'],
-  payload: StoredChatSessionEvent['payload']
+  payload: StoredChatSessionEvent['payload'],
 ): StoredChatSessionEvent {
   return {
     sequenceId: version,
@@ -15,7 +15,7 @@ function event(
     version,
     type,
     payload,
-    occurredAt: version
+    occurredAt: version,
   } as StoredChatSessionEvent
 }
 
@@ -33,7 +33,7 @@ describe('reduceChatSessionEvents', () => {
           stopReason: null,
           errorText: null,
           startedAt: 100,
-          finishedAt: null
+          finishedAt: null,
         },
         assistantMessage: {
           id: 'assistant-1',
@@ -48,10 +48,10 @@ describe('reduceChatSessionEvents', () => {
           messageJson: '{"id":"assistant-1","role":"assistant","parts":[]}',
           errorText: null,
           createdAt: 100,
-          updatedAt: 100
+          updatedAt: 100,
         },
-        queueItemId: 'queue-1'
-      })
+        queueItemId: 'queue-1',
+      }),
     ])
 
     expect(state.version).toBe(1)
@@ -59,7 +59,7 @@ describe('reduceChatSessionEvents', () => {
       runId: 'run-1',
       messageId: 'assistant-1',
       queueItemId: 'queue-1',
-      startedAt: 100
+      startedAt: 100,
     })
   })
 
@@ -76,10 +76,10 @@ describe('reduceChatSessionEvents', () => {
           stopReason: null,
           errorText: null,
           startedAt: 100,
-          finishedAt: null
+          finishedAt: null,
         },
         assistantMessage: null,
-        queueItemId: null
+        queueItemId: null,
       }),
       event(2, 'RunFailed', {
         runId: 'run-1',
@@ -88,8 +88,8 @@ describe('reduceChatSessionEvents', () => {
         status: 'failed',
         stopReason: 'response.interrupted',
         errorText: 'interrupted',
-        finishedAt: 120
-      })
+        finishedAt: 120,
+      }),
     ])
 
     expect(state.version).toBe(2)
@@ -112,8 +112,8 @@ describe('reduceChatSessionEvents', () => {
           messageJson: '{"id":"user-1","role":"user","parts":[]}',
           errorText: null,
           createdAt: 100,
-          updatedAt: 100
-        }
+          updatedAt: 100,
+        },
       }),
       event(2, 'RunStarted', {
         run: {
@@ -126,7 +126,7 @@ describe('reduceChatSessionEvents', () => {
           stopReason: null,
           errorText: null,
           startedAt: 101,
-          finishedAt: null
+          finishedAt: null,
         },
         assistantMessage: {
           id: 'assistant-1',
@@ -141,9 +141,9 @@ describe('reduceChatSessionEvents', () => {
           messageJson: '{"id":"assistant-1","role":"assistant","parts":[]}',
           errorText: null,
           createdAt: 101,
-          updatedAt: 101
+          updatedAt: 101,
         },
-        queueItemId: null
+        queueItemId: null,
       }),
       event(3, 'AssistantMessageCompleted', {
         message: {
@@ -153,8 +153,8 @@ describe('reduceChatSessionEvents', () => {
           messageJson: '{"id":"assistant-1","role":"assistant","parts":[]}',
           status: 'complete',
           errorText: null,
-          updatedAt: 110
-        }
+          updatedAt: 110,
+        },
       }),
       event(4, 'RunCompleted', {
         runId: 'run-1',
@@ -163,7 +163,7 @@ describe('reduceChatSessionEvents', () => {
         status: 'complete',
         stopReason: 'response.completed',
         errorText: null,
-        finishedAt: 110
+        finishedAt: 110,
       }),
       event(5, 'LastTurnRolledBack', {
         sessionId: 'session-1',
@@ -172,8 +172,8 @@ describe('reduceChatSessionEvents', () => {
         providerSessionId: 'codex-thread-1',
         providerRolledBackTurns: 1,
         fileChangesReverted: false,
-        updatedAt: 120
-      })
+        updatedAt: 120,
+      }),
     ])
 
     expect(state.version).toBe(5)

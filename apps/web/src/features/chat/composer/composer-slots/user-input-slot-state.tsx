@@ -1,5 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { QuestionLine as CircleHelpIcon } from '@mingcute/react'
+import { useQueryClient } from '@tanstack/react-query'
+
 import { cn } from '~/lib/cn'
 
 import type { ChatRuntimeUserInputUiSlotState } from '../../capabilities/chat-capabilities'
@@ -11,7 +12,7 @@ import { ComposerSlotShell } from './composer-slot-shell'
 export function UserInputSlotState({
   state,
   sessionId,
-  className
+  className,
 }: {
   state: ChatRuntimeUserInputUiSlotState
   sessionId: string
@@ -23,7 +24,7 @@ export function UserInputSlotState({
     await submitRuntimeUserInput({
       sessionId,
       requestId: state.requestId,
-      answers
+      answers,
     })
     await queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(sessionId) })
   }

@@ -6,7 +6,7 @@ import {
   updateOpencodeServerMetrics,
   updateProviderRuntimeMetrics,
   updatePtyMetrics,
-  updateServerProcessMetrics
+  updateServerProcessMetrics,
 } from '../../telemetry/metrics'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
@@ -34,7 +34,8 @@ function readActiveResourceCount(name: '_getActiveHandles' | '_getActiveRequests
   try {
     const value = reader()
     return Array.isArray(value) ? value.length : 0
-  } catch {
+  }
+ catch {
     return 0
   }
 }
@@ -46,7 +47,7 @@ function readRecordNumber(record: Record<string, unknown> | undefined, key: stri
 
 function readNestedRecord(
   record: Record<string, unknown>,
-  key: string
+  key: string,
 ): Record<string, unknown> | undefined {
   const value = record[key]
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -66,7 +67,7 @@ function readRecordString(record: Record<string, unknown> | undefined, key: stri
 
 function readRecordBoolean(
   record: Record<string, unknown> | undefined,
-  key: string
+  key: string,
 ): boolean | null {
   const value = record?.[key]
   return typeof value === 'boolean' ? value : null
@@ -115,7 +116,7 @@ function summarizeRendererDrilldowns(latestDesktopSample: Record<string, unknown
       totalJSHeapSize: readRecordNumber(currentMemory, 'totalJSHeapSize'),
       nodeCount: readRecordNumber(documentMetrics, 'nodeCount'),
       messageBubbleCount: readRecordNumber(documentMetrics, 'messageBubbleCount'),
-      toolCallCount: readRecordNumber(documentMetrics, 'toolCallCount')
+      toolCallCount: readRecordNumber(documentMetrics, 'toolCallCount'),
     }
     rendererWindows.push(windowIdentity)
 
@@ -138,13 +139,13 @@ function summarizeRendererDrilldowns(latestDesktopSample: Record<string, unknown
         generatingMessageCount: readRecordNumber(sessionRecord, 'generatingMessageCount'),
         passiveStreamingMessageCount: readRecordNumber(
           sessionRecord,
-          'passiveStreamingMessageCount'
+          'passiveStreamingMessageCount',
         ),
         hasLocalDriver: readRecordBoolean(sessionRecord, 'hasLocalDriver'),
         passiveStatus: readRecordString(sessionRecord, 'passiveStatus'),
         errorCount: readRecordNumber(sessionRecord, 'errorCount'),
         activeGoal: readRecordBoolean(sessionRecord, 'activeGoal'),
-        assistantDisplaySplitCount: readRecordNumber(sessionRecord, 'assistantDisplaySplitCount')
+        assistantDisplaySplitCount: readRecordNumber(sessionRecord, 'assistantDisplaySplitCount'),
       })
     }
 
@@ -165,7 +166,7 @@ function summarizeRendererDrilldowns(latestDesktopSample: Record<string, unknown
         runCompletedAtMs: readRecordNumber(messageRecord, 'runCompletedAtMs'),
         role: readRecordString(messageRecord, 'role'),
         partCount: readRecordNumber(messageRecord, 'partCount'),
-        estimatedPartStringChars: readRecordNumber(messageRecord, 'estimatedPartStringChars')
+        estimatedPartStringChars: readRecordNumber(messageRecord, 'estimatedPartStringChars'),
       })
     }
 
@@ -186,39 +187,39 @@ function summarizeRendererDrilldowns(latestDesktopSample: Record<string, unknown
         role: readRecordString(messageRecord, 'role'),
         partCount: readRecordNumber(messageRecord, 'partCount'),
         splitSourceMessageId: readRecordString(messageRecord, 'splitSourceMessageId'),
-        splitTailMessageId: readRecordString(messageRecord, 'splitTailMessageId')
+        splitTailMessageId: readRecordString(messageRecord, 'splitTailMessageId'),
       })
     }
   }
 
   topChatSessions.sort(
     (a, b) =>
-      (readRecordNumber(b, 'estimatedPartStringChars') ?? 0) -
-        (readRecordNumber(a, 'estimatedPartStringChars') ?? 0) ||
-      (readRecordNumber(b, 'partCount') ?? 0) - (readRecordNumber(a, 'partCount') ?? 0)
+      (readRecordNumber(b, 'estimatedPartStringChars') ?? 0)
+      - (readRecordNumber(a, 'estimatedPartStringChars') ?? 0)
+      || (readRecordNumber(b, 'partCount') ?? 0) - (readRecordNumber(a, 'partCount') ?? 0),
   )
   activeStreamingMessages.sort(
     (a, b) =>
-      (readRecordNumber(b, 'estimatedPartStringChars') ?? 0) -
-        (readRecordNumber(a, 'estimatedPartStringChars') ?? 0) ||
-      (readRecordNumber(b, 'partCount') ?? 0) - (readRecordNumber(a, 'partCount') ?? 0)
+      (readRecordNumber(b, 'estimatedPartStringChars') ?? 0)
+      - (readRecordNumber(a, 'estimatedPartStringChars') ?? 0)
+      || (readRecordNumber(b, 'partCount') ?? 0) - (readRecordNumber(a, 'partCount') ?? 0),
   )
   runDisplayMetaMessages.sort(
     (a, b) =>
-      Number(readRecordNumber(a, 'completedAtMs') !== null) -
-        Number(readRecordNumber(b, 'completedAtMs') !== null) ||
-      (readRecordNumber(b, 'partCount') ?? 0) - (readRecordNumber(a, 'partCount') ?? 0)
+      Number(readRecordNumber(a, 'completedAtMs') !== null)
+      - Number(readRecordNumber(b, 'completedAtMs') !== null)
+      || (readRecordNumber(b, 'partCount') ?? 0) - (readRecordNumber(a, 'partCount') ?? 0),
   )
   rendererWindows.sort(
     (a, b) =>
-      (readRecordNumber(b, 'usedJSHeapSize') ?? 0) - (readRecordNumber(a, 'usedJSHeapSize') ?? 0)
+      (readRecordNumber(b, 'usedJSHeapSize') ?? 0) - (readRecordNumber(a, 'usedJSHeapSize') ?? 0),
   )
 
   return {
     rendererWindows: rendererWindows.slice(0, TOP_DRILLDOWN_LIMIT),
     topChatSessions: topChatSessions.slice(0, TOP_DRILLDOWN_LIMIT),
     activeStreamingMessages: activeStreamingMessages.slice(0, TOP_DRILLDOWN_LIMIT),
-    runDisplayMetaMessages: runDisplayMetaMessages.slice(0, TOP_DRILLDOWN_LIMIT)
+    runDisplayMetaMessages: runDisplayMetaMessages.slice(0, TOP_DRILLDOWN_LIMIT),
   }
 }
 
@@ -231,20 +232,20 @@ function summarizeBrowserPanelDrilldowns(latestDesktopSample: Record<string, unk
   const limits = readNestedRecord(browser ?? {}, 'limits')
   const threads = readNestedArray(browser ?? {}, 'threads').filter(
     (item): item is Record<string, unknown> =>
-      Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+      Boolean(item) && typeof item === 'object' && !Array.isArray(item),
   )
   const runtimes = readNestedArray(browser ?? {}, 'runtimes').filter(
     (item): item is Record<string, unknown> =>
-      Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+      Boolean(item) && typeof item === 'object' && !Array.isArray(item),
   )
 
   const activeThreads = threads
     .filter(
-      (thread) =>
-        readRecordBoolean(thread, 'open') === true ||
-        readRecordBoolean(thread, 'active') === true ||
-        (readRecordNumber(thread, 'tabCount') ?? 0) > 0 ||
-        (readRecordNumber(thread, 'runtimeCount') ?? 0) > 0
+      thread =>
+        readRecordBoolean(thread, 'open') === true
+        || readRecordBoolean(thread, 'active') === true
+        || (readRecordNumber(thread, 'tabCount') ?? 0) > 0
+        || (readRecordNumber(thread, 'runtimeCount') ?? 0) > 0,
     )
     .slice(0, TOP_DRILLDOWN_LIMIT)
 
@@ -252,15 +253,15 @@ function summarizeBrowserPanelDrilldowns(latestDesktopSample: Record<string, unk
     .flatMap((thread) => {
       const tabs = readNestedArray(thread, 'tabs').filter(
         (item): item is Record<string, unknown> =>
-          Boolean(item) && typeof item === 'object' && !Array.isArray(item)
+          Boolean(item) && typeof item === 'object' && !Array.isArray(item),
       )
       return tabs
         .filter(
-          (tab) =>
-            readRecordBoolean(tab, 'hasRuntime') === true ||
-            readRecordBoolean(tab, 'active') === true
+          tab =>
+            readRecordBoolean(tab, 'hasRuntime') === true
+            || readRecordBoolean(tab, 'active') === true,
         )
-        .map((tab) => ({
+        .map(tab => ({
           threadId: readRecordString(thread, 'threadId'),
           tabId: readRecordString(tab, 'id'),
           status: readRecordString(tab, 'status'),
@@ -273,7 +274,7 @@ function summarizeBrowserPanelDrilldowns(latestDesktopSample: Record<string, unk
           url: readRecordString(tab, 'url'),
           title: readRecordString(tab, 'title'),
           lastCommittedUrl: readRecordString(tab, 'lastCommittedUrl'),
-          lastError: readRecordString(tab, 'lastError')
+          lastError: readRecordString(tab, 'lastError'),
         }))
     })
     .slice(0, TOP_DRILLDOWN_LIMIT)
@@ -283,15 +284,15 @@ function summarizeBrowserPanelDrilldowns(latestDesktopSample: Record<string, unk
     limits: limits ?? null,
     activeThreads,
     liveTabs,
-    runtimes: runtimes.slice(0, TOP_DRILLDOWN_LIMIT)
+    runtimes: runtimes.slice(0, TOP_DRILLDOWN_LIMIT),
   }
 }
 
 function summarizeReplayDrilldowns(
   activeRuns: ChatRuntime.ActiveRunSummary[],
-  replayBuffers: ChatRuntime.ActiveRunReplayBufferSummary[]
+  replayBuffers: ChatRuntime.ActiveRunReplayBufferSummary[],
 ) {
-  const runById = new Map(activeRuns.map((run) => [run.runId, run]))
+  const runById = new Map(activeRuns.map(run => [run.runId, run]))
   return replayBuffers
     .map((buffer) => {
       const run = runById.get(buffer.runId)
@@ -301,7 +302,7 @@ function summarizeReplayDrilldowns(
         messageId: run?.messageId ?? null,
         providerTargetKind: run?.providerTargetKind ?? null,
         providerTargetId: run?.providerTargetId ?? null,
-        modelId: run?.modelId ?? null
+        modelId: run?.modelId ?? null,
       }
     })
     .sort((a, b) => b.chunkCount - a.chunkCount || b.maxDeltaChars - a.maxDeltaChars)
@@ -309,21 +310,21 @@ function summarizeReplayDrilldowns(
 }
 
 function summarizeProviderHostDrilldowns(
-  hosts: ReturnType<typeof providerRuntimeHostManager.listHosts>
+  hosts: ReturnType<typeof providerRuntimeHostManager.listHosts>,
 ) {
   const now = Date.now()
   return hosts
-    .map((host) => ({
+    .map(host => ({
       ...host,
       expiresInMs: host.expiresAt - now,
-      idleForMs: now - host.updatedAt
+      idleForMs: now - host.updatedAt,
     }))
     .sort(
       (a, b) =>
-        b.refCount - a.refCount ||
-        b.pinnedCount - a.pinnedCount ||
-        Number(b.hasResource) - Number(a.hasResource) ||
-        b.idleForMs - a.idleForMs
+        b.refCount - a.refCount
+        || b.pinnedCount - a.pinnedCount
+        || Number(b.hasResource) - Number(a.hasResource)
+        || b.idleForMs - a.idleForMs,
     )
     .slice(0, TOP_DRILLDOWN_LIMIT)
 }
@@ -333,15 +334,15 @@ export async function getRuntimeSnapshot() {
   const memory = process.memoryUsage()
   const activeRuns = ChatRuntime.listActiveRunSummaries()
   const replayBuffers = activeRuns
-    .map((run) => ChatRuntime.getActiveRunReplayBufferSummary(run.runId))
-    .filter((item) => item !== null)
+    .map(run => ChatRuntime.getActiveRunReplayBufferSummary(run.runId))
+    .filter(item => item !== null)
   const providerHosts = providerRuntimeHostManager.listHosts()
   const pty = await Pty.listResources()
   const chronicle = getDaemonResources()
   const opencodeServer = getOpencodeServerResources()
   const observability = getQueueHealth()
   const desktop = {
-    latestSamples: getDesktopRuntimeSamples()
+    latestSamples: getDesktopRuntimeSamples(),
   }
 
   const activeRunsByRuntimeKind: Record<string, number> = {}
@@ -352,7 +353,7 @@ export async function getRuntimeSnapshot() {
   for (const run of activeRuns) {
     const runtimeKind = run.providerTargetKind ?? 'unknown'
     incrementBucket(activeRunsByRuntimeKind, runtimeKind)
-    const replay = replayBuffers.find((item) => item.runId === run.runId)
+    const replay = replayBuffers.find(item => item.runId === run.runId)
     if (replay) {
       incrementBucket(replayBufferChunksByRuntimeKind, runtimeKind, replay.chunkCount)
       incrementBucket(replayTextDeltasByRuntimeKind, runtimeKind, replay.textDeltaCount)
@@ -360,7 +361,7 @@ export async function getRuntimeSnapshot() {
       incrementBucket(
         replayToolDeltasByRuntimeKind,
         runtimeKind,
-        replay.toolInputDeltaCount + replay.toolOutputCount
+        replay.toolInputDeltaCount + replay.toolOutputCount,
       )
     }
   }
@@ -383,7 +384,7 @@ export async function getRuntimeSnapshot() {
     heapUsedMB: toMB(memory.heapUsed),
     heapTotalMB: toMB(memory.heapTotal),
     externalMB: toMB(memory.external),
-    arrayBuffersMB: toMB(memory.arrayBuffers)
+    arrayBuffersMB: toMB(memory.arrayBuffers),
   }
   const activeHandles = readActiveResourceCount('_getActiveHandles')
   const activeRequests = readActiveResourceCount('_getActiveRequests')
@@ -477,32 +478,32 @@ export async function getRuntimeSnapshot() {
     cpuPercent: health.cpu.percent,
     uptimeSeconds: health.uptime,
     activeHandles,
-    activeRequests
+    activeRequests,
   })
   updateChatRuntimeMetrics({
     activeRunsByRuntimeKind,
     replayBufferChunksByRuntimeKind,
     replayTextDeltasByRuntimeKind,
     replayReasoningDeltasByRuntimeKind,
-    replayToolDeltasByRuntimeKind
+    replayToolDeltasByRuntimeKind,
   })
   updateProviderRuntimeMetrics({
     hostsByRuntimeKind,
     resourceHostsByRuntimeKind,
     refCountsByRuntimeKind,
-    pinnedCountsByRuntimeKind
+    pinnedCountsByRuntimeKind,
   })
   updatePtyMetrics({
     terminalCountByRole,
     rssMBByRole: {
       'cli-tui': pty.totals.cliTuiRssMB,
-      'bottom-panel': pty.totals.bottomPanelRssMB
+      'bottom-panel': pty.totals.bottomPanelRssMB,
     },
     cpuPercentByRole: {
       'cli-tui': pty.totals.cliTuiCpuPercent,
-      'bottom-panel': pty.totals.bottomPanelCpuPercent
+      'bottom-panel': pty.totals.bottomPanelCpuPercent,
     },
-    descendantCountByRole
+    descendantCountByRole,
   })
   updateChronicleMetrics(chronicle)
   updateOpencodeServerMetrics({
@@ -510,7 +511,7 @@ export async function getRuntimeSnapshot() {
     pid: opencodeServer.pid,
     uptimeSeconds: opencodeServer.uptimeSeconds,
     rssMB: opencodeServer.rssMB,
-    cpuPercent: opencodeServer.cpuPercent
+    cpuPercent: opencodeServer.cpuPercent,
   })
   updateDesktopMetrics({
     latestSampleAgeMs: latestDesktopSample ? Date.now() - latestDesktopSample.sampledAt : null,
@@ -521,7 +522,7 @@ export async function getRuntimeSnapshot() {
     rendererMemoryBytesByKind,
     rendererChatStoreTotals,
     rendererDocumentTotals,
-    rendererPerformanceTotals
+    rendererPerformanceTotals,
   })
   updateObservabilityMetrics(observability)
 
@@ -529,11 +530,11 @@ export async function getRuntimeSnapshot() {
     renderer: summarizeRendererDrilldowns(latestDesktopSampleRecord),
     browserPanel: summarizeBrowserPanelDrilldowns(latestDesktopSampleRecord),
     replay: {
-      topRuns: summarizeReplayDrilldowns(activeRuns, replayBuffers)
+      topRuns: summarizeReplayDrilldowns(activeRuns, replayBuffers),
     },
     providerRuntime: {
-      topHosts: summarizeProviderHostDrilldowns(providerHosts)
-    }
+      topHosts: summarizeProviderHostDrilldowns(providerHosts),
+    },
   }
 
   return {
@@ -545,21 +546,21 @@ export async function getRuntimeSnapshot() {
       cpu: health.cpu,
       node: {
         activeHandles,
-        activeRequests
-      }
+        activeRequests,
+      },
     },
     chatRuntime: {
       activeRuns,
-      replayBuffers
+      replayBuffers,
     },
     providerRuntime: {
-      hosts: providerHosts
+      hosts: providerHosts,
     },
     pty,
     chronicle,
     opencodeServer,
     desktop,
     drilldowns,
-    observability
+    observability,
   }
 }

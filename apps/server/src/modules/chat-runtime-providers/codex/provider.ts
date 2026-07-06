@@ -104,13 +104,13 @@ import {
 } from './config/runtime-config'
 import { resolveCodexRuntimeContext } from './config/runtime-context'
 import { toSandboxPolicy } from './config/sandbox-policy'
+import { createCodexGoalContinuation } from './goal-continuation'
 import {
   CODEX_RUNTIME_CAPABILITIES,
   CODEX_RUNTIME_KIND as RUNTIME_KIND,
   CODEX_RUNTIME_METADATA,
 } from './metadata'
 import { createCodexRuntimePresentation } from './presentation'
-import { createCodexGoalContinuation } from './goal-continuation'
 import { projectCodexEstimatedContextUsage } from './projection/context-usage-projector'
 import {
   clearCodexGoalSnapshot,

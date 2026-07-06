@@ -1,17 +1,17 @@
 'use client'
 
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
-  RobotLine as Bot,
   BrainLine as Brain,
+  FlashLine as Zap,
   GitBranchLine as GitBranch,
   Message1Line as MessageSquare,
   PluginLine as Plug,
-  TerminalLine as Terminal,
   ProcessLine as Workflow,
-  FlashLine as Zap
+  RobotLine as Bot,
+  TerminalLine as Terminal,
 } from '@mingcute/react'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useEffect, useRef } from 'react'
 
 gsap.registerPlugin(ScrollTrigger)

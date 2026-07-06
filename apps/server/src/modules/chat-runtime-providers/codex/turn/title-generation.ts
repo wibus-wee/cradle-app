@@ -1,24 +1,23 @@
 import type { RuntimeSession } from '../../../chat-runtime/runtime-provider-types'
-
 import { createBoundedTextCollector } from '../../bounded-text-collector'
 import type { CodexAppServerMessage } from '../app-server/client'
 import type { UserInput } from '../app-server-protocol/v2/UserInput'
-import { codexRequestError, formatUnknownError } from '../provider-errors'
 import { toSandboxPolicy } from '../config/sandbox-policy'
 import {
   projectCodexGoalSnapshotFromGoal,
   readCodexProviderSnapshot,
-  writeCodexGoalSnapshot
+  writeCodexGoalSnapshot,
 } from '../projection/state-projector'
-import { getNotificationTurnId, getThreadId } from './stream-diagnostics'
+import { codexRequestError, formatUnknownError } from '../provider-errors'
 import type {
   CodexAppServerClientLike,
   CodexGoalSnapshot,
   ItemNotificationParams,
   ThreadGoalGetResponse,
   ThreadResponse,
-  TurnResponse
+  TurnResponse,
 } from '../types'
+import { getNotificationTurnId, getThreadId } from './stream-diagnostics'
 
 const CODEX_THREAD_TITLE_MAX_LENGTH = 36
 export type CodexTitleGenerationThinkingEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
@@ -30,18 +29,18 @@ const CODEX_THREAD_TITLE_PROMPT_PREFIX = [
   'Do not answer the prompt.',
   'Do not include quotes, markdown, labels, or trailing punctuation.',
   '',
-  'User prompt:'
+  'User prompt:',
 ].join('\n')
 
 export async function setCodexThreadGoal(
   client: CodexAppServerClientLike,
   runtimeSession: RuntimeSession,
   threadId: string,
-  objective: string
+  objective: string,
 ): Promise<CodexGoalSnapshot | null> {
   const response = (await client.request('thread/goal/set', {
     threadId,
-    objective
+    objective,
   })) as ThreadGoalGetResponse
   const goalSnapshot = projectCodexGoalSnapshotFromGoal(response.goal ?? null)
   if (!goalSnapshot) {
@@ -59,11 +58,11 @@ export function shouldGenerateCodexThreadTitle(input: {
   compactCommandRequested: boolean
 }): boolean {
   return (
-    input.isFreshProviderThread &&
-    !input.existingTitle &&
-    input.promptText.length > 0 &&
-    !input.goalContinuationRequested &&
-    !input.compactCommandRequested
+    input.isFreshProviderThread
+    && !input.existingTitle
+    && input.promptText.length > 0
+    && !input.goalContinuationRequested
+    && !input.compactCommandRequested
   )
 }
 
@@ -80,11 +79,12 @@ export async function generateAndSetCodexThreadTitle(
     thinkingEffort: CodexTitleGenerationThinkingEffort
     config: Record<string, unknown>
     signal: AbortSignal
-  }
+  },
 ): Promise<string | null> {
   try {
     return await generateAndSetCodexThreadTitleOrThrow(titleClient, mainClient, input)
-  } catch {
+  }
+ catch {
     return null
   }
 }
@@ -102,8 +102,9 @@ export async function generateAndSetCodexThreadTitleOrThrow(
     thinkingEffort: CodexTitleGenerationThinkingEffort
     config: Record<string, unknown>
     signal: AbortSignal
-  }
-): Promise<string> {  const title = await generateCodexThreadTitle(titleClient, input)
+  },
+): Promise<string> {
+  const title = await generateCodexThreadTitle(titleClient, input)
   if (input.signal.aborted) {
     throw codexRequestError('title/generate', 'Codex title generation was aborted')
   }
@@ -113,9 +114,10 @@ export async function generateAndSetCodexThreadTitleOrThrow(
   try {
     await setCodexThreadTitleName(mainClient, titleClient, {
       threadId: input.mainThreadId,
-      name: title
+      name: title,
     })
-  } catch (error) {
+  }
+ catch (error) {
     throw codexRequestError('thread/name/set', formatUnknownError(error))
   }
   return title
@@ -127,11 +129,12 @@ async function setCodexThreadTitleName(
   params: {
     threadId: string
     name: string
-  }
+  },
 ): Promise<void> {
   try {
     await primaryClient.request('thread/name/set', params)
-  } catch {
+  }
+ catch {
     await fallbackClient.request('thread/name/set', params)
   }
 }
@@ -147,7 +150,7 @@ async function generateCodexThreadTitle(
     thinkingEffort: CodexTitleGenerationThinkingEffort
     config: Record<string, unknown>
     signal: AbortSignal
-  }
+  },
 ): Promise<string | null> {
   const model = input.modelId ?? input.fallbackModel
   const titleConfig = buildCodexTitleConfig(input.config, model)
@@ -163,9 +166,10 @@ async function generateCodexThreadTitle(
         sandbox: 'read-only',
         config: titleConfig,
         ephemeral: true,
-        threadSource: 'user'
+        threadSource: 'user',
       })) as ThreadResponse
-    } catch (error) {
+    }
+ catch (error) {
       throw codexRequestError('thread/start', formatUnknownError(error))
     }
     titleThreadId = threadResponse.thread?.id ?? null
@@ -183,14 +187,16 @@ async function generateCodexThreadTitle(
         approvalPolicy: 'never',
         sandboxPolicy: toSandboxPolicy('read-only', input.runtimeWorkspaceRoots, []),
         model,
-        effort: input.thinkingEffort
+        effort: input.thinkingEffort,
       })) as TurnResponse
-    } catch (error) {
+    }
+ catch (error) {
       throw codexRequestError('turn/start', formatUnknownError(error))
     }
     const turnId = turnResponse.turn?.id ?? turnResponse.turnId ?? null
     return await readGeneratedCodexThreadTitle(client, titleThreadId, turnId, input.signal)
-  } finally {
+  }
+ finally {
     if (titleThreadId) {
       await client.request('thread/unsubscribe', { threadId: titleThreadId }).catch(() => undefined)
     }
@@ -212,8 +218,8 @@ function buildCodexThreadTitleInput(promptText: string): UserInput[] {
     {
       type: 'text',
       text: `${CODEX_THREAD_TITLE_PROMPT_PREFIX}\n${promptText}`,
-      text_elements: []
-    }
+      text_elements: [],
+    },
   ]
 }
 
@@ -221,7 +227,7 @@ async function readGeneratedCodexThreadTitle(
   client: CodexAppServerClientLike,
   threadId: string,
   turnId: string | null,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): Promise<string | null> {
   const titleAbortController = new AbortController()
   const abortTitleRead = () => titleAbortController.abort()
@@ -236,7 +242,8 @@ async function readGeneratedCodexThreadTitle(
       let notification: CodexAppServerMessage | null
       try {
         notification = await client.nextNotification(titleAbortController.signal)
-      } catch (error) {
+      }
+ catch (error) {
         if (titleAbortController.signal.aborted) {
           return null
         }
@@ -275,7 +282,8 @@ async function readGeneratedCodexThreadTitle(
       }
     }
     return null
-  } finally {
+  }
+ finally {
     signal.removeEventListener('abort', abortTitleRead)
   }
 }
@@ -310,22 +318,22 @@ function readCodexAppServerErrorDetail(notification: CodexAppServerMessage): str
     details?: unknown
     additionalDetails?: unknown
   }
-  const nestedError =
-    candidate.error && typeof candidate.error === 'object'
-      ? (candidate.error as { message?: unknown; details?: unknown; additionalDetails?: unknown })
+  const nestedError
+    = candidate.error && typeof candidate.error === 'object'
+      ? (candidate.error as { message?: unknown, details?: unknown, additionalDetails?: unknown })
       : null
-  const message =
-    typeof candidate.message === 'string'
+  const message
+    = typeof candidate.message === 'string'
       ? candidate.message
       : typeof candidate.error === 'string'
         ? candidate.error
         : typeof nestedError?.message === 'string'
           ? nestedError.message
           : null
-  const code =
-    typeof candidate.code === 'string' || typeof candidate.code === 'number' ? String(candidate.code) : null
-  const details =
-    typeof candidate.details === 'string'
+  const code
+    = typeof candidate.code === 'string' || typeof candidate.code === 'number' ? String(candidate.code) : null
+  const details
+    = typeof candidate.details === 'string'
       ? candidate.details
       : typeof candidate.additionalDetails === 'string'
         ? candidate.additionalDetails
@@ -335,8 +343,8 @@ function readCodexAppServerErrorDetail(notification: CodexAppServerMessage): str
             ? nestedError.additionalDetails
             : null
   return (
-    [code ? `[${code}]` : null, message, details].filter(Boolean).join(' ') ||
-    'Codex app-server reported an error'
+    [code ? `[${code}]` : null, message, details].filter(Boolean).join(' ')
+    || 'Codex app-server reported an error'
   )
 }
 
@@ -354,8 +362,9 @@ function readGeneratedCodexThreadTitleCandidate(title: string | null | undefined
     if (typeof parsed.title === 'string') {
       return parsed.title
     }
-  } catch {
+  }
+ catch {
     // Plain-text titles are the expected app-server output.
   }
-  return unfenced.split('\n').map((line) => line.trim()).find(Boolean) ?? null
+  return unfenced.split('\n').map(line => line.trim()).find(Boolean) ?? null
 }

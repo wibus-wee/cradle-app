@@ -1,8 +1,8 @@
 import { execFile, spawn } from 'node:child_process'
-import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { access, chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, parse } from 'node:path'
 import { promisify } from 'node:util'
-import { constants } from 'node:fs'
 
 import { app } from 'electron'
 

@@ -1,5 +1,5 @@
-export { disposeSyncSocketClient, getActiveSyncSubscriptionCount, isSyncSocketSupported } from './client'
-export { createSyncGlobalSessionEventSource } from './adapters/global-event-source'
 export { subscribeSyncSessionRunChunks } from './adapters/chunk-stream'
+export { createSyncGlobalSessionEventSource } from './adapters/global-event-source'
 export { createSyncSessionEventSource } from './adapters/session-event-source'
+export { disposeSyncSocketClient, getActiveSyncSubscriptionCount, isSyncSocketSupported } from './client'
 export { isSyncSocketEnabled, resolveRealtimeTransport } from './select-transport'

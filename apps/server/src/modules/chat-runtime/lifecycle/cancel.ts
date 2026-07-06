@@ -6,18 +6,19 @@ import { AppError } from '../../../errors/app-error'
 import { db } from '../../../infra'
 import { cancelQueuedSessionItem, normalizeSessionQueuePositions } from '../es/commands'
 import { abortProjectedStreamingRun, recoverChatRuntimeSession } from '../es/recovery'
+import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
+import { runRegistry } from '../run-registry'
 import { attachBinding, getSessionRunContext } from '../runtime-session-context'
-import { runRegistry, type ActiveRun, type TerminalChatMessageStatus } from '../run-registry'
 
 export interface ActiveRunLifecycleDeps {
-  readRun(runId: string): BackendRun | undefined
-  settleActiveRun(
+  readRun: (runId: string) => BackendRun | undefined
+  settleActiveRun: (
     activeRun: ActiveRun,
     status: TerminalChatMessageStatus,
-    errorText: string | null
-  ): Promise<void>
-  releaseActiveRun(activeRun: ActiveRun): void
-  warn(message: string, payload: Record<string, unknown>): void
+    errorText: string | null,
+  ) => Promise<void>
+  releaseActiveRun: (activeRun: ActiveRun) => void
+  warn: (message: string, payload: Record<string, unknown>) => void
 }
 
 export async function abortRun(runId: string, deps: ActiveRunLifecycleDeps): Promise<void> {
@@ -29,7 +30,7 @@ export async function abortRun(runId: string, deps: ActiveRunLifecycleDeps): Pro
         code: 'chat_run_not_found',
         status: 404,
         message: 'Chat run not found',
-        details: { runId }
+        details: { runId },
       })
     }
     await abortProjectedStreamingRun(persistedRun)
@@ -39,14 +40,15 @@ export async function abortRun(runId: string, deps: ActiveRunLifecycleDeps): Pro
   await deps.settleActiveRun(active, 'aborted', null)
   try {
     await requestRuntimeCancel(active, deps)
-  } finally {
+  }
+ finally {
     deps.releaseActiveRun(active)
   }
 }
 
 export async function cancelSession(
   sessionId: string,
-  deps: ActiveRunLifecycleDeps
+  deps: ActiveRunLifecycleDeps,
 ): Promise<void> {
   if (await releaseTerminalPersistedActiveRunForSession(sessionId, deps)) {
     return
@@ -85,9 +87,11 @@ export async function abortAllRuns(deps: ActiveRunLifecycleDeps): Promise<void> 
     try {
       await deps.settleActiveRun(active, 'aborted', null)
       await requestRuntimeCancel(active, deps)
-    } catch {
+    }
+ catch {
       /* best-effort */
-    } finally {
+    }
+ finally {
       deps.releaseActiveRun(active)
     }
   }
@@ -96,7 +100,7 @@ export async function abortAllRuns(deps: ActiveRunLifecycleDeps): Promise<void> 
 
 export async function releaseTerminalPersistedActiveRunForSession(
   sessionId: string,
-  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'releaseActiveRun'>
+  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'releaseActiveRun'>,
 ): Promise<boolean> {
   const runId = runRegistry.getActiveRunIdForSession(sessionId)
   if (!runId) {
@@ -115,7 +119,8 @@ export async function releaseTerminalPersistedActiveRunForSession(
   if (activeRun) {
     activeRun.terminalStatus ??= run.status
     deps.releaseActiveRun(activeRun)
-  } else {
+  }
+ else {
     runRegistry.deleteActiveRunIdForSession(sessionId)
   }
   return true
@@ -123,7 +128,7 @@ export async function releaseTerminalPersistedActiveRunForSession(
 
 export async function finalizeInterruptedPersistedStreamingSessionIfIdle(
   sessionId: string,
-  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'releaseActiveRun'>
+  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'releaseActiveRun'>,
 ): Promise<void> {
   await releaseTerminalPersistedActiveRunForSession(sessionId, deps)
   if (!runRegistry.hasActiveRunForSession(sessionId) && !runRegistry.hasPendingRun(sessionId)) {
@@ -133,13 +138,13 @@ export async function finalizeInterruptedPersistedStreamingSessionIfIdle(
 
 async function requestRuntimeCancel(
   activeRun: ActiveRun,
-  deps: Pick<ActiveRunLifecycleDeps, 'warn'>
+  deps: Pick<ActiveRunLifecycleDeps, 'warn'>,
 ): Promise<void> {
   const context = getSessionRunContext(activeRun.sessionId)
   if (!context) {
     deps.warn('cannot cancel runtime turn because chat session context is missing', {
       sessionId: activeRun.sessionId,
-      runId: activeRun.runId
+      runId: activeRun.runId,
     })
     return
   }
@@ -147,28 +152,31 @@ async function requestRuntimeCancel(
   try {
     await activeRun.runtime.cancelTurn({
       runtimeSession: activeRun.runtimeSession,
-      profile: context.profile
+      profile: context.profile,
     })
-  } catch (error) {
+  }
+ catch (error) {
     deps.warn('runtime turn cancellation failed after chat run was marked aborted', {
       error,
       sessionId: activeRun.sessionId,
-      runId: activeRun.runId
+      runId: activeRun.runId,
     })
-  } finally {
+  }
+ finally {
     try {
       attachBinding({
         sessionId: activeRun.sessionId,
         providerTargetId: activeRun.providerTargetId,
         runtimeKind: activeRun.runtimeSession.runtimeKind,
         runtimeSession: activeRun.runtimeSession,
-        requestedModelId: activeRun.modelId
+        requestedModelId: activeRun.modelId,
       })
-    } catch (error) {
+    }
+ catch (error) {
       deps.warn('failed to persist runtime session after cancellation', {
         error,
         sessionId: activeRun.sessionId,
-        runId: activeRun.runId
+        runId: activeRun.runId,
       })
     }
   }

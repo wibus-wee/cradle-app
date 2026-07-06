@@ -1,9 +1,9 @@
-import type { FileUIPart } from 'ai'
 import {
-  FileLine as FileIcon,
   AttachmentLine as PaperclipIcon,
-  CloseLine as XIcon
+  CloseLine as XIcon,
+  FileLine as FileIcon,
 } from '@mingcute/react'
+import type { FileUIPart } from 'ai'
 import { m } from 'motion/react'
 import type { ChangeEvent, RefObject } from 'react'
 

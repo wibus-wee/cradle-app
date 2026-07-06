@@ -52,4 +52,3 @@ export async function fillPromptEditor(editor: Locator, text: string): Promise<v
 export async function expectPromptEditorToContain(editor: Locator, expected: string | RegExp, timeout = 10_000): Promise<void> {
   await expect(editor).toContainText(expected, { timeout })
 }
-

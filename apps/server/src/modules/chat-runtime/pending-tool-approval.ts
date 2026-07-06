@@ -6,7 +6,7 @@ import {
 } from './interaction/event-recorder'
 import type {
   RuntimeToolApprovalRequest,
-  RuntimeToolApprovalResolution
+  RuntimeToolApprovalResolution,
 } from './runtime-provider-types'
 
 interface PendingToolApprovalState {
@@ -19,7 +19,7 @@ interface PendingToolApprovalState {
 const pendingToolApprovalById = new Map<string, PendingToolApprovalState>()
 
 export async function requestRuntimeToolApproval(
-  input: RuntimeToolApprovalRequest
+  input: RuntimeToolApprovalRequest,
 ): Promise<RuntimeToolApprovalResolution> {
   const pendingKey = readPendingKey(input.sessionId, input.providerRequestId)
   if (pendingToolApprovalById.has(pendingKey)) {
@@ -28,8 +28,8 @@ export async function requestRuntimeToolApproval(
         code: 'chat_runtime_tool_approval_duplicate',
         status: 409,
         message: 'Runtime tool approval request is already pending',
-        details: { requestId: input.providerRequestId, sessionId: input.sessionId }
-      })
+        details: { requestId: input.providerRequestId, sessionId: input.sessionId },
+      }),
     )
   }
 
@@ -39,7 +39,7 @@ export async function requestRuntimeToolApproval(
       request: input,
       createdAt,
       resolve,
-      reject
+      reject,
     })
   })
 
@@ -53,9 +53,10 @@ export async function requestRuntimeToolApproval(
       runtimeKind: input.runtimeKind,
       providerMethod: input.providerMethod,
       toolCallId: input.toolCallId,
-      createdAt
+      createdAt,
     })
-  } catch (error) {
+  }
+ catch (error) {
     const current = pendingToolApprovalById.get(pendingKey)
     if (current?.request === input) {
       pendingToolApprovalById.delete(pendingKey)
@@ -83,7 +84,7 @@ export async function submitRuntimeToolApproval(input: {
     code: 'chat_runtime_tool_approval_not_found',
     status: 404,
     message: 'Pending runtime tool approval request was not found',
-    details: { requestId: input.requestId, sessionId: input.sessionId }
+    details: { requestId: input.requestId, sessionId: input.sessionId },
   })
 }
 
@@ -117,7 +118,7 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
   const resolution: RuntimeToolApprovalResolution = {
     requestId: input.requestId,
     approved: input.approved,
-    ...(input.reason ? { reason: input.reason } : {})
+    ...(input.reason ? { reason: input.reason } : {}),
   }
   pending.resolve(resolution)
   return {
@@ -129,8 +130,8 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
       interactionKind: 'toolApproval',
       resolution: 'submitted',
       approved: input.approved,
-      updatedAt: currentUnixSeconds()
-    })
+      updatedAt: currentUnixSeconds(),
+    }),
   }
 }
 
@@ -147,7 +148,7 @@ export function rejectPendingToolApprovalsForRun(runId: string, error: Error): v
       requestId: pending.request.providerRequestId,
       interactionKind: 'toolApproval',
       resolution: 'cancelled',
-      updatedAt: currentUnixSeconds()
+      updatedAt: currentUnixSeconds(),
     }).catch(() => undefined)
   }
 }

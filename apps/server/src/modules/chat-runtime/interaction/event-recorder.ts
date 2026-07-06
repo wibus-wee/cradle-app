@@ -1,5 +1,5 @@
-import type { ChatSessionEvent } from '../es/events'
 import { commitSessionEvents } from '../es/commands'
+import type { ChatSessionEvent } from '../es/events'
 
 export type RuntimeInteractionKind = 'toolApproval' | 'userInput'
 export type RuntimeInteractionResolution = 'submitted' | 'cancelled'

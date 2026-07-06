@@ -5,21 +5,21 @@
 
 import {
   AlignCenterLine as AlignCenterIcon,
-  DistributeSpacingHorizontalLine as AlignHorizontalSpaceAroundIcon,
-  DistributeSpacingHorizontalLine as AlignHorizontalSpaceBetweenIcon,
   AlignJustifyLine as AlignJustifyIcon,
   AlignLeftLine as AlignLeftIcon,
   AlignRightLine as AlignRightIcon,
+  AnticlockwiseLine as RotateCcwIcon,
   BoxLine as BoxIcon,
-  DownSmallLine as ChevronDownIcon,
   CodeLine as Code2Icon,
   Columns2Line as Columns2Icon,
-  SubtractLine as MinusIcon,
   Cursor2Line as MousePointer2Icon,
+  DistributeSpacingHorizontalLine as AlignHorizontalSpaceAroundIcon,
+  DistributeSpacingHorizontalLine as AlignHorizontalSpaceBetweenIcon,
+  DownSmallLine as ChevronDownIcon,
   PlusLine as PlusIcon,
-  AnticlockwiseLine as RotateCcwIcon,
   Rows2Line as Rows2Icon,
-  SelectorHorizontalLine as SlidersHorizontalIcon
+  SelectorHorizontalLine as SlidersHorizontalIcon,
+  SubtractLine as MinusIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'

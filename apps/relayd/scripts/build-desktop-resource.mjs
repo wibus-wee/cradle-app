@@ -1,9 +1,9 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawnSync } from 'node:child_process'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const relaydRoot = resolve(scriptDir, '..')

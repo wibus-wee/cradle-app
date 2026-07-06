@@ -46,10 +46,8 @@ export function captureClaudeAgentTaskToolInput(
       if (taskInput) {
         state.pendingUpdatesByToolCallId.set(toolCallId, taskInput)
       }
-      return
     }
     default:
-      return
   }
 }
 

@@ -4,13 +4,12 @@ import { desc, eq } from 'drizzle-orm'
 import { AppError } from '../../../errors/app-error'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
+import type { ChatSessionEvent, StoredChatSessionEvent } from './events'
 import {
   CHAT_SESSION_AGGREGATE_TYPE,
-  type ChatSessionEvent,
-  type StoredChatSessionEvent,
   parseStoredChatSessionEvent,
-  serializeChatSessionEventPayload
-} from './events'
+  serializeChatSessionEventPayload,
+  } from './events'
 
 type ChatRuntimeDb = ReturnType<typeof db>
 export type ChatRuntimeTx = Parameters<Parameters<ChatRuntimeDb['transaction']>[0]>[0]
@@ -25,7 +24,7 @@ export interface AppendSessionEventInput {
 
 export function readCurrentSessionEventVersion(
   d: Pick<ChatRuntimeWriteDb, 'select'>,
-  aggregateId: string
+  aggregateId: string,
 ): number {
   const latest = d
     .select({ version: sessionEvents.version })
@@ -39,14 +38,14 @@ export function readCurrentSessionEventVersion(
 
 export function readNextSessionEventVersion(
   d: Pick<ChatRuntimeWriteDb, 'select'>,
-  aggregateId: string
+  aggregateId: string,
 ): number {
   return readCurrentSessionEventVersion(d, aggregateId) + 1
 }
 
 export function appendSessionEvent(
   d: Pick<ChatRuntimeWriteDb, 'select' | 'insert'>,
-  input: AppendSessionEventInput
+  input: AppendSessionEventInput,
 ): StoredChatSessionEvent {
   const currentVersion = readCurrentSessionEventVersion(d, input.aggregateId)
   if (input.expectedVersion !== undefined && currentVersion !== input.expectedVersion) {
@@ -64,11 +63,12 @@ export function appendSessionEvent(
         version,
         eventType: input.event.type,
         payload: serializeChatSessionEventPayload(input.event),
-        occurredAt: input.occurredAt ?? currentUnixSeconds()
+        occurredAt: input.occurredAt ?? currentUnixSeconds(),
       })
       .returning()
       .get()
-  } catch {
+  }
+ catch {
     throwConcurrencyConflict(input.aggregateId, input.expectedVersion ?? currentVersion, currentVersion)
   }
   return parseStoredChatSessionEvent(row)
@@ -76,7 +76,7 @@ export function appendSessionEvent(
 
 export function readSessionEvents(
   aggregateId: string,
-  d: Pick<ChatRuntimeWriteDb, 'select'> = db()
+  d: Pick<ChatRuntimeWriteDb, 'select'> = db(),
 ): StoredChatSessionEvent[] {
   return d
     .select()
@@ -90,7 +90,7 @@ export function readSessionEvents(
 function throwConcurrencyConflict(
   aggregateId: string,
   expectedVersion: number,
-  actualVersion: number
+  actualVersion: number,
 ): never {
   throw new AppError({
     code: 'chat_session_concurrency_conflict',
@@ -100,7 +100,7 @@ function throwConcurrencyConflict(
       kind: 'concurrency_conflict',
       aggregateId,
       expectedVersion,
-      actualVersion
-    }
+      actualVersion,
+    },
   })
 }

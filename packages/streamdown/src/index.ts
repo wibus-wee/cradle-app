@@ -53,12 +53,12 @@ export { patchIncomplete } from './plugins/remark-incomplete'
 // Types
 export type { Citation } from './components/citation-popover'
 export type { FadableTag } from './components/fade-components'
-export type {
-  Components as MarkdownComponents,
-  UrlTransform as MarkdownUrlTransform,
-} from 'react-markdown'
 export type { AnimationPreset, AnimationPresetName } from './presets/types'
 export type { StreamDebugState } from './profiler/debug-store'
 export type { FrameMetrics, ProfilerSnapshot } from './profiler/profiler'
 export type { ScrollDebugState, ScrollLogEntry } from './profiler/scroll-debug-state'
 export type { BlockState, SmoothPreset, StreamdownProps } from './types'
+export type {
+  Components as MarkdownComponents,
+  UrlTransform as MarkdownUrlTransform,
+} from 'react-markdown'

@@ -1,23 +1,23 @@
-import type { TFunction } from 'i18next'
 import {
-  HeartbeatLine as ActivityIcon,
   BrainLine as BrainIcon,
   CheckCircleLine as CheckCircle2Icon,
-  ClockLine as ClockIcon,
   ChipLine as CpuIcon,
+  ClockLine as ClockIcon,
   DownloadLine as DownloadIcon,
+  DriveLine as HardDriveIcon,
   EyeLine as EyeIcon,
   FileMusicLine as FileAudioIcon,
-  DriveLine as HardDriveIcon,
-  PicLine as ImageIcon,
+  HeartbeatLine as ActivityIcon,
   Key2Line as KeyRoundIcon,
   LayersLine as LayersIcon,
   Message1Line as MessageSquareIcon,
+  PicLine as ImageIcon,
   Refresh1Line as RefreshCwIcon,
   SearchLine as SearchIcon,
+  User2Line as UserRoundIcon,
   WarningLine as TriangleAlertIcon,
-  User2Line as UserRoundIcon
 } from '@mingcute/react'
+import type { TFunction } from 'i18next'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -442,7 +442,7 @@ export function ChronicleSettings() {
     <SettingsPage
       title={t('page.title')}
       description={t('page.description')}
-      action={
+      action={(
         <div className="flex items-center gap-2">
           <StatusBadge running={status?.running ?? false} available={status?.available ?? false} />
           <Button type="button" variant="outline" size="xs" onClick={refreshChronicle} className="transition-transform active:scale-[0.96]">
@@ -450,7 +450,7 @@ export function ChronicleSettings() {
             {t('common.action.refresh')}
           </Button>
         </div>
-      }
+      )}
       maxWidth="4xl"
       data-testid="chronicle-settings"
       data-settings-chronicle-ready={settingsChronicleReady ? 'true' : 'false'}
@@ -501,11 +501,11 @@ export function ChronicleSettings() {
         <SettingsRow
           label={t('control.capture.title')}
           description={canEnable ? t('control.capture.description.enabled') : t('control.capture.description.blocked')}
-          labelAccessory={
+          labelAccessory={(
             <StatusBadgeInline tone={config?.enabled ? 'enabled' : captureDisabledReason ? 'warning' : 'disabled'}>
               {localizedCaptureStatus}
             </StatusBadgeInline>
-          }
+          )}
         >
           <Switch
             checked={config?.enabled ?? false}
@@ -534,11 +534,11 @@ export function ChronicleSettings() {
         <SettingsRow
           label={t('control.activity.title')}
           description={config?.enabled ? t('control.activity.description.enabled') : t('control.activity.description.blocked')}
-          labelAccessory={
+          labelAccessory={(
             <StatusBadgeInline tone={config?.enabled && (config?.activityPipelineEnabled ?? false) ? 'enabled' : activityDisabledReason ? 'warning' : 'disabled'}>
               {localizedActivityStatus}
             </StatusBadgeInline>
-          }
+          )}
         >
           <Switch
             checked={config?.activityPipelineEnabled ?? false}
@@ -550,11 +550,11 @@ export function ChronicleSettings() {
         <SettingsRow
           label={t('control.dream.title')}
           description={config?.enabled ? t('control.dream.description.enabled') : t('control.dream.description.blocked')}
-          labelAccessory={
+          labelAccessory={(
             <StatusBadgeInline tone={config?.enabled && (config?.dreamSchedulerEnabled ?? false) ? 'enabled' : activityDisabledReason ? 'warning' : 'disabled'}>
               {localizedDreamStatus}
             </StatusBadgeInline>
-          }
+          )}
         >
           <Switch
             checked={config?.dreamSchedulerEnabled ?? false}
@@ -566,11 +566,11 @@ export function ChronicleSettings() {
         <SettingsRow
           label={t('control.audio.title')}
           description={config?.enabled ? t('control.audio.description.enabled') : t('control.audio.description.blocked')}
-          labelAccessory={
+          labelAccessory={(
             <StatusBadgeInline tone={config?.enabled && config?.audioCaptureEnabled ? 'enabled' : audioDisabledReason || audioSourceDisabledReason ? 'warning' : 'disabled'}>
               {localizedAudioStatus}
             </StatusBadgeInline>
-          }
+          )}
         >
           <div className="flex items-center gap-2">
             <select
@@ -596,7 +596,7 @@ export function ChronicleSettings() {
       <SettingsGroup
         label={t('sources.title')}
         description={t('sources.description')}
-        action={
+        action={(
           <Badge variant="secondary" className="text-[11px] tabular-nums">
             {t('sources.metric.total', {
               screen: status?.totalAccessibilitySnapshots ?? 0,
@@ -604,7 +604,7 @@ export function ChronicleSettings() {
               audio: status?.totalAudioTranscripts ?? 0,
             })}
           </Badge>
-        }
+        )}
       >
         <SettingsRow
           label={t('sources.screen.title')}
@@ -639,7 +639,7 @@ export function ChronicleSettings() {
       <SettingsGroup
         label={t('memorySection.title')}
         description={t('memorySection.description')}
-        action={
+        action={(
           <div className="flex items-center gap-1.5">
             <Badge variant="secondary" className="text-[11px] tabular-nums">
               {t('hero.metric.memories')}
@@ -652,7 +652,7 @@ export function ChronicleSettings() {
               {status?.totalKnowledgeCards ?? 0}
             </Badge>
           </div>
-        }
+        )}
       >
         <SettingsRow label={t('recentActivity.title')} description={t('recentActivity.description')} vertical>
           {timelineLoading
@@ -944,11 +944,11 @@ function ChronicleModelRow({
     <SettingsRow
       label={t('control.model.title')}
       description={t('control.model.description')}
-      labelAccessory={
+      labelAccessory={(
         <StatusBadgeInline tone={displayModelId ? 'enabled' : 'warning'}>
           {modelStatus}
         </StatusBadgeInline>
-      }
+      )}
     >
       <ProviderModelPicker
         providerTargets={profiles}
@@ -1036,11 +1036,11 @@ export function PrivacyRulesPanel({
       <SettingsRow
         label={t('privacy.closedEyes.title')}
         description={t('privacy.closedEyes.description')}
-        labelAccessory={
+        labelAccessory={(
           <Badge variant="outline" className="text-[11px]">
             {t('common.status.unavailable')}
           </Badge>
-        }
+        )}
       >
         <div className="flex items-center gap-2">
           <ToggleGroup
@@ -1923,54 +1923,54 @@ function ActivitySourceBadge({ label, value }: { label: string, value: number })
 }
 
 function formatActivitySegmentType(t: ChronicleTranslate, type: ChronicleActivitySegment['segmentType']): string {
-  if (type === 'meeting') return t('activitySegment.type.meeting')
-  if (type === 'browsing') return t('activitySegment.type.browsing')
-  if (type === 'chat') return t('activitySegment.type.chat')
-  if (type === 'audio') return t('activitySegment.type.audio')
-  if (type === 'idle') return t('activitySegment.type.idle')
-  if (type === 'work') return t('activitySegment.type.work')
+  if (type === 'meeting') { return t('activitySegment.type.meeting') }
+  if (type === 'browsing') { return t('activitySegment.type.browsing') }
+  if (type === 'chat') { return t('activitySegment.type.chat') }
+  if (type === 'audio') { return t('activitySegment.type.audio') }
+  if (type === 'idle') { return t('activitySegment.type.idle') }
+  if (type === 'work') { return t('activitySegment.type.work') }
   return t('common.status.unknown')
 }
 
 function formatActivityPipelineStatus(t: ChronicleTranslate, status: ChronicleActivitySegment['pipelineStatus']): string {
-  if (status === 'triaged') return t('activitySegment.pipelineStatus.triaged')
-  if (status === 'summarized') return t('activitySegment.pipelineStatus.summarized')
-  if (status === 'crystallized') return t('activitySegment.pipelineStatus.crystallized')
-  if (status === 'error') return t('common.status.error')
+  if (status === 'triaged') { return t('activitySegment.pipelineStatus.triaged') }
+  if (status === 'summarized') { return t('activitySegment.pipelineStatus.summarized') }
+  if (status === 'crystallized') { return t('activitySegment.pipelineStatus.crystallized') }
+  if (status === 'error') { return t('common.status.error') }
   return t('activitySegment.pipelineStatus.collecting')
 }
 
 function formatPipelineTrigger(t: ChronicleTranslate, trigger: ChroniclePipelineRun['trigger']): string {
-  if (trigger === 'audio-raw') return t('pipeline.trigger.audioRaw')
-  if (trigger === 'audio-transcript') return t('pipeline.trigger.audioTranscript')
-  if (trigger === 'message') return t('pipeline.trigger.message')
-  if (trigger === 'memory') return t('pipeline.trigger.memory')
-  if (trigger === 'summarize') return t('pipeline.trigger.summarize')
-  if (trigger === 'manual') return t('pipeline.trigger.manual')
+  if (trigger === 'audio-raw') { return t('pipeline.trigger.audioRaw') }
+  if (trigger === 'audio-transcript') { return t('pipeline.trigger.audioTranscript') }
+  if (trigger === 'message') { return t('pipeline.trigger.message') }
+  if (trigger === 'memory') { return t('pipeline.trigger.memory') }
+  if (trigger === 'summarize') { return t('pipeline.trigger.summarize') }
+  if (trigger === 'manual') { return t('pipeline.trigger.manual') }
   return t('pipeline.trigger.snapshot')
 }
 
 function formatPipelineStage(t: ChronicleTranslate, stage: ChroniclePipelineRun['stage']): string {
-  if (stage === 'collection') return t('pipeline.stage.collection')
-  if (stage === 'triage') return t('pipeline.stage.triage')
-  if (stage === 'summarization') return t('pipeline.stage.summarization')
-  if (stage === 'crystallization') return t('pipeline.stage.crystallization')
+  if (stage === 'collection') { return t('pipeline.stage.collection') }
+  if (stage === 'triage') { return t('pipeline.stage.triage') }
+  if (stage === 'summarization') { return t('pipeline.stage.summarization') }
+  if (stage === 'crystallization') { return t('pipeline.stage.crystallization') }
   return t('pipeline.stage.segmentation')
 }
 
 function formatPipelineRunStatus(t: ChronicleTranslate, status: ChroniclePipelineRun['status']): string {
-  if (status === 'success') return t('common.status.completed')
-  if (status === 'error') return t('common.status.error')
-  if (status === 'queued') return t('common.status.queued')
-  if (status === 'running') return t('common.status.running')
-  if (status === 'skipped') return t('common.status.skipped')
+  if (status === 'success') { return t('common.status.completed') }
+  if (status === 'error') { return t('common.status.error') }
+  if (status === 'queued') { return t('common.status.queued') }
+  if (status === 'running') { return t('common.status.running') }
+  if (status === 'skipped') { return t('common.status.skipped') }
   return t('common.status.unknown')
 }
 
 function formatDurationSeconds(t: ChronicleTranslate, value: number): string {
-  if (value < 60) return t('duration.seconds', { count: Math.max(0, Math.floor(value)) })
+  if (value < 60) { return t('duration.seconds', { count: Math.max(0, Math.floor(value)) }) }
   const minutes = Math.floor(value / 60)
-  if (minutes < 60) return t('duration.minutes', { count: minutes })
+  if (minutes < 60) { return t('duration.minutes', { count: minutes }) }
   const hours = Math.floor(minutes / 60)
   const remainder = minutes % 60
   return remainder === 0
@@ -1979,99 +1979,99 @@ function formatDurationSeconds(t: ChronicleTranslate, value: number): string {
 }
 
 function formatKnowledgeCardType(t: ChronicleTranslate, type: ChronicleKnowledgeCard['cardType']): string {
-  if (type === 'insight') return t('knowledgeCard.type.insight')
-  if (type === 'decision') return t('knowledgeCard.type.decision')
-  if (type === 'task') return t('knowledgeCard.type.task')
-  if (type === 'pattern') return t('knowledgeCard.type.pattern')
+  if (type === 'insight') { return t('knowledgeCard.type.insight') }
+  if (type === 'decision') { return t('knowledgeCard.type.decision') }
+  if (type === 'task') { return t('knowledgeCard.type.task') }
+  if (type === 'pattern') { return t('knowledgeCard.type.pattern') }
   return t('knowledgeCard.type.fact')
 }
 
 function formatKnowledgeDimension(t: ChronicleTranslate, dimension: ChronicleKnowledgeCard['dimension']): string {
-  if (dimension === 'technical') return t('knowledgeCard.dimension.technical')
-  if (dimension === 'business') return t('knowledgeCard.dimension.business')
-  if (dimension === 'personal') return t('knowledgeCard.dimension.personal')
-  if (dimension === 'project') return t('knowledgeCard.dimension.project')
+  if (dimension === 'technical') { return t('knowledgeCard.dimension.technical') }
+  if (dimension === 'business') { return t('knowledgeCard.dimension.business') }
+  if (dimension === 'personal') { return t('knowledgeCard.dimension.personal') }
+  if (dimension === 'project') { return t('knowledgeCard.dimension.project') }
   return t('knowledgeCard.dimension.general')
 }
 
 function formatDreamRunType(t: ChronicleTranslate, type: ChronicleDreamRun['runType']): string {
-  if (type === 'merge') return t('dreamRun.type.merge')
-  if (type === 'archive') return t('dreamRun.type.archive')
-  if (type === 'prune') return t('dreamRun.type.prune')
-  if (type === 'restore') return t('dreamRun.type.restore')
+  if (type === 'merge') { return t('dreamRun.type.merge') }
+  if (type === 'archive') { return t('dreamRun.type.archive') }
+  if (type === 'prune') { return t('dreamRun.type.prune') }
+  if (type === 'restore') { return t('dreamRun.type.restore') }
   return t('dreamRun.type.dryRun')
 }
 
 function formatDreamRunStatus(t: ChronicleTranslate, status: ChronicleDreamRun['status']): string {
-  if (status === 'completed') return t('common.status.completed')
-  if (status === 'failed') return t('common.status.error')
-  if (status === 'running') return t('common.status.running')
+  if (status === 'completed') { return t('common.status.completed') }
+  if (status === 'failed') { return t('common.status.error') }
+  if (status === 'running') { return t('common.status.running') }
   return t('common.status.queued')
 }
 
 function formatKnowledgeCardStatus(t: ChronicleTranslate, status: ChronicleKnowledgeCard['status']): string {
-  if (status === 'active') return t('knowledgeCard.status.active')
-  if (status === 'merged') return t('knowledgeCard.status.merged')
-  if (status === 'archived') return t('knowledgeCard.status.archived')
-  if (status === 'deleted') return t('knowledgeCard.status.deleted')
+  if (status === 'active') { return t('knowledgeCard.status.active') }
+  if (status === 'merged') { return t('knowledgeCard.status.merged') }
+  if (status === 'archived') { return t('knowledgeCard.status.archived') }
+  if (status === 'deleted') { return t('knowledgeCard.status.deleted') }
   return status
 }
 
 function formatTranscriptStatus(t: ChronicleTranslate, status: ChronicleAudioTranscript['status']): string {
-  if (status === 'recording') return t('common.status.recording')
-  if (status === 'completed') return t('common.status.completed')
-  if (status === 'imported') return t('common.status.imported')
+  if (status === 'recording') { return t('common.status.recording') }
+  if (status === 'completed') { return t('common.status.completed') }
+  if (status === 'imported') { return t('common.status.imported') }
   return t('common.status.error')
 }
 
 function formatSlackRealtimeMode(t: ChronicleTranslate, mode: ChronicleMessageSource['realtimeMode']): string {
-  if (mode === 'events-api') return 'Events API'
-  if (mode === 'socket-mode') return 'Socket Mode'
+  if (mode === 'events-api') { return 'Events API' }
+  if (mode === 'socket-mode') { return 'Socket Mode' }
   return t('slack.mode.polling')
 }
 
 function formatAudioRuntimeStatus(t: ChronicleTranslate, status: ChronicleStatus['audioRuntimeStatus']): string {
-  if (status === 'armed') return t('common.status.armed')
-  if (status === 'unavailable') return t('common.status.unavailable')
+  if (status === 'armed') { return t('common.status.armed') }
+  if (status === 'unavailable') { return t('common.status.unavailable') }
   return t('common.status.disabled')
 }
 
 function formatAccessibilityStatus(t: ChronicleTranslate, status: ChronicleAccessibilitySnapshot['status']): string {
-  if (status === 'permission-denied') return t('accessibility.status.permissionDenied')
-  if (status === 'unavailable') return t('common.status.unavailable')
-  if (status === 'error') return t('common.status.error')
+  if (status === 'permission-denied') { return t('accessibility.status.permissionDenied') }
+  if (status === 'unavailable') { return t('common.status.unavailable') }
+  if (status === 'error') { return t('common.status.error') }
   return t('resource.state.available')
 }
 
 function formatAccessibilityEventNotification(t: ChronicleTranslate, notification: string): string {
-  if (notification === 'AXFocusedWindowChanged') return t('accessibility.notification.focusedWindowChanged')
-  if (notification === 'AXFocusedUIElementChanged') return t('accessibility.notification.focusedElementChanged')
-  if (notification === 'AXWindowCreated') return t('accessibility.notification.windowCreated')
-  if (notification === 'AXWindowMoved') return t('accessibility.notification.windowMoved')
-  if (notification === 'AXWindowResized') return t('accessibility.notification.windowResized')
+  if (notification === 'AXFocusedWindowChanged') { return t('accessibility.notification.focusedWindowChanged') }
+  if (notification === 'AXFocusedUIElementChanged') { return t('accessibility.notification.focusedElementChanged') }
+  if (notification === 'AXWindowCreated') { return t('accessibility.notification.windowCreated') }
+  if (notification === 'AXWindowMoved') { return t('accessibility.notification.windowMoved') }
+  if (notification === 'AXWindowResized') { return t('accessibility.notification.windowResized') }
   return notification
 }
 
 function formatMemoryType(t: ChronicleTranslate, type: MemoryEntry['type']): string {
-  if (type === '10min') return t('memory.type.short')
+  if (type === '10min') { return t('memory.type.short') }
   return t('memory.type.long')
 }
 
 function formatAudioSegmentTitle(t: ChronicleTranslate, segment: ChronicleAudioRawSegment): string {
-  if (segment.source === 'system') return t('audioRaw.title.system')
-  if (segment.source === 'mixed') return t('audioRaw.title.mixed')
+  if (segment.source === 'system') { return t('audioRaw.title.system') }
+  if (segment.source === 'mixed') { return t('audioRaw.title.mixed') }
   return t('audioRaw.title.microphone')
 }
 
 function formatAudioProcessingStatus(t: ChronicleTranslate, status: ChronicleAudioRawSegment['vadStatus']): string {
-  if (status === 'pending') return t('common.status.pending')
-  if (status === 'ready') return t('common.status.completed')
-  if (status === 'error') return t('common.status.error')
+  if (status === 'pending') { return t('common.status.pending') }
+  if (status === 'ready') { return t('common.status.completed') }
+  if (status === 'error') { return t('common.status.error') }
   return t('audioRaw.processing.notConnected')
 }
 
 function getMemoryMatchLabel(t: ChronicleTranslate, entry: MemoryEntry): string {
-  if (entry.matchKind === 'hybrid') return t('memory.match.hybrid')
+  if (entry.matchKind === 'hybrid') { return t('memory.match.hybrid') }
   if (entry.matchKind === 'semantic') {
     return entry.semanticScore !== null && entry.semanticScore !== undefined
       ? t('memory.match.semanticScore', { score: entry.semanticScore.toFixed(2) })
@@ -2081,10 +2081,10 @@ function getMemoryMatchLabel(t: ChronicleTranslate, entry: MemoryEntry): string 
 }
 
 function getAccessibilityTreeDepthClass(depth: number): string {
-  if (depth <= 0) return 'pl-0'
-  if (depth === 1) return 'pl-2'
-  if (depth === 2) return 'pl-4'
-  if (depth === 3) return 'pl-6'
+  if (depth <= 0) { return 'pl-0' }
+  if (depth === 1) { return 'pl-2' }
+  if (depth === 2) { return 'pl-4' }
+  if (depth === 3) { return 'pl-6' }
   return 'pl-8'
 }
 

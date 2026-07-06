@@ -1,5 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
-
 import './styles.css'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

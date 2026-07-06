@@ -1135,7 +1135,8 @@ export function useChronicleDownloadProgress(active: boolean): Map<string, Downl
       let entries: DownloadProgressEntry[]
       try {
         entries = ChronicleDownloadProgressMessageSchema.parse(event.data)
-      } catch (error) {
+      }
+ catch (error) {
         if (!malformedFrameReported) {
           malformedFrameReported = true
           console.warn('[chronicle] dropped malformed download progress event', error)

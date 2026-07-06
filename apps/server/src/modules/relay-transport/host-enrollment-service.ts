@@ -5,15 +5,16 @@ import { asc, eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { upsertSecret } from '../secrets/service'
+import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import {
   createRelayRoomId,
   generateRelaySigningKeyPair,
   signRelayAssertion,
-  type SignedRelayAssertion,
 } from '../relay-servers/relay-signature-service'
+import { upsertSecret } from '../secrets/service'
 import { generateRelayKeyPair, relayPublicKeyFingerprint } from './crypto'
-import { getHostConnectorService, type HostEnrollmentLiveState } from './host-connector'
+import type { HostEnrollmentLiveState } from './host-connector'
+import { getHostConnectorService } from './host-connector'
 import { upsertHostRelayAuthToken } from './relay-auth-token-service'
 
 /**

@@ -6,14 +6,13 @@ import {
   SafeShieldLine as ShieldCheckIcon,
   SandglassLine as HourglassIcon,
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
 import type { Workspace } from '~/features/workspace/types'

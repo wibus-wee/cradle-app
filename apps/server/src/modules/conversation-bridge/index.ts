@@ -1,12 +1,12 @@
 import { Elysia, t } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
+import { ConversationBridgeModel } from './model'
 import {
   restartConversationBridgeConnection,
   startConversationBridgeConnection,
   stopConversationBridgeConnection,
 } from './runtime-supervisor'
-import { ConversationBridgeModel } from './model'
 import * as ConversationBridge from './service'
 
 function requireConnection<T>(connection: T | null, id: string): T {

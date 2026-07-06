@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { PtyErrorEvent, PtySnapshotEvent } from './pty-protocol'
 import { createPtyChannel } from './pty-channel'
+import type { PtyErrorEvent, PtySnapshotEvent } from './pty-protocol'
 
 vi.mock('~/lib/electron', () => ({
   getServerWebSocketUrl: (_socketPath: string, query?: { fromSeq?: number }) => {

@@ -1,11 +1,12 @@
 import {
   ArrowLeftLine as ArrowLeftIcon,
-  LeftSmallLine as ChevronLeftIcon,
-  RightSmallLine as ChevronRightIcon,
   CornerUpLeftLine as CornerUpLeftIcon,
+  DeleteLine as TrashIcon,
+  LeftSmallLine as ChevronLeftIcon,
   More2Line as MoreHorizontalIcon,
-  DeleteLine as TrashIcon
+  RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
+
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from '~/components/ui/menu'
 import type { KanbanIssue, KanbanStatus } from '~/features/kanban/types'
 

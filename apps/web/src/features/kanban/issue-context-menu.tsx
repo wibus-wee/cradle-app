@@ -1,15 +1,15 @@
 import {
-  RobotLine as BotIcon,
   CheckLine as CheckIcon,
   CircleDashLine as CircleDashedIcon,
   ClipboardLine as ClipboardIcon,
   CopyLine as CopyIcon,
+  DeleteLine as Trash2Icon,
   ExternalLinkLine as ExternalLinkIcon,
   Flag2Line as FlagIcon,
   Flag3Line as MilestoneIcon,
-  DeleteLine as Trash2Icon,
+  RobotLine as BotIcon,
   User2Line as UserIcon,
-  UserXLine as UserRoundXIcon
+  UserXLine as UserRoundXIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'

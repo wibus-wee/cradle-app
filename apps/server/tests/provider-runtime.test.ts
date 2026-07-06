@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../src/infra'
 import type { ChatRuntime, ResumeChatSessionInput, RuntimeProviderTargetProfile, RuntimeSession, StartChatSessionInput } from '../src/modules/chat-runtime/runtime-provider-types'
+import * as Observability from '../src/modules/observability/service'
+import type { RuntimeKind } from '../src/modules/provider-contracts/types'
 import { providerRuntimeHostManager } from '../src/modules/provider-runtime/host-manager'
 import {
   persistProviderRuntimeResolution,
@@ -22,8 +24,6 @@ import {
   releaseSideConversationsByProviderTargetId,
   reserveSideConversationHostLease,
 } from '../src/modules/provider-runtime/side-conversation-registry'
-import * as Observability from '../src/modules/observability/service'
-import type { RuntimeKind } from '../src/modules/provider-contracts/types'
 
 const runtimeSession: RuntimeSession = {
   id: 'side-session',

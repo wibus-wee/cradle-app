@@ -3,7 +3,7 @@ import { sessionEvents, sessions } from '@cradle/db'
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm'
 
 import { db } from '../../../infra'
-import type { ChatSessionEvent, StoredChatSessionEvent } from './events'
+import type { StoredChatSessionEvent } from './events'
 import { parseStoredChatSessionEvent } from './events'
 
 const encoder = new TextEncoder()
@@ -268,8 +268,8 @@ function readWorkspaceIdsBySessionId(events: ChatSessionTailEvent[]): Map<string
 
 export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalSessionTailEvent>(input: {
   replay: ChatTailReplay<TEvent>
-  subscribe(subscriber: (event: TEvent) => void): () => void
-  readCatchupReplay(cursor: number): ChatTailReplay<TEvent>
+  subscribe: (subscriber: (event: TEvent) => void) => () => void
+  readCatchupReplay: (cursor: number) => ChatTailReplay<TEvent>
 }): ReadableStream<Uint8Array> {
   let unsubscribe = () => {}
   let keepAlive: ReturnType<typeof setInterval> | null = null
@@ -311,7 +311,8 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
       keepAlive = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(': keepalive\n\n'))
-        } catch {
+        }
+ catch {
           close()
         }
       }, KEEPALIVE_INTERVAL_MS)

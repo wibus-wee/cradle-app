@@ -14,9 +14,9 @@ import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 
 import type { ChatViewProps } from './chat-view'
 import { searchSessionPluginMentions } from './mentions/plugin-mentions'
-import { runtimeSupportsCodexPluginMentions } from './runtime/codex-app-server-bridge'
 import type { SkillMentionItem } from './mentions/skill-mention-panel'
 import { useProviderTargetClaudeAgentModelAliases, useSessionClaudeAgentModelAliases } from './runtime/claude-session-model-matrix-control'
+import { runtimeSupportsCodexPluginMentions } from './runtime/codex-app-server-bridge'
 import type { SendMessageOptions } from './session/use-chat-session'
 import { useSessionProviderModelPersistence } from './session/use-session-binding'
 

@@ -5,6 +5,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     constructor(callback: ResizeObserverCallback) {
       this.callback = callback
     }
+
     observe() {}
     unobserve() {}
     disconnect() {}

@@ -28,10 +28,10 @@ import {
   readTrustedUniversalConfig,
   resolveApiKey,
 } from '../../provider-contracts/provider-base'
+import { createBoundedTextCollector } from '../bounded-text-collector'
 import type { ProviderInputPart } from '../kit/input-projector'
 import { projectProviderInputParts } from '../kit/input-projector'
 import { readWorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
-import { createBoundedTextCollector } from '../bounded-text-collector'
 import { CLAUDE_AGENT_RUNTIME_KIND } from './metadata'
 import type { ClaudeAgentPermissionBridgeState, ClaudeAgentToolApprovalRequest } from './permission-bridge'
 import {
@@ -340,7 +340,7 @@ export interface ClaudeStderrSink {
 export function createClaudeStderrSink(): ClaudeStderrSink {
   const collector = createBoundedTextCollector(CLAUDE_STDERR_MAX_LENGTH)
   return {
-    onStderr: (chunk) => collector.append(chunk),
+    onStderr: chunk => collector.append(chunk),
     enrichError: (error) => {
       const stderr = collector.read()
       if (!stderr) {

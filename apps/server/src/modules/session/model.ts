@@ -11,7 +11,7 @@ const thinkingEffortSchema = t.Union([
   t.Literal('low'),
   t.Literal('medium'),
   t.Literal('high'),
-  t.Literal('xhigh')
+  t.Literal('xhigh'),
 ])
 const sessionStatusSchema = t.Union([t.Literal('idle'), t.Literal('streaming'), t.Literal('error')])
 const sideContextSourceSchema = t.Union([t.Literal('provider-native'), t.Literal('cradle-context')])
@@ -91,21 +91,21 @@ export const SessionModel = {
     thinkingEffort: t.Optional(thinkingEffortSchema),
     linkedIssueId: t.Optional(nullableRequiredString),
     worktreeId: t.Optional(t.String({ minLength: 1 })),
-    id: t.Optional(t.String())
+    id: t.Optional(t.String()),
   }),
 
   exportMarkdownResponse: t.Object({
-    markdown: t.String()
+    markdown: t.String(),
   }),
 
   idParams: t.Object({
-    id: t.String({ minLength: 1 })
+    id: t.String({ minLength: 1 }),
   }),
 
   listQuery: t.Object({
     workspaceId: t.Optional(t.String({ minLength: 1 })),
     origin: t.Optional(t.String({ minLength: 1 })),
-    archived: t.Optional(t.Boolean())
+    archived: t.Optional(t.Boolean()),
   }),
 
   updateBody: t.Object({
@@ -113,10 +113,10 @@ export const SessionModel = {
     pinned: t.Optional(t.Boolean()),
     providerTargetId: t.Optional(t.String({ minLength: 1 })),
     modelId: t.Optional(nullableRequiredString),
-    thinkingEffort: t.Optional(t.Nullable(thinkingEffortSchema))
+    thinkingEffort: t.Optional(t.Nullable(thinkingEffortSchema)),
   }),
 
   archiveBody: t.Object({
-    archived: t.Boolean()
-  })
+    archived: t.Boolean(),
+  }),
 }

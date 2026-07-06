@@ -2,11 +2,11 @@
   "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "target": "ES2022",
+    "rootDir": "src",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "outDir": "dist",
-    "rootDir": "src",
-    "types": ["node", "vitest"]
+    "types": ["node", "vitest"],
+    "outDir": "dist"
   },
   "include": ["src"]
 }

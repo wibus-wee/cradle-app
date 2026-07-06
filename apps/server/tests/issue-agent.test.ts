@@ -57,9 +57,9 @@ async function createProfile(app: ElysiaApp) {
       body: JSON.stringify({
         kind: 'openai-compatible',
         label: 'Issue Agent Key',
-        secret: 'sk-issue-agent-test'
-      })
-    })
+        secret: 'sk-issue-agent-test',
+      }),
+    }),
   )
   const credential = (await credentialRes.json()) as { id: string }
 
@@ -72,9 +72,9 @@ async function createProfile(app: ElysiaApp) {
         providerKind: 'openai-compatible',
         enabled: true,
         config: { baseUrl: 'https://example.com/v1', model: 'gpt-4o-mini' },
-        credentialRef: credential.id
-      })
-    })
+        credentialRef: credential.id,
+      }),
+    }),
   )
   expect(profileRes.status).toBe(200)
 }
@@ -89,12 +89,12 @@ async function createAgent(app: ElysiaApp) {
         avatarStyle: 'bottts-neutral',
         avatarSeed: 'issue-agent',
         providerTargetId: 'profile-issue-agent',
-        runtimeKind: 'standard'
-      })
-    })
+        runtimeKind: 'standard',
+      }),
+    }),
   )
   expect(agentRes.status).toBe(200)
-  return (await agentRes.json()) as { id: string; name: string; providerTargetId: string }
+  return (await agentRes.json()) as { id: string, name: string, providerTargetId: string }
 }
 
 async function createIssue(app: ElysiaApp, workspaceId: string) {
@@ -102,16 +102,16 @@ async function createIssue(app: ElysiaApp, workspaceId: string) {
     new Request('http://localhost/kanban/boards', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workspaceId, name: 'Agent Board' })
-    })
+      body: JSON.stringify({ workspaceId, name: 'Agent Board' }),
+    }),
   )
   expect(boardRes.status).toBe(200)
 
   const statusesRes = await app.handle(
-    new Request(`http://localhost/issues/statuses?workspaceId=${encodeURIComponent(workspaceId)}`)
+    new Request(`http://localhost/issues/statuses?workspaceId=${encodeURIComponent(workspaceId)}`),
   )
-  const statuses = (await statusesRes.json()) as Array<{ id: string; name: string }>
-  const todoStatusId = statuses.find((status) => status.name === 'To Do')?.id
+  const statuses = (await statusesRes.json()) as Array<{ id: string, name: string }>
+  const todoStatusId = statuses.find(status => status.name === 'To Do')?.id
   expect(todoStatusId).toBeTruthy()
 
   const issueRes = await app.handle(
@@ -124,22 +124,22 @@ async function createIssue(app: ElysiaApp, workspaceId: string) {
         description: 'Please investigate this server task.',
         statusId: todoStatusId!,
         priority: 'high',
-        labels: ['backend']
-      })
-    })
+        labels: ['backend'],
+      }),
+    }),
   )
   expect(issueRes.status).toBe(200)
-  return (await issueRes.json()) as { id: string; title: string }
+  return (await issueRes.json()) as { id: string, title: string }
 }
 
 async function waitForSessionStatus(
   app: ElysiaApp,
   issueId: string,
-  expectedStatus: AgentSessionView['status']
+  expectedStatus: AgentSessionView['status'],
 ): Promise<AgentSessionView[]> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const response = await app.handle(
-      new Request(`http://localhost/issues/${encodeURIComponent(issueId)}/agent-sessions`)
+      new Request(`http://localhost/issues/${encodeURIComponent(issueId)}/agent-sessions`),
     )
     if (response.status === 200) {
       const sessions = (await response.json()) as AgentSessionView[]
@@ -147,7 +147,7 @@ async function waitForSessionStatus(
         return sessions
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 20))
   }
   throw new Error(`Timed out waiting for agent session status ${expectedStatus}`)
 }
@@ -155,21 +155,21 @@ async function waitForSessionStatus(
 async function waitForActivitySignal(
   app: ElysiaApp,
   agentSessionId: string,
-  expectedSignal: string
+  expectedSignal: string,
 ): Promise<AgentActivityView[]> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const response = await app.handle(
       new Request(
-        `http://localhost/issue-agent-sessions/${encodeURIComponent(agentSessionId)}/activities`
-      )
+        `http://localhost/issue-agent-sessions/${encodeURIComponent(agentSessionId)}/activities`,
+      ),
     )
     if (response.status === 200) {
       const activities = (await response.json()) as AgentActivityView[]
-      if (activities.some((activity) => activity.signal === expectedSignal)) {
+      if (activities.some(activity => activity.signal === expectedSignal)) {
         return activities
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 20))
   }
   throw new Error(`Timed out waiting for agent activity signal ${expectedSignal}`)
 }
@@ -177,21 +177,21 @@ async function waitForActivitySignal(
 async function waitForActivityBody(
   app: ElysiaApp,
   agentSessionId: string,
-  expectedBody: string
+  expectedBody: string,
 ): Promise<AgentActivityView[]> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const response = await app.handle(
       new Request(
-        `http://localhost/issue-agent-sessions/${encodeURIComponent(agentSessionId)}/activities`
-      )
+        `http://localhost/issue-agent-sessions/${encodeURIComponent(agentSessionId)}/activities`,
+      ),
     )
     if (response.status === 200) {
       const activities = (await response.json()) as AgentActivityView[]
-      if (activities.some((activity) => JSON.parse(activity.content).body === expectedBody)) {
+      if (activities.some(activity => JSON.parse(activity.content).body === expectedBody)) {
         return activities
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 20))
   }
   throw new Error(`Timed out waiting for agent activity body ${expectedBody}`)
 }
@@ -200,21 +200,21 @@ async function waitForChatQueueItemStatus(
   app: ElysiaApp,
   chatSessionId: string,
   queueItemId: string,
-  expectedStatus: string
+  expectedStatus: string,
 ): Promise<void> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const response = await app.handle(
-      new Request(`http://localhost/chat/sessions/${encodeURIComponent(chatSessionId)}/queue`)
+      new Request(`http://localhost/chat/sessions/${encodeURIComponent(chatSessionId)}/queue`),
     )
     if (response.status === 200) {
       const queue = (await response.json()) as {
-        items: Array<{ id: string; status: string }>
+        items: Array<{ id: string, status: string }>
       }
-      if (queue.items.some((item) => item.id === queueItemId && item.status === expectedStatus)) {
+      if (queue.items.some(item => item.id === queueItemId && item.status === expectedStatus)) {
         return
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 20))
   }
   throw new Error(`Timed out waiting for chat queue item ${queueItemId} status ${expectedStatus}`)
 }
@@ -226,14 +226,14 @@ function createChatCompletionResponse(text: string, release?: Promise<void>): Re
       start(controller) {
         controller.enqueue(
           encoder.encode(
-            `data: {"id":"chunk-1","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"${text}"},"finish_reason":null}]}\n\n`
-          )
+            `data: {"id":"chunk-1","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"${text}"},"finish_reason":null}]}\n\n`,
+          ),
         )
         const close = () => {
           controller.enqueue(
             encoder.encode(
-              'data: {"id":"chunk-2","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}\n\n'
-            )
+              'data: {"id":"chunk-2","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}\n\n',
+            ),
           )
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
@@ -243,12 +243,12 @@ function createChatCompletionResponse(text: string, release?: Promise<void>): Re
           return
         }
         close()
-      }
+      },
     }),
     {
       status: 200,
-      headers: { 'content-type': 'text/event-stream' }
-    }
+      headers: { 'content-type': 'text/event-stream' },
+    },
   )
 }
 
@@ -270,7 +270,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-delegation-model',
           name: 'Workspace Delegation Model',
-          locatorJson: localWorkspaceLocatorJson('/tmp/workspace-delegation-model')
+          locatorJson: localWorkspaceLocatorJson('/tmp/workspace-delegation-model'),
         })
         .run()
       db()
@@ -280,7 +280,7 @@ describe('issue-agent capability', () => {
           kind: 'manual',
           providerKind: 'openai-compatible',
           displayName: 'Delegation Provider',
-          enabled: true
+          enabled: true,
         })
         .run()
       db()
@@ -294,22 +294,22 @@ describe('issue-agent capability', () => {
           runtimeKind: 'standard',
           enabled: true,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         })
         .run()
 
       const issue = Issue.createIssue({
         workspaceId: 'workspace-delegation-model',
-        title: 'Keep ownership clear'
+        title: 'Keep ownership clear',
       })
       Issue.updateIssue(issue.id, {
         assigneeKind: 'user',
-        assigneeId: '__self__'
+        assigneeId: '__self__',
       })
 
       const delegatedIssue = Issue.updateIssueDelegation(issue.id, {
         agentId: 'agent-delegation-model',
-        providerTargetId: 'provider-target-delegation-model'
+        providerTargetId: 'provider-target-delegation-model',
       })
 
       expect(delegatedIssue).toEqual(
@@ -317,14 +317,14 @@ describe('issue-agent capability', () => {
           assigneeKind: 'user',
           assigneeId: '__self__',
           delegateAgentId: 'agent-delegation-model',
-          delegateProviderTargetId: 'provider-target-delegation-model'
-        })
+          delegateProviderTargetId: 'provider-target-delegation-model',
+        }),
       )
 
       Issue.addComment({
         issueId: issue.id,
         content: 'Delegated to Delegation Agent',
-        authorKind: 'system.delegated'
+        authorKind: 'system.delegated',
       })
 
       expect(Issue.listComments(issue.id)).toEqual(
@@ -332,16 +332,18 @@ describe('issue-agent capability', () => {
           expect.objectContaining({
             authorKind: 'system.delegated',
             authorId: null,
-            content: 'Delegated to Delegation Agent'
-          })
-        ])
+            content: 'Delegated to Delegation Agent',
+          }),
+        ]),
       )
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -360,7 +362,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-stale-run',
           name: 'Workspace Stale Run',
-          locatorJson: localWorkspaceLocatorJson('/tmp/workspace-stale-run')
+          locatorJson: localWorkspaceLocatorJson('/tmp/workspace-stale-run'),
         })
         .run()
       db()
@@ -370,7 +372,7 @@ describe('issue-agent capability', () => {
           kind: 'manual',
           providerKind: 'openai-compatible',
           displayName: 'Stale Run Provider',
-          enabled: true
+          enabled: true,
         })
         .run()
       db()
@@ -384,36 +386,36 @@ describe('issue-agent capability', () => {
           runtimeKind: 'standard',
           enabled: true,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         })
         .run()
 
       const issue = Issue.createIssue({
         workspaceId: 'workspace-stale-run',
-        title: 'Ignore stale completion'
+        title: 'Ignore stale completion',
       })
       const session = AgentInteraction.createSession({
         issueId: issue.id,
         providerTargetId: 'provider-target-stale-run',
-        agentId: 'agent-stale-run'
+        agentId: 'agent-stale-run',
       })
       AgentInteraction.updateSessionStatus(session.id, 'active')
       issueAgentRunTrackingTestHooks.setActiveRun(session.id, {
         runId: 'current-run',
         chatSessionId: null,
-        aborted: false
+        aborted: false,
       })
 
       expect(
         issueAgentRunTrackingTestHooks.settleRunCompletion(session.id, 'stale-run', {
           status: 'complete',
-          errorText: null
-        })
+          errorText: null,
+        }),
       ).toBe(false)
       expect(issueAgentRunTrackingTestHooks.getActiveRun(session.id)).toEqual({
         runId: 'current-run',
         chatSessionId: null,
-        aborted: false
+        aborted: false,
       })
       expect(AgentInteraction.getSession(session.id)?.status).toBe('active')
       expect(AgentInteraction.listActivities(session.id)).toHaveLength(0)
@@ -421,17 +423,19 @@ describe('issue-agent capability', () => {
       expect(
         issueAgentRunTrackingTestHooks.settleRunCompletion(session.id, 'current-run', {
           status: 'complete',
-          errorText: null
-        })
+          errorText: null,
+        }),
       ).toBe(true)
       expect(issueAgentRunTrackingTestHooks.getActiveRun(session.id)).toBeUndefined()
       expect(AgentInteraction.getSession(session.id)?.status).toBe('completed')
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -454,30 +458,30 @@ describe('issue-agent capability', () => {
       }
       completionBodies.push(String(init?.body ?? ''))
       completionIndex += 1
-      const responseText =
-        completionIndex === 1 ? 'Hello from delegated run 1' : 'Hello from delegated run 2'
+      const responseText
+        = completionIndex === 1 ? 'Hello from delegated run 1' : 'Hello from delegated run 2'
       const encoder = new TextEncoder()
       return new Response(
         new ReadableStream({
           start(controller) {
             controller.enqueue(
               encoder.encode(
-                `data: {"id":"chunk-${completionIndex}-1","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"${responseText}"},"finish_reason":null}]}\n\n`
-              )
+                `data: {"id":"chunk-${completionIndex}-1","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"${responseText}"},"finish_reason":null}]}\n\n`,
+              ),
             )
             controller.enqueue(
               encoder.encode(
-                `data: {"id":"chunk-${completionIndex}-2","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}\n\n`
-              )
+                `data: {"id":"chunk-${completionIndex}-2","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}\n\n`,
+              ),
             )
             controller.enqueue(encoder.encode('data: [DONE]\n\n'))
             controller.close()
-          }
+          },
         }),
         {
           status: 200,
-          headers: { 'content-type': 'text/event-stream' }
-        }
+          headers: { 'content-type': 'text/event-stream' },
+        },
       )
     })
 
@@ -490,7 +494,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-issue-agent',
           name: 'Workspace Issue Agent',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -502,8 +506,8 @@ describe('issue-agent capability', () => {
         new Request('http://localhost/workflow-rules/workspace-issue-agent', {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ content: 'global issue-agent rule' })
-        })
+          body: JSON.stringify({ content: 'global issue-agent rule' }),
+        }),
       )
       expect(saveGlobalRule.status).toBe(200)
 
@@ -511,8 +515,8 @@ describe('issue-agent capability', () => {
         new Request('http://localhost/workflow-rules/workspace-issue-agent', {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id, content: 'agent identity issue-agent rule' })
-        })
+          body: JSON.stringify({ agentId: agent.id, content: 'agent identity issue-agent rule' }),
+        }),
       )
       expect(saveAgentRule.status).toBe(200)
 
@@ -522,9 +526,9 @@ describe('issue-agent capability', () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             agentId: agent.providerTargetId,
-            content: 'provider target named rule should not load'
-          })
-        })
+            content: 'provider target named rule should not load',
+          }),
+        }),
       )
       expect(saveProviderTargetNamedRule.status).toBe(200)
 
@@ -532,8 +536,8 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(delegateRes.status).toBe(200)
       const delegatedSession = (await delegateRes.json()) as AgentSessionView
@@ -547,12 +551,12 @@ describe('issue-agent capability', () => {
         expect.objectContaining({
           id: delegatedSession.id,
           isCurrentDelegation: true,
-          status: 'completed'
-        })
+          status: 'completed',
+        }),
       )
 
       const delegationStateRes = await app.handle(
-        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`)
+        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`),
       )
       expect(delegationStateRes.status).toBe(200)
       const delegationState = (await delegationStateRes.json()) as DelegationState
@@ -562,8 +566,8 @@ describe('issue-agent capability', () => {
           delegated: true,
           providerTargetId: 'profile-issue-agent',
           agentId: agent.id,
-          agentSessionId: delegatedSession.id
-        })
+          agentSessionId: delegatedSession.id,
+        }),
       )
       expect(delegationState.chatSessionId).toBeTruthy()
       const chatSession = db()
@@ -574,7 +578,7 @@ describe('issue-agent capability', () => {
       expect(chatSession?.origin).toBe('cradle-issue')
 
       const assignedIssueRes = await app.handle(
-        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}`)
+        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}`),
       )
       expect(assignedIssueRes.status).toBe(200)
       expect(await assignedIssueRes.json()).toEqual(
@@ -582,47 +586,47 @@ describe('issue-agent capability', () => {
           assigneeKind: null,
           assigneeId: null,
           delegateAgentId: agent.id,
-          delegateProviderTargetId: 'profile-issue-agent'
-        })
+          delegateProviderTargetId: 'profile-issue-agent',
+        }),
       )
 
       const commentsRes = await app.handle(
-        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/comments`)
+        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/comments`),
       )
       expect(commentsRes.status).toBe(200)
       expect(await commentsRes.json()).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ authorKind: 'system.delegated', authorId: null })
-        ])
+          expect.objectContaining({ authorKind: 'system.delegated', authorId: null }),
+        ]),
       )
 
       const activitiesRes = await app.handle(
         new Request(
-          `http://localhost/issue-agent-sessions/${encodeURIComponent(delegatedSession.id)}/activities`
-        )
+          `http://localhost/issue-agent-sessions/${encodeURIComponent(delegatedSession.id)}/activities`,
+        ),
       )
       expect(activitiesRes.status).toBe(200)
       const activities = (await activitiesRes.json()) as AgentActivityView[]
-      expect(activities.map((activity) => JSON.parse(activity.content).body)).toEqual(
+      expect(activities.map(activity => JSON.parse(activity.content).body)).toEqual(
         expect.arrayContaining([
           'Delegated to Issue Agent',
           'Examining issue...',
-          'Completed work on issue'
-        ])
+          'Completed work on issue',
+        ]),
       )
 
       const genericActivitiesRes = await app.handle(
         new Request(
-          `http://localhost/agent-sessions/${encodeURIComponent(delegatedSession.id)}/activities`
-        )
+          `http://localhost/agent-sessions/${encodeURIComponent(delegatedSession.id)}/activities`,
+        ),
       )
       expect(genericActivitiesRes.status).toBe(200)
       expect(await genericActivitiesRes.json()).toEqual(activities)
 
       const messagesRes = await app.handle(
         new Request(
-          `http://localhost/chat/sessions/${encodeURIComponent(String(delegationState.chatSessionId))}/messages`
-        )
+          `http://localhost/chat/sessions/${encodeURIComponent(String(delegationState.chatSessionId))}/messages`,
+        ),
       )
       expect(messagesRes.status).toBe(200)
       const messages = (await messagesRes.json()) as Array<{
@@ -634,8 +638,8 @@ describe('issue-agent capability', () => {
         expect.objectContaining({
           role: 'assistant',
           content: 'Hello from delegated run 1',
-          status: 'complete'
-        })
+          status: 'complete',
+        }),
       )
       expect(completionBodies[0]).toContain(`Issue ID: ${issue.id}`)
       expect(completionBodies[0]).toContain('global issue-agent rule')
@@ -644,22 +648,22 @@ describe('issue-agent capability', () => {
 
       const chatSessionRes = await app.handle(
         new Request(
-          `http://localhost/sessions/${encodeURIComponent(String(delegationState.chatSessionId))}`
-        )
+          `http://localhost/sessions/${encodeURIComponent(String(delegationState.chatSessionId))}`,
+        ),
       )
       expect(chatSessionRes.status).toBe(200)
       expect(await chatSessionRes.json()).toEqual(expect.objectContaining({ agentId: agent.id }))
 
       const linkedSessionsRes = await app.handle(
-        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/sessions`)
+        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/sessions`),
       )
       expect(linkedSessionsRes.status).toBe(200)
       expect(await linkedSessionsRes.json()).toEqual([
         expect.objectContaining({
           id: delegationState.chatSessionId,
           agentId: agent.id,
-          linkedIssueId: issue.id
-        })
+          linkedIssueId: issue.id,
+        }),
       ])
 
       const rerunRes = await app.handle(
@@ -668,9 +672,9 @@ describe('issue-agent capability', () => {
           {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({})
-          }
-        )
+            body: JSON.stringify({}),
+          },
+        ),
       )
       expect(rerunRes.status).toBe(200)
 
@@ -682,8 +686,8 @@ describe('issue-agent capability', () => {
 
       const rerunMessagesRes = await app.handle(
         new Request(
-          `http://localhost/chat/sessions/${encodeURIComponent(String(rerunSession.chatSessionId))}/messages`
-        )
+          `http://localhost/chat/sessions/${encodeURIComponent(String(rerunSession.chatSessionId))}/messages`,
+        ),
       )
       expect(rerunMessagesRes.status).toBe(200)
       const rerunMessages = (await rerunMessagesRes.json()) as Array<{
@@ -691,19 +695,19 @@ describe('issue-agent capability', () => {
         content: string
       }>
       expect(rerunMessages.at(-1)).toEqual(
-        expect.objectContaining({ role: 'assistant', content: 'Hello from delegated run 2' })
+        expect.objectContaining({ role: 'assistant', content: 'Hello from delegated run 2' }),
       )
 
       const undelegateRes = await app.handle(
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
-          method: 'DELETE'
-        })
+          method: 'DELETE',
+        }),
       )
       expect(undelegateRes.status).toBe(200)
       expect(await undelegateRes.json()).toEqual({ ok: true })
 
       const delegationAfterDeleteRes = await app.handle(
-        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`)
+        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`),
       )
       expect(delegationAfterDeleteRes.status).toBe(200)
       expect(await delegationAfterDeleteRes.json()).toEqual(
@@ -713,12 +717,12 @@ describe('issue-agent capability', () => {
           providerTargetId: null,
           agentId: null,
           agentSessionId: null,
-          chatSessionId: null
-        })
+          chatSessionId: null,
+        }),
       )
 
       const unassignedIssueRes = await app.handle(
-        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}`)
+        new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}`),
       )
       expect(unassignedIssueRes.status).toBe(200)
       expect(await unassignedIssueRes.json()).toEqual(
@@ -726,35 +730,38 @@ describe('issue-agent capability', () => {
           assigneeKind: null,
           assigneeId: null,
           delegateAgentId: null,
-          delegateProviderTargetId: null
-        })
+          delegateProviderTargetId: null,
+        }),
       )
 
       const activitiesAfterDeleteRes = await app.handle(
         new Request(
-          `http://localhost/issue-agent-sessions/${encodeURIComponent(delegatedSession.id)}/activities`
-        )
+          `http://localhost/issue-agent-sessions/${encodeURIComponent(delegatedSession.id)}/activities`,
+        ),
       )
       const activitiesAfterDelete = (await activitiesAfterDeleteRes.json()) as AgentActivityView[]
-      expect(activitiesAfterDelete.map((activity) => JSON.parse(activity.content).body)).toContain(
-        'Delegation removed'
+      expect(activitiesAfterDelete.map(activity => JSON.parse(activity.content).body)).toContain(
+        'Delegation removed',
       )
       expect(
-        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions'))
+        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions')),
       ).toHaveLength(2)
-    } finally {
+    }
+ finally {
       fetchSpy.mockRestore()
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousSecret === undefined) {
         delete process.env.CRADLE_CREDENTIAL_SECRET
-      } else {
+      }
+ else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousSecret
       }
     }
@@ -789,7 +796,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-issue-agent-double-delegate',
           name: 'Workspace Issue Agent Double Delegate',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -801,8 +808,8 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(firstDelegate.status).toBe(200)
 
@@ -810,27 +817,30 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(secondDelegate.status).toBe(409)
       expect((await secondDelegate.json()).code).toBe('issue_agent_delegation_in_progress')
 
       releaseRun()
       await waitForSessionStatus(app, issue.id, 'completed')
-    } finally {
+    }
+ finally {
       fetchSpy.mockRestore()
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousSecret === undefined) {
         delete process.env.CRADLE_CREDENTIAL_SECRET
-      } else {
+      }
+ else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousSecret
       }
     }
@@ -870,7 +880,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-issue-agent-rapid-rerun',
           name: 'Workspace Issue Agent Rapid Rerun',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -882,8 +892,8 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(delegateRes.status).toBe(200)
       const delegatedSession = (await delegateRes.json()) as AgentSessionView
@@ -896,9 +906,9 @@ describe('issue-agent capability', () => {
             {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({})
-            }
-          )
+              body: JSON.stringify({}),
+            },
+          ),
         ),
         app.handle(
           new Request(
@@ -906,9 +916,9 @@ describe('issue-agent capability', () => {
             {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({})
-            }
-          )
+              body: JSON.stringify({}),
+            },
+          ),
         ),
       ])
       expect(rerunRequests.map(response => response.status).sort()).toEqual([200, 409])
@@ -918,19 +928,22 @@ describe('issue-agent capability', () => {
       releaseRerun()
       await waitForSessionStatus(app, issue.id, 'completed')
       expect(completionCount).toBe(2)
-    } finally {
+    }
+ finally {
       fetchSpy.mockRestore()
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousSecret === undefined) {
         delete process.env.CRADLE_CREDENTIAL_SECRET
-      } else {
+      }
+ else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousSecret
       }
     }
@@ -953,7 +966,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-issue-agent-rollback',
           name: 'Workspace Issue Agent Rollback',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -968,30 +981,33 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(delegateRes.status).toBe(500)
 
       expect(Issue.getIssue(issue.id)).toEqual(expect.objectContaining({
         delegateAgentId: null,
-        delegateProviderTargetId: null
+        delegateProviderTargetId: null,
       }))
       expect(AgentInteraction.listSessionsForIssue(issue.id)).toHaveLength(0)
       expect(Issue.listComments(issue.id)).toEqual([])
-    } finally {
+    }
+ finally {
       vi.restoreAllMocks()
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousSecret === undefined) {
         delete process.env.CRADLE_CREDENTIAL_SECRET
-      } else {
+      }
+ else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousSecret
       }
     }
@@ -1012,30 +1028,30 @@ describe('issue-agent capability', () => {
         return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
       }
       completionIndex += 1
-      const responseText =
-        completionIndex === 1 ? 'Initial delegated run done' : 'Queued continuation done'
+      const responseText
+        = completionIndex === 1 ? 'Initial delegated run done' : 'Queued continuation done'
       const encoder = new TextEncoder()
       return new Response(
         new ReadableStream({
           start(controller) {
             controller.enqueue(
               encoder.encode(
-                `data: {"id":"chunk-${completionIndex}-1","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"${responseText}"},"finish_reason":null}]}\n\n`
-              )
+                `data: {"id":"chunk-${completionIndex}-1","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"${responseText}"},"finish_reason":null}]}\n\n`,
+              ),
             )
             controller.enqueue(
               encoder.encode(
-                `data: {"id":"chunk-${completionIndex}-2","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}\n\n`
-              )
+                `data: {"id":"chunk-${completionIndex}-2","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}\n\n`,
+              ),
             )
             controller.enqueue(encoder.encode('data: [DONE]\n\n'))
             controller.close()
-          }
+          },
         }),
         {
           status: 200,
-          headers: { 'content-type': 'text/event-stream' }
-        }
+          headers: { 'content-type': 'text/event-stream' },
+        },
       )
     })
 
@@ -1048,7 +1064,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-issue-agent-continuation',
           name: 'Workspace Issue Agent Continuation',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -1060,8 +1076,8 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(delegateRes.status).toBe(200)
       const delegatedSession = (await delegateRes.json()) as AgentSessionView
@@ -1075,9 +1091,9 @@ describe('issue-agent capability', () => {
           {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'queue', text: 'Continue with follow-up work' })
-          }
-        )
+            body: JSON.stringify({ mode: 'queue', text: 'Continue with follow-up work' }),
+          },
+        ),
       )
       expect(continuationRes.status).toBe(200)
       const continuation = (await continuationRes.json()) as {
@@ -1088,54 +1104,54 @@ describe('issue-agent capability', () => {
       expect(continuation).toEqual(
         expect.objectContaining({
           chatSessionId,
-          mode: 'queue'
-        })
+          mode: 'queue',
+        }),
       )
 
       const activities = await waitForActivitySignal(
         app,
         delegatedSession.id,
-        'continuation.completed'
+        'continuation.completed',
       )
       expect(activities).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             type: 'prompt',
-            signal: 'continuation.queued'
+            signal: 'continuation.queued',
           }),
           expect.objectContaining({
             type: 'response',
-            signal: 'continuation.completed'
-          })
-        ])
+            signal: 'continuation.completed',
+          }),
+        ]),
       )
-      expect(activities.map((activity) => JSON.parse(activity.content).body)).toContain(
-        'Continue with follow-up work'
+      expect(activities.map(activity => JSON.parse(activity.content).body)).toContain(
+        'Continue with follow-up work',
       )
 
       const queueRes = await app.handle(
         new Request(
-          `http://localhost/chat/sessions/${encodeURIComponent(String(chatSessionId))}/queue`
-        )
+          `http://localhost/chat/sessions/${encodeURIComponent(String(chatSessionId))}/queue`,
+        ),
       )
       expect(queueRes.status).toBe(200)
       const queueData = (await queueRes.json()) as {
-        items: Array<{ id: string; status: string; startedRunId: string | null }>
+        items: Array<{ id: string, status: string, startedRunId: string | null }>
       }
       expect(queueData.items).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             id: continuation.continuationId,
             status: 'completed',
-            startedRunId: expect.any(String)
-          })
-        ])
+            startedRunId: expect.any(String),
+          }),
+        ]),
       )
 
       const messagesRes = await app.handle(
         new Request(
-          `http://localhost/chat/sessions/${encodeURIComponent(String(chatSessionId))}/messages`
-        )
+          `http://localhost/chat/sessions/${encodeURIComponent(String(chatSessionId))}/messages`,
+        ),
       )
       expect(messagesRes.status).toBe(200)
       const messages = (await messagesRes.json()) as Array<{
@@ -1148,17 +1164,17 @@ describe('issue-agent capability', () => {
           expect.objectContaining({
             role: 'user',
             content: 'Continue with follow-up work',
-            status: 'complete'
+            status: 'complete',
           }),
           expect.objectContaining({
             role: 'assistant',
             content: 'Queued continuation done',
-            status: 'complete'
-          })
-        ])
+            status: 'complete',
+          }),
+        ]),
       )
       expect(
-        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions'))
+        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions')),
       ).toHaveLength(2)
 
       const steerRes = await app.handle(
@@ -1167,9 +1183,9 @@ describe('issue-agent capability', () => {
           {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'steer', text: 'Steer the next follow-up' })
-          }
-        )
+            body: JSON.stringify({ mode: 'steer', text: 'Steer the next follow-up' }),
+          },
+        ),
       )
       expect(steerRes.status).toBe(200)
       const steer = (await steerRes.json()) as {
@@ -1180,35 +1196,38 @@ describe('issue-agent capability', () => {
       expect(steer).toEqual(
         expect.objectContaining({
           chatSessionId,
-          mode: 'queue'
-        })
+          mode: 'queue',
+        }),
       )
 
       const activitiesAfterQueuedSteer = await waitForActivityBody(
         app,
         delegatedSession.id,
-        'Steer the next follow-up'
+        'Steer the next follow-up',
       )
       expect(
-        activitiesAfterQueuedSteer.map((activity) => JSON.parse(activity.content).body)
+        activitiesAfterQueuedSteer.map(activity => JSON.parse(activity.content).body),
       ).toContain('Steer the next follow-up')
       await waitForChatQueueItemStatus(app, String(chatSessionId), steer.continuationId, 'completed')
       expect(
-        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions'))
+        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions')),
       ).toHaveLength(3)
-    } finally {
+    }
+ finally {
       fetchSpy.mockRestore()
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousSecret === undefined) {
         delete process.env.CRADLE_CREDENTIAL_SECRET
-      } else {
+      }
+ else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousSecret
       }
     }
@@ -1231,7 +1250,7 @@ describe('issue-agent capability', () => {
         .values({
           id: 'workspace-issue-agent',
           name: 'Workspace Issue Agent',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -1243,8 +1262,8 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({})
-        })
+          body: JSON.stringify({}),
+        }),
       )
       expect(invalidDelegate.status).toBe(400)
       expect((await invalidDelegate.json()).code).toBe('validation_error')
@@ -1253,8 +1272,8 @@ describe('issue-agent capability', () => {
         new Request('http://localhost/issues/missing-issue/delegation', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: agent.id })
-        })
+          body: JSON.stringify({ agentId: agent.id }),
+        }),
       )
       expect(missingIssue.status).toBe(404)
       expect((await missingIssue.json()).code).toBe('issue_agent_issue_not_found')
@@ -1263,48 +1282,51 @@ describe('issue-agent capability', () => {
         new Request(`http://localhost/issues/${encodeURIComponent(issue.id)}/delegation`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ agentId: 'missing-agent' })
-        })
+          body: JSON.stringify({ agentId: 'missing-agent' }),
+        }),
       )
       expect(missingAgent.status).toBe(404)
       expect((await missingAgent.json()).code).toBe('issue_agent_agent_not_found')
 
       const missingActivities = await app.handle(
-        new Request('http://localhost/issue-agent-sessions/missing-session/activities')
+        new Request('http://localhost/issue-agent-sessions/missing-session/activities'),
       )
       expect(missingActivities.status).toBe(404)
       expect((await missingActivities.json()).code).toBe('agent_interaction_session_not_found')
 
       const missingGenericActivities = await app.handle(
-        new Request('http://localhost/agent-sessions/missing-session/activities')
+        new Request('http://localhost/agent-sessions/missing-session/activities'),
       )
       expect(missingGenericActivities.status).toBe(404)
       expect((await missingGenericActivities.json()).code).toBe(
-        'agent_interaction_session_not_found'
+        'agent_interaction_session_not_found',
       )
 
       const missingRerun = await app.handle(
         new Request('http://localhost/issue-agent-sessions/missing-session/rerun', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({})
-        })
+          body: JSON.stringify({}),
+        }),
       )
       expect(missingRerun.status).toBe(404)
       expect((await missingRerun.json()).code).toBe('agent_interaction_session_not_found')
-    } finally {
+    }
+ finally {
       vi.restoreAllMocks()
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousSecret === undefined) {
         delete process.env.CRADLE_CREDENTIAL_SECRET
-      } else {
+      }
+ else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousSecret
       }
     }

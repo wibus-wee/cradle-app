@@ -1,6 +1,6 @@
+import { DotCircleLine as CircleDotIcon, ExternalLinkLine as ExternalLinkIcon } from '@mingcute/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
-import { DotCircleLine as CircleDotIcon, ExternalLinkLine as ExternalLinkIcon } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '~/components/ui/badge'

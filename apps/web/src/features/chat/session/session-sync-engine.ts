@@ -124,6 +124,7 @@ export class SessionSyncEngine {
     messageId: string
     handle: SessionPassiveStreamHandle
   } | null = null
+
   private requestedRuntimeActiveRunMessageId: string | null = null
   private runtimeQueueSignature: string | null = null
   private latestTerminalRunRefreshId: string | null = null

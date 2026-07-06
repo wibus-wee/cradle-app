@@ -1,7 +1,8 @@
 import { existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 
-import { spawnManagedProcess, type ManagedChildProcess } from '../../infra/managed-process'
+import type { ManagedChildProcess } from '../../infra/managed-process'
+import { spawnManagedProcess } from '../../infra/managed-process'
 
 export interface SshTunnelOptions {
   hostId: string
@@ -25,8 +26,8 @@ export interface SshTunnelHandle {
   readonly sshTarget: string
   readonly pid: number | null
   readonly stderr: string
-  onExit(listener: (exit: SshTunnelExit) => void): void
-  close(): Promise<void>
+  onExit: (listener: (exit: SshTunnelExit) => void) => void
+  close: () => Promise<void>
 }
 
 export async function startSshTunnel(options: SshTunnelOptions): Promise<SshTunnelHandle> {
@@ -126,8 +127,8 @@ class NodeSshTunnelHandle implements SshTunnelHandle {
       await new Promise(resolve => setTimeout(resolve, 50))
     }
     throw new Error(
-      `ssh tunnel did not create local socket ${this.options.localSocketPath} within timeout.`
-      + (this.stderr ? ` ssh stderr: ${this.stderr}` : ''),
+      `ssh tunnel did not create local socket ${this.options.localSocketPath} within timeout.${
+       this.stderr ? ` ssh stderr: ${this.stderr}` : ''}`,
     )
   }
 
@@ -146,8 +147,8 @@ class NodeSshTunnelHandle implements SshTunnelHandle {
     const code = this.exit?.code ?? null
     const signal = this.exit?.signal ?? null
     return `ssh tunnel exited before creating local socket ${this.options.localSocketPath}`
-      + ` with code ${code ?? 'null'} signal ${signal ?? 'null'}`
-      + (this.stderr ? `: ${this.stderr}` : '')
+      + ` with code ${code ?? 'null'} signal ${signal ?? 'null'}${
+       this.stderr ? `: ${this.stderr}` : ''}`
   }
 }
 

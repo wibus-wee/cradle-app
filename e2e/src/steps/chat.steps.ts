@@ -3,7 +3,8 @@ import { Given, Then, When } from '@cucumber/cucumber'
 import type { Locator } from '@playwright/test'
 import { expect } from '@playwright/test'
 
-import { MockLlmServer, type MockToolCall } from '../support/mock-llm-server'
+import type { MockToolCall } from '../support/mock-llm-server'
+import { MockLlmServer } from '../support/mock-llm-server'
 import {
   expectPromptEditorToContain,
   fillPromptEditor,

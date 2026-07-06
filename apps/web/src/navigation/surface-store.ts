@@ -1,6 +1,6 @@
+import { z } from 'zod'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { z } from 'zod'
 
 import { isTearoffWindow } from '~/lib/electron'
 

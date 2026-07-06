@@ -4,7 +4,7 @@ import { app } from 'electron'
 
 import { DesktopUpdateDownloader } from './update-downloader'
 import { DesktopUpdateInstaller } from './update-installer'
-import { readUpdateFeedUrl, DesktopUpdateSource } from './update-source'
+import { DesktopUpdateSource, readUpdateFeedUrl } from './update-source'
 import type {
   DesktopUpdateCandidate,
   DesktopUpdateInstallerPlan,

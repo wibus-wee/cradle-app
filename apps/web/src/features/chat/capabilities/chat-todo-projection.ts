@@ -1,7 +1,8 @@
 import type { UIMessage } from 'ai'
-import { isToolLikePart } from '../rendering/chat-tool-entities'
-import { ToolPayload, readPrimaryTodos, readToolInputPayload, readToolPayload, ToolTodo } from '../rendering/tool-ui-classifier'
 
+import { isToolLikePart } from '../rendering/chat-tool-entities'
+import type { ToolPayload, ToolTodo } from '../rendering/tool-ui-classifier'
+import { readPrimaryTodos, readToolInputPayload, readToolPayload } from '../rendering/tool-ui-classifier'
 
 export type ChatTodoStatus = 'todo' | 'processing' | 'completed'
 

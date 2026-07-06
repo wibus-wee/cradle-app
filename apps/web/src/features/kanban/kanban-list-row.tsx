@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 
 import { AgentAvatar } from '~/features/agent-runtime/agent-avatar'
 import { useAgents } from '~/features/agent-runtime/use-agents'
-import { useWorkspaces } from '~/features/workspace/use-workspace'
-import { cn } from '~/lib/cn'
 import type { KanbanBoardIssue, KanbanMilestone, KanbanStatus } from '~/features/kanban/types'
 import { isExternalKanbanIssue } from '~/features/kanban/types'
+import { useWorkspaces } from '~/features/workspace/use-workspace'
+import { cn } from '~/lib/cn'
 
 import { IssueContextMenu } from './issue-context-menu'
 import { AssigneeAvatar } from './shared/assignee-avatar'

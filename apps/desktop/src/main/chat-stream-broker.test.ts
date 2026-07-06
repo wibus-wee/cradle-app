@@ -296,25 +296,25 @@ describe('chat stream broker', () => {
     const lateChunks = readChannelPayloads(late, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL)
       .map(payload => (payload as { chunk: unknown }).chunk)
     const textStartIndex = lateChunks.findIndex(chunk =>
-      typeof chunk === 'object' &&
-      chunk !== null &&
-      (chunk as { type?: unknown, id?: unknown }).type === 'text-start' &&
-      (chunk as { id?: unknown }).id === 'text-protected')
+      typeof chunk === 'object'
+      && chunk !== null
+      && (chunk as { type?: unknown, id?: unknown }).type === 'text-start'
+      && (chunk as { id?: unknown }).id === 'text-protected')
     const textDeltaIndex = lateChunks.findIndex(chunk =>
-      typeof chunk === 'object' &&
-      chunk !== null &&
-      (chunk as { type?: unknown, id?: unknown }).type === 'text-delta' &&
-      (chunk as { id?: unknown }).id === 'text-protected')
+      typeof chunk === 'object'
+      && chunk !== null
+      && (chunk as { type?: unknown, id?: unknown }).type === 'text-delta'
+      && (chunk as { id?: unknown }).id === 'text-protected')
     const toolStartIndex = lateChunks.findIndex(chunk =>
-      typeof chunk === 'object' &&
-      chunk !== null &&
-      (chunk as { type?: unknown, toolCallId?: unknown }).type === 'tool-input-start' &&
-      (chunk as { toolCallId?: unknown }).toolCallId === 'call-protected')
+      typeof chunk === 'object'
+      && chunk !== null
+      && (chunk as { type?: unknown, toolCallId?: unknown }).type === 'tool-input-start'
+      && (chunk as { toolCallId?: unknown }).toolCallId === 'call-protected')
     const toolOutputIndex = lateChunks.findIndex(chunk =>
-      typeof chunk === 'object' &&
-      chunk !== null &&
-      (chunk as { type?: unknown, toolCallId?: unknown }).type === 'tool-output-available' &&
-      (chunk as { toolCallId?: unknown }).toolCallId === 'call-protected')
+      typeof chunk === 'object'
+      && chunk !== null
+      && (chunk as { type?: unknown, toolCallId?: unknown }).type === 'tool-output-available'
+      && (chunk as { toolCallId?: unknown }).toolCallId === 'call-protected')
 
     expect(textStartIndex).toBeGreaterThanOrEqual(0)
     expect(textDeltaIndex).toBeGreaterThan(textStartIndex)

@@ -11,7 +11,7 @@ function createManifestResponse(body: unknown): Response {
   })
 }
 
-describe('DesktopUpdateSource', () => {
+describe('desktopUpdateSource', () => {
   it('reads an update candidate from a feed root manifest', async () => {
     const requests: string[] = []
     const source = new DesktopUpdateSource({

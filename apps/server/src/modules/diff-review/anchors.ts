@@ -4,7 +4,8 @@ import { eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { parsePatchLines, type ParsedPatchLine } from './patch'
+import type { ParsedPatchLine } from './patch'
+import { parsePatchLines } from './patch'
 import type { ReviewRangeAnchorInput, ReviewRangeAnchorView } from './types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -68,13 +69,11 @@ export function normalizeAnchor(input: {
     line.path === input.file.path
     && line.side === side
     && line.lineNumber >= startLine
-    && line.lineNumber <= endLine,
-  )
+    && line.lineNumber <= endLine)
   const primary = selected[0] ?? patchLines.find(line =>
     line.path === input.file.path
     && line.side === side
-    && line.lineNumber === startLine,
-  )
+    && line.lineNumber === startLine)
   if (!primary) {
     throw new AppError({
       code: 'diff_review_anchor_not_found',
@@ -132,17 +131,14 @@ function textSimilarity(left: string, right: string): number {
 }
 
 function findOriginalAnchorLine(anchor: ReviewRangeAnchorView, oldPath: string): ParsedPatchLine | undefined {
-  const revision = db().select().from(diffReviewRevisions)
-    .where(eq(diffReviewRevisions.id, anchor.revisionId))
-    .get()
+  const revision = db().select().from(diffReviewRevisions).where(eq(diffReviewRevisions.id, anchor.revisionId)).get()
   if (!revision) {
     return undefined
   }
   return parsePatchLines(revision.patch).find(line =>
     (line.path === oldPath || line.path === anchor.path)
     && line.side === anchor.side
-    && line.lineHash === anchor.lineHash,
-  )
+    && line.lineHash === anchor.lineHash)
 }
 
 function findFuzzyAnchorLine(input: {
@@ -161,7 +157,9 @@ function findFuzzyAnchorLine(input: {
       const contextBonus = (
         candidate.contextBeforeHash === input.anchor.contextBeforeHash
         || candidate.contextAfterHash === input.anchor.contextAfterHash
-      ) ? 0.12 : 0
+      )
+? 0.12
+: 0
       const hunkBonus = candidate.hunkHeader === input.anchor.hunkHeader ? 0.08 : 0
       const lineDistance = Math.abs(candidate.lineNumber - input.anchor.startLine)
       const distancePenalty = Math.min(lineDistance, 30) / 100
@@ -189,8 +187,7 @@ export function remapAnchorToRevision(input: {
     file.path === oldPath
     || file.previousPath === oldPath
     || file.path === input.anchor.path
-    || file.previousPath === input.anchor.path,
-  )
+    || file.previousPath === input.anchor.path)
   if (!newFile) {
     return null
   }
@@ -202,8 +199,7 @@ export function remapAnchorToRevision(input: {
     ? candidates.find(line =>
       line.hunkHeader === input.anchor.hunkHeader
       && line.contextBeforeHash === input.anchor.contextBeforeHash
-      && line.contextAfterHash === input.anchor.contextAfterHash,
-    )
+      && line.contextAfterHash === input.anchor.contextAfterHash)
     : undefined
   const fuzzy = !exact && !context
     ? findFuzzyAnchorLine({

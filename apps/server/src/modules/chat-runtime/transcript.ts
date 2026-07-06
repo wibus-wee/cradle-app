@@ -1,7 +1,6 @@
+import { messages } from '@cradle/db'
 import type { UIMessage } from 'ai'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
-
-import { messages } from '@cradle/db'
 
 import { db } from '../../infra'
 import { parseStoredMessageSnapshot } from './ui-message'
@@ -69,7 +68,7 @@ export async function readFullSessionTranscript(sessionId: string): Promise<UIMe
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()
 
-  return rows.map((row) => parseStoredMessageSnapshot(row.messageJson))
+  return rows.map(row => parseStoredMessageSnapshot(row.messageJson))
 }
 
 export function reconstructCradleTurnTranscript(input: {

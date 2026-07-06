@@ -735,8 +735,7 @@ function trimReplayBuffer(buffer: ReplayBuffer): void {
 
 function findRemovableReplayItemIndex(buffer: ReplayBuffer): number {
   const firstUnprotectedIndex = buffer.chunks.findIndex((_, index) =>
-    !isReplayDependencyForLaterChunk(buffer, index)
-  )
+    !isReplayDependencyForLaterChunk(buffer, index))
   if (firstUnprotectedIndex !== -1) {
     return firstUnprotectedIndex
   }
@@ -754,35 +753,32 @@ function isReplayDependencyForLaterChunk(buffer: ReplayBuffer, index: number): b
   if (type === 'text-start') {
     const id = typeof chunk.id === 'string' ? chunk.id : null
     return id !== null && (
-      buffer.activeTextPartIds.has(id) ||
-      hasLaterChunk(items, index, candidate =>
-        (candidate.type === 'text-delta' || candidate.type === 'text-end') &&
-        candidate.id === id
-      )
+      buffer.activeTextPartIds.has(id)
+      || hasLaterChunk(items, index, candidate =>
+        (candidate.type === 'text-delta' || candidate.type === 'text-end')
+        && candidate.id === id)
     )
   }
   if (type === 'reasoning-start') {
     const id = typeof chunk.id === 'string' ? chunk.id : null
     return id !== null && (
-      buffer.activeReasoningPartIds.has(id) ||
-      hasLaterChunk(items, index, candidate =>
-        (candidate.type === 'reasoning-delta' || candidate.type === 'reasoning-end') &&
-        candidate.id === id
-      )
+      buffer.activeReasoningPartIds.has(id)
+      || hasLaterChunk(items, index, candidate =>
+        (candidate.type === 'reasoning-delta' || candidate.type === 'reasoning-end')
+        && candidate.id === id)
     )
   }
   if (
-    type === 'tool-input-start' ||
-    type === 'tool-input-available' ||
-    type === 'tool-input-error'
+    type === 'tool-input-start'
+    || type === 'tool-input-available'
+    || type === 'tool-input-error'
   ) {
     const toolCallId = typeof chunk.toolCallId === 'string' ? chunk.toolCallId : null
     return toolCallId !== null && (
-      buffer.activeToolInvocationIds.has(toolCallId) ||
-      hasLaterChunk(items, index, candidate =>
-        isToolDependentReplayChunk(candidate) &&
-        candidate.toolCallId === toolCallId
-      )
+      buffer.activeToolInvocationIds.has(toolCallId)
+      || hasLaterChunk(items, index, candidate =>
+        isToolDependentReplayChunk(candidate)
+        && candidate.toolCallId === toolCallId)
     )
   }
   return false
@@ -794,19 +790,19 @@ function recordReplayProtocolState(buffer: ReplayBuffer, chunk: unknown): void {
     return
   }
   if (
-    (record.type === 'tool-input-start' ||
-      record.type === 'tool-input-available' ||
-      record.type === 'tool-input-error') &&
-    typeof record.toolCallId === 'string'
+    (record.type === 'tool-input-start'
+      || record.type === 'tool-input-available'
+      || record.type === 'tool-input-error')
+    && typeof record.toolCallId === 'string'
   ) {
     buffer.activeToolInvocationIds.add(record.toolCallId)
   }
   if (
-    typeof record.toolCallId === 'string' &&
-    (
-      (record.type === 'tool-output-available' && record.preliminary !== true) ||
-      record.type === 'tool-output-error' ||
-      record.type === 'tool-output-denied'
+    typeof record.toolCallId === 'string'
+    && (
+      (record.type === 'tool-output-available' && record.preliminary !== true)
+      || record.type === 'tool-output-error'
+      || record.type === 'tool-output-denied'
     )
   ) {
     buffer.activeToolInvocationIds.delete(record.toolCallId)
@@ -841,11 +837,11 @@ function hasLaterChunk(
 
 function isToolDependentReplayChunk(chunk: Record<string, unknown>): boolean {
   return (
-    chunk.type === 'tool-input-delta' ||
-    chunk.type === 'tool-approval-request' ||
-    chunk.type === 'tool-output-available' ||
-    chunk.type === 'tool-output-error' ||
-    chunk.type === 'tool-output-denied'
+    chunk.type === 'tool-input-delta'
+    || chunk.type === 'tool-approval-request'
+    || chunk.type === 'tool-output-available'
+    || chunk.type === 'tool-output-error'
+    || chunk.type === 'tool-output-denied'
   )
 }
 

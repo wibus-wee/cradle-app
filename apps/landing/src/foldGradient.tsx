@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react'
 import { ShaderMount } from '@paper-design/shaders-react'
+import * as React from 'react'
+import { useMemo } from 'react'
+
 import { fragmentShader } from './foldGradientShader'
+
 export interface FoldGradientProps {
   /** up to 5 stops, darkest → hottest; bright sheet edges reach the last stop */
   colors?: string[]
@@ -25,9 +28,9 @@ export interface FoldGradientProps {
   style?: React.CSSProperties
 }
 // hex → linear-light rgb(a); the shader mixes colour in linear space
-const toLin = (c: number) => Math.pow(c, 2.2)
+const toLin = (c: number) => c ** 2.2
 const hexRGBA = (h: string): [number, number, number, number] => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map(toLin)
+  const [r, g, b] = [1, 3, 5].map(i => Number.parseInt(h.slice(i, i + 2), 16) / 255).map(toLin)
   return [r, g, b, 1]
 }
 const hexRGB = (h: string): [number, number, number] =>
@@ -60,7 +63,7 @@ export default function FoldGradient({
       u_ribbonWidth: ribbonWidth,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [colors.join(), bgColor, shadowColor, softness, saturation, rotation, zoom, ribbon, ribbonWidth]
+    [colors.join(), bgColor, shadowColor, softness, saturation, rotation, zoom, ribbon, ribbonWidth],
   )
   return (
     <ShaderMount

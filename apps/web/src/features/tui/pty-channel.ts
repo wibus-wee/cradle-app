@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-import { getServerWebSocketUrl } from '~/lib/electron'
 import { getI18n } from '~/i18n/instance'
+import { getServerWebSocketUrl } from '~/lib/electron'
 
 import type { PtyClientEvent, PtyErrorEvent, PtyExitEvent, PtyOutputEvent, PtySnapshotEvent } from './pty-protocol'
 import { PtyServerEventJsonSchema } from './pty-protocol'
@@ -125,7 +125,8 @@ export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
     const event = (() => {
       try {
         return PtyServerEventJsonSchema.parse(raw)
-      } catch {
+      }
+ catch {
         return null
       }
     })()

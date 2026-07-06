@@ -6,11 +6,11 @@ import { workspaces } from '@cradle/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import { createBypassRule } from '../src/modules/session-await/service'
 import { fetchLiveCIStatus, githubCISource, resetTokenCache } from '../src/modules/session-await/sources/github-ci'
 import { githubReviewSource } from '../src/modules/session-await/sources/github-review'
 import type { SessionAwait } from '../src/modules/session-await/types'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 const originalFetch = globalThis.fetch
 const originalDataDir = process.env.CRADLE_DATA_DIR

@@ -6,12 +6,12 @@
  */
 import {
   CheckCircleLine as CheckCircle2Icon,
-  PauseCircleLine as CirclePauseIcon,
-  ForbidCircleLine as CircleSlashIcon,
   Dashboard2Line as GaugeIcon,
+  DeleteLine as Trash2Icon,
+  ForbidCircleLine as CircleSlashIcon,
+  PauseCircleLine as CirclePauseIcon,
   PencilLine as PencilIcon,
   TargetLine as TargetIcon,
-  DeleteLine as Trash2Icon
 } from '@mingcute/react'
 import { useEffect, useState } from 'react'
 

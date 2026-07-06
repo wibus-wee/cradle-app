@@ -8,37 +8,36 @@ import { z } from 'zod'
 import { AppError } from '../../errors/app-error'
 import {
   AgentRuntimeConfigJsonSchema,
-  buildSessionRuntimeConfigJson
+  buildSessionRuntimeConfigJson,
 } from '../../helpers/agent-runtime-config'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
 import { commitSessionEventsWithProjection } from '../chat-runtime/es/commands'
+import type {
+  ChatRuntimeSettingsPatch,
+  ChatThinkingEffort,
+} from '../chat-runtime/runtime-provider-types'
+import type { SessionClaudeAgentConfigPatchInput } from '../chat-runtime/runtime-settings'
 import {
   mergeRuntimeSettings,
   normalizeRuntimeSettingsPatch,
   readSessionRuntimeSettings,
   writeSessionRuntimeConfigJson,
-  type SessionClaudeAgentConfigPatchInput
 } from '../chat-runtime/runtime-settings'
-import type {
-  ChatRuntimeSettingsPatch,
-  ChatThinkingEffort
-} from '../chat-runtime/runtime-provider-types'
 import { normalizeClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
-import type { RuntimeKind } from '../provider-contracts/types'
-import { invalidateDurableProviderRuntimeBindingForChatSession } from '../provider-runtime/service'
 import {
   readRuntimeOwnedProviderTargetOwner,
   runtimeOwnsProviderBinding,
   runtimeUsesAgentTerminalLaunch,
 } from '../provider-contracts/runtime-compatibility'
+import type { RuntimeKind } from '../provider-contracts/types'
+import { invalidateDurableProviderRuntimeBindingForChatSession } from '../provider-runtime/service'
 import {
   assertProviderTargetCompatibleWithRuntime,
-  resolveProviderTarget
+  resolveProviderTarget,
 } from '../provider-targets/service'
 import * as Workspace from '../workspace/service'
-import { attachSessionToWorktree } from '../worktree/service'
-import { readSessionIsolation } from '../worktree/service'
+import { attachSessionToWorktree, readSessionIsolation } from '../worktree/service'
 
 export type SessionStatus = 'idle' | 'streaming' | 'error'
 export type SessionView = Session & {
@@ -76,7 +75,7 @@ const SessionCreateInputSchema = z.object({
   agentId: z.string().nullable().optional(),
   linkedIssueId: z.string().nullable().default(null),
   worktreeId: z.string().nullable().optional(),
-  configJson: z.string().optional()
+  configJson: z.string().optional(),
 })
 
 function listRequestedModelsBySessionIds(sessionIds: string[]): Map<string, string | null> {
@@ -87,26 +86,26 @@ function listRequestedModelsBySessionIds(sessionIds: string[]): Map<string, stri
   const sessionRows = db()
     .select({
       id: sessions.id,
-      configJson: sessions.configJson
+      configJson: sessions.configJson,
     })
     .from(sessions)
     .where(inArray(sessions.id, sessionIds))
     .all()
   const modelsBySessionId = new Map(
-    sessionRows.map((row) => [row.id, readSessionModelPreference(row.configJson)])
+    sessionRows.map(row => [row.id, readSessionModelPreference(row.configJson)]),
   )
 
   const bindings = db()
     .select({
       chatSessionId: backendSessionBindings.chatSessionId,
-      requestedModelId: backendSessionBindings.requestedModelId
+      requestedModelId: backendSessionBindings.requestedModelId,
     })
     .from(backendSessionBindings)
     .where(
       and(
         inArray(backendSessionBindings.chatSessionId, sessionIds),
-        isNotNull(backendSessionBindings.backendSessionId)
-      )
+        isNotNull(backendSessionBindings.backendSessionId),
+      ),
     )
     .all()
 
@@ -124,7 +123,7 @@ function parseTrustedConfigJson(configJson: string | null | undefined): Record<s
 }
 
 function hasOwn(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key)
+  return Object.hasOwn(value, key)
 }
 
 export function readSessionModelPreference(configJson: string | null | undefined): string | null {
@@ -135,7 +134,7 @@ export function readSessionModelPreference(configJson: string | null | undefined
 }
 
 export function readSessionThinkingEffortPreference(
-  configJson: string | null | undefined
+  configJson: string | null | undefined,
 ): ChatThinkingEffort | null {
   const config = parseTrustedConfigJson(configJson)
   switch (config.requestedThinkingEffort) {
@@ -151,7 +150,7 @@ export function readSessionThinkingEffortPreference(
 
 function writeSessionModelPreferenceConfigJson(
   configJson: string | null | undefined,
-  modelId: string | null
+  modelId: string | null,
 ): string {
   const config = parseTrustedConfigJson(configJson)
   if (modelId === null) {
@@ -160,13 +159,13 @@ function writeSessionModelPreferenceConfigJson(
   }
   return JSON.stringify({
     ...config,
-    requestedModelId: modelId
+    requestedModelId: modelId,
   })
 }
 
 function writeSessionThinkingEffortPreferenceConfigJson(
   configJson: string | null | undefined,
-  thinkingEffort: ChatThinkingEffort | null
+  thinkingEffort: ChatThinkingEffort | null,
 ): string {
   const config = parseTrustedConfigJson(configJson)
   if (thinkingEffort === null) {
@@ -175,7 +174,7 @@ function writeSessionThinkingEffortPreferenceConfigJson(
   }
   return JSON.stringify({
     ...config,
-    requestedThinkingEffort: thinkingEffort
+    requestedThinkingEffort: thinkingEffort,
   })
 }
 
@@ -200,7 +199,7 @@ function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStat
     .select({
       chatSessionId: backendRuns.chatSessionId,
       status: backendRuns.status,
-      startedAt: backendRuns.startedAt
+      startedAt: backendRuns.startedAt,
     })
     .from(backendRuns)
     .where(inArray(backendRuns.chatSessionId, sessionIds))
@@ -217,7 +216,7 @@ function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStat
       row.chatSessionId,
       projectSessionStatus({
         runStatus: row.status,
-      })
+      }),
     )
   }
 
@@ -227,7 +226,7 @@ function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStat
     }
     statusesBySessionId.set(
       sessionId,
-      projectSessionStatus({})
+      projectSessionStatus({}),
     )
   }
 
@@ -237,7 +236,7 @@ function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStat
 function readSessionStatus(sessionId: string): SessionStatus {
   const latestRun = db()
     .select({
-      status: backendRuns.status
+      status: backendRuns.status,
     })
     .from(backendRuns)
     .where(eq(backendRuns.chatSessionId, sessionId))
@@ -254,7 +253,7 @@ function toSessionView(
   modelId: string | null,
   status: SessionStatus,
   latestUserMessageAt: number | null = null,
-  latestAssistantMessageAt: number | null = null
+  latestAssistantMessageAt: number | null = null,
 ): SessionView {
   const isolation = readSessionIsolation(session)
   return {
@@ -266,8 +265,8 @@ function toSessionView(
     latestUserMessageAt,
     latestAssistantMessageAt,
     unread:
-      latestAssistantMessageAt !== null &&
-      (session.lastReadAt === null || latestAssistantMessageAt > session.lastReadAt),
+      latestAssistantMessageAt !== null
+      && (session.lastReadAt === null || latestAssistantMessageAt > session.lastReadAt),
     isIsolated: isolation.isIsolated,
     worktreeId: isolation.worktreeId,
     worktreeBranch: isolation.worktreeBranch,
@@ -286,7 +285,7 @@ function listRowsByActivity(where: ReturnType<typeof and> | undefined): Array<{
   const latestUserMessages = db()
     .select({
       sessionId: messages.sessionId,
-      latestUserMessageAt: max(messages.createdAt).as('latest_user_message_at')
+      latestUserMessageAt: max(messages.createdAt).as('latest_user_message_at'),
     })
     .from(messages)
     .where(eq(messages.role, 'user'))
@@ -296,14 +295,14 @@ function listRowsByActivity(where: ReturnType<typeof and> | undefined): Array<{
   const latestAssistantMessages = db()
     .select({
       sessionId: messages.sessionId,
-      latestAssistantMessageAt: max(messages.createdAt).as('latest_assistant_message_at')
+      latestAssistantMessageAt: max(messages.createdAt).as('latest_assistant_message_at'),
     })
     .from(messages)
     .where(
       and(
         eq(messages.role, 'assistant'),
-        inArray(messages.status, ['complete', 'aborted', 'failed'])
-      )
+        inArray(messages.status, ['complete', 'aborted', 'failed']),
+      ),
     )
     .groupBy(messages.sessionId)
     .as('latest_assistant_messages')
@@ -312,27 +311,27 @@ function listRowsByActivity(where: ReturnType<typeof and> | undefined): Array<{
     .select({
       session: sessions,
       latestUserMessageAt: latestUserMessages.latestUserMessageAt,
-      latestAssistantMessageAt: latestAssistantMessages.latestAssistantMessageAt
+      latestAssistantMessageAt: latestAssistantMessages.latestAssistantMessageAt,
     })
     .from(sessions)
     .leftJoin(latestUserMessages, eq(sessions.id, latestUserMessages.sessionId))
     .leftJoin(latestAssistantMessages, eq(sessions.id, latestAssistantMessages.sessionId))
     .orderBy(
       desc(sql<number>`coalesce(${latestUserMessages.latestUserMessageAt}, ${sessions.createdAt})`),
-      desc(sessions.createdAt)
+      desc(sessions.createdAt),
     )
 
-  return (where ? query.where(where).all() : query.all()).map((row) => ({
+  return (where ? query.where(where).all() : query.all()).map(row => ({
     session: row.session,
     latestUserMessageAt: row.latestUserMessageAt ?? null,
-    latestAssistantMessageAt: row.latestAssistantMessageAt ?? null
+    latestAssistantMessageAt: row.latestAssistantMessageAt ?? null,
   }))
 }
 
 function readLatestUserMessageAt(sessionId: string): number | null {
   const row = db()
     .select({
-      latestUserMessageAt: max(messages.createdAt)
+      latestUserMessageAt: max(messages.createdAt),
     })
     .from(messages)
     .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
@@ -343,15 +342,15 @@ function readLatestUserMessageAt(sessionId: string): number | null {
 function readLatestAssistantMessageAt(sessionId: string): number | null {
   const row = db()
     .select({
-      latestAssistantMessageAt: max(messages.createdAt)
+      latestAssistantMessageAt: max(messages.createdAt),
     })
     .from(messages)
     .where(
       and(
         eq(messages.sessionId, sessionId),
         eq(messages.role, 'assistant'),
-        inArray(messages.status, ['complete', 'aborted', 'failed'])
-      )
+        inArray(messages.status, ['complete', 'aborted', 'failed']),
+      ),
     )
     .get()
   return row?.latestAssistantMessageAt ?? null
@@ -366,13 +365,14 @@ function assertTargetCompatibleWithRuntime(input: {
   }
   try {
     assertProviderTargetCompatibleWithRuntime(input.providerTargetId, input.runtimeKind)
-  } catch (error) {
+  }
+ catch (error) {
     if (error instanceof AppError && error.code === 'invalid_provider_target') {
       throw new AppError({
         code: 'invalid_session_input',
         status: 400,
         message: 'Session provider target is not compatible with the selected runtime',
-        details: error.details
+        details: error.details,
       })
     }
     throw error
@@ -397,54 +397,52 @@ function assertRuntimeOwnedProviderTargetForRuntime(input: {
     details: {
       providerTargetId: input.providerTargetId,
       runtimeKind: input.runtimeKind,
-      owningRuntimeKind
-    }
+      owningRuntimeKind,
+    },
   })
 }
 
 export function list(
-  input: { workspaceId?: string; origin?: string; archived?: boolean } = {}
+  input: { workspaceId?: string, origin?: string, archived?: boolean } = {},
 ): SessionView[] {
   const predicates = [
     input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
     input.origin ? eq(sessions.origin, input.origin) : undefined,
-    input.archived ? isNotNull(sessions.archivedAt) : isNull(sessions.archivedAt)
-  ].filter((predicate) => predicate !== undefined)
+    input.archived ? isNotNull(sessions.archivedAt) : isNull(sessions.archivedAt),
+  ].filter(predicate => predicate !== undefined)
   const where = predicates.length > 0 ? and(...predicates) : undefined
   const rows = listRowsByActivity(where)
 
-  const sessionIds = rows.map((row) => row.session.id)
+  const sessionIds = rows.map(row => row.session.id)
   const modelsBySessionId = listRequestedModelsBySessionIds(sessionIds)
   const statusesBySessionId = listStatusesBySessionIds(sessionIds)
-  return rows.map((row) =>
+  return rows.map(row =>
     toSessionView(
       row.session,
       modelsBySessionId.get(row.session.id) ?? null,
       statusesBySessionId.get(row.session.id) ?? 'idle',
       row.latestUserMessageAt,
-      row.latestAssistantMessageAt
-    )
-  )
+      row.latestAssistantMessageAt,
+    ))
 }
 
 export function listLinkedToIssue(issueId: string): SessionView[] {
   const rows = listRowsByActivity(and(eq(sessions.linkedIssueId, issueId)))
 
-  const sessionIds = rows.map((row) => row.session.id)
+  const sessionIds = rows.map(row => row.session.id)
   const modelsBySessionId = listRequestedModelsBySessionIds(sessionIds)
   const statusesBySessionId = listStatusesBySessionIds(sessionIds)
-  return rows.map((row) =>
+  return rows.map(row =>
     toSessionView(
       row.session,
       modelsBySessionId.get(row.session.id) ?? null,
       statusesBySessionId.get(row.session.id) ?? 'idle',
       row.latestUserMessageAt,
-      row.latestAssistantMessageAt
-    )
-  )
+      row.latestAssistantMessageAt,
+    ))
 }
 
-export function setArchived(input: { id: string; archived: boolean }): SessionView | null {
+export function setArchived(input: { id: string, archived: boolean }): SessionView | null {
   const record = db().select().from(sessions).where(eq(sessions.id, input.id)).get()
   if (!record) {
     return null
@@ -455,7 +453,7 @@ export function setArchived(input: { id: string; archived: boolean }): SessionVi
     .update(sessions)
     .set({
       archivedAt: input.archived ? now : null,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(sessions.id, input.id))
     .run()
@@ -471,17 +469,17 @@ export function get(id: string): SessionView | null {
     return null
   }
 
-  const binding =
-    db()
+  const binding
+    = db()
       .select({
-        requestedModelId: backendSessionBindings.requestedModelId
+        requestedModelId: backendSessionBindings.requestedModelId,
       })
       .from(backendSessionBindings)
       .where(
         and(
           eq(backendSessionBindings.chatSessionId, id),
-          isNotNull(backendSessionBindings.backendSessionId)
-        )
+          isNotNull(backendSessionBindings.backendSessionId),
+        ),
       )
       .get() ?? null
 
@@ -490,7 +488,7 @@ export function get(id: string): SessionView | null {
     readSessionModelPreference(row.configJson) ?? binding?.requestedModelId ?? null,
     readSessionStatus(id),
     readLatestUserMessageAt(id),
-    readLatestAssistantMessageAt(id)
+    readLatestAssistantMessageAt(id),
   )
 }
 
@@ -506,7 +504,7 @@ export function markRead(id: string): SessionView | null {
     .update(sessions)
     .set({
       lastReadAt: latestAssistantMessageAt ?? record.lastReadAt,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(sessions.id, id))
     .run()
@@ -526,7 +524,7 @@ export function markUnread(id: string): SessionView | null {
     .update(sessions)
     .set({
       lastReadAt: latestAssistantMessageAt !== null ? latestAssistantMessageAt - 1 : null,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(sessions.id, id))
     .run()
@@ -556,15 +554,15 @@ export function create(input: {
   const workspaceId = resolveSessionWorkspaceId(parsed)
   const rowInput = z
     .object({
-      configJson: z.string().default(() => resolved.configJson)
+      configJson: z.string().default(() => resolved.configJson),
     })
     .parse(parsed)
   const runtimeSettings = mergeRuntimeSettings(
     readSessionRuntimeSettings(rowInput.configJson),
-    normalizeRuntimeSettingsPatch(parsed.runtimeSettings)
+    normalizeRuntimeSettingsPatch(parsed.runtimeSettings),
   )
-  const rawRuntimeSettings =
-    parsed.runtimeSettings && typeof parsed.runtimeSettings === 'object'
+  const rawRuntimeSettings
+    = parsed.runtimeSettings && typeof parsed.runtimeSettings === 'object'
       ? (parsed.runtimeSettings as Record<string, unknown>)
       : {}
   const updateClaudeAgent = hasOwn(rawRuntimeSettings, 'claudeAgent')
@@ -574,14 +572,14 @@ export function create(input: {
     claudeAgent: updateClaudeAgent
       ? normalizeClaudeAgentConfigPatch(rawRuntimeSettings.claudeAgent)
       : undefined,
-    updateClaudeAgent
+    updateClaudeAgent,
   })
-  const modelConfigJson =
-    parsed.modelId !== undefined
+  const modelConfigJson
+    = parsed.modelId !== undefined
       ? writeSessionModelPreferenceConfigJson(runtimeConfigJson, parsed.modelId)
       : runtimeConfigJson
-  const configJson =
-    parsed.thinkingEffort !== undefined
+  const configJson
+    = parsed.thinkingEffort !== undefined
       ? writeSessionThinkingEffortPreferenceConfigJson(modelConfigJson, parsed.thinkingEffort)
       : modelConfigJson
   const created = db()
@@ -641,7 +639,7 @@ function resolveSessionCreateInput(input: {
         code: 'agent_not_found',
         status: 404,
         message: 'Agent not found',
-        details: { agentId: input.agentId }
+        details: { agentId: input.agentId },
       })
     }
 
@@ -653,8 +651,8 @@ function resolveSessionCreateInput(input: {
         details: {
           agentId: input.agentId,
           runtimeKind: input.runtimeKind,
-          agentRuntimeKind: agent.runtimeKind
-        }
+          agentRuntimeKind: agent.runtimeKind,
+        },
       })
     }
 
@@ -663,7 +661,7 @@ function resolveSessionCreateInput(input: {
         code: 'invalid_session_input',
         status: 409,
         message: 'Agent is disabled',
-        details: { agentId: input.agentId }
+        details: { agentId: input.agentId },
       })
     }
 
@@ -674,14 +672,14 @@ function resolveSessionCreateInput(input: {
           code: 'invalid_session_input',
           status: 400,
           message: 'Agent terminal session requires launch configuration on the selected agent',
-          details: { agentId: input.agentId }
+          details: { agentId: input.agentId },
         })
       }
       return {
         providerTargetId: null,
         runtimeKind: agent.runtimeKind,
         agentId: agent.id,
-        configJson: buildSessionRuntimeConfigJson({ cliTuiLaunch: launch })
+        configJson: buildSessionRuntimeConfigJson({ cliTuiLaunch: launch }),
       }
     }
 
@@ -690,7 +688,7 @@ function resolveSessionCreateInput(input: {
         code: 'invalid_session_input',
         status: 400,
         message: 'Provider-backed agent requires a provider target',
-        details: { agentId: input.agentId }
+        details: { agentId: input.agentId },
       })
     }
 
@@ -701,14 +699,14 @@ function resolveSessionCreateInput(input: {
         agentId: agent.id,
         configJson: writeSessionThinkingEffortPreferenceConfigJson(
           writeSessionModelPreferenceConfigJson('{}', agent.modelId),
-          agent.thinkingEffort
-        )
+          agent.thinkingEffort,
+        ),
       }
     }
 
     assertTargetCompatibleWithRuntime({
       providerTargetId: agent.providerTargetId,
-      runtimeKind: agent.runtimeKind
+      runtimeKind: agent.runtimeKind,
     })
     const providerTarget = resolveProviderTarget(agent.providerTargetId)
     if (!providerTarget.enabled) {
@@ -716,7 +714,7 @@ function resolveSessionCreateInput(input: {
         code: 'invalid_session_input',
         status: 409,
         message: 'Provider target is disabled',
-        details: { agentId: input.agentId, providerTargetId: agent.providerTargetId }
+        details: { agentId: input.agentId, providerTargetId: agent.providerTargetId },
       })
     }
 
@@ -726,8 +724,8 @@ function resolveSessionCreateInput(input: {
       agentId: agent.id,
       configJson: writeSessionThinkingEffortPreferenceConfigJson(
         writeSessionModelPreferenceConfigJson('{}', agent.modelId),
-        agent.thinkingEffort
-      )
+        agent.thinkingEffort,
+      ),
     }
   }
 
@@ -736,7 +734,7 @@ function resolveSessionCreateInput(input: {
     throw new AppError({
       code: 'invalid_session_input',
       status: 400,
-      message: 'Agent terminal sessions must be created from an agent'
+      message: 'Agent terminal sessions must be created from an agent',
     })
   }
 
@@ -746,39 +744,39 @@ function resolveSessionCreateInput(input: {
         providerTargetId: null,
         runtimeKind,
         agentId: null,
-        configJson: '{}'
+        configJson: '{}',
       }
     }
     throw new AppError({
       code: 'invalid_session_input',
       status: 400,
-      message: 'Session requires a provider target or an agent'
+      message: 'Session requires a provider target or an agent',
     })
   }
 
   if (assertRuntimeOwnedProviderTargetForRuntime({
     providerTargetId: input.providerTargetId,
-    runtimeKind
+    runtimeKind,
   })) {
     return {
       providerTargetId: null,
       runtimeKind,
       agentId: null,
-      configJson: '{}'
+      configJson: '{}',
     }
   }
 
   resolveProviderTarget(input.providerTargetId)
   assertTargetCompatibleWithRuntime({
     providerTargetId: input.providerTargetId,
-    runtimeKind
+    runtimeKind,
   })
 
   return {
     providerTargetId: input.providerTargetId,
     runtimeKind,
     agentId: null,
-    configJson: '{}'
+    configJson: '{}',
   }
 }
 
@@ -804,13 +802,14 @@ export async function update(input: {
   if (input.providerTargetId !== undefined) {
     if (assertRuntimeOwnedProviderTargetForRuntime({
       providerTargetId: input.providerTargetId,
-      runtimeKind: record.runtimeKind ?? 'standard'
+      runtimeKind: record.runtimeKind ?? 'standard',
     })) {
       patch.providerTargetId = null
       if (record.agentId) {
         patch.agentId = null
       }
-    } else {
+    }
+ else {
       const target = resolveProviderTarget(input.providerTargetId)
       assertProviderTargetCompatibleWithRuntime(input.providerTargetId, record.runtimeKind)
       if (!target.enabled) {
@@ -818,7 +817,7 @@ export async function update(input: {
           code: 'invalid_session_input',
           status: 409,
           message: 'Provider target is disabled',
-          details: { sessionId: input.id, providerTargetId: input.providerTargetId }
+          details: { sessionId: input.id, providerTargetId: input.providerTargetId },
         })
       }
       patch.providerTargetId = input.providerTargetId
@@ -826,10 +825,11 @@ export async function update(input: {
         patch.agentId = null
       }
     }
-  } else if (
-    input.modelId !== undefined &&
-    runtimeOwnsProviderBinding(record.runtimeKind) &&
-    record.providerTargetId !== null
+  }
+ else if (
+    input.modelId !== undefined
+    && runtimeOwnsProviderBinding(record.runtimeKind)
+    && record.providerTargetId !== null
   ) {
     patch.providerTargetId = null
     if (record.agentId) {
@@ -839,9 +839,10 @@ export async function update(input: {
   let configJson = record.configJson
   if (input.modelId !== undefined) {
     configJson = writeSessionModelPreferenceConfigJson(configJson, input.modelId)
-  } else if (
-    input.providerTargetId !== undefined &&
-    input.providerTargetId !== record.providerTargetId
+  }
+ else if (
+    input.providerTargetId !== undefined
+    && input.providerTargetId !== record.providerTargetId
   ) {
     configJson = writeSessionModelPreferenceConfigJson(configJson, null)
   }
@@ -852,7 +853,7 @@ export async function update(input: {
     patch.configJson = configJson
   }
 
-  const hasSessionPatch = Object.keys(patch).some((key) => key !== 'updatedAt')
+  const hasSessionPatch = Object.keys(patch).some(key => key !== 'updatedAt')
   if (input.title !== undefined) {
     await commitSessionEventsWithProjection(
       input.id,
@@ -863,17 +864,18 @@ export async function update(input: {
             sessionId: input.id,
             title: input.title,
             titleSource: 'user',
-            updatedAt: now
-          }
-        }
+            updatedAt: now,
+          },
+        },
       ],
       (tx) => {
         if (hasSessionPatch) {
           tx.update(sessions).set(patch).where(eq(sessions.id, input.id)).run()
         }
-      }
+      },
     )
-  } else {
+  }
+ else {
     db().update(sessions).set(patch).where(eq(sessions.id, input.id)).run()
   }
   if (input.providerTargetId !== undefined && input.providerTargetId !== record.providerTargetId) {
@@ -883,7 +885,7 @@ export async function update(input: {
   return get(input.id)
 }
 
-export async function updateTitle(input: { id: string; title: string }): Promise<void> {
+export async function updateTitle(input: { id: string, title: string }): Promise<void> {
   await update(input)
 }
 
@@ -904,7 +906,8 @@ function notifySessionArchived(id: string): void {
   for (const handler of archiveHandlers) {
     try {
       handler(id)
-    } catch {
+    }
+ catch {
       // archive hooks must not break the soft-archive flow
     }
   }
@@ -914,7 +917,8 @@ function cleanupSessionResources(id: string): void {
   for (const handler of cleanupHandlers) {
     try {
       handler(id)
-    } catch {
+    }
+ catch {
       // cleanup handlers must not break the delete flow
     }
   }
@@ -943,7 +947,7 @@ export function deleteByProviderTargetInDb(providerTargetId: string, d: SessionD
     .from(sessions)
     .where(eq(sessions.providerTargetId, providerTargetId))
     .all()
-    .map((row) => row.id)
+    .map(row => row.id)
 
   deleteSessionIdsInDb(ids, d)
 }
@@ -958,13 +962,13 @@ export function deleteByAgentIdsInDb(agentIds: string[], d: SessionDeleteDb): vo
     .from(sessions)
     .where(inArray(sessions.agentId, agentIds))
     .all()
-    .map((row) => row.id)
+    .map(row => row.id)
 
   deleteSessionIdsInDb(ids, d)
 }
 
 export function getMessagesWithRunIds(
-  sessionId: string
+  sessionId: string,
 ): Array<Message & { runId: string | null }> {
   const d = db()
   const rows = d
@@ -974,7 +978,7 @@ export function getMessagesWithRunIds(
     .orderBy(messages.createdAt)
     .all()
 
-  const assistantIds = rows.filter((row) => row.role === 'assistant').map((row) => row.id)
+  const assistantIds = rows.filter(row => row.role === 'assistant').map(row => row.id)
   const latestRunByMessageId = new Map<string, string>()
 
   if (assistantIds.length > 0) {
@@ -982,7 +986,7 @@ export function getMessagesWithRunIds(
       .select({
         id: backendRuns.id,
         messageId: backendRuns.messageId,
-        startedAt: backendRuns.startedAt
+        startedAt: backendRuns.startedAt,
       })
       .from(backendRuns)
       .where(inArray(backendRuns.messageId, assistantIds))
@@ -997,13 +1001,13 @@ export function getMessagesWithRunIds(
     }
   }
 
-  return rows.map((row) => ({
+  return rows.map(row => ({
     ...row,
-    runId: row.role === 'assistant' ? (latestRunByMessageId.get(row.id) ?? null) : null
+    runId: row.role === 'assistant' ? (latestRunByMessageId.get(row.id) ?? null) : null,
   }))
 }
 
-export function getRunMessageContents(runIds: string[]): { runId: string; content: string }[] {
+export function getRunMessageContents(runIds: string[]): { runId: string, content: string }[] {
   if (runIds.length === 0) {
     return []
   }
@@ -1011,14 +1015,14 @@ export function getRunMessageContents(runIds: string[]): { runId: string; conten
   const rows = db()
     .select({
       runId: backendRuns.id,
-      content: messages.content
+      content: messages.content,
     })
     .from(backendRuns)
     .innerJoin(messages, eq(backendRuns.messageId, messages.id))
     .where(inArray(backendRuns.id, runIds))
     .all()
 
-  return rows.map((row) => ({ runId: row.runId, content: row.content }))
+  return rows.map(row => ({ runId: row.runId, content: row.content }))
 }
 
 export function exportMarkdown(sessionId: string): string {
@@ -1041,8 +1045,8 @@ export function exportMarkdown(sessionId: string): string {
     .where(
       and(
         eq(backendSessionBindings.chatSessionId, sessionId),
-        isNotNull(backendSessionBindings.backendSessionId)
-      )
+        isNotNull(backendSessionBindings.backendSessionId),
+      ),
     )
     .get()
 
@@ -1050,7 +1054,7 @@ export function exportMarkdown(sessionId: string): string {
   lines.push(`# ${session.title}`)
   lines.push('')
   lines.push(
-    `> Model: ${readSessionModelPreference(session.configJson) ?? binding?.requestedModelId ?? 'unknown'} | Created: ${new Date(session.createdAt * 1000).toLocaleString()}`
+    `> Model: ${readSessionModelPreference(session.configJson) ?? binding?.requestedModelId ?? 'unknown'} | Created: ${new Date(session.createdAt * 1000).toLocaleString()}`,
   )
   lines.push('')
 

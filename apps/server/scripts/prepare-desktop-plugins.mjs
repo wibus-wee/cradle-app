@@ -374,5 +374,5 @@ function removeUnusedTopLevelDependencies(nodeModulesDir, retainedPackages) {
 }
 
 function sanitizePackageName(packageName) {
-  return packageName.replace(/[^a-zA-Z0-9._-]+/g, '-')
+  return packageName.replace(/[^\w.-]+/g, '-')
 }

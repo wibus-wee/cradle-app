@@ -12,11 +12,11 @@ import {
 } from '~/components/ui/dialog'
 
 function resolveTitle(title: Record<string, string> | string | undefined): string {
-  if (!title) return "What's New"
-  if (typeof title === 'string') return title
+  if (!title) { return 'What\'s New' }
+  if (typeof title === 'string') { return title }
   const lang = document.documentElement.lang || navigator.language || 'zh'
   const short = lang.split('-')[0].toLowerCase()
-  return title[short] || title['zh'] || title['en'] || Object.values(title)[0] || "What's New"
+  return title[short] || title.zh || title.en || Object.values(title)[0] || 'What\'s New'
 }
 
 interface WhatsNewDialogProps {

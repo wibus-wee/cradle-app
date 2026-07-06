@@ -5,11 +5,10 @@ import {
 } from '@cradle/plugin-sdk/server'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { SlackAppFactory, SlackAppLike } from './adapter'
 import {
   normalizeSlackMessageEvent,
   SlackConversationBridgeRuntime,
-  type SlackAppFactory,
-  type SlackAppLike,
 } from './adapter'
 
 function createFakeApp(): {
@@ -53,7 +52,7 @@ function createFakeApp(): {
   return { app, posted, handlers, commands, actions }
 }
 
-describe('Slack conversation bridge adapter', () => {
+describe('slack conversation bridge adapter', () => {
   it('normalizes Slack app mentions into platform-neutral inbound messages', () => {
     const normalized = normalizeSlackMessageEvent({
       connectionId: 'connection-1',
@@ -236,7 +235,7 @@ describe('Slack conversation bridge adapter', () => {
 
     const ack = vi.fn(async () => undefined)
     const responses: unknown[] = []
-    const respond = vi.fn(async message => {
+    const respond = vi.fn(async (message) => {
       responses.push(message)
     })
 

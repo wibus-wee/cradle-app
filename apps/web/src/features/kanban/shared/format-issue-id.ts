@@ -1,5 +1,5 @@
-import type { Workspace } from '~/features/workspace/types'
 import type { KanbanIssue } from '~/features/kanban/types'
+import type { Workspace } from '~/features/workspace/types'
 
 /**
  * Format a human-readable issue identifier like "CRA-12".

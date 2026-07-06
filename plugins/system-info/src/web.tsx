@@ -2,16 +2,16 @@
 // Uses React via import map resolution (provided by host in dev + prod)
 import type { WebPluginContext } from '@cradle/plugin-sdk/web'
 import {
-  HeartbeatLine as ActivityIcon,
   AlertLine as AlertCircleIcon,
   ChipLine as CpuIcon,
   Dashboard2Line as GaugeIcon,
   DriveLine as HardDriveIcon,
-  UsbFlashDiskLine as MemoryStickIcon,
+  HeartbeatLine as ActivityIcon,
   MonitorLine as MonitorIcon,
   Refresh1Line as RefreshCwIcon,
   ServerLine as ServerIcon,
-  TerminalLine as TerminalIcon
+  TerminalLine as TerminalIcon,
+  UsbFlashDiskLine as MemoryStickIcon,
 } from '@mingcute/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

@@ -3,11 +3,13 @@ import net from 'node:net'
 import WebSocket from 'ws'
 
 import { AppError } from '../../errors/app-error'
-import { allocateLocalPort } from '../remote-hosts/cradle-server-tunnel'
+import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
+import { relayAssertionHeaders } from '../relay-servers/relay-signature-service'
 import type { RemoteCradleServerTunnelHandle } from '../remote-hosts/cradle-server-tunnel'
-import { relayAssertionHeaders, type SignedRelayAssertion } from '../relay-servers/relay-signature-service'
+import { allocateLocalPort } from '../remote-hosts/cradle-server-tunnel'
 import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
-import { relayEnvelopeSchema, type RelayEnvelope } from './protocol'
+import type { RelayEnvelope } from './protocol'
+import { relayEnvelopeSchema } from './protocol'
 import { RelaySession } from './session'
 
 /**
@@ -184,11 +186,11 @@ class ControllerTransport {
             this.hostPublicKeyBase64 = pubkey
           },
           onStreamData: (streamId, data) => this.handleStreamData(streamId, data),
-          onStreamClose: (streamId) => this.handleStreamClose(streamId),
+          onStreamClose: streamId => this.handleStreamClose(streamId),
           onPeerClosed: () => this.fireExit(null, null),
-          onError: (error) => finish(error),
-          onPauseStream: (streamId) => this.streams.get(streamId)?.socket.pause(),
-          onResumeStream: (streamId) => this.streams.get(streamId)?.socket.resume(),
+          onError: error => finish(error),
+          onPauseStream: streamId => this.streams.get(streamId)?.socket.pause(),
+          onResumeStream: streamId => this.streams.get(streamId)?.socket.resume(),
         },
       )
       this.session = session

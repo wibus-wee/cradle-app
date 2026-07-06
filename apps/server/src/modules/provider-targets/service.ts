@@ -18,13 +18,13 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import { clearProviderTargetFromSessionQueuesInTransaction } from '../chat-runtime/es/commands'
+import { publishSessionTailEvents } from '../chat-runtime/es/event-tail'
 import {
   CODEX_BEDROCK_API_KEY_SECRET_KIND,
   CODEX_CHATGPT_AUTH_SECRET_KIND,
   CODEX_PERSONAL_ACCESS_TOKEN_SECRET_KIND,
 } from '../chat-runtime-providers/codex/app-server/chatgpt-auth'
-import { clearProviderTargetFromSessionQueuesInTransaction } from '../chat-runtime/es/commands'
-import { publishSessionTailEvents } from '../chat-runtime/es/event-tail'
 import type { ClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
 import {
   applyClaudeAgentConfigPatch,
@@ -494,7 +494,7 @@ export function removeProviderTarget(providerTargetId: string): void {
       .run()
     const queueEvents = clearProviderTargetFromSessionQueuesInTransaction(tx, {
       providerTargetId: target.id,
-      updatedAt: now
+      updatedAt: now,
     })
     tx.delete(providerTargetModelCache).where(eq(providerTargetModelCache.providerTargetId, target.id)).run()
     tx.delete(agentSessions).where(eq(agentSessions.providerTargetId, target.id)).run()

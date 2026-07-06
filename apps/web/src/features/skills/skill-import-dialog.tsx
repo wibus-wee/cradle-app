@@ -1,8 +1,8 @@
 import {
   CheckLine as CheckIcon,
-  RightSmallLine as ChevronRightIcon,
+  CloseLine as XIcon,
   LinkLine as LinkIcon,
-  CloseLine as XIcon
+  RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
 import { AnimatePresence, m } from 'motion/react'
 import { useEffect, useReducer, useRef, useState } from 'react'
@@ -16,8 +16,8 @@ import {
 } from '~/components/ui/dialog'
 import { Spinner } from '~/components/ui/spinner'
 import { TruncatedText } from '~/components/ui/truncated-text'
-import { cn } from '~/lib/cn'
 import type { DiscoveredSkill, SkillScope } from '~/features/skills/types'
+import { cn } from '~/lib/cn'
 
 import { useSkillSourceImport } from './use-skills'
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
-import { type RelayServer, relayServers } from '@cradle/db'
+import type { RelayServer } from '@cradle/db'
+import { relayServers } from '@cradle/db'
 import { and, asc, desc, eq, ne } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'

@@ -5,7 +5,7 @@ import { bindReadableStreamToAbortSignal } from '../stream/sse'
 import { loadChatRuntime } from './runtime-loader'
 
 export const chatRuntimeStreamRoutes = new Elysia({
-  detail: { tags: ['chat-runtime'] }
+  detail: { tags: ['chat-runtime'] },
 })
   // GET /chat/sessions/:sessionId/stream -> join the active run SSE stream
   .get(
@@ -18,9 +18,9 @@ export const chatRuntimeStreamRoutes = new Elysia({
         headers: {
           'content-type': 'text/event-stream',
           'cache-control': 'no-cache',
-          connection: 'keep-alive',
-          ...(activeRun ? { 'x-cradle-run-id': activeRun.runId } : {})
-        }
+          'connection': 'keep-alive',
+          ...(activeRun ? { 'x-cradle-run-id': activeRun.runId } : {}),
+        },
       })
     },
     {
@@ -33,15 +33,15 @@ export const chatRuntimeStreamRoutes = new Elysia({
             content: {
               'text/event-stream': {
                 schema: {
-                  type: 'string'
+                  type: 'string',
                 },
                 example:
-                  'data: {"type":"text-delta","id":"text_1","delta":" world"}\n\ndata: {"type":"text-end","id":"text_1"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n'
-              }
-            }
-          }
-        }
+                  'data: {"type":"text-delta","id":"text_1","delta":" world"}\n\ndata: {"type":"text-end","id":"text_1"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
+              },
+            },
+          },
+        },
       },
-      params: ChatRuntimeModel.sessionIdParams
-    }
+      params: ChatRuntimeModel.sessionIdParams,
+    },
   )

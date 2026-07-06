@@ -1,10 +1,10 @@
-import type { CodexAppServerClientOptions } from './client'
 import type { CodexChatgptAuthCredential } from './chatgpt-auth'
 import {
   CODEX_BEDROCK_API_KEY_ENV,
   CODEX_BEDROCK_REGION_ENV,
   CODEX_PERSONAL_ACCESS_TOKEN_ENV,
 } from './chatgpt-auth'
+import type { CodexAppServerClientOptions } from './client'
 
 /**
  * Creates a fingerprint for Codex app-server host resource that includes only

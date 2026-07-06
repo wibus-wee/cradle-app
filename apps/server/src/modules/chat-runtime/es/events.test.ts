@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ChatSessionEventRow } from './events'
 import {
   CHAT_SESSION_EVENT_SCHEMA_VERSION,
   parseStoredChatSessionEvent,
   serializeChatSessionEventPayload,
   upcastChatSessionEventPayload,
-  type ChatSessionEventRow
 } from './events'
 
 function eventRow(input: {
@@ -20,7 +20,7 @@ function eventRow(input: {
     eventType: input.eventType,
     payload: input.payload,
     subjectRunId: null,
-    occurredAt: 100
+    occurredAt: 100,
   }
 }
 
@@ -31,15 +31,15 @@ describe('chat session event payload versioning', () => {
       payload: {
         queueItemId: 'queue-1',
         sessionId: 'session-1',
-        updatedAt: 120
-      }
+        updatedAt: 120,
+      },
     })
 
     expect(JSON.parse(payload)).toEqual({
       v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
       queueItemId: 'queue-1',
       sessionId: 'session-1',
-      updatedAt: 120
+      updatedAt: 120,
     })
   })
 
@@ -55,7 +55,7 @@ describe('chat session event payload versioning', () => {
         stopReason: null,
         errorText: null,
         startedAt: 100,
-        finishedAt: null
+        finishedAt: null,
       },
       assistantMessage: {
         id: 'assistant-1',
@@ -70,10 +70,10 @@ describe('chat session event payload versioning', () => {
         messageJson: '{"id":"assistant-1","role":"assistant","parts":[]}',
         errorText: null,
         createdAt: 100,
-        updatedAt: 100
+        updatedAt: 100,
       },
       assistantMessageProjection: 'update',
-      queueItemId: null
+      queueItemId: null,
     } as const
 
     const upcasted = upcastChatSessionEventPayload('RunStarted', v1Payload)
@@ -82,7 +82,7 @@ describe('chat session event payload versioning', () => {
       v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
       run: { id: 'run-1' },
       assistantMessage: { id: 'assistant-1' },
-      queueItemId: null
+      queueItemId: null,
     })
     expect('assistantMessageProjection' in upcasted).toBe(false)
   })
@@ -104,9 +104,9 @@ describe('chat session event payload versioning', () => {
           messageJson: '{"id":"user-1","role":"user","parts":[{"type":"text","text":"hello"}]}',
           errorText: null,
           createdAt: 100,
-          updatedAt: 100
-        }
-      })
+          updatedAt: 100,
+        },
+      }),
     }))
 
     expect(stored).toMatchObject({
@@ -116,9 +116,9 @@ describe('chat session event payload versioning', () => {
         message: {
           id: 'user-1',
           sessionId: 'session-1',
-          content: 'hello'
-        }
-      }
+          content: 'hello',
+        },
+      },
     })
   })
 })

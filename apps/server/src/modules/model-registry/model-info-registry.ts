@@ -227,10 +227,10 @@ function tokensAlignedPrefix(candidate: string, target: string): boolean {
   const cTokens = candidate.toLowerCase().split(SEP_RE).filter(Boolean)
   const tTokens = target.toLowerCase().split(SEP_RE).filter(Boolean)
 
-  if (cTokens.length === 0 || cTokens.length > tTokens.length) return false
+  if (cTokens.length === 0 || cTokens.length > tTokens.length) { return false }
 
   for (let i = 0; i < cTokens.length; i++) {
-    if (cTokens[i] !== tTokens[i]) return false
+    if (cTokens[i] !== tTokens[i]) { return false }
   }
 
   // All candidate tokens matched — reject if next target token is a version number

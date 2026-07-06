@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
+import { once } from 'node:events'
 import { createWriteStream } from 'node:fs'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import { once } from 'node:events'
 
 import { app } from 'electron'
 

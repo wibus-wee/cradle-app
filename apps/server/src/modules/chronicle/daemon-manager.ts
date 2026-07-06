@@ -6,7 +6,8 @@ import { join, resolve } from 'node:path'
 import { z } from 'zod'
 
 import { getServerConfig } from '../../infra'
-import { spawnManagedProcess, type ManagedChildProcess } from '../../infra/managed-process'
+import type { ManagedChildProcess } from '../../infra/managed-process'
+import { spawnManagedProcess } from '../../infra/managed-process'
 
 let chronicleProcess: ManagedChildProcess | null = null
 let lastExitCode: number | null = null

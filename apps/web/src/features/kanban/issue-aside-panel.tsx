@@ -5,7 +5,7 @@ import {
   LinkLine as LinkIcon,
   SearchLine as SearchIcon,
   SparklesLine as SparklesIcon,
-  UnlinkLine as UnlinkIcon
+  UnlinkLine as UnlinkIcon,
 } from '@mingcute/react'
 import { AnimatePresence, m } from 'motion/react'
 import { useState } from 'react'
@@ -15,19 +15,19 @@ import { Button } from '~/components/ui/button'
 import { Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList } from '~/components/ui/combobox'
 import { Skeleton } from '~/components/ui/skeleton'
 import { AssetMarkdown } from '~/features/assets/asset-markdown'
+import type { KanbanIssue, KanbanIssueCommentView, KanbanStatus } from '~/features/kanban/types'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
-import type { KanbanIssue, KanbanIssueCommentView, KanbanStatus } from '~/features/kanban/types'
 import { openKanbanBoard } from '~/navigation/navigation-commands'
 
 import { AssigneeAvatar } from './shared/assignee-avatar'
-import { formatIssueId } from './shared/format-issue-id'
 import { formatActorLabel, formatActorName, formatRelativeTime } from './shared/format-actor'
+import { formatIssueId } from './shared/format-issue-id'
 import { LabelChip } from './shared/label-chip'
 import { PriorityIcon } from './shared/priority-icon'
 import { StatusIcon } from './shared/status-icon'
-import { useBoards, useComments, useIssue, useIssues, useLinkedIssue, useLinkIssue, useStatuses, useUnlinkIssue } from './use-kanban'
 import type { IssuePriority } from './use-kanban'
+import { useBoards, useComments, useIssue, useIssues, useLinkedIssue, useLinkIssue, useStatuses, useUnlinkIssue } from './use-kanban'
 import type { StatusCategory } from './use-view-config'
 
 interface IssueAsidePanelProps {

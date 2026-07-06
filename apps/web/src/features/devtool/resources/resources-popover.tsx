@@ -1,15 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
 import {
-  HeartbeatLine as ActivityIcon,
   AlertLine as CircleAlertIcon,
   ChipLine as CpuIcon,
-  UsbFlashDiskLine as MemoryStickIcon,
-  MonitorLine as MonitorIcon,
+  HeartbeatLine as ActivityIcon,
   LayoutBottomLine as PanelBottomIcon,
+  MonitorLine as MonitorIcon,
   Refresh1Line as RefreshCwIcon,
   ServerLine as ServerIcon,
-  TerminalBoxLine as SquareTerminalIcon
+  TerminalBoxLine as SquareTerminalIcon,
+  UsbFlashDiskLine as MemoryStickIcon,
 } from '@mingcute/react'
+import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'

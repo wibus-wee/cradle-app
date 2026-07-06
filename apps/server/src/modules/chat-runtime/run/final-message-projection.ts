@@ -1,5 +1,5 @@
-import { parsePartialJson } from 'ai'
 import type { ProviderMetadata, UIMessage, UIMessageChunk } from 'ai'
+import { parsePartialJson } from 'ai'
 
 export interface FinalMessageProjectionState {
   activeTextParts: Map<string, ProjectedTextPart<MutableTextPart>>
@@ -44,13 +44,13 @@ export function createFinalMessageProjectionState(): FinalMessageProjectionState
   return {
     activeTextParts: new Map(),
     activeReasoningParts: new Map(),
-    partialToolCalls: new Map()
+    partialToolCalls: new Map(),
   }
 }
 
 export function projectFinalMessageChunk(
   activeRun: FinalMessageProjectionRun,
-  chunk: UIMessageChunk
+  chunk: UIMessageChunk,
 ): void {
   const message = activeRun.finalMessage
   const projection = activeRun.finalProjection
@@ -66,7 +66,7 @@ export function projectFinalMessageChunk(
         type: 'text',
         text: '',
         state: 'streaming',
-        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {})
+        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {}),
       } satisfies MutableTextPart
       projection.activeTextParts.set(chunk.id, { part, deltas: [] })
       message.parts.push(part)
@@ -76,8 +76,8 @@ export function projectFinalMessageChunk(
       const activePart = projection.activeTextParts.get(chunk.id)
       if (activePart) {
         activePart.deltas.push(chunk.delta)
-        activePart.part.providerMetadata =
-          chunk.providerMetadata ?? activePart.part.providerMetadata
+        activePart.part.providerMetadata
+          = chunk.providerMetadata ?? activePart.part.providerMetadata
       }
       break
     }
@@ -86,8 +86,8 @@ export function projectFinalMessageChunk(
       if (activePart) {
         flushProjectedTextPart(activePart)
         activePart.part.state = 'done'
-        activePart.part.providerMetadata =
-          chunk.providerMetadata ?? activePart.part.providerMetadata
+        activePart.part.providerMetadata
+          = chunk.providerMetadata ?? activePart.part.providerMetadata
         projection.activeTextParts.delete(chunk.id)
       }
       break
@@ -97,7 +97,7 @@ export function projectFinalMessageChunk(
         type: 'reasoning',
         text: '',
         state: 'streaming',
-        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {})
+        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {}),
       } satisfies MutableReasoningPart
       projection.activeReasoningParts.set(chunk.id, { part, deltas: [] })
       message.parts.push(part)
@@ -107,8 +107,8 @@ export function projectFinalMessageChunk(
       const activePart = projection.activeReasoningParts.get(chunk.id)
       if (activePart) {
         activePart.deltas.push(chunk.delta)
-        activePart.part.providerMetadata =
-          chunk.providerMetadata ?? activePart.part.providerMetadata
+        activePart.part.providerMetadata
+          = chunk.providerMetadata ?? activePart.part.providerMetadata
       }
       break
     }
@@ -117,8 +117,8 @@ export function projectFinalMessageChunk(
       if (activePart) {
         flushProjectedTextPart(activePart)
         activePart.part.state = 'done'
-        activePart.part.providerMetadata =
-          chunk.providerMetadata ?? activePart.part.providerMetadata
+        activePart.part.providerMetadata
+          = chunk.providerMetadata ?? activePart.part.providerMetadata
         projection.activeReasoningParts.delete(chunk.id)
       }
       break
@@ -128,7 +128,7 @@ export function projectFinalMessageChunk(
         deltas: [],
         toolName: chunk.toolName,
         dynamic: chunk.dynamic,
-        title: chunk.title
+        title: chunk.title,
       })
       upsertProjectedToolPart(message, {
         toolCallId: chunk.toolCallId,
@@ -138,7 +138,7 @@ export function projectFinalMessageChunk(
         providerExecuted: chunk.providerExecuted,
         providerMetadata: chunk.providerMetadata,
         dynamic: chunk.dynamic,
-        title: chunk.title
+        title: chunk.title,
       })
       break
     }
@@ -152,7 +152,7 @@ export function projectFinalMessageChunk(
           state: 'input-streaming',
           input: undefined,
           dynamic: partialToolCall.dynamic,
-          title: partialToolCall.title
+          title: partialToolCall.title,
         })
       }
       break
@@ -167,7 +167,7 @@ export function projectFinalMessageChunk(
         providerExecuted: chunk.providerExecuted,
         providerMetadata: chunk.providerMetadata,
         dynamic: chunk.dynamic,
-        title: chunk.title
+        title: chunk.title,
       })
       break
     case 'tool-approval-request':
@@ -179,7 +179,7 @@ export function projectFinalMessageChunk(
         output: chunk.output,
         providerExecuted: chunk.providerExecuted,
         providerMetadata: chunk.providerMetadata,
-        preliminary: chunk.preliminary === true
+        preliminary: chunk.preliminary === true,
       })
       break
     case 'tool-output-error':
@@ -188,7 +188,7 @@ export function projectFinalMessageChunk(
         errorText: chunk.errorText,
         providerExecuted: chunk.providerExecuted,
         providerMetadata: chunk.providerMetadata,
-        preliminary: false
+        preliminary: false,
       })
       break
     case 'tool-output-denied':
@@ -205,7 +205,7 @@ export function projectFinalMessageChunk(
         type: 'file',
         mediaType: chunk.mediaType,
         url: chunk.url,
-        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {})
+        ...(chunk.providerMetadata ? { providerMetadata: chunk.providerMetadata } : {}),
       })
       break
     case 'source-url':
@@ -214,7 +214,7 @@ export function projectFinalMessageChunk(
         sourceId: chunk.sourceId,
         url: chunk.url,
         title: chunk.title,
-        providerMetadata: chunk.providerMetadata
+        providerMetadata: chunk.providerMetadata,
       })
       break
     case 'source-document':
@@ -224,7 +224,7 @@ export function projectFinalMessageChunk(
         mediaType: chunk.mediaType,
         title: chunk.title,
         filename: chunk.filename,
-        providerMetadata: chunk.providerMetadata
+        providerMetadata: chunk.providerMetadata,
       })
       break
   }
@@ -254,7 +254,7 @@ function mergeFinalMessageMetadata(message: UIMessage, nextMetadata: unknown): v
 
 function mergeMetadataRecords(
   currentRecord: Record<string, unknown>,
-  nextRecord: Record<string, unknown>
+  nextRecord: Record<string, unknown>,
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...currentRecord }
   for (const [key, nextValue] of Object.entries(nextRecord)) {
@@ -316,13 +316,13 @@ export async function flushProjectedToolInputs(activeRun: FinalMessageProjection
           ? inputText
           : parsedInput.value,
       dynamic: partialToolCall.dynamic,
-      title: partialToolCall.title
+      title: partialToolCall.title,
     })
   }
 }
 
 function flushProjectedTextPart<TPart extends MutableTextPart | MutableReasoningPart>(
-  activePart: ProjectedTextPart<TPart>
+  activePart: ProjectedTextPart<TPart>,
 ): void {
   if (activePart.deltas.length === 0) {
     return
@@ -342,7 +342,7 @@ function upsertProjectedToolPart(
     providerMetadata?: ProviderMetadata
     dynamic?: boolean
     title?: string
-  }
+  },
 ): void {
   const part = findProjectedToolPart(message, options.toolCallId)
   if (part) {
@@ -352,7 +352,7 @@ function upsertProjectedToolPart(
       providerExecuted: options.providerExecuted,
       title: options.title,
       providerMetadata: options.providerMetadata,
-      isResultMetadata: false
+      isResultMetadata: false,
     })
     return
   }
@@ -366,7 +366,7 @@ function upsertProjectedToolPart(
       input: options.input,
       providerExecuted: options.providerExecuted,
       title: options.title,
-      ...(options.providerMetadata ? { callProviderMetadata: options.providerMetadata } : {})
+      ...(options.providerMetadata ? { callProviderMetadata: options.providerMetadata } : {}),
     } as UIMessage['parts'][number])
     return
   }
@@ -378,7 +378,7 @@ function upsertProjectedToolPart(
     input: options.input,
     providerExecuted: options.providerExecuted,
     title: options.title,
-    ...(options.providerMetadata ? { callProviderMetadata: options.providerMetadata } : {})
+    ...(options.providerMetadata ? { callProviderMetadata: options.providerMetadata } : {}),
   } as UIMessage['parts'][number])
 }
 
@@ -392,7 +392,7 @@ function updateProjectedToolOutput(
     providerExecuted?: boolean
     providerMetadata?: ProviderMetadata
     preliminary?: boolean
-  }
+  },
 ): void {
   const part = findProjectedToolPart(message, toolCallId)
   if (!part) {
@@ -406,14 +406,14 @@ function updateProjectedToolOutput(
     providerExecuted: options.providerExecuted,
     preliminary: options.preliminary,
     providerMetadata: options.providerMetadata,
-    isResultMetadata: true
+    isResultMetadata: true,
   })
 }
 
 function updateProjectedToolApproval(
   message: UIMessage,
   toolCallId: string,
-  approvalId: string
+  approvalId: string,
 ): void {
   const part = findProjectedToolPart(message, toolCallId)
   if (!part) {
@@ -427,10 +427,10 @@ function updateProjectedToolApproval(
 
 function findProjectedToolPart(
   message: UIMessage,
-  toolCallId: string
+  toolCallId: string,
 ): MutableToolPart | undefined {
   return message.parts.find(
-    (part): part is MutableToolPart => 'toolCallId' in part && part.toolCallId === toolCallId
+    (part): part is MutableToolPart => 'toolCallId' in part && part.toolCallId === toolCallId,
   )
 }
 
@@ -451,7 +451,7 @@ function assignProjectedToolPart(
     title?: string
     providerMetadata?: ProviderMetadata
     isResultMetadata: boolean
-  }
+  },
 ): void {
   const target = part as MutableToolPart & Record<string, unknown>
   target.state = values.state
@@ -479,7 +479,7 @@ function assignProjectedToolPart(
     target.title = values.title
   }
   if (values.providerMetadata !== undefined) {
-    target[values.isResultMetadata ? 'resultProviderMetadata' : 'callProviderMetadata'] =
-      values.providerMetadata
+    target[values.isResultMetadata ? 'resultProviderMetadata' : 'callProviderMetadata']
+      = values.providerMetadata
   }
 }

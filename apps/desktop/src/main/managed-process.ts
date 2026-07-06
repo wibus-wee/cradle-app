@@ -29,7 +29,7 @@ export type ManagedProcessOptions = ManagedSpawnOptions | ManagedForkOptions
 
 export interface ManagedChildProcess extends ChildProcess {
   readonly targetPid: number | null
-  stop(signal?: NodeJS.Signals): Promise<void>
+  stop: (signal?: NodeJS.Signals) => Promise<void>
 }
 
 const localModuleDir = dirname(fileURLToPath(import.meta.url))

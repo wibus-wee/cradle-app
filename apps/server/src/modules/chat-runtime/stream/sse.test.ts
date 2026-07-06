@@ -12,13 +12,13 @@ describe('bindReadableStreamToAbortSignal', () => {
       },
       cancel() {
         cancelled = true
-      }
+      },
     })
 
     const reader = bindReadableStreamToAbortSignal(source, abortController.signal).getReader()
     await expect(reader.read()).resolves.toEqual({
       done: false,
-      value: new Uint8Array([1])
+      value: new Uint8Array([1]),
     })
 
     const pendingRead = reader.read()

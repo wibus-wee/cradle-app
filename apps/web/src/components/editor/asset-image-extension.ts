@@ -72,7 +72,7 @@ export const AssetImage = Image.extend({
     return [
       'img',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        src: toAssetContentUrl(assetId),
+        'src': toAssetContentUrl(assetId),
         'data-cradle-asset-src': canonicalSrc,
         ...sizeAttributes,
       }),
@@ -96,7 +96,8 @@ export const AssetImage = Image.extend({
           const img = (view as { dom?: HTMLElement }).dom
           if (img instanceof HTMLImageElement) {
             img.src = contentUrl
-          } else if (img) {
+          }
+ else if (img) {
             const inner = img.querySelector('img')
             if (inner) {
               inner.src = contentUrl

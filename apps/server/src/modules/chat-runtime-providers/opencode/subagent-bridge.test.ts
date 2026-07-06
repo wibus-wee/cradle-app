@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest'
-
 import type { Session as OpencodeSession, ToolPart as OpencodeToolPart } from '@opencode-ai/sdk'
+import { describe, expect, it } from 'vitest'
 
 import {
   OpencodeSubagentRegistry,
@@ -33,7 +32,7 @@ function taskPart(input: Partial<OpencodeToolPart> = {}): OpencodeToolPart {
   }
 }
 
-describe('OpenCode subagent bridge', () => {
+describe('openCode subagent bridge', () => {
   it('resolves provider-thread reads from task toolCallId via parent history', async () => {
     const registry = new OpencodeSubagentRegistry()
     const childSession: OpencodeSession = {

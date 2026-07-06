@@ -1,10 +1,11 @@
 // Startup trigger that shows the What's New dialog after a desktop update.
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { isElectron, nativeIpc } from '~/lib/electron'
 import { useDesktopPreferences } from '~/features/settings/use-desktop-preferences'
+import { isElectron, nativeIpc } from '~/lib/electron'
 
-import { useChangelogEntry, useChangelogIndex, type ChangelogEntry } from './use-changelog'
+import type { ChangelogEntry } from './use-changelog'
+import { useChangelogEntry, useChangelogIndex } from './use-changelog'
 import { WhatsNewDialog } from './whats-new-dialog'
 
 export function WhatsNewTrigger() {
@@ -17,15 +18,15 @@ export function WhatsNewTrigger() {
 
   // Determine if we need to show the dialog
   useEffect(() => {
-    if (checkedRef.current) return
-    if (!prefs || !index || index.length === 0) return
-    if (!isElectron || !nativeIpc) return
+    if (checkedRef.current) { return }
+    if (!prefs || !index || index.length === 0) { return }
+    if (!isElectron || !nativeIpc) { return }
 
     checkedRef.current = true
 
     void nativeIpc.desktopUpdate.getStatus().then((status) => {
       const currentVersion = status.currentVersion
-      if (!currentVersion || currentVersion === '0.0.0') return
+      if (!currentVersion || currentVersion === '0.0.0') { return }
 
       const lastSeen = prefs.lastSeenChangelogVersion
 
@@ -53,7 +54,7 @@ export function WhatsNewTrigger() {
     setOpen(isOpen)
   }, [])
 
-  if (!markdown || !targetEntry) return null
+  if (!markdown || !targetEntry) { return null }
 
   return (
     <WhatsNewDialog

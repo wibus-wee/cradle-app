@@ -9,8 +9,9 @@
  */
 
 import { motion } from 'motion/react'
-import React, { useId } from 'react'
 import type { CSSProperties } from 'react'
+import * as React from 'react'
+import { useId } from 'react'
 
 /* ─── BorderBeam ─────────────────────────────────────────────────── */
 /* A small gradient beam travels around the parent's border on a loop.
@@ -215,15 +216,15 @@ const BEAM_PATHS = [
   'M-37 -581C-37 -581 31 -176 495 -49C959 78 1027 483 1027 483',
 ]
 
-export const BackgroundBeams = React.memo(function BackgroundBeams({
+export const BackgroundBeams = React.memo(({
   style,
 }: {
   style?: CSSProperties
-}) {
+}) => {
   const gradientId = useId()
   // Math.random() is fine here: component is memo'd with no props, so it
   // mounts once and the per-beam durations/delays stay stable for its life.
-  const beams = BEAM_PATHS.map((d) => ({
+  const beams = BEAM_PATHS.map(d => ({
     d,
     duration: Math.random() * 10 + 10,
     delay: Math.random() * 10,

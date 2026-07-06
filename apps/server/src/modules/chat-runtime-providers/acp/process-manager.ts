@@ -1,7 +1,8 @@
 import { join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 
-import { spawnManagedProcess, type ManagedChildProcess } from '../../../infra/managed-process'
+import type { ManagedChildProcess } from '../../../infra/managed-process'
+import { spawnManagedProcess } from '../../../infra/managed-process'
 
 export interface ProcessMetrics {
   pid: number

@@ -1,42 +1,43 @@
 import type { UIMessageChunk } from 'ai'
 
 import { currentUnixSeconds } from '../../../helpers/time'
-import {
-  compactStoredMessageSnapshot
-} from '../message-snapshot-compaction'
+import { evaluateIsolationBoundary } from '../../worktree/service'
 import { commitSessionEvents, readRunStopReason, readRunTerminalEventType } from '../es/commands'
+import {
+  compactStoredMessageSnapshot,
+} from '../message-snapshot-compaction'
+import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
+import { attachBinding } from '../runtime-session-context'
+import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
+import {
+  extractMessageText,
+  normalizeMessageSnapshot,
+} from '../ui-message'
 import {
   flushFinalMessageProjection,
   flushProjectedToolInputs,
-  projectFinalMessageChunk
+  projectFinalMessageChunk,
 } from './final-message-projection'
-import { readRunWriteFence, type RunWriteFence } from './run-write-fence'
+import type { ChatRuntimeProfile } from './profile'
+import type { RunWriteFence } from './run-write-fence'
+import { readRunWriteFence } from './run-write-fence'
 import type { ChatMessageStatus } from './stream-chunks'
 import { readTerminalStatus } from './stream-chunks'
-import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
-import { attachBinding } from '../runtime-session-context'
-import { evaluateIsolationBoundary } from '../../worktree/service'
-import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
-import type { ChatRuntimeProfile } from './profile'
-import {
-  extractMessageText,
-  normalizeMessageSnapshot
-} from '../ui-message'
 
 export interface TerminalRunFinalizerDeps {
   stream: {
-    publishRunStartChunk(activeRun: ActiveRun): void
-    flushPendingRunDelta(activeRun: ActiveRun): void
-    publishUIMessageChunk(activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean): void
+    publishRunStartChunk: (activeRun: ActiveRun) => void
+    flushPendingRunDelta: (activeRun: ActiveRun) => void
+    publishUIMessageChunk: (activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean) => void
   }
-  error(message: string, payload: Record<string, unknown>): void
+  error: (message: string, payload: Record<string, unknown>) => void
 }
 
 export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
   async function publishTerminalChunk(
     activeRun: ActiveRun,
     chunk: UIMessageChunk,
-    profile?: ChatRuntimeProfile
+    profile?: ChatRuntimeProfile,
   ): Promise<boolean> {
     deps.stream.publishRunStartChunk(activeRun)
     deps.stream.flushPendingRunDelta(activeRun)
@@ -55,7 +56,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     status: ChatMessageStatus,
     errorText: string | null,
     terminalChunk: UIMessageChunk,
-    profile?: ChatRuntimeProfile
+    profile?: ChatRuntimeProfile,
   ): Promise<boolean> {
     if (status === 'streaming' || activeRun.terminalStatus) {
       return false
@@ -83,7 +84,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
       activeRun,
       status,
       errorText,
-      bindingId
+      bindingId,
     )
     if (profile) {
       profile.finalMessageJsonBytes = snapshotResult?.messageJsonBytes ?? null
@@ -108,8 +109,8 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
         payload: {
           status,
           errorText,
-          message: activeRun.finalMessage
-        }
+          message: activeRun.finalMessage,
+        },
       })
     }
     void evaluateIsolationBoundary(activeRun.sessionId).catch((error) => {
@@ -124,7 +125,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
   async function settleActiveRun(
     activeRun: ActiveRun,
     status: TerminalChatMessageStatus,
-    errorText: string | null
+    errorText: string | null,
   ): Promise<void> {
     if (activeRun.terminalStatus) {
       return
@@ -132,8 +133,8 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     if (status === 'aborted') {
       activeRun.cancelRequested = true
     }
-    const terminalChunk: UIMessageChunk =
-      status === 'complete'
+    const terminalChunk: UIMessageChunk
+      = status === 'complete'
         ? { type: 'finish', finishReason: 'stop' }
         : status === 'aborted'
           ? { type: 'abort', reason: 'user' }
@@ -145,7 +146,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     activeRun: ActiveRun,
     status: TerminalChatMessageStatus,
     errorText: string | null,
-    bindingId?: string | null
+    bindingId?: string | null,
   ): Promise<{ messageJsonBytes: number } | null> {
     try {
       const now = currentUnixSeconds()
@@ -162,9 +163,9 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
               messageJson,
               status,
               errorText,
-              updatedAt: now
-            }
-          }
+              updatedAt: now,
+            },
+          },
         },
         {
           type: readRunTerminalEventType(status),
@@ -176,18 +177,19 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
             status,
             stopReason: readRunStopReason(status),
             errorText,
-            finishedAt: now
-          }
-        }
+            finishedAt: now,
+          },
+        },
       ])
       return { messageJsonBytes: Buffer.byteLength(messageJson) }
-    } catch (error) {
+    }
+ catch (error) {
       deps.error('failed to persist final message snapshot', {
         error,
         sessionId: activeRun.sessionId,
         runId: activeRun.runId,
         messageId: activeRun.messageId,
-        status
+        status,
       })
       return null
     }
@@ -195,7 +197,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
 
   return {
     publishTerminalChunk,
-    settleActiveRun
+    settleActiveRun,
   }
 }
 
@@ -231,9 +233,10 @@ function recordTerminalRunBindingId(activeRun: ActiveRun): string | undefined {
       providerTargetId: activeRun.providerTargetId,
       runtimeKind: activeRun.runtimeSession.runtimeKind,
       runtimeSession: activeRun.runtimeSession,
-      requestedModelId: activeRun.modelId
+      requestedModelId: activeRun.modelId,
     })?.id
-  } catch {
+  }
+ catch {
     return undefined
   }
 }

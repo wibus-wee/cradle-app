@@ -6,7 +6,7 @@ import {
   readClaudeAgentAskUserQuestionInput,
 } from './user-question'
 
-describe('Claude Agent AskUserQuestion projection', () => {
+describe('claude Agent AskUserQuestion projection', () => {
   it('preserves SDK option preview annotations and joins multi-select answers', () => {
     const request = readClaudeAgentAskUserQuestionInput({
       questions: [

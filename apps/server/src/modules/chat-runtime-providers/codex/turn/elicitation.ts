@@ -20,7 +20,7 @@ export function readCodexUserInputQuestions(params: unknown): RuntimeUserInputQu
           const optionRecord = readRecord(option)
           return {
             label: readString(optionRecord.label, ''),
-            description: readString(optionRecord.description, '')
+            description: readString(optionRecord.description, ''),
           }
         })
       : null
@@ -32,7 +32,7 @@ export function readCodexUserInputQuestions(params: unknown): RuntimeUserInputQu
       isOther: question.isOther === true,
       isSecret: question.isSecret === true,
       multiSelect: false,
-      options
+      options,
     }
   })
 }
@@ -52,9 +52,9 @@ export function readCodexMcpElicitationQuestions(params: unknown): RuntimeUserIn
         multiSelect: false,
         options: [
           { label: 'accept', description: readString(record.url, '') },
-          { label: 'decline', description: 'Decline this MCP elicitation' }
-        ]
-      }
+          { label: 'decline', description: 'Decline this MCP elicitation' },
+        ],
+      },
     ]
   }
 
@@ -70,8 +70,8 @@ export function readCodexMcpElicitationQuestions(params: unknown): RuntimeUserIn
         isOther: false,
         isSecret: false,
         multiSelect: false,
-        options: null
-      }
+        options: null,
+      },
     ]
   }
 
@@ -84,14 +84,14 @@ export function readCodexMcpElicitationQuestions(params: unknown): RuntimeUserIn
       isOther: false,
       isSecret: readString(property.format, '') === 'password',
       multiSelect: property.type === 'array',
-      options: readMcpElicitationOptions(property)
+      options: readMcpElicitationOptions(property),
     }
   })
 }
 
 function readMcpElicitationOptions(
-  property: Record<string, unknown>
-): Array<{ label: string; description: string }> | null {
+  property: Record<string, unknown>,
+): Array<{ label: string, description: string }> | null {
   if (Array.isArray(property.enum)) {
     const names = Array.isArray(property.enumNames) ? property.enumNames : []
     return property.enum.flatMap((value, index) => {
@@ -101,8 +101,8 @@ function readMcpElicitationOptions(
       return [
         {
           label: value,
-          description: typeof names[index] === 'string' ? names[index] : ''
-        }
+          description: typeof names[index] === 'string' ? names[index] : '',
+        },
       ]
     })
   }
@@ -117,17 +117,16 @@ function readMcpElicitationOptions(
       return [
         {
           label: value,
-          description: readString(optionRecord.title, '')
-        }
+          description: readString(optionRecord.title, ''),
+        },
       ]
     })
   }
 
   const items = readRecord(property.items)
   if (Array.isArray(items.enum)) {
-    return items.enum.flatMap((value) =>
-      typeof value === 'string' ? [{ label: value, description: '' }] : []
-    )
+    return items.enum.flatMap(value =>
+      typeof value === 'string' ? [{ label: value, description: '' }] : [])
   }
 
   if (Array.isArray(items.anyOf)) {
@@ -140,8 +139,8 @@ function readMcpElicitationOptions(
       return [
         {
           label: value,
-          description: readString(optionRecord.title, '')
-        }
+          description: readString(optionRecord.title, ''),
+        },
       ]
     })
   }
@@ -149,7 +148,7 @@ function readMcpElicitationOptions(
   if (property.type === 'boolean') {
     return [
       { label: 'true', description: 'Yes' },
-      { label: 'false', description: 'No' }
+      { label: 'false', description: 'No' },
     ]
   }
 
@@ -158,7 +157,7 @@ function readMcpElicitationOptions(
 
 export function buildCodexMcpElicitationResponse(
   params: unknown,
-  answers: Record<string, string[]>
+  answers: Record<string, string[]>,
 ): unknown {
   const record = readRecord(params)
   if (record.mode === 'url') {
@@ -169,13 +168,13 @@ export function buildCodexMcpElicitationResponse(
   return {
     action: 'accept',
     content: buildCodexMcpElicitationContent(record, answers),
-    _meta: null
+    _meta: null,
   }
 }
 
 function buildCodexMcpElicitationContent(
   params: Record<string, unknown>,
-  answers: Record<string, string[]>
+  answers: Record<string, string[]>,
 ): Record<string, unknown> {
   const schema = readRecord(params.requestedSchema)
   const properties = readRecord(schema.properties)
@@ -185,7 +184,7 @@ function buildCodexMcpElicitationContent(
         return []
       }
       return [[key, readMcpElicitationAnswerValue(readRecord(properties[key]), value)]]
-    })
+    }),
   )
 }
 

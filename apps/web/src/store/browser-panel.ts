@@ -4,9 +4,9 @@
 // Depends on: Zustand persistence, browser IPC state snapshots
 
 import type { FileUIPart } from 'ai'
+import { z } from 'zod'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { z } from 'zod'
 
 import { persistStorage } from './persist-storage'
 

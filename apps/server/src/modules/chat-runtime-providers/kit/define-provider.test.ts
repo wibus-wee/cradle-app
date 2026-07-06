@@ -39,7 +39,7 @@ describe('defineChatRuntime', () => {
         providerStateSnapshot: JSON.stringify({ models: { currentModelId: null } }),
       }),
       resumeChatSession: async input => input.runtimeSession,
-      streamTurn: async function* () {},
+      async* streamTurn() {},
       cancelTurn: async () => undefined,
     })
 
@@ -62,7 +62,7 @@ describe('defineChatRuntime', () => {
         providerStateSnapshot: JSON.stringify({ models: { currentModelId: null } }),
       }),
       resumeChatSession: async input => input.runtimeSession,
-      streamTurn: async function* () {},
+      async* streamTurn() {},
       cancelTurn: async () => undefined,
     })
 
@@ -85,7 +85,7 @@ describe('defineChatRuntime', () => {
         providerStateSnapshot: JSON.stringify({ models: { currentModelId: null } }),
       }),
       resumeChatSession: async input => input.runtimeSession,
-      streamTurn: async function* () {},
+      async* streamTurn() {},
       cancelTurn: async () => undefined,
     })
   })

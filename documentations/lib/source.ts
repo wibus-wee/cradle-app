@@ -1,4 +1,3 @@
-import { docs } from 'collections/server'
 import {
   BracesLine,
   ChipLine,
@@ -20,6 +19,7 @@ import {
   Settings2Line,
   TerminalLine,
 } from '@mingcute/react'
+import { docs } from 'collections/server'
 import { loader } from 'fumadocs-core/source'
 import { createElement } from 'react'
 

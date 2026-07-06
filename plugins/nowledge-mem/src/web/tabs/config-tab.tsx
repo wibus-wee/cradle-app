@@ -14,8 +14,8 @@ import {
   ServerLine as ServerIcon,
   SparklesLine as SparklesIcon,
 } from '@mingcute/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Badge } from '~/components/ui/badge'
@@ -314,7 +314,9 @@ export function ConfigTab({ ctx }: ConfigTabProps) {
           <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen} className="mt-4">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="text-muted-foreground">
-                {advancedOpen ? 'Hide' : 'Show'} advanced
+                {advancedOpen ? 'Hide' : 'Show'}
+{' '}
+advanced
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 flex flex-col gap-2">

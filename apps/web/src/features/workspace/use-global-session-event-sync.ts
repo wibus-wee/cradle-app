@@ -1,5 +1,5 @@
-import type { QueryClient } from '@tanstack/react-query'
 import type { ChatGlobalSessionTailEvent, ChatSessionTailEventType } from '@cradle/chat-runtime-contracts'
+import type { QueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 
 import {

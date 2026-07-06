@@ -21,7 +21,7 @@ function serializeRuntimeError(err: unknown): Record<string, unknown> {
     return {
       name: err.name,
       message: err.message,
-      stack: err.stack
+      stack: err.stack,
     }
   }
   return { value: String(err) }
@@ -30,12 +30,13 @@ function serializeRuntimeError(err: unknown): Record<string, unknown> {
 async function recordFatalError(
   message: string,
   err: unknown,
-  code: CreateEventInput['code'] = OBSERVABILITY_CODES.serverBootstrapFatal
+  code: CreateEventInput['code'] = OBSERVABILITY_CODES.serverBootstrapFatal,
 ): Promise<void> {
   const logger = getLogger()
   if (err instanceof Error) {
     logger.error(message, { err })
-  } else {
+  }
+ else {
     logger.error(message, { reason: err })
   }
   try {
@@ -47,11 +48,12 @@ async function recordFatalError(
       message,
       attrs: {
         error: serializeRuntimeError(err),
-        pid: process.pid
-      }
+        pid: process.pid,
+      },
     })
     await flushEvents()
-  } catch (observabilityError) {
+  }
+ catch (observabilityError) {
     logger.error('failed to persist fatal observability event', { err: observabilityError })
   }
   flushLogger()
@@ -68,7 +70,8 @@ async function stopActiveRuntimeBeforeExit(): Promise<void> {
       return
     }
     await activeRuntimeApp?.stop()
-  } catch (err) {
+  }
+ catch (err) {
     getLogger().error('failed to stop runtime during fatal shutdown', { err })
   }
 }
@@ -78,7 +81,7 @@ function installProcessFatalHandlers(): void {
     void recordFatalError(
       'unhandled promise rejection',
       reason,
-      OBSERVABILITY_CODES.serverUnhandledRejection
+      OBSERVABILITY_CODES.serverUnhandledRejection,
     ).finally(async () => {
       await stopActiveRuntimeBeforeExit()
       await shutdownTelemetry()
@@ -91,7 +94,7 @@ function installProcessFatalHandlers(): void {
     void recordFatalError(
       'uncaught exception',
       err,
-      OBSERVABILITY_CODES.serverUncaughtException
+      OBSERVABILITY_CODES.serverUncaughtException,
     ).finally(async () => {
       await stopActiveRuntimeBeforeExit()
       await shutdownTelemetry()
@@ -114,12 +117,12 @@ async function bootstrap() {
     { createServerApp },
     { loadServerConfig },
     { warmupModelsDevCache },
-    { recoverPersistedRunProjections }
+    { recoverPersistedRunProjections },
   ] = await Promise.all([
     import('./app'),
     import('./config/server-config'),
     import('./modules/model-registry/model-info-registry'),
-    import('./modules/chat-runtime/runtime')
+    import('./modules/chat-runtime/runtime'),
   ])
 
   const config = loadServerConfig()
@@ -132,7 +135,7 @@ async function bootstrap() {
   app.listen(
     {
       port: config.port,
-      hostname: config.host
+      hostname: config.host,
     },
     (server) => {
       runtimeServer = server
@@ -140,7 +143,7 @@ async function bootstrap() {
       void recoverPersistedRunProjections().catch((error) => {
         logger.warn('failed to recover persisted run projections', { error })
       })
-    }
+    },
   )
 
   // Pre-warm models.dev cache so first model list request is fast
@@ -159,20 +162,23 @@ async function bootstrap() {
       signal,
       pid: process.pid,
       ppid: process.ppid,
-      desktopPid: process.env.CRADLE_DESKTOP_PID ?? null
+      desktopPid: process.env.CRADLE_DESKTOP_PID ?? null,
     })
     try {
       if (runtimeServer) {
         await runtimeServer.stop()
-      } else {
+      }
+ else {
         await app.stop()
       }
       activeRuntimeServer = null
       activeRuntimeApp = null
       logger.info('graceful shutdown complete')
-    } catch (err) {
+    }
+ catch (err) {
       logger.error('error during graceful shutdown', { err })
-    } finally {
+    }
+ finally {
       await shutdownTelemetry()
       flushLogger()
       process.exit(0)

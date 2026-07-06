@@ -14,10 +14,11 @@
  * Data is loaded at runtime from /changelog/index.json + individual .md files.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { marked } from 'marked'
 import { motion } from 'motion/react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { StarBorders } from './blueprint-annotations'
 import { MeshGradient } from './mesh-gradient'
 
@@ -48,9 +49,9 @@ function resolveLocale(): string {
 
 /* ─── Frontmatter parser ──────────────────────────────────────── */
 
-function parseFrontmatter(content: string): { meta: Record<string, string>; body: string } {
+function parseFrontmatter(content: string): { meta: Record<string, string>, body: string } {
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(content)
-  if (!match) return { meta: {}, body: content }
+  if (!match) { return { meta: {}, body: content } }
   const meta: Record<string, string> = {}
   for (const line of match[1].split('\n')) {
     const idx = line.indexOf(':')
@@ -73,7 +74,7 @@ function useChangelogData() {
     async function load() {
       try {
         const indexRes = await fetch('/changelog/index.json')
-        if (!indexRes.ok) throw new Error('Failed to fetch changelog index')
+        if (!indexRes.ok) { throw new Error('Failed to fetch changelog index') }
         const index: ChangelogIndexEntry[] = await indexRes.json()
 
         const locale = resolveLocale()
@@ -84,13 +85,13 @@ function useChangelogData() {
               ? locale
               : entry.languages.includes('zh') ? 'zh' : entry.languages[0]
             const res = await fetch(`/changelog/${entry.version}.${lang}.md`)
-            if (!res.ok) throw new Error(`Failed to fetch ${entry.version}.${lang}.md`)
+            if (!res.ok) { throw new Error(`Failed to fetch ${entry.version}.${lang}.md`) }
             const raw = await res.text()
             const { body } = parseFrontmatter(raw)
             return {
               version: entry.version,
               date: entry.date,
-              title: entry.title[locale] || entry.title['zh'] || entry.title['en'] || Object.values(entry.title)[0] || '',
+              title: entry.title[locale] || entry.title.zh || entry.title.en || Object.values(entry.title)[0] || '',
               body,
               featured: i === 0,
             }
@@ -104,7 +105,7 @@ function useChangelogData() {
       }
       catch (err) {
         console.error('Failed to load changelog:', err)
-        if (!cancelled) setLoading(false)
+        if (!cancelled) { setLoading(false) }
       }
     }
 
@@ -118,7 +119,7 @@ function useChangelogData() {
 /* ─── Date formatter ───────────────────────────────────────────── */
 
 function formatDate(iso: string) {
-  const d = new Date(iso + 'T00:00:00Z')
+  const d = new Date(`${iso}T00:00:00Z`)
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -129,7 +130,7 @@ function formatDate(iso: string) {
 
 /* ─── Markdown body ────────────────────────────────────────────── */
 
-function MarkdownBody({ body, featured }: { body: string; featured?: boolean }) {
+function MarkdownBody({ body, featured }: { body: string, featured?: boolean }) {
   const html = useMemo(() => marked.parse(body) as string, [body])
   return (
     <div
@@ -203,7 +204,8 @@ function ReleaseCard({ release }: { release: Release }) {
             letterSpacing: '-0.02em',
           }}
         >
-          v{release.version}
+          v
+{release.version}
         </span>
         <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-strong)' }} />
         <time
@@ -278,7 +280,7 @@ function VersionRail({
           aria-hidden
           style={{ position: 'absolute', left: 7, top: 6, bottom: 6, width: 1, background: 'var(--border)' }}
         />
-        {releases.map(r => {
+        {releases.map((r) => {
           const isActive = r.version === active
           return (
             <li key={r.version} style={{ position: 'relative' }}>
@@ -320,7 +322,8 @@ function VersionRail({
                     transition: 'color 0.2s',
                   }}
                 >
-                  v{r.version}
+                  v
+{r.version}
                 </span>
                 {isActive && (
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto', paddingRight: 4 }}>
@@ -382,7 +385,7 @@ export function ChangelogPage({ onBack }: { onBack: () => void }) {
   }, [releases, active])
 
   useEffect(() => {
-    if (releases.length === 0) return
+    if (releases.length === 0) { return }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -393,7 +396,7 @@ export function ChangelogPage({ onBack }: { onBack: () => void }) {
           setActive(visible[0].target.id.replace('release-', ''))
         }
       },
-      { rootMargin: '-20% 0px -65% 0px', threshold: 0 }
+      { rootMargin: '-20% 0px -65% 0px', threshold: 0 },
     )
     for (const r of releases) {
       const el = document.getElementById(`release-${r.version}`)
@@ -406,15 +409,15 @@ export function ChangelogPage({ onBack }: { onBack: () => void }) {
   }, [releases])
 
   useEffect(() => {
-    if (releases.length === 0) return
+    if (releases.length === 0) { return }
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') { return }
       const idx = releases.findIndex(r => r.version === active)
-      if (idx === -1) return
+      if (idx === -1) { return }
       const next = e.key === 'ArrowDown' ? Math.min(idx + 1, releases.length - 1) : Math.max(idx - 1, 0)
       const target = releases[next]
-      if (target.version === active) return
+      if (target.version === active) { return }
       e.preventDefault()
       railRefs.current.get(target.version)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       setActive(target.version)
@@ -581,11 +584,11 @@ export function ChangelogPage({ onBack }: { onBack: () => void }) {
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => {
+                onMouseEnter={(e) => {
                   e.currentTarget.style.color = 'var(--text)'
                   e.currentTarget.style.borderColor = 'var(--border-strong)'
                 }}
-                onMouseLeave={e => {
+                onMouseLeave={(e) => {
                   e.currentTarget.style.color = 'var(--text-secondary)'
                   e.currentTarget.style.borderColor = 'var(--border)'
                 }}

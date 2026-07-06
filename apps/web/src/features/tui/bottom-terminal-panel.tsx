@@ -1,7 +1,7 @@
 import {
+  CloseLine as XIcon,
   PlusLine as PlusIcon,
   TerminalBoxLine as SquareTerminalIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
 import { useEffect, useState } from 'react'
 

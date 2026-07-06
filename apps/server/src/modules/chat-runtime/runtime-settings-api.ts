@@ -4,6 +4,15 @@ import { eq } from 'drizzle-orm'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
+import { normalizeClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
+import { runRegistry } from './run-registry'
+import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
+import type {
+  ChatRuntimeSettings,
+  ChatRuntimeSettingsPatch,
+} from './runtime-provider-types'
+import { assertStoredSession, getSessionRunContext } from './runtime-session-context'
+import type { SessionClaudeAgentConfig, SessionClaudeAgentConfigPatchInput } from './runtime-settings'
 import {
   areRuntimeSettingsEqual,
   mergeRuntimeSettings,
@@ -11,17 +20,7 @@ import {
   readSessionClaudeAgentConfig,
   readSessionRuntimeSettings,
   writeSessionRuntimeConfigJson,
-  type SessionClaudeAgentConfig,
-  type SessionClaudeAgentConfigPatchInput,
 } from './runtime-settings'
-import { assertStoredSession, getSessionRunContext } from './runtime-session-context'
-import { runRegistry } from './run-registry'
-import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
-import { normalizeClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
-import type {
-  ChatRuntimeSettings,
-  ChatRuntimeSettingsPatch
-} from './runtime-provider-types'
 
 const settingsLogger = createChildLogger({ module: 'chat-runtime.runtime-settings' })
 
@@ -37,7 +36,7 @@ export type ChatRuntimeSettingsUpdatePatch = ChatRuntimeSettingsPatch & {
 }
 
 function hasOwn(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key)
+  return Object.hasOwn(value, key)
 }
 
 export function getSessionRuntimeSettings(sessionId: string): ChatRuntimeSettingsDto {
@@ -47,7 +46,7 @@ export function getSessionRuntimeSettings(sessionId: string): ChatRuntimeSetting
     sessionId,
     runtimeSettings,
     claudeAgent: readSessionClaudeAgentConfig(session.configJson),
-    applied: readRuntimeSettingsApplied(sessionId, runtimeSettings)
+    applied: readRuntimeSettingsApplied(sessionId, runtimeSettings),
   }
 }
 
@@ -63,7 +62,7 @@ export async function updateSessionRuntimeSettings(input: {
     : undefined
   const runtimeSettings = mergeRuntimeSettings(
     readSessionRuntimeSettings(session.configJson),
-    normalizeRuntimeSettingsPatch(input.patch)
+    normalizeRuntimeSettingsPatch(input.patch),
   )
   db()
     .update(sessions)
@@ -74,7 +73,7 @@ export async function updateSessionRuntimeSettings(input: {
         claudeAgent,
         updateClaudeAgent,
       }),
-      updatedAt: currentUnixSeconds()
+      updatedAt: currentUnixSeconds(),
     })
     .where(eq(sessions.id, input.sessionId))
     .run()
@@ -83,22 +82,22 @@ export async function updateSessionRuntimeSettings(input: {
   if (!runId) {
     const applied = await applyIdleSessionRuntimeSettings({
       sessionId: input.sessionId,
-      runtimeSettings
+      runtimeSettings,
     })
     return {
       sessionId: input.sessionId,
       runtimeSettings,
       claudeAgent: readSessionClaudeAgentConfig(assertStoredSession(input.sessionId).configJson),
-      applied
+      applied,
     }
   }
   const activeRun = runRegistry.getActiveRun(runId)
   let applied = readRuntimeSettingsApplied(input.sessionId, runtimeSettings)
   if (
-    !applied &&
-    activeRun?.runtime.capabilities.supportsRuntimeSettings &&
-    activeRun.runtime.updateRuntimeSettings &&
-    !activeRun.terminalStatus
+    !applied
+    && activeRun?.runtime.capabilities.supportsRuntimeSettings
+    && activeRun.runtime.updateRuntimeSettings
+    && !activeRun.terminalStatus
   ) {
     const context = getSessionRunContext(input.sessionId)
     if (context) {
@@ -106,16 +105,17 @@ export async function updateSessionRuntimeSettings(input: {
         await activeRun.runtime.updateRuntimeSettings({
           runtimeSession: activeRun.runtimeSession,
           profile: context.profile,
-          settings: runtimeSettings
+          settings: runtimeSettings,
         })
         activeRun.runtimeSettings = runtimeSettings
         applied = true
-      } catch (error) {
+      }
+ catch (error) {
         settingsLogger.warn('update runtime settings failed', {
           error,
           sessionId: input.sessionId,
           runId,
-          runtimeSettings
+          runtimeSettings,
         })
       }
     }
@@ -125,7 +125,7 @@ export async function updateSessionRuntimeSettings(input: {
     sessionId: input.sessionId,
     runtimeSettings,
     claudeAgent: readSessionClaudeAgentConfig(assertStoredSession(input.sessionId).configJson),
-    applied
+    applied,
   }
 }
 
@@ -145,11 +145,12 @@ async function applyIdleSessionRuntimeSettings(input: {
   try {
     await liveRuntimeSession.updateRuntimeSettings(input.runtimeSettings)
     return true
-  } catch (error) {
+  }
+ catch (error) {
     settingsLogger.warn('update idle runtime settings failed', {
       error,
       sessionId: input.sessionId,
-      runtimeSettings: input.runtimeSettings
+      runtimeSettings: input.runtimeSettings,
     })
     return false
   }
@@ -157,7 +158,7 @@ async function applyIdleSessionRuntimeSettings(input: {
 
 function readRuntimeSettingsApplied(
   sessionId: string,
-  runtimeSettings: ChatRuntimeSettings
+  runtimeSettings: ChatRuntimeSettings,
 ): boolean {
   if (runRegistry.hasPendingRun(sessionId)) {
     return false

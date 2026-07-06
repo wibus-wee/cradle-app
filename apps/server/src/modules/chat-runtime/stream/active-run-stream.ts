@@ -6,47 +6,49 @@ import { recordAssistantMessageSnapshot } from '../es/commands'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import {
   flushFinalMessageProjection,
-  projectFinalMessageChunk
+  projectFinalMessageChunk,
 } from '../run/final-message-projection'
-import { readRunWriteFence, type RunWriteFence } from '../run/run-write-fence'
+import type { RunWriteFence } from '../run/run-write-fence'
+import { readRunWriteFence } from '../run/run-write-fence'
+import { readChunkTraceToolCallId } from '../run/snapshot-events'
 import {
   mergeBufferedStreamChunk,
   mergeRuntimeDeltaChunk,
   readDeltaChunkTextLength,
   readReplayCoalesceKey,
-  readRunDeltaCoalesceKey
+  readRunDeltaCoalesceKey,
 } from '../run/stream-chunks'
-import { readChunkTraceToolCallId } from '../run/snapshot-events'
-import { runRegistry, type ActiveRun } from '../run-registry'
+import type { ActiveRun } from '../run-registry'
+import { runRegistry } from '../run-registry'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
 import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
 import {
   DEFAULT_RUN_DELTA_FLUSH_CHARS,
   DEFAULT_RUN_DELTA_FLUSH_MS,
   DEFAULT_RUN_REPLAY_CHUNKS,
-  DEFAULT_SNAPSHOT_INTERVAL_MS
+  DEFAULT_SNAPSHOT_INTERVAL_MS,
 } from './constants'
 import { runSubscribers } from './live-run-streams'
 
 export interface ActiveRunStreamControllerDeps {
-  releaseStaleActiveRun(activeRun: ActiveRun, fence: RunWriteFence): void
-  error(message: string, payload?: Record<string, unknown>): void
+  releaseStaleActiveRun: (activeRun: ActiveRun, fence: RunWriteFence) => void
+  error: (message: string, payload?: Record<string, unknown>) => void
 }
 
 export interface ActiveRunStreamController {
-  snapshotActiveRun(activeRun: ActiveRun): Promise<void>
-  startSnapshotTimer(activeRun: ActiveRun): void
-  stopSnapshotTimer(activeRun: ActiveRun): void
-  stopPendingRunDeltaFlush(activeRun: ActiveRun): void
-  flushAllActiveRunSnapshots(): Promise<void>
-  publishRuntimeChunk(activeRun: ActiveRun, chunk: UIMessageChunk): void
-  flushPendingRunDelta(activeRun: ActiveRun): void
-  publishUIMessageChunk(activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean): void
-  publishRunStartChunk(activeRun: ActiveRun): void
+  snapshotActiveRun: (activeRun: ActiveRun) => Promise<void>
+  startSnapshotTimer: (activeRun: ActiveRun) => void
+  stopSnapshotTimer: (activeRun: ActiveRun) => void
+  stopPendingRunDeltaFlush: (activeRun: ActiveRun) => void
+  flushAllActiveRunSnapshots: () => Promise<void>
+  publishRuntimeChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => void
+  flushPendingRunDelta: (activeRun: ActiveRun) => void
+  publishUIMessageChunk: (activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean) => void
+  publishRunStartChunk: (activeRun: ActiveRun) => void
 }
 
 export function createActiveRunStreamController(
-  deps: ActiveRunStreamControllerDeps
+  deps: ActiveRunStreamControllerDeps,
 ): ActiveRunStreamController {
   async function snapshotActiveRun(activeRun: ActiveRun): Promise<void> {
     if (activeRun.terminalStatus) {
@@ -55,12 +57,13 @@ export function createActiveRunStreamController(
     try {
       flushFinalMessageProjection(activeRun)
       await persistStreamingMessageSnapshot(activeRun)
-    } catch (error) {
+    }
+ catch (error) {
       deps.error('failed to snapshot active chat run', {
         error,
         sessionId: activeRun.sessionId,
         runId: activeRun.runId,
-        messageId: activeRun.messageId
+        messageId: activeRun.messageId,
       })
     }
   }
@@ -74,8 +77,8 @@ export function createActiveRunStreamController(
       const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage))
       const messageJson = JSON.stringify(message)
       if (
-        activeRun.lastStreamingSnapshotMessageJson === messageJson ||
-        activeRun.pendingStreamingSnapshotMessageJson === messageJson
+        activeRun.lastStreamingSnapshotMessageJson === messageJson
+        || activeRun.pendingStreamingSnapshotMessageJson === messageJson
       ) {
         return
       }
@@ -89,12 +92,13 @@ export function createActiveRunStreamController(
             id: activeRun.messageId,
             content: extractMessageText(message),
             messageJson,
-            updatedAt: currentUnixSeconds()
+            updatedAt: currentUnixSeconds(),
           },
-          messageJsonBytes: Buffer.byteLength(messageJson)
+          messageJsonBytes: Buffer.byteLength(messageJson),
         })
         activeRun.lastStreamingSnapshotMessageJson = messageJson
-      } catch (error) {
+      }
+ catch (error) {
         const latestFence = readRunWriteFence(activeRun.runId)
         if (latestFence.status !== 'streaming') {
           deps.releaseStaleActiveRun(activeRun, latestFence)
@@ -104,9 +108,10 @@ export function createActiveRunStreamController(
           error,
           sessionId: activeRun.sessionId,
           runId: activeRun.runId,
-          messageId: activeRun.messageId
+          messageId: activeRun.messageId,
         })
-      } finally {
+      }
+ finally {
         if (activeRun.pendingStreamingSnapshotMessageJson === messageJson) {
           activeRun.pendingStreamingSnapshotMessageJson = null
         }
@@ -144,7 +149,8 @@ export function createActiveRunStreamController(
     await Promise.all(runRegistry.listActiveRuns().map(async (activeRun) => {
       try {
         await snapshotActiveRun(activeRun)
-      } catch {
+      }
+ catch {
         // best-effort on shutdown
       }
     }))
@@ -166,8 +172,8 @@ export function createActiveRunStreamController(
     if (merged) {
       activeRun.pendingDeltaChunk = merged
       if (
-        readDeltaChunkTextLength(merged) >=
-        readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS', DEFAULT_RUN_DELTA_FLUSH_CHARS)
+        readDeltaChunkTextLength(merged)
+        >= readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS', DEFAULT_RUN_DELTA_FLUSH_CHARS)
       ) {
         flushPendingRunDelta(activeRun)
         return
@@ -194,7 +200,7 @@ export function createActiveRunStreamController(
         activeRun.pendingDeltaFlushTimer = null
         flushPendingRunDelta(activeRun)
       },
-      readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_MS', DEFAULT_RUN_DELTA_FLUSH_MS)
+      readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_MS', DEFAULT_RUN_DELTA_FLUSH_MS),
     )
   }
 
@@ -218,7 +224,7 @@ export function createActiveRunStreamController(
   function publishUIMessageChunk(
     activeRun: ActiveRun,
     chunk: UIMessageChunk,
-    terminal: boolean
+    terminal: boolean,
   ): void {
     if (chunk.type === 'start') {
       activeRun.startChunkPublished = true
@@ -236,8 +242,8 @@ export function createActiveRunStreamController(
         payload: {
           chunk,
           terminal,
-          subscriberCount: runSubscribers.size(activeRun.runId)
-        }
+          subscriberCount: runSubscribers.size(activeRun.runId),
+        },
       })
     }
 
@@ -302,12 +308,12 @@ export function createActiveRunStreamController(
     }
 
     const existingLogicalIndex = activeRun.chunkBufferIndexByKey.get(key)
-    const physicalIndex =
-      existingLogicalIndex === undefined
+    const physicalIndex
+      = existingLogicalIndex === undefined
         ? -1
         : logicalToPhysicalIndex(activeRun, existingLogicalIndex)
-    const existing =
-      physicalIndex >= 0 && physicalIndex < activeRun.chunkBuffer.length
+    const existing
+      = physicalIndex >= 0 && physicalIndex < activeRun.chunkBuffer.length
         ? activeRun.chunkBuffer[physicalIndex]
         : undefined
     if (existing === undefined) {
@@ -321,7 +327,7 @@ export function createActiveRunStreamController(
     const merged = mergeBufferedStreamChunk(
       existing,
       chunk,
-      readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS', DEFAULT_RUN_DELTA_FLUSH_CHARS)
+      readPositiveIntegerEnv('CRADLE_CHAT_RUN_DELTA_FLUSH_CHARS', DEFAULT_RUN_DELTA_FLUSH_CHARS),
     )
     if (!merged) {
       activeRun.chunkBufferIndexByKey.set(key, currentTailLogicalIndex(activeRun))
@@ -333,7 +339,8 @@ export function createActiveRunStreamController(
       reindexCoalesceKeysAfterRemoval(activeRun, physicalIndex)
       activeRun.chunkBufferIndexByKey.set(key, currentTailLogicalIndex(activeRun))
       activeRun.chunkBuffer.push(merged)
-    } else {
+    }
+ else {
       activeRun.chunkBuffer[physicalIndex] = merged
     }
     return true
@@ -366,6 +373,6 @@ export function createActiveRunStreamController(
     publishRuntimeChunk,
     flushPendingRunDelta,
     publishUIMessageChunk,
-    publishRunStartChunk
+    publishRunStartChunk,
   }
 }

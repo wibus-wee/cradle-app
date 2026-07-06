@@ -3,8 +3,8 @@ import { execFile } from 'node:child_process'
 import type { AccountInfo, Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
-import { readTrustedClaudeAgentConfig, resolveApiKey } from '../../provider-contracts/provider-base'
 import { resolveAnthropicWireAuth } from '../../provider-catalog/provider-endpoint-registry'
+import { readTrustedClaudeAgentConfig, resolveApiKey } from '../../provider-contracts/provider-base'
 import * as ProviderTargets from '../../provider-targets/service'
 import * as Secrets from '../../secrets/service'
 import { removeCradleOwnedClaudeConfigDirFromEnv } from './runtime-context'
@@ -630,7 +630,7 @@ function parseGenericCliVersion(output: string): string | null {
   if (!trimmed) {
     return null
   }
-  const match = /\b\d+(?:\.\d+){1,3}(?:[-+][0-9A-Za-z.-]+)?\b/.exec(trimmed)
+  const match = /\b\d+(?:\.\d+){1,3}(?:[-+][0-9A-Z.-]+)?\b/i.exec(trimmed)
   return match?.[0] ?? trimmed.split(/\s+/)[0] ?? null
 }
 

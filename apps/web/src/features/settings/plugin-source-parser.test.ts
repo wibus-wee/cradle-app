@@ -43,7 +43,7 @@ describe('parsePluginSourceInput', () => {
     })
   })
 
-  describe('GitHub URLs', () => {
+  describe('gitHub URLs', () => {
     it('parses a plain https URL with no tree', () => {
       expect(parsePluginSourceInput('https://github.com/owner/repo')).toEqual({
         kind: 'git',

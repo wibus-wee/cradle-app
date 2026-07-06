@@ -92,7 +92,12 @@ import {
   presetForProviderKind,
   PROVIDER_KIND_LABELS,
 } from './provider-settings-utils'
-import { RuntimeSettingsSchemaFields } from './runtime-settings-schema-fields'
+import type { EditableCustomModel } from './provider-target-model-settings'
+import {
+  CustomModelsJsonSchema,
+  updateProviderTargetCustomModels,
+  updateProviderTargetModelVisibility,
+} from './provider-target-model-settings'
 import type {
   RuntimeSettingsFieldDescriptor,
   RuntimeSettingsFormValue,
@@ -102,12 +107,7 @@ import {
   readRuntimeSettingsFormValues,
   writeRuntimeSettingsConfig,
 } from './runtime-settings-schema'
-import type { EditableCustomModel } from './provider-target-model-settings'
-import {
-  CustomModelsJsonSchema,
-  updateProviderTargetCustomModels,
-  updateProviderTargetModelVisibility,
-} from './provider-target-model-settings'
+import { RuntimeSettingsSchemaFields } from './runtime-settings-schema-fields'
 import type { ChatgptCredentialLoginStart } from './use-chatgpt-credential-login'
 import {
   openChatgptCredentialLoginUrl,

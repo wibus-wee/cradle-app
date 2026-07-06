@@ -4,11 +4,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { chatSelectors, useChatStore } from '~/store/chat'
 import { useRendererChatStore } from '~/store/renderer-chat'
 
-import { ChatStreamingHandler } from './chat-streaming-handler'
 import type { ChatStreamChunk } from './chat-stream-types'
 import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
-import { buildUIMessageChunkStreamFromResponse } from './sse-chat-transport'
-import { disposeChatRunBroadcast, onChatRunSettled } from './sse-chat-transport'
+import { ChatStreamingHandler } from './chat-streaming-handler'
+import { buildUIMessageChunkStreamFromResponse, disposeChatRunBroadcast, onChatRunSettled } from './sse-chat-transport'
 
 function resetChatStore(store: typeof useChatStore): void {
   store.setState(state => ({

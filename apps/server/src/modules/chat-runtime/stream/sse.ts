@@ -11,7 +11,7 @@ export interface BufferedChunkStreamInput {
   terminal?: boolean
   shouldCloseWithoutSubscriber?: boolean
   coalesceMaxChars: number
-  subscribe(subscriber: ChunkSubscriber): () => void
+  subscribe: (subscriber: ChunkSubscriber) => () => void
 }
 
 const encoder = new TextEncoder()
@@ -24,7 +24,7 @@ type ChunkStreamItem
 
 export function bindReadableStreamToAbortSignal<T>(
   stream: ReadableStream<T>,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): ReadableStream<T> {
   const reader = stream.getReader()
   let abortListener: (() => void) | null = null
@@ -85,7 +85,8 @@ export function bindReadableStreamToAbortSignal<T>(
           return
         }
         controller.enqueue(result.value)
-      } catch (error) {
+      }
+ catch (error) {
         if (closed) {
           return
         }
@@ -103,7 +104,7 @@ export function bindReadableStreamToAbortSignal<T>(
       detachAbortListener()
       await reader.cancel(reason).catch(() => undefined)
       releaseReader()
-    }
+    },
   })
 }
 
@@ -129,8 +130,8 @@ function encodeChunkStreamAsSse(stream: ReadableStream<ChunkStreamItem>): Readab
       },
       flush(controller) {
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-      }
-    })
+      },
+    }),
   )
 }
 
@@ -241,7 +242,7 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
       closed = true
       clearQueuedFlush()
       unsubscribe()
-    }
+    },
   })
 
   return encodeChunkStreamAsSse(chunkStream)
@@ -253,7 +254,7 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
  * shared SSE transform on stream close.
  */
 export function openDirectChunkStream(
-  chunks: AsyncIterable<UIMessageChunk>
+  chunks: AsyncIterable<UIMessageChunk>,
 ): ReadableStream<Uint8Array> {
   const chunkStream = new ReadableStream<ChunkStreamItem>({
     async start(controller) {
@@ -274,12 +275,14 @@ export function openDirectChunkStream(
         if (!terminalPublished) {
           publish({ type: 'finish', finishReason: 'stop' }, true)
         }
-      } catch (error) {
+      }
+ catch (error) {
         publish({ type: 'error', errorText: serializeChatError(error).text }, true)
-      } finally {
+      }
+ finally {
         controller.close()
       }
-    }
+    },
   })
   return encodeChunkStreamAsSse(chunkStream)
 }

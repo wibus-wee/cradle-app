@@ -10,13 +10,13 @@ import { shutdownInfra } from '../src/infra'
 import { setCodexChatgptCredentialLoginFetchForTests } from '../src/modules/chat-runtime-providers/codex/app-server/account-service'
 import { setCodexChatgptModelListClientFactoryForTests } from '../src/modules/chat-runtime-providers/codex/app-server/model-list'
 import { readSecret, saveSecret } from '../src/modules/secrets/service'
-import { registerPluginSkill, resetPluginSkillRegistry } from '../src/plugins/skill-registry'
 import {
   createClaudeGlobalNativeSkillProjectionTarget,
   createCodexGlobalNativeSkillProjectionTarget,
   projectNativeSkill,
   resetNativeSkillProjectionTargets,
 } from '../src/modules/skills/native-skill-projection'
+import { registerPluginSkill, resetPluginSkillRegistry } from '../src/plugins/skill-registry'
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))

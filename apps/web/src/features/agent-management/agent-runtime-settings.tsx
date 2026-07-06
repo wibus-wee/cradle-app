@@ -1,19 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  DownSmallLine as ChevronDownIcon,
-  RightSmallLine as ChevronRightIcon,
+  CheckboxLine as SquareCheckIcon,
+  CloseLine as XIcon,
+  DeleteLine as Trash2Icon,
   DownloadLine as DownloadIcon,
+  DownSmallLine as ChevronDownIcon,
   PlusLine as PlusIcon,
   Refresh1Line as RefreshCwIcon,
+  RightSmallLine as ChevronRightIcon,
   SearchLine as SearchIcon,
   ServerLine as ServerIcon,
   SparklesLine as SparklesIcon,
-  CheckboxLine as SquareCheckIcon,
   SquareLine as SquareIcon,
-  DeleteLine as Trash2Icon,
-  CloseLine as XIcon
 } from '@mingcute/react'
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useDeferredValue, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -57,12 +57,12 @@ import { AGENTS_QUERY_KEY } from '~/features/agent-runtime/use-agents'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { cn } from '~/lib/cn'
 
+import { SettingsMasterDetail } from '../settings/settings-container'
 import { DraftSetupPanel } from './draft-setup-panel'
 import { ExternalProviderRecordDetailPanel } from './external-provider-record-detail-panel'
 import { ImportProviderDialog } from './import-provider-dialog'
 import { ProfileDetailPanel } from './profile-detail-panel'
 import { collectProviderListGroups } from './provider-list-groups'
-import { SettingsMasterDetail } from '../settings/settings-container'
 import type {
   DraftProvider,
   ExternalProviderRecordView,
@@ -787,8 +787,8 @@ export function AgentRuntimeSettings() {
                   </p>
                 </div>
               )}
-            </div>
-          </ScrollArea>
+        </div>
+      </ScrollArea>
 
       {profiles.length > 0 && (
         <div className="px-3 pb-3 pt-1 text-[10.5px] tabular-nums text-muted-foreground/60">
