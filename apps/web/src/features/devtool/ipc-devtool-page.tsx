@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { Kbd, KbdGroup } from '~/components/ui/kbd'
+import { isUiRuntimeKindEnabled } from '~/features/agent-runtime/ui-availability'
 import { cn } from '~/lib/cn'
 
 import { AcpEventDetail } from './acp/acp-event-detail'
@@ -23,7 +24,9 @@ import { SurfacesPanel } from './surfaces/surfaces-panel'
 
 type DevtoolTab = 'ipc' | 'acp' | 'observability' | 'health' | 'memory' | 'surfaces' | 'plugins'
 
-const DEVTOOL_TABS: { id: DevtoolTab, label: string, description: string }[] = [
+const ACP_DEVTOOL_ENABLED = isUiRuntimeKindEnabled('acp-chat')
+
+const ALL_DEVTOOL_TABS: { id: DevtoolTab, label: string, description: string }[] = [
   {
     id: 'ipc',
     label: 'IPC',
@@ -44,6 +47,8 @@ const DEVTOOL_TABS: { id: DevtoolTab, label: string, description: string }[] = [
   { id: 'surfaces', label: 'Surfaces', description: 'Router surface state and route ownership' },
   { id: 'plugins', label: 'Plugins', description: 'Plugin runtime graph and registrations' },
 ]
+
+const DEVTOOL_TABS = ALL_DEVTOOL_TABS.filter(tab => ACP_DEVTOOL_ENABLED || tab.id !== 'acp')
 
 function isDevtoolTabShortcut(event: KeyboardEvent): boolean {
   return (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && !event.repeat
@@ -70,11 +75,13 @@ export function DevtoolPage() {
   useEffect(() => {
     void loadObservability()
     void initializeIpc()
-    void initializeAcp()
+    if (ACP_DEVTOOL_ENABLED) {
+      void initializeAcp()
+    }
   }, [loadObservability, initializeIpc, initializeAcp])
 
   useIpcKeyboard(tab === 'ipc')
-  useAcpKeyboard(tab === 'acp')
+  useAcpKeyboard(ACP_DEVTOOL_ENABLED && tab === 'acp')
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -132,10 +139,10 @@ export function DevtoolPage() {
 
         <KbdGroup className="hidden shrink-0 font-mono text-[10px] text-muted-foreground md:inline-flex">
           <Kbd>Cmd</Kbd>
-          <Kbd>1-7</Kbd>
+          <Kbd>{`1-${DEVTOOL_TABS.length}`}</Kbd>
           <span>or</span>
           <Kbd>Ctrl</Kbd>
-          <Kbd>1-7</Kbd>
+          <Kbd>{`1-${DEVTOOL_TABS.length}`}</Kbd>
         </KbdGroup>
       </div>
 
@@ -153,7 +160,7 @@ export function DevtoolPage() {
         </div>
       )}
 
-      {tab === 'acp' && (
+      {ACP_DEVTOOL_ENABLED && tab === 'acp' && (
         <div className="flex flex-1 flex-col overflow-hidden">
           <AcpFilterBar />
           <div className="flex flex-1 overflow-hidden">

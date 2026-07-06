@@ -1,19 +1,45 @@
 {
   "name": "@cradle/plugin-sdk",
   "type": "module",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
   "exports": {
-    ".": "./src/index.ts",
-    "./server": "./src/server.ts",
-    "./web": "./src/web.ts",
-    "./desktop": "./src/desktop.ts",
-    "./permissions": "./src/permissions.ts",
-    "./manifest": "./src/manifest.ts",
-    "./vite-plugin-import-map": "./src/vite-plugin-import-map.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "default": "./dist/web.js"
+    },
+    "./desktop": {
+      "types": "./dist/desktop.d.ts",
+      "default": "./dist/desktop.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions.d.ts",
+      "default": "./dist/permissions.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest.d.ts",
+      "default": "./dist/manifest.js"
+    },
+    "./vite-plugin-import-map": {
+      "types": "./dist/vite-plugin-import-map.d.ts",
+      "default": "./dist/vite-plugin-import-map.js"
+    }
   },
-  "files": ["src"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {

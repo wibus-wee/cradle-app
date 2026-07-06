@@ -292,7 +292,6 @@ export async function createRun(
         lastRequestMessage?.role === 'assistant'
           ? lastRequestMessage
           : createAssistantMessage(draft.assistantMessageId),
-      assistantMessageProjection: lastRequestMessage?.role === 'assistant' ? 'update' : 'insert',
       queueItemId: input.queueItemId ?? null
     })
     const activeRun: ActiveRun = {
@@ -317,6 +316,8 @@ export async function createRun(
       finalProjection: createFinalMessageProjectionState(),
       firstTokenDeltaSnapshotRecorded: false,
       firstTextDeltaSnapshotRecorded: false,
+      lastStreamingSnapshotMessageJson: null,
+      pendingStreamingSnapshotMessageJson: null,
       queueItemId: input.queueItemId,
       runtimeSettings,
       internalContinuation: input.internalContinuation,

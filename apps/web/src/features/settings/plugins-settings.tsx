@@ -1,6 +1,8 @@
 import {
+  DeleteLine as TrashIcon,
   GridLine as GridIcon,
   MonitorLine as MonitorIcon,
+  PlusLine as PlusIcon,
   PuzzledLine as PuzzleIcon,
   Refresh2Line as RefreshIcon,
   SearchLine as SearchIcon,
@@ -11,7 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getPlugins, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
+import { deletePluginsSourcesById, getPlugins, getPluginsSources, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
+import type { GetPluginsSourcesResponse } from '~/api-gen/types.gen'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
@@ -19,6 +22,7 @@ import { toastManager } from '~/components/ui/toast'
 import { cn } from '~/lib/cn'
 import { getServerUrl } from '~/lib/electron'
 
+import { AddPluginDialog } from './plugins-add-dialog'
 import { SettingsPage } from './settings-container'
 
 type PluginListEntry = {
@@ -50,6 +54,8 @@ type PluginListEntry = {
 }
 
 type Filter = 'all' | 'enabled' | 'disabled'
+type PluginSourceKind = 'localPath' | 'git' | 'npm'
+type PluginSourceEntry = GetPluginsSourcesResponse[number]
 
 type SettingsKey = keyof typeof import('~/locales/default').default.settings
 
@@ -59,12 +65,27 @@ const SOURCE_LABELS: Record<PluginListEntry['source']['kind'], SettingsKey> = {
   externalLocal: 'plugins.source.external' as SettingsKey,
 }
 
+const SOURCE_KIND_LABELS: Record<PluginSourceKind, SettingsKey> = {
+  localPath: 'plugins.sources.kind.localPath' as SettingsKey,
+  git: 'plugins.sources.kind.git' as SettingsKey,
+  npm: 'plugins.sources.kind.npm' as SettingsKey,
+}
+
+function unsyncDesktopPlugins(source: PluginSourceEntry): void {
+  for (const plugin of source.plugins) {
+    if (plugin.hasDesktop) {
+      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(() => undefined)
+    }
+  }
+}
+
 export function PluginsSettings() {
   const { t } = useTranslation('settings')
   const queryClient = useQueryClient()
 
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
 
   const pluginsQuery = useQuery({
     queryKey: ['plugins', 'list'],
@@ -74,6 +95,38 @@ export function PluginsSettings() {
         throw new Error(String(error))
       }
       return (data ?? []) as PluginListEntry[]
+    },
+  })
+
+  const sourcesQuery = useQuery({
+    queryKey: ['plugins', 'sources'],
+    queryFn: async () => {
+      const { data, error } = await getPluginsSources()
+      if (error) {
+        throw new Error(String(error))
+      }
+      return (data ?? []) as GetPluginsSourcesResponse
+    },
+  })
+
+  const removeSourceMutation = useMutation({
+    mutationFn: async (source: PluginSourceEntry) => {
+      const { error } = await deletePluginsSourcesById({ path: { id: source.id } })
+      if (error) {
+        throw new Error(String(error))
+      }
+      return source
+    },
+    onSuccess: (source) => {
+      unsyncDesktopPlugins(source)
+      toastManager.add({ type: 'success', title: t('plugins.sources.toast.removed') })
+    },
+    onError: () => {
+      toastManager.add({ type: 'error', title: t('plugins.sources.toast.removeFailed') })
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['plugins', 'list'] })
+      void queryClient.invalidateQueries({ queryKey: ['plugins', 'sources'] })
     },
   })
 
@@ -118,6 +171,7 @@ export function PluginsSettings() {
   })
 
   const plugins = useMemo(() => pluginsQuery.data ?? [], [pluginsQuery.data])
+  const sources = useMemo(() => sourcesQuery.data ?? [], [sourcesQuery.data])
   const loading = pluginsQuery.isLoading
 
   const enabledCount = useMemo(() => plugins.filter(p => p.activation.enabled).length, [plugins])
@@ -144,6 +198,7 @@ export function PluginsSettings() {
   }, [plugins, filter, query])
 
   return (
+    <>
     <SettingsPage
       title={t('plugins.page.title')}
       description={t('plugins.page.description')}
@@ -162,6 +217,48 @@ export function PluginsSettings() {
           : undefined
       }
     >
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[13px] font-medium text-foreground">{t('plugins.sources.title')}</h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{t('plugins.sources.description')}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => setAddDialogOpen(true)}
+              className="h-8 gap-1.5"
+            >
+              <PlusIcon className="size-3.5" aria-hidden="true" />
+              {t('plugins.add.button')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void sourcesQuery.refetch()}
+              disabled={sourcesQuery.isFetching}
+              className="h-8 gap-1.5"
+            >
+              <RefreshIcon className={cn('size-3.5', sourcesQuery.isFetching && 'animate-spin')} aria-hidden="true" />
+              {t('plugins.action.refresh')}
+            </Button>
+          </div>
+        </div>
+
+        {sources.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {sources.map(source => (
+              <PluginSourceCard
+                key={source.id}
+                source={source}
+                removing={removeSourceMutation.isPending && removeSourceMutation.variables?.id === source.id}
+                onRemove={() => removeSourceMutation.mutate(source)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Filter bar */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
@@ -248,7 +345,70 @@ export function PluginsSettings() {
                     ))}
                   </ul>
                 )}
-    </SettingsPage>
+      </SettingsPage>
+
+      <AddPluginDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+    </>
+  )
+}
+
+function PluginSourceCard({
+  source,
+  removing,
+  onRemove,
+}: {
+  source: PluginSourceEntry
+  removing: boolean
+  onRemove: () => void
+}) {
+  const { t } = useTranslation('settings')
+  const title = source.label || source.location
+  const pluginCount = source.plugins.length
+
+  return (
+    <li className="rounded-xl border border-border/60 bg-card px-3.5 py-3">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-foreground">{title}</span>
+            <span className="shrink-0 rounded-md bg-fill px-1.5 py-px text-[10.5px] text-muted-foreground">
+              {t(SOURCE_KIND_LABELS[source.kind])}
+            </span>
+            {source.error && (
+              <span className="text-[10.5px] text-destructive">{t('plugins.sources.status.error')}</span>
+            )}
+          </div>
+          <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground/80" title={source.location}>
+            {source.location}
+          </p>
+          {source.resolvedDirectory && (
+            <p className="mt-1 truncate font-mono text-[10.5px] text-muted-foreground/60" title={source.resolvedDirectory}>
+              {source.resolvedDirectory}
+            </p>
+          )}
+          {source.error && (
+            <p className="mt-1 line-clamp-2 text-[11px] text-destructive/80" title={source.error}>
+              {source.error}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {t('plugins.sources.pluginsCount', { count: pluginCount })}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={removing}
+            onClick={onRemove}
+            aria-label={t('plugins.sources.removeAria', { name: title })}
+            className="size-8"
+          >
+            <TrashIcon className="size-3.5" aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+    </li>
   )
 }
 

@@ -102,6 +102,8 @@ class TestDiffReviewGuideRuntime implements ChatRuntime {
   readonly capabilities = TEST_DIFF_REVIEW_RUNTIME_CAPABILITIES
   readonly streamInputs: StreamTurnInput[] = []
   responseText = '{"steps":[]}'
+  blockNextRun = false
+  private releaseBlockedRun: (() => void) | null = null
 
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
     return {
@@ -121,12 +123,25 @@ class TestDiffReviewGuideRuntime implements ChatRuntime {
   async* streamTurn(input: StreamTurnInput): AsyncGenerator<UIMessageChunk, void, void> {
     this.streamInputs.push(input)
     yield { type: 'text-start', id: 'diff-review-guide' }
+    if (this.blockNextRun) {
+      this.blockNextRun = false
+      await new Promise<void>((resolve) => {
+        this.releaseBlockedRun = resolve
+      })
+    }
     yield { type: 'text-delta', id: 'diff-review-guide', delta: this.responseText }
     yield { type: 'text-end', id: 'diff-review-guide' }
     yield { type: 'finish', finishReason: 'stop' }
   }
 
-  async cancelTurn(): Promise<void> {}
+  releaseRun(): void {
+    this.releaseBlockedRun?.()
+    this.releaseBlockedRun = null
+  }
+
+  async cancelTurn(): Promise<void> {
+    this.releaseRun()
+  }
 }
 
 interface DiffReviewResponse {
@@ -870,6 +885,108 @@ describe('diff-review capability', () => {
       expect(reloaded.guide).toEqual(completed.guide)
     }
     finally {
+      unregisterRuntime(DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND, 'diff-review-test')
+      restoreTestInfra(previousEnv)
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps change walkthrough generation alive when the local worktree changes during the run', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-diff-review-workspace-')
+    const previousEnv = useIsolatedTestInfra(dataDir)
+    const runtime = new TestDiffReviewGuideRuntime()
+
+    try {
+      registerRuntime(runtime, undefined, 'diff-review-test')
+      initGitRepository(workspaceRoot)
+      commitFile(workspaceRoot, 'README.md', '# Diff Review Fixture', 'repo: initial commit')
+      writeFileSync(join(workspaceRoot, 'README.md'), '# Diff Review Fixture\nneeds review guide\n', 'utf8')
+
+      const app = await createServerApp()
+      db()
+        .insert(workspaces)
+        .values(localWorkspaceRow({
+          id: 'workspace-diff-review-guide-source-changed',
+          name: 'Workspace Diff Review Guide Source Changed',
+          path: workspaceRoot,
+        }))
+        .run()
+      db().insert(providerTargets).values({
+        id: 'provider-target-diff-review-guide-source-changed',
+        kind: 'manual',
+        providerKind: 'openai-compatible',
+        displayName: 'Diff Review Guide Source Changed Provider',
+        enabled: true,
+      }).run()
+
+      const review = await refreshLocalReview(app, 'workspace-diff-review-guide-source-changed')
+      const readme = review.files.find(item => item.path === 'README.md')
+      expect(readme).toBeTruthy()
+      runtime.blockNextRun = true
+      runtime.responseText = [
+        'I inspected the working tree.',
+        '<cradle_guide>',
+        JSON.stringify({
+          steps: [
+            {
+              title: 'Review stored README change',
+              rationale: 'Use the stored review revision even if the live worktree changes later.',
+              ranges: [{ path: 'README.md', side: 'head', startLine: 2, endLine: 2 }],
+            },
+          ],
+        }),
+        '</cradle_guide>',
+      ].join('\n')
+
+      const generated = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-guide-source-changed/diff-reviews/${review.id}/guide/generate`,
+        {
+          providerTargetId: 'provider-target-diff-review-guide-source-changed',
+          runtimeKind: DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND,
+        },
+      )
+
+      expect(generated.guide).toMatchObject({
+        revisionId: review.currentRevisionId,
+        status: 'running',
+      })
+
+      writeFileSync(join(workspaceRoot, 'README.md'), '# Diff Review Fixture\nchanged while running\n', 'utf8')
+      writeFileSync(join(workspaceRoot, 'later.ts'), 'export const later = true\n', 'utf8')
+      runtime.releaseRun()
+
+      const completed = await waitForCondition(async () => {
+        const reloaded = await getJson<DiffReviewResponse>(
+          app,
+          `/workspaces/workspace-diff-review-guide-source-changed/diff-reviews/${review.id}`,
+        )
+        return reloaded.guide.status === 'ready' ? reloaded : null
+      }, 'change walkthrough generation after source change')
+
+      expect(completed.currentRevisionId).toBe(review.currentRevisionId)
+      expect(completed.guide).toMatchObject({
+        revisionId: review.currentRevisionId,
+        status: 'ready',
+        errorMessage: null,
+        steps: [
+          {
+            title: 'Review stored README change',
+            fileIds: [readme!.id],
+            anchors: [expect.objectContaining({
+              fileId: readme!.id,
+              path: 'README.md',
+              startLine: 2,
+              endLine: 2,
+            })],
+          },
+        ],
+      })
+    }
+    finally {
+      runtime.releaseRun()
       unregisterRuntime(DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND, 'diff-review-test')
       restoreTestInfra(previousEnv)
       rmSync(dataDir, { recursive: true, force: true })

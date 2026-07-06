@@ -27,9 +27,12 @@ export interface GlobalSessionSyncEngineOptions {
 
 const SESSION_SUMMARY_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'UserMessageAppended',
+  'MessageImported',
+  'AssistantMessageSnapshotted',
   'RunStarted',
   'InteractionRequested',
   'InteractionResolved',
+  'PlanImplementationResponded',
   'RunCompleted',
   'RunFailed',
   'RunAborted',
@@ -39,6 +42,7 @@ const SESSION_SUMMARY_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'QueueItemFailed',
   'QueueItemReordered',
   'QueueItemUpdated',
+  'QueueItemProviderTargetCleared',
   'QueueItemCancelled',
   'SteerApplied',
   'LastTurnRolledBack',

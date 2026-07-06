@@ -132,10 +132,48 @@ const updatePluginActivationBody = t.Object({
   reason: t.Optional(t.Union([t.String(), t.Null()])),
 }, { additionalProperties: false })
 
+const pluginSourceRegistryKind = t.Union([
+  t.Literal('localPath'),
+  t.Literal('git'),
+  t.Literal('npm'),
+])
+
+const pluginSourceRegistryEntry = t.Object({
+  id: t.String({ minLength: 1 }),
+  kind: pluginSourceRegistryKind,
+  location: t.String({ minLength: 1 }),
+  ref: t.Union([t.String(), t.Null()]),
+  subPath: t.Union([t.String(), t.Null()]),
+  label: t.Union([t.String(), t.Null()]),
+  addedReason: t.String(),
+  createdAt: t.Number(),
+  updatedAt: t.Number(),
+  resolvedDirectory: t.Union([t.String(), t.Null()]),
+  error: t.Union([t.String(), t.Null()]),
+  plugins: t.Array(pluginDescriptor),
+}, { additionalProperties: false })
+
+const addPluginSourceBody = t.Object({
+  kind: pluginSourceRegistryKind,
+  location: t.String({ minLength: 1 }),
+  ref: t.Optional(t.Union([t.String(), t.Null()])),
+  subPath: t.Optional(t.Union([t.String(), t.Null()])),
+  label: t.Optional(t.Union([t.String(), t.Null()])),
+  addedReason: t.Optional(t.Union([t.String(), t.Null()])),
+}, { additionalProperties: false })
+
+const addPluginSourceResult = t.Object({
+  source: pluginSourceRegistryEntry,
+  discoveredPlugins: t.Array(pluginDescriptor),
+}, { additionalProperties: false })
+
 export const PluginsModel = {
+  addPluginSourceBody,
+  addPluginSourceResult,
   pluginActivationState,
   pluginDescriptor,
   pluginMentionCapability,
   pluginMentionCandidate,
+  pluginSourceRegistryEntry,
   updatePluginActivationBody,
 } as const

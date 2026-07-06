@@ -54,6 +54,7 @@ import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { toastManager } from '~/components/ui/toast'
+import { isUiRuntimeKindEnabled } from '~/features/agent-runtime/ui-availability'
 import { runtimeCatalogItemRequiresProviderTarget } from '~/features/agent-runtime/use-runtime-catalog'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
@@ -104,6 +105,9 @@ function buildRuntimeTargetOptions({
   const chatRuntimeByKind = new Map<string, GetChatRuntimesResponse['items'][number]>()
   const runtimesByProviderKind = new Map<string, GetChatRuntimesResponse['items']>()
   for (const runtime of runtimes) {
+    if (!isUiRuntimeKindEnabled(runtime.runtimeKind)) {
+      continue
+    }
     let supportsChatSurface = !runtime.surfaces
     for (const surface of runtime.surfaces ?? []) {
       if (surface === 'chat') {

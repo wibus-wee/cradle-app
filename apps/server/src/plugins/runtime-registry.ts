@@ -164,6 +164,25 @@ export function registerPluginDescriptor(descriptor: PluginDescriptor): void {
   }
 }
 
+function rebuildRouteOwners(): void {
+  routeOwners.clear()
+  for (const descriptor of descriptors.values()) {
+    if (!routeOwners.has(descriptor.routeSegment)) {
+      routeOwners.set(descriptor.routeSegment, descriptor.identity)
+    }
+  }
+}
+
+export function unregisterPluginDescriptor(owner: string): void {
+  descriptors.delete(owner)
+  for (const key of [...descriptors.keys()]) {
+    if (key.startsWith(`${owner}#duplicate:`)) {
+      descriptors.delete(key)
+    }
+  }
+  rebuildRouteOwners()
+}
+
 export function setPluginActivationState(owner: string, activation: PluginActivationState): void {
   const descriptor = descriptors.get(owner)
   if (!descriptor) { return }

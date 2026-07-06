@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 5174",
-    "build": "vite build",
+    "build": "pnpm --filter @cradle/plugin-sdk build && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit",
     "test": "NODE_ENV=test vitest run --config vite.config.ts --environment jsdom src",
     "i18n": "tsx ./scripts/i18n-workflow/index.ts",
     "i18n:diff": "tsx ./scripts/i18n-workflow/gen-diff.ts",

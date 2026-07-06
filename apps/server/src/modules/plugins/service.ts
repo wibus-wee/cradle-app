@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 
+import type { PluginSource } from '@cradle/db'
 import type {
   PluginActivationState,
   PluginCapabilityRecord,
@@ -12,8 +13,11 @@ import type {
 } from '@cradle/plugin-sdk'
 
 import { AppError } from '../../errors/app-error'
-import { disablePlugin, enablePlugin } from '../../plugins/loader'
+import { deletePluginSource, listPluginSources, addPluginSource, readPluginSource } from '../../plugins/source-registry'
+import type { AddPluginSourceInput } from '../../plugins/source-registry'
+import { discoverAndActivateSource, disablePlugin, enablePlugin, removeDiscoveredSource } from '../../plugins/loader'
 import { getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
+import { resolvePluginSourceDirectory } from '../../plugins/source-installer'
 
 export interface PluginMentionCapability {
   id: string
@@ -114,6 +118,26 @@ export interface PluginDescriptorView {
   serverEntry: string | null
   webEntry: string | null
   desktopEntry: string | null
+}
+
+export interface PluginSourceRegistryEntryView {
+  id: string
+  kind: PluginSource['kind']
+  location: string
+  ref: string | null
+  subPath: string | null
+  label: string | null
+  addedReason: string
+  createdAt: number
+  updatedAt: number
+  resolvedDirectory: string | null
+  error: string | null
+  plugins: PluginDescriptorView[]
+}
+
+export interface AddPluginSourceResult {
+  source: PluginSourceRegistryEntryView
+  discoveredPlugins: PluginDescriptorView[]
 }
 
 const iconMimeTypesByExtension: Record<string, string> = {
@@ -307,6 +331,94 @@ export function listPlugins(): PluginDescriptorView[] {
   return listPluginDescriptors()
     .map(toPluginDescriptorView)
     .sort((left, right) => left.displayName.localeCompare(right.displayName))
+}
+
+function isPathWithin(path: string, parent: string): boolean {
+  const normalizedPath = resolve(path)
+  const normalizedParent = resolve(parent)
+  return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`)
+}
+
+async function toPluginSourceRegistryEntryView(source: PluginSource): Promise<PluginSourceRegistryEntryView> {
+  let resolvedDirectory: string | null = null
+  let error: string | null = null
+  try {
+    resolvedDirectory = await resolvePluginSourceDirectory(source)
+  }
+  catch (err) {
+    error = err instanceof Error ? err.message : String(err)
+  }
+
+  const plugins = resolvedDirectory
+    ? listPluginDescriptors()
+        .filter(descriptor => isPathWithin(descriptor.source.packageDir, resolvedDirectory))
+        .map(toPluginDescriptorView)
+        .sort((left, right) => left.displayName.localeCompare(right.displayName))
+    : []
+
+  return {
+    id: source.id,
+    kind: source.kind,
+    location: source.location,
+    ref: source.ref ?? null,
+    subPath: source.subPath ?? null,
+    label: source.label ?? null,
+    addedReason: source.addedReason,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt,
+    resolvedDirectory,
+    error,
+    plugins,
+  }
+}
+
+export async function listSources(): Promise<PluginSourceRegistryEntryView[]> {
+  return Promise.all(listPluginSources().map(toPluginSourceRegistryEntryView))
+}
+
+export async function getSource(sourceId: string): Promise<PluginSourceRegistryEntryView> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new AppError({
+      code: 'plugin_source_not_found',
+      status: 404,
+      message: 'Plugin source not found.',
+      details: { sourceId },
+    })
+  }
+  return toPluginSourceRegistryEntryView(source)
+}
+
+export async function createSource(input: AddPluginSourceInput): Promise<AddPluginSourceResult> {
+  const source = addPluginSource(input)
+  try {
+    const discovered = await discoverAndActivateSource(source.id)
+    return {
+      source: await toPluginSourceRegistryEntryView(source),
+      discoveredPlugins: discovered.map(toPluginDescriptorView),
+    }
+  }
+  catch {
+    return {
+      source: await toPluginSourceRegistryEntryView(source),
+      discoveredPlugins: [],
+    }
+  }
+}
+
+export async function removeSource(sourceId: string): Promise<{ removed: true }> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new AppError({
+      code: 'plugin_source_not_found',
+      status: 404,
+      message: 'Plugin source not found.',
+      details: { sourceId },
+    })
+  }
+  await removeDiscoveredSource(source.id)
+  deletePluginSource(source.id)
+  return { removed: true }
 }
 
 export function getPlugin(routeSegment: string): PluginDescriptorView {

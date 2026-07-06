@@ -28,7 +28,7 @@
     "smoke:update": "node scripts/run-update-smoke.mjs",
     "dist:win": "pnpm build && electron-builder --config electron-builder.mjs --win",
     "dist:linux": "pnpm build && electron-builder --config electron-builder.mjs --linux",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json"
+    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "@cradle/browser-use": "workspace:*",

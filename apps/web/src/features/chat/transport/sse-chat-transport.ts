@@ -1,5 +1,8 @@
 import type { UIMessageChunk } from 'ai'
-import { parseJsonEventStream, uiMessageChunkSchema } from 'ai'
+import { uiMessageChunkSchema } from 'ai'
+
+import type { ChatStreamChunk } from './chat-stream-types'
+import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
 
 interface ChatRunActivityPayload {
   chatSessionId: string
@@ -20,6 +23,13 @@ type RunSettledHandler = (data: ChatRunSettledPayload) => void
 type ChatRunBroadcastEvent
   = | { kind: 'activity', payload: ChatRunActivityPayload }
     | { kind: 'settled', payload: ChatRunSettledPayload }
+type UIMessageChunkValidationResult
+  = | { success: true, value: UIMessageChunk }
+    | { success: false, error: unknown }
+
+interface UIMessageChunkValidator {
+  validate?: (value: unknown) => UIMessageChunkValidationResult | PromiseLike<UIMessageChunkValidationResult>
+}
 
 const globalHandlers = new Set<RunActivityHandler>()
 const settledHandlers = new Set<RunSettledHandler>()
@@ -169,33 +179,170 @@ export function readTerminalChunkStatus(chunk: UIMessageChunk): ChatRunSettledSt
 export function buildUIMessageChunkStreamFromResponse(
   response: Response,
   chatSessionId: string,
-): ReadableStream<UIMessageChunk> {
+  options: { initialReplay?: boolean } = {},
+): ReadableStream<ChatStreamChunk> {
   if (!response.body) {
     throw new Error('SSE stream has no body')
   }
 
-  return parseJsonEventStream({
-    stream: response.body,
-    schema: uiMessageChunkSchema,
-  }).pipeThrough(new TransformStream({
-    transform(result, controller) {
-      if (!result.success) {
-        throw result.error
-      }
-      emitChatRunActivity({
-        chatSessionId,
-        messageId: readChunkMessageId(result.value),
-        chunk: result.value,
-      })
-      const terminalStatus = readTerminalChunkStatus(result.value)
-      if (terminalStatus) {
-        emitChatRunSettled({
+  return parseChatChunkEventStream(response.body, options.initialReplay ?? false)
+    .pipeThrough(new TransformStream<ChatStreamChunk, ChatStreamChunk>({
+      transform(item, controller) {
+        emitChatRunActivity({
           chatSessionId,
-          messageId: readChunkMessageId(result.value),
-          status: terminalStatus,
+          messageId: readChunkMessageId(item.chunk),
+          chunk: item.chunk,
         })
+        const terminalStatus = readTerminalChunkStatus(item.chunk)
+        if (terminalStatus) {
+          emitChatRunSettled({
+            chatSessionId,
+            messageId: readChunkMessageId(item.chunk),
+            status: terminalStatus,
+          })
+        }
+        controller.enqueue(item)
+      },
+    }))
+}
+
+function parseChatChunkEventStream(
+  stream: ReadableStream<Uint8Array>,
+  initialReplay: boolean,
+): ReadableStream<ChatStreamChunk> {
+  const schema = uiMessageChunkSchema() as unknown as UIMessageChunkValidator
+  if (!schema.validate) {
+    throw new Error('AI SDK UIMessageChunk schema is unavailable')
+  }
+
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let replay = initialReplay
+
+  return new ReadableStream<ChatStreamChunk>({
+    async pull(controller) {
+      while (true) {
+        const frame = readCompleteSseFrame()
+        if (frame) {
+          const result = await processSseFrame(frame, schema, replay)
+          replay = result.replay
+          if (result.kind === 'skip') {
+            continue
+          }
+          if (result.kind === 'done') {
+            controller.close()
+            await reader.cancel().catch(() => undefined)
+            return
+          }
+          controller.enqueue(result.item)
+          return
+        }
+
+        const next = await reader.read()
+        if (next.done) {
+          buffer += decoder.decode()
+          const finalFrame = buffer.trim() ? buffer : null
+          buffer = ''
+          if (finalFrame) {
+            const result = await processSseFrame(finalFrame, schema, replay)
+            replay = result.replay
+            if (result.kind === 'item') {
+              controller.enqueue(result.item)
+              return
+            }
+          }
+          controller.close()
+          return
+        }
+        buffer += decoder.decode(next.value, { stream: true })
       }
-      controller.enqueue(result.value)
     },
-  }))
+    async cancel(reason) {
+      await reader.cancel(reason).catch(() => undefined)
+    },
+  })
+
+  function readCompleteSseFrame(): string | null {
+    const normalized = buffer.replace(/\r\n/g, '\n')
+    const idx = normalized.indexOf('\n\n')
+    if (idx === -1) {
+      return null
+    }
+    const frame = normalized.slice(0, idx)
+    buffer = normalized.slice(idx + 2)
+    return frame
+  }
+}
+
+async function processSseFrame(
+  frame: string,
+  schema: UIMessageChunkValidator,
+  replay: boolean,
+): Promise<
+  | { kind: 'skip', replay: boolean }
+  | { kind: 'done', replay: boolean }
+  | { kind: 'item', replay: boolean, item: ChatStreamChunk }
+> {
+  const boundary = readSseReplayBoundary(frame)
+  if (boundary) {
+    return { kind: 'skip', replay: false }
+  }
+
+  const data = readSseData(frame)
+  if (data === null) {
+    return { kind: 'skip', replay }
+  }
+  if (data === '[DONE]') {
+    return { kind: 'done', replay }
+  }
+
+  const parsed = JSON.parse(data) as unknown
+  const chunkInput = readChunkPayload(parsed)
+  const result = await schema.validate!(chunkInput.chunk)
+  if (!result.success) {
+    throw result.error
+  }
+  const itemReplay = chunkInput.replay ?? replay
+  return {
+    kind: 'item',
+    replay,
+    item: itemReplay ? replayChatStreamChunk(result.value) : liveChatStreamChunk(result.value),
+  }
+}
+
+function readSseReplayBoundary(frame: string): boolean {
+  return frame
+    .split('\n')
+    .some(line => line.trim() === ': cradle-replay-end')
+}
+
+function readSseData(frame: string): string | null {
+  const lines = frame.split('\n')
+  const dataLines = lines.flatMap((line) => {
+    if (!line.startsWith('data:')) {
+      return []
+    }
+    const value = line.slice('data:'.length)
+    return [value.startsWith(' ') ? value.slice(1) : value]
+  })
+  return dataLines.length > 0 ? dataLines.join('\n') : null
+}
+
+function readChunkPayload(value: unknown): { chunk: unknown, replay?: boolean } {
+  if (
+    value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && 'chunk' in value
+  ) {
+    const replay = (value as { replay?: unknown }).replay
+    return {
+      chunk: (value as { chunk: unknown }).chunk,
+      replay: typeof replay === 'boolean'
+        ? replay
+        : undefined,
+    }
+  }
+  return { chunk: value }
 }

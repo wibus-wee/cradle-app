@@ -1,4 +1,4 @@
-import type { BackendRun, Message } from '@cradle/db'
+import type { BackendRun, ChatSessionQueueItem, Message } from '@cradle/db'
 import {
   backendRunSnapshots,
   backendRuns,
@@ -10,6 +10,7 @@ import { and, desc, eq, or, sql } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
+import { DEFAULT_RUNTIME_SETTINGS } from '../runtime-settings'
 import { parseStoredMessageSnapshot } from '../ui-message'
 import { publishSessionTailEvents } from './event-tail'
 import type { ChatSessionEvent, StoredChatSessionEvent, TerminalRunEventType } from './events'
@@ -17,6 +18,7 @@ import { parseStoredChatSessionEvent } from './events'
 import { projectSessionEvent } from './projectors'
 import { runSessionActorTask } from './session-actor'
 import {
+  appendDecidedSessionEvents,
   commitSessionEventsInTransaction,
   readRunStopReason,
   readRunTerminalEventType
@@ -119,7 +121,9 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
   }
   const message = run.messageId ? readMessage(run.chatSessionId, run.messageId) : null
   const finishedAt = run.finishedAt ?? currentUnixSeconds()
-  const events: ChatSessionEvent[] = []
+  const queueItemId = readRunQueueItemId(run.chatSessionId, run.id)
+  const bootstrapEvents = readMissingRunBootstrapEvents({ run, message, queueItemId })
+  const events: ChatSessionEvent[] = [...bootstrapEvents]
   if (message) {
     events.push({
       type: 'AssistantMessageCompleted',
@@ -141,7 +145,7 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
     payload: {
       runId: run.id,
       sessionId: run.chatSessionId,
-      queueItemId: readRunQueueItemId(run.chatSessionId, run.id),
+      queueItemId,
       ...(run.bindingId !== null ? { bindingId: run.bindingId } : {}),
       status: run.status,
       stopReason: run.stopReason ?? readRunStopReason(run.status),
@@ -149,7 +153,10 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
       finishedAt
     }
   })
-  return commitSessionEventsInTransaction(run.chatSessionId, events)
+  return commitRecoverySessionEventsInTransaction(run.chatSessionId, {
+    events,
+    alreadyProjectedCount: bootstrapEvents.length
+  })
 }
 
 export async function repairTerminalProjectionDrifts(sessionId?: string): Promise<number> {
@@ -200,23 +207,8 @@ function repairTerminalProjectionDriftInActor(sessionId: string, runId: string):
       }
     }
 
-    const snapshot = tx
-      .select()
-      .from(backendRunSnapshots)
-      .where(eq(backendRunSnapshots.runId, run.id))
-      .get()
-    if (snapshot && snapshot.status !== terminalFact.payload.status) {
-      tx.update(backendRunSnapshots)
-        .set({
-          status: terminalFact.payload.status,
-          completedAt: terminalFact.payload.finishedAt * 1000,
-          completionReason: terminalFact.payload.stopReason,
-          errorText: terminalFact.payload.errorText
-        })
-        .where(eq(backendRunSnapshots.id, snapshot.id))
-        .run()
-      repaired = true
-    }
+    projectSessionEvent(tx, terminalFact)
+    repaired = true
   })
 
   return repaired
@@ -232,6 +224,40 @@ function hasTerminalRunFact(sessionId: string, runId: string): boolean {
           eq(sessionEvents.aggregateId, sessionId),
           eq(sessionEvents.subjectRunId, runId),
           terminalRunFactEventPredicate()
+        )
+      )
+      .limit(1)
+      .get() !== undefined
+  )
+}
+
+function hasRunStartedFact(sessionId: string, runId: string): boolean {
+  return (
+    db()
+      .select({ sequenceId: sessionEvents.sequenceId })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.aggregateId, sessionId),
+          eq(sessionEvents.subjectRunId, runId),
+          eq(sessionEvents.eventType, 'RunStarted')
+        )
+      )
+      .limit(1)
+      .get() !== undefined
+  )
+}
+
+function hasQueueItemEnqueuedFact(sessionId: string, queueItemId: string): boolean {
+  return (
+    db()
+      .select({ sequenceId: sessionEvents.sequenceId })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.aggregateId, sessionId),
+          eq(sessionEvents.eventType, 'QueueItemEnqueued'),
+          sql`json_extract(${sessionEvents.payload}, '$.item.id') = ${queueItemId}`
         )
       )
       .limit(1)
@@ -255,7 +281,9 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
 
   const message = run.messageId ? readMessage(sessionId, run.messageId) : null
   const finishedAt = currentUnixSeconds()
-  const events: ChatSessionEvent[] = []
+  const queueItemId = readRunQueueItemId(sessionId, runId)
+  const bootstrapEvents = readMissingRunBootstrapEvents({ run, message, queueItemId })
+  const events: ChatSessionEvent[] = [...bootstrapEvents]
   if (message) {
     events.push({
       type: 'AssistantMessageCompleted',
@@ -277,7 +305,7 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
     payload: {
       runId,
       sessionId,
-      queueItemId: readRunQueueItemId(sessionId, runId),
+      queueItemId,
       ...(run.bindingId !== null ? { bindingId: run.bindingId } : {}),
       status: 'failed',
       stopReason: INTERRUPTED_RUN_STOP_REASON,
@@ -285,7 +313,118 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
       finishedAt
     }
   })
-  return commitSessionEventsInTransaction(sessionId, events)
+  return commitRecoverySessionEventsInTransaction(sessionId, {
+    events,
+    alreadyProjectedCount: bootstrapEvents.length
+  })
+}
+
+function commitRecoverySessionEventsInTransaction(
+  sessionId: string,
+  input: {
+    events: ChatSessionEvent[]
+    alreadyProjectedCount: number
+  }
+): StoredChatSessionEvent[] {
+  if (input.events.length === 0) {
+    return []
+  }
+
+  const storedEvents: StoredChatSessionEvent[] = []
+  db().transaction((tx) => {
+    let appended = 0
+    storedEvents.push(
+      ...appendDecidedSessionEvents(tx, sessionId, input.events, {
+        projectEvent: () => {
+          appended += 1
+          return appended > input.alreadyProjectedCount
+        }
+      })
+    )
+  })
+  return storedEvents
+}
+
+function readMissingRunBootstrapEvents(input: {
+  run: BackendRun
+  message: Message | null | undefined
+  queueItemId: string | null
+}): ChatSessionEvent[] {
+  if (hasRunStartedFact(input.run.chatSessionId, input.run.id)) {
+    return []
+  }
+
+  const queueItem = input.queueItemId
+    ? readQueueItem(input.run.chatSessionId, input.queueItemId)
+    : undefined
+  const events: ChatSessionEvent[] = []
+  if (queueItem && !hasQueueItemEnqueuedFact(input.run.chatSessionId, queueItem.id)) {
+    events.push({
+      type: 'QueueItemEnqueued',
+      payload: {
+        item: {
+          id: queueItem.id,
+          sessionId: queueItem.sessionId,
+          mode: 'queue',
+          status: 'pending',
+          text: queueItem.text,
+          filesJson: queueItem.filesJson,
+          contextPartsJson: queueItem.contextPartsJson,
+          providerTargetId: queueItem.providerTargetId,
+          modelId: queueItem.modelId,
+          thinkingEffort: queueItem.thinkingEffort,
+          permissionMode: queueItem.permissionMode,
+          runtimeAccessMode: queueItem.runtimeAccessMode ?? DEFAULT_RUNTIME_SETTINGS.accessMode,
+          runtimeInteractionMode:
+            queueItem.runtimeInteractionMode ?? DEFAULT_RUNTIME_SETTINGS.interactionMode,
+          position: queueItem.position,
+          sourceRunId: queueItem.sourceRunId,
+          startedRunId: null,
+          errorText: null,
+          createdAt: queueItem.createdAt,
+          updatedAt: queueItem.createdAt
+        }
+      }
+    })
+  }
+
+  events.push({
+    type: 'RunStarted',
+    payload: {
+      run: {
+        id: input.run.id,
+        bindingId: input.run.bindingId,
+        chatSessionId: input.run.chatSessionId,
+        messageId: input.run.messageId,
+        origin: input.run.origin,
+        status: 'streaming',
+        stopReason: null,
+        errorText: null,
+        startedAt: input.run.startedAt,
+        finishedAt: null
+      },
+      assistantMessage:
+        input.message?.role === 'assistant'
+          ? {
+              id: input.message.id,
+              sessionId: input.message.sessionId,
+              parentMessageId: input.message.parentMessageId,
+              parentToolCallId: input.message.parentToolCallId,
+              taskId: input.message.taskId,
+              depth: input.message.depth,
+              role: 'assistant',
+              status: 'streaming',
+              content: input.message.content,
+              messageJson: normalizeTerminalMessageJson(input.message),
+              errorText: null,
+              createdAt: input.message.createdAt,
+              updatedAt: input.run.startedAt
+            }
+          : null,
+      queueItemId: queueItem?.id ?? null
+    }
+  })
+  return events
 }
 
 export async function abortProjectedStreamingRun(run: BackendRun): Promise<boolean> {
@@ -535,6 +674,23 @@ function readRunQueueItemId(sessionId: string, runId: string): string | null {
       )
       .get()?.id ?? null
   )
+}
+
+function readQueueItem(
+  sessionId: string,
+  queueItemId: string
+): ChatSessionQueueItem | undefined {
+  return db()
+    .select()
+    .from(chatSessionQueueItems)
+    .where(
+      and(
+        eq(chatSessionQueueItems.id, queueItemId),
+        eq(chatSessionQueueItems.sessionId, sessionId),
+        eq(chatSessionQueueItems.mode, 'queue')
+      )
+    )
+    .get()
 }
 
 function normalizeTerminalMessageJson(message: Message): string {

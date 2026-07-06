@@ -29,6 +29,7 @@ const QUEUE_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'QueueItemFailed',
   'QueueItemReordered',
   'QueueItemUpdated',
+  'QueueItemProviderTargetCleared',
   'QueueItemCancelled',
 ])
 

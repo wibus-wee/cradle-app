@@ -115,6 +115,12 @@ const cradleElectron = {
       ipcRenderer.invoke('desktop-app-badge:set-unread-count', count),
   },
 
+  /** Desktop plugin source sync bridge */
+  plugins: {
+    syncSource: (sourceId: string) => ipcRenderer.invoke('desktop:plugins-sync-source', sourceId),
+    unsyncSource: (pluginName: string) => ipcRenderer.invoke('desktop:plugins-unsync-source', pluginName),
+  },
+
   /** Desktop-owned long-lived chat stream bridge */
   chatStream: {
     startResponse: (request: unknown) => ipcRenderer.invoke('chatStream.startResponse', request),

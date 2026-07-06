@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 
-import type { BackendRun } from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
 
 import { currentUnixSeconds } from '../../../helpers/time'
 import { commitSessionEvents, readRunStopReason, readRunTerminalEventType } from '../es/commands'
+import type { BackendRunStartedFact } from '../es/events'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
@@ -151,7 +151,7 @@ async function finalizeProviderSyntheticTurn(
   const now = currentUnixSeconds()
   const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(syntheticTurn.finalMessage))
   const messageJson = JSON.stringify(message)
-  const run: BackendRun = {
+  const run = {
     id: randomUUID(),
     bindingId: bindingId ?? null,
     chatSessionId: syntheticTurn.sessionId,
@@ -162,7 +162,7 @@ async function finalizeProviderSyntheticTurn(
     errorText: null,
     startedAt: now,
     finishedAt: null
-  }
+  } satisfies BackendRunStartedFact
   syntheticTurn.runId = run.id
   await commitSessionEvents(syntheticTurn.sessionId, [
     {
@@ -184,7 +184,6 @@ async function finalizeProviderSyntheticTurn(
           createdAt: now,
           updatedAt: now
         },
-        assistantMessageProjection: 'insert',
         queueItemId: null
       }
     },

@@ -6,13 +6,14 @@ import { basename, join } from 'node:path'
 import type { ExternalWorkImportItem } from '@cradle/db'
 import {
   externalWorkImportItems,
-  messages,
   sessions,
 } from '@cradle/db'
 import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '../../infra'
+import { recordImportedSessionMessages } from '../chat-runtime/es/commands'
+import type { MessageRecordedFact } from '../chat-runtime/es/events'
 import type { RuntimeKind } from '../provider-contracts/types'
 import { listDurableProviderRuntimeBindingsByProviderSession } from '../provider-runtime/service'
 import * as Workspace from '../workspace/service'
@@ -716,7 +717,7 @@ function resolveWorkspaceId(workspacePath: string | null): string | null {
   }
 }
 
-function insertImportedSession(item: PreviewItem, workspaceId: string | null): string | null {
+async function insertImportedSession(item: PreviewItem, workspaceId: string | null): Promise<string | null> {
   const payload = z.object({
     messages: z.array(z.object({
       role: z.enum(['user', 'assistant']),
@@ -754,7 +755,7 @@ function insertImportedSession(item: PreviewItem, workspaceId: string | null): s
     updatedAt,
   }).run()
 
-  for (const [index, message] of payload.messages.entries()) {
+  const importedMessages: Array<MessageRecordedFact & { status: 'complete' }> = payload.messages.map((message, index) => {
     const messageId = randomUUID()
     const messageCreatedAt = message.createdAt ?? createdAt + index
     const snapshot = {
@@ -764,17 +765,24 @@ function insertImportedSession(item: PreviewItem, workspaceId: string | null): s
         { type: 'text', text: message.content },
       ],
     }
-    db().insert(messages).values({
+    return {
       id: messageId,
       sessionId,
+      parentMessageId: null,
+      parentToolCallId: null,
+      taskId: null,
+      depth: 0,
       role: message.role,
       status: 'complete',
       content: message.content,
       messageJson: stableJson(snapshot),
+      errorText: null,
       createdAt: messageCreatedAt,
       updatedAt: messageCreatedAt,
-    }).run()
-  }
+    }
+  })
+
+  await recordImportedSessionMessages({ sessionId, messages: importedMessages })
 
   return sessionId
 }
@@ -889,7 +897,7 @@ export async function importItems(items: PreviewItem[]): Promise<ImportResult> {
 
     try {
       const workspaceId = resolveWorkspaceId(item.workspacePath)
-      const sessionId = insertImportedSession(item, workspaceId)
+      const sessionId = await insertImportedSession(item, workspaceId)
       const record = insertRecord({
         item,
         workspaceId,

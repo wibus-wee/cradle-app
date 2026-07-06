@@ -7,8 +7,10 @@
 
 ## Current Behavior Evidence
 
-- 旧 IPC `UsageService` 提供 `getDailyUsage/getUsageSummary/getUsageStats/getSessionUsage`。
-- usage 写入由 `chat.message-completed` 事件订阅器负责，本 capability 本身主要是读模型查询。
+- HTTP `UsageModule` 提供 `getDailyUsage/getUsageSummary/getUsageStats/getSessionUsage` 及 cost 端点。
+- **写入路径**：`turn-executor` 在 run finalize 时调用 `insertRunUsage` → `usage_logs`（每 completed、非 cancel 的 run 一行）。数值来自 `ChatRuntime.totalUsage ?? lastUsage`。
+- **权威字段契约**：见 `plans/025-usage-authoritative-fields.md`（各 provider 应从 SDK/app-server 原样取用 turn-final usage，不在 Dashboard 层自行汇总）。
+- 本 capability 的 service 层是读模型查询；cost 由 `usage_logs` token × 当前价目表即时计算。
 
 ## Target API
 

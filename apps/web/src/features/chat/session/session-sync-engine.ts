@@ -20,6 +20,7 @@ export interface SessionSyncEngineCallbacks {
   onRuntimeUiSlotStatesChanged: () => void
   onQueueChanged: () => void
   onSessionSummaryChanged: () => void
+  hasStreamLease?: (messageId: string) => boolean
   onSnapshotRequired?: () => void
   onError?: (error: unknown) => void
 }
@@ -45,9 +46,7 @@ export interface SessionPassiveStreamInput {
   enabled: boolean
   sessionId: string | null
   locallyDriven: boolean
-  holdEmptyStreamingSnapshot: boolean
   runtimeActiveRunMessageId: string | null
-  snapshotStreamingMessageIds: readonly string[]
 }
 
 export type SessionPassiveStreamFactory = (request: SessionPassiveStreamRequest) => SessionPassiveStreamHandle
@@ -80,7 +79,10 @@ export interface SessionSyncEngineOptions {
 
 const MESSAGE_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'UserMessageAppended',
+  'MessageImported',
+  'AssistantMessageSnapshotted',
   'AssistantMessageCompleted',
+  'PlanImplementationResponded',
   'SteerApplied',
   'LastTurnRolledBack',
 ])
@@ -104,6 +106,7 @@ const QUEUE_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'QueueItemFailed',
   'QueueItemReordered',
   'QueueItemUpdated',
+  'QueueItemProviderTargetCleared',
   'QueueItemCancelled',
 ])
 
@@ -160,17 +163,12 @@ export class SessionSyncEngine {
   }
 
   updatePassiveStream(input: SessionPassiveStreamInput): void {
-    if (!input.enabled || !input.sessionId || input.locallyDriven || input.holdEmptyStreamingSnapshot) {
+    if (!input.enabled || !input.sessionId || input.locallyDriven || !input.runtimeActiveRunMessageId) {
       this.stopPassiveStream(input.sessionId)
       return
     }
 
-    const messageId = input.runtimeActiveRunMessageId ?? input.snapshotStreamingMessageIds[0] ?? null
-    if (!messageId) {
-      this.stopPassiveStream(input.sessionId)
-      return
-    }
-
+    const messageId = input.runtimeActiveRunMessageId
     if (this.passiveStream?.sessionId === input.sessionId && this.passiveStream.messageId === messageId) {
       return
     }
@@ -276,8 +274,13 @@ export class SessionSyncEngine {
       this.requestSnapshotCatchup()
       return
     }
+    if (event.type === 'RunCompleted' || event.type === 'RunFailed' || event.type === 'RunAborted') {
+      this.stopPassiveStream()
+    }
     if (MESSAGE_EVENT_TYPES.has(event.type)) {
-      this.callbacks.onMessagesChanged()
+      if (!this.shouldSkipMessageSnapshotRefresh(event)) {
+        this.callbacks.onMessagesChanged()
+      }
       this.callbacks.onRuntimeUiSlotStatesChanged()
     }
     if (RUN_EVENT_TYPES.has(event.type)) {
@@ -303,6 +306,14 @@ export class SessionSyncEngine {
     this.callbacks.onRuntimeUiSlotStatesChanged()
     this.callbacks.onQueueChanged()
     this.callbacks.onSessionSummaryChanged()
+  }
+
+  private shouldSkipMessageSnapshotRefresh(event: ChatSessionTailEvent): boolean {
+    if (event.type !== 'AssistantMessageSnapshotted') {
+      return false
+    }
+    const messageId = readTailMessageId(event)
+    return Boolean(messageId && this.callbacks.hasStreamLease?.(messageId))
   }
 }
 
@@ -341,4 +352,18 @@ function readChatSessionTailEvent(value: string, sessionId: string): ChatSession
  catch {
     return null
   }
+}
+
+function readTailMessageId(event: ChatSessionTailEvent): string | null {
+  const payload = event.payload as {
+    messageId?: unknown
+    message?: { id?: unknown }
+  }
+  if (typeof payload.messageId === 'string') {
+    return payload.messageId
+  }
+  if (typeof payload.message?.id === 'string') {
+    return payload.message.id
+  }
+  return null
 }

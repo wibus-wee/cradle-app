@@ -7,6 +7,7 @@ import type { ProviderKind } from '~/features/agent-runtime/types'
 import { client } from '~/lib/client.config'
 
 import type { RuntimeCatalogItem } from './runtime-catalog'
+import { isUiRuntimeKindEnabled } from './ui-availability'
 
 export type {
   RuntimeCatalogComposer,
@@ -167,7 +168,9 @@ function normalizeCatalogItem(item: z.infer<typeof RuntimeCatalogSchema>['items'
 
 export async function fetchRuntimeCatalog(): Promise<RuntimeCatalogItem[]> {
   const response = await client.get<unknown>({ url: '/chat/runtimes' })
-  return RuntimeCatalogSchema.parse(response.data).items.map(normalizeCatalogItem)
+  return RuntimeCatalogSchema.parse(response.data).items
+    .map(normalizeCatalogItem)
+    .filter(runtime => isUiRuntimeKindEnabled(runtime.runtimeKind))
 }
 
 export function useRuntimeCatalog() {

@@ -1,10 +1,8 @@
-import { messages, sessions } from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
-import { and, eq } from 'drizzle-orm'
 
 import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { currentUnixSeconds } from '../../../helpers/time'
-import { db } from '../../../infra'
+import { recordAssistantMessageSnapshot } from '../es/commands'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import {
   flushFinalMessageProjection,
@@ -32,14 +30,15 @@ import { runSubscribers } from './live-run-streams'
 
 export interface ActiveRunStreamControllerDeps {
   releaseStaleActiveRun(activeRun: ActiveRun, fence: RunWriteFence): void
+  error(message: string, payload?: Record<string, unknown>): void
 }
 
 export interface ActiveRunStreamController {
-  snapshotActiveRun(activeRun: ActiveRun): void
+  snapshotActiveRun(activeRun: ActiveRun): Promise<void>
   startSnapshotTimer(activeRun: ActiveRun): void
   stopSnapshotTimer(activeRun: ActiveRun): void
   stopPendingRunDeltaFlush(activeRun: ActiveRun): void
-  flushAllActiveRunSnapshots(): void
+  flushAllActiveRunSnapshots(): Promise<void>
   publishRuntimeChunk(activeRun: ActiveRun, chunk: UIMessageChunk): void
   flushPendingRunDelta(activeRun: ActiveRun): void
   publishUIMessageChunk(activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean): void
@@ -49,45 +48,69 @@ export interface ActiveRunStreamController {
 export function createActiveRunStreamController(
   deps: ActiveRunStreamControllerDeps
 ): ActiveRunStreamController {
-  function snapshotActiveRun(activeRun: ActiveRun): void {
+  async function snapshotActiveRun(activeRun: ActiveRun): Promise<void> {
     if (activeRun.terminalStatus) {
       return
     }
-    flushFinalMessageProjection(activeRun)
-    persistStreamingMessageSnapshot(activeRun)
+    try {
+      flushFinalMessageProjection(activeRun)
+      await persistStreamingMessageSnapshot(activeRun)
+    } catch (error) {
+      deps.error('failed to snapshot active chat run', {
+        error,
+        sessionId: activeRun.sessionId,
+        runId: activeRun.runId,
+        messageId: activeRun.messageId
+      })
+    }
   }
 
-  // Fenced streaming message writer. The only path that writes `messages` with
-  // `status = 'streaming'`. It checks the persisted run row first: once a
-  // terminal fact exists the run row is terminal, the fence returns
-  // non-streaming, and this releases the stale active run instead of
-  // overwriting a terminal message. `persistMessageSnapshot()` stays fence-free
-  // with no run id; it serves only the event-derived terminal projection and
-  // non-streaming record mutations.
-  function persistStreamingMessageSnapshot(activeRun: ActiveRun): void {
+  // Fenced streaming snapshot fact writer. The persisted run row is checked
+  // before appending so a stale active run cannot enqueue a snapshot after a
+  // terminal projection has already won.
+  async function persistStreamingMessageSnapshot(activeRun: ActiveRun): Promise<void> {
     const fence = readRunWriteFence(activeRun.runId)
     if (fence.status === 'streaming') {
       const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage))
       const messageJson = JSON.stringify(message)
-      db().transaction((tx) => {
-        tx.update(messages)
-          .set({
+      if (
+        activeRun.lastStreamingSnapshotMessageJson === messageJson ||
+        activeRun.pendingStreamingSnapshotMessageJson === messageJson
+      ) {
+        return
+      }
+
+      activeRun.pendingStreamingSnapshotMessageJson = messageJson
+      try {
+        await recordAssistantMessageSnapshot({
+          sessionId: activeRun.sessionId,
+          runId: activeRun.runId,
+          message: {
+            id: activeRun.messageId,
             content: extractMessageText(message),
             messageJson,
-            status: 'streaming',
-            errorText: null,
             updatedAt: currentUnixSeconds()
-          })
-          .where(
-            and(eq(messages.id, activeRun.messageId), eq(messages.sessionId, activeRun.sessionId))
-          )
-          .run()
-
-        tx.update(sessions)
-          .set({ updatedAt: currentUnixSeconds() })
-          .where(eq(sessions.id, activeRun.sessionId))
-          .run()
-      })
+          },
+          messageJsonBytes: Buffer.byteLength(messageJson)
+        })
+        activeRun.lastStreamingSnapshotMessageJson = messageJson
+      } catch (error) {
+        const latestFence = readRunWriteFence(activeRun.runId)
+        if (latestFence.status !== 'streaming') {
+          deps.releaseStaleActiveRun(activeRun, latestFence)
+          return
+        }
+        deps.error('failed to persist streaming message snapshot fact', {
+          error,
+          sessionId: activeRun.sessionId,
+          runId: activeRun.runId,
+          messageId: activeRun.messageId
+        })
+      } finally {
+        if (activeRun.pendingStreamingSnapshotMessageJson === messageJson) {
+          activeRun.pendingStreamingSnapshotMessageJson = null
+        }
+      }
       return
     }
 
@@ -98,11 +121,9 @@ export function createActiveRunStreamController(
 
   function startSnapshotTimer(activeRun: ActiveRun): void {
     stopSnapshotTimer(activeRun)
-    activeRun.snapshotTimer = setInterval(
-      snapshotActiveRun,
-      readPositiveIntegerEnv('CRADLE_CHAT_SNAPSHOT_INTERVAL_MS', DEFAULT_SNAPSHOT_INTERVAL_MS),
-      activeRun
-    )
+    activeRun.snapshotTimer = setInterval(() => {
+      void snapshotActiveRun(activeRun)
+    }, readPositiveIntegerEnv('CRADLE_CHAT_SNAPSHOT_INTERVAL_MS', DEFAULT_SNAPSHOT_INTERVAL_MS))
   }
 
   function stopSnapshotTimer(activeRun: ActiveRun): void {
@@ -119,14 +140,14 @@ export function createActiveRunStreamController(
     }
   }
 
-  function flushAllActiveRunSnapshots(): void {
-    for (const activeRun of runRegistry.listActiveRuns()) {
+  async function flushAllActiveRunSnapshots(): Promise<void> {
+    await Promise.all(runRegistry.listActiveRuns().map(async (activeRun) => {
       try {
-        snapshotActiveRun(activeRun)
+        await snapshotActiveRun(activeRun)
       } catch {
         // best-effort on shutdown
       }
-    }
+    }))
   }
 
   function publishRuntimeChunk(activeRun: ActiveRun, chunk: UIMessageChunk): void {

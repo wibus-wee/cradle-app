@@ -165,6 +165,7 @@ function readRuntimeGoalContinuationOptions(): RuntimeGoalContinuationOptions {
 const activeRunStream = createActiveRunStreamController({
   releaseStaleActiveRun: (activeRun, fence) =>
     activeRunReleaseController.releaseStaleActiveRun(activeRun, fence),
+  error: (message, payload) => chatLogger.error(message, payload),
 })
 const {
   flushPendingRunDelta,

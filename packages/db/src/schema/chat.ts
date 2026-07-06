@@ -163,8 +163,8 @@ export const composerDrafts = sqliteTable('composer_drafts', {
 // Event Sourcing: append-only log for chat-runtime-owned session lifecycle facts.
 // `messages`, `backend_runs`, `chat_session_queue_items`, and runtime-owned session fields
 // are same-transaction projections. Session metadata creation, archive, and deletion remain
-// owned by the session module. Payloads carry existing AI SDK / snapshot shapes (UIMessage,
-// queue DTOs, lifecycle facts) — no parallel projection type universe.
+// owned by the session module. Payload JSON is versioned by chat-runtime-owned domain facts
+// and hydrated through upcasters before projection.
 export const sessionEvents = sqliteTable('session_events', {
   sequenceId: int('sequence_id').primaryKey({ autoIncrement: true }),
   aggregateId: text('aggregate_id').notNull(),

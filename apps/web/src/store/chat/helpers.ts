@@ -120,7 +120,9 @@ function canReusePart(current: MessagePart, incoming: MessagePart, change?: Mess
 
   // Text: compare by value
   if (current.type === 'text') {
-    return (current as { text: string }).text === (incoming as { text: string }).text
+    const c = current as { text: string, state?: string }
+    const n = incoming as { text: string, state?: string }
+    return c.text === n.text && c.state === n.state
   }
 
   // Reasoning: compare text + state

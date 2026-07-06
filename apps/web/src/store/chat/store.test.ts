@@ -31,4 +31,28 @@ describe('chat store selectors', () => {
     store.getState().finishGeneration('message-b')
     expect(chatSelectors.streamingMessageIdSet(store.getState())).toBe(idleIds)
   })
+
+  it('does not replace leased stream content with an empty snapshot row', () => {
+    const store = createChatStore()
+
+    store.getState().setMessages('session-a', [{
+      id: 'assistant-a',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Streaming text' }],
+    }])
+    store.getState().acquireStreamLease({
+      sessionId: 'session-a',
+      messageId: 'assistant-a',
+      source: 'passive',
+    })
+    store.getState().setMessages('session-a', [{
+      id: 'assistant-a',
+      role: 'assistant',
+      parts: [],
+    }])
+
+    expect(chatSelectors.messages('session-a')(store.getState())[0]?.parts).toEqual([
+      { type: 'text', text: 'Streaming text' },
+    ])
+  })
 })

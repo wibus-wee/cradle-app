@@ -1,7 +1,7 @@
 import type { UIMessage } from 'ai'
 
 import type { ChatRunState } from '~/store/chat'
-import { chatSelectors, useChatStore } from '~/store/chat'
+import { useChatStore } from '~/store/chat'
 
 import type { ChatContinuationMode, ChatQueueItem, ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../commands/chat-response-command'
 import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
@@ -72,9 +72,6 @@ export function projectStreamingMainAssistantMessageIds(rows: ChatSessionMessage
 export type PublicStatus = import('~/store/chat').PublicStatus
 
 export function derivePassiveStatus(rows: ChatSessionMessageRow[]): PublicStatus {
-  if (rows.some(row => row.status === 'streaming')) {
-    return 'streaming'
-  }
   const latestAssistant = [...rows].reverse().find(row => row.role === 'assistant')
   if (latestAssistant?.status === 'failed') {
     return 'error'
@@ -87,35 +84,6 @@ export function readLatestFailedMainAssistantRow(rows: ChatSessionMessageRow[]):
     .reverse()
     .find(row => row.role === 'assistant' && !row.parentToolCallId)
   return latestAssistant?.status === 'failed' ? latestAssistant : undefined
-}
-
-export function isEmptyStreamingMainAssistantRow(row: ChatSessionMessageRow): boolean {
-  return row.role === 'assistant'
-    && row.status === 'streaming'
-    && !row.parentToolCallId
-    && row.message.parts.length === 0
-}
-
-export function shouldHoldEmptyStreamingSnapshot(input: {
-  rows: ChatSessionMessageRow[]
-  runtimeStatusKnown: boolean
-  runtimeIdle: boolean
-  snapshotFetching: boolean
-}): boolean {
-  if (!input.rows.some(isEmptyStreamingMainAssistantRow)) {
-    return false
-  }
-  if (input.snapshotFetching) {
-    return true
-  }
-  if (!input.runtimeStatusKnown) {
-    return true
-  }
-  return input.runtimeIdle
-}
-
-export function projectRowsWithoutEmptyStreamingAssistant(rows: ChatSessionMessageRow[]): ChatSessionMessageRow[] {
-  return rows.filter(row => !isEmptyStreamingMainAssistantRow(row))
 }
 
 export function readStableSnapshotRows(rows: ChatSessionMessageRow[]): ChatSessionMessageRow[] | null {
@@ -176,59 +144,17 @@ export function releaseSessionStreamingStateForTerminalRun(
   }
 
   const state = useChatStore.getState()
-  const localDriverMessageId = readLocalDriverMessageId(chatSelectors.sessionRunState(sessionId)(state))
-  const sessionMessageIds = new Set((state.messagesMap.get(sessionId) ?? []).map(message => message.id))
-  if (localDriverMessageId) {
-    sessionMessageIds.add(localDriverMessageId)
-  }
-
-  const candidateMessageIds = new Set<string>()
-  if (run.messageId) {
-    candidateMessageIds.add(run.messageId)
-    const split = state.assistantDisplaySplitMap.get(run.messageId)
-    if (split) {
-      candidateMessageIds.add(split.tailMessageId)
-    }
-  }
-
-  for (const messageId of sessionMessageIds) {
-    if (state.runDisplayMetaMap.get(messageId)?.runId === run.runId) {
-      candidateMessageIds.add(messageId)
-    }
-  }
-
-  let released = false
-  for (const messageId of candidateMessageIds) {
-    if (!sessionMessageIds.has(messageId) && localDriverMessageId !== messageId) {
-      continue
-    }
-    const runDisplayId = state.runDisplayMetaMap.get(messageId)?.runId
-    const matchesTerminalRun = runDisplayId ? runDisplayId === run.runId : messageId === run.messageId
-    if (!matchesTerminalRun) {
-      continue
-    }
-    const runMeta = state.runDisplayMetaMap.get(messageId)
+  for (const [messageId, lease] of state.streamLeaseMap) {
     if (
-      chatSelectors.isStreamingMessage(messageId)(state)
-      || localDriverMessageId === messageId
-      || runMeta?.completedAtMs === null
+      lease.sessionId === sessionId
+      && (lease.runId ? lease.runId === run.runId : messageId === run.messageId)
     ) {
       state.finishGeneration(messageId)
-      released = true
+      return true
     }
   }
 
-  if (released) {
-    const nextState = useChatStore.getState()
-    const nextSessionMessageIds = new Set((nextState.messagesMap.get(sessionId) ?? []).map(message => message.id))
-    const hasRemainingStreamingRefs = [...nextSessionMessageIds].some(messageId =>
-      chatSelectors.isStreamingMessage(messageId)(nextState))
-    if (!hasRemainingStreamingRefs && isChatRunStateStreaming(chatSelectors.sessionRunState(sessionId)(nextState))) {
-      nextState.setPassiveRunState(sessionId, { messageIds: [], status: 'idle' })
-    }
-  }
-
-  return released
+  return false
 }
 
 // ── Constants ──────────────────────────────────────────────
@@ -361,11 +287,4 @@ export function readSideChatCommand(text: string): string | null {
     return null
   }
   return normalized.slice('/side'.length).trim()
-}
-
-export function detachPassiveSessionStreamingState(sessionId: string): void {
-  useChatStore.getState().setPassiveRunState(sessionId, {
-    messageIds: [],
-    status: 'idle',
-  })
 }

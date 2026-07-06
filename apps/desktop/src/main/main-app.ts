@@ -41,6 +41,11 @@ import {
   deactivateDesktopPlugins,
   notifyWebviewCreated,
 } from './plugin-loader'
+import {
+  registerPluginSourceSyncIpcHandlers,
+  setPluginSourceSyncServerUrl,
+  syncAllDesktopLayerSources,
+} from './plugin-source-sync'
 import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import { QuitGuard } from './quit-guard'
 import { startServer, stopServer } from './server-process'
@@ -63,10 +68,6 @@ let macBridgeManager: MacBridgeManager | null = null
 let chatStreamBroker: ChatStreamBroker | null = null
 let chatEventTailBroker: ChatEventTailBroker | null = null
 
-function fetchWithElectronNet(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const requestInput = input instanceof URL ? input.toString() : input
-  return net.fetch(requestInput, init) as Promise<Response>
-}
 let notificationCenterManager: NotificationCenterManager | null = null
 let isQuitting = false
 let shutdownPromise: Promise<void> | null = null
@@ -586,6 +587,7 @@ export async function startDesktopApp(): Promise<void> {
     getChatEventTailBroker: () => chatEventTailBroker,
     getQuitGuard: () => quitGuard,
   })
+  registerPluginSourceSyncIpcHandlers()
   updateManager.on('statusChanged', broadcastUpdateStatus)
 
   app.on('open-url', (event, url) => {
@@ -601,11 +603,15 @@ export async function startDesktopApp(): Promise<void> {
     await activateDesktopPlugins()
 
     const serverUrl = await startServer()
+    setPluginSourceSyncServerUrl(serverUrl)
     bindDesktopObservabilityServerUrl(serverUrl)
     startDesktopResourceReporting()
     await syncDesktopPreferencesFromServer(serverUrl)
-    chatStreamBroker = new ChatStreamBroker({ serverUrl, fetchFn: fetchWithElectronNet })
-    chatEventTailBroker = new ChatEventTailBroker({ serverUrl, fetchFn: fetchWithElectronNet })
+    void syncAllDesktopLayerSources().catch((error) => {
+      console.error('[plugins] desktop source catch-up failed:', error)
+    })
+    chatStreamBroker = new ChatStreamBroker({ serverUrl })
+    chatEventTailBroker = new ChatEventTailBroker({ serverUrl })
 
     windowManager = new WindowManager(serverUrl)
     appBadgeManager.initialize()

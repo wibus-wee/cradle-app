@@ -1,6 +1,6 @@
-import type { UIMessageChunk } from 'ai'
-
 import type { ChatStreamTransportResult } from '~/features/chat/transport/chat-stream-transport'
+import type { ChatStreamChunk } from '~/features/chat/transport/chat-stream-types'
+import { liveChatStreamChunk, replayChatStreamChunk } from '~/features/chat/transport/chat-stream-types'
 
 import {
   subscribeSyncChannel,
@@ -16,7 +16,7 @@ export function subscribeSyncSessionRunChunks(input: {
   let closed = false
   let terminal = false
 
-  const stream = new ReadableStream<UIMessageChunk>({
+  const stream = new ReadableStream<ChatStreamChunk>({
     start(controller) {
       const abort = () => {
         if (closed) {
@@ -49,7 +49,7 @@ export function subscribeSyncSessionRunChunks(input: {
             return
           }
           if (frame.kind === 'chunk') {
-            controller.enqueue(frame.chunk)
+            controller.enqueue(frame.replay ? replayChatStreamChunk(frame.chunk) : liveChatStreamChunk(frame.chunk))
             if (frame.terminal) {
               terminal = true
               closed = true

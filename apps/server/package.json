@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "dev": "nodemon",
-    "build": "vite build",
+    "build": "pnpm --filter @cradle/plugin-sdk build && vite build",
     "build:desktop-plugins": "pnpm --filter \"../../plugins/*\" build && node scripts/prepare-desktop-plugins.mjs",
     "build:desktop-runtime": "pnpm run build && node scripts/prepare-desktop-runtime.mjs && node scripts/rebuild-electron-runtime.mjs",
     "start": "node dist/main.js",
@@ -25,7 +25,7 @@
     "generate:codex-app-server-capabilities": "node scripts/generate-codex-app-server-capabilities.mjs",
     "tab-working-set:collect": "python3 scripts/tab_working_set_collector.py",
     "leak:harness": "tsx scripts/leak-harness.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },

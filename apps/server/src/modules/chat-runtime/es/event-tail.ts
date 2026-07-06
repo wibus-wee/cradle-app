@@ -420,6 +420,7 @@ function encodeTailEvent(event: ChatSessionTailEvent | ChatGlobalSessionTailEven
 function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['payload'] {
   switch (event.type) {
     case 'UserMessageAppended':
+    case 'MessageImported':
     case 'SteerApplied':
       return { messageId: event.payload.message.id }
     case 'RunStarted':
@@ -429,6 +430,7 @@ function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['p
         queueItemId: event.payload.queueItemId ?? null,
         ...(event.payload.runtimeSettings ? { runtimeSettings: event.payload.runtimeSettings } : {}),
       }
+    case 'AssistantMessageSnapshotted':
     case 'AssistantMessageCompleted':
       return {
         messageId: event.payload.message.id,
@@ -462,6 +464,12 @@ function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['p
         resolution: event.payload.resolution,
         approved: event.payload.approved,
       }
+    case 'PlanImplementationResponded':
+      return {
+        messageId: event.payload.messageId,
+        approvalId: event.payload.approvalId,
+        approved: event.payload.approved,
+      }
     case 'QueueItemEnqueued':
       return {
         queueItemId: event.payload.item.id,
@@ -489,6 +497,7 @@ function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['p
         position: event.payload.position,
       }
     case 'QueueItemUpdated':
+    case 'QueueItemProviderTargetCleared':
       return {
         queueItemId: event.payload.queueItemId,
         updatedAt: event.payload.updatedAt,

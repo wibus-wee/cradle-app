@@ -111,6 +111,7 @@ function attachRunChunks(
       kind: 'chunk',
       chunk: item.chunk,
       terminal: item.terminal,
+      replay: true,
     })
     lastSeq = item.seq
     if (item.terminal) {
@@ -134,6 +135,7 @@ function attachRunChunks(
       kind: 'chunk',
       chunk,
       terminal,
+      replay: false,
     })
     nextSeq += 1
     if (terminal) {

@@ -8,10 +8,31 @@ export interface DiffsViewSearch {
   path?: string
   review?: string
   view?: 'commit' | 'guide'
+  line?: number
+  side?: 'base' | 'head'
 }
 
 function normalizeRepositoryPath(repositoryPath?: string | null): string | undefined {
   return repositoryPath && repositoryPath !== '.' ? repositoryPath : undefined
+}
+
+/**
+ * Coerce a route search value (string from the URL, or number from in-memory navigation) into a
+ * positive integer. Used by the diff route `validateSearch` schemas so `line` arrives typed.
+ */
+export function parsePositiveInt(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return value
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    const parsed = Number(value)
+    return parsed > 0 ? parsed : undefined
+  }
+  return undefined
+}
+
+export function parseAnchorSide(value: unknown): 'base' | 'head' | undefined {
+  return value === 'base' || value === 'head' ? value : undefined
 }
 
 function navigateWithinCurrentDiffSurface(input: {
@@ -20,6 +41,8 @@ function navigateWithinCurrentDiffSurface(input: {
   path?: string | null
   review?: string
   view?: 'commit' | 'guide'
+  line?: number | null
+  side?: 'base' | 'head' | null
   replace?: boolean
 }): void {
   const repo = normalizeRepositoryPath(input.repositoryPath)
@@ -33,6 +56,8 @@ function navigateWithinCurrentDiffSurface(input: {
         path: input.path ?? undefined,
         review: input.review,
         view: input.view,
+        line: input.line ?? undefined,
+        side: input.side ?? undefined,
       },
       replace: input.replace,
     })
@@ -47,6 +72,8 @@ function navigateWithinCurrentDiffSurface(input: {
       path: input.path ?? undefined,
       review: input.review,
       view: input.view,
+      line: input.line ?? undefined,
+      side: input.side ?? undefined,
     },
     replace: input.replace,
   })
@@ -67,6 +94,31 @@ export function navigateToReview(
     path: options.path,
     review: reviewId,
     replace: options.replace,
+  })
+}
+
+/**
+ * Jump from a guide chapter (or anywhere with a file + line) into the review detail at that
+ * anchor. Drops `view: 'guide'` so the review detail renders instead of the guide, and threads
+ * `line`/`side` so DiffStage can scroll to the exact line on mount.
+ */
+export function navigateToReviewAtAnchor(
+  workspaceId: string,
+  reviewId: string,
+  options: {
+    repositoryPath?: string | null
+    path: string
+    line?: number
+    side?: 'base' | 'head'
+  },
+): void {
+  navigateWithinCurrentDiffSurface({
+    workspaceId,
+    repositoryPath: options.repositoryPath,
+    path: options.path,
+    review: reviewId,
+    line: options.line,
+    side: options.side,
   })
 }
 

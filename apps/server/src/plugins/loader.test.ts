@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { relayHostEnrollments } from '@cradle/db'
+import { pluginActivationPolicies, pluginSources, relayHostEnrollments } from '@cradle/db'
 import { Elysia } from 'elysia'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -15,7 +15,8 @@ import { resolveCodexRuntimeContext } from '../modules/chat-runtime-providers/co
 import { setAppPreferences } from '../modules/preferences/service'
 import { resetNativeSkillProjectionTargets } from '../modules/skills/native-skill-projection'
 import { setPluginActivationPolicy } from './activation-policy'
-import { activateServerPlugins, deactivateAllPlugins, disablePlugin, enablePlugin } from './loader'
+import { addPluginSource, deletePluginSource } from './source-registry'
+import { activateServerPlugins, deactivateAllPlugins, disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from './loader'
 import { getRegisteredMcpServers } from './mcp-registry'
 import { calculatePluginPackageChecksum } from './package-checksum'
 import { listPluginDescriptors } from './runtime-registry'
@@ -24,6 +25,7 @@ import { deletePluginTrustGrantsForPlugin, grantPluginTrust } from './trust-gran
 let tempPluginsDir: string | undefined
 
 interface PluginPackageOptions {
+  packageName?: string
   contributes?: Record<string, unknown>
   omitContributes?: boolean
   grantedPermissions?: string[]
@@ -44,7 +46,7 @@ async function writePluginPackage(options: PluginPackageOptions = {}): Promise<s
   await writeFile(
     join(pluginDir, 'package.json'),
     JSON.stringify({
-      name: '@cradle/loader-cleanup',
+      name: options.packageName ?? '@cradle/loader-cleanup',
       type: 'module',
       version: '1.0.0',
       cradle: {
@@ -179,6 +181,12 @@ describe('server plugin loader lifecycle', () => {
     resetNativeSkillProjectionTargets()
     setPluginActivationPolicy('@cradle/loader-cleanup', { enabled: true, reason: null })
     deletePluginTrustGrantsForPlugin('@cradle/loader-cleanup')
+    db().delete(pluginSources).run()
+    db()
+      .delete(pluginActivationPolicies)
+      .where(eq(pluginActivationPolicies.pluginName, '@acme/live-source'))
+      .run()
+    deletePluginTrustGrantsForPlugin('@acme/live-source')
     db()
       .delete(relayHostEnrollments)
       .where(eq(relayHostEnrollments.id, 'plugin-loader-relay-fixture'))
@@ -763,5 +771,60 @@ describe('server plugin loader lifecycle', () => {
       version: '1.0.0',
       ref: 'main',
     })
+  })
+
+  it('discovers a persisted local source without activating it until operator enable', async () => {
+    tempPluginsDir = await writePluginPackage({
+      packageName: '@acme/live-source',
+      contributes: {
+        capabilities: [{
+          id: 'mcp.live-source',
+          type: 'mcp-server',
+          layer: 'server',
+          permissions: [],
+        }],
+        permissions: [],
+      },
+      serverSource: [
+        'export function activate(ctx) {',
+        '  ctx.mcp.registerServer({ transport: "stdio", name: "live-source", command: "node", args: ["server.mjs"] })',
+        '}',
+      ].join('\n'),
+    })
+    db()
+      .delete(pluginActivationPolicies)
+      .where(eq(pluginActivationPolicies.pluginName, '@acme/live-source'))
+      .run()
+
+    const source = addPluginSource({
+      kind: 'localPath',
+      location: tempPluginsDir,
+      addedReason: 'test source',
+    })
+
+    const discovered = await discoverAndActivateSource(source.id)
+
+    expect(discovered).toHaveLength(1)
+    const descriptor = listPluginDescriptors().find(plugin => plugin.identity === '@acme/live-source')
+    expect(descriptor?.source.kind).toBe('externalLocal')
+    expect(descriptor?.activation).toMatchObject({
+      enabled: false,
+      source: 'user',
+      reason: 'External plugin source was added. Enable the plugin to trust and activate it.',
+    })
+    expect(descriptor?.layers.server.status).toBe('disabled')
+    expect(getRegisteredMcpServers()).not.toHaveProperty('live-source')
+
+    const enabled = await enablePlugin('@acme/live-source')
+
+    expect(enabled.layers.server.status).toBe('active')
+    expect(enabled.source.trusted).toBe(true)
+    expect(getRegisteredMcpServers()).toHaveProperty('live-source')
+
+    await removeDiscoveredSource(source.id)
+    deletePluginSource(source.id)
+
+    expect(listPluginDescriptors().some(plugin => plugin.identity === '@acme/live-source')).toBe(false)
+    expect(getRegisteredMcpServers()).not.toHaveProperty('live-source')
   })
 })

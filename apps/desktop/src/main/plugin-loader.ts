@@ -429,6 +429,98 @@ function validatePluginModule(
   }
 }
 
+function registerDesktopPluginDescriptor(descriptor: PluginDescriptor): void {
+  if (!descriptor.identity || isRejectedDescriptor(descriptor)) {
+    invalidDesktopPluginDescriptors.push(descriptor)
+    return
+  }
+  desktopPluginDescriptors.set(descriptor.identity, descriptor)
+}
+
+export async function activateOneDesktopPlugin(manifest: PluginManifest): Promise<void> {
+  if (!manifest.cradle.desktop) { return }
+  if (activePlugins.has(manifest.name)) { return }
+
+  const entryPath = resolve(manifest.packageDir, manifest.cradle.desktop)
+  const descriptor = desktopPluginDescriptors.get(manifest.name)
+  let subscriptions: Disposable[] = []
+  if (descriptor) {
+    const permissionDecision = evaluatePluginPermissionPolicy(descriptor, 'desktop', process.env)
+    if (!permissionDecision.allowed) {
+      setDesktopLayerStatus(descriptor, 'disabled', permissionDecision.reason)
+      console.warn('[plugins] desktop plugin disabled by permission policy:', {
+        plugin: manifest.name,
+        missingRequiredPermissions: permissionDecision.missingRequiredPermissions,
+      })
+      return
+    }
+    setDesktopLayerStatus(descriptor, 'activating')
+  }
+
+  try {
+    const mod = await import(pathToFileURL(entryPath).href)
+    validatePluginModule(mod, manifest.name)
+
+    const ctx = createDesktopPluginContext(manifest)
+    subscriptions = ctx.subscriptions
+    await mod.activate(ctx)
+
+    activePlugins.set(manifest.name, {
+      deactivate: mod.deactivate as (() => void | Promise<void>) | undefined,
+      subscriptions: ctx.subscriptions,
+    })
+    if (descriptor) {
+      setDesktopLayerStatus(descriptor, 'active')
+    }
+    console.log(`[plugins] desktop activated: ${manifest.name}`)
+  }
+  catch (err) {
+    disposeSubscriptions(manifest.name, subscriptions)
+    if (descriptor) {
+      setDesktopLayerStatus(descriptor, 'failed', formatError(err))
+    }
+    console.error(`[plugins] failed to activate desktop plugin ${manifest.name}:`, err)
+  }
+}
+
+export async function deactivateOneDesktopPlugin(
+  pluginName: string,
+  options: { removeDescriptor?: boolean } = {},
+): Promise<void> {
+  const plugin = activePlugins.get(pluginName)
+  activePlugins.delete(pluginName)
+  if (plugin) {
+    try {
+      await plugin.deactivate?.()
+    }
+    catch (err) {
+      console.error(`[plugins] error deactivating ${pluginName}:`, err)
+    }
+    finally {
+      disposeSubscriptions(pluginName, plugin.subscriptions)
+    }
+  }
+  if (options.removeDescriptor !== false) {
+    desktopPluginDescriptors.delete(pluginName)
+  }
+}
+
+export async function discoverAndActivateDesktopPluginSource(
+  source: DesktopPluginSource,
+  pluginIdentities?: ReadonlySet<string>,
+): Promise<void> {
+  const { manifests, descriptors } = await discoverDesktopPlugins([source])
+  for (const descriptor of descriptors) {
+    if (pluginIdentities && !pluginIdentities.has(descriptor.identity)) { continue }
+    registerDesktopPluginDescriptor(descriptor)
+  }
+
+  for (const manifest of manifests) {
+    if (pluginIdentities && !pluginIdentities.has(manifest.name)) { continue }
+    await activateOneDesktopPlugin(manifest)
+  }
+}
+
 /**
  * Discover and activate all desktop plugins.
  * Must be called BEFORE startServer() so shared config is available for the fork.
@@ -442,72 +534,20 @@ export async function activateDesktopPlugins(): Promise<void> {
 
   const { manifests, descriptors } = await discoverDesktopPlugins(sources)
   for (const descriptor of descriptors) {
-    if (!descriptor.identity || isRejectedDescriptor(descriptor)) {
-      invalidDesktopPluginDescriptors.push(descriptor)
-    }
- else {
-      desktopPluginDescriptors.set(descriptor.identity, descriptor)
-    }
+    registerDesktopPluginDescriptor(descriptor)
   }
 
   const desktopPlugins = manifests.filter(m => m.cradle.desktop)
 
   for (const manifest of desktopPlugins) {
-    const entryPath = resolve(manifest.packageDir, manifest.cradle.desktop!)
-    const descriptor = desktopPluginDescriptors.get(manifest.name)
-    let subscriptions: Disposable[] = []
-    if (descriptor) {
-      const permissionDecision = evaluatePluginPermissionPolicy(descriptor, 'desktop', process.env)
-      if (!permissionDecision.allowed) {
-        setDesktopLayerStatus(descriptor, 'disabled', permissionDecision.reason)
-        console.warn('[plugins] desktop plugin disabled by permission policy:', {
-          plugin: manifest.name,
-          missingRequiredPermissions: permissionDecision.missingRequiredPermissions,
-        })
-        continue
-      }
-      setDesktopLayerStatus(descriptor, 'activating')
-    }
-
-    try {
-      const mod = await import(pathToFileURL(entryPath).href)
-      validatePluginModule(mod, manifest.name)
-
-      const ctx = createDesktopPluginContext(manifest)
-      subscriptions = ctx.subscriptions
-      await mod.activate(ctx)
-
-      activePlugins.set(manifest.name, {
-        deactivate: mod.deactivate as (() => void | Promise<void>) | undefined,
-        subscriptions: ctx.subscriptions,
-      })
-      if (descriptor) {
-        setDesktopLayerStatus(descriptor, 'active')
-      }
-      console.log(`[plugins] desktop activated: ${manifest.name}`)
-    }
- catch (err) {
-      disposeSubscriptions(manifest.name, subscriptions)
-      if (descriptor) {
-        setDesktopLayerStatus(descriptor, 'failed', formatError(err))
-      }
-      console.error(`[plugins] failed to activate desktop plugin ${manifest.name}:`, err)
-    }
+    await activateOneDesktopPlugin(manifest)
   }
 }
 
 /** Deactivate all desktop plugins (called on app quit) */
 export async function deactivateDesktopPlugins(): Promise<void> {
-  for (const [name, plugin] of activePlugins) {
-    try {
-      await plugin.deactivate?.()
-    }
- catch (err) {
-      console.error(`[plugins] error deactivating ${name}:`, err)
-    }
- finally {
-      disposeSubscriptions(name, plugin.subscriptions)
-    }
+  for (const name of [...activePlugins.keys()]) {
+    await deactivateOneDesktopPlugin(name, { removeDescriptor: false })
   }
   activePlugins.clear()
 }

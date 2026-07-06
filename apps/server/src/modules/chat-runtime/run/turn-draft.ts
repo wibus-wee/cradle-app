@@ -8,6 +8,7 @@ import { currentUnixSeconds } from '../../../helpers/time'
 import { readDurableProviderRuntimeBinding } from '../../provider-runtime/service'
 import type { ChatContextPart } from '../context-parts'
 import { commitSessionEvents } from '../es/commands'
+import type { BackendRunStartedFact } from '../es/events'
 import type { ChatSessionContinuationMode } from '../queue/session-queue'
 import type { RuntimeGoalContinuation } from '../runtime-provider-types'
 import {
@@ -55,7 +56,6 @@ export interface StartRunInput {
   messageId: string
   origin: 'user' | 'issue-agent' | 'system'
   assistantMessage: UIMessage
-  assistantMessageProjection?: 'insert' | 'update'
   queueItemId?: string | null
 }
 
@@ -194,7 +194,7 @@ export async function insertCompletedUserMessage(
 export async function startRun(input: StartRunInput): Promise<BackendRun> {
   const binding = readDurableProviderRuntimeBinding(input.sessionId)
   const now = currentUnixSeconds()
-  const run: BackendRun = {
+  const run = {
     id: randomUUID(),
     bindingId: binding?.id ?? null,
     chatSessionId: input.sessionId,
@@ -205,7 +205,7 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
     errorText: null,
     startedAt: now,
     finishedAt: null
-  }
+  } satisfies BackendRunStartedFact
   await commitSessionEvents(input.sessionId, [
     {
       type: 'RunStarted',
@@ -226,7 +226,6 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
           createdAt: now,
           updatedAt: now
         },
-        assistantMessageProjection: input.assistantMessageProjection ?? 'insert',
         queueItemId: input.queueItemId ?? null
       }
     }

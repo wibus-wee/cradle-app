@@ -22,6 +22,49 @@ export const plugins = new Elysia({
     },
     response: { 200: t.Array(PluginsModel.pluginMentionCandidate) },
   })
+  .get('/sources', () => Plugins.listSources(), {
+    detail: {
+      'summary': 'List plugin sources',
+      'x-cradle-cli': {
+        command: ['plugin', 'source', 'list'],
+      },
+    },
+    response: { 200: t.Array(PluginsModel.pluginSourceRegistryEntry) },
+  })
+  .post('/sources', ({ body }) => Plugins.createSource(body), {
+    detail: {
+      'summary': 'Add plugin source',
+      'x-cradle-cli': {
+        command: ['plugin', 'source', 'add'],
+      },
+    },
+    body: PluginsModel.addPluginSourceBody,
+    response: { 200: PluginsModel.addPluginSourceResult },
+  })
+  .get('/sources/:id', ({ params }) => Plugins.getSource(params.id), {
+    detail: {
+      'summary': 'Get plugin source',
+      'x-cradle-cli': {
+        command: ['plugin', 'source', 'get'],
+      },
+    },
+    params: t.Object({
+      id: t.String({ minLength: 1 }),
+    }),
+    response: { 200: PluginsModel.pluginSourceRegistryEntry },
+  })
+  .delete('/sources/:id', ({ params }) => Plugins.removeSource(params.id), {
+    detail: {
+      'summary': 'Remove plugin source',
+      'x-cradle-cli': {
+        command: ['plugin', 'source', 'remove'],
+      },
+    },
+    params: t.Object({
+      id: t.String({ minLength: 1 }),
+    }),
+    response: { 200: t.Object({ removed: t.Literal(true) }) },
+  })
   .get('/:routeSegment/icon', async ({ params }) => {
     const icon = await Plugins.readPluginIcon(params.routeSegment)
     const body = icon.bytes.buffer.slice(

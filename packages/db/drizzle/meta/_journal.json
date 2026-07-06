@@ -162,6 +162,13 @@
       "when": 1783243046218,
       "tag": "0022_quiet_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1783323010014,
+      "tag": "0023_bored_speed",
+      "breakpoints": true
     }
   ]
 }

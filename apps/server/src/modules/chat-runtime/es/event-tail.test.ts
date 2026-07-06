@@ -161,6 +161,20 @@ describe('chat session event tail', () => {
       },
     })
     expect(JSON.stringify(tailEvent.payload)).not.toContain('secret transcript content')
+    expect(tailEvent).toMatchInlineSnapshot(`
+      {
+        "occurredAt": 100,
+        "payload": {
+          "messageId": "assistant-1",
+          "status": "complete",
+        },
+        "scope": "session",
+        "sequenceId": 1,
+        "sessionId": "session-1",
+        "type": "AssistantMessageCompleted",
+        "version": 1,
+      }
+    `)
   })
 
   it('projects interaction events without approval reasons or user answers', () => {
@@ -191,6 +205,62 @@ describe('chat session event tail', () => {
     })
     expect(JSON.stringify(tailEvent.payload)).not.toContain('reason')
     expect(JSON.stringify(tailEvent.payload)).not.toContain('answers')
+  })
+
+  it('projects plan implementation responses to the message refresh DTO', () => {
+    const event = storedEvent({
+      type: 'PlanImplementationResponded',
+      payload: {
+        sessionId: 'session-1',
+        messageId: 'assistant-1',
+        approvalId: 'implement-plan:tool-1',
+        approved: true,
+        updatedAt: 140,
+      },
+    })
+
+    const tailEvent = toChatSessionTailEvent(event)
+
+    expect(tailEvent).toMatchObject({
+      type: 'PlanImplementationResponded',
+      payload: {
+        messageId: 'assistant-1',
+        approvalId: 'implement-plan:tool-1',
+        approved: true,
+      },
+    })
+    expect(JSON.stringify(tailEvent.payload)).not.toContain('messageJson')
+  })
+
+  it('projects assistant message snapshots to slim message refresh DTOs', () => {
+    const event = storedEvent({
+      type: 'AssistantMessageSnapshotted',
+      payload: {
+        runId: 'run-1',
+        message: {
+          id: 'assistant-1',
+          sessionId: 'session-1',
+          content: 'partial secret transcript content',
+          messageJson: '{"id":"assistant-1","role":"assistant","parts":[]}',
+          status: 'streaming',
+          errorText: null,
+          updatedAt: 150,
+        },
+        messageJsonBytes: 52,
+      },
+    })
+
+    const tailEvent = toChatSessionTailEvent(event)
+
+    expect(tailEvent).toMatchObject({
+      type: 'AssistantMessageSnapshotted',
+      payload: {
+        messageId: 'assistant-1',
+        status: 'streaming',
+      },
+    })
+    expect(JSON.stringify(tailEvent.payload)).not.toContain('partial secret transcript content')
+    expect(JSON.stringify(tailEvent.payload)).not.toContain('messageJson')
   })
 
   it('emits SnapshotRequired instead of truncating replay when the requested gap exceeds the limit', async () => {

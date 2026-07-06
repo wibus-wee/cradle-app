@@ -4,7 +4,6 @@ import { subscribeChatSessionStreamForSession } from '../transport/chat-stream-t
 import { ChatStreamingHandler } from '../transport/chat-streaming-handler'
 import type { SessionPassiveStreamRequest } from './session-sync-engine'
 import {
-  detachPassiveSessionStreamingState,
   QUEUE_DRAIN_SYNC_DELAY_MS,
 } from './use-chat-session-types'
 
@@ -12,10 +11,11 @@ export interface OpenPassiveSessionStreamInput {
   request: SessionPassiveStreamRequest
   scheduleSnapshotRefresh: (delay?: number) => void
   refreshQueue: (delay?: number) => void
+  releaseStreamLeaseAfterSnapshot: (messageId: string) => void
 }
 
 export function openPassiveSessionStream(input: OpenPassiveSessionStreamInput) {
-  const { request, scheduleSnapshotRefresh, refreshQueue } = input
+  const { request, scheduleSnapshotRefresh, refreshQueue, releaseStreamLeaseAfterSnapshot } = input
   const controller = new AbortController()
   const handler = new ChatStreamingHandler(
     request.sessionId,
@@ -44,8 +44,10 @@ export function openPassiveSessionStream(input: OpenPassiveSessionStreamInput) {
       }
     }
     finally {
+      const messageId = handler.readActiveMessageId()
       handler.dispose()
       request.onSettled()
+      releaseStreamLeaseAfterSnapshot(messageId)
       scheduleSnapshotRefresh(0)
       refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
     }
@@ -55,7 +57,6 @@ export function openPassiveSessionStream(input: OpenPassiveSessionStreamInput) {
     close: () => {
       controller.abort()
       handler.dispose()
-      detachPassiveSessionStreamingState(request.sessionId)
     },
   }
 }

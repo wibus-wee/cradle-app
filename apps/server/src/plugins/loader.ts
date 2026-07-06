@@ -32,8 +32,11 @@ import {
   setPluginActivationState,
   setPluginLayerState,
   setPluginSourceDescriptor,
+  unregisterPluginDescriptor,
 } from './runtime-registry'
 import { resetPluginSkillRegistry } from './skill-registry'
+import { listPluginSources, readPluginSource } from './source-registry'
+import { deletePluginSourceCache, refreshPluginSourceDirectory, resolvePluginSourceDirectory } from './source-installer'
 import { createPluginStaticServer, rewritePluginWebBundleImports } from './static-server'
 import { calculatePluginPackageChecksum } from './package-checksum'
 import { grantPluginTrust } from './trust-grants'
@@ -69,11 +72,13 @@ interface PluginDiscoverySource {
   pluginsDir: string
   kind?: PluginSourceKind
   trustMarketplaceGrants?: boolean
+  persistedSourceId?: string
 }
 
 interface PackageWithSource {
   pkg: DiscoveredPluginPackage
   source: PluginSourceDescriptor
+  persistedSourceId?: string
 }
 
 function readPrimaryPluginSourceKind(): PluginSourceKind | undefined {
@@ -89,7 +94,7 @@ function readMarketplacePluginsDir(): string | undefined {
   return value ? resolve(value) : undefined
 }
 
-function getPluginDiscoverySources(defaultPluginsDir: string): PluginDiscoverySource[] {
+async function getPluginDiscoverySources(defaultPluginsDir: string): Promise<PluginDiscoverySource[]> {
   const marketplacePluginsDir = readMarketplacePluginsDir()
   const externalDirs = (process.env.CRADLE_EXTERNAL_PLUGINS_DIRS ?? '')
     .split(delimiter)
@@ -110,6 +115,26 @@ function getPluginDiscoverySources(defaultPluginsDir: string): PluginDiscoverySo
   addSource(defaultPluginsDir, readPrimaryPluginSourceKind())
   for (const pluginsDir of externalDirs) {
     addSource(pluginsDir, 'externalLocal')
+  }
+  for (const source of listPluginSources()) {
+    try {
+      const pluginsDir = await resolvePluginSourceDirectory(source)
+      const normalizedDir = resolve(pluginsDir)
+      if (sources.some(existing => resolve(existing.pluginsDir) === normalizedDir)) { continue }
+      sources.push({
+        pluginsDir,
+        kind: 'externalLocal',
+        persistedSourceId: source.id,
+      })
+    }
+    catch (error) {
+      logger.error('plugin source resolution failed', {
+        sourceId: source.id,
+        kind: source.kind,
+        location: source.location,
+        error,
+      })
+    }
   }
   return sources
 }
@@ -153,10 +178,17 @@ async function discoverPackagesFromSources(
       packages.push({
         pkg: trustedPackage,
         source: trustedSource,
+        persistedSourceId: source.persistedSourceId,
       })
     }
   }
   return packages
+}
+
+function isPathWithin(path: string, parent: string): boolean {
+  const normalizedPath = resolve(path)
+  const normalizedParent = resolve(parent)
+  return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`)
 }
 
 function disposeSubscriptions(name: string, subscriptions: Disposable[]): void {
@@ -186,6 +218,19 @@ function refreshPluginActivationState(pluginName: string): boolean {
       }
     : { enabled: true, source: 'default' })
   return policy?.enabled ?? true
+}
+
+function initializePersistedSourceActivationPolicy(
+  manifest: PluginManifest,
+  persistedSourceId: string | undefined,
+): void {
+  if (!persistedSourceId || readPluginActivationPolicy(manifest.name)) {
+    return
+  }
+  setPluginActivationPolicy(manifest.name, {
+    enabled: false,
+    reason: 'External plugin source was added. Enable the plugin to trust and activate it.',
+  })
 }
 
 function markPluginLayersDisabled(manifest: PluginManifest, reason: string): void {
@@ -341,7 +386,7 @@ export async function activateServerPlugins(app: Elysia): Promise<void> {
   const thisDir = dirname(fileURLToPath(import.meta.url))
   const pluginsDir = process.env.CRADLE_PLUGINS_DIR
     ?? resolve(thisDir, '../../../../plugins')
-  const packages = await discoverPackagesFromSources(getPluginDiscoverySources(pluginsDir), {
+  const packages = await discoverPackagesFromSources(await getPluginDiscoverySources(pluginsDir), {
     relayHostExposed: readRelayHostExposure(),
   })
   resetPluginRuntimeRegistry()
@@ -350,7 +395,7 @@ export async function activateServerPlugins(app: Elysia): Promise<void> {
   resetExternalIssueSourceRegistry()
   resetConversationBridgeAdapterRegistry()
 
-  for (const { pkg, source } of packages) {
+  for (const { pkg, source, persistedSourceId } of packages) {
     if (!pkg.manifest) {
       const identity = `invalid:${basename(pkg.packageDir)}`
       registerPluginDescriptor(createInvalidPluginDescriptor(identity, '0.0.0', source, pkg.error ?? 'Invalid plugin package.'))
@@ -358,6 +403,7 @@ export async function activateServerPlugins(app: Elysia): Promise<void> {
     }
     registerPluginDescriptor(createPluginDescriptor(pkg.manifest, source))
     discoveredPluginManifests.set(pkg.manifest.name, pkg.manifest)
+    initializePersistedSourceActivationPolicy(pkg.manifest, persistedSourceId)
   }
 
   const descriptors = listPluginDescriptors()
@@ -382,7 +428,7 @@ export async function activateServerPlugins(app: Elysia): Promise<void> {
   }
 
   // Plugin static server — serves web entries + plugin list API
-  const staticServer = createPluginStaticServer(manifests)
+  const staticServer = createPluginStaticServer(() => [...discoveredPluginManifests.values()])
 
   const pluginRoutes = new Elysia({ prefix: '/api/plugins' })
     .get('/', () => staticServer.getPluginList())
@@ -425,6 +471,77 @@ export async function activateServerPlugins(app: Elysia): Promise<void> {
     ))
 
   app.use(pluginRoutes)
+}
+
+async function registerDiscoveredPackages(packages: PackageWithSource[]): Promise<PluginManifest[]> {
+  const manifests: PluginManifest[] = []
+  for (const { pkg, source, persistedSourceId } of packages) {
+    if (!pkg.manifest) {
+      const identity = `invalid:${basename(pkg.packageDir)}`
+      registerPluginDescriptor(createInvalidPluginDescriptor(identity, '0.0.0', source, pkg.error ?? 'Invalid plugin package.'))
+      continue
+    }
+    registerPluginDescriptor(createPluginDescriptor(pkg.manifest, source))
+    discoveredPluginManifests.set(pkg.manifest.name, pkg.manifest)
+    initializePersistedSourceActivationPolicy(pkg.manifest, persistedSourceId)
+    manifests.push(pkg.manifest)
+  }
+  return manifests
+}
+
+async function prepareAndActivateManifests(manifests: PluginManifest[]): Promise<void> {
+  for (const manifest of manifests) {
+    const descriptor = getPluginDescriptor(manifest.name)
+    if (!descriptor) { continue }
+    const enabled = refreshPluginActivationState(manifest.name)
+    if (!enabled) {
+      markPluginLayersDisabled(manifest, toDisabledReason(descriptor.activation.reason))
+      continue
+    }
+    await preparePluginWebLayer(manifest)
+  }
+
+  for (const manifest of manifests) {
+    if (!getPluginDescriptor(manifest.name)?.activation.enabled) { continue }
+    await activatePluginServerLayer(manifest)
+  }
+}
+
+export async function discoverAndActivateSource(sourceId: string): Promise<PluginDescriptor[]> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new Error(`Plugin source not found: ${sourceId}`)
+  }
+  const pluginsDir = await refreshPluginSourceDirectory(source)
+  const packages = await discoverPackagesFromSources([{
+    pluginsDir,
+    kind: 'externalLocal',
+    persistedSourceId: source.id,
+  }], {
+    relayHostExposed: readRelayHostExposure(),
+  })
+  const manifests = await registerDiscoveredPackages(packages)
+  await prepareAndActivateManifests(manifests)
+  return manifests
+    .map(manifest => getPluginDescriptor(manifest.name))
+    .filter((descriptor): descriptor is PluginDescriptor => !!descriptor)
+}
+
+export async function removeDiscoveredSource(sourceId: string): Promise<void> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new Error(`Plugin source not found: ${sourceId}`)
+  }
+  const pluginsDir = await resolvePluginSourceDirectory(source)
+  const descriptors = listPluginDescriptors()
+    .filter(descriptor => isPathWithin(descriptor.source.packageDir, pluginsDir))
+
+  for (const descriptor of descriptors) {
+    await deactivatePluginServerLayer(descriptor.identity)
+    discoveredPluginManifests.delete(descriptor.identity)
+    unregisterPluginDescriptor(descriptor.identity)
+  }
+  await deletePluginSourceCache(source)
 }
 
 async function dispatchPluginRouteFromElysia(

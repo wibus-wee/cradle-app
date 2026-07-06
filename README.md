@@ -11,14 +11,16 @@
     <img src='https://img.shields.io/github/downloads/wibus-wee/cradle-app/total?style=flat-square'>
     <br />
     <br />
-    <a href="https://github.com/wibus-wee/Cradle-app/releases">Download Latest Release</a>
+    <b>Download for </b>
+		<a href="https://github.com/wibus-wee/Cradle-app/releases">macOS</a> · Windows · Linux · <a href="https://app.cradle.wibus.ren/">Web</a>
+    <br />
   </p>
 </p>
 
 > The project is still in the early stages of development. If you have any ideas or suggestions, please feel free to open an issue or open a pull request. Your contributions are welcome! Thank you for your support and interest in this project ❤️.
 
 <p align="center">
-<img src='./.github/readme/Slide 4:3.png' alt='Screenshot' width='800px' />
+<img src='./.github/readme/screenshot.png' alt='Screenshot' width='800px' />
 </p>
 
 

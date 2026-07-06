@@ -24,7 +24,22 @@ export const pluginActivationPolicies = sqliteTable('plugin_activation_policies'
   byPlugin: uniqueIndex('plugin_activation_policies_plugin_unique').on(table.pluginName),
 }))
 
+export const pluginSources = sqliteTable('plugin_sources', {
+  id: textPk(),
+  kind: text('kind', { enum: ['localPath', 'git', 'npm'] }).notNull(),
+  location: text('location').notNull(),
+  ref: text('ref'),
+  subPath: text('sub_path'),
+  label: text('label'),
+  addedReason: text('added_reason').notNull(),
+  ...timestamps(),
+}, table => ({
+  byKindLocation: index('plugin_sources_kind_location_idx').on(table.kind, table.location),
+}))
+
 export type PluginStorageEntry = typeof pluginStorageEntries.$inferSelect
 export type NewPluginStorageEntry = typeof pluginStorageEntries.$inferInsert
 export type PluginActivationPolicy = typeof pluginActivationPolicies.$inferSelect
 export type NewPluginActivationPolicy = typeof pluginActivationPolicies.$inferInsert
+export type PluginSource = typeof pluginSources.$inferSelect
+export type NewPluginSource = typeof pluginSources.$inferInsert

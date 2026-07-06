@@ -52,7 +52,7 @@ export type SyncClientFrame
 
 export type SyncServerDataFrame
   = | { subId: string, seq?: number, kind: 'tail-event', event: ChatSessionTailEvent | ChatGlobalSessionTailEvent }
-    | { subId: string, seq?: number, kind: 'chunk', chunk: UIMessageChunk, terminal?: boolean }
+    | { subId: string, seq?: number, kind: 'chunk', chunk: UIMessageChunk, terminal?: boolean, replay?: boolean }
     | { subId: string, seq?: number, kind: 'file-event', event: SyncWorkspaceFileChangeEvent }
     | { subId: string, kind: 'sub-ack', cursor: number }
     | { subId: string, kind: 'end', reason: SyncEndReason, detail?: string }

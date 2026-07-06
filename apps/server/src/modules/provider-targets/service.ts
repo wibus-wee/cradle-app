@@ -6,7 +6,6 @@ import {
   agents,
   agentSessions,
   backendCapabilitySnapshots,
-  chatSessionQueueItems,
   externalProviderRecords,
   providerTargetModelCache,
   providerTargets,
@@ -24,6 +23,8 @@ import {
   CODEX_CHATGPT_AUTH_SECRET_KIND,
   CODEX_PERSONAL_ACCESS_TOKEN_SECRET_KIND,
 } from '../chat-runtime-providers/codex/app-server/chatgpt-auth'
+import { clearProviderTargetFromSessionQueuesInTransaction } from '../chat-runtime/es/commands'
+import { publishSessionTailEvents } from '../chat-runtime/es/event-tail'
 import type { ClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
 import {
   applyClaudeAgentConfigPatch,
@@ -462,7 +463,7 @@ export function updateProviderTargetEnabled(
 export function removeProviderTarget(providerTargetId: string): void {
   const target = resolveProviderTarget(providerTargetId)
   const d = db()
-  d.transaction((tx) => {
+  const storedSessionEvents = d.transaction((tx) => {
     const now = nowUnix()
     const ownedAgentIds = tx
       .select({ id: agents.id })
@@ -491,10 +492,10 @@ export function removeProviderTarget(providerTargetId: string): void {
       .set({ providerTargetId: null })
       .where(eq(usageLogs.providerTargetId, target.id))
       .run()
-    tx.update(chatSessionQueueItems)
-      .set({ providerTargetId: null, updatedAt: now })
-      .where(eq(chatSessionQueueItems.providerTargetId, target.id))
-      .run()
+    const queueEvents = clearProviderTargetFromSessionQueuesInTransaction(tx, {
+      providerTargetId: target.id,
+      updatedAt: now
+    })
     tx.delete(providerTargetModelCache).where(eq(providerTargetModelCache.providerTargetId, target.id)).run()
     tx.delete(agentSessions).where(eq(agentSessions.providerTargetId, target.id)).run()
     if (ownedAgentIds.length > 0) {
@@ -508,7 +509,9 @@ export function removeProviderTarget(providerTargetId: string): void {
         .run()
     }
     tx.delete(providerTargets).where(eq(providerTargets.id, target.id)).run()
+    return queueEvents
   })
+  publishSessionTailEvents(storedSessionEvents)
   releaseLiveProviderRuntimeSessionsForProviderTarget(target.id)
 }
 

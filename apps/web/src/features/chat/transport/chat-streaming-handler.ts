@@ -5,6 +5,7 @@ import type { MessageReconcileChange } from '~/store/chat'
 import { useChatStore } from '~/store/chat'
 
 import { emitChatRunSettled } from './sse-chat-transport'
+import type { ChatStreamChunk } from './chat-stream-types'
 
 const STREAM_FLUSH_INTERVAL_MS = 125
 type ChatStreamingStore = Pick<typeof useChatStore, 'getState'>
@@ -20,12 +21,15 @@ export class ChatStreamingHandler {
   private activeMessageId: string | null = null
   private terminated = false
   private pendingMessages = new Map<string, { message: UIMessage, receivedAtMs: number, dirtyToolCallIds: Set<string> }>()
+  private latestMessageSnapshots = new Map<string, { message: UIMessage, receivedAtMs: number, dirtyToolCallIds: Set<string> }>()
   private pendingDirtyToolCallIds = new Set<string>()
   private rafId: number | null = null
   private flushTimerId: number | null = null
   private microtaskFlushQueued = false
   private lastFlushAtMs = 0
   private settled = false
+  private currentChunkReplay = false
+  private replayBatchOpen = false
 
   constructor(
     sessionId: string,
@@ -51,10 +55,10 @@ export class ChatStreamingHandler {
     const store = this.store.getState()
     store.beginRunDisplayMeta(this.messageId, this.requestStartedAtMs)
     if (this.mode === 'passive') {
-      store.setPassiveRunState(this.sessionId, {
-        messageIds: [this.messageId],
-        allowMissingMessage: true,
-        status: 'streaming',
+      store.acquireStreamLease({
+        sessionId: this.sessionId,
+        messageId: this.messageId,
+        source: 'passive',
       })
       return
     }
@@ -62,7 +66,7 @@ export class ChatStreamingHandler {
     store.startGeneration(this.sessionId, this.messageId, controller)
   }
 
-  async consume(stream: ReadableStream<UIMessageChunk>): Promise<void> {
+  async consume(stream: ReadableStream<ChatStreamChunk>): Promise<void> {
     const initialMessage = this.useStoredMessageSnapshot
       ? cloneMessageForStreamReader(
           this.store.getState().messagesMap.get(this.sessionId)?.find(message => message.id === (this.activeMessageId ?? this.messageId)),
@@ -78,8 +82,9 @@ export class ChatStreamingHandler {
       stream: this.trackStreamChanges(stream),
       terminateOnError: true,
     })) {
-      this.applyMessageSnapshot(message)
+      this.applyMessageSnapshot(message, this.currentChunkReplay)
     }
+    this.stageLatestMessageSnapshots()
     this.flushPendingMessages()
   }
 
@@ -91,12 +96,13 @@ export class ChatStreamingHandler {
     this.terminated = true
     const messageId = this.activeMessageId ?? this.messageId
     const store = this.store.getState()
-    store.finishGeneration(messageId)
-    if (this.mode === 'local' && this.activeMessageId === null) {
-      store.removeMessage(this.sessionId, this.messageId)
-    }
     if (this.mode === 'passive') {
-      store.setPassiveRunState(this.sessionId, { messageIds: [], status: 'idle' })
+      this.emitSettled(messageId, 'complete')
+      return
+    }
+    store.finishGeneration(messageId)
+    if (this.activeMessageId === null) {
+      store.removeMessage(this.sessionId, this.messageId)
     }
     this.emitSettled(messageId, 'complete')
   }
@@ -110,9 +116,6 @@ export class ChatStreamingHandler {
     const messageId = this.activeMessageId ?? this.messageId
     const store = this.store.getState()
     store.failGeneration(messageId, error)
-    if (this.mode === 'passive') {
-      store.setPassiveRunState(this.sessionId, { messageIds: [], status: 'error' })
-    }
     this.emitSettled(messageId, 'error')
   }
 
@@ -127,7 +130,13 @@ export class ChatStreamingHandler {
     }
     this.microtaskFlushQueued = false
     this.pendingMessages.clear()
+    this.latestMessageSnapshots.clear()
     this.pendingDirtyToolCallIds.clear()
+    this.replayBatchOpen = false
+  }
+
+  readActiveMessageId(): string {
+    return this.activeMessageId ?? this.messageId
   }
 
   private flushPendingMessages(): void {
@@ -174,7 +183,7 @@ export class ChatStreamingHandler {
     })
   }
 
-  private applyMessageSnapshot(message: UIMessage): void {
+  private applyMessageSnapshot(message: UIMessage, replay: boolean): void {
     const receivedAtMs = performance.now()
     this.activateServerMessage(message.id)
 
@@ -184,7 +193,14 @@ export class ChatStreamingHandler {
       dirtyToolCallIds.add(toolCallId)
     }
     this.pendingDirtyToolCallIds.clear()
-    this.pendingMessages.set(message.id, { message, receivedAtMs, dirtyToolCallIds })
+    const snapshot = { message, receivedAtMs, dirtyToolCallIds }
+    this.latestMessageSnapshots.set(message.id, snapshot)
+    this.pendingMessages.set(message.id, snapshot)
+
+    if (replay) {
+      this.replayBatchOpen = true
+      return
+    }
 
     if (typeof requestAnimationFrame !== 'function') {
       if (!this.microtaskFlushQueued) {
@@ -223,6 +239,12 @@ export class ChatStreamingHandler {
     })
   }
 
+  private stageLatestMessageSnapshots(): void {
+    for (const [messageId, snapshot] of this.latestMessageSnapshots) {
+      this.pendingMessages.set(messageId, snapshot)
+    }
+  }
+
   private activateServerMessage(messageId: string): void {
     if (this.activeMessageId === messageId) {
       return
@@ -252,11 +274,7 @@ export class ChatStreamingHandler {
     if (this.activeMessageId === null && messageId !== this.messageId) {
       if (this.mode === 'passive') {
         store.moveRunDisplayMeta(this.messageId, messageId)
-        store.setPassiveRunState(this.sessionId, {
-          messageIds: [messageId],
-          allowMissingMessage: true,
-          status: 'streaming',
-        })
+        store.moveStreamLease(this.sessionId, this.messageId, messageId)
       }
       else {
         store.moveStreamingMessage(this.sessionId, this.messageId, messageId)
@@ -281,11 +299,16 @@ export class ChatStreamingHandler {
     })
   }
 
-  private trackStreamChanges(stream: ReadableStream<UIMessageChunk>): ReadableStream<UIMessageChunk> {
-    return stream.pipeThrough(new TransformStream<UIMessageChunk, UIMessageChunk>({
-      transform: (chunk, controller) => {
-        this.recordChunkChange(chunk)
-        controller.enqueue(chunk)
+  private trackStreamChanges(stream: ReadableStream<ChatStreamChunk>): ReadableStream<UIMessageChunk> {
+    return stream.pipeThrough(new TransformStream<ChatStreamChunk, UIMessageChunk>({
+      transform: (item, controller) => {
+        if (!item.replay && this.replayBatchOpen) {
+          this.flushPendingMessages()
+          this.replayBatchOpen = false
+        }
+        this.currentChunkReplay = item.replay
+        this.recordChunkChange(item.chunk)
+        controller.enqueue(item.chunk)
       },
     }))
   }

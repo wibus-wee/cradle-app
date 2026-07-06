@@ -39,6 +39,8 @@ export interface ActiveRun {
   startChunkPublished?: boolean
   firstTokenDeltaSnapshotRecorded?: boolean
   firstTextDeltaSnapshotRecorded?: boolean
+  lastStreamingSnapshotMessageJson?: string | null
+  pendingStreamingSnapshotMessageJson?: string | null
   terminalStatus?: TerminalChatMessageStatus
   cancelRequested?: boolean
   queueItemId?: string

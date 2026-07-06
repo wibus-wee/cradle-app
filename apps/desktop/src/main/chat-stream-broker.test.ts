@@ -203,8 +203,8 @@ describe('chat stream broker', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1)
     expect(lateHandle.runId).toBe('run-replay')
     expect(readChannelPayloads(late, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL)).toMatchObject([
-      { chunk: { type: 'start', messageId: 'assistant-replay' } },
-      { chunk: { type: 'text-start', id: 'text-replay' } },
+      { replay: true, chunk: { type: 'start', messageId: 'assistant-replay' } },
+      { replay: true, chunk: { type: 'text-start', id: 'text-replay' } },
     ])
     expect(broker.diagnostics().streams).toMatchObject([
       {
@@ -219,6 +219,10 @@ describe('chat stream broker', () => {
     await vi.waitFor(() => {
       expect(readChannelPayloads(first, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL)).toHaveLength(3)
       expect(readChannelPayloads(late, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL)).toHaveLength(3)
+    })
+    expect(readChannelPayloads(late, DESKTOP_CHAT_STREAM_CHUNK_CHANNEL).at(-1)).toMatchObject({
+      replay: false,
+      chunk: { type: 'text-delta', id: 'text-replay', delta: ' world' },
     })
   })
 

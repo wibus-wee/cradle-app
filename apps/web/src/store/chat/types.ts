@@ -19,6 +19,12 @@ export interface ChatRunDisplayMeta {
   completedAtMs: number | null
 }
 
+export interface MessageStreamLease {
+  sessionId: string
+  runId: string | null
+  source: 'local' | 'passive'
+}
+
 export type ChatActiveGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete'
 
 export interface ChatActiveGoal {
@@ -64,6 +70,7 @@ export interface ChatState {
   messagesMap: Map<string, UIMessage[]>
   hydratedSessionIds: Set<string>
   runStateMap: Map<string, ChatRunState>
+  streamLeaseMap: Map<string, MessageStreamLease>
   activeAbortControllers: Map<string, AbortController>
   runDisplayMetaMap: Map<string, ChatRunDisplayMeta>
   errorMap: Map<string, ChatError>
@@ -83,6 +90,14 @@ export interface ChatState {
   failGeneration: (messageId: string, error: string) => void
   stopGeneration: (messageId: string, sessionId: string) => void
   setRunCancelling: (sessionId: string, cancelling: boolean) => void
+  acquireStreamLease: (input: {
+    sessionId: string
+    messageId: string
+    runId?: string | null
+    source: 'local' | 'passive'
+  }) => void
+  moveStreamLease: (sessionId: string, fromMessageId: string, toMessageId: string) => void
+  releaseStreamLease: (messageId: string) => void
   moveStreamingMessage: (sessionId: string, fromMessageId: string, toMessageId: string) => void
   setPassiveRunState: (sessionId: string, input: PassiveRunStateInput) => void
   beginRunDisplayMeta: (messageId: string, requestStartedAtMs: number) => void

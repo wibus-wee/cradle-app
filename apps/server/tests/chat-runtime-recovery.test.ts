@@ -259,6 +259,8 @@ describe('chat runtime recovery', () => {
           .orderBy(sessionEvents.version)
           .all()
       ).toEqual([
+        { eventType: 'QueueItemEnqueued', subjectRunId: null },
+        { eventType: 'RunStarted', subjectRunId: 'run-terminal-recovery' },
         { eventType: 'AssistantMessageCompleted', subjectRunId: null },
         { eventType: 'RunAborted', subjectRunId: 'run-terminal-recovery' }
       ])

@@ -5,11 +5,15 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import type { ChatMessageStatus } from '../run/stream-chunks'
+import { AppError } from '../../../errors/app-error'
 import { publishSessionTailEvents } from './event-tail'
-import { appendSessionEvent } from './event-store'
+import { reduceChatSessionEvents } from './aggregate'
+import { decideChatSessionEvents, type ChatSessionDomainError } from './decide'
+import { appendSessionEvent, readSessionEvents } from './event-store'
 import type { ChatRuntimeTx } from './event-store'
 import type {
   ChatSessionEvent,
+  MessageRecordedFact,
   QueueProjectionStatus,
   StoredChatSessionEvent,
   TerminalRunEventType
@@ -36,14 +40,7 @@ export function commitSessionEventsWithProjection(
   return runSessionActorTask(sessionId, () => {
     const storedEvents: StoredChatSessionEvent[] = []
     db().transaction((tx) => {
-      for (const event of events) {
-        const stored = appendSessionEvent(tx, {
-          aggregateId: sessionId,
-          event
-        })
-        projectSessionEvent(tx, stored)
-        storedEvents.push(stored)
-      }
+      storedEvents.push(...appendDecidedSessionEvents(tx, sessionId, events))
       projectAdditionalChanges(tx)
     })
     return storedEvents
@@ -58,15 +55,44 @@ export function commitSessionEventsInTransaction(
 ): StoredChatSessionEvent[] {
   const storedEvents: StoredChatSessionEvent[] = []
   db().transaction((tx) => {
-    for (const event of events) {
-      const stored = appendSessionEvent(tx, {
-        aggregateId: sessionId,
-        event
-      })
-      projectSessionEvent(tx, stored)
-      storedEvents.push(stored)
-    }
+    storedEvents.push(...appendDecidedSessionEvents(tx, sessionId, events))
   })
+  return storedEvents
+}
+
+export function appendDecidedSessionEvents(
+  tx: ChatRuntimeTx,
+  sessionId: string,
+  events: ChatSessionEvent[],
+  options: {
+    projectEvent?: (event: StoredChatSessionEvent) => boolean
+  } = {}
+): StoredChatSessionEvent[] {
+  if (events.length === 0) {
+    return []
+  }
+
+  const state = reduceChatSessionEvents(readSessionEvents(sessionId, tx))
+  state.aggregateId = sessionId
+  const decision = decideChatSessionEvents(state, events)
+  if (!decision.ok) {
+    throwDomainError(decision.error)
+  }
+
+  const storedEvents: StoredChatSessionEvent[] = []
+  let expectedVersion = state.version
+  for (const event of decision.events) {
+    const stored = appendSessionEvent(tx, {
+      aggregateId: sessionId,
+      event,
+      expectedVersion
+    })
+    if (options.projectEvent?.(stored) ?? true) {
+      projectSessionEvent(tx, stored)
+    }
+    storedEvents.push(stored)
+    expectedVersion = stored.version
+  }
   return storedEvents
 }
 
@@ -112,9 +138,8 @@ export async function claimSessionQueueItem(
         return { item: undefined, storedEvents: [] }
       }
       const updatedAt = currentUnixSeconds()
-      const stored = appendSessionEvent(tx, {
-        aggregateId: sessionId,
-        event: {
+      const storedEvents = appendDecidedSessionEvents(tx, sessionId, [
+        {
           type: 'QueueItemClaimed',
           payload: {
             queueItemId,
@@ -122,8 +147,7 @@ export async function claimSessionQueueItem(
             updatedAt
           }
         }
-      })
-      projectSessionEvent(tx, stored)
+      ])
       return {
         item: {
           ...row,
@@ -131,7 +155,7 @@ export async function claimSessionQueueItem(
           errorText: null,
           updatedAt
         },
-        storedEvents: [stored]
+        storedEvents
       }
     })
   })
@@ -177,6 +201,100 @@ export async function commitLastTurnRolledBack(input: {
   ])
 }
 
+export async function recordImportedSessionMessages(input: {
+  sessionId: string
+  messages: Array<MessageRecordedFact & { status: 'complete' }>
+}): Promise<void> {
+  await commitSessionEvents(
+    input.sessionId,
+    input.messages.map((message): ChatSessionEvent => ({
+      type: 'MessageImported',
+      payload: { message }
+    }))
+  )
+}
+
+export async function recordAssistantMessageSnapshot(input: {
+  sessionId: string
+  runId: string
+  message: {
+    id: string
+    content: string
+    messageJson: string
+    updatedAt: number
+  }
+  messageJsonBytes: number
+}): Promise<void> {
+  await commitSessionEvents(input.sessionId, [
+    {
+      type: 'AssistantMessageSnapshotted',
+      payload: {
+        runId: input.runId,
+        message: {
+          id: input.message.id,
+          sessionId: input.sessionId,
+          content: input.message.content,
+          messageJson: input.message.messageJson,
+          status: 'streaming',
+          errorText: null,
+          updatedAt: input.message.updatedAt
+        },
+        messageJsonBytes: input.messageJsonBytes
+      }
+    }
+  ])
+}
+
+export function clearProviderTargetFromSessionQueuesInTransaction(
+  tx: ChatRuntimeTx,
+  input: {
+    providerTargetId: string
+    updatedAt: number
+  }
+): StoredChatSessionEvent[] {
+  const rows = tx
+    .select({
+      id: chatSessionQueueItems.id,
+      sessionId: chatSessionQueueItems.sessionId
+    })
+    .from(chatSessionQueueItems)
+    .where(eq(chatSessionQueueItems.providerTargetId, input.providerTargetId))
+    .all()
+  if (rows.length === 0) {
+    return []
+  }
+
+  const rowsBySessionId = new Map<string, typeof rows>()
+  for (const row of rows) {
+    const sessionRows = rowsBySessionId.get(row.sessionId)
+    if (sessionRows) {
+      sessionRows.push(row)
+    } else {
+      rowsBySessionId.set(row.sessionId, [row])
+    }
+  }
+
+  const storedEvents: StoredChatSessionEvent[] = []
+  for (const [sessionId, sessionRows] of rowsBySessionId) {
+    storedEvents.push(
+      ...appendDecidedSessionEvents(
+        tx,
+        sessionId,
+        sessionRows.map((row): ChatSessionEvent => ({
+          type: 'QueueItemProviderTargetCleared',
+          payload: {
+            queueItemId: row.id,
+            sessionId,
+            providerTargetId: input.providerTargetId,
+            updatedAt: input.updatedAt
+          }
+        }))
+      )
+    )
+  }
+  return storedEvents
+}
+
 export async function failSessionQueueItem(
   sessionId: string,
   queueItemId: string,
@@ -211,22 +329,18 @@ export async function recoverOrphanedQueueItemClaims(sessionId: string): Promise
       }
 
       const updatedAt = currentUnixSeconds()
-      const storedEvents: StoredChatSessionEvent[] = []
-      for (const row of rows) {
-        const stored = appendSessionEvent(tx, {
-          aggregateId: sessionId,
-          event: {
-            type: 'QueueItemReleased',
-            payload: {
-              queueItemId: row.id,
-              sessionId,
-              updatedAt
-            }
+      const storedEvents = appendDecidedSessionEvents(
+        tx,
+        sessionId,
+        rows.map((row): ChatSessionEvent => ({
+          type: 'QueueItemReleased',
+          payload: {
+            queueItemId: row.id,
+            sessionId,
+            updatedAt
           }
-        })
-        projectSessionEvent(tx, stored)
-        storedEvents.push(stored)
-      }
+        }))
+      )
       return { count: rows.length, storedEvents }
     })
   })
@@ -252,28 +366,24 @@ export async function normalizeSessionQueuePositions(sessionId: string): Promise
 
       const updatedAt = currentUnixSeconds()
       let changed = 0
-      const storedEvents: StoredChatSessionEvent[] = []
+      const events: ChatSessionEvent[] = []
       pendingRows.forEach((row, index) => {
         const position = index + 1
         if (row.position === position) {
           return
         }
-        const stored = appendSessionEvent(tx, {
-          aggregateId: sessionId,
-          event: {
-            type: 'QueueItemReordered',
-            payload: {
-              queueItemId: row.id,
-              sessionId,
-              position,
-              updatedAt
-            }
+        events.push({
+          type: 'QueueItemReordered',
+          payload: {
+            queueItemId: row.id,
+            sessionId,
+            position,
+            updatedAt
           }
         })
-        projectSessionEvent(tx, stored)
-        storedEvents.push(stored)
         changed += 1
       })
+      const storedEvents = appendDecidedSessionEvents(tx, sessionId, events)
       return { count: changed, storedEvents }
     })
   })
@@ -305,14 +415,12 @@ export async function cancelQueuedSessionItem(
         return { item: row, storedEvents: [] }
       }
       const updatedAt = currentUnixSeconds()
-      const stored = appendSessionEvent(tx, {
-        aggregateId: sessionId,
-        event: {
+      const storedEvents = appendDecidedSessionEvents(tx, sessionId, [
+        {
           type: 'QueueItemCancelled',
           payload: { queueItemId, sessionId, updatedAt }
         }
-      })
-      projectSessionEvent(tx, stored)
+      ])
       return {
         item: {
           ...row,
@@ -320,7 +428,7 @@ export async function cancelQueuedSessionItem(
           errorText: null,
           updatedAt
         },
-        storedEvents: [stored]
+        storedEvents
       }
     })
   })
@@ -345,4 +453,13 @@ export async function recordQueuePositions(
     })
   )
   await commitSessionEvents(sessionId, events)
+}
+
+function throwDomainError(error: ChatSessionDomainError): never {
+  throw new AppError({
+    code: `chat_session_${error.code}`,
+    status: 409,
+    message: error.message,
+    details: error.details
+  })
 }

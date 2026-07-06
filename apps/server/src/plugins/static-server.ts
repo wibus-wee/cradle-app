@@ -128,10 +128,10 @@ export async function rewritePluginWebBundleImports(source: string, requestUrl: 
  * GET /api/plugins/:name/web.mjs → returns the plugin's web bundle
  * GET /api/plugins → returns list of active plugins
  */
-export function createPluginStaticServer(manifests: PluginManifest[]) {
+export function createPluginStaticServer(readManifests: () => PluginManifest[]) {
   return {
-    manifests,
     async getWebEntry(pluginName: string): Promise<string | null> {
+      const manifests = readManifests()
       const descriptor = getPluginDescriptorByRouteSegment(pluginName)
       if (descriptor?.layers.web.status === 'invalid' || descriptor?.layers.web.status === 'disabled') {
         return null

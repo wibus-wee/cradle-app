@@ -17,6 +17,7 @@ import { ThreadComposer } from './thread-composer'
 export interface DiffStageHandle {
   scrollToPath: (path: string) => void
   scrollToThread: (thread: ReviewThread) => void
+  scrollToLine: (path: string, line: number, side: 'base' | 'head') => void
 }
 
 interface DiffStageProps {
@@ -170,10 +171,44 @@ export function DiffStage({
     viewer.scrollTo({ type: 'line', id: itemId, lineNumber: anchor.startLine, side, align: 'center', behavior: 'smooth' })
   })
 
+  // Scroll to a specific line in a file, un-collapsing the file first if needed. Used by the
+  // guide's "Open in review" deep link. Two rAFs let the virtualizer measure the freshly
+  // un-collapsed lines before we ask it to center a specific one — scrolling synchronously races
+  // the virtualizer on cold mount.
+  const scrollToLine = useStableCallback((path: string, line: number, side: 'base' | 'head') => {
+    const viewer = viewerRef.current
+    if (!viewer || visibleItems.length === 0) {
+      return
+    }
+    const itemId = visiblePathToItemId.get(path)
+    if (!itemId) {
+      return
+    }
+    const item = viewer.getItem(itemId)
+    if (item?.collapsed === true) {
+      viewer.updateItem({ ...item, collapsed: false, version: typeof item.version === 'number' ? item.version + 1 : 1 })
+    }
+    // Defer two frames so the virtualizer measures the freshly un-collapsed lines before we ask
+    // it to center a specific one. viewerRef is re-read inside the rAF so a stale viewer (after
+    // unmount) is a no-op rather than a throw.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        viewerRef.current?.scrollTo({
+          type: 'line',
+          id: itemId,
+          lineNumber: line,
+          side: side === 'base' ? 'deletions' : 'additions',
+          align: 'center',
+          behavior: 'smooth',
+        })
+      })
+    })
+  })
+
   useEffect(() => {
-    handleRef?.({ scrollToPath, scrollToThread })
+    handleRef?.({ scrollToPath, scrollToThread, scrollToLine })
     return () => handleRef?.(null)
-  }, [handleRef, scrollToPath, scrollToThread])
+  }, [handleRef, scrollToPath, scrollToThread, scrollToLine])
 
   const threadById = useMemo(() => new Map(review.threads.map(thread => [thread.id, thread])), [review.threads])
 

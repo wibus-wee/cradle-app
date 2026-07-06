@@ -1,4 +1,3 @@
-import { JsonToSseTransformStream } from 'ai'
 import type { UIMessageChunk } from 'ai'
 
 import { serializeChatError } from '../run/errors'
@@ -16,6 +15,12 @@ export interface BufferedChunkStreamInput {
 }
 
 const encoder = new TextEncoder()
+const STREAM_OPEN_COMMENT = ': cradle-stream-open\n\n'
+const REPLAY_END_COMMENT = ': cradle-replay-end\n\n'
+
+type ChunkStreamItem
+  = | { kind: 'chunk', chunk: UIMessageChunk }
+    | { kind: 'replay-end' }
 
 export function bindReadableStreamToAbortSignal<T>(
   stream: ReadableStream<T>,
@@ -107,19 +112,26 @@ function createStreamAbortError(): DOMException {
 }
 
 /**
- * Shared SSE encoding tail used by every chunk stream: AI SDK JSON→SSE transform
- * (which also emits the terminal `data: [DONE]` on flush) then UTF-8 encode.
+ * Shared SSE encoding tail used by every chunk stream.
  */
-function encodeChunkStreamAsSse(stream: ReadableStream<UIMessageChunk>): ReadableStream<Uint8Array> {
-  return stream
-    .pipeThrough(new JsonToSseTransformStream())
-    .pipeThrough(
-      new TransformStream<string, Uint8Array>({
-        transform: (chunk, controller) => {
-          controller.enqueue(encoder.encode(chunk))
+function encodeChunkStreamAsSse(stream: ReadableStream<ChunkStreamItem>): ReadableStream<Uint8Array> {
+  return stream.pipeThrough(
+    new TransformStream<ChunkStreamItem, Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(STREAM_OPEN_COMMENT))
+      },
+      transform: (item, controller) => {
+        if (item.kind === 'replay-end') {
+          controller.enqueue(encoder.encode(REPLAY_END_COMMENT))
+          return
         }
-      })
-    )
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(item.chunk)}\n\n`))
+      },
+      flush(controller) {
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+      }
+    })
+  )
 }
 
 export function openBufferedChunkStream(input: BufferedChunkStreamInput): ReadableStream<Uint8Array> {
@@ -135,7 +147,7 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
     queuedChunk = null
   }
 
-  const chunkStream = new ReadableStream<UIMessageChunk>({
+  const chunkStream = new ReadableStream<ChunkStreamItem>({
     start: (controller) => {
       const clearFlushTimer = () => {
         if (flushTimer) {
@@ -162,7 +174,7 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
         if (closed) {
           return
         }
-        controller.enqueue(chunk)
+        controller.enqueue({ kind: 'chunk', chunk })
         if (terminal) {
           closeStream(false)
         }
@@ -214,6 +226,9 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
           return
         }
       }
+      clearFlushTimer()
+      flushQueuedChunk()
+      controller.enqueue({ kind: 'replay-end' })
 
       if (input.terminal || input.shouldCloseWithoutSubscriber) {
         closeStream(true)
@@ -240,14 +255,14 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
 export function openDirectChunkStream(
   chunks: AsyncIterable<UIMessageChunk>
 ): ReadableStream<Uint8Array> {
-  const chunkStream = new ReadableStream<UIMessageChunk>({
+  const chunkStream = new ReadableStream<ChunkStreamItem>({
     async start(controller) {
       let terminalPublished = false
       const publish = (chunk: UIMessageChunk, terminal = isTerminalUIMessageChunk(chunk)) => {
         if (terminalPublished) {
           return
         }
-        controller.enqueue(chunk)
+        controller.enqueue({ kind: 'chunk', chunk })
         if (terminal) {
           terminalPublished = true
         }

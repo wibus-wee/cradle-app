@@ -21,6 +21,7 @@ import type {
   AssistantDisplaySplit,
   ChatActiveGoal,
   ChatError,
+  MessageStreamLease,
   ChatRunDisplayMeta,
   ChatRunState,
   ChatState,
@@ -41,6 +42,7 @@ export function createChatStore() {
       messagesMap: new Map(),
       hydratedSessionIds: new Set(),
       runStateMap: new Map(),
+      streamLeaseMap: new Map(),
       activeAbortControllers: new Map(),
       runDisplayMetaMap: new Map(),
       errorMap: new Map(),
@@ -52,7 +54,12 @@ export function createChatStore() {
       setMessages: (sessionId, messages) => {
         set((state) => {
           const splits = hydrateDisplaySplits(messages, state.assistantDisplaySplitMap)
-          const displayed = applyDisplaySplits(messages, splits)
+          const displayed = preserveLeasedMessages(
+            sessionId,
+            state.messagesMap.get(sessionId),
+            applyDisplaySplits(messages, splits),
+            state.streamLeaseMap,
+          )
           const current = state.messagesMap.get(sessionId)
           const next = current ? reconcileMessages(current, displayed) : displayed
           const splitsChanged = splits !== state.assistantDisplaySplitMap
@@ -191,6 +198,7 @@ export function createChatStore() {
             const idx = draftMsgs.findIndex(m => m.id === messageId)
             if (idx !== -1) { draftMsgs.splice(idx, 1) }
             draft.activeAbortControllers.delete(messageId)
+            draft.streamLeaseMap.delete(messageId)
             draft.runDisplayMetaMap.delete(messageId)
             draft.errorMap.delete(messageId)
             const runState = readSessionRunState(draft, sessionId)
@@ -209,9 +217,11 @@ export function createChatStore() {
           for (const m of state.messagesMap.get(sessionId) ?? EMPTY_MESSAGES) { nextError.delete(m.id) }
           const nextAbort = new Map(state.activeAbortControllers)
           nextAbort.set(messageId, controller)
+          const nextLease = new Map(state.streamLeaseMap)
+          nextLease.set(messageId, { sessionId, runId: state.runDisplayMetaMap.get(messageId)?.runId ?? null, source: 'local' })
           const nextRunState = new Map(state.runStateMap)
           nextRunState.set(sessionId, { phase: 'streaming', source: 'local', messageId })
-          return { errorMap: nextError, activeAbortControllers: nextAbort, runStateMap: nextRunState }
+          return { errorMap: nextError, activeAbortControllers: nextAbort, streamLeaseMap: nextLease, runStateMap: nextRunState }
         })
       },
 
@@ -220,8 +230,10 @@ export function createChatStore() {
           const ids = getRunMessageIds(state, messageId)
           const nextAbort = new Map(state.activeAbortControllers)
           const nextRun = new Map(state.runDisplayMetaMap)
+          const nextLease = new Map(state.streamLeaseMap)
           for (const id of ids) {
             nextAbort.delete(id)
+            nextLease.delete(id)
             const rm = nextRun.get(id)
             if (rm && rm.completedAtMs === null) { nextRun.set(id, { ...rm, completedAtMs: performance.now() }) }
           }
@@ -232,7 +244,7 @@ export function createChatStore() {
               nextRunState.set(sid, DEFAULT_CHAT_RUN_STATE)
             }
           }
-          return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, runStateMap: nextRunState }
+          return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, streamLeaseMap: nextLease, runStateMap: nextRunState }
         })
       },
 
@@ -242,8 +254,10 @@ export function createChatStore() {
           const visibleId = ids.at(-1) ?? messageId
           const nextAbort = new Map(state.activeAbortControllers)
           const nextRun = new Map(state.runDisplayMetaMap)
+          const nextLease = new Map(state.streamLeaseMap)
           for (const id of ids) {
             nextAbort.delete(id)
+            nextLease.delete(id)
             const rm = nextRun.get(id)
             if (rm && rm.completedAtMs === null) { nextRun.set(id, { ...rm, completedAtMs: performance.now() }) }
           }
@@ -256,7 +270,7 @@ export function createChatStore() {
               nextRunState.set(sid, { phase: 'idle', error: true })
             }
           }
-          return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, errorMap: nextError, runStateMap: nextRunState }
+          return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, streamLeaseMap: nextLease, errorMap: nextError, runStateMap: nextRunState }
         })
       },
 
@@ -276,6 +290,19 @@ export function createChatStore() {
           nextRunState.set(sessionId, next)
           return { runStateMap: nextRunState }
         })
+      },
+
+      acquireStreamLease: (input) => {
+        set(state => acquireStreamLease_immutable(state, input))
+      },
+
+      moveStreamLease: (sessionId, from, to) => {
+        if (from === to) { return }
+        set(state => moveStreamingRefs_immutable(state, sessionId, from, to))
+      },
+
+      releaseStreamLease: (messageId) => {
+        set(state => releaseStreamLease_immutable(state, messageId))
       },
 
       moveStreamingMessage: (sessionId, from, to) => {
@@ -311,7 +338,9 @@ export function createChatStore() {
           const sourceMeta = state.runDisplayMetaMap.get(messageId)
           const c = displayMeta ?? sourceMeta
           const needsMigration = displayMessageId !== messageId && state.runDisplayMetaMap.has(messageId)
-          if (c?.runId === runId && c.completedAtMs === null && !needsMigration) { return state }
+          const currentLease = state.streamLeaseMap.get(displayMessageId) ?? state.streamLeaseMap.get(messageId)
+          const needsLeaseUpdate = currentLease ? currentLease.runId !== runId || displayMessageId !== messageId : false
+          if (c?.runId === runId && c.completedAtMs === null && !needsMigration && !needsLeaseUpdate) { return state }
           const now = performance.now()
           const next = new Map(state.runDisplayMetaMap)
           if (displayMessageId !== messageId) {
@@ -325,7 +354,12 @@ export function createChatStore() {
             firstContentAtMs: c?.firstContentAtMs ?? null,
             completedAtMs: null,
           })
-          return { runDisplayMetaMap: next }
+          const nextLease = new Map(state.streamLeaseMap)
+          if (currentLease) {
+            nextLease.delete(messageId)
+            nextLease.set(displayMessageId, { ...currentLease, runId })
+          }
+          return { runDisplayMetaMap: next, streamLeaseMap: nextLease }
         })
       },
 
@@ -454,6 +488,11 @@ export function createChatStore() {
             draft.hydratedSessionIds.delete(sessionId)
             draft.runStateMap.delete(sessionId)
             draft.activeGoalMap.delete(sessionId)
+            for (const [messageId, lease] of draft.streamLeaseMap) {
+              if (lease.sessionId === sessionId) {
+                draft.streamLeaseMap.delete(messageId)
+              }
+            }
             for (const id of removed) {
               draft.activeAbortControllers.delete(id)
               draft.runDisplayMetaMap.delete(id)
@@ -529,12 +568,14 @@ function readRunStateMessageId(runState: ChatRunState): string | null {
 
 function readStreamingMessageIds(state: ChatState): Set<string> {
   const ids: string[] = []
+  for (const [messageId] of state.streamLeaseMap) {
+    if (!ids.includes(messageId)) {
+      ids.push(messageId)
+    }
+  }
   for (const runState of state.runStateMap.values()) {
-    const messageId = readRunStateMessageId(runState)
-    if (messageId && (runState.phase === 'submitting' || runState.phase === 'streaming')) {
-      if (!ids.includes(messageId)) {
-        ids.push(messageId)
-      }
+    if (runState.phase === 'submitting' && !ids.includes(runState.messageId)) {
+      ids.push(runState.messageId)
     }
   }
   if (ids.length === 0) {
@@ -554,8 +595,11 @@ function readStreamingMessageIds(state: ChatState): Set<string> {
 }
 
 function isStreamingMessageId(state: ChatState, messageId: string): boolean {
+  if (state.streamLeaseMap.has(messageId)) {
+    return true
+  }
   for (const runState of state.runStateMap.values()) {
-    if (readRunStateMessageId(runState) === messageId && (runState.phase === 'submitting' || runState.phase === 'streaming')) {
+    if (runState.phase === 'submitting' && runState.messageId === messageId) {
       return true
     }
   }
@@ -563,12 +607,7 @@ function isStreamingMessageId(state: ChatState, messageId: string): boolean {
 }
 
 function isLocalStreamingMessageId(state: ChatState, messageId: string): boolean {
-  for (const runState of state.runStateMap.values()) {
-    if (runState.phase === 'streaming' && runState.source === 'local' && runState.messageId === messageId) {
-      return true
-    }
-  }
-  return false
+  return state.streamLeaseMap.get(messageId)?.source === 'local'
 }
 
 function applyPassiveRunState(
@@ -668,6 +707,128 @@ function moveRunStateMessage(runState: ChatRunState, messageId: string): ChatRun
   }
 }
 
+function preserveLeasedMessages(
+  sessionId: string,
+  current: UIMessage[] | undefined,
+  displayed: UIMessage[],
+  leases: Map<string, MessageStreamLease>,
+): UIMessage[] {
+  if (!current || leases.size === 0) {
+    return displayed
+  }
+
+  const currentById = new Map(current.map(message => [message.id, message]))
+  let changed = false
+  const seenIds = new Set<string>()
+  const next = displayed.map((message) => {
+    seenIds.add(message.id)
+    const lease = leases.get(message.id)
+    const currentMessage = currentById.get(message.id)
+    if (lease?.sessionId === sessionId && currentMessage) {
+      changed = changed || currentMessage !== message
+      return currentMessage
+    }
+    return message
+  })
+
+  for (const message of current) {
+    const lease = leases.get(message.id)
+    if (lease?.sessionId === sessionId && !seenIds.has(message.id)) {
+      next.push(message)
+      changed = true
+    }
+  }
+
+  return changed ? next : displayed
+}
+
+function acquireStreamLease_immutable(
+  state: ChatState,
+  input: {
+    sessionId: string
+    messageId: string
+    runId?: string | null
+    source: 'local' | 'passive'
+  },
+): ChatState | Partial<ChatState> {
+  const messageId = resolveStreamingDisplayMessageId(state, input.messageId)
+  const currentLease = state.streamLeaseMap.get(messageId)
+  if (currentLease?.source === 'local' && input.source === 'passive') {
+    return state
+  }
+
+  const currentRunState = readSessionRunState(state, input.sessionId)
+  if (
+    input.source === 'passive'
+    && (
+      currentRunState.phase === 'submitting'
+      || (currentRunState.phase === 'streaming' && currentRunState.source === 'local')
+    )
+  ) {
+    return state
+  }
+
+  const runId = input.runId ?? state.runDisplayMetaMap.get(messageId)?.runId ?? state.runDisplayMetaMap.get(input.messageId)?.runId ?? null
+  const nextLease: MessageStreamLease = {
+    sessionId: input.sessionId,
+    runId,
+    source: input.source,
+  }
+  const nextRunState: ChatRunState = {
+    phase: 'streaming',
+    source: input.source,
+    messageId,
+  }
+
+  if (
+    isEqual(currentLease, nextLease)
+    && isEqual(currentRunState, nextRunState)
+  ) {
+    return state
+  }
+
+  const nextLeaseMap = new Map(state.streamLeaseMap)
+  nextLeaseMap.delete(input.messageId)
+  nextLeaseMap.set(messageId, nextLease)
+  const nextRunStateMap = new Map(state.runStateMap)
+  nextRunStateMap.set(input.sessionId, nextRunState)
+  return {
+    streamLeaseMap: nextLeaseMap,
+    runStateMap: nextRunStateMap,
+  }
+}
+
+function releaseStreamLease_immutable(state: ChatState, messageId: string): ChatState | Partial<ChatState> {
+  const ids = getRunMessageIds(state, messageId)
+  if (!ids.some(id => state.streamLeaseMap.has(id))) {
+    return state
+  }
+
+  const nextLease = new Map(state.streamLeaseMap)
+  const nextRun = new Map(state.runDisplayMetaMap)
+  for (const id of ids) {
+    nextLease.delete(id)
+    const run = nextRun.get(id)
+    if (run && run.completedAtMs === null) {
+      nextRun.set(id, { ...run, completedAtMs: performance.now() })
+    }
+  }
+
+  const nextRunState = new Map(state.runStateMap)
+  for (const [sessionId, runState] of state.runStateMap) {
+    const activeMessageId = readRunStateMessageId(runState)
+    if (activeMessageId && ids.includes(activeMessageId)) {
+      nextRunState.set(sessionId, DEFAULT_CHAT_RUN_STATE)
+    }
+  }
+
+  return {
+    streamLeaseMap: nextLease,
+    runDisplayMetaMap: nextRun,
+    runStateMap: nextRunState,
+  }
+}
+
 export const chatSelectors = {
   messages: (sessionId: string) => (s: ChatState) =>
     s.messagesMap.get(sessionId) ?? EMPTY_MESSAGES,
@@ -697,7 +858,8 @@ export const chatSelectors = {
 
   isVisibleStreamingMessage: (sessionId: string, messageId: string) => (s: ChatState) => {
     const runState = readSessionRunState(s, sessionId)
-    return readRunStateMessageId(runState) === messageId
+    const lease = s.streamLeaseMap.get(messageId)
+    return lease?.sessionId === sessionId || readRunStateMessageId(runState) === messageId
   },
 
   isAnyGenerating: (s: ChatState) =>
@@ -711,8 +873,10 @@ export const chatSelectors = {
 
   isSessionStreaming: (sessionId: string) => (s: ChatState) => {
     const runState = readSessionRunState(s, sessionId)
+    for (const lease of s.streamLeaseMap.values()) {
+      if (lease.sessionId === sessionId) { return true }
+    }
     return runState.phase === 'submitting'
-      || runState.phase === 'streaming'
   },
 
   error: (messageId: string) => (s: ChatState) => s.errorMap.get(messageId),
@@ -737,9 +901,11 @@ export const chatSelectors = {
 
   visibleStatus: (sessionId: string) => (s: ChatState): PublicStatus => {
     const runState = readSessionRunState(s, sessionId)
+    for (const lease of s.streamLeaseMap.values()) {
+      if (lease.sessionId === sessionId) { return 'streaming' }
+    }
     if (
       runState.phase === 'submitting'
-      || runState.phase === 'streaming'
     ) {
       return 'streaming'
     }
@@ -791,12 +957,17 @@ function moveStreamingRefs(
   if (from === to) { return }
   const ctrl = state.activeAbortControllers.get(from)
   const run = state.runDisplayMetaMap.get(from)
+  const lease = state.streamLeaseMap.get(from)
 
   draft.activeAbortControllers.delete(from)
   draft.runDisplayMetaMap.delete(from)
+  draft.streamLeaseMap.delete(from)
   if (ctrl) { draft.activeAbortControllers.set(to, ctrl) }
   if (run && (run.completedAtMs === null || !state.runDisplayMetaMap.has(to))) {
     draft.runDisplayMetaMap.set(to, { ...run } as Draft<ChatRunDisplayMeta>)
+  }
+  if (lease) {
+    draft.streamLeaseMap.set(to, { ...lease } as Draft<MessageStreamLease>)
   }
 
   const runState = readSessionRunState(state, sessionId)
@@ -816,13 +987,18 @@ function moveStreamingRefs_immutable(state: ChatState, sessionId: string, from: 
   nextRun.delete(from)
   if (run && (run.completedAtMs === null || !nextRun.has(to))) { nextRun.set(to, { ...run }) }
 
+  const nextLease = new Map(state.streamLeaseMap)
+  const lease = nextLease.get(from)
+  nextLease.delete(from)
+  if (lease) { nextLease.set(to, { ...lease }) }
+
   const runState = readSessionRunState(state, sessionId)
   const nextRunState = new Map(state.runStateMap)
   if (readRunStateMessageId(runState) === from) {
     nextRunState.set(sessionId, moveRunStateMessage(runState, to))
   }
 
-  return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, runStateMap: nextRunState }
+  return { activeAbortControllers: nextAbort, runDisplayMetaMap: nextRun, streamLeaseMap: nextLease, runStateMap: nextRunState }
 }
 
 function migrateDisplaySplit(state: ChatState, messagesMap: Map<string, UIMessage[]>, from: string, to: string): Partial<ChatState> {
@@ -854,6 +1030,8 @@ function migrateDisplaySplit(state: ChatState, messagesMap: Map<string, UIMessag
     if (ctrl) { const a = new Map(state.activeAbortControllers); a.delete(split.tailMessageId); a.set(nextTailId, ctrl); result.activeAbortControllers = a }
     const rm = state.runDisplayMetaMap.get(split.tailMessageId)
     if (rm) { const r = new Map(state.runDisplayMetaMap); r.delete(split.tailMessageId); r.set(nextTailId, rm); result.runDisplayMetaMap = r }
+    const lease = state.streamLeaseMap.get(split.tailMessageId)
+    if (lease) { const l = new Map(state.streamLeaseMap); l.delete(split.tailMessageId); l.set(nextTailId, lease); result.streamLeaseMap = l }
     const runState = readSessionRunState(state, sid)
     if (readRunStateMessageId(runState) === split.tailMessageId) {
       const nextRunState = new Map(state.runStateMap)

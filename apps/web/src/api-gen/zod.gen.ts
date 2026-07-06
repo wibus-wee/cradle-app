@@ -824,6 +824,11 @@ export const zPostSecretsBody = z.object({
     secret: z.string().min(1)
 });
 
+export const zPostSecretsRotateBody = z.object({
+    from: z.string().min(1),
+    to: z.string().min(1)
+});
+
 export const zDeleteSecretsByIdPath = z.object({
     id: z.string().min(1)
 });
@@ -1698,6 +1703,27 @@ export const zGetSearchChronicleQuery = z.object({
     ]).optional()
 });
 
+export const zPostPluginsSourcesBody = z.object({
+    kind: z.enum([
+        'localPath',
+        'git',
+        'npm'
+    ]),
+    location: z.string().min(1),
+    ref: z.string().nullish(),
+    subPath: z.string().nullish(),
+    label: z.string().nullish(),
+    addedReason: z.string().nullish()
+});
+
+export const zDeletePluginsSourcesByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zGetPluginsSourcesByIdPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zGetPluginsByRouteSegmentIconPath = z.object({
     routeSegment: z.string().min(1)
 });
@@ -1985,7 +2011,8 @@ export const zGetWorkspacesByWorkspaceIdWorktreesPath = z.object({
 export const zPostWorkspacesByWorkspaceIdWorktreesBody = z.object({
     sessionId: z.string().min(1),
     slug: z.string().min(1).optional(),
-    bindSession: z.boolean().optional()
+    bindSession: z.boolean().optional(),
+    confirmedSetupHooks: z.boolean().optional()
 });
 
 export const zPostWorkspacesByWorkspaceIdWorktreesPath = z.object({

@@ -117,10 +117,29 @@ describe('parsePluginInstallUrl', () => {
     })
   })
 
-  it('rejects duplicate, unknown, cross-repository, and traversal parameters', () => {
+  it('accepts third-party repositories, npm package names, and repository-root paths', () => {
+    const thirdPartyUrl = 'cradle://plugins/install?source=github&repository=acme-labs%2Fplugin-pack&path=.&package=acme-plugin&version=1.2.3&channel=bundled'
+    expect(parsePluginInstallUrl(thirdPartyUrl)).toMatchObject({
+      repository: 'acme-labs/plugin-pack',
+      path: '.',
+      packageName: 'acme-plugin',
+      version: '1.2.3',
+    })
+
+    const scopedUrl = 'cradle://plugins/install?source=github&repository=acme%2Fplugin-pack&path=packages%2Ftool&package=%40acme%2Ftool&version=1.2.3&channel=bundled'
+    expect(parsePluginInstallUrl(scopedUrl)).toMatchObject({
+      repository: 'acme/plugin-pack',
+      path: 'packages/tool',
+      packageName: '@acme/tool',
+    })
+  })
+
+  it('rejects duplicate, unknown, malformed, and traversal parameters', () => {
     expect(() => parsePluginInstallUrl(`${installUrl}&package=%40cradle%2Fother`)).toThrow(PluginInstallLinkError)
     expect(() => parsePluginInstallUrl(`${installUrl}&token=secret`)).toThrow(PluginInstallLinkError)
-    expect(() => parsePluginInstallUrl(installUrl.replace('wibus-wee%2Fcradle-app', 'other%2Fcradle-app'))).toThrow(PluginInstallLinkError)
+    expect(() => parsePluginInstallUrl(installUrl.replace('wibus-wee%2Fcradle-app', 'missing-repo-owner'))).toThrow(PluginInstallLinkError)
+    expect(() => parsePluginInstallUrl(installUrl.replace('version=0.0.1', 'version=latest'))).toThrow(PluginInstallLinkError)
+    expect(() => parsePluginInstallUrl(installUrl.replace('%40cradle%2Fsystem-info', '%40bad-scope'))).toThrow(PluginInstallLinkError)
     expect(() => parsePluginInstallUrl(installUrl.replace('plugins%2Fsystem-info', 'plugins%2F..%2Fsystem-info'))).toThrow(PluginInstallLinkError)
   })
 })
@@ -198,6 +217,47 @@ describe('installPluginFromRequest', () => {
       mode: 'downloaded',
       packageName: '@cradle/system-info',
       grantedPermissions: ['system-info.read'],
+    })
+  })
+
+  it('downloads a plugin from a third-party repository root', async () => {
+    const userDataPath = await createTempRoot('cradle-plugin-user-data-')
+    const root = await createTempRoot('cradle-plugin-root-archive-')
+    const repoRoot = resolve(root, 'acme-plugin-pack-testref')
+    await writePluginPackage(repoRoot, '.', '@acme/tool', 'dist/server.mjs')
+    const archivePath = resolve(root, 'repo.tar.gz')
+    await tar.c(
+      {
+        cwd: root,
+        file: archivePath,
+        gzip: true,
+      },
+      ['acme-plugin-pack-testref'],
+    )
+    const archive = await readFile(archivePath)
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(archive)))
+    const request = parsePluginInstallUrl('cradle://plugins/install?source=github&repository=acme%2Fplugin-pack&path=.&package=%40acme%2Ftool&version=0.0.1&channel=bundled&ref=testref')
+
+    const result = await installPluginFromRequest(request, {
+      fetchImpl,
+      now: () => new Date('2026-05-21T10:00:00.000Z'),
+      userDataPath,
+    })
+
+    expect(result).toBeDefined()
+    if (!result) { throw new Error('Expected plugin install result') }
+    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({
+      mode: 'downloaded',
+      packageDir: resolve(
+        resolveDesktopInstalledPluginsDir(userDataPath),
+        createInstalledPluginPackageDirName('@acme/tool'),
+      ),
+    })
+    const packageJson = PackageJsonSchema.parse(await readFile(resolve(result.packageDir, 'package.json'), 'utf8'))
+    expect(packageJson).toMatchObject({
+      name: '@acme/tool',
+      version: '0.0.1',
     })
   })
 

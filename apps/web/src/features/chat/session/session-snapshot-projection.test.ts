@@ -78,7 +78,7 @@ describe('session snapshot projection', () => {
     })
   })
 
-  it('holds an empty streaming snapshot without replacing existing messages', () => {
+  it('projects an empty streaming snapshot as a normal placeholder row', () => {
     const projection = deriveSessionSnapshotProjection({
       rows: [
         row({ id: 'user-1', role: 'user', text: 'Question' }),
@@ -89,14 +89,14 @@ describe('session snapshot projection', () => {
       runtimeStatusKnown: true,
       runtimeIdle: true,
       runtimeActiveRunMessageId: null,
-      snapshotFetching: false,
     })
 
     expect(projection).toMatchObject({
-      messages: null,
-      holdEmptyStreamingSnapshot: true,
-      requestSnapshotRefresh: true,
-      snapshotStreamingMessageIds: [],
+      messages: [
+        expect.objectContaining({ id: 'user-1' }),
+        expect.objectContaining({ id: 'assistant-empty', parts: [] }),
+      ],
+      requestSnapshotRefresh: false,
       passiveRunState: {
         messageIds: [],
         allowMissingMessage: false,
@@ -117,7 +117,6 @@ describe('session snapshot projection', () => {
       runtimeStatusKnown: true,
       runtimeIdle: false,
       runtimeActiveRunMessageId: 'assistant-live',
-      snapshotFetching: false,
     })
 
     expect(projection?.messages?.map(item => item.id)).toEqual(['user-1', 'assistant-old'])
@@ -139,27 +138,18 @@ describe('session snapshot projection', () => {
       runtimeStatusKnown: true,
       runtimeIdle: false,
       runtimeActiveRunMessageId: 'assistant-passive',
-      snapshotFetching: false,
     })
 
     expect(projection).toBeNull()
   })
 
-  it('derives passive stream inputs from the same hold-empty rules', () => {
+  it('derives passive stream inputs only from local driver state', () => {
     const projection = deriveSessionPassiveStreamProjection({
-      rows: [
-        row({ id: 'assistant-empty', role: 'assistant', status: 'streaming', parts: [] }),
-      ],
       runState: idleRunState,
-      runtimeStatusKnown: true,
-      runtimeIdle: true,
-      snapshotFetching: false,
     })
 
     expect(projection).toEqual({
       locallyDriven: false,
-      holdEmptyStreamingSnapshot: true,
-      snapshotStreamingMessageIds: [],
     })
   })
 })

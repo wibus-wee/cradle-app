@@ -3707,6 +3707,29 @@ export type PostSecretsResponses = {
 
 export type PostSecretsResponse = PostSecretsResponses[keyof PostSecretsResponses];
 
+export type PostSecretsRotateData = {
+    body: {
+        from: string;
+        to: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/secrets/rotate';
+};
+
+export type PostSecretsRotateResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        rotated: number;
+        fromVersion: number;
+        toVersion: number;
+    };
+};
+
+export type PostSecretsRotateResponse = PostSecretsRotateResponses[keyof PostSecretsRotateResponses];
+
 export type DeleteSecretsByIdData = {
     body?: never;
     path: {
@@ -7772,6 +7795,7 @@ export type GetPluginsResponses = {
             packageDir: string;
             trusted: boolean;
             reason: string | null;
+            checksum: string | null;
         };
         activation: {
             enabled: boolean;
@@ -7877,6 +7901,461 @@ export type GetPluginsMentionsResponses = {
 
 export type GetPluginsMentionsResponse = GetPluginsMentionsResponses[keyof GetPluginsMentionsResponses];
 
+export type GetPluginsSourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/plugins/sources';
+};
+
+export type GetPluginsSourcesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        kind: 'localPath' | 'git' | 'npm';
+        location: string;
+        ref: string | null;
+        subPath: string | null;
+        label: string | null;
+        addedReason: string;
+        createdAt: number;
+        updatedAt: number;
+        resolvedDirectory: string | null;
+        error: string | null;
+        plugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: string | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+    }>;
+};
+
+export type GetPluginsSourcesResponse = GetPluginsSourcesResponses[keyof GetPluginsSourcesResponses];
+
+export type PostPluginsSourcesData = {
+    body: {
+        kind: 'localPath' | 'git' | 'npm';
+        location: string;
+        ref?: string | null;
+        subPath?: string | null;
+        label?: string | null;
+        addedReason?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/plugins/sources';
+};
+
+export type PostPluginsSourcesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            id: string;
+            kind: 'localPath' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: string | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+        discoveredPlugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: string | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+    };
+};
+
+export type PostPluginsSourcesResponse = PostPluginsSourcesResponses[keyof PostPluginsSourcesResponses];
+
+export type DeletePluginsSourcesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}';
+};
+
+export type DeletePluginsSourcesByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        removed: boolean;
+    };
+};
+
+export type DeletePluginsSourcesByIdResponse = DeletePluginsSourcesByIdResponses[keyof DeletePluginsSourcesByIdResponses];
+
+export type GetPluginsSourcesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}';
+};
+
+export type GetPluginsSourcesByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        kind: 'localPath' | 'git' | 'npm';
+        location: string;
+        ref: string | null;
+        subPath: string | null;
+        label: string | null;
+        addedReason: string;
+        createdAt: number;
+        updatedAt: number;
+        resolvedDirectory: string | null;
+        error: string | null;
+        plugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: string | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+    };
+};
+
+export type GetPluginsSourcesByIdResponse = GetPluginsSourcesByIdResponses[keyof GetPluginsSourcesByIdResponses];
+
 export type GetPluginsByRouteSegmentIconData = {
     body?: never;
     path: {
@@ -7912,6 +8391,7 @@ export type GetPluginsByRouteSegmentResponses = {
             packageDir: string;
             trusted: boolean;
             reason: string | null;
+            checksum: string | null;
         };
         activation: {
             enabled: boolean;
@@ -8016,6 +8496,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
             packageDir: string;
             trusted: boolean;
             reason: string | null;
+            checksum: string | null;
         };
         activation: {
             enabled: boolean;
@@ -8905,6 +9386,7 @@ export type PostWorkspacesByWorkspaceIdWorktreesData = {
         sessionId: string;
         slug?: string;
         bindSession?: boolean;
+        confirmedSetupHooks?: boolean;
     };
     path: {
         workspaceId: string;

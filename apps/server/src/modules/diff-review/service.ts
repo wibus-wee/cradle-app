@@ -2171,37 +2171,19 @@ function upsertGuide(input: {
     .run()
 }
 
-async function assertLocalWorktreeMatchesRevision(input: {
-  workspaceId: string
-  review: DiffReview
-  revision: DiffReviewRevision
-}): Promise<void> {
-  if (input.review.sourceKind !== 'local-working-tree') {
-    throw new AppError({
-      code: 'diff_review_local_source_unsupported',
-      status: 400,
-      message: 'Diff review generation currently supports local working tree reviews only',
-      details: {
-        reviewId: input.review.id,
-        sourceKind: input.review.sourceKind
-      }
-    })
+function validateGuideSourceKind(review: DiffReview): void {
+  if (review.sourceKind === 'local-working-tree') {
+    return
   }
-  const currentPatch = await Git.getDiff(input.workspaceId, undefined, input.review.repositoryPath)
-  const currentPatchHash = hashText(currentPatch)
-  if (currentPatchHash !== input.revision.patchHash) {
-    throw new AppError({
-      code: 'diff_review_source_changed',
-      status: 409,
-      message: 'Diff review source changed; refresh the review before generating output',
-      details: {
-        reviewId: input.review.id,
-        revisionId: input.revision.id,
-        revisionPatchHash: input.revision.patchHash,
-        currentPatchHash
-      }
-    })
-  }
+  throw new AppError({
+    code: 'diff_review_local_source_unsupported',
+    status: 400,
+    message: 'Diff review generation currently supports local working tree reviews only',
+    details: {
+      reviewId: review.id,
+      sourceKind: review.sourceKind
+    }
+  })
 }
 
 function isGuideGenerationActive(status: DiffReviewGuide['status'] | undefined): boolean {
@@ -2253,11 +2235,6 @@ async function runGuideGenerationTask(input: {
     if (!rawOutput) {
       throw new Error('Guide generation completed without assistant output')
     }
-    await assertLocalWorktreeMatchesRevision({
-      workspaceId: input.workspaceId,
-      review: input.review,
-      revision: input.revision
-    })
     const parsedArtifact = parseGuideJson(rawOutput)
     const steps = normalizeGuideSteps({
       parsed: parsedArtifact,
@@ -2327,6 +2304,7 @@ export async function generateGuide(input: {
   userId?: string
 }): Promise<DiffReviewView> {
   const review = getReviewRow(input.workspaceId, input.reviewId)
+  validateGuideSourceKind(review)
   const revision = getCurrentRevision(review)
   const files = db()
     .select()
@@ -2342,12 +2320,6 @@ export async function generateGuide(input: {
       details: { reviewId: review.id, revisionId: revision.id }
     })
   }
-  await assertLocalWorktreeMatchesRevision({
-    workspaceId: input.workspaceId,
-    review,
-    revision
-  })
-
   const existing = db()
     .select()
     .from(diffReviewGuides)
@@ -2888,18 +2860,12 @@ function normalizeGeneratedCommitPlan(input: {
 }
 
 async function createCommitPlanFromAgentOutput(input: {
-  workspaceId: string
   review: DiffReview
   revision: DiffReviewRevision
   files: DiffReviewFile[]
   agentFix: DiffReviewAgentFix
   rawOutput: string
 }): Promise<DiffReviewCommitPlan> {
-  await assertLocalWorktreeMatchesRevision({
-    workspaceId: input.workspaceId,
-    review: input.review,
-    revision: input.revision
-  })
   const parsed = parseCommitPlanJson(input.rawOutput)
   const plan = normalizeGeneratedCommitPlan({
     parsed,
@@ -3036,7 +3002,6 @@ async function watchAgentFixRunCompletion(input: {
         }
       })
       const commitPlan = await createCommitPlanFromAgentOutput({
-        workspaceId: input.workspaceId,
         review,
         revision,
         files,

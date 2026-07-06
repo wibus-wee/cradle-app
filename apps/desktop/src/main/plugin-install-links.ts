@@ -28,7 +28,6 @@ const SUPPORTED_PARAMS = new Set([
 ])
 const REQUIRED_PARAMS = ['source', 'repository', 'path', 'package', 'version', 'channel'] as const
 const DEFAULT_GITHUB_REF = 'main'
-const FIRST_PARTY_REPOSITORY = 'wibus-wee/cradle-app'
 
 export interface PluginInstallRequest {
   source: 'github'
@@ -108,14 +107,11 @@ function validateGitHubRepository(repository: string): void {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) {
     throw new PluginInstallLinkError('GitHub repository must use owner/name syntax')
   }
-  if (repository !== FIRST_PARTY_REPOSITORY) {
-    throw new PluginInstallLinkError(`Unsupported plugin repository: ${repository}`)
-  }
 }
 
 function validatePluginPath(path: string): void {
-  if (!path.startsWith('plugins/')) {
-    throw new PluginInstallLinkError('Plugin path must live under plugins/')
+  if (path === '' || path === '.') {
+    return
   }
   if (path.includes('\\') || path.startsWith('/') || path.endsWith('/')) {
     throw new PluginInstallLinkError('Plugin path must be a normalized relative path')
@@ -127,8 +123,8 @@ function validatePluginPath(path: string): void {
 }
 
 function validatePluginPackageName(packageName: string): void {
-  if (!/^@cradle\/[a-z0-9][a-z0-9._-]*$/.test(packageName)) {
-    throw new PluginInstallLinkError('Plugin package must use the @cradle/* namespace')
+  if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(packageName)) {
+    throw new PluginInstallLinkError('Plugin package must be a valid npm package name')
   }
 }
 
@@ -258,7 +254,8 @@ async function downloadTarball(request: PluginInstallRequest, archivePath: strin
 
 async function extractPluginPath(archivePath: string, request: PluginInstallRequest, stagingDir: string): Promise<void> {
   const requestedPath = request.path
-  const stripSegments = requestedPath.split('/').length + 1
+  const isRepositoryRoot = requestedPath === '' || requestedPath === '.'
+  const stripSegments = isRepositoryRoot ? 1 : requestedPath.split('/').length + 1
   let matched = false
 
   await tar.x({
@@ -270,6 +267,10 @@ async function extractPluginPath(archivePath: string, request: PluginInstallRequ
       const slashIndex = normalized.indexOf('/')
       if (slashIndex < 0) { return false }
       const relativePath = normalized.slice(slashIndex + 1).replace(/\/$/, '')
+      if (isRepositoryRoot) {
+        matched = true
+        return true
+      }
       const include = relativePath === requestedPath || relativePath.startsWith(`${requestedPath}/`)
       matched ||= include
       return include

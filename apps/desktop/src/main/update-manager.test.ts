@@ -109,6 +109,7 @@ const electronUpdaterMocks = vi.hoisted(() => {
   class FakeAutoUpdater {
     autoDownload = true
     autoInstallOnAppQuit = true
+    allowPrerelease = false
     disableWebInstaller = false
     logger: Console | null = null
     readonly listeners = new Map<string, Listener[]>()
@@ -132,6 +133,7 @@ const electronUpdaterMocks = vi.hoisted(() => {
     reset(): void {
       this.autoDownload = true
       this.autoInstallOnAppQuit = true
+      this.allowPrerelease = false
       this.disableWebInstaller = false
       this.logger = null
       this.listeners.clear()
@@ -320,6 +322,7 @@ describe('DesktopUpdateManager', () => {
     )
     expect(electronUpdaterMocks.autoUpdater.autoDownload).toBe(false)
     expect(electronUpdaterMocks.autoUpdater.autoInstallOnAppQuit).toBe(false)
+    expect(electronUpdaterMocks.autoUpdater.allowPrerelease).toBe(true)
     expect(electronUpdaterMocks.autoUpdater.disableWebInstaller).toBe(true)
     expect(updateSourceMocks.state.instances).toHaveLength(0)
     expect(updateInstallerMocks.state.instances).toHaveLength(0)

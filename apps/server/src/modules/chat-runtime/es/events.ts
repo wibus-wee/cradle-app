@@ -1,61 +1,146 @@
-import type {
-  ChatSessionQueueItem,
-  Message,
-  NewBackendRun,
-  NewChatSessionQueueItem,
-  NewMessage,
-  SessionEvent
-} from '@cradle/db'
-
 import type { ChatMessageStatus } from '../run/stream-chunks'
-import type { ChatRuntimeSettings } from '../runtime-provider-types'
 import type { PersistedThinkingEffort } from '../queue/session-queue'
+import type { ChatRuntimeSettings } from '../runtime-provider-types'
 
 export const CHAT_SESSION_AGGREGATE_TYPE = 'ChatSession'
+export const CHAT_SESSION_EVENT_SCHEMA_VERSION = 2
+
+export type ChatSessionEventSchemaVersion = typeof CHAT_SESSION_EVENT_SCHEMA_VERSION
 
 export type TerminalRunEventType = 'RunCompleted' | 'RunFailed' | 'RunAborted'
 
 export type ChatSessionEventType =
   | 'UserMessageAppended'
+  | 'MessageImported'
   | 'RunStarted'
+  | 'AssistantMessageSnapshotted'
   | 'AssistantMessageCompleted'
   | TerminalRunEventType
   | 'InteractionRequested'
   | 'InteractionResolved'
+  | 'PlanImplementationResponded'
   | 'QueueItemEnqueued'
   | 'QueueItemClaimed'
   | 'QueueItemReleased'
   | 'QueueItemFailed'
   | 'QueueItemReordered'
   | 'QueueItemUpdated'
+  | 'QueueItemProviderTargetCleared'
   | 'QueueItemCancelled'
   | 'SteerApplied'
   | 'LastTurnRolledBack'
   | 'TitleChanged'
 
-export type QueueProjectionStatus = ChatSessionQueueItem['status']
+export type QueueProjectionStatus = 'pending' | 'running' | 'cancelled' | 'completed' | 'failed'
 
-export interface UserMessageAppendedPayload {
-  message: NewMessage & { id: string; sessionId: string }
+export interface ChatSessionEventRow {
+  sequenceId: number
+  aggregateId: string
+  aggregateType: string
+  version: number
+  eventType: string
+  payload: string
+  subjectRunId: string | null
+  occurredAt: number
 }
 
-export interface RunStartedPayload {
-  run: NewBackendRun & { id: string; chatSessionId: string; startedAt: number }
-  assistantMessage?: (NewMessage & { id: string; sessionId: string }) | null
-  assistantMessageProjection?: 'insert' | 'update' | null
+export interface VersionedChatSessionPayload {
+  v?: ChatSessionEventSchemaVersion
+}
+
+export interface MessageRecordedFact {
+  id: string
+  sessionId: string
+  parentMessageId: string | null
+  parentToolCallId: string | null
+  taskId: string | null
+  depth: number
+  role: 'user' | 'assistant'
+  status: ChatMessageStatus
+  content: string
+  messageJson: string
+  errorText?: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface BackendRunStartedFact {
+  id: string
+  bindingId: string | null
+  chatSessionId: string
+  messageId: string | null
+  origin: 'user' | 'issue-agent' | 'system'
+  status: 'streaming'
+  stopReason: null
+  errorText: null
+  startedAt: number
+  finishedAt: null
+}
+
+export interface QueueItemFact {
+  id: string
+  sessionId: string
+  mode: 'queue'
+  status: QueueProjectionStatus
+  text: string
+  filesJson: string
+  contextPartsJson: string
+  providerTargetId: string | null
+  modelId: string | null
+  thinkingEffort: PersistedThinkingEffort | null
+  permissionMode: 'bypassPermissions' | 'plan' | null
+  runtimeAccessMode: ChatRuntimeSettings['accessMode']
+  runtimeInteractionMode: ChatRuntimeSettings['interactionMode']
+  position: number
+  sourceRunId: string | null
+  startedRunId: string | null
+  errorText: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface UserMessageAppendedPayload extends VersionedChatSessionPayload {
+  message: MessageRecordedFact & { role: 'user'; status: 'complete' }
+}
+
+export interface MessageImportedPayload extends VersionedChatSessionPayload {
+  message: MessageRecordedFact & { status: 'complete' }
+}
+
+export interface RunStartedPayload extends VersionedChatSessionPayload {
+  run: BackendRunStartedFact
+  assistantMessage?: (MessageRecordedFact & { role: 'assistant'; status: 'streaming' }) | null
   queueItemId?: string | null
   runtimeSettings?: ChatRuntimeSettings
 }
 
-export interface AssistantMessageCompletedPayload {
-  message: Pick<Message, 'id' | 'sessionId' | 'content' | 'messageJson'> & {
+export interface AssistantMessageCompletedPayload extends VersionedChatSessionPayload {
+  message: {
+    id: string
+    sessionId: string
+    content: string
+    messageJson: string
     status: ChatMessageStatus
     errorText: string | null
     updatedAt: number
   }
 }
 
-export interface RunTerminalPayload {
+export interface AssistantMessageSnapshottedPayload extends VersionedChatSessionPayload {
+  runId: string
+  message: {
+    id: string
+    sessionId: string
+    content: string
+    messageJson: string
+    status: 'streaming'
+    errorText: null
+    updatedAt: number
+  }
+  messageJsonBytes: number
+}
+
+export interface RunTerminalPayload extends VersionedChatSessionPayload {
   runId: string
   sessionId: string
   queueItemId?: string | null
@@ -66,43 +151,38 @@ export interface RunTerminalPayload {
   finishedAt: number
 }
 
-export interface QueueItemEnqueuedPayload {
-  item: NewChatSessionQueueItem & {
-    id: string
-    sessionId: string
-    createdAt: number
-    updatedAt: number
-  }
+export interface QueueItemEnqueuedPayload extends VersionedChatSessionPayload {
+  item: QueueItemFact
 }
 
-export interface QueueItemClaimedPayload {
+export interface QueueItemClaimedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
   startedRunId?: string | null
   updatedAt: number
 }
 
-export interface QueueItemReleasedPayload {
+export interface QueueItemReleasedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
   updatedAt: number
 }
 
-export interface QueueItemFailedPayload {
+export interface QueueItemFailedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
   errorText: string | null
   updatedAt: number
 }
 
-export interface QueueItemReorderedPayload {
+export interface QueueItemReorderedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
   position: number
   updatedAt: number
 }
 
-export interface QueueItemUpdatedPayload {
+export interface QueueItemUpdatedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
   text: string
@@ -116,17 +196,24 @@ export interface QueueItemUpdatedPayload {
   updatedAt: number
 }
 
-export interface QueueItemCancelledPayload {
+export interface QueueItemProviderTargetClearedPayload extends VersionedChatSessionPayload {
+  queueItemId: string
+  sessionId: string
+  providerTargetId: string
+  updatedAt: number
+}
+
+export interface QueueItemCancelledPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
   updatedAt: number
 }
 
-export interface SteerAppliedPayload {
-  message: NewMessage & { id: string; sessionId: string }
+export interface SteerAppliedPayload extends VersionedChatSessionPayload {
+  message: MessageRecordedFact & { role: 'user'; status: 'complete' }
 }
 
-export interface LastTurnRolledBackPayload {
+export interface LastTurnRolledBackPayload extends VersionedChatSessionPayload {
   sessionId: string
   messageIds: string[]
   providerRuntimeKind: string
@@ -136,14 +223,14 @@ export interface LastTurnRolledBackPayload {
   updatedAt: number
 }
 
-export interface TitleChangedPayload {
+export interface TitleChangedPayload extends VersionedChatSessionPayload {
   sessionId: string
   title: string
   titleSource: 'provider' | 'user'
   updatedAt: number
 }
 
-export interface InteractionRequestedPayload {
+export interface InteractionRequestedPayload extends VersionedChatSessionPayload {
   sessionId: string
   runId: string
   requestId: string
@@ -157,7 +244,7 @@ export interface InteractionRequestedPayload {
   updatedAt: number
 }
 
-export interface InteractionResolvedPayload {
+export interface InteractionResolvedPayload extends VersionedChatSessionPayload {
   sessionId: string
   runId: string
   requestId: string
@@ -167,30 +254,93 @@ export interface InteractionResolvedPayload {
   updatedAt: number
 }
 
+export interface PlanImplementationRespondedPayload extends VersionedChatSessionPayload {
+  sessionId: string
+  messageId: string
+  approvalId: string
+  approved: boolean
+  updatedAt: number
+}
+
 export type ChatSessionEvent =
   | { type: 'UserMessageAppended'; payload: UserMessageAppendedPayload }
+  | { type: 'MessageImported'; payload: MessageImportedPayload }
   | { type: 'RunStarted'; payload: RunStartedPayload }
+  | { type: 'AssistantMessageSnapshotted'; payload: AssistantMessageSnapshottedPayload }
   | { type: 'AssistantMessageCompleted'; payload: AssistantMessageCompletedPayload }
-  | { type: TerminalRunEventType; payload: RunTerminalPayload }
+  | { type: 'RunCompleted'; payload: RunTerminalPayload }
+  | { type: 'RunFailed'; payload: RunTerminalPayload }
+  | { type: 'RunAborted'; payload: RunTerminalPayload }
   | { type: 'InteractionRequested'; payload: InteractionRequestedPayload }
   | { type: 'InteractionResolved'; payload: InteractionResolvedPayload }
+  | { type: 'PlanImplementationResponded'; payload: PlanImplementationRespondedPayload }
   | { type: 'QueueItemEnqueued'; payload: QueueItemEnqueuedPayload }
   | { type: 'QueueItemClaimed'; payload: QueueItemClaimedPayload }
   | { type: 'QueueItemReleased'; payload: QueueItemReleasedPayload }
   | { type: 'QueueItemFailed'; payload: QueueItemFailedPayload }
   | { type: 'QueueItemReordered'; payload: QueueItemReorderedPayload }
   | { type: 'QueueItemUpdated'; payload: QueueItemUpdatedPayload }
+  | { type: 'QueueItemProviderTargetCleared'; payload: QueueItemProviderTargetClearedPayload }
   | { type: 'QueueItemCancelled'; payload: QueueItemCancelledPayload }
   | { type: 'SteerApplied'; payload: SteerAppliedPayload }
   | { type: 'LastTurnRolledBack'; payload: LastTurnRolledBackPayload }
   | { type: 'TitleChanged'; payload: TitleChangedPayload }
 
-export type StoredChatSessionEvent = Omit<SessionEvent, 'eventType' | 'payload'> & ChatSessionEvent
+export type StoredChatSessionEvent =
+  Omit<ChatSessionEventRow, 'eventType' | 'payload'>
+  & ChatSessionEvent
 
-export function parseStoredChatSessionEvent(row: SessionEvent): StoredChatSessionEvent {
+type V1RunStartedPayload = Omit<RunStartedPayload, 'v'> & {
+  assistantMessageProjection?: 'insert' | 'update' | null
+}
+
+export function serializeChatSessionEventPayload(event: ChatSessionEvent): string {
+  return JSON.stringify(addCurrentPayloadVersion(event.payload))
+}
+
+export function parseStoredChatSessionEvent(row: ChatSessionEventRow): StoredChatSessionEvent {
+  const type = row.eventType as ChatSessionEventType
   return {
     ...row,
-    type: row.eventType as ChatSessionEventType,
-    payload: JSON.parse(row.payload) as ChatSessionEvent['payload']
+    type,
+    payload: upcastChatSessionEventPayload(type, JSON.parse(row.payload))
   } as StoredChatSessionEvent
+}
+
+export function upcastChatSessionEventPayload(
+  eventType: ChatSessionEventType,
+  rawPayload: ChatSessionEvent['payload']
+): ChatSessionEvent['payload'] {
+  if (rawPayload.v === CHAT_SESSION_EVENT_SCHEMA_VERSION) {
+    return rawPayload
+  }
+  if (rawPayload.v !== undefined) {
+    throw new Error(`Unsupported chat session event payload version: ${rawPayload.v}`)
+  }
+
+  return upcastV1ChatSessionEventPayload(eventType, rawPayload)
+}
+
+function upcastV1ChatSessionEventPayload(
+  eventType: ChatSessionEventType,
+  payload: ChatSessionEvent['payload']
+): ChatSessionEvent['payload'] {
+  if (eventType === 'RunStarted') {
+    const {
+      assistantMessageProjection: _assistantMessageProjection,
+      ...rest
+    } = payload as V1RunStartedPayload
+    return addCurrentPayloadVersion(rest)
+  }
+
+  return addCurrentPayloadVersion(payload)
+}
+
+function addCurrentPayloadVersion<TPayload extends ChatSessionEvent['payload']>(
+  payload: TPayload
+): TPayload & { v: ChatSessionEventSchemaVersion } {
+  return {
+    ...payload,
+    v: CHAT_SESSION_EVENT_SCHEMA_VERSION
+  }
 }

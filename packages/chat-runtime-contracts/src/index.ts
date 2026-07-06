@@ -798,19 +798,23 @@ export interface ChatRuntimeHealthItem extends ProviderHealthStatus {
 
 export type ChatSessionTailEventType =
   | 'UserMessageAppended'
+  | 'MessageImported'
   | 'RunStarted'
+  | 'AssistantMessageSnapshotted'
   | 'AssistantMessageCompleted'
   | 'RunCompleted'
   | 'RunFailed'
   | 'RunAborted'
   | 'InteractionRequested'
   | 'InteractionResolved'
+  | 'PlanImplementationResponded'
   | 'QueueItemEnqueued'
   | 'QueueItemClaimed'
   | 'QueueItemReleased'
   | 'QueueItemFailed'
   | 'QueueItemReordered'
   | 'QueueItemUpdated'
+  | 'QueueItemProviderTargetCleared'
   | 'QueueItemCancelled'
   | 'SteerApplied'
   | 'LastTurnRolledBack'
@@ -849,6 +853,7 @@ export type ChatSessionTailEventPayload =
       resolution: 'submitted' | 'cancelled'
       approved: boolean | null
     }
+  | { messageId: string; approvalId: string; approved: boolean }
   | {
       reason: 'tail_gap'
       latestVersion: number

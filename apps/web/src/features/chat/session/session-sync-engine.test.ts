@@ -222,6 +222,38 @@ describe('sessionSyncEngine', () => {
     expect(callbacks.onSessionSummaryChanged).toHaveBeenCalledTimes(1)
   })
 
+  it('does not request a snapshot for snapshotted messages with an active stream lease', () => {
+    const source = new FakeEventSource()
+    const callbacks = {
+      ...createCallbacks(),
+      hasStreamLease: vi.fn((messageId: string) => messageId === 'assistant-1'),
+    }
+    const engine = new SessionSyncEngine({
+      sessionId: 'session-1',
+      serverBaseUrl: 'http://127.0.0.1:21423',
+      eventSourceFactory: () => source,
+      callbacks,
+    })
+
+    engine.start()
+    source.emitSession({
+      scope: 'session',
+      sessionId: 'session-1',
+      sequenceId: 1,
+      version: 1,
+      type: 'AssistantMessageSnapshotted',
+      occurredAt: 100,
+      payload: {
+        runId: 'run-1',
+        message: { id: 'assistant-1' },
+      },
+    })
+
+    expect(callbacks.hasStreamLease).toHaveBeenCalledWith('assistant-1')
+    expect(callbacks.onMessagesChanged).not.toHaveBeenCalled()
+    expect(callbacks.onRuntimeUiSlotStatesChanged).toHaveBeenCalledTimes(1)
+  })
+
   it('starts, replaces, and stops passive chunk streams from runtime state inputs', () => {
     const source = new FakeEventSource()
     const callbacks = createCallbacks()
@@ -248,33 +280,25 @@ describe('sessionSyncEngine', () => {
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
-      holdEmptyStreamingSnapshot: false,
       runtimeActiveRunMessageId: 'assistant-1',
-      snapshotStreamingMessageIds: [],
     })
     engine.updatePassiveStream({
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
-      holdEmptyStreamingSnapshot: false,
       runtimeActiveRunMessageId: 'assistant-1',
-      snapshotStreamingMessageIds: ['snapshot-1'],
     })
     engine.updatePassiveStream({
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
-      holdEmptyStreamingSnapshot: false,
       runtimeActiveRunMessageId: 'assistant-2',
-      snapshotStreamingMessageIds: [],
     })
     engine.updatePassiveStream({
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: true,
-      holdEmptyStreamingSnapshot: false,
       runtimeActiveRunMessageId: 'assistant-2',
-      snapshotStreamingMessageIds: [],
     })
 
     expect(starts).toEqual(['session-1:assistant-1', 'session-1:assistant-2'])
@@ -285,36 +309,43 @@ describe('sessionSyncEngine', () => {
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
-      holdEmptyStreamingSnapshot: false,
       runtimeActiveRunMessageId: null,
-      snapshotStreamingMessageIds: ['snapshot-2'],
     })
 
-    expect(starts).toEqual(['session-1:assistant-1', 'session-1:assistant-2', 'session-1:snapshot-2'])
+    expect(starts).toEqual(['session-1:assistant-1', 'session-1:assistant-2'])
     engine.stop()
-    expect(closed).toEqual(['session-1:assistant-1', 'session-1:assistant-2', 'session-1:snapshot-2'])
+    expect(closed).toEqual(['session-1:assistant-1', 'session-1:assistant-2'])
   })
 
-  it('does not open a passive stream while holding an empty streaming snapshot', () => {
+  it('does not close or reopen a passive stream during snapshot fetch jitter', () => {
     const callbacks = createCallbacks()
-    const passiveStreamFactory = vi.fn()
+    const closed: string[] = []
+    const starts: string[] = []
     const engine = new SessionSyncEngine({
       sessionId: 'session-1',
       serverBaseUrl: 'http://127.0.0.1:21423',
-      passiveStreamFactory,
+      passiveStreamFactory: (request) => {
+        starts.push(`${request.sessionId}:${request.messageId}`)
+        return {
+          close: () => {
+            closed.push(`${request.sessionId}:${request.messageId}`)
+          },
+        }
+      },
       callbacks,
     })
 
-    engine.updatePassiveStream({
-      enabled: true,
-      sessionId: 'session-1',
-      locallyDriven: false,
-      holdEmptyStreamingSnapshot: true,
-      runtimeActiveRunMessageId: 'assistant-1',
-      snapshotStreamingMessageIds: ['assistant-1'],
-    })
+    for (let i = 0; i < 3; i++) {
+      engine.updatePassiveStream({
+        enabled: true,
+        sessionId: 'session-1',
+        locallyDriven: false,
+        runtimeActiveRunMessageId: 'assistant-1',
+      })
+    }
 
-    expect(passiveStreamFactory).not.toHaveBeenCalled()
+    expect(starts).toEqual(['session-1:assistant-1'])
+    expect(closed).toEqual([])
   })
 
   it('deduplicates runtime reconciliation decisions inside the engine', () => {

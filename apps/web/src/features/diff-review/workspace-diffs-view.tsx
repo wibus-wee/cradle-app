@@ -17,6 +17,8 @@ export interface WorkspaceDiffsViewProps {
   path?: string
   review?: string
   view?: 'commit' | 'guide'
+  line?: number
+  side?: 'base' | 'head'
 }
 
 /**
@@ -37,6 +39,8 @@ export function WorkspaceDiffsView({
   path,
   review,
   view,
+  line,
+  side,
 }: WorkspaceDiffsViewProps) {
   const { t } = useTranslation('diff-review')
 
@@ -58,6 +62,8 @@ export function WorkspaceDiffsView({
             path={path}
             review={review}
             view={view}
+            line={line}
+            side={side}
           />
         </div>
       </div>
@@ -71,6 +77,8 @@ function WorkspaceDiffsContent({
   path,
   review,
   view,
+  line,
+  side,
 }: WorkspaceDiffsViewProps) {
   if (review && view === 'commit') {
     return <CommitPlanPage workspaceId={workspaceId} repositoryPath={repo} reviewId={review} />
@@ -95,6 +103,8 @@ function WorkspaceDiffsContent({
         repositoryPath={repo}
         reviewId={review}
         initialPath={path}
+        initialLine={line}
+        initialSide={side}
       />
     )
   }
@@ -107,6 +117,8 @@ function WorkspaceDiffsContent({
         repositoryPath={repo}
         reviewId={WORKING_TREE_REVIEW_ID}
         initialPath={path}
+        initialLine={line}
+        initialSide={side}
       />
     )
   }

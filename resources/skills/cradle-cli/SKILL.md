@@ -230,7 +230,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `link-preview` | 1 | Generated Cradle CLI module. | `cradle man link-preview` |
 | `observability` | 5 | Inspect local observability events, incidents, and exports. | `cradle man observability` |
 | `opencode` | 1 | Generated Cradle CLI module. | `cradle man opencode` |
-| `plugin` | 3 | Generated Cradle CLI module. | `cradle man plugin` |
+| `plugin` | 7 | Generated Cradle CLI module. | `cradle man plugin` |
 | `preferences` | 10 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |

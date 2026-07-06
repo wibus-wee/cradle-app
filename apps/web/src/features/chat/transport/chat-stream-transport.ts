@@ -19,6 +19,8 @@ import {
   emitChatRunSettled,
   readTerminalChunkStatus,
 } from './sse-chat-transport'
+import type { ChatStreamChunk } from './chat-stream-types'
+import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
 
 export interface ChatStreamTransportResult {
   streamId: string | null
@@ -26,7 +28,7 @@ export interface ChatStreamTransportResult {
   runId: string | null
   assistantMessageId?: string
   userMessageId?: string
-  stream: ReadableStream<UIMessageChunk>
+  stream: ReadableStream<ChatStreamChunk>
 }
 
 interface StartChatResponseStreamArgs {
@@ -46,7 +48,7 @@ type BufferedDesktopEvent
     | { kind: 'error', event: DesktopChatStreamErrorEvent }
 
 interface DesktopStreamState {
-  controller: ReadableStreamDefaultController<UIMessageChunk>
+  controller: ReadableStreamDefaultController<ChatStreamChunk>
   bridge: DesktopChatStreamBridge
   streamId: string
   queue: Promise<void>
@@ -123,7 +125,7 @@ async function subscribeHttpChatSessionStream(
     streamId: null,
     sessionId: args.sessionId,
     runId: response.headers.get('x-cradle-run-id'),
-    stream: buildUIMessageChunkStreamFromResponse(response, args.sessionId),
+    stream: buildUIMessageChunkStreamFromResponse(response, args.sessionId, { initialReplay: true }),
   }
 }
 
@@ -167,7 +169,7 @@ function readDesktopTransportResult(
   signal: AbortSignal | undefined,
 ): ChatStreamTransportResult {
   closedDesktopStreamIds.delete(handle.streamId)
-  const stream = new ReadableStream<UIMessageChunk>({
+  const stream = new ReadableStream<ChatStreamChunk>({
     start(controller) {
       const state: DesktopStreamState = {
         controller,
@@ -251,7 +253,7 @@ function routeDesktopEvent(event: BufferedDesktopEvent): void {
           status: terminalStatus,
         })
       }
-      state.controller.enqueue(result.value)
+      state.controller.enqueue(event.event.replay ? replayChatStreamChunk(result.value) : liveChatStreamChunk(result.value))
       return
     }
     if (event.kind === 'closed') {

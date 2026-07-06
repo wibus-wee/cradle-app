@@ -66,6 +66,12 @@ A single plugin can implement **any combination** of these layers. For example:
 mkdir -p plugins/my-plugin/src
 ```
 
+For an in-repository plugin, use the workspace dependency shown below. For an external plugin repository, install the published SDK package instead:
+
+```bash
+pnpm add -D @cradle/plugin-sdk
+```
+
 ### Step 2: Create `plugins/my-plugin/package.json`
 
 ```json
@@ -153,9 +159,9 @@ plugins/
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `name` | Yes | Must be `@cradle/<name>` (e.g. `@cradle/my-plugin`) |
+| `name` | Yes | Any valid npm package name, scoped or unscoped (e.g. `@acme/my-plugin` or `my-plugin`) |
 | `type` | Yes | Must be `"module"` |
-| `private` | Recommended | `true` — plugins are monorepo-local |
+| `private` | Optional | Use `true` for local-only plugins; omit it for plugins you publish independently |
 | `cradle` | Yes | Plugin metadata object (see below) |
 | `cradle.displayName` | No | Human-readable name for UI |
 | `cradle.description` | No | What the plugin does |
@@ -184,6 +190,8 @@ CRADLE_PLUGIN_ALLOWED_MY_PLUGIN_PERMISSIONS=network.local
 
 Marketplace install consent records the manifest-derived required permission ids in the install receipt. That receipt is displayed as provenance for any matching package, but it becomes an activation grant only when the host projects it from the Cradle-owned Marketplace installed plugin directory. A copied or hand-written receipt in an arbitrary external plugin directory does not grant permissions.
 
+Marketplace install links can point at any GitHub repository and any normalized package subdirectory, including the repository root. The link only controls where Cradle fetches the package from; checksum trust and install consent still decide whether external code can activate.
+
 If a required permission is missing, the host marks that layer `disabled`. Server and desktop entries do not call `activate()`. Web entries are not served from `/api/plugins/{routeSegment}/web.mjs` and the renderer does not import them.
 
 External local trust is bound to the package checksum. If package contents change, the host disables the plugin until the operator enables that exact package revision again. External local plugins are also blocked while relay host enrollments expose the server.
@@ -205,6 +213,7 @@ The public descriptor includes `activation: { enabled, source, reason?, updatedA
 @cradle/system-info →  system-info
 @cradle/my-tool     →  my-tool
 @external/tool      →  scope-external--tool
+external-tool       →  external-tool
 ```
 
 Current `@cradle/*` route segments remain legacy-compatible. External scoped packages use an encoded route segment to avoid collisions. Do not use the route segment as plugin ownership identity; use the package name.

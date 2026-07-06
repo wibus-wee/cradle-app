@@ -46,6 +46,8 @@ export function createActiveRunReleaseController(
       runRegistry.deleteActiveRunIdForSession(activeRun.sessionId)
     }
     activeRun.pendingDeltaChunk = null
+    activeRun.pendingStreamingSnapshotMessageJson = null
+    activeRun.lastStreamingSnapshotMessageJson = null
     activeRun.chunkBuffer = []
     activeRun.chunkBufferIndexByKey.clear()
     activeRun.chunkBufferDroppedCount = 0

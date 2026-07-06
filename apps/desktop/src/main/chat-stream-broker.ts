@@ -46,6 +46,7 @@ export interface DesktopChatStreamChunkEvent {
   sessionId: string
   runId: string | null
   chunk: unknown
+  replay?: boolean
 }
 
 export interface DesktopChatStreamClosedEvent {
@@ -493,7 +494,7 @@ export class ChatStreamBroker {
       if (item.cursor < subscriber.replayCursor) {
         continue
       }
-      this.sendChunkToSubscriber(entry, subscriber, item.chunk, item.cursor + 1)
+      this.sendChunkToSubscriber(entry, subscriber, item.chunk, item.cursor + 1, true)
     }
   }
 
@@ -502,6 +503,7 @@ export class ChatStreamBroker {
     subscriber: StreamSubscriber,
     chunk: unknown,
     cursorAfter = entry.replayBuffer.nextCursor,
+    replay = false,
   ): void {
     if (subscriber.sink.isDestroyed()) {
       this.removeSubscriber(entry, subscriber.streamId)
@@ -513,6 +515,7 @@ export class ChatStreamBroker {
       sessionId: entry.sessionId,
       runId: entry.runId,
       chunk,
+      replay,
     } satisfies DesktopChatStreamChunkEvent)
     subscriber.replayCursor = cursorAfter
   }

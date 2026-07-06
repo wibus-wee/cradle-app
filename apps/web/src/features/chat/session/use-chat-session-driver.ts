@@ -9,6 +9,7 @@ import { getServerUrl } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
 import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
+import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
 import { createChatSessionEventSource } from '../transport/chat-event-tail-transport'
 import { openPassiveSessionStream } from './session-passive-stream'
@@ -22,7 +23,6 @@ import { readStableMessageRows, writeStableMessageRows } from './stable-message-
 import { useChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 import type { ChatSessionMessageRow } from './use-chat-session-types'
 import {
-  detachPassiveSessionStreamingState,
   QUEUE_DRAIN_SYNC_DELAY_MS,
   readStableSnapshotRows,
   releaseSessionStreamingStateForTerminalRun,
@@ -59,6 +59,8 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
   })
   const snapshotRows = snapshotRowsQuery.data
   const runtimeStatus = runtimeStatusQuery.data
+  const mountedAtMs = useMemo(() => Date.now(), [chatSessionId])
+  const snapshotDataUpdatedAtRef = useRef(snapshotRowsQuery.dataUpdatedAt)
   const runtimeActiveRun = runtimeStatus?.activeRun ?? null
   const runtimeActiveRunMessageId = runtimeStatus?.activeRun?.messageId ?? null
   const runtimeStatusKnown = Boolean(runtimeStatus)
@@ -68,6 +70,20 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     && !runtimeStatus.activeRun,
   )
   const syncEngineRef = useRef<SessionSyncEngine | null>(null)
+  const pendingTerminalReleaseRef = useRef<{
+    run: RuntimeSessionRunStatus
+    requestedDataUpdatedAt: number
+  } | null>(null)
+  const pendingPassiveStreamLeaseReleaseRef = useRef<{
+    messageId: string
+    requestedDataUpdatedAt: number
+  } | null>(null)
+  const runtimeStatusFreshForSubscription = runtimeStatusQuery.isFetchedAfterMount
+    && runtimeStatusQuery.dataUpdatedAt >= mountedAtMs
+
+  useLayoutEffect(() => {
+    snapshotDataUpdatedAtRef.current = snapshotRowsQuery.dataUpdatedAt
+  }, [snapshotRowsQuery.dataUpdatedAt])
 
   useEffect(() => {
     if (!driverEnabled || !chatSessionId) {
@@ -83,6 +99,13 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
         request,
         scheduleSnapshotRefresh: delay => controlsRef.current.scheduleSnapshotRefresh(delay),
         refreshQueue: delay => controlsRef.current.refreshQueue(delay),
+        releaseStreamLeaseAfterSnapshot: (messageId) => {
+          pendingPassiveStreamLeaseReleaseRef.current = {
+            messageId,
+            requestedDataUpdatedAt: snapshotDataUpdatedAtRef.current,
+          }
+          controlsRef.current.scheduleSnapshotRefresh(0)
+        },
       }),
       callbacks: {
         onMessagesChanged: () => {
@@ -102,6 +125,9 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
         onSessionSummaryChanged: () => {
           controlsRef.current.refreshSessionLists()
           controlsRef.current.scheduleSnapshotRefresh(0)
+        },
+        hasStreamLease: (messageId) => {
+          return useChatStore.getState().streamLeaseMap.has(messageId)
         },
         onSnapshotRequired: () => {
           controlsRef.current.refreshSessionLists()
@@ -182,13 +208,8 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       enabled: false,
       sessionId: chatSessionId,
       locallyDriven: false,
-      holdEmptyStreamingSnapshot: false,
       runtimeActiveRunMessageId: null,
-      snapshotStreamingMessageIds: [],
     })
-    if (chatSessionId) {
-      detachPassiveSessionStreamingState(chatSessionId)
-    }
   }, [chatSessionId, driverEnabled])
 
   useLayoutEffect(() => {
@@ -204,15 +225,12 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       runtimeStatusKnown,
       runtimeIdle,
       runtimeActiveRunMessageId,
-      snapshotFetching: snapshotRowsQuery.isFetching,
     })
     if (!projection) {
       return
     }
 
-    if (projection.messages) {
-      store.setMessages(chatSessionId, projection.messages)
-    }
+    store.setMessages(chatSessionId, projection.messages)
     store.setSessionHydrated(chatSessionId, true)
     store.clearSessionErrors(chatSessionId)
     store.setPassiveRunState(chatSessionId, projection.passiveRunState)
@@ -223,7 +241,34 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     if (projection.requestSnapshotRefresh) {
       scheduleSnapshotRefresh(0)
     }
-  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.isFetching])
+
+    const pendingTerminalRelease = pendingTerminalReleaseRef.current
+    if (
+      pendingTerminalRelease
+      && !snapshotRowsQuery.isFetching
+      && snapshotRowsQuery.dataUpdatedAt > pendingTerminalRelease.requestedDataUpdatedAt
+    ) {
+      pendingTerminalReleaseRef.current = null
+      const released = releaseSessionStreamingStateForTerminalRun(chatSessionId, pendingTerminalRelease.run)
+      if (released) {
+        refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
+      }
+    }
+
+    const pendingPassiveStreamLeaseRelease = pendingPassiveStreamLeaseReleaseRef.current
+    if (
+      pendingPassiveStreamLeaseRelease
+      && !snapshotRowsQuery.isFetching
+      && snapshotRowsQuery.dataUpdatedAt > pendingPassiveStreamLeaseRelease.requestedDataUpdatedAt
+    ) {
+      pendingPassiveStreamLeaseReleaseRef.current = null
+      const state = useChatStore.getState()
+      if (state.streamLeaseMap.get(pendingPassiveStreamLeaseRelease.messageId)?.sessionId === chatSessionId) {
+        state.releaseStreamLease(pendingPassiveStreamLeaseRelease.messageId)
+        refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
+      }
+    }
+  }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.dataUpdatedAt, snapshotRowsQuery.isFetching])
 
   useEffect(() => {
     if (!driverEnabled || !chatSessionId || !snapshotRows || runtimeActiveRunMessageId) {
@@ -271,8 +316,11 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       scheduleSnapshotRefresh(0)
     }
 
-    const released = releaseSessionStreamingStateForTerminalRun(chatSessionId, action.terminalRunReleaseCandidate)
-    if (released) {
+    if (action.terminalRunReleaseCandidate) {
+      pendingTerminalReleaseRef.current = {
+        run: action.terminalRunReleaseCandidate,
+        requestedDataUpdatedAt: snapshotRowsQuery.dataUpdatedAt,
+      }
       scheduleSnapshotRefresh(0)
       refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
     }
@@ -280,27 +328,21 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     if (action.requestQueueRefresh) {
       refreshQueue(0)
     }
-  }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRun, runtimeStatus, scheduleSnapshotRefresh, snapshotRows])
+  }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRun, runtimeStatus, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.dataUpdatedAt])
 
   useEffect(() => {
     const runState = chatSessionId
       ? chatSelectors.sessionRunState(chatSessionId)(useChatStore.getState())
       : null
     const projection = deriveSessionPassiveStreamProjection({
-      rows: snapshotRows,
       runState,
-      runtimeStatusKnown,
-      runtimeIdle,
-      snapshotFetching: snapshotRowsQuery.isFetching,
     })
 
     syncEngineRef.current?.updatePassiveStream({
       enabled: driverEnabled,
       sessionId: chatSessionId,
       locallyDriven: projection.locallyDriven,
-      holdEmptyStreamingSnapshot: projection.holdEmptyStreamingSnapshot,
-      runtimeActiveRunMessageId,
-      snapshotStreamingMessageIds: projection.snapshotStreamingMessageIds,
+      runtimeActiveRunMessageId: runtimeStatusFreshForSubscription ? runtimeActiveRunMessageId : null,
     })
-  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, snapshotRows, snapshotRowsQuery.isFetching])
+  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeStatus, runtimeStatusFreshForSubscription])
 }

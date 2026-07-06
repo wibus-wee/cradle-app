@@ -27,6 +27,8 @@ interface ReviewDetailPageProps {
   repositoryPath?: string | null
   reviewId: string
   initialPath?: string | null
+  initialLine?: number
+  initialSide?: 'base' | 'head'
 }
 
 export function ReviewDetailPage({
@@ -34,6 +36,8 @@ export function ReviewDetailPage({
   repositoryPath,
   reviewId,
   initialPath,
+  initialLine,
+  initialSide,
 }: ReviewDetailPageProps) {
   const {
     review,
@@ -61,6 +65,11 @@ export function ReviewDetailPage({
   const [composerAnchor, setComposerAnchor] = useState<CodeViewLineSelection | null>(null)
   const stageHandleRef = useRef<DiffStageHandle | null>(null)
   const pendingScrollRef = useRef<string | null>(initialPath ?? null)
+  // Paired with initialPath: when present, mount-scroll targets a specific line (from a guide
+  // "Open in review" deep link) instead of just the file header.
+  const pendingLineRef = useRef<{ line: number, side: 'base' | 'head' } | null>(
+    initialPath && initialLine ? { line: initialLine, side: initialSide ?? 'head' } : null,
+  )
 
   // Panel widths — Linear-style: panels are resizable, the diff stays the protagonist.
   // Right rail auto-hides when there are no open threads so the diff gets the room.
@@ -175,7 +184,14 @@ export function ReviewDetailPage({
     }
     const path = pendingScrollRef.current
     pendingScrollRef.current = null
-    stageHandleRef.current?.scrollToPath(path)
+    const lineTarget = pendingLineRef.current
+    pendingLineRef.current = null
+    if (lineTarget) {
+      stageHandleRef.current?.scrollToLine(path, lineTarget.line, lineTarget.side)
+    }
+    else {
+      stageHandleRef.current?.scrollToPath(path)
+    }
   }, [visibleItems])
 
   const selectFile = (file: ReviewFile) => {

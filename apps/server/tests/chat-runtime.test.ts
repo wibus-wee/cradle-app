@@ -68,8 +68,10 @@ import {
 } from '../src/modules/chat-runtime/runtime'
 import {
   cancelQueuedSessionItem,
-  claimSessionQueueItem
+  claimSessionQueueItem,
+  commitSessionEventsInTransaction
 } from '../src/modules/chat-runtime/es/commands'
+import type { ChatSessionEvent } from '../src/modules/chat-runtime/es/events'
 import { providerRuntimeHostManager } from '../src/modules/provider-runtime/host-manager'
 import {
   clearSideConversations,
@@ -271,6 +273,47 @@ function restoreEnv(name: string, previousValue: string | undefined): void {
     delete process.env[name]
   } else {
     process.env[name] = previousValue
+  }
+}
+
+function queueItemEnqueuedEvent(input: {
+  id: string
+  sessionId: string
+  text: string
+  position: number
+  createdAt: number
+  providerTargetId?: string | null
+  modelId?: string | null
+  thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh' | null
+  permissionMode?: 'bypassPermissions' | 'plan' | null
+  runtimeAccessMode?: 'approval-required' | 'full-access'
+  runtimeInteractionMode?: 'default' | 'plan'
+}): ChatSessionEvent {
+  return {
+    type: 'QueueItemEnqueued',
+    payload: {
+      item: {
+        id: input.id,
+        sessionId: input.sessionId,
+        mode: 'queue',
+        status: 'pending',
+        text: input.text,
+        filesJson: '[]',
+        contextPartsJson: '[]',
+        providerTargetId: input.providerTargetId ?? null,
+        modelId: input.modelId ?? null,
+        thinkingEffort: input.thinkingEffort ?? null,
+        permissionMode: input.permissionMode ?? null,
+        runtimeAccessMode: input.runtimeAccessMode ?? 'approval-required',
+        runtimeInteractionMode: input.runtimeInteractionMode ?? 'default',
+        position: input.position,
+        sourceRunId: null,
+        startedRunId: null,
+        errorText: null,
+        createdAt: input.createdAt,
+        updatedAt: input.createdAt
+      }
+    }
   }
 }
 
@@ -3824,53 +3867,27 @@ describe('chat runtime capability', () => {
       expect(patchRes.status).toBe(200)
 
       const now = Math.floor(Date.now() / 1000)
-      db()
-        .insert(chatSessionQueueItems)
-        .values([
-          {
-            id: 'queue-historical-default-runtime-settings',
-            sessionId: 'session-historical-queue-runtime-settings',
-            mode: 'queue',
-            status: 'pending',
-            text: 'Use historical defaults.',
-            filesJson: '[]',
-            contextPartsJson: '[]',
-            providerTargetId: null,
-            modelId: null,
-            thinkingEffort: null,
-            permissionMode: null,
-            runtimeAccessMode: null,
-            runtimeInteractionMode: null,
-            position: 1,
-            sourceRunId: null,
-            startedRunId: null,
-            errorText: null,
-            createdAt: now,
-            updatedAt: now
-          },
-          {
-            id: 'queue-historical-plan-runtime-settings',
-            sessionId: 'session-historical-queue-runtime-settings',
-            mode: 'queue',
-            status: 'pending',
-            text: 'Use historical plan mode.',
-            filesJson: '[]',
-            contextPartsJson: '[]',
-            providerTargetId: null,
-            modelId: null,
-            thinkingEffort: null,
-            permissionMode: 'plan',
-            runtimeAccessMode: null,
-            runtimeInteractionMode: null,
-            position: 2,
-            sourceRunId: null,
-            startedRunId: null,
-            errorText: null,
-            createdAt: now,
-            updatedAt: now
-          }
-        ])
-        .run()
+      commitSessionEventsInTransaction('session-historical-queue-runtime-settings', [
+        queueItemEnqueuedEvent({
+          id: 'queue-historical-default-runtime-settings',
+          sessionId: 'session-historical-queue-runtime-settings',
+          text: 'Use historical defaults.',
+          position: 1,
+          createdAt: now,
+          runtimeAccessMode: 'full-access',
+          runtimeInteractionMode: 'default'
+        }),
+        queueItemEnqueuedEvent({
+          id: 'queue-historical-plan-runtime-settings',
+          sessionId: 'session-historical-queue-runtime-settings',
+          text: 'Use historical plan mode.',
+          position: 2,
+          createdAt: now,
+          permissionMode: 'plan',
+          runtimeAccessMode: 'approval-required',
+          runtimeInteractionMode: 'plan'
+        })
+      ])
 
       const visibleQueue = await listChatQueue(app, 'session-historical-queue-runtime-settings')
       expect(
@@ -5178,7 +5195,7 @@ describe('chat runtime capability', () => {
         return summary
       }, 'active snapshot replay text delta')
 
-      flushAllActiveRunSnapshots()
+      await flushAllActiveRunSnapshots()
 
       const assistantRow = db().select().from(messages).where(eq(messages.id, run.messageId!)).get()
       expect(assistantRow).toEqual(
@@ -5209,7 +5226,7 @@ describe('chat runtime capability', () => {
         .where(eq(messages.id, run.messageId!))
         .run()
 
-      flushAllActiveRunSnapshots()
+      await flushAllActiveRunSnapshots()
 
       expect(db().select().from(messages).where(eq(messages.id, run.messageId!)).get()).toEqual(
         expect.objectContaining({
@@ -5818,30 +5835,15 @@ describe('chat runtime capability', () => {
           runtimeKind: 'standard'
         })
         .run()
-      db()
-        .insert(chatSessionQueueItems)
-        .values({
+      commitSessionEventsInTransaction('session-claimed-queue-cancel', [
+        queueItemEnqueuedEvent({
           id: 'queue-claimed-cancel',
           sessionId: 'session-claimed-queue-cancel',
-          mode: 'queue',
-          status: 'pending',
           text: 'cancel before run starts',
-          filesJson: '[]',
-          contextPartsJson: '[]',
-          providerTargetId: null,
-          modelId: null,
-          thinkingEffort: null,
-          permissionMode: null,
-          runtimeAccessMode: 'approval-required',
-          runtimeInteractionMode: 'default',
           position: 1,
-          sourceRunId: null,
-          startedRunId: null,
-          errorText: null,
-          createdAt: 100,
-          updatedAt: 100
+          createdAt: 100
         })
-        .run()
+      ])
 
       const claimed = await claimSessionQueueItem(
         'session-claimed-queue-cancel',
@@ -5887,6 +5889,7 @@ describe('chat runtime capability', () => {
         .orderBy(sessionEvents.version)
         .all()
       expect(events.map((event) => event.eventType)).toEqual([
+        'QueueItemEnqueued',
         'QueueItemClaimed',
         'QueueItemCancelled'
       ])
@@ -5923,54 +5926,30 @@ describe('chat runtime capability', () => {
         sessionId: 'session-queue-update'
       })
 
-      db()
-        .insert(chatSessionQueueItems)
-        .values({
+      commitSessionEventsInTransaction('session-queue-update', [
+        queueItemEnqueuedEvent({
           id: 'queue-update-pending',
           sessionId: 'session-queue-update',
-          mode: 'queue',
-          status: 'pending',
           text: 'original text',
-          filesJson: '[]',
-          contextPartsJson: '[]',
-          providerTargetId: null,
-          modelId: null,
-          thinkingEffort: null,
-          permissionMode: null,
-          runtimeAccessMode: 'approval-required',
-          runtimeInteractionMode: 'default',
           position: 1,
-          sourceRunId: null,
-          startedRunId: null,
-          errorText: null,
-          createdAt: 100,
-          updatedAt: 100
-        })
-        .run()
-      db()
-        .insert(chatSessionQueueItems)
-        .values({
+          createdAt: 100
+        }),
+        queueItemEnqueuedEvent({
           id: 'queue-update-claimed',
           sessionId: 'session-queue-update',
-          mode: 'queue',
-          status: 'running',
           text: 'claimed item',
-          filesJson: '[]',
-          contextPartsJson: '[]',
-          providerTargetId: null,
-          modelId: null,
-          thinkingEffort: null,
-          permissionMode: null,
-          runtimeAccessMode: 'approval-required',
-          runtimeInteractionMode: 'default',
           position: 2,
-          sourceRunId: null,
-          startedRunId: null,
-          errorText: null,
-          createdAt: 110,
-          updatedAt: 110
-        })
-        .run()
+          createdAt: 110
+        }),
+        {
+          type: 'QueueItemClaimed',
+          payload: {
+            queueItemId: 'queue-update-claimed',
+            sessionId: 'session-queue-update',
+            updatedAt: 110
+          }
+        }
+      ])
 
       const updated = await updateSessionQueueItem({
         sessionId: 'session-queue-update',
@@ -6011,7 +5990,12 @@ describe('chat runtime capability', () => {
         .from(sessionEvents)
         .where(eq(sessionEvents.aggregateId, 'session-queue-update'))
         .all()
-      expect(events.map((event) => event.eventType)).toEqual(['QueueItemUpdated'])
+      expect(events.map((event) => event.eventType)).toEqual([
+        'QueueItemEnqueued',
+        'QueueItemEnqueued',
+        'QueueItemClaimed',
+        'QueueItemUpdated'
+      ])
 
       // Editing a non-pending (claimed) item is rejected.
       await expect(

@@ -5,6 +5,9 @@ import { chatSelectors, useChatStore } from '~/store/chat'
 import { useRendererChatStore } from '~/store/renderer-chat'
 
 import { ChatStreamingHandler } from './chat-streaming-handler'
+import type { ChatStreamChunk } from './chat-stream-types'
+import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
+import { buildUIMessageChunkStreamFromResponse } from './sse-chat-transport'
 import { disposeChatRunBroadcast, onChatRunSettled } from './sse-chat-transport'
 
 function resetChatStore(store: typeof useChatStore): void {
@@ -13,6 +16,7 @@ function resetChatStore(store: typeof useChatStore): void {
     messagesMap: new Map(),
     hydratedSessionIds: new Set(),
     runStateMap: new Map(),
+    streamLeaseMap: new Map(),
     activeAbortControllers: new Map(),
     runDisplayMetaMap: new Map(),
     errorMap: new Map(),
@@ -20,11 +24,11 @@ function resetChatStore(store: typeof useChatStore): void {
   }))
 }
 
-function createChunkStream(chunks: UIMessageChunk[]): ReadableStream<UIMessageChunk> {
-  return new ReadableStream<UIMessageChunk>({
+function createChunkStream(chunks: UIMessageChunk[], replay = false): ReadableStream<ChatStreamChunk> {
+  return new ReadableStream<ChatStreamChunk>({
     start(controller) {
       for (const chunk of chunks) {
-        controller.enqueue(chunk)
+        controller.enqueue(replay ? replayChatStreamChunk(chunk) : liveChatStreamChunk(chunk))
       }
       controller.close()
     },
@@ -90,5 +94,61 @@ describe('chat streaming handler store boundary', () => {
       messageId: 'assistant-1',
       status: 'complete',
     }])
+  })
+
+  it('applies replay chunks as a single store update when replay catches up', async () => {
+    let resolveStreamController!: (controller: ReadableStreamDefaultController<ChatStreamChunk>) => void
+    const streamControllerPromise = new Promise<ReadableStreamDefaultController<ChatStreamChunk>>((resolve) => {
+      resolveStreamController = resolve
+    })
+    const stream = new ReadableStream<ChatStreamChunk>({
+      start(nextController) {
+        resolveStreamController(nextController)
+      },
+    })
+    const handler = new ChatStreamingHandler('session-1', 'assistant-local', 0)
+
+    handler.start(new AbortController())
+    const consumePromise = handler.consume(stream)
+    const streamController = await streamControllerPromise
+
+    for (const chunk of assistantTextChunks) {
+      streamController.enqueue(replayChatStreamChunk(chunk))
+    }
+    await Promise.resolve()
+
+    expect(chatSelectors.messages('session-1')(useChatStore.getState())[0]?.parts).toEqual([])
+
+    streamController.close()
+    await consumePromise
+    handler.finish()
+
+    expect(chatSelectors.messages('session-1')(useChatStore.getState())[0]).toMatchObject({
+      id: 'assistant-stream',
+      parts: [{ type: 'text', text: 'Hello', state: 'done' }],
+    })
+  })
+
+  it('marks HTTP stream chunks before the replay boundary as replay', async () => {
+    const encoder = new TextEncoder()
+    const response = new Response(encoder.encode([
+      'data: {"type":"start","messageId":"assistant-stream"}\n\n',
+      'data: {"type":"text-start","id":"text-1"}\n\n',
+      ': cradle-replay-end\n\n',
+      'data: {"type":"text-delta","id":"text-1","delta":"Live"}\n\n',
+      'data: [DONE]\n\n',
+    ].join('')))
+
+    const reader = buildUIMessageChunkStreamFromResponse(response, 'session-1', { initialReplay: true }).getReader()
+    const items: ChatStreamChunk[] = []
+    while (true) {
+      const result = await reader.read()
+      if (result.done) {
+        break
+      }
+      items.push(result.value)
+    }
+
+    expect(items.map(item => item.replay)).toEqual([true, true, false])
   })
 })

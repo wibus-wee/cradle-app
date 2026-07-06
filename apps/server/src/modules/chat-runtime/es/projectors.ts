@@ -5,14 +5,22 @@ import {
   messages,
   sessions
 } from '@cradle/db'
-import { and, eq, inArray, isNull, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
+import { applyPlanImplementationApprovalResponse } from '../interaction/plan-implementation-message'
+import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
+import type { ChatMessageStatus } from '../run/stream-chunks'
+import { parseStoredMessageSnapshot } from '../stream/projection'
+import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
 import type { ChatRuntimeWriteDb } from './event-store'
 import type {
+  AssistantMessageSnapshottedPayload,
   ChatSessionEvent,
+  PlanImplementationRespondedPayload,
   QueueItemCancelledPayload,
   QueueItemClaimedPayload,
   QueueItemFailedPayload,
+  QueueItemProviderTargetClearedPayload,
   QueueItemReleasedPayload,
   QueueItemReorderedPayload,
   QueueItemUpdatedPayload,
@@ -21,7 +29,7 @@ import type {
   StoredChatSessionEvent
 } from './events'
 
-type ProjectorDb = Pick<ChatRuntimeWriteDb, 'insert' | 'update'>
+type ProjectorDb = Pick<ChatRuntimeWriteDb, 'select' | 'insert' | 'update'>
   & Pick<ChatRuntimeWriteDb, 'delete'>
 
 export function projectSessionEvent(d: ProjectorDb, event: StoredChatSessionEvent): void {
@@ -34,12 +42,19 @@ export function projectSessionEvent(d: ProjectorDb, event: StoredChatSessionEven
 export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent): void {
   switch (event.type) {
     case 'UserMessageAppended':
+    case 'MessageImported':
       d.insert(messages).values(event.payload.message).run()
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'RunStarted':
       if (event.payload.assistantMessage) {
-        if (event.payload.assistantMessageProjection === 'update') {
+        if (
+          hasProjectedMessage(
+            d,
+            event.payload.assistantMessage.id,
+            event.payload.assistantMessage.sessionId
+          )
+        ) {
           d.update(messages)
             .set({
               status: event.payload.assistantMessage.status,
@@ -71,6 +86,9 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       }
       touchSession(d, event.payload.run.chatSessionId, event.payload.run.startedAt)
       break
+    case 'AssistantMessageSnapshotted':
+      projectAssistantMessageSnapshotted(d, event.payload)
+      break
     case 'AssistantMessageCompleted':
       d.update(messages)
         .set({
@@ -97,6 +115,9 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
     case 'InteractionRequested':
     case 'InteractionResolved':
       break
+    case 'PlanImplementationResponded':
+      projectPlanImplementationResponded(d, event.payload)
+      break
     case 'QueueItemEnqueued':
       d.insert(chatSessionQueueItems).values(event.payload.item).run()
       touchSession(d, event.payload.item.sessionId, event.payload.item.updatedAt)
@@ -115,6 +136,9 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       break
     case 'QueueItemUpdated':
       projectQueueItemUpdated(d, event.payload)
+      break
+    case 'QueueItemProviderTargetCleared':
+      projectQueueItemProviderTargetCleared(d, event.payload)
       break
     case 'QueueItemCancelled':
       projectQueueItemCancelled(d, event.payload)
@@ -147,6 +171,87 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
         .run()
       break
   }
+}
+
+function projectAssistantMessageSnapshotted(
+  d: ProjectorDb,
+  payload: AssistantMessageSnapshottedPayload
+): void {
+  d.update(messages)
+    .set({
+      content: payload.message.content,
+      messageJson: payload.message.messageJson,
+      status: payload.message.status,
+      errorText: payload.message.errorText,
+      updatedAt: payload.message.updatedAt
+    })
+    .where(
+      and(
+        eq(messages.id, payload.message.id),
+        eq(messages.sessionId, payload.message.sessionId),
+        eq(messages.role, 'assistant')
+      )
+    )
+    .run()
+  touchSession(d, payload.message.sessionId, payload.message.updatedAt)
+}
+
+function hasProjectedMessage(
+  d: ProjectorDb,
+  messageId: string,
+  sessionId: string
+): boolean {
+  return (
+    d.select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.sessionId, sessionId)))
+      .limit(1)
+      .get() !== undefined
+  )
+}
+
+function projectPlanImplementationResponded(
+  d: ProjectorDb,
+  payload: PlanImplementationRespondedPayload
+): void {
+  const row = d
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.id, payload.messageId),
+        eq(messages.sessionId, payload.sessionId),
+        eq(messages.role, 'assistant')
+      )
+    )
+    .get()
+  if (!row) {
+    return
+  }
+
+  const message = compactStoredMessageSnapshot(
+    normalizeMessageSnapshot(
+      applyPlanImplementationApprovalResponse({
+        message: parseStoredMessageSnapshot(row, 'assistant'),
+        sessionId: payload.sessionId,
+        messageId: payload.messageId,
+        approvalId: payload.approvalId,
+        approved: payload.approved
+      })
+    )
+  )
+  const messageJson = JSON.stringify(message)
+  d.update(messages)
+    .set({
+      content: extractMessageText(message),
+      messageJson,
+      status: row.status as ChatMessageStatus,
+      errorText: row.errorText,
+      updatedAt: payload.updatedAt
+    })
+    .where(and(eq(messages.id, payload.messageId), eq(messages.sessionId, payload.sessionId)))
+    .run()
+  touchSession(d, payload.sessionId, payload.updatedAt)
 }
 
 function projectRunTerminal(d: ProjectorDb, payload: RunTerminalPayload): void {
@@ -184,7 +289,13 @@ function projectRunTerminal(d: ProjectorDb, payload: RunTerminalPayload): void {
       errorText: payload.errorText
     })
     .where(
-      and(eq(backendRunSnapshots.runId, payload.runId), eq(backendRunSnapshots.status, 'running'))
+      and(
+        eq(backendRunSnapshots.runId, payload.runId),
+        or(
+          eq(backendRunSnapshots.status, 'running'),
+          sql`${backendRunSnapshots.status} != ${payload.status}`
+        )
+      )
     )
     .run()
   touchSession(d, payload.sessionId, payload.finishedAt)
@@ -310,6 +421,27 @@ function projectQueueItemUpdated(d: ProjectorDb, payload: QueueItemUpdatedPayloa
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
         eq(chatSessionQueueItems.mode, 'queue'),
         eq(chatSessionQueueItems.status, 'pending')
+      )
+    )
+    .run()
+  touchSession(d, payload.sessionId, payload.updatedAt)
+}
+
+function projectQueueItemProviderTargetCleared(
+  d: ProjectorDb,
+  payload: QueueItemProviderTargetClearedPayload
+): void {
+  d.update(chatSessionQueueItems)
+    .set({
+      providerTargetId: null,
+      updatedAt: payload.updatedAt
+    })
+    .where(
+      and(
+        eq(chatSessionQueueItems.id, payload.queueItemId),
+        eq(chatSessionQueueItems.sessionId, payload.sessionId),
+        eq(chatSessionQueueItems.mode, 'queue'),
+        eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId)
       )
     )
     .run()

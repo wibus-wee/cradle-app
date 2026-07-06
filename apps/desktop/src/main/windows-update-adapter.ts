@@ -29,6 +29,7 @@ export class WindowsDesktopUpdateAdapter {
 
     this.updater.autoDownload = false
     this.updater.autoInstallOnAppQuit = false
+    this.updater.allowPrerelease = true
     this.updater.disableWebInstaller = true
     this.updater.logger = console
     this.updater.setFeedURL(resolveWindowsUpdaterFeedUrl(options.updateFeedUrl))
