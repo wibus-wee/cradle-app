@@ -55,6 +55,7 @@ jobs:
         shell: bash
         run: |
           semver_regex='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          RUN_NUMBER="${{ github.run_number }}"
           DEV_FEED_TAG="feed-dev"
           BLEEDING_EDGE_FEED_TAG="feed-bleeding-edge"
 
@@ -65,19 +66,11 @@ jobs:
 
             if [ "$CHANNEL" = "dev" ]; then
               DISPLAY_VERSION="$INPUT_VERSION"
-              if [[ "$INPUT_VERSION" =~ $semver_regex ]]; then
-                DESKTOP_VERSION="$INPUT_VERSION"
-              else
-                DESKTOP_VERSION="0.0.0-dev.${INPUT_VERSION}"
-              fi
+              DESKTOP_VERSION="0.0.0-dev.${RUN_NUMBER}"
               RELEASE_TAG="dev-${DISPLAY_VERSION}"
             elif [ "$CHANNEL" = "bleeding-edge" ]; then
               DISPLAY_VERSION="$INPUT_VERSION"
-              if [[ "$INPUT_VERSION" =~ $semver_regex ]]; then
-                DESKTOP_VERSION="$INPUT_VERSION"
-              else
-                DESKTOP_VERSION="0.0.0-${INPUT_VERSION}"
-              fi
+              DESKTOP_VERSION="0.0.0-be.${RUN_NUMBER}"
               RELEASE_TAG="bleeding-edge-${DISPLAY_VERSION}"
             else
               DISPLAY_VERSION="${INPUT_VERSION#v}"
@@ -89,7 +82,7 @@ jobs:
             SHORT_SHA="${SHORT_SHA:0:7}"
             CHANNEL="bleeding-edge"
             DISPLAY_VERSION="$SHORT_SHA"
-            DESKTOP_VERSION="0.0.0-$SHORT_SHA"
+            DESKTOP_VERSION="0.0.0-be.${RUN_NUMBER}"
             RELEASE_TAG="bleeding-edge-$SHORT_SHA"
             SOURCE_REF="main"
           else
@@ -97,7 +90,7 @@ jobs:
             if [[ "$TAG" == dev-* ]]; then
               CHANNEL="dev"
               DISPLAY_VERSION="${TAG#dev-}"
-              DESKTOP_VERSION="0.0.0-dev.${DISPLAY_VERSION}"
+              DESKTOP_VERSION="0.0.0-dev.${RUN_NUMBER}"
             else
               CHANNEL="release"
               DISPLAY_VERSION="${TAG#v}"
