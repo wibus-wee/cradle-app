@@ -31,8 +31,16 @@ function resolveWorkspacePath(workspaceId?: string | null): string | undefined {
   if (!workspaceId) {
     return undefined
   }
-  const workspacePath = Workspace.getLocalWorkspacePath(workspaceId)
-  if (!workspacePath) {
+  const workspace = Workspace.get(workspaceId)
+  if (!workspace) {
+    throw new AppError({
+      code: 'skills_workspace_not_found',
+      status: 404,
+      message: 'Workspace not found',
+      details: { workspaceId },
+    })
+  }
+  if (workspace.locator.hostId !== 'local') {
     throw new AppError({
       code: 'skills_local_workspace_required',
       status: 409,
@@ -40,7 +48,7 @@ function resolveWorkspacePath(workspaceId?: string | null): string | undefined {
       details: { workspaceId },
     })
   }
-  return workspacePath
+  return workspace.locator.path
 }
 
 function mapError(error: unknown): Error {
