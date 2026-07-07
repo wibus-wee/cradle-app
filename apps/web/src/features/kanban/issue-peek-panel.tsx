@@ -1,12 +1,12 @@
-import type { TFunction } from 'i18next'
 import { CloseLine as XIcon } from '@mingcute/react'
+import type { TFunction } from 'i18next'
 import { AnimatePresence, m } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 
 import { AssetMarkdown } from '~/features/assets/asset-markdown'
-import { useWorkspaces } from '~/features/workspace/use-workspace'
 import type { KanbanBoardIssue, KanbanStatus } from '~/features/kanban/types'
 import { isExternalKanbanIssue } from '~/features/kanban/types'
+import { useWorkspaces } from '~/features/workspace/use-workspace'
 
 import { formatIssueId } from './shared/format-issue-id'
 import { LabelChip } from './shared/label-chip'

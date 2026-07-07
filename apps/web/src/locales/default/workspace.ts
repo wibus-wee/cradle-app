@@ -246,5 +246,5 @@ export default {
     'Add a workspace name and an absolute path for every folder.',
   'workspace.toast.openDefaultFailed': 'Workspace could not be opened',
   'workspace.toast.openInFinderFailed': 'Workspace could not be opened in Finder',
-  'workspace.toast.renameFailed': 'Workspace could not be renamed'
+  'workspace.toast.renameFailed': 'Workspace could not be renamed',
 } as const

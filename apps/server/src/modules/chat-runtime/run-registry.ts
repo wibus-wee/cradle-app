@@ -91,18 +91,23 @@ class RunRegistry {
   getActiveRun(runId: string): ActiveRun | undefined {
     return this.activeRuns.get(runId)
   }
+
   setActiveRun(runId: string, run: ActiveRun): void {
     this.activeRuns.set(runId, run)
   }
+
   deleteActiveRun(runId: string): void {
     this.activeRuns.delete(runId)
   }
+
   hasActiveRun(runId: string): boolean {
     return this.activeRuns.has(runId)
   }
+
   listActiveRuns(): ActiveRun[] {
     return Array.from(this.activeRuns.values())
   }
+
   listActiveRunIds(): string[] {
     return Array.from(this.activeRuns.keys())
   }
@@ -122,12 +127,15 @@ class RunRegistry {
   getActiveRunIdForSession(sessionId: string): string | undefined {
     return this.activeRunIdsBySession.get(sessionId)
   }
+
   setActiveRunIdForSession(sessionId: string, runId: string): void {
     this.activeRunIdsBySession.set(sessionId, runId)
   }
+
   deleteActiveRunIdForSession(sessionId: string): void {
     this.activeRunIdsBySession.delete(sessionId)
   }
+
   hasActiveRunForSession(sessionId: string): boolean {
     return this.activeRunIdsBySession.has(sessionId)
   }
@@ -136,12 +144,15 @@ class RunRegistry {
   getPendingRun(sessionId: string): PendingRunState | undefined {
     return this.pendingRunSessions.get(sessionId)
   }
+
   setPendingRun(sessionId: string, state: PendingRunState): void {
     this.pendingRunSessions.set(sessionId, state)
   }
+
   deletePendingRun(sessionId: string): void {
     this.pendingRunSessions.delete(sessionId)
   }
+
   hasPendingRun(sessionId: string): boolean {
     return this.pendingRunSessions.has(sessionId)
   }

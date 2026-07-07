@@ -1,4 +1,4 @@
-import { index, int, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 import { textPk, timestamps } from './shared'
 

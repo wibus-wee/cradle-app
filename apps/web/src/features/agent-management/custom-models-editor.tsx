@@ -1,7 +1,7 @@
 import {
+  DeleteLine as Trash2Icon,
   PlusLine as PlusIcon,
   SparklesLine as SparklesIcon,
-  DeleteLine as Trash2Icon
 } from '@mingcute/react'
 import { useEffect, useReducer, useRef } from 'react'
 import { z } from 'zod'
@@ -11,8 +11,8 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Spinner } from '~/components/ui/spinner'
-import { cn } from '~/lib/cn'
 import type { ModelCapabilities } from '~/features/agent-runtime/types'
+import { cn } from '~/lib/cn'
 
 interface CustomModelEntry {
   id: string

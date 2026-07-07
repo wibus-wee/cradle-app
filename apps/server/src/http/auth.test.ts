@@ -11,7 +11,7 @@ function createTestApp(config: { authRequired: boolean, authToken: string | null
     .get('/protected', () => ({ ok: true }))
 }
 
-describe('HTTP auth plugin', () => {
+describe('hTTP auth plugin', () => {
   it('allows requests when auth is not required', async () => {
     const app = createTestApp({ authRequired: false, authToken: null })
 

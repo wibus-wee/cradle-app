@@ -1,15 +1,15 @@
 import type {
+  GetExternalIssueSourcesItemsResponse,
   GetIssuesByIdActivityResponse,
   GetIssuesByIdAgentSessionsResponse,
   GetIssuesByIdCommentsResponse,
   GetIssuesByIdFieldChangesResponse,
   GetIssuesByIdRelationsResponse,
   GetIssuesByIdSessionsResponse,
+  GetIssuesMilestonesResponse,
   GetIssuesResponse,
   GetIssuesStatusesResponse,
   GetKanbanBoardsResponse,
-  GetIssuesMilestonesResponse,
-  GetExternalIssueSourcesItemsResponse,
 } from '~/api-gen/types.gen'
 
 export type KanbanBoard = GetKanbanBoardsResponse[number]

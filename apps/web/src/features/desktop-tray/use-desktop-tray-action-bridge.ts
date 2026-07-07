@@ -128,7 +128,6 @@ export function useDesktopTrayActionBridge({ onOpenGlobalSearch }: DesktopTrayAc
         return
       case 'open-desktop-settings':
         openSettingsRouteSection('desktop')
-        return
 
       case 'open-app':
       case 'quit':

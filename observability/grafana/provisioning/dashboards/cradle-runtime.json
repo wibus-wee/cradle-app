@@ -21,14 +21,14 @@
   "id": null,
   "links": [
     {
-        "icon": "dashboard",
-        "includeVars": true,
-        "keepTime": true,
-        "tags": [],
-        "targetBlank": false,
-        "title": "Runtime correlations",
-        "type": "link",
-        "url": "/d/cradle-correlations/cradle-runtime-correlations"
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Runtime correlations",
+      "type": "link",
+      "url": "/d/cradle-correlations/cradle-runtime-correlations"
     },
     {
       "icon": "external link",
@@ -2355,673 +2355,673 @@
       "type": "timeseries"
     },
     {
-          "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 79
-          },
-          "id": 42,
-          "title": "Renderer Diagnostics",
-          "type": "row"
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 42,
+      "title": "Renderer Diagnostics",
+      "type": "row"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "thresholds"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 536870912
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 1073741824
-                                  }
-                            ]
-                      },
-                      "unit": "bytes"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 536870912
+              },
+              {
+                "color": "red",
+                "value": 1073741824
+              }
+            ]
           },
-          "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 0,
-                "y": 80
-          },
-          "id": 43,
-          "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                      "calcs": [
-                            "lastNotNull"
-                      ],
-                      "fields": "",
-                      "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"usedJSHeapSize\"})",
-                      "legendFormat": "heap used",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 80
+      },
+      "id": 43,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "title": "Renderer Heap Used",
-          "type": "stat"
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"usedJSHeapSize\"})",
+          "legendFormat": "heap used",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Renderer Heap Used",
+      "type": "stat"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "thresholds"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 200
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 1000
-                                  }
-                            ]
-                      },
-                      "unit": "short"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
           },
-          "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 6,
-                "y": 80
-          },
-          "id": 44,
-          "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                      "calcs": [
-                            "lastNotNull"
-                      ],
-                      "fields": "",
-                      "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"messageCount\"})",
-                      "legendFormat": "messages",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 80
+      },
+      "id": 44,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "title": "Chat Store Messages",
-          "type": "stat"
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"messageCount\"})",
+          "legendFormat": "messages",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Chat Store Messages",
+      "type": "stat"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "thresholds"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 1000
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 5000
-                                  }
-                            ]
-                      },
-                      "unit": "short"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 5000
+              }
+            ]
           },
-          "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 12,
-                "y": 80
-          },
-          "id": 45,
-          "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                      "calcs": [
-                            "lastNotNull"
-                      ],
-                      "fields": "",
-                      "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"partCount\"})",
-                      "legendFormat": "parts",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 80
+      },
+      "id": 45,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "title": "Chat Store Parts",
-          "type": "stat"
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"partCount\"})",
+          "legendFormat": "parts",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Chat Store Parts",
+      "type": "stat"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "thresholds"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 1000000
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 5000000
-                                  }
-                            ]
-                      },
-                      "unit": "short"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1000000
+              },
+              {
+                "color": "red",
+                "value": 5000000
+              }
+            ]
           },
-          "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 18,
-                "y": 80
-          },
-          "id": 46,
-          "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                      "calcs": [
-                            "lastNotNull"
-                      ],
-                      "fields": "",
-                      "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"estimatedPartStringChars\"})",
-                      "legendFormat": "chars",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 80
+      },
+      "id": 46,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "title": "Estimated Part Chars",
-          "type": "stat"
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"estimatedPartStringChars\"})",
+          "legendFormat": "chars",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Estimated Part Chars",
+      "type": "stat"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "palette-classic"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 536870912
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 1073741824
-                                  }
-                            ]
-                      },
-                      "unit": "bytes"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 536870912
+              },
+              {
+                "color": "red",
+                "value": 1073741824
+              }
+            ]
           },
-          "gridPos": {
-                "h": 8,
-                "w": 8,
-                "x": 0,
-                "y": 85
-          },
-          "id": 47,
-          "options": {
-                "legend": {
-                      "calcs": [
-                            "lastNotNull",
-                            "max"
-                      ],
-                      "displayMode": "table",
-                      "placement": "bottom",
-                      "showLegend": true
-                },
-                "tooltip": {
-                      "mode": "multi",
-                      "sort": "desc"
-                }
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum by (kind) (cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\"})",
-                      "legendFormat": "{{kind}}",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 85
+      },
+      "id": 47,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
           ],
-          "title": "Renderer JS Heap",
-          "type": "timeseries"
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Renderer JS Heap",
+      "type": "timeseries"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "palette-classic"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 1073741824
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 2147483648
-                                  }
-                            ]
-                      },
-                      "unit": "bytes"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1073741824
+              },
+              {
+                "color": "red",
+                "value": 2147483648
+              }
+            ]
           },
-          "gridPos": {
-                "h": 8,
-                "w": 8,
-                "x": 8,
-                "y": 85
-          },
-          "id": 48,
-          "options": {
-                "legend": {
-                      "calcs": [
-                            "lastNotNull",
-                            "max"
-                      ],
-                      "displayMode": "table",
-                      "placement": "bottom",
-                      "showLegend": true
-                },
-                "tooltip": {
-                      "mode": "multi",
-                      "sort": "desc"
-                }
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_memory_bytes{job=~\"$job\", instance=~\"$instance\", process=\"Tab\", kind=\"working_set\"})",
-                      "legendFormat": "Tab working set",
-                      "range": true,
-                      "refId": "A"
-                },
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"usedJSHeapSize\"})",
-                      "legendFormat": "JS heap used",
-                      "range": true,
-                      "refId": "B"
-                },
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"totalJSHeapSize\"})",
-                      "legendFormat": "JS heap total",
-                      "range": true,
-                      "refId": "C"
-                }
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 85
+      },
+      "id": 48,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
           ],
-          "title": "Renderer Heap vs Tab Working Set",
-          "type": "timeseries"
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_memory_bytes{job=~\"$job\", instance=~\"$instance\", process=\"Tab\", kind=\"working_set\"})",
+          "legendFormat": "Tab working set",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"usedJSHeapSize\"})",
+          "legendFormat": "JS heap used",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_memory_bytes{job=~\"$job\", instance=~\"$instance\", kind=\"totalJSHeapSize\"})",
+          "legendFormat": "JS heap total",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Renderer Heap vs Tab Working Set",
+      "type": "timeseries"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "palette-classic"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  }
-                            ]
-                      },
-                      "unit": "short"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           },
-          "gridPos": {
-                "h": 8,
-                "w": 8,
-                "x": 16,
-                "y": 85
-          },
-          "id": 49,
-          "options": {
-                "legend": {
-                      "calcs": [
-                            "lastNotNull",
-                            "max"
-                      ],
-                      "displayMode": "table",
-                      "placement": "bottom",
-                      "showLegend": true
-                },
-                "tooltip": {
-                      "mode": "multi",
-                      "sort": "desc"
-                }
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum by (kind) (cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=~\"sessionCount|hydratedSessionCount|messageCount|partCount|textPartCount|toolPartCount|filePartCount|dataPartCount|reasoningPartCount|generatingMessageCount|passiveStreamingMessageCount|activeAbortControllerCount|runDisplayMetaCount|errorCount|sessionMetaCount|activeGoalCount|assistantDisplaySplitCount\"})",
-                      "legendFormat": "{{kind}}",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 85
+      },
+      "id": 49,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
           ],
-          "title": "Chat Store Counts",
-          "type": "timeseries"
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=~\"sessionCount|hydratedSessionCount|messageCount|partCount|textPartCount|toolPartCount|filePartCount|dataPartCount|reasoningPartCount|generatingMessageCount|passiveStreamingMessageCount|activeAbortControllerCount|runDisplayMetaCount|errorCount|sessionMetaCount|activeGoalCount|assistantDisplaySplitCount\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Chat Store Counts",
+      "type": "timeseries"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "palette-classic"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  },
-                                  {
-                                        "color": "orange",
-                                        "value": 1000000
-                                  },
-                                  {
-                                        "color": "red",
-                                        "value": 5000000
-                                  }
-                            ]
-                      },
-                      "unit": "short"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1000000
+              },
+              {
+                "color": "red",
+                "value": 5000000
+              }
+            ]
           },
-          "gridPos": {
-                "h": 7,
-                "w": 12,
-                "x": 0,
-                "y": 93
-          },
-          "id": 50,
-          "options": {
-                "legend": {
-                      "calcs": [
-                            "lastNotNull",
-                            "max"
-                      ],
-                      "displayMode": "list",
-                      "placement": "bottom",
-                      "showLegend": true
-                },
-                "tooltip": {
-                      "mode": "multi",
-                      "sort": "desc"
-                }
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"estimatedPartStringChars\"})",
-                      "legendFormat": "estimated chars",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 93
+      },
+      "id": 50,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
           ],
-          "title": "Estimated Chat Payload Chars",
-          "type": "timeseries"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum(cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=\"estimatedPartStringChars\"})",
+          "legendFormat": "estimated chars",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Estimated Chat Payload Chars",
+      "type": "timeseries"
     },
     {
-          "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "fieldConfig": {
-                "defaults": {
-                      "color": {
-                            "mode": "palette-classic"
-                      },
-                      "mappings": [],
-                      "noValue": "No data",
-                      "thresholds": {
-                            "mode": "absolute",
-                            "steps": [
-                                  {
-                                        "color": "green",
-                                        "value": null
-                                  }
-                            ]
-                      },
-                      "unit": "short"
-                },
-                "overrides": []
+          "mappings": [],
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           },
-          "gridPos": {
-                "h": 7,
-                "w": 12,
-                "x": 12,
-                "y": 93
-          },
-          "id": 51,
-          "options": {
-                "legend": {
-                      "calcs": [
-                            "lastNotNull",
-                            "max"
-                      ],
-                      "displayMode": "list",
-                      "placement": "bottom",
-                      "showLegend": true
-                },
-                "tooltip": {
-                      "mode": "multi",
-                      "sort": "desc"
-                }
-          },
-          "pluginVersion": "11.0.0",
-          "targets": [
-                {
-                      "datasource": {
-                            "type": "prometheus",
-                            "uid": "${datasource}"
-                      },
-                      "editorMode": "code",
-                      "expr": "sum by (kind) (cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=~\"generatingMessageCount|passiveStreamingMessageCount|activeAbortControllerCount|runDisplayMetaCount|activeGoalCount\"})",
-                      "legendFormat": "{{kind}}",
-                      "range": true,
-                      "refId": "A"
-                }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 93
+      },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
           ],
-          "title": "Streaming State",
-          "type": "timeseries"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (kind) (cradle_desktop_renderer_chat_store_total{job=~\"$job\", instance=~\"$instance\", kind=~\"generatingMessageCount|passiveStreamingMessageCount|activeAbortControllerCount|runDisplayMetaCount|activeGoalCount\"})",
+          "legendFormat": "{{kind}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Streaming State",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",

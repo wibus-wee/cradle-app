@@ -4,7 +4,7 @@ import {
   providerTargets,
   sessionAwaits,
   sessions,
-  workspaces
+  workspaces,
 } from '@cradle/db'
 import { desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
@@ -79,7 +79,7 @@ const RECENT_SESSION_LIMIT = 8
 const AWAIT_LIMIT = 20
 
 function readWorkspaceNames(workspaceIds: Array<string | null>): Map<string, string> {
-  const ids = [...new Set(workspaceIds.flatMap((id) => (id ? [id] : [])))]
+  const ids = [...new Set(workspaceIds.flatMap(id => (id ? [id] : [])))]
   if (ids.length === 0) {
     return new Map()
   }
@@ -90,11 +90,11 @@ function readWorkspaceNames(workspaceIds: Array<string | null>): Map<string, str
     .where(inArray(workspaces.id, ids))
     .all()
 
-  return new Map(rows.map((row) => [row.id, row.name]))
+  return new Map(rows.map(row => [row.id, row.name]))
 }
 
 function readSessionTitles(sessionIds: string[]): Map<string, string> {
-  const ids = [...new Set(sessionIds.filter((id) => id.length > 0))]
+  const ids = [...new Set(sessionIds.filter(id => id.length > 0))]
   if (ids.length === 0) {
     return new Map()
   }
@@ -105,7 +105,7 @@ function readSessionTitles(sessionIds: string[]): Map<string, string> {
     .where(inArray(sessions.id, ids))
     .all()
 
-  return new Map(rows.map((row) => [row.id, row.title]))
+  return new Map(rows.map(row => [row.id, row.title]))
 }
 
 function toDesktopSessionItem(
@@ -113,7 +113,7 @@ function toDesktopSessionItem(
   workspaceNames: Map<string, string>,
   detail: string,
   modelId: string | null,
-  state: DesktopSessionItem['state']
+  state: DesktopSessionItem['state'],
 ): DesktopSessionItem {
   const workspaceName = row.workspaceId
     ? (workspaceNames.get(row.workspaceId) ?? DEFAULT_WORKSPACE_NAME)
@@ -129,7 +129,7 @@ function toDesktopSessionItem(
     modelId,
     updatedAt: row.updatedAt,
     state,
-    detail
+    detail,
   }
 }
 
@@ -139,37 +139,36 @@ function readRunningItems(): DesktopSessionItem[] {
     return []
   }
 
-  const runBySessionId = new Map(activeRuns.map((run) => [run.sessionId, run]))
+  const runBySessionId = new Map(activeRuns.map(run => [run.sessionId, run]))
   const rows = db()
     .select()
     .from(sessions)
     .where(inArray(sessions.id, [...runBySessionId.keys()]))
     .all()
-  const workspaceNames = readWorkspaceNames(rows.map((row) => row.workspaceId))
+  const workspaceNames = readWorkspaceNames(rows.map(row => row.workspaceId))
 
   return rows
-    .map((row) =>
+    .map(row =>
       toDesktopSessionItem(
         row,
         workspaceNames,
         `Running ${row.runtimeKind}`,
         runBySessionId.get(row.id)?.modelId ?? null,
-        'running'
-      )
-    )
+        'running',
+      ))
     .sort((left, right) => right.updatedAt - left.updatedAt)
     .slice(0, RUNNING_LIMIT)
 }
 
 function readRecentSessionItems(activeItems: DesktopSessionItem[]): DesktopSessionItem[] {
-  const activeBySessionId = new Map(activeItems.map((item) => [item.sessionId, item]))
+  const activeBySessionId = new Map(activeItems.map(item => [item.sessionId, item]))
   const pendingAwaitSessionIds = new Set(
     db()
       .select({ sessionId: sessionAwaits.chatSessionId })
       .from(sessionAwaits)
       .where(eq(sessionAwaits.status, 'pending'))
       .all()
-      .map((row) => row.sessionId)
+      .map(row => row.sessionId),
   )
   const rows = db()
     .select()
@@ -178,7 +177,7 @@ function readRecentSessionItems(activeItems: DesktopSessionItem[]): DesktopSessi
     .orderBy(desc(sessions.updatedAt))
     .limit(RECENT_SESSION_LIMIT)
     .all()
-  const workspaceNames = readWorkspaceNames(rows.map((row) => row.workspaceId))
+  const workspaceNames = readWorkspaceNames(rows.map(row => row.workspaceId))
 
   const recentItems = rows.map((row) => {
     const activeItem = activeBySessionId.get(row.id)
@@ -190,7 +189,7 @@ function readRecentSessionItems(activeItems: DesktopSessionItem[]): DesktopSessi
         workspaceName: row.workspaceId
           ? (workspaceNames.get(row.workspaceId) ?? DEFAULT_WORKSPACE_NAME)
           : DEFAULT_WORKSPACE_NAME,
-        updatedAt: row.updatedAt
+        updatedAt: row.updatedAt,
       }
     }
 
@@ -209,12 +208,12 @@ function readRecentSessionItems(activeItems: DesktopSessionItem[]): DesktopSessi
           ? `Pinned ${row.runtimeKind}`
           : `Recent ${row.runtimeKind}`,
       null,
-      state
+      state,
     )
   })
 
-  const knownSessionIds = new Set(recentItems.map((item) => item.sessionId))
-  const missingActiveItems = activeItems.filter((item) => !knownSessionIds.has(item.sessionId))
+  const knownSessionIds = new Set(recentItems.map(item => item.sessionId))
+  const missingActiveItems = activeItems.filter(item => !knownSessionIds.has(item.sessionId))
   return [...missingActiveItems, ...recentItems]
     .sort((left, right) => {
       if (left.state === 'running' && right.state !== 'running') {
@@ -228,20 +227,22 @@ function readRecentSessionItems(activeItems: DesktopSessionItem[]): DesktopSessi
     .slice(0, RECENT_SESSION_LIMIT)
 }
 
-function readAutomationCounts(): { enabled: number; running: number } {
-  const enabled =
-    db()
+function readAutomationCounts(): { enabled: number, running: number } {
+  const enabled
+    = db()
       .select({ count: sql<number>`count(*)` })
       .from(automationDefinitions)
       .where(eq(automationDefinitions.enabled, true))
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
 
-  const running =
-    db()
+  const running
+    = db()
       .select({ count: sql<number>`count(*)` })
       .from(automationRuns)
       .where(or(eq(automationRuns.status, 'queued'), eq(automationRuns.status, 'running')))
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
 
   return { enabled, running }
 }
@@ -252,7 +253,8 @@ function readAwaitCount(): number {
       .select({ count: sql<number>`count(*)` })
       .from(sessionAwaits)
       .where(eq(sessionAwaits.status, 'pending'))
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
   )
 }
 
@@ -262,7 +264,8 @@ function readPinnedSessionCount(): number {
       .select({ count: sql<number>`count(*)` })
       .from(sessions)
       .where(eq(sessions.pinned, 1))
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
   )
 }
 
@@ -274,10 +277,10 @@ export function getDesktopAwaits(): DesktopAwaitItem[] {
     .orderBy(desc(sessionAwaits.createdAt))
     .limit(AWAIT_LIMIT)
     .all()
-  const workspaceNames = readWorkspaceNames(rows.map((row) => row.workspaceId))
-  const sessionTitles = readSessionTitles(rows.map((row) => row.chatSessionId))
+  const workspaceNames = readWorkspaceNames(rows.map(row => row.workspaceId))
+  const sessionTitles = readSessionTitles(rows.map(row => row.chatSessionId))
 
-  return rows.map((row) => ({
+  return rows.map(row => ({
     id: row.id,
     sessionId: row.chatSessionId,
     title: sessionTitles.get(row.chatSessionId) ?? DEFAULT_SESSION_TITLE,
@@ -285,7 +288,7 @@ export function getDesktopAwaits(): DesktopAwaitItem[] {
     workspaceName: workspaceNames.get(row.workspaceId) ?? DEFAULT_WORKSPACE_NAME,
     source: row.source,
     reason: row.reason,
-    createdAt: row.createdAt
+    createdAt: row.createdAt,
   }))
 }
 
@@ -295,14 +298,14 @@ export function getDesktopUserInputRequests(): DesktopUserInputRequestItem[] {
     return []
   }
 
-  const sessionIds = [...new Set(pendingInputs.map((input) => input.sessionId))]
+  const sessionIds = [...new Set(pendingInputs.map(input => input.sessionId))]
   const sessionRows = db()
     .select({ id: sessions.id, title: sessions.title, workspaceId: sessions.workspaceId })
     .from(sessions)
     .where(inArray(sessions.id, sessionIds))
     .all()
-  const sessionsById = new Map(sessionRows.map((row) => [row.id, row]))
-  const workspaceNames = readWorkspaceNames(sessionRows.map((row) => row.workspaceId))
+  const sessionsById = new Map(sessionRows.map(row => [row.id, row]))
+  const workspaceNames = readWorkspaceNames(sessionRows.map(row => row.workspaceId))
 
   return pendingInputs.map((input) => {
     const session = sessionsById.get(input.sessionId)
@@ -320,7 +323,7 @@ export function getDesktopUserInputRequests(): DesktopUserInputRequestItem[] {
       providerMethod: input.providerMethod,
       questionCount: input.questionCount,
       firstQuestion: input.firstQuestion,
-      createdAt: input.createdAt
+      createdAt: input.createdAt,
     }
   })
 }
@@ -330,23 +333,26 @@ function readWorkspaceCount(): number {
     db()
       .select({ count: sql<number>`count(*)` })
       .from(workspaces)
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
   )
 }
 
-function readProviderCounts(): { enabled: number; total: number } {
-  const enabled =
-    db()
+function readProviderCounts(): { enabled: number, total: number } {
+  const enabled
+    = db()
       .select({ count: sql<number>`count(*)` })
       .from(providerTargets)
       .where(eq(providerTargets.enabled, true))
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
 
-  const total =
-    db()
+  const total
+    = db()
       .select({ count: sql<number>`count(*)` })
       .from(providerTargets)
-      .get()?.count ?? 0
+      .get()
+?.count ?? 0
 
   return { enabled, total }
 }
@@ -358,7 +364,7 @@ async function readChronicleHealthItem(): Promise<DesktopHealthItem> {
       label: 'Chronicle',
       value: 'Disabled',
       status: 'ok',
-      detail: 'Chronicle runtime is only available in development builds.'
+      detail: 'Chronicle runtime is only available in development builds.',
     }
   }
 
@@ -369,15 +375,16 @@ async function readChronicleHealthItem(): Promise<DesktopHealthItem> {
       label: 'Chronicle',
       value: status.running ? 'Running' : 'Idle',
       status: status.running ? 'active' : status.available ? 'ok' : 'warning',
-      detail: status.available ? null : 'Chronicle is not configured.'
+      detail: status.available ? null : 'Chronicle is not configured.',
     }
-  } catch {
+  }
+ catch {
     return {
       id: 'chronicle',
       label: 'Chronicle',
       value: 'Unavailable',
       status: 'warning',
-      detail: 'Chronicle status could not be read.'
+      detail: 'Chronicle status could not be read.',
     }
   }
 }
@@ -398,7 +405,7 @@ export function getDesktopSummary(): DesktopSummary {
     runningAutomations: automationCounts.running,
     workspaces: readWorkspaceCount(),
     enabledProviders: providerCounts.enabled,
-    totalProviders: providerCounts.total
+    totalProviders: providerCounts.total,
   }
 }
 
@@ -416,14 +423,14 @@ export async function getDesktopHealth(): Promise<DesktopHealthItem[]> {
       label: 'Server',
       value: 'Online',
       status: 'ok',
-      detail: null
+      detail: null,
     },
     {
       id: 'chat-runtime',
       label: 'Chat Runtime',
       value: summary.running > 0 ? `${summary.running} running` : 'Idle',
       status: summary.running > 0 ? 'active' : 'ok',
-      detail: null
+      detail: null,
     },
     {
       id: 'awaits',
@@ -431,7 +438,7 @@ export async function getDesktopHealth(): Promise<DesktopHealthItem[]> {
       value: summary.pendingAwaits > 0 ? `${summary.pendingAwaits} pending` : 'Clear',
       status: summary.pendingAwaits > 0 ? 'warning' : 'ok',
       detail:
-        summary.pendingAwaits > 0 ? 'Sessions are waiting on user input or external checks.' : null
+        summary.pendingAwaits > 0 ? 'Sessions are waiting on user input or external checks.' : null,
     },
     {
       id: 'automations',
@@ -441,7 +448,7 @@ export async function getDesktopHealth(): Promise<DesktopHealthItem[]> {
           ? `${summary.runningAutomations} active`
           : `${summary.enabledAutomations} enabled`,
       status: summary.runningAutomations > 0 ? 'active' : 'ok',
-      detail: null
+      detail: null,
     },
     {
       id: 'providers',
@@ -449,8 +456,8 @@ export async function getDesktopHealth(): Promise<DesktopHealthItem[]> {
       value:
         summary.enabledProviders > 0 ? `${summary.enabledProviders} enabled` : 'Not configured',
       status: summary.enabledProviders > 0 ? 'ok' : 'warning',
-      detail: summary.enabledProviders > 0 ? null : 'No enabled provider targets are configured.'
+      detail: summary.enabledProviders > 0 ? null : 'No enabled provider targets are configured.',
     },
-    chronicleHealth
+    chronicleHealth,
   ]
 }

@@ -6,7 +6,6 @@ import type { CradleWorld } from '../support/world'
 
 const AGENT_CREATE_PAGE = '[data-testid="agent-create"]'
 const AGENT_NAME_INPUT = '[data-testid="agent-detail-name"]'
-const BG_FOREGROUND_RE = /bg-foreground/
 
 function visibleSettingsSidebar(world: CradleWorld) {
   return world.page.locator('[data-testid="settings-sidebar-pane"][data-sidebar-pane-active="true"] [data-testid="settings-sidebar"]').last()
@@ -14,74 +13,6 @@ function visibleSettingsSidebar(world: CradleWorld) {
 
 function activeSettingsPane(world: CradleWorld) {
   return world.page.locator('[data-testid="settings-sidebar-pane"][data-sidebar-pane-active="true"]').last()
-}
-
-async function selectOption(world: CradleWorld, triggerSelector: string, value: string) {
-  const trigger = world.page.locator(triggerSelector)
-  await expect(trigger).toBeVisible({ timeout: 10_000 })
-  await trigger.click()
-
-  const option = world.page.getByRole('option', { name: value })
-  await expect(option).toBeVisible({ timeout: 10_000 })
-  await option.click()
-}
-
-/**
- * Select a provider target + model (and optionally thinking effort) via the unified
- * ProviderModelPicker menu.  The picker is a base-ui Menu with nested submenus.
- *
- * Flow:
- *  1. Click the trigger button
- *  2. Click the provider target submenu trigger (matches providerName)
- *  3. Click the model menu item (matches modelId)
- *  4. If thinkingEffort is given, click the thinking submenu trigger, then the option
- */
-async function selectProviderModelViaMenu(
-  world: CradleWorld,
-  triggerTestId: string,
-  providerName: string,
-  modelId: string,
-  thinkingEffort?: string,
-): Promise<void> {
-  const trigger = world.page.locator(`[data-testid="${triggerTestId}"]`)
-  await expect(trigger).toBeVisible({ timeout: 10_000 })
-  await trigger.click()
-
-  // Wait for the menu popup
-  const menuPopup = world.page.locator('[role="menu"]').last()
-  await expect(menuPopup).toBeVisible({ timeout: 10_000 })
-
-  // Click the provider target submenu trigger
-  const providerItem = menuPopup.locator('[role="menuitem"]', { hasText: providerName }).first()
-  await expect(providerItem).toBeVisible({ timeout: 10_000 })
-  await providerItem.click()
-
-  // Wait for models to load — they appear as menuitems in a nested submenu
-  // Try multiple selector strategies for robustness
-  const modelItem = world.page.locator(`[role="menuitem"]:has-text("${modelId}")`).first()
-  const modelVisible = await modelItem.isVisible({ timeout: 15_000 }).catch(() => false)
-  if (modelVisible) {
-    await modelItem.click()
-  }
- else {
-    // Fallback: try getByRole
-    const fallbackItem = world.page.getByRole('menuitem', { name: modelId }).first()
-    if (await fallbackItem.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await fallbackItem.click()
-    }
-  }
-
-  // If thinking effort is specified, try to select it
-  if (thinkingEffort) {
-    await world.page.waitForTimeout(500)
-    const thinkingItem = world.page.locator(`[role="menuitem"]:has-text("${thinkingEffort}")`).first()
-    if (await thinkingItem.isVisible().catch(() => false)) {
-      await thinkingItem.click()
-    }
-  }
-
-  // Close any remaining menu
-  await world.page.keyboard.press('Escape')
 }
 
 function getProviderRows(world: CradleWorld, name: string) {
@@ -484,7 +415,7 @@ Then('当前 Agent Model 应显示{string}', async function (this: CradleWorld, 
   await expect(modelTrigger).toBeVisible({ timeout: 10_000 })
   // Use poll to wait for lazy-loaded model to appear after provider switch
   await expect
-    .poll(async () => modelTrigger.innerText(), { timeout: 30_000, message: `Expected model trigger to contain "${modelId}"` })
+    .poll(async () => modelTrigger.textContent(), { timeout: 30_000, message: `Expected model trigger to contain "${modelId}"` })
     .toContain(modelId)
 })
 

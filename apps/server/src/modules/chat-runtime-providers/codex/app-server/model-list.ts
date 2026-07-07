@@ -1,13 +1,13 @@
 import type { ModelDescriptor } from '../../../provider-contracts/types'
 import type { ModelListResponse } from '../app-server-protocol/v2/ModelListResponse'
-import type { CodexAppServerClientOptions } from './client'
-import { CodexAppServerClient } from './client'
+import type { CodexAppServerClientLike } from '../types'
+import type { CodexChatgptAuthCredential } from './chatgpt-auth'
 import {
   buildCodexChatgptAuthLoginParams,
   ensureCodexChatgptAuthAccessToken,
-  type CodexChatgptAuthCredential,
 } from './chatgpt-auth'
-import type { CodexAppServerClientLike } from '../types'
+import type { CodexAppServerClientOptions } from './client'
+import { CodexAppServerClient } from './client'
 
 type ReasoningEffort = NonNullable<ModelDescriptor['capabilities']['reasoningEfforts']>[number]
 

@@ -6,16 +6,16 @@ import type { UIMessage } from 'ai'
 import { AppError } from '../../../errors/app-error'
 import { createChildLogger } from '../../../logging/logger'
 import { readProviderStateSnapshot } from '../../chat-runtime-providers/kit/state-snapshot'
+import type { RuntimeKind } from '../../provider-contracts/types'
+import { ProviderRuntimeLease } from '../../provider-runtime/host-manager'
 import {
   registerSideConversation,
-  reserveSideConversationHostLease
+  reserveSideConversationHostLease,
 } from '../../provider-runtime/side-conversation-registry'
-import { ProviderRuntimeLease } from '../../provider-runtime/host-manager'
-import type { RuntimeKind } from '../../provider-contracts/types'
 import type {
   ChatRuntime,
   RuntimeProviderTargetProfile,
-  RuntimeSession
+  RuntimeSession,
 } from '../runtime-provider-types'
 
 const sideChatLogger = createChildLogger({ module: 'chat-runtime.side-chat' })
@@ -39,7 +39,7 @@ export interface SideChatRunContext {
   session: Session
   workspacePath: string
   profile: RuntimeProviderTargetProfile
-  providerTarget: { id: string; kind: 'manual' | 'external' }
+  providerTarget: { id: string, kind: 'manual' | 'external' }
 }
 
 export interface ActiveParentRuntimeSession {
@@ -49,23 +49,23 @@ export interface ActiveParentRuntimeSession {
 }
 
 export interface CreateSideChatDeps {
-  getParentSession(parentSessionId: string): Session
-  getParentContext(parentSessionId: string, providerTargetId?: string): SideChatRunContext
-  getRuntime(runtimeKind: RuntimeKind): ChatRuntime | undefined
-  getActiveParentRuntimeSession(parentSessionId: string): ActiveParentRuntimeSession | undefined
-  readReusableBinding(input: {
+  getParentSession: (parentSessionId: string) => Session
+  getParentContext: (parentSessionId: string, providerTargetId?: string) => SideChatRunContext
+  getRuntime: (runtimeKind: RuntimeKind) => ChatRuntime | undefined
+  getActiveParentRuntimeSession: (parentSessionId: string) => ActiveParentRuntimeSession | undefined
+  readReusableBinding: (input: {
     parentSessionId: string
     providerTargetId: string
     runtimeKind: RuntimeKind
-  }): BackendSessionBinding | undefined
-  readTranscript(parentSessionId: string): Promise<UIMessage[]>
-  resolveSystemPrompt(session: Session): string | undefined
-  normalizeTitle(title: string): string | null
+  }) => BackendSessionBinding | undefined
+  readTranscript: (parentSessionId: string) => Promise<UIMessage[]>
+  resolveSystemPrompt: (session: Session) => string | undefined
+  normalizeTitle: (title: string) => string | null
 }
 
 export async function createSideChat(
   input: CreateSideChatInput,
-  deps: CreateSideChatDeps
+  deps: CreateSideChatDeps,
 ): Promise<SideChatSessionDto> {
   const parentSession = deps.getParentSession(input.parentSessionId)
   const context = deps.getParentContext(input.parentSessionId, input.providerTargetId)
@@ -75,8 +75,8 @@ export async function createSideChat(
       status: 409,
       message: 'Provider target is disabled',
       details: {
-        providerTargetId: context.providerTarget.id
-      }
+        providerTargetId: context.providerTarget.id,
+      },
     })
   }
 
@@ -86,7 +86,7 @@ export async function createSideChat(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${runtimeKind}`
+      message: `Runtime is not available: ${runtimeKind}`,
     })
   }
 
@@ -96,12 +96,12 @@ export async function createSideChat(
     runtimeKind,
     runtime,
     modelId: input.modelId,
-    deps
+    deps,
   })
 
   const sideConversationId = randomUUID()
-  const childAgentId =
-    context.session.agentId && context.session.providerTargetId === context.providerTarget.id
+  const childAgentId
+    = context.session.agentId && context.session.providerTargetId === context.providerTarget.id
       ? context.session.agentId
       : null
   const transcript = await deps.readTranscript(input.parentSessionId)
@@ -109,8 +109,8 @@ export async function createSideChat(
   let sideRegistered = false
   let sideHostLease: ReturnType<typeof reserveSideConversationHostLease> | null = null
   try {
-    const childRuntimeSession =
-      runtime.forkRuntimeSession && parentRuntime.runtimeSession?.providerSessionId
+    const childRuntimeSession
+      = runtime.forkRuntimeSession && parentRuntime.runtimeSession?.providerSessionId
         ? await runtime.forkRuntimeSession({
             sourceRuntimeSession: parentRuntime.runtimeSession,
             childChatSessionId: sideConversationId,
@@ -119,14 +119,14 @@ export async function createSideChat(
             workspacePath: context.workspacePath,
             agentId: childAgentId,
             modelId: requestedModelId,
-            systemPrompt: deps.resolveSystemPrompt(context.session)
+            systemPrompt: deps.resolveSystemPrompt(context.session),
           })
         : await runtime.startChatSession({
             chatSessionId: sideConversationId,
             profile: context.profile,
             workspacePath: context.workspacePath,
             agentId: childAgentId,
-            modelId: requestedModelId
+            modelId: requestedModelId,
           })
 
     sideHostLease = childRuntimeSession.providerRuntimeLease instanceof ProviderRuntimeLease
@@ -135,26 +135,26 @@ export async function createSideChat(
           providerTargetId: context.providerTarget.id,
           runtimeKind: childRuntimeSession.runtimeKind,
           pinned: true,
-          lease: childRuntimeSession.providerRuntimeLease
+          lease: childRuntimeSession.providerRuntimeLease,
         }
       : reserveSideConversationHostLease({
           sideConversationId,
           runtimeKind: childRuntimeSession.runtimeKind,
-          providerTargetId: context.providerTarget.id
+          providerTargetId: context.providerTarget.id,
         })
 
-    const record = registerSideConversation({
+    registerSideConversation({
       sideConversationId,
       parentSessionId: input.parentSessionId,
       runtimeKind: childRuntimeSession.runtimeKind,
       providerTargetId: context.providerTarget.id,
       runtimeSession: childRuntimeSession,
       requestedModelId:
-        parentRuntime.requestedModelId ??
-        input.modelId ??
-        readProviderStateSnapshot(childRuntimeSession.providerStateSnapshot).models.currentModelId,
+        parentRuntime.requestedModelId
+        ?? input.modelId
+        ?? readProviderStateSnapshot(childRuntimeSession.providerStateSnapshot).models.currentModelId,
       history: transcript,
-      hostLease: sideHostLease
+      hostLease: sideHostLease,
     })
     sideRegistered = true
 
@@ -166,7 +166,8 @@ export async function createSideChat(
       providerSessionId: childRuntimeSession.providerSessionId,
       title: createSideSessionTitle(parentSession.title, deps),
     }
-  } finally {
+  }
+ finally {
     if (!sideRegistered) {
       sideHostLease?.lease.release()
     }
@@ -187,42 +188,41 @@ async function resolveParentRuntimeSessionForSide(input: {
 }> {
   const activeRun = input.deps.getActiveParentRuntimeSession(input.parentSessionId)
   if (
-    activeRun &&
-    activeRun.providerTargetId === input.context.providerTarget.id &&
-    activeRun.runtimeSession.runtimeKind === input.runtimeKind &&
-    activeRun.runtimeSession.providerSessionId
+    activeRun
+    && activeRun.providerTargetId === input.context.providerTarget.id
+    && activeRun.runtimeSession.runtimeKind === input.runtimeKind
+    && activeRun.runtimeSession.providerSessionId
   ) {
     return {
       runtimeSession: activeRun.runtimeSession,
       reusableBinding: undefined,
       requestedModelId:
-        input.modelId ??
-        activeRun.modelId ??
-        readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models
-          .currentModelId ??
-        null
+        input.modelId
+        ?? activeRun.modelId
+        ?? readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models.currentModelId
+        ?? null,
     }
   }
 
   const reusableBinding = input.deps.readReusableBinding({
     parentSessionId: input.parentSessionId,
     providerTargetId: input.context.providerTarget.id,
-    runtimeKind: input.runtimeKind
+    runtimeKind: input.runtimeKind,
   })
 
   if (!reusableBinding) {
     return {
       runtimeSession: null,
       reusableBinding: undefined,
-      requestedModelId: input.modelId ?? null
+      requestedModelId: input.modelId ?? null,
     }
   }
 
-  const requestedModelId =
-    input.modelId ??
-    reusableBinding.requestedModelId ??
-    readProviderStateSnapshot(reusableBinding.backendStateSnapshot).models.currentModelId ??
-    null
+  const requestedModelId
+    = input.modelId
+      ?? reusableBinding.requestedModelId
+      ?? readProviderStateSnapshot(reusableBinding.backendStateSnapshot).models.currentModelId
+      ?? null
 
   let runtimeSession: RuntimeSession
   try {
@@ -233,26 +233,27 @@ async function resolveParentRuntimeSessionForSide(input: {
         providerTargetId: input.context.providerTarget.id,
         runtimeKind: input.runtimeKind,
         providerSessionId: reusableBinding.backendSessionId,
-        providerStateSnapshot: reusableBinding.backendStateSnapshot
+        providerStateSnapshot: reusableBinding.backendStateSnapshot,
       },
       profile: input.context.profile,
       workspacePath: input.context.workspacePath,
       agentId: input.context.session.agentId,
-      modelId: requestedModelId ?? undefined
+      modelId: requestedModelId ?? undefined,
     })
-  } catch (error) {
+  }
+ catch (error) {
     sideChatLogger.warn(
       'parent runtime resume failed for side chat; falling back to Cradle side context',
       {
         error,
         parentSessionId: input.parentSessionId,
-        runtimeKind: input.runtimeKind
-      }
+        runtimeKind: input.runtimeKind,
+      },
     )
     return {
       runtimeSession: null,
       reusableBinding,
-      requestedModelId
+      requestedModelId,
     }
   }
 
@@ -260,8 +261,8 @@ async function resolveParentRuntimeSessionForSide(input: {
     runtimeSession,
     reusableBinding,
     requestedModelId:
-      requestedModelId ??
-      readProviderStateSnapshot(runtimeSession.providerStateSnapshot).models.currentModelId
+      requestedModelId
+      ?? readProviderStateSnapshot(runtimeSession.providerStateSnapshot).models.currentModelId,
   }
 }
 

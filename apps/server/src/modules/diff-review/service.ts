@@ -14,11 +14,10 @@ import type {
   DiffReviewSourceOperation,
   DiffReviewSubmission,
   DiffReviewThread,
-  DiffReviewThreadReaction
+  DiffReviewThreadReaction,
 } from '@cradle/db'
 import {
   agents,
-  diffReviewSources,
   diffReviewAgentFixes,
   diffReviewComments,
   diffReviewCommitPlans,
@@ -28,11 +27,12 @@ import {
   diffReviewGuides,
   diffReviewPreferences,
   diffReviewRevisions,
-  diffReviewSourceOperations,
   diffReviews,
+  diffReviewSourceOperations,
+  diffReviewSources,
   diffReviewSubmissions,
   diffReviewThreadReactions,
-  diffReviewThreads
+  diffReviewThreads,
 } from '@cradle/db'
 import { and, asc, desc, eq, ne } from 'drizzle-orm'
 
@@ -40,17 +40,17 @@ import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { getRuntimeRegistry, listRuntimeCatalog } from '../chat-runtime/chat-runtime-provider-registry'
+import * as ChatRuntime from '../chat-runtime/runtime'
 import type {
   ChatRuntimeSettings,
-  RuntimeProviderTargetProfile
+  RuntimeProviderTargetProfile,
 } from '../chat-runtime/runtime-provider-types'
-import * as ChatRuntime from '../chat-runtime/runtime'
 import * as Git from '../git/service'
 import * as ModelRegistry from '../model-registry/service'
 import { runtimeOwnsProviderBinding, runtimeSupportsProviderKind } from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
-import * as Session from '../session/service'
 import { resolveProviderTarget } from '../provider-targets/service'
+import * as Session from '../session/service'
 import { buildAgentFixArtifact } from './agent-fix-artifacts'
 import { isRangeAnchorInput, normalizeAnchor, remapAnchorToRevision, toAnchorView } from './anchors'
 import { commitGroupsForPlan, normalizeCommitPlanGroups } from './commit-plans'
@@ -82,7 +82,7 @@ import type {
   ReviewSourceReadinessView,
   ReviewSubmissionView,
   ReviewThreadReactionView,
-  ReviewThreadView
+  ReviewThreadView,
 } from './types'
 import { hashText, jsonStringify, safeJsonParse, shortHash, titleForRepository } from './utils'
 
@@ -104,7 +104,7 @@ export type {
   ReviewSourceReadinessView,
   ReviewSubmissionView,
   ReviewThreadReactionView,
-  ReviewThreadView
+  ReviewThreadView,
 } from './types'
 
 const LOCAL_USER_ID = 'local-user'
@@ -114,7 +114,7 @@ const COMMIT_PLAN_ARTIFACT_START = '<cradle_commit_plan>'
 const COMMIT_PLAN_ARTIFACT_END = '</cradle_commit_plan>'
 const GUIDE_RUNTIME_SETTINGS: ChatRuntimeSettings = {
   accessMode: 'full-access',
-  interactionMode: 'default'
+  interactionMode: 'default',
 }
 const DEFAULT_OUTPUT_LOCALE: ReviewOutputLocale = 'en-US'
 const OUTPUT_LOCALE_LABELS = {
@@ -142,7 +142,7 @@ function toRevisionView(row: DiffReviewRevision): DiffRevisionView {
     additions: row.additions,
     deletions: row.deletions,
     generatedAt: row.generatedAt,
-    patch: row.patch
+    patch: row.patch,
   }
 }
 
@@ -157,7 +157,7 @@ function toFileView(row: DiffReviewFile): ReviewFileDiffView {
     deletions: row.deletions,
     isGenerated: row.isGenerated,
     isBinary: row.isBinary,
-    isViewed: row.isViewed
+    isViewed: row.isViewed,
   }
 }
 
@@ -170,7 +170,7 @@ function toCommentView(row: DiffReviewComment): ReviewCommentView {
     bodyMarkdown: row.bodyMarkdown,
     externalUrl: row.externalUrl,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -180,7 +180,7 @@ function toReactionView(row: DiffReviewThreadReaction): ReviewThreadReactionView
     threadId: row.threadId,
     userId: row.userId,
     reaction: row.reaction,
-    createdAt: row.createdAt
+    createdAt: row.createdAt,
   }
 }
 
@@ -193,7 +193,7 @@ function toSubmissionView(row: DiffReviewSubmission): ReviewSubmissionView {
     decision: row.decision,
     bodyMarkdown: row.bodyMarkdown,
     submittedAt: row.submittedAt,
-    sourceSyncState: row.sourceSyncState
+    sourceSyncState: row.sourceSyncState,
   }
 }
 
@@ -211,7 +211,7 @@ function toPreferenceView(row: DiffReviewPreference): DiffReviewPreferenceView {
     collapseGeneratedFiles: row.collapseGeneratedFiles,
     notificationMode: row.notificationMode,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -223,7 +223,7 @@ function toEventView(row: DiffReviewEvent): ReviewEventView {
     actorKind: row.actorKind,
     actorId: row.actorId,
     payload: safeJsonParse(row.payloadJson) ?? {},
-    createdAt: row.createdAt
+    createdAt: row.createdAt,
   }
 }
 
@@ -244,7 +244,7 @@ function toAgentFixView(row: DiffReviewAgentFix): ReviewAgentFixView {
     resultRevisionId: row.resultRevisionId,
     errorMessage: row.errorMessage,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -265,12 +265,12 @@ function toCommitPlanView(row: DiffReviewCommitPlan): ReviewCommitPlanView {
     conflicts,
     rationale: row.rationale,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
 function computeCommitPlanConflicts(
-  groups: ReviewCommitPlanGroupView[]
+  groups: ReviewCommitPlanGroupView[],
 ): ReviewCommitPlanConflictView[] {
   const fileIdToGroupIds = new Map<string, string[]>()
   const fileIdToPath = new Map<string, string>()
@@ -282,7 +282,8 @@ function computeCommitPlanConflicts(
       const existing = fileIdToGroupIds.get(fileId)
       if (existing) {
         existing.push(group.id)
-      } else {
+      }
+ else {
         fileIdToGroupIds.set(fileId, [group.id])
       }
     }
@@ -293,7 +294,7 @@ function computeCommitPlanConflicts(
       conflicts.push({
         fileId,
         path: fileIdToPath.get(fileId) ?? fileId,
-        groupIds
+        groupIds,
       })
     }
   }
@@ -313,7 +314,7 @@ function emptyGuideView(revisionId: string | null): ReviewGuideView {
     createdAt: null,
     updatedAt: null,
     title: null,
-    steps: []
+    steps: [],
   }
 }
 
@@ -324,8 +325,8 @@ function ensurePreferences(workspaceId: string, userId = LOCAL_USER_ID): DiffRev
     .where(
       and(
         eq(diffReviewPreferences.workspaceId, workspaceId),
-        eq(diffReviewPreferences.userId, userId)
-      )
+        eq(diffReviewPreferences.userId, userId),
+      ),
     )
     .get()
   if (existing) {
@@ -339,7 +340,7 @@ function ensurePreferences(workspaceId: string, userId = LOCAL_USER_ID): DiffRev
       workspaceId,
       userId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
     .get()
@@ -362,14 +363,14 @@ function recordEvent(input: {
       actorKind: input.actorKind ?? 'system',
       actorId: input.actorId ?? null,
       payloadJson: jsonStringify(input.payload ?? {}),
-      createdAt: input.createdAt ?? currentUnixSeconds()
+      createdAt: input.createdAt ?? currentUnixSeconds(),
     })
     .returning()
     .get()
 }
 
 function reviewStateForDecision(
-  decision: ReviewSubmissionView['decision']
+  decision: ReviewSubmissionView['decision'],
 ): DiffReviewView['reviewState'] {
   if (decision === 'approve') {
     return 'approved'
@@ -400,7 +401,7 @@ function loadThreads(reviewId: string): ReviewThreadView[] {
     .from(diffReviewThreadReactions)
     .orderBy(asc(diffReviewThreadReactions.createdAt))
     .all()
-  return threads.map((thread) => ({
+  return threads.map(thread => ({
     id: thread.id,
     reviewId: thread.reviewId,
     originalRevisionId: thread.originalRevisionId,
@@ -413,14 +414,14 @@ function loadThreads(reviewId: string): ReviewThreadView[] {
     updatedAt: thread.updatedAt,
     resolvedBy: thread.resolvedBy,
     resolvedAt: thread.resolvedAt,
-    comments: comments.filter((comment) => comment.threadId === thread.id).map(toCommentView),
-    reactions: reactions.filter((reaction) => reaction.threadId === thread.id).map(toReactionView)
+    comments: comments.filter(comment => comment.threadId === thread.id).map(toCommentView),
+    reactions: reactions.filter(reaction => reaction.threadId === thread.id).map(toReactionView),
   }))
 }
 
 function toGuideView(
   row: DiffReviewGuide | null | undefined,
-  revision: DiffReviewRevision | null
+  revision: DiffReviewRevision | null,
 ): ReviewGuideView {
   if (!revision) {
     return emptyGuideView(null)
@@ -441,7 +442,7 @@ function toGuideView(
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     title: readString(row.title) ?? null,
-    steps: row.status === 'ready' ? normalizeStoredGuideSteps(parsed) : []
+    steps: row.status === 'ready' ? normalizeStoredGuideSteps(parsed) : [],
   }
 }
 
@@ -452,8 +453,8 @@ function normalizeStoredGuideSteps(parsed: unknown): ReviewGuideStepView[] {
 
   return parsed
     .flatMap((rawStep, index): ReviewGuideStepView[] => {
-      const step =
-        rawStep && typeof rawStep === 'object' ? (rawStep as Record<string, unknown>) : null
+      const step
+        = rawStep && typeof rawStep === 'object' ? (rawStep as Record<string, unknown>) : null
       if (!step) {
         return []
       }
@@ -467,22 +468,22 @@ function normalizeStoredGuideSteps(parsed: unknown): ReviewGuideStepView[] {
       const fileIds = readStringArray(step.fileIds)
       const threadIds = readStringArray(step.threadIds)
       const anchors = Array.isArray(step.anchors)
-        ? step.anchors.flatMap((anchor) => toAnchorView(anchor) ?? [])
+        ? step.anchors.flatMap(anchor => toAnchorView(anchor) ?? [])
         : []
-      const order =
-        typeof step.order === 'number' && Number.isFinite(step.order) ? step.order : index
+      const order
+        = typeof step.order === 'number' && Number.isFinite(step.order) ? step.order : index
       return [
         {
           id:
-            readString(step.id) ||
-            `step-${index + 1}-${shortHash(JSON.stringify({ title, fileIds }))}`,
+            readString(step.id)
+            || `step-${index + 1}-${shortHash(JSON.stringify({ title, fileIds }))}`,
           title,
           rationale,
           fileIds,
           threadIds,
           anchors,
-          order
-        }
+          order,
+        },
       ]
     })
     .toSorted((left, right) => left.order - right.order)
@@ -496,7 +497,7 @@ function loadCurrentGuide(reviewId: string, revision: DiffReviewRevision | null)
     .select()
     .from(diffReviewGuides)
     .where(
-      and(eq(diffReviewGuides.reviewId, reviewId), eq(diffReviewGuides.revisionId, revision.id))
+      and(eq(diffReviewGuides.reviewId, reviewId), eq(diffReviewGuides.revisionId, revision.id)),
     )
     .get()
   return toGuideView(row, revision)
@@ -506,7 +507,7 @@ function buildReviewView(
   review: DiffReview,
   revision: DiffReviewRevision | null,
   files: DiffReviewFile[],
-  options: { userId?: string } = {}
+  options: { userId?: string } = {},
 ): DiffReviewView {
   const userId = options.userId ?? LOCAL_USER_ID
   const viewStates = revision
@@ -517,17 +518,17 @@ function buildReviewView(
           and(
             eq(diffReviewFileViewState.reviewId, review.id),
             eq(diffReviewFileViewState.revisionId, revision.id),
-            eq(diffReviewFileViewState.userId, userId)
-          )
+            eq(diffReviewFileViewState.userId, userId),
+          ),
         )
         .all()
     : []
   const viewedFileIds = new Set(
-    viewStates.filter((state) => state.viewed).map((state) => state.fileId)
+    viewStates.filter(state => state.viewed).map(state => state.fileId),
   )
-  const filesWithViewed = files.map((file) => ({
+  const filesWithViewed = files.map(file => ({
     ...file,
-    isViewed: file.isViewed || viewedFileIds.has(file.id)
+    isViewed: file.isViewed || viewedFileIds.has(file.id),
   }))
   const threads = loadThreads(review.id)
   const submissions = db()
@@ -560,8 +561,8 @@ function buildReviewView(
           and(
             eq(diffReviewCommitPlans.reviewId, review.id),
             eq(diffReviewCommitPlans.revisionId, revision.id),
-            eq(diffReviewCommitPlans.strategy, 'manual')
-          )
+            eq(diffReviewCommitPlans.strategy, 'manual'),
+          ),
         )
         .orderBy(desc(diffReviewCommitPlans.createdAt))
         .all()
@@ -588,7 +589,7 @@ function buildReviewView(
     preferences: toPreferenceView(ensurePreferences(review.workspaceId, userId)),
     guide: loadCurrentGuide(review.id, revision),
     agentFixes,
-    commitPlans
+    commitPlans,
   }
 }
 
@@ -613,11 +614,11 @@ function ensureReviewSource(input: {
     .where(
       and(
         eq(diffReviewSources.workspaceId, input.workspaceId),
-        eq(diffReviewSources.kind, input.kind)
-      )
+        eq(diffReviewSources.kind, input.kind),
+      ),
     )
     .all()
-    .find((source) => source.bindingJson === bindingJson)
+    .find(source => source.bindingJson === bindingJson)
   if (existing) {
     return existing.id
   }
@@ -632,10 +633,11 @@ function ensureReviewSource(input: {
       bindingJson,
       refreshPolicy: input.refreshPolicy,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
-    .get().id
+    .get()
+.id
 }
 
 function ensureLocalWorkingTreeSource(workspaceId: string, repositoryPath: string): string {
@@ -643,7 +645,7 @@ function ensureLocalWorkingTreeSource(workspaceId: string, repositoryPath: strin
     workspaceId,
     kind: 'local-working-tree',
     binding: { repositoryPath, includeUntracked: true },
-    refreshPolicy: 'manual'
+    refreshPolicy: 'manual',
   })
 }
 
@@ -652,7 +654,7 @@ function ensureBranchCompareSource(workspaceId: string, binding: BranchCompareBi
     workspaceId,
     kind: 'local-branch-compare',
     binding,
-    refreshPolicy: 'manual'
+    refreshPolicy: 'manual',
   })
 }
 
@@ -661,7 +663,7 @@ function ensureLocalCommitSource(workspaceId: string, binding: LocalCommitBindin
     workspaceId,
     kind: 'local-commit',
     binding,
-    refreshPolicy: 'manual'
+    refreshPolicy: 'manual',
   })
 }
 
@@ -675,7 +677,7 @@ function getReviewSource(review: DiffReview): DiffReviewSource {
       code: 'diff_review_source_missing',
       status: 409,
       message: 'Diff review source is missing',
-      details: { reviewId: review.id }
+      details: { reviewId: review.id },
     })
   }
   const source = db()
@@ -688,7 +690,7 @@ function getReviewSource(review: DiffReview): DiffReviewSource {
       code: 'diff_review_source_not_found',
       status: 404,
       message: 'Diff review source was not found',
-      details: { reviewId: review.id, sourceId: review.sourceId }
+      details: { reviewId: review.id, sourceId: review.sourceId },
     })
   }
   return source
@@ -705,7 +707,7 @@ function getReviewRow(workspaceId: string, reviewId: string): DiffReview {
       code: 'diff_review_not_found',
       status: 404,
       message: 'Diff review not found',
-      details: { workspaceId, reviewId }
+      details: { workspaceId, reviewId },
     })
   }
   return review
@@ -732,15 +734,15 @@ function loadReviewView(review: DiffReview, options: { userId?: string } = {}): 
 
 function includeCommitPlanInReviewView(
   view: DiffReviewView,
-  plan: DiffReviewCommitPlan
+  plan: DiffReviewCommitPlan,
 ): DiffReviewView {
   const planView = toCommitPlanView(plan)
   return {
     ...view,
     commitPlans: [
       planView,
-      ...view.commitPlans.filter(candidate => candidate.id !== planView.id)
-    ]
+      ...view.commitPlans.filter(candidate => candidate.id !== planView.id),
+    ],
   }
 }
 
@@ -774,7 +776,7 @@ function remapReviewThreads(reviewId: string, newRevision: DiffReviewRevision): 
       anchor,
       oldFile,
       newRevision,
-      newFiles
+      newFiles,
     })
     if (!remapped) {
       db()
@@ -782,7 +784,7 @@ function remapReviewThreads(reviewId: string, newRevision: DiffReviewRevision): 
         .set({
           currentRevisionId: null,
           state: 'stale',
-          updatedAt: currentUnixSeconds()
+          updatedAt: currentUnixSeconds(),
         })
         .where(eq(diffReviewThreads.id, thread.id))
         .run()
@@ -795,7 +797,7 @@ function remapReviewThreads(reviewId: string, newRevision: DiffReviewRevision): 
         fileId: remapped.fileId,
         anchorJson: jsonStringify(remapped.anchor),
         state: 'open',
-        updatedAt: currentUnixSeconds()
+        updatedAt: currentUnixSeconds(),
       })
       .where(eq(diffReviewThreads.id, thread.id))
       .run()
@@ -833,8 +835,8 @@ function markStaleCommitPlans(reviewId: string): void {
       and(
         eq(diffReviewCommitPlans.reviewId, reviewId),
         ne(diffReviewCommitPlans.status, 'applied'),
-        ne(diffReviewCommitPlans.status, 'abandoned')
-      )
+        ne(diffReviewCommitPlans.status, 'abandoned'),
+      ),
     )
     .run()
 }
@@ -868,7 +870,7 @@ async function refreshMaterializedPatchReview(input: {
         reviewState: 'unreviewed',
         currentRevisionId: null,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       })
       .returning()
       .get()
@@ -876,7 +878,7 @@ async function refreshMaterializedPatchReview(input: {
       reviewId: review.id,
       eventKind: 'review_created',
       payload: input.reviewCreatedPayload,
-      createdAt: now
+      createdAt: now,
     })
   }
 
@@ -890,7 +892,7 @@ async function refreshMaterializedPatchReview(input: {
         sourceId: input.sourceId,
         status: input.sourceKind === 'local-working-tree' ? 'open' : review.status,
         currentRevisionId: null,
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(diffReviews.id, review.id))
       .returning()
@@ -912,7 +914,7 @@ async function refreshMaterializedPatchReview(input: {
         title: input.title,
         sourceId: input.sourceId,
         status: input.sourceKind === 'local-working-tree' ? 'open' : review.status,
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(diffReviews.id, review.id))
       .returning()
@@ -930,8 +932,8 @@ async function refreshMaterializedPatchReview(input: {
       .where(
         and(
           eq(diffReviewRevisions.reviewId, review.id),
-          eq(diffReviewRevisions.patchHash, input.patchHash)
-        )
+          eq(diffReviewRevisions.patchHash, input.patchHash),
+        ),
       )
       .get()
     if (existing) {
@@ -949,7 +951,7 @@ async function refreshMaterializedPatchReview(input: {
         additions,
         deletions,
         patch: input.patch,
-        generatedAt: now
+        generatedAt: now,
       })
       .returning()
       .get()
@@ -965,7 +967,7 @@ async function refreshMaterializedPatchReview(input: {
           deletions: file.deletions,
           isGenerated: isGeneratedReviewFile(file),
           isBinary: file.isBinary,
-          isViewed: false
+          isViewed: false,
         })
         .run()
     }
@@ -980,7 +982,7 @@ async function refreshMaterializedPatchReview(input: {
       sourceId: input.sourceId,
       status: input.sourceKind === 'local-working-tree' ? 'open' : review.status,
       currentRevisionId: revision.id,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(diffReviews.id, review.id))
     .returning()
@@ -993,16 +995,16 @@ async function refreshMaterializedPatchReview(input: {
       revisionId: revision.id,
       patchHash: revision.patchHash,
       fileCount: revision.fileCount,
-      ...input.revisionUpdatedPayload
+      ...input.revisionUpdatedPayload,
     },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(updated)
 }
 
 export async function refreshLocalWorkingTree(
   workspaceId: string,
-  repositoryPath?: string
+  repositoryPath?: string,
 ): Promise<DiffReviewView> {
   const status = await Git.getStatus(workspaceId, repositoryPath)
   const patch = await Git.getDiff(workspaceId, undefined, status.repositoryPath)
@@ -1012,8 +1014,8 @@ export async function refreshLocalWorkingTree(
       repositoryPath: status.repositoryPath,
       branch: status.branch,
       files: status.files,
-      patchHash
-    })
+      patchHash,
+    }),
   )
   const title = titleForRepository(status.repositoryName)
   const sourceId = ensureLocalWorkingTreeSource(workspaceId, status.repositoryPath)
@@ -1030,9 +1032,9 @@ export async function refreshLocalWorkingTree(
     statusFiles: status.files,
     reviewCreatedPayload: {
       sourceKind: 'local-working-tree',
-      repositoryPath: status.repositoryPath
+      repositoryPath: status.repositoryPath,
     },
-    revisionUpdatedPayload: {}
+    revisionUpdatedPayload: {},
   })
 }
 
@@ -1046,7 +1048,7 @@ export async function refreshLocalBranchCompare(input: {
     input.workspaceId,
     input.baseRef,
     input.headRef,
-    input.repositoryPath
+    input.repositoryPath,
   )
   const patch = compare.patch
   const patchHash = hashText(patch)
@@ -1054,7 +1056,7 @@ export async function refreshLocalBranchCompare(input: {
   const sourceId = ensureBranchCompareSource(input.workspaceId, {
     repositoryPath: compare.repositoryPath,
     baseRef: input.baseRef,
-    headRef: input.headRef
+    headRef: input.headRef,
   })
   const title = `${compare.headRef} into ${compare.baseRef}`
 
@@ -1072,13 +1074,13 @@ export async function refreshLocalBranchCompare(input: {
       sourceKind: 'local-branch-compare',
       repositoryPath: compare.repositoryPath,
       baseRef: input.baseRef,
-      headRef: input.headRef
+      headRef: input.headRef,
     },
     revisionUpdatedPayload: {
       baseRef: input.baseRef,
       headRef: input.headRef,
-      mergeBaseSha: compare.mergeBaseSha
-    }
+      mergeBaseSha: compare.mergeBaseSha,
+    },
   })
 }
 
@@ -1093,7 +1095,7 @@ export async function refreshLocalCommit(input: {
   const sourceVersion = `${commit.parentSha ?? 'root'}..${commit.commitSha}:${patchHash}`
   const sourceId = ensureLocalCommitSource(input.workspaceId, {
     repositoryPath: commit.repositoryPath,
-    commitSha: commit.commitSha
+    commitSha: commit.commitSha,
   })
   const title = `${commit.shortSha} ${commit.subject}`
 
@@ -1112,12 +1114,12 @@ export async function refreshLocalCommit(input: {
       repositoryPath: commit.repositoryPath,
       commitSha: commit.commitSha,
       parentSha: commit.parentSha,
-      subject: commit.subject
+      subject: commit.subject,
     },
     revisionUpdatedPayload: {
       commitSha: commit.commitSha,
-      parentSha: commit.parentSha
-    }
+      parentSha: commit.parentSha,
+    },
   })
 }
 
@@ -1126,7 +1128,7 @@ const reviewSourceAdapters: Partial<Record<ReviewSourceKind, ReviewSourceAdapter
     refreshStored: (workspaceId, source) => {
       const binding = readSourceBinding<LocalWorkingTreeBinding>(source)
       return refreshLocalWorkingTree(workspaceId, binding.repositoryPath)
-    }
+    },
   },
   'local-branch-compare': {
     refreshStored: (workspaceId, source) => {
@@ -1135,9 +1137,9 @@ const reviewSourceAdapters: Partial<Record<ReviewSourceKind, ReviewSourceAdapter
         workspaceId,
         repositoryPath: binding.repositoryPath,
         baseRef: binding.baseRef,
-        headRef: binding.headRef
+        headRef: binding.headRef,
       })
-    }
+    },
   },
   'local-commit': {
     refreshStored: (workspaceId, source) => {
@@ -1145,10 +1147,10 @@ const reviewSourceAdapters: Partial<Record<ReviewSourceKind, ReviewSourceAdapter
       return refreshLocalCommit({
         workspaceId,
         repositoryPath: binding.repositoryPath,
-        commitRef: binding.commitSha
+        commitRef: binding.commitSha,
       })
-    }
-  }
+    },
+  },
 }
 
 export function get(workspaceId: string, reviewId: string): DiffReviewView {
@@ -1162,7 +1164,7 @@ export function list(workspaceId: string): DiffReviewView[] {
     .where(eq(diffReviews.workspaceId, workspaceId))
     .orderBy(desc(diffReviews.updatedAt))
     .all()
-    .map((review) => loadReviewView(review))
+    .map(review => loadReviewView(review))
 }
 
 export async function refresh(workspaceId: string, reviewId: string): Promise<DiffReviewView> {
@@ -1173,7 +1175,7 @@ export async function refresh(workspaceId: string, reviewId: string): Promise<Di
       code: 'diff_review_refresh_not_supported',
       status: 400,
       message: 'Diff review source cannot be refreshed in this build',
-      details: { workspaceId, reviewId, sourceKind: review.sourceKind }
+      details: { workspaceId, reviewId, sourceKind: review.sourceKind },
     })
   }
   return adapter.refreshStored(workspaceId, getReviewSource(review))
@@ -1185,7 +1187,7 @@ function getCurrentRevision(review: DiffReview): DiffReviewRevision {
       code: 'diff_review_revision_missing',
       status: 409,
       message: 'Diff review has no current revision',
-      details: { reviewId: review.id }
+      details: { reviewId: review.id },
     })
   }
   const revision = db()
@@ -1198,7 +1200,7 @@ function getCurrentRevision(review: DiffReview): DiffReviewRevision {
       code: 'diff_review_revision_missing',
       status: 409,
       message: 'Diff review current revision is missing',
-      details: { reviewId: review.id, revisionId: review.currentRevisionId }
+      details: { reviewId: review.id, revisionId: review.currentRevisionId },
     })
   }
   return revision
@@ -1216,7 +1218,7 @@ function getFileForReview(review: DiffReview, fileId: string): DiffReviewFile {
       code: 'diff_review_file_not_found',
       status: 404,
       message: 'Diff review file not found',
-      details: { reviewId: review.id, fileId }
+      details: { reviewId: review.id, fileId },
     })
   }
   return file
@@ -1233,7 +1235,7 @@ function getThreadForReview(reviewId: string, threadId: string): DiffReviewThrea
       code: 'diff_review_thread_not_found',
       status: 404,
       message: 'Diff review thread not found',
-      details: { reviewId, threadId }
+      details: { reviewId, threadId },
     })
   }
   return thread
@@ -1247,8 +1249,8 @@ function getCommitPlanForReview(reviewId: string, commitPlanId: string): DiffRev
       and(
         eq(diffReviewCommitPlans.id, commitPlanId),
         eq(diffReviewCommitPlans.reviewId, reviewId),
-        eq(diffReviewCommitPlans.strategy, 'manual')
-      )
+        eq(diffReviewCommitPlans.strategy, 'manual'),
+      ),
     )
     .get()
   if (!plan) {
@@ -1256,7 +1258,7 @@ function getCommitPlanForReview(reviewId: string, commitPlanId: string): DiffRev
       code: 'diff_review_commit_plan_not_found',
       status: 404,
       message: 'Diff review commit plan not found',
-      details: { reviewId, commitPlanId }
+      details: { reviewId, commitPlanId },
     })
   }
   return plan
@@ -1276,8 +1278,8 @@ function createOrResetSourceOperation(input: {
       and(
         eq(diffReviewSourceOperations.sourceId, input.sourceId),
         eq(diffReviewSourceOperations.operationKind, input.operationKind),
-        eq(diffReviewSourceOperations.idempotencyKey, input.idempotencyKey)
-      )
+        eq(diffReviewSourceOperations.idempotencyKey, input.idempotencyKey),
+      ),
     )
     .get()
   const now = currentUnixSeconds()
@@ -1292,7 +1294,7 @@ function createOrResetSourceOperation(input: {
         requestJson: jsonStringify(input.request),
         responseJson: null,
         errorMessage: null,
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(diffReviewSourceOperations.id, existing.id))
       .returning()
@@ -1310,7 +1312,7 @@ function createOrResetSourceOperation(input: {
       status: 'pending',
       requestJson: jsonStringify(input.request),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
     .get()
@@ -1328,7 +1330,7 @@ function finishSourceOperation(input: {
       status: input.status,
       responseJson: input.response === undefined ? null : jsonStringify(input.response),
       errorMessage: input.errorMessage ?? null,
-      updatedAt: currentUnixSeconds()
+      updatedAt: currentUnixSeconds(),
     })
     .where(eq(diffReviewSourceOperations.id, input.operationId))
     .run()
@@ -1339,7 +1341,7 @@ export function setFileViewed(
   reviewId: string,
   fileId: string,
   viewed: boolean,
-  userId = LOCAL_USER_ID
+  userId = LOCAL_USER_ID,
 ): DiffReviewView {
   const review = getReviewRow(workspaceId, reviewId)
   const file = getFileForReview(review, fileId)
@@ -1354,16 +1356,16 @@ export function setFileViewed(
       fileId: file.id,
       userId,
       viewed,
-      viewedAt: now
+      viewedAt: now,
     })
     .onConflictDoUpdate({
       target: [
         diffReviewFileViewState.reviewId,
         diffReviewFileViewState.revisionId,
         diffReviewFileViewState.fileId,
-        diffReviewFileViewState.userId
+        diffReviewFileViewState.userId,
       ],
-      set: { viewed, viewedAt: now }
+      set: { viewed, viewedAt: now },
     })
     .run()
   recordEvent({
@@ -1372,7 +1374,7 @@ export function setFileViewed(
     actorKind: 'user',
     actorId: userId,
     payload: { fileId: file.id, path: file.path, viewed },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(review, { userId })
 }
@@ -1405,7 +1407,7 @@ export function createThread(input: {
       state: 'open',
       createdBy: userId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
     .get()
@@ -1418,7 +1420,7 @@ export function createThread(input: {
       authorId: userId,
       bodyMarkdown: input.bodyMarkdown,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .run()
   db()
@@ -1432,7 +1434,7 @@ export function createThread(input: {
     actorKind: 'user',
     actorId: userId,
     payload: { threadId: thread.id, fileId: file?.id ?? null, path: file?.path ?? null, anchor },
-    createdAt: now
+    createdAt: now,
   })
   recordEvent({
     reviewId: review.id,
@@ -1440,7 +1442,7 @@ export function createThread(input: {
     actorKind: 'user',
     actorId: userId,
     payload: { threadId: thread.id },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId })
 }
@@ -1465,7 +1467,7 @@ export function addComment(input: {
       authorId: userId,
       bodyMarkdown: input.bodyMarkdown,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .run()
   db()
@@ -1479,7 +1481,7 @@ export function addComment(input: {
     actorKind: 'user',
     actorId: userId,
     payload: { threadId: thread.id },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(review, { userId })
 }
@@ -1501,14 +1503,14 @@ export function addReaction(input: {
       threadId: thread.id,
       userId,
       reaction: input.reaction,
-      createdAt: currentUnixSeconds()
+      createdAt: currentUnixSeconds(),
     })
     .onConflictDoNothing({
       target: [
         diffReviewThreadReactions.threadId,
         diffReviewThreadReactions.userId,
-        diffReviewThreadReactions.reaction
-      ]
+        diffReviewThreadReactions.reaction,
+      ],
     })
     .run()
   return loadReviewView(review, { userId })
@@ -1518,7 +1520,7 @@ export function resolveThread(
   workspaceId: string,
   reviewId: string,
   threadId: string,
-  userId = LOCAL_USER_ID
+  userId = LOCAL_USER_ID,
 ): DiffReviewView {
   const review = getReviewRow(workspaceId, reviewId)
   const thread = getThreadForReview(review.id, threadId)
@@ -1534,7 +1536,7 @@ export function resolveThread(
     actorKind: 'user',
     actorId: userId,
     payload: { threadId: thread.id },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(review, { userId })
 }
@@ -1560,7 +1562,7 @@ export function submitReview(input: {
       decision: input.decision,
       bodyMarkdown: input.bodyMarkdown ?? null,
       submittedAt: now,
-      sourceSyncState: 'local-only'
+      sourceSyncState: 'local-only',
     })
     .run()
   db()
@@ -1574,7 +1576,7 @@ export function submitReview(input: {
     actorKind: 'user',
     actorId: userId,
     payload: { revisionId: revision.id, decision: input.decision, sourceSyncState: 'local-only' },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId })
 }
@@ -1591,7 +1593,7 @@ export function closeReview(input: {
       status: 400,
       message:
         'Live working tree reviews cannot be closed; commit, stash, or discard the working tree changes instead',
-      details: { reviewId: review.id, sourceKind: review.sourceKind }
+      details: { reviewId: review.id, sourceKind: review.sourceKind },
     })
   }
   const userId = input.userId ?? LOCAL_USER_ID
@@ -1612,7 +1614,7 @@ export function closeReview(input: {
     actorKind: 'user',
     actorId: userId,
     payload: { previousStatus: review.status },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(updated, { userId })
 }
@@ -1643,7 +1645,7 @@ export function updatePreferences(input: {
       structuralHighlighting: input.structuralHighlighting ?? existing.structuralHighlighting,
       collapseGeneratedFiles: input.collapseGeneratedFiles ?? existing.collapseGeneratedFiles,
       notificationMode: input.notificationMode ?? existing.notificationMode,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(diffReviewPreferences.id, existing.id))
     .returning()
@@ -1657,19 +1659,19 @@ export function sourceReadiness(workspaceId: string): ReviewSourceReadinessView[
       sourceKind: 'local-working-tree',
       workspaceId,
       state: 'ready',
-      actions: []
+      actions: [],
     },
     {
       sourceKind: 'local-branch-compare',
       workspaceId,
       state: 'ready',
-      actions: []
+      actions: [],
     },
     {
       sourceKind: 'local-commit',
       workspaceId,
       state: 'ready',
-      actions: []
+      actions: [],
     },
     {
       sourceKind: 'github-pull-request',
@@ -1678,10 +1680,10 @@ export function sourceReadiness(workspaceId: string): ReviewSourceReadinessView[
       actions: [
         {
           label: 'Connect GitHub integration',
-          ownerKind: 'workspace-admin'
-        }
-      ]
-    }
+          ownerKind: 'workspace-admin',
+        },
+      ],
+    },
   ]
 }
 
@@ -1704,8 +1706,7 @@ function selectGuideRuntimeKind(input: {
     item.providerBinding !== 'runtime-owned'
     && item.surfaces?.includes('chat') === true
     && runtimeSupportsProviderKind(item.runtimeKind, input.providerKind)
-    && Boolean(getRuntimeRegistry().get(item.runtimeKind))
-  )
+    && Boolean(getRuntimeRegistry().get(item.runtimeKind)))
   if (runtime) {
     return runtime.runtimeKind
   }
@@ -1761,7 +1762,7 @@ function buildGuideProfile(providerTargetId: string): RuntimeProviderTargetProfi
       code: 'diff_review_guide_provider_disabled',
       status: 409,
       message: 'Guided review provider target is disabled',
-      details: { providerTargetId }
+      details: { providerTargetId },
     })
   }
   return {
@@ -1771,18 +1772,18 @@ function buildGuideProfile(providerTargetId: string): RuntimeProviderTargetProfi
     enabled: target.enabled,
     configJson: JSON.stringify({
       ...((safeJsonParse(target.configJson) as Record<string, unknown> | null) ?? {}),
-      modelRegistryMappings: ModelRegistry.listMappingEntries()
+      modelRegistryMappings: ModelRegistry.listMappingEntries(),
     }),
     credentialRef: target.credentialRef,
     customModels: target.customModelsJson,
     iconSlug: target.iconSlug,
     providerTargetKind: target.target.kind,
-    providerTargetId: target.target.id
+    providerTargetId: target.target.id,
   }
 }
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`
+  return `'${value.replace(/'/g, '\'\\\'\'')}'`
 }
 
 function outputLocaleLabel(locale: ReviewOutputLocale): string {
@@ -1800,16 +1801,16 @@ function buildGuideAgentInstruction(input: {
   threads: ReviewThreadView[]
   outputLocale: ReviewOutputLocale
 }): string {
-  const files = input.files.map((file) => ({
+  const files = input.files.map(file => ({
     id: file.id,
     path: file.path,
     status: file.status,
     additions: file.additions,
     deletions: file.deletions,
     isGenerated: file.isGenerated,
-    isBinary: file.isBinary
+    isBinary: file.isBinary,
   }))
-  const threads = input.threads.map((thread) => ({
+  const threads = input.threads.map(thread => ({
     id: thread.id,
     state: thread.state,
     fileId: thread.fileId,
@@ -1819,20 +1820,20 @@ function buildGuideAgentInstruction(input: {
           path: thread.anchor.path,
           side: thread.anchor.side,
           startLine: thread.anchor.startLine,
-          endLine: thread.anchor.endLine
+          endLine: thread.anchor.endLine,
         }
       : null,
-    comments: thread.comments.map((comment) => ({
+    comments: thread.comments.map(comment => ({
       authorKind: comment.authorKind,
-      bodyMarkdown: comment.bodyMarkdown
-    }))
+      bodyMarkdown: comment.bodyMarkdown,
+    })),
   }))
-  const gitTarget =
-    input.review.repositoryPath === '.'
+  const gitTarget
+    = input.review.repositoryPath === '.'
       ? 'the current directory'
       : `repository path ${input.review.repositoryPath}`
-  const gitPrefix =
-    input.review.repositoryPath === '.'
+  const gitPrefix
+    = input.review.repositoryPath === '.'
       ? 'git'
       : `git -C ${shellQuote(input.review.repositoryPath)}`
 
@@ -1894,11 +1895,11 @@ function buildGuideAgentInstruction(input: {
         patchHash: input.revision.patchHash,
         fileCount: input.revision.fileCount,
         additions: input.revision.additions,
-        deletions: input.revision.deletions
+        deletions: input.revision.deletions,
       },
       files,
-      threads
-    })
+      threads,
+    }),
   ].join('\n')
 }
 
@@ -1940,7 +1941,7 @@ function readStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value
         .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-        .map((item) => item.trim())
+        .map(item => item.trim())
     : []
 }
 
@@ -1954,9 +1955,8 @@ function readGuideStepRecords(parsed: unknown): Record<string, unknown>[] {
   if (!rawSteps) {
     throw new Error('Guide output is missing steps[]')
   }
-  return rawSteps.map((rawStep) =>
-    rawStep && typeof rawStep === 'object' ? (rawStep as Record<string, unknown>) : {}
-  )
+  return rawSteps.map(rawStep =>
+    rawStep && typeof rawStep === 'object' ? (rawStep as Record<string, unknown>) : {})
 }
 
 function readGuideTitle(parsed: unknown): string | null {
@@ -1987,7 +1987,7 @@ function buildFileLookup(files: DiffReviewFile[]): Map<string, DiffReviewFile> {
 
 function resolveGuideFile(
   value: unknown,
-  lookup: Map<string, DiffReviewFile>
+  lookup: Map<string, DiffReviewFile>,
 ): DiffReviewFile | null {
   const key = readString(value)
   return key ? (lookup.get(key) ?? null) : null
@@ -1995,19 +1995,19 @@ function resolveGuideFile(
 
 function readGuidePathFiles(
   step: Record<string, unknown>,
-  lookup: Map<string, DiffReviewFile>
+  lookup: Map<string, DiffReviewFile>,
 ): DiffReviewFile[] {
   const candidates = [
     ...readStringArray(step.fileIds),
     ...readStringArray(step.paths),
     ...readStringArray(step.files),
-    ...readStringArray(step.filePaths)
+    ...readStringArray(step.filePaths),
   ]
   const files = candidates.flatMap((candidate) => {
     const file = lookup.get(candidate)
     return file ? [file] : []
   })
-  return Array.from(new Map(files.map((file) => [file.id, file])).values())
+  return Array.from(new Map(files.map(file => [file.id, file])).values())
 }
 
 function readGuideRangeRecords(step: Record<string, unknown>): Record<string, unknown>[] {
@@ -2018,9 +2018,8 @@ function readGuideRangeRecords(step: Record<string, unknown>): Record<string, un
       : Array.isArray(step.locations)
         ? step.locations
         : []
-  return ranges.flatMap((range) =>
-    range && typeof range === 'object' ? [range as Record<string, unknown>] : []
-  )
+  return ranges.flatMap(range =>
+    range && typeof range === 'object' ? [range as Record<string, unknown>] : [])
 }
 
 function resolveGuideRangeAnchor(input: {
@@ -2041,8 +2040,8 @@ function resolveGuideRangeAnchor(input: {
     return null
   }
   const sideValue = readString(input.range.side)
-  const side =
-    sideValue === 'base' || sideValue === 'head'
+  const side
+    = sideValue === 'base' || sideValue === 'head'
       ? sideValue
       : file.status === 'deleted'
         ? 'base'
@@ -2055,10 +2054,11 @@ function resolveGuideRangeAnchor(input: {
         fileId: file.id,
         side,
         startLine,
-        endLine
-      }
+        endLine,
+      },
     })
-  } catch {
+  }
+ catch {
     return null
   }
 }
@@ -2071,7 +2071,7 @@ function normalizeGuideSteps(input: {
 }): ReviewGuideStepView[] {
   const rawSteps = readGuideStepRecords(input.parsed)
   const lookup = buildFileLookup(input.files)
-  const threadIds = new Set(input.threads.map((thread) => thread.id))
+  const threadIds = new Set(input.threads.map(thread => thread.id))
   return rawSteps.map((step, index): ReviewGuideStepView => {
     const title = readString(step.title)
     const rationale = readString(step.rationale)
@@ -2082,18 +2082,17 @@ function normalizeGuideSteps(input: {
       return file ? [file] : []
     })
     const anchors = rangeRecords.flatMap(
-      (range) => resolveGuideRangeAnchor({ revision: input.revision, range, lookup }) ?? []
+      range => resolveGuideRangeAnchor({ revision: input.revision, range, lookup }) ?? [],
     )
     const stepFileIds = [
       ...new Set([
-        ...pathFiles.map((file) => file.id),
-        ...rangeFiles.map((file) => file.id),
-        ...anchors.map((anchor) => anchor.fileId)
-      ])
+        ...pathFiles.map(file => file.id),
+        ...rangeFiles.map(file => file.id),
+        ...anchors.map(anchor => anchor.fileId),
+      ]),
     ]
-    const stepThreadIds = [...new Set(readStringArray(step.threadIds))].filter((threadId) =>
-      threadIds.has(threadId)
-    )
+    const stepThreadIds = [...new Set(readStringArray(step.threadIds))].filter(threadId =>
+      threadIds.has(threadId))
     if (!title) {
       throw new Error(`Guide step ${index + 1} is missing title`)
     }
@@ -2111,7 +2110,7 @@ function normalizeGuideSteps(input: {
       fileIds: stepFileIds,
       threadIds: stepThreadIds,
       anchors,
-      order
+      order,
     }
   })
 }
@@ -2150,7 +2149,7 @@ function upsertGuide(input: {
       stepsJson: jsonStringify(steps),
       errorMessage: input.errorMessage ?? null,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .onConflictDoUpdate({
       target: [diffReviewGuides.reviewId, diffReviewGuides.revisionId],
@@ -2165,8 +2164,8 @@ function upsertGuide(input: {
         title,
         stepsJson: jsonStringify(steps),
         errorMessage: input.errorMessage ?? null,
-        updatedAt: now
-      }
+        updatedAt: now,
+      },
     })
     .run()
 }
@@ -2181,8 +2180,8 @@ function validateGuideSourceKind(review: DiffReview): void {
     message: 'Diff review generation currently supports local working tree reviews only',
     details: {
       reviewId: review.id,
-      sourceKind: review.sourceKind
-    }
+      sourceKind: review.sourceKind,
+    },
   })
 }
 
@@ -2201,8 +2200,8 @@ function isCurrentGuideGeneration(input: {
     .where(
       and(
         eq(diffReviewGuides.reviewId, input.reviewId),
-        eq(diffReviewGuides.revisionId, input.revisionId)
-      )
+        eq(diffReviewGuides.revisionId, input.revisionId),
+      ),
     )
     .get()
   return current?.inputHash === input.inputHash && isGuideGenerationActive(current.status)
@@ -2225,10 +2224,10 @@ async function runGuideGenerationTask(input: {
     const run = await ChatRuntime.waitForRunCompletion(input.runId)
     if (run.status !== 'complete') {
       throw new Error(
-        run.errorText ??
-          (run.status === 'aborted'
+        run.errorText
+        ?? (run.status === 'aborted'
             ? 'Guide generation run was aborted'
-            : 'Guide generation run failed')
+            : 'Guide generation run failed'),
       )
     }
     const rawOutput = Session.getRunMessageContents([input.runId])[0]?.content?.trim()
@@ -2240,14 +2239,14 @@ async function runGuideGenerationTask(input: {
       parsed: parsedArtifact,
       revision: input.revision,
       files: input.files,
-      threads: input.threads
+      threads: input.threads,
     })
     const title = readGuideTitle(parsedArtifact)
     if (
       !isCurrentGuideGeneration({
         reviewId: input.review.id,
         revisionId: input.revision.id,
-        inputHash: input.inputHash
+        inputHash: input.inputHash,
       })
     ) {
       return
@@ -2264,15 +2263,16 @@ async function runGuideGenerationTask(input: {
       status: 'ready',
       title,
       steps,
-      errorMessage: null
+      errorMessage: null,
     })
-  } catch (error) {
+  }
+ catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (
       !isCurrentGuideGeneration({
         reviewId: input.review.id,
         revisionId: input.revision.id,
-        inputHash: input.inputHash
+        inputHash: input.inputHash,
       })
     ) {
       return
@@ -2288,7 +2288,7 @@ async function runGuideGenerationTask(input: {
       inputHash: input.inputHash,
       status: 'failed',
       steps: [],
-      errorMessage: message
+      errorMessage: message,
     })
   }
 }
@@ -2317,14 +2317,14 @@ export async function generateGuide(input: {
       code: 'diff_review_guide_empty_revision',
       status: 409,
       message: 'Guided review generation requires a revision with changed files',
-      details: { reviewId: review.id, revisionId: revision.id }
+      details: { reviewId: review.id, revisionId: revision.id },
     })
   }
   const existing = db()
     .select()
     .from(diffReviewGuides)
     .where(
-      and(eq(diffReviewGuides.reviewId, review.id), eq(diffReviewGuides.revisionId, revision.id))
+      and(eq(diffReviewGuides.reviewId, review.id), eq(diffReviewGuides.revisionId, revision.id)),
     )
     .get()
   if (existing?.status === 'ready' && !input.force) {
@@ -2338,7 +2338,7 @@ export async function generateGuide(input: {
   const runtimeKind = selectGuideRuntimeKind({
     providerKind: profile.providerKind,
     runtimeKind: input.runtimeKind,
-    providerTargetId: input.providerTargetId
+    providerTargetId: input.providerTargetId,
   })
 
   const threads = loadThreads(review.id)
@@ -2352,15 +2352,15 @@ export async function generateGuide(input: {
       runtimeKind,
       modelId: input.modelId ?? null,
       outputLocale,
-      instructionHash: hashText(instruction)
-    })
+      instructionHash: hashText(instruction),
+    }),
   )
   if (!getRuntimeRegistry().get(runtimeKind)) {
     throw new AppError({
       code: 'diff_review_guide_provider_unsupported',
       status: 400,
       message: 'Provider target runtime does not support change walkthrough generation',
-      details: { runtimeKind, providerTargetId: input.providerTargetId }
+      details: { runtimeKind, providerTargetId: input.providerTargetId },
     })
   }
 
@@ -2371,13 +2371,13 @@ export async function generateGuide(input: {
     providerTargetId: input.providerTargetId,
     modelId: input.modelId ?? null,
     runtimeKind,
-    runtimeSettings: GUIDE_RUNTIME_SETTINGS
+    runtimeSettings: GUIDE_RUNTIME_SETTINGS,
   })
   const run = await ChatRuntime.createRun({
     sessionId: session.id,
     text: instruction,
     modelId: input.modelId ?? undefined,
-    runtimeSettings: GUIDE_RUNTIME_SETTINGS
+    runtimeSettings: GUIDE_RUNTIME_SETTINGS,
   })
 
   upsertGuide({
@@ -2391,7 +2391,7 @@ export async function generateGuide(input: {
     inputHash,
     status: 'running',
     steps: [],
-    errorMessage: null
+    errorMessage: null,
   })
   void runGuideGenerationTask({
     workspaceId: input.workspaceId,
@@ -2404,7 +2404,7 @@ export async function generateGuide(input: {
     modelId: input.modelId,
     inputHash,
     sessionId: session.id,
-    runId: run.runId
+    runId: run.runId,
   }).catch((error) => {
     console.error('Diff review guide generation background task failed', error)
   })
@@ -2423,7 +2423,7 @@ export async function cancelGuide(input: {
     .select()
     .from(diffReviewGuides)
     .where(
-      and(eq(diffReviewGuides.reviewId, review.id), eq(diffReviewGuides.revisionId, revision.id))
+      and(eq(diffReviewGuides.reviewId, review.id), eq(diffReviewGuides.revisionId, revision.id)),
     )
     .get()
 
@@ -2435,7 +2435,7 @@ export async function cancelGuide(input: {
       code: 'diff_review_guide_ready',
       status: 409,
       message: 'Completed guide generation cannot be cancelled',
-      details: { reviewId: review.id, revisionId: revision.id }
+      details: { reviewId: review.id, revisionId: revision.id },
     })
   }
   if (isGuideGenerationActive(guide.status) && guide.sessionId) {
@@ -2449,7 +2449,7 @@ export async function cancelGuide(input: {
       status: 'cancelled',
       stepsJson: '[]',
       errorMessage: null,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(diffReviewGuides.id, guide.id))
     .run()
@@ -2462,9 +2462,9 @@ export async function cancelGuide(input: {
       revisionId: revision.id,
       sessionId: guide.sessionId,
       runId: guide.runId,
-      previousStatus: guide.status
+      previousStatus: guide.status,
     },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId: input.userId })
 }
@@ -2504,7 +2504,7 @@ export function createAgentFix(input: {
       expectedOutput: input.expectedOutput,
       status: 'pending',
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
     .get()
@@ -2517,9 +2517,9 @@ export function createAgentFix(input: {
       agentFixId: agentFix.id,
       threadId: input.threadId ?? null,
       expectedOutput: input.expectedOutput,
-      anchor
+      anchor,
     },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(review, { userId })
 }
@@ -2529,7 +2529,7 @@ function getAgentFixForReview(reviewId: string, agentFixId: string): DiffReviewA
     .select()
     .from(diffReviewAgentFixes)
     .where(
-      and(eq(diffReviewAgentFixes.id, agentFixId), eq(diffReviewAgentFixes.reviewId, reviewId))
+      and(eq(diffReviewAgentFixes.id, agentFixId), eq(diffReviewAgentFixes.reviewId, reviewId)),
     )
     .get()
   if (!agentFix) {
@@ -2537,7 +2537,7 @@ function getAgentFixForReview(reviewId: string, agentFixId: string): DiffReviewA
       code: 'diff_review_agent_fix_not_found',
       status: 404,
       message: 'Diff review agent fix was not found',
-      details: { reviewId, agentFixId }
+      details: { reviewId, agentFixId },
     })
   }
   return agentFix
@@ -2551,7 +2551,7 @@ function formatAgentFixAnchor(anchor: ReviewRangeAnchorView | null): string {
     `File: ${anchor.path}`,
     `Side: ${anchor.side}`,
     `Lines: ${anchor.startLine}-${anchor.endLine}`,
-    `Hunk: ${anchor.hunkHeader}`
+    `Hunk: ${anchor.hunkHeader}`,
   ].join('\n')
 }
 
@@ -2562,7 +2562,7 @@ function buildCommitPlanAgentPrompt(input: {
   files: DiffReviewFile[]
   outputLocale: ReviewOutputLocale
 }): string {
-  const files = input.files.map((file) => ({
+  const files = input.files.map(file => ({
     id: file.id,
     path: file.path,
     previousPath: file.previousPath,
@@ -2570,20 +2570,16 @@ function buildCommitPlanAgentPrompt(input: {
     additions: file.additions,
     deletions: file.deletions,
     isGenerated: file.isGenerated,
-    isBinary: file.isBinary
+    isBinary: file.isBinary,
   }))
-  const gitTarget =
-    input.review.repositoryPath === '.'
+  const gitTarget
+    = input.review.repositoryPath === '.'
       ? 'the current directory'
       : `repository path ${input.review.repositoryPath}`
-  const gitPrefix =
-    input.review.repositoryPath === '.'
+  const gitPrefix
+    = input.review.repositoryPath === '.'
       ? 'git'
       : `git -C ${shellQuote(input.review.repositoryPath)}`
-  const patchSummary = input.revision
-    ? `Revision ${input.revision.id} has patch hash ${input.revision.patchHash}, ${input.revision.fileCount} files, +${input.revision.additions}/-${input.revision.deletions}.`
-    : 'The review currently has no active revision.'
-
   return [
     'You are generating a Cradle Diffs commit plan for the current local working tree.',
     '',
@@ -2645,11 +2641,11 @@ function buildCommitPlanAgentPrompt(input: {
             patchHash: input.revision.patchHash,
             fileCount: input.revision.fileCount,
             additions: input.revision.additions,
-            deletions: input.revision.deletions
+            deletions: input.revision.deletions,
           }
         : null,
-      files
-    })
+      files,
+    }),
   ].join('\n')
 }
 
@@ -2668,19 +2664,19 @@ function buildAgentFixPrompt(input: {
       revision: input.revision,
       agentFix: input.agentFix,
       files: input.files,
-      outputLocale: input.outputLocale
+      outputLocale: input.outputLocale,
     })
   }
 
   const anchor = toAnchorView(safeJsonParse(input.agentFix.anchorJson))
-  const changedFiles =
-    input.files.length > 0
-      ? input.files.map((file) => `- ${file.status}: ${file.path}`).join('\n')
+  const changedFiles
+    = input.files.length > 0
+      ? input.files.map(file => `- ${file.status}: ${file.path}`).join('\n')
       : '- No current changed files are recorded.'
-  const comments =
-    input.comments.length > 0
+  const comments
+    = input.comments.length > 0
       ? input.comments
-          .map((comment) => `- ${comment.authorKind}:${comment.authorId}: ${comment.bodyMarkdown}`)
+          .map(comment => `- ${comment.authorKind}:${comment.authorId}: ${comment.bodyMarkdown}`)
           .join('\n')
       : '- No review thread comments were provided.'
   const threadState = input.thread ? input.thread.state : 'not attached'
@@ -2718,7 +2714,7 @@ function buildAgentFixPrompt(input: {
     '## Changed Files',
     changedFiles,
     '',
-    'After finishing, summarize exactly what changed and call out anything you could not complete.'
+    'After finishing, summarize exactly what changed and call out anything you could not complete.',
   ].join('\n')
 }
 
@@ -2740,7 +2736,7 @@ function readAgentFixArtifact(input: {
     sessionId: input.agentFix.sessionId,
     runId: input.agentFix.runId,
     content,
-    createdAt: input.agentFix.updatedAt
+    createdAt: input.agentFix.updatedAt,
   })
 }
 
@@ -2776,15 +2772,14 @@ function readCommitPlanGroupRecords(parsed: unknown): Record<string, unknown>[] 
   if (!rawGroups) {
     throw new Error('Commit plan output is missing groups[]')
   }
-  return rawGroups.map((rawGroup) =>
-    rawGroup && typeof rawGroup === 'object' ? (rawGroup as Record<string, unknown>) : {}
-  )
+  return rawGroups.map(rawGroup =>
+    rawGroup && typeof rawGroup === 'object' ? (rawGroup as Record<string, unknown>) : {})
 }
 
 function readCommitPlanDependencyIndexes(
   value: unknown,
   groupCount: number,
-  groupIndex: number
+  groupIndex: number,
 ): number[] {
   if (!Array.isArray(value)) {
     return []
@@ -2811,9 +2806,9 @@ function normalizeGeneratedCommitPlan(input: {
   parsed: unknown
   revision: DiffReviewRevision
   files: DiffReviewFile[]
-}): { groups: ReviewCommitPlanGroupView[]; rationale: string } {
-  const record =
-    input.parsed && typeof input.parsed === 'object'
+}): { groups: ReviewCommitPlanGroupView[], rationale: string } {
+  const record
+    = input.parsed && typeof input.parsed === 'object'
       ? (input.parsed as Record<string, unknown>)
       : null
   const rationale = readString(record?.rationale)
@@ -2843,15 +2838,15 @@ function normalizeGeneratedCommitPlan(input: {
     const dependsOn = readCommitPlanDependencyIndexes(
       group.dependsOn,
       groupRecords.length,
-      index
-    ).map((dependencyIndex) => groupIds[dependencyIndex - 1])
+      index,
+    ).map(dependencyIndex => groupIds[dependencyIndex - 1])
     return {
       id: groupIds[index],
       title,
       message,
       rationale: groupRationale,
       fileIds,
-      dependsOn
+      dependsOn,
     }
   })
 
@@ -2870,7 +2865,7 @@ async function createCommitPlanFromAgentOutput(input: {
   const plan = normalizeGeneratedCommitPlan({
     parsed,
     revision: input.revision,
-    files: input.files
+    files: input.files,
   })
   const now = currentUnixSeconds()
   const row = db()
@@ -2885,7 +2880,7 @@ async function createCommitPlanFromAgentOutput(input: {
       groupsJson: jsonStringify(plan.groups),
       rationale: plan.rationale,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
     .get()
@@ -2897,9 +2892,9 @@ async function createCommitPlanFromAgentOutput(input: {
     payload: {
       commitPlanId: row.id,
       agentFixId: input.agentFix.id,
-      groupCount: plan.groups.length
+      groupCount: plan.groups.length,
     },
-    createdAt: now
+    createdAt: now,
   })
   return row
 }
@@ -2917,7 +2912,7 @@ function markAgentFixFailed(input: {
     .set({
       status: 'failed',
       errorMessage: input.errorMessage,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(diffReviewAgentFixes.id, input.agentFixId))
     .run()
@@ -2927,7 +2922,7 @@ function markAgentFixFailed(input: {
     actorKind: input.actorKind ?? 'system',
     actorId: input.actorId ?? null,
     payload: { agentFixId: input.agentFixId, errorMessage: input.errorMessage },
-    createdAt: now
+    createdAt: now,
   })
 }
 
@@ -2956,9 +2951,9 @@ async function watchAgentFixRunCompletion(input: {
         .set({
           status: run.status === 'aborted' ? 'cancelled' : 'failed',
           errorMessage:
-            run.errorText ??
-            (run.status === 'aborted' ? 'Agent fix run was aborted' : 'Agent fix run failed'),
-          updatedAt: now
+            run.errorText
+            ?? (run.status === 'aborted' ? 'Agent fix run was aborted' : 'Agent fix run failed'),
+          updatedAt: now,
         })
         .where(eq(diffReviewAgentFixes.id, input.agentFixId))
         .run()
@@ -2971,9 +2966,9 @@ async function watchAgentFixRunCompletion(input: {
           agentFixId: input.agentFixId,
           sessionId: input.sessionId,
           runId: input.runId,
-          runStatus: run.status
+          runStatus: run.status,
         },
-        createdAt: now
+        createdAt: now,
       })
       return
     }
@@ -2998,15 +2993,15 @@ async function watchAgentFixRunCompletion(input: {
           ...current,
           sessionId: input.sessionId,
           runId: input.runId,
-          updatedAt: now
-        }
+          updatedAt: now,
+        },
       })
       const commitPlan = await createCommitPlanFromAgentOutput({
         review,
         revision,
         files,
         agentFix: current,
-        rawOutput
+        rawOutput,
       })
       db()
         .update(diffReviewAgentFixes)
@@ -3015,7 +3010,7 @@ async function watchAgentFixRunCompletion(input: {
           artifactId: artifact?.id ?? null,
           resultRevisionId: revision.id,
           errorMessage: null,
-          updatedAt: now
+          updatedAt: now,
         })
         .where(eq(diffReviewAgentFixes.id, input.agentFixId))
         .run()
@@ -3032,9 +3027,9 @@ async function watchAgentFixRunCompletion(input: {
           artifactKind: artifact?.kind ?? null,
           artifactContentHash: artifact?.contentHash ?? null,
           resultRevisionId: revision.id,
-          commitPlanId: commitPlan.id
+          commitPlanId: commitPlan.id,
         },
-        createdAt: now
+        createdAt: now,
       })
       return
     }
@@ -3047,8 +3042,8 @@ async function watchAgentFixRunCompletion(input: {
         ...current,
         sessionId: input.sessionId,
         runId: input.runId,
-        updatedAt: now
-      }
+        updatedAt: now,
+      },
     })
     db()
       .update(diffReviewAgentFixes)
@@ -3057,7 +3052,7 @@ async function watchAgentFixRunCompletion(input: {
         artifactId: artifact?.id ?? null,
         resultRevisionId: refreshed.currentRevisionId,
         errorMessage: null,
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(diffReviewAgentFixes.id, input.agentFixId))
       .run()
@@ -3073,15 +3068,16 @@ async function watchAgentFixRunCompletion(input: {
         artifactId: artifact?.id ?? null,
         artifactKind: artifact?.kind ?? null,
         artifactContentHash: artifact?.contentHash ?? null,
-        resultRevisionId: refreshed.currentRevisionId
+        resultRevisionId: refreshed.currentRevisionId,
       },
-      createdAt: now
+      createdAt: now,
     })
-  } catch (error) {
+  }
+ catch (error) {
     markAgentFixFailed({
       reviewId: input.reviewId,
       agentFixId: input.agentFixId,
-      errorMessage: error instanceof Error ? error.message : String(error)
+      errorMessage: error instanceof Error ? error.message : String(error),
     })
   }
 }
@@ -3112,7 +3108,7 @@ async function startAgentFixRun(
     outputLocale?: ReviewOutputLocale | null
     userId?: string
   },
-  options: { rerun: boolean }
+  options: { rerun: boolean },
 ): Promise<DiffReviewView> {
   const review = getReviewRow(input.workspaceId, input.reviewId)
   const agentFix = getAgentFixForReview(review.id, input.agentFixId)
@@ -3127,13 +3123,13 @@ async function startAgentFixRun(
       code: 'diff_review_agent_fix_cancelled',
       status: 409,
       message: 'Cancelled agent fix work orders cannot be started',
-      details: { reviewId: review.id, agentFixId: agentFix.id }
+      details: { reviewId: review.id, agentFixId: agentFix.id },
     })
   }
 
   const providerTargetId = input.providerTargetId?.trim() || undefined
-  const agentId =
-    input.agentId?.trim() || (providerTargetId ? undefined : agentFix.profileId) || undefined
+  const agentId
+    = input.agentId?.trim() || (providerTargetId ? undefined : agentFix.profileId) || undefined
   const runtimeKind = input.runtimeKind?.trim() || undefined
   const outputLocale = normalizeOutputLocale(input.outputLocale)
   if (!agentId && !providerTargetId) {
@@ -3141,7 +3137,7 @@ async function startAgentFixRun(
       code: 'diff_review_agent_fix_target_missing',
       status: 400,
       message: 'Starting a diff review agent fix requires an agentId or providerTargetId',
-      details: { reviewId: review.id, agentFixId: agentFix.id }
+      details: { reviewId: review.id, agentFixId: agentFix.id },
     })
   }
   if (providerTargetId && !runtimeKind) {
@@ -3149,7 +3145,7 @@ async function startAgentFixRun(
       code: 'diff_review_agent_fix_runtime_missing',
       status: 400,
       message: 'Starting a provider-backed diff review agent fix requires runtimeKind',
-      details: { reviewId: review.id, agentFixId: agentFix.id, providerTargetId }
+      details: { reviewId: review.id, agentFixId: agentFix.id, providerTargetId },
     })
   }
 
@@ -3200,13 +3196,13 @@ async function startAgentFixRun(
       providerTargetId,
       runtimeKind,
       modelId: input.modelId ?? agentRow?.modelId ?? null,
-      runtimeSettings: { accessMode: 'full-access' }
+      runtimeSettings: { accessMode: 'full-access' },
     })
     const run = await ChatRuntime.createRun({
       sessionId: session.id,
       text: buildAgentFixPrompt({ review, revision, agentFix, thread, comments, files, outputLocale }),
       modelId: input.modelId ?? agentRow?.modelId ?? undefined,
-      thinkingEffort: agentRow?.thinkingEffort ?? undefined
+      thinkingEffort: agentRow?.thinkingEffort ?? undefined,
     })
     const now = currentUnixSeconds()
     db()
@@ -3219,7 +3215,7 @@ async function startAgentFixRun(
         artifactId: null,
         resultRevisionId: null,
         errorMessage: null,
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(diffReviewAgentFixes.id, agentFix.id))
       .run()
@@ -3234,24 +3230,25 @@ async function startAgentFixRun(
         runId: run.runId,
         status: 'running',
         rerun: options.rerun,
-        runtimeKind
+        runtimeKind,
       },
-      createdAt: now
+      createdAt: now,
     })
     void watchAgentFixRunCompletion({
       workspaceId: review.workspaceId,
       reviewId: review.id,
       agentFixId: agentFix.id,
       sessionId: session.id,
-      runId: run.runId
+      runId: run.runId,
     })
     return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId: input.userId })
-  } catch (error) {
+  }
+ catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     markAgentFixFailed({
       reviewId: review.id,
       agentFixId: agentFix.id,
-      errorMessage: message
+      errorMessage: message,
     })
     throw error
   }
@@ -3287,8 +3284,8 @@ export function getAgentFixArtifact(input: {
       details: {
         reviewId: review.id,
         agentFixId: agentFix.id,
-        artifactId: agentFix.artifactId
-      }
+        artifactId: agentFix.artifactId,
+      },
     })
   }
   return artifact
@@ -3307,7 +3304,7 @@ export async function cancelAgentFix(input: {
       code: 'diff_review_agent_fix_completed',
       status: 409,
       message: 'Completed agent fix work orders cannot be cancelled',
-      details: { reviewId: review.id, agentFixId: agentFix.id }
+      details: { reviewId: review.id, agentFixId: agentFix.id },
     })
   }
   if (agentFix.status === 'cancelled') {
@@ -3323,7 +3320,7 @@ export async function cancelAgentFix(input: {
     .set({
       status: 'cancelled',
       errorMessage: null,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(diffReviewAgentFixes.id, agentFix.id))
     .run()
@@ -3336,9 +3333,9 @@ export async function cancelAgentFix(input: {
       agentFixId: agentFix.id,
       sessionId: agentFix.sessionId,
       runId: agentFix.runId,
-      previousStatus: agentFix.status
+      previousStatus: agentFix.status,
     },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId: input.userId })
 }
@@ -3357,7 +3354,7 @@ export async function deleteAgentFix(input: {
       status: 409,
       message:
         'Pending agent fix work orders must be started or cancelled before they can be deleted',
-      details: { reviewId: review.id, agentFixId: agentFix.id }
+      details: { reviewId: review.id, agentFixId: agentFix.id },
     })
   }
   if (agentFix.status === 'running') {
@@ -3365,7 +3362,7 @@ export async function deleteAgentFix(input: {
       code: 'diff_review_agent_fix_running',
       status: 409,
       message: 'Running agent fix work orders must be cancelled before they can be deleted',
-      details: { reviewId: review.id, agentFixId: agentFix.id }
+      details: { reviewId: review.id, agentFixId: agentFix.id },
     })
   }
 
@@ -3382,9 +3379,9 @@ export async function deleteAgentFix(input: {
       sessionId: agentFix.sessionId,
       runId: agentFix.runId,
       artifactId: agentFix.artifactId,
-      resultRevisionId: agentFix.resultRevisionId
+      resultRevisionId: agentFix.resultRevisionId,
     },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId: input.userId })
 }
@@ -3410,8 +3407,8 @@ export function updateCommitPlan(input: {
         reviewId: review.id,
         commitPlanId: plan.id,
         planRevisionId: plan.revisionId,
-        currentRevisionId: revision.id
-      }
+        currentRevisionId: revision.id,
+      },
     })
   }
   if (plan.status === 'applied') {
@@ -3419,7 +3416,7 @@ export function updateCommitPlan(input: {
       code: 'diff_review_commit_plan_applied',
       status: 409,
       message: 'Diff review commit plan has already been applied',
-      details: { reviewId: review.id, commitPlanId: plan.id }
+      details: { reviewId: review.id, commitPlanId: plan.id },
     })
   }
 
@@ -3435,7 +3432,7 @@ export function updateCommitPlan(input: {
       rationale: input.rationale ?? plan.rationale,
       status: input.status ?? plan.status,
       strategy: input.groups ? 'manual' : plan.strategy,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(diffReviewCommitPlans.id, plan.id))
     .run()
@@ -3449,9 +3446,9 @@ export function updateCommitPlan(input: {
       commitPlanId: plan.id,
       status: input.status ?? plan.status,
       groupCount: groups.length,
-      strategy: input.groups ? 'manual' : plan.strategy
+      strategy: input.groups ? 'manual' : plan.strategy,
     },
-    createdAt: now
+    createdAt: now,
   })
   return loadReviewView(review, { userId })
 }
@@ -3469,7 +3466,7 @@ export async function applyCommitPlan(input: {
       code: 'diff_review_commit_plan_apply_unsupported_source',
       status: 400,
       message: 'Diff review commit plans can only be applied for local working tree reviews',
-      details: { reviewId: review.id, sourceKind: review.sourceKind }
+      details: { reviewId: review.id, sourceKind: review.sourceKind },
     })
   }
   if (!review.sourceId) {
@@ -3477,7 +3474,7 @@ export async function applyCommitPlan(input: {
       code: 'diff_review_source_missing',
       status: 409,
       message: 'Diff review source is missing',
-      details: { reviewId: review.id }
+      details: { reviewId: review.id },
     })
   }
 
@@ -3491,7 +3488,7 @@ export async function applyCommitPlan(input: {
       code: 'diff_review_commit_plan_not_accepted',
       status: 409,
       message: 'Diff review commit plan must be accepted before it can be applied',
-      details: { reviewId: review.id, commitPlanId: plan.id, status: plan.status }
+      details: { reviewId: review.id, commitPlanId: plan.id, status: plan.status },
     })
   }
   if (plan.revisionId !== revision.id) {
@@ -3503,8 +3500,8 @@ export async function applyCommitPlan(input: {
         reviewId: review.id,
         commitPlanId: plan.id,
         planRevisionId: plan.revisionId,
-        currentRevisionId: revision.id
-      }
+        currentRevisionId: revision.id,
+      },
     })
   }
 
@@ -3519,8 +3516,8 @@ export async function applyCommitPlan(input: {
         reviewId: review.id,
         commitPlanId: plan.id,
         planPatchHash: revision.patchHash,
-        currentPatchHash
-      }
+        currentPatchHash,
+      },
     })
   }
 
@@ -3532,7 +3529,7 @@ export async function applyCommitPlan(input: {
     reviewId: review.id,
     operationKind: 'commit_plan_apply',
     idempotencyKey,
-    request: { commitPlanId: plan.id, revisionId: revision.id, groupCount: groups.length }
+    request: { commitPlanId: plan.id, revisionId: revision.id, groupCount: groups.length },
   })
   if (operation.status === 'succeeded') {
     return includeCommitPlanInReviewView(loadReviewView(review, { userId: input.userId }), plan)
@@ -3546,7 +3543,7 @@ export async function applyCommitPlan(input: {
       .update(diffReviewCommitPlans)
       .set({
         status: 'applied',
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(diffReviewCommitPlans.id, plan.id))
       .returning()
@@ -3554,7 +3551,7 @@ export async function applyCommitPlan(input: {
     finishSourceOperation({
       operationId: operation.id,
       status: 'succeeded',
-      response: result
+      response: result,
     })
     recordEvent({
       reviewId: review.id,
@@ -3564,25 +3561,26 @@ export async function applyCommitPlan(input: {
       payload: {
         commitPlanId: plan.id,
         operationId: operation.id,
-        commits: result.commits
+        commits: result.commits,
       },
-      createdAt: now
+      createdAt: now,
     })
     const refreshed = await refreshLocalWorkingTree(input.workspaceId, review.repositoryPath)
     return includeCommitPlanInReviewView(refreshed, appliedPlan)
-  } catch (error) {
+  }
+ catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     finishSourceOperation({
       operationId: operation.id,
       status: 'failed',
-      errorMessage: message
+      errorMessage: message,
     })
     recordEvent({
       reviewId: review.id,
       eventKind: 'commit_plan_apply_failed',
       actorKind: 'user',
       actorId: userId,
-      payload: { commitPlanId: plan.id, operationId: operation.id, errorMessage: message }
+      payload: { commitPlanId: plan.id, operationId: operation.id, errorMessage: message },
     })
     throw error
   }

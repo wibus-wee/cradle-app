@@ -14,7 +14,7 @@ import type { RuntimeGoalContinuation } from '../runtime-provider-types'
 import {
   annotateGoalMessage,
   createUserMessage,
-  extractMessageText
+  extractMessageText,
 } from '../ui-message'
 
 interface ContinuationMetadataInput {
@@ -30,13 +30,13 @@ export interface DraftTurnInput {
   files: FileUIPart[]
   contextParts: ChatContextPart[]
   goalContinuation?: RuntimeGoalContinuation
-  continuation?: { mode: ChatSessionContinuationMode; queueItemId?: string }
+  continuation?: { mode: ChatSessionContinuationMode, queueItemId?: string }
 }
 
 export interface DraftTurnFromUserMessageInput {
   sessionId: string
   userMessage: UIMessage
-  continuation?: { mode: ChatSessionContinuationMode; queueItemId?: string }
+  continuation?: { mode: ChatSessionContinuationMode, queueItemId?: string }
 }
 
 export interface DraftTurnResult {
@@ -61,7 +61,7 @@ export interface StartRunInput {
 
 export function annotateContinuationMessage(
   message: UIMessage,
-  continuation: ContinuationMetadataInput | null
+  continuation: ContinuationMetadataInput | null,
 ): UIMessage {
   if (!continuation) {
     return message
@@ -82,10 +82,10 @@ export function annotateContinuationMessage(
           ...(continuation.sourceMessageId
             ? { sourceMessageId: continuation.sourceMessageId }
             : {}),
-          ...(continuation.splitParts !== undefined ? { splitParts: continuation.splitParts } : {})
-        }
-      }
-    }
+          ...(continuation.splitParts !== undefined ? { splitParts: continuation.splitParts } : {}),
+        },
+      },
+    },
   } as UIMessage
 }
 
@@ -93,17 +93,17 @@ export async function createDraftTurn(input: DraftTurnInput): Promise<DraftTurnR
   const userMessageId = randomUUID()
   const assistantMessageId = randomUUID()
   const now = currentUnixSeconds()
-  const goalObjective =
-    input.goalContinuation?.readGoalCommandObjective?.({ text: input.userText }) ?? null
+  const goalObjective
+    = input.goalContinuation?.readGoalCommandObjective?.({ text: input.userText }) ?? null
   const userText = goalObjective ?? input.userText
   const userMessage = annotateContinuationMessage(
     goalObjective
       ? annotateGoalMessage(
           createUserMessage(userMessageId, userText, input.files, input.contextParts),
-          goalObjective
+          goalObjective,
         )
       : createUserMessage(userMessageId, userText, input.files, input.contextParts),
-    input.continuation ?? null
+    input.continuation ?? null,
   )
   const userContent = extractMessageText(userMessage)
 
@@ -123,17 +123,17 @@ export async function createDraftTurn(input: DraftTurnInput): Promise<DraftTurnR
           content: userContent,
           messageJson: JSON.stringify(userMessage),
           createdAt: now,
-          updatedAt: now
-        }
-      }
-    }
+          updatedAt: now,
+        },
+      },
+    },
   ])
 
   return { userMessageId, assistantMessageId, userMessage }
 }
 
 export async function createDraftTurnFromUserMessage(
-  input: DraftTurnFromUserMessageInput
+  input: DraftTurnFromUserMessageInput,
 ): Promise<DraftTurnResult> {
   const assistantMessageId = randomUUID()
   const now = currentUnixSeconds()
@@ -155,17 +155,17 @@ export async function createDraftTurnFromUserMessage(
           content: extractMessageText(userMessage),
           messageJson: JSON.stringify(userMessage),
           createdAt: now,
-          updatedAt: now
-        }
-      }
-    }
+          updatedAt: now,
+        },
+      },
+    },
   ])
 
   return { userMessageId: userMessage.id, assistantMessageId, userMessage }
 }
 
 export async function insertCompletedUserMessage(
-  input: InsertCompletedUserMessageInput
+  input: InsertCompletedUserMessageInput,
 ): Promise<void> {
   const now = currentUnixSeconds()
   await commitSessionEvents(input.sessionId, [
@@ -184,10 +184,10 @@ export async function insertCompletedUserMessage(
           content: extractMessageText(input.message),
           messageJson: JSON.stringify(input.message),
           createdAt: now,
-          updatedAt: now
-        }
-      }
-    }
+          updatedAt: now,
+        },
+      },
+    },
   ])
 }
 
@@ -204,7 +204,7 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
     stopReason: null,
     errorText: null,
     startedAt: now,
-    finishedAt: null
+    finishedAt: null,
   } satisfies BackendRunStartedFact
   await commitSessionEvents(input.sessionId, [
     {
@@ -224,11 +224,11 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
           messageJson: JSON.stringify(input.assistantMessage),
           errorText: null,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         },
-        queueItemId: input.queueItemId ?? null
-      }
-    }
+        queueItemId: input.queueItemId ?? null,
+      },
+    },
   ])
   return run
 }

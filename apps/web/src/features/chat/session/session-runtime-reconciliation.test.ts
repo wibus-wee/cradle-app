@@ -141,6 +141,18 @@ describe('session runtime reconciliation', () => {
     expect(readTerminalRunReleaseCandidate(runtimeStatus({ activeRun, latestRun }))).toBeNull()
   })
 
+  it('returns each terminal release candidate once', () => {
+    const latestRun = runtimeRun({
+      runId: 'run-complete',
+      messageId: 'assistant-complete',
+      status: 'complete',
+    })
+    const status = runtimeStatus({ latestRun })
+
+    expect(readTerminalRunReleaseCandidate(status, null)).toBe(latestRun)
+    expect(readTerminalRunReleaseCandidate(status, 'run-complete')).toBeNull()
+  })
+
   it('requests queue refresh only when the queue signature changes into active work', () => {
     const idle = runtimeStatus({})
     const first = deriveRuntimeQueueRefresh({

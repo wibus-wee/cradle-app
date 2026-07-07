@@ -6,11 +6,11 @@
  */
 import {
   CheckLine as CheckIcon,
+  CloseLine as XIcon,
   DownSmallLine as ChevronDownIcon,
   ExternalLinkLine as OpenPlanIcon,
   ListCheckLine as ListChecksIcon,
   TargetLine as TargetIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
 import { useEffect, useMemo, useState } from 'react'
 

@@ -1,11 +1,12 @@
 import {
-  WarningLine as AlertTriangle,
   ArrowRightLine as ArrowRight,
-  SitemapLine as ChartNetwork,
   Link2Line as Link2,
   RouteLine as Route,
-  ScanLine as ScanSearch
+  ScanLine as ScanSearch,
+  SitemapLine as ChartNetwork,
+  WarningLine as AlertTriangle,
 } from '@mingcute/react'
+
 import { cn } from '@/lib/cn'
 import type { DocsGraphPageScore } from '@/lib/docs-graph'
 import { buildDocsGraph } from '@/lib/docs-graph'

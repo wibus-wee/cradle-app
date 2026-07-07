@@ -24,7 +24,7 @@ export const worktree = new Elysia({
   .group('/workspaces', app => app
     .get('/:workspaceId/worktrees', ({ params }) => Worktree.listWorktreesByWorkspace(params.workspaceId), {
       detail: {
-        summary: 'List active worktrees for workspace',
+        'summary': 'List active worktrees for workspace',
         'x-cradle-cli': {
           command: ['workspace', 'worktree', 'list'],
           defaultWorkspaceId: true,
@@ -49,7 +49,7 @@ export const worktree = new Elysia({
       return worktreeRecord
     }, {
       detail: {
-        summary: 'Create managed worktree',
+        'summary': 'Create managed worktree',
         'x-cradle-cli': {
           command: ['workspace', 'worktree', 'create'],
           defaultWorkspaceId: true,
@@ -73,7 +73,7 @@ export const worktree = new Elysia({
       return { ok: true as const }
     }, {
       detail: {
-        summary: 'Cleanup managed worktree',
+        'summary': 'Cleanup managed worktree',
         'x-cradle-cli': {
           command: ['workspace', 'worktree', 'cleanup'],
           defaultWorkspaceId: true,

@@ -31,7 +31,7 @@ export default defineConfig({
       rollupOptions: {
         external: nodeRuntimeExternals,
         input: {
-          index: resolve(__dirname, 'src/main/index.ts'),
+          'index': resolve(__dirname, 'src/main/index.ts'),
           'managed-process-runner': resolve(__dirname, 'src/main/managed-process-runner.ts'),
         },
         output: {
@@ -47,7 +47,7 @@ export default defineConfig({
       rollupOptions: {
         external: nodeRuntimeExternals,
         input: {
-          index: resolve(__dirname, 'src/preload/index.ts'),
+          'index': resolve(__dirname, 'src/preload/index.ts'),
           'browser-panel': resolve(__dirname, 'src/preload/browser-panel.ts'),
         },
         output: {

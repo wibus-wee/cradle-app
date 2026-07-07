@@ -11,7 +11,7 @@ import {
   providerTargets,
   sessionEvents,
   sessions,
-  workspaces
+  workspaces,
 } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
@@ -33,7 +33,7 @@ function localWorkspaceLocatorJson(path: string): string {
 function readLocalWorkspacePath(locatorJson: string): string {
   const locator = JSON.parse(locatorJson) as { path?: unknown }
   if (typeof locator.path !== 'string') {
-    throw new Error('Expected local workspace locator path')
+    throw new TypeError('Expected local workspace locator path')
   }
   return locator.path
 }
@@ -44,7 +44,7 @@ async function waitForCondition(check: () => boolean, timeoutMs = 5000): Promise
     if (check()) {
       return
     }
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 20))
   }
   throw new Error(`Timed out waiting for condition after ${timeoutMs}ms`)
 }
@@ -68,7 +68,7 @@ describe('session capability', () => {
         .values({
           id: workspaceId,
           name: 'Workspace',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
       d.insert(providerTargets)
@@ -76,7 +76,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Test Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
       d.insert(providerTargets)
@@ -84,7 +84,7 @@ describe('session capability', () => {
           id: secondaryProviderTargetId,
           kind: 'manual',
           displayName: 'Secondary Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
 
@@ -97,9 +97,9 @@ describe('session capability', () => {
             id: sessionId,
             workspaceId,
             title: 'Chat',
-            providerTargetId
-          })
-        })
+            providerTargetId,
+          }),
+        }),
       )
       expect(createRes.status).toBe(200)
       const created = await createRes.json()
@@ -112,34 +112,34 @@ describe('session capability', () => {
           agentId: null,
           modelId: null,
           status: 'idle',
-          archivedAt: null
-        })
+          archivedAt: null,
+        }),
       )
       expect(d.select().from(agents).all()).toHaveLength(0)
       expect(created.createdAt).toBeTypeOf('number')
       expect(created.updatedAt).toBeTypeOf('number')
 
       const listRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       const list = await listRes.json()
       expect(list).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' })
-        ])
+          expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' }),
+        ]),
       )
 
       const allListRes = await app.handle(new Request('http://localhost/sessions'))
       expect(allListRes.status).toBe(200)
       expect(await allListRes.json()).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' })
-        ])
+          expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' }),
+        ]),
       )
 
       const getRes = await app.handle(new Request(`http://localhost/sessions/${sessionId}`))
       expect(await getRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' })
+        expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' }),
       )
 
       const missingGet = await app.handle(new Request('http://localhost/sessions/missing'))
@@ -149,8 +149,8 @@ describe('session capability', () => {
         new Request(`http://localhost/sessions/${sessionId}`, {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ title: 'Renamed Chat' })
-        })
+          body: JSON.stringify({ title: 'Renamed Chat' }),
+        }),
       )
       expect(updateRes.status).toBe(200)
       expect(await updateRes.json()).toEqual(expect.objectContaining({ title: 'Renamed Chat' }))
@@ -162,8 +162,8 @@ describe('session capability', () => {
       expect(titleEvent).toEqual(
         expect.objectContaining({
           eventType: 'TitleChanged',
-          payload: expect.stringContaining('"title":"Renamed Chat"')
-        })
+          payload: expect.stringContaining('"title":"Renamed Chat"'),
+        }),
       )
 
       const updated = await (
@@ -175,8 +175,8 @@ describe('session capability', () => {
         new Request(`http://localhost/sessions/${sessionId}`, {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ pinned: true })
-        })
+          body: JSON.stringify({ pinned: true }),
+        }),
       )
       expect(await pinRes.json()).toEqual(expect.objectContaining({ pinned: 1 }))
 
@@ -184,8 +184,8 @@ describe('session capability', () => {
         new Request(`http://localhost/sessions/${sessionId}`, {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ pinned: false })
-        })
+          body: JSON.stringify({ pinned: false }),
+        }),
       )
       expect(await unpinRes.json()).toEqual(expect.objectContaining({ pinned: 0 }))
 
@@ -193,8 +193,8 @@ describe('session capability', () => {
         new Request('http://localhost/sessions/missing', {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ pinned: true })
-        })
+          body: JSON.stringify({ pinned: true }),
+        }),
       )
       expect(missingPin.status).toBe(404)
       expect((await missingPin.json()).code).toBe('session_not_found')
@@ -203,21 +203,21 @@ describe('session capability', () => {
         new Request(`http://localhost/sessions/${sessionId}/archive`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ archived: true })
-        })
+          body: JSON.stringify({ archived: true }),
+        }),
       )
       expect(archiveRes.status).toBe(200)
       const archived = await archiveRes.json()
       expect(archived).toEqual(
         expect.objectContaining({
           id: sessionId,
-          archivedAt: expect.any(Number)
-        })
+          archivedAt: expect.any(Number),
+        }),
       )
 
       const activeListAfterArchive = await (
         await app.handle(
-          new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+          new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
         )
       ).json()
       expect(activeListAfterArchive).toEqual([])
@@ -225,35 +225,35 @@ describe('session capability', () => {
       const archivedList = await (
         await app.handle(
           new Request(
-            `http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}&archived=true`
-          )
+            `http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}&archived=true`,
+          ),
         )
       ).json()
       expect(archivedList).toEqual([
-        expect.objectContaining({ id: sessionId, archivedAt: expect.any(Number) })
+        expect.objectContaining({ id: sessionId, archivedAt: expect.any(Number) }),
       ])
 
       const restoreRes = await app.handle(
         new Request(`http://localhost/sessions/${sessionId}/archive`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ archived: false })
-        })
+          body: JSON.stringify({ archived: false }),
+        }),
       )
       expect(restoreRes.status).toBe(200)
       expect(await restoreRes.json()).toEqual(
         expect.objectContaining({
           id: sessionId,
-          archivedAt: null
-        })
+          archivedAt: null,
+        }),
       )
 
       const missingArchive = await app.handle(
         new Request('http://localhost/sessions/missing/archive', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ archived: true })
-        })
+          body: JSON.stringify({ archived: true }),
+        }),
       )
       expect(missingArchive.status).toBe(404)
       expect((await missingArchive.json()).code).toBe('session_not_found')
@@ -272,10 +272,10 @@ describe('session capability', () => {
             messageJson: JSON.stringify({
               id: userMessageId,
               role: 'user',
-              parts: [{ type: 'text', text: 'Hello' }]
+              parts: [{ type: 'text', text: 'Hello' }],
             }),
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
           },
           {
             id: assistantMessageId,
@@ -286,16 +286,16 @@ describe('session capability', () => {
             messageJson: JSON.stringify({
               id: assistantMessageId,
               role: 'assistant',
-              parts: [{ type: 'text', text: 'Hello world' }]
+              parts: [{ type: 'text', text: 'Hello world' }],
             }),
             createdAt: now + 1,
-            updatedAt: now + 1
-          }
+            updatedAt: now + 1,
+          },
         ])
         .run()
 
       const legacyMessagesRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}/messages`)
+        new Request(`http://localhost/sessions/${sessionId}/messages`),
       )
       expect(legacyMessagesRes.status).toBe(404)
 
@@ -305,25 +305,25 @@ describe('session capability', () => {
           id: sessionId,
           latestAssistantMessageAt: now + 1,
           lastReadAt: null,
-          unread: true
-        })
+          unread: true,
+        }),
       )
 
       const unreadListRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       expect(await unreadListRes.json()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             id: sessionId,
             latestAssistantMessageAt: now + 1,
-            unread: true
-          })
-        ])
+            unread: true,
+          }),
+        ]),
       )
 
       const readRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}/read`, { method: 'POST' })
+        new Request(`http://localhost/sessions/${sessionId}/read`, { method: 'POST' }),
       )
       expect(readRes.status).toBe(200)
       expect(await readRes.json()).toEqual(
@@ -331,12 +331,12 @@ describe('session capability', () => {
           id: sessionId,
           lastReadAt: now + 1,
           latestAssistantMessageAt: now + 1,
-          unread: false
-        })
+          unread: false,
+        }),
       )
 
       const unreadRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}/unread`, { method: 'POST' })
+        new Request(`http://localhost/sessions/${sessionId}/unread`, { method: 'POST' }),
       )
       expect(unreadRes.status).toBe(200)
       expect(await unreadRes.json()).toEqual(
@@ -344,12 +344,12 @@ describe('session capability', () => {
           id: sessionId,
           lastReadAt: now,
           latestAssistantMessageAt: now + 1,
-          unread: true
-        })
+          unread: true,
+        }),
       )
 
       const missingReadRes = await app.handle(
-        new Request('http://localhost/sessions/missing/read', { method: 'POST' })
+        new Request('http://localhost/sessions/missing/read', { method: 'POST' }),
       )
       expect(missingReadRes.status).toBe(404)
 
@@ -361,19 +361,19 @@ describe('session capability', () => {
           providerTargetId,
           runtimeKind: 'standard',
           backendSessionId: 'provider-session-primary',
-          requestedModelId: 'gpt-test'
+          requestedModelId: 'gpt-test',
         })
         .run()
 
       const getWithBindingRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await getWithBindingRes.json()).toEqual(
         expect.objectContaining({
           id: sessionId,
           modelId: 'gpt-test',
-          status: 'idle'
-        })
+          status: 'idle',
+        }),
       )
 
       const providerModelPatchRes = await app.handle(
@@ -382,29 +382,29 @@ describe('session capability', () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             providerTargetId: secondaryProviderTargetId,
-            modelId: 'gpt-secondary'
-          })
-        })
+            modelId: 'gpt-secondary',
+          }),
+        }),
       )
       expect(providerModelPatchRes.status).toBe(200)
       expect(await providerModelPatchRes.json()).toEqual(
         expect.objectContaining({
           providerTargetId: secondaryProviderTargetId,
-          modelId: 'gpt-secondary'
-        })
+          modelId: 'gpt-secondary',
+        }),
       )
       expect(
         d
           .select()
           .from(backendSessionBindings)
           .where(eq(backendSessionBindings.id, bindingId))
-          .get()
+          .get(),
       ).toBeUndefined()
       const patchedSessionRow = d.select().from(sessions).where(eq(sessions.id, sessionId)).get()
       expect(JSON.parse(patchedSessionRow?.configJson ?? '{}')).toEqual(
         expect.objectContaining({
-          requestedModelId: 'gpt-secondary'
-        })
+          requestedModelId: 'gpt-secondary',
+        }),
       )
 
       const thinkingPatchRes = await app.handle(
@@ -412,15 +412,15 @@ describe('session capability', () => {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            thinkingEffort: 'xhigh'
-          })
-        })
+            thinkingEffort: 'xhigh',
+          }),
+        }),
       )
       expect(thinkingPatchRes.status).toBe(200)
       expect(await thinkingPatchRes.json()).toEqual(
         expect.objectContaining({
-          thinkingEffort: 'xhigh'
-        })
+          thinkingEffort: 'xhigh',
+        }),
       )
       const thinkingPatchedSessionRow = d
         .select()
@@ -430,19 +430,19 @@ describe('session capability', () => {
       expect(JSON.parse(thinkingPatchedSessionRow?.configJson ?? '{}')).toEqual(
         expect.objectContaining({
           requestedModelId: 'gpt-secondary',
-          requestedThinkingEffort: 'xhigh'
-        })
+          requestedThinkingEffort: 'xhigh',
+        }),
       )
 
       const getWithPatchedProviderRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await getWithPatchedProviderRes.json()).toEqual(
         expect.objectContaining({
           providerTargetId: secondaryProviderTargetId,
           modelId: 'gpt-secondary',
-          thinkingEffort: 'xhigh'
-        })
+          thinkingEffort: 'xhigh',
+        }),
       )
 
       const streamingRunId = randomUUID()
@@ -455,37 +455,37 @@ describe('session capability', () => {
           origin: 'user',
           status: 'streaming',
           startedAt: now,
-          finishedAt: null
+          finishedAt: null,
         })
         .run()
 
       const streamingListRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       expect(await streamingListRes.json()).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'streaming' })])
+        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'streaming' })]),
       )
 
       const streamingGetRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await streamingGetRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, status: 'streaming' })
+        expect.objectContaining({ id: sessionId, status: 'streaming' }),
       )
 
       d.update(backendRuns)
         .set({
           status: 'complete',
-          finishedAt: now + 1
+          finishedAt: now + 1,
         })
         .where(eq(backendRuns.id, streamingRunId))
         .run()
 
       const completedGetRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await completedGetRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, status: 'idle' })
+        expect.objectContaining({ id: sessionId, status: 'idle' }),
       )
 
       const failedRunId = randomUUID()
@@ -499,20 +499,20 @@ describe('session capability', () => {
           status: 'failed',
           errorText: 'Provider failed',
           startedAt: now + 2,
-          finishedAt: now + 3
+          finishedAt: now + 3,
         })
         .run()
 
       const failedListRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       expect(await failedListRes.json()).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'error' })])
+        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'error' })]),
       )
 
       const failedGetRes = await app.handle(new Request(`http://localhost/sessions/${sessionId}`))
       expect(await failedGetRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, status: 'error' })
+        expect.objectContaining({ id: sessionId, status: 'error' }),
       )
 
       d.insert(backendRuns)
@@ -524,15 +524,15 @@ describe('session capability', () => {
           origin: 'user',
           status: 'complete',
           startedAt: now + 4,
-          finishedAt: now + 5
+          finishedAt: now + 5,
         })
         .run()
 
       const recoveredGetRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await recoveredGetRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, status: 'idle' })
+        expect.objectContaining({ id: sessionId, status: 'idle' }),
       )
 
       const activeGoalBindingId = randomUUID()
@@ -549,32 +549,32 @@ describe('session capability', () => {
               goal: {
                 threadId: 'codex-thread-active-goal',
                 objective: 'Finish active goal',
-                status: 'active'
-              }
-            }
+                status: 'active',
+              },
+            },
           }),
-          requestedModelId: 'gpt-secondary'
+          requestedModelId: 'gpt-secondary',
         })
         .run()
 
       const activeGoalGetRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await activeGoalGetRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, status: 'idle' })
+        expect.objectContaining({ id: sessionId, status: 'idle' }),
       )
 
       const activeGoalListRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       expect(await activeGoalListRes.json()).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'idle' })])
+        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'idle' })]),
       )
 
       d.update(backendSessionBindings)
         .set({
           runtimeKind: 'standard',
-          backendStateSnapshot: null
+          backendStateSnapshot: null,
         })
         .where(eq(backendSessionBindings.id, activeGoalBindingId))
         .run()
@@ -588,22 +588,22 @@ describe('session capability', () => {
           origin: 'user',
           status: 'streaming',
           startedAt: now + 3,
-          finishedAt: null
+          finishedAt: null,
         })
         .run()
 
       const staleStreamingGetRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`)
+        new Request(`http://localhost/sessions/${sessionId}`),
       )
       expect(await staleStreamingGetRes.json()).toEqual(
-        expect.objectContaining({ id: sessionId, status: 'idle' })
+        expect.objectContaining({ id: sessionId, status: 'idle' }),
       )
 
       const staleStreamingListRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       expect(await staleStreamingListRes.json()).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'idle' })])
+        expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'idle' })]),
       )
 
       const cliAgentId = randomUUID()
@@ -619,9 +619,9 @@ describe('session capability', () => {
             cliTui: {
               preset: 'claude-code',
               executable: 'claude',
-              args: ['--print']
-            }
-          })
+              args: ['--print'],
+            },
+          }),
         })
         .run()
 
@@ -632,9 +632,9 @@ describe('session capability', () => {
           body: JSON.stringify({
             workspaceId,
             title: 'CLI Session',
-            agentId: cliAgentId
-          })
-        })
+            agentId: cliAgentId,
+          }),
+        }),
       )
       expect(cliSessionRes.status).toBe(200)
       expect(await cliSessionRes.json()).toEqual(
@@ -642,12 +642,12 @@ describe('session capability', () => {
           agentId: cliAgentId,
           providerTargetId: null,
           runtimeKind: 'cli-tui',
-          status: 'idle'
-        })
+          status: 'idle',
+        }),
       )
 
       const exportRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}/export/markdown`)
+        new Request(`http://localhost/sessions/${sessionId}/export/markdown`),
       )
       const exportBody = await exportRes.json()
       expect(exportBody.markdown).toContain('# Renamed Chat')
@@ -661,38 +661,40 @@ describe('session capability', () => {
         new Request('http://localhost/sessions', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ title: '' })
-        })
+          body: JSON.stringify({ title: '' }),
+        }),
       )
       expect(invalidCreate.status).toBe(400)
       const invalidBody = await invalidCreate.json()
       expect(invalidBody.code).toBe('validation_error')
 
       const deleteRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`, { method: 'DELETE' })
+        new Request(`http://localhost/sessions/${sessionId}`, { method: 'DELETE' }),
       )
       expect(deleteRes.status).toBe(200)
       expect(await deleteRes.json()).toEqual({ ok: true })
 
       const afterList = await (
         await app.handle(
-          new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+          new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
         )
       ).json()
       expect(afterList).toEqual([
         expect.objectContaining({
           id: expect.any(String),
           runtimeKind: 'cli-tui',
-          agentId: cliAgentId
-        })
+          agentId: cliAgentId,
+        }),
       ])
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -716,7 +718,7 @@ describe('session capability', () => {
         .values({
           id: workspaceId,
           name: 'Workspace',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
       d.insert(providerTargets)
@@ -724,7 +726,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Codex Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
       d.insert(agents)
@@ -736,7 +738,7 @@ describe('session capability', () => {
           providerTargetId,
           modelId: 'gpt-5.5',
           thinkingEffort: 'medium',
-          runtimeKind: 'codex'
+          runtimeKind: 'codex',
         })
         .run()
 
@@ -749,9 +751,9 @@ describe('session capability', () => {
             id: sessionId,
             workspaceId,
             title: 'Agent Session',
-            agentId
-          })
-        })
+            agentId,
+          }),
+        }),
       )
       expect(createRes.status).toBe(200)
       expect(await createRes.json()).toEqual(
@@ -760,24 +762,26 @@ describe('session capability', () => {
           agentId,
           providerTargetId,
           runtimeKind: 'codex',
-          modelId: 'gpt-5.5'
-        })
+          modelId: 'gpt-5.5',
+        }),
       )
 
       const sessionRow = d.select().from(sessions).where(eq(sessions.id, sessionId)).get()
       expect(JSON.parse(sessionRow?.configJson ?? '{}')).toEqual(
         expect.objectContaining({
           requestedModelId: 'gpt-5.5',
-          requestedThinkingEffort: 'medium'
-        })
+          requestedThinkingEffort: 'medium',
+        }),
       )
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -800,7 +804,7 @@ describe('session capability', () => {
         .values({
           id: workspaceId,
           name: 'Origin Workspace',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
       d.insert(providerTargets)
@@ -808,7 +812,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Origin Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
 
@@ -821,16 +825,16 @@ describe('session capability', () => {
             id: manualSessionId,
             workspaceId,
             title: 'Manual Origin Session',
-            providerTargetId
-          })
-        })
+            providerTargetId,
+          }),
+        }),
       )
       expect(manualCreateRes.status).toBe(200)
       expect(await manualCreateRes.json()).toEqual(
         expect.objectContaining({
           id: manualSessionId,
-          origin: 'manual'
-        })
+          origin: 'manual',
+        }),
       )
 
       const automationSessionId = randomUUID()
@@ -843,61 +847,63 @@ describe('session capability', () => {
             workspaceId,
             title: 'Automation Origin Session',
             origin: 'automation',
-            providerTargetId
-          })
-        })
+            providerTargetId,
+          }),
+        }),
       )
       expect(automationCreateRes.status).toBe(200)
       expect(await automationCreateRes.json()).toEqual(
         expect.objectContaining({
           id: automationSessionId,
-          origin: 'automation'
-        })
+          origin: 'automation',
+        }),
       )
 
       const automationListRes = await app.handle(
         new Request(
-          `http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}&origin=automation`
-        )
+          `http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}&origin=automation`,
+        ),
       )
       expect(automationListRes.status).toBe(200)
       expect(await automationListRes.json()).toEqual([
         expect.objectContaining({
           id: automationSessionId,
-          origin: 'automation'
-        })
+          origin: 'automation',
+        }),
       ])
 
       const manualListRes = await app.handle(
         new Request(
-          `http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}&origin=manual`
-        )
+          `http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}&origin=manual`,
+        ),
       )
       expect(manualListRes.status).toBe(200)
       expect(await manualListRes.json()).toEqual([
         expect.objectContaining({
           id: manualSessionId,
-          origin: 'manual'
-        })
+          origin: 'manual',
+        }),
       ])
 
       const getAutomationRes = await app.handle(
-        new Request(`http://localhost/sessions/${automationSessionId}`)
+        new Request(`http://localhost/sessions/${automationSessionId}`),
       )
       expect(getAutomationRes.status).toBe(200)
       expect(await getAutomationRes.json()).toEqual(
         expect.objectContaining({
           id: automationSessionId,
-          origin: 'automation'
-        })
+          origin: 'automation',
+        }),
       )
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -924,7 +930,7 @@ describe('session capability', () => {
         .values({
           id: workspaceId,
           name: 'Workspace',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
       d.insert(providerTargets)
@@ -932,7 +938,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
       d.insert(sessions)
@@ -947,7 +953,7 @@ describe('session capability', () => {
           linkedIssueId: null,
           pinned: 0,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         })
         .run()
       d.insert(messages)
@@ -960,10 +966,10 @@ describe('session capability', () => {
           messageJson: JSON.stringify({
             id: assistantMessageId,
             role: 'assistant',
-            parts: [{ type: 'text', text: 'partial response' }]
+            parts: [{ type: 'text', text: 'partial response' }],
           }),
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         })
         .run()
       d.insert(backendSessionBindings)
@@ -973,7 +979,7 @@ describe('session capability', () => {
           providerTargetId,
           runtimeKind: 'standard',
           backendSessionId: 'provider-session-stale-streaming',
-          requestedModelId: 'gpt-test'
+          requestedModelId: 'gpt-test',
         })
         .run()
       d.insert(backendRuns)
@@ -985,7 +991,7 @@ describe('session capability', () => {
           origin: 'user',
           status: 'streaming',
           startedAt: now,
-          finishedAt: null
+          finishedAt: null,
         })
         .run()
 
@@ -996,8 +1002,8 @@ describe('session capability', () => {
         expect.objectContaining({
           id: sessionId,
           modelId: 'gpt-test',
-          status: 'error'
-        })
+          status: 'error',
+        }),
       )
       expect(d.select().from(backendRuns).where(eq(backendRuns.id, runId)).get()).toEqual(
         expect.objectContaining({
@@ -1005,23 +1011,25 @@ describe('session capability', () => {
           stopReason: 'response.interrupted',
           errorText:
             'Response interrupted because the Cradle server process exited while the run was streaming.',
-          finishedAt: expect.any(Number)
-        })
+          finishedAt: expect.any(Number),
+        }),
       )
       expect(d.select().from(messages).where(eq(messages.id, assistantMessageId)).get()).toEqual(
         expect.objectContaining({
           status: 'failed',
           errorText:
-            'Response interrupted because the Cradle server process exited while the run was streaming.'
-        })
+            'Response interrupted because the Cradle server process exited while the run was streaming.',
+        }),
       )
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -1047,7 +1055,7 @@ describe('session capability', () => {
         .values({
           id: workspaceId,
           name: 'Workspace',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
       d.insert(providerTargets)
@@ -1055,7 +1063,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
       d.insert(sessions)
@@ -1070,7 +1078,7 @@ describe('session capability', () => {
           linkedIssueId: null,
           pinned: 0,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         })
         .run()
       d.insert(backendSessionBindings)
@@ -1085,10 +1093,10 @@ describe('session capability', () => {
               goal: {
                 threadId: 'legacy-thread',
                 objective: 'Do not project this goal',
-                status: 'active'
-              }
-            }
-          })
+                status: 'active',
+              },
+            },
+          }),
         })
         .run()
 
@@ -1097,34 +1105,36 @@ describe('session capability', () => {
         expect.objectContaining({
           id: sessionId,
           modelId: null,
-          status: 'idle'
-        })
+          status: 'idle',
+        }),
       )
 
       const listRes = await app.handle(
-        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
+        new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       expect(await listRes.json()).toEqual([
         expect.objectContaining({
           id: sessionId,
           modelId: null,
-          status: 'idle'
-        })
+          status: 'idle',
+        }),
       ])
 
       const exportRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}/export/markdown`)
+        new Request(`http://localhost/sessions/${sessionId}/export/markdown`),
       )
       const exportBody = await exportRes.json()
       expect(exportBody.markdown).toContain('Model: unknown')
       expect(exportBody.markdown).not.toContain('legacy-model')
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
@@ -1148,7 +1158,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Ad Hoc Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
 
@@ -1158,9 +1168,9 @@ describe('session capability', () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             title: 'No Project Chat',
-            providerTargetId
-          })
-        })
+            providerTargetId,
+          }),
+        }),
       )
 
       expect(createRes.status).toBe(200)
@@ -1175,25 +1185,28 @@ describe('session capability', () => {
       expect(workspace).toEqual(
         expect.objectContaining({
           id: created.workspaceId,
-          name: expect.stringMatching(/^Chat \d{4}-\d{2}-\d{2}$/)
-        })
+          name: expect.stringMatching(/^Chat \d{4}-\d{2}-\d{2}$/),
+        }),
       )
       const workspacePath = readLocalWorkspacePath(workspace!.locatorJson)
       const workspaceRelativePath = relative(adHocRoot, workspacePath).replaceAll('\\', '/')
       expect(workspaceRelativePath).toMatch(/^\d{4}-\d{2}-\d{2}\/\d{8}-\d{6}-[0-9a-f-]{36}$/)
       expect(existsSync(workspacePath)).toBe(true)
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(adHocRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousAdHocRoot === undefined) {
         delete process.env.CRADLE_AD_HOC_WORKSPACE_ROOT
-      } else {
+      }
+ else {
         process.env.CRADLE_AD_HOC_WORKSPACE_ROOT = previousAdHocRoot
       }
     }
@@ -1217,7 +1230,7 @@ describe('session capability', () => {
           id: providerTargetId,
           kind: 'manual',
           displayName: 'Jarvis Provider Target',
-          providerKind: 'openai-compatible'
+          providerKind: 'openai-compatible',
         })
         .run()
 
@@ -1229,9 +1242,9 @@ describe('session capability', () => {
             workspaceId: null,
             title: 'Jarvis',
             providerTargetId,
-            runtimeKind: 'jar-core'
-          })
-        })
+            runtimeKind: 'jar-core',
+          }),
+        }),
       )
 
       expect(createRes.status).toBe(200)
@@ -1239,22 +1252,25 @@ describe('session capability', () => {
       expect(created).toEqual(
         expect.objectContaining({
           workspaceId: null,
-          runtimeKind: 'jar-core'
-        })
+          runtimeKind: 'jar-core',
+        }),
       )
       expect(d.select().from(workspaces).all()).toEqual([])
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(adHocRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
       if (previousAdHocRoot === undefined) {
         delete process.env.CRADLE_AD_HOC_WORKSPACE_ROOT
-      } else {
+      }
+ else {
         process.env.CRADLE_AD_HOC_WORKSPACE_ROOT = previousAdHocRoot
       }
     }
@@ -1276,7 +1292,7 @@ describe('session capability', () => {
         .values({
           id: workspaceId,
           name: 'Workspace',
-          locatorJson: localWorkspaceLocatorJson(workspaceRoot)
+          locatorJson: localWorkspaceLocatorJson(workspaceRoot),
         })
         .run()
 
@@ -1292,9 +1308,9 @@ describe('session capability', () => {
           configJson: JSON.stringify({
             cliTui: {
               executable: process.execPath,
-              args: ['-e', 'setInterval(() => {}, 1000)']
-            }
-          })
+              args: ['-e', 'setInterval(() => {}, 1000)'],
+            },
+          }),
         })
         .run()
 
@@ -1307,9 +1323,9 @@ describe('session capability', () => {
             id: sessionId,
             workspaceId,
             title: 'CLI Cleanup Session',
-            agentId
-          })
-        })
+            agentId,
+          }),
+        }),
       )
       expect(createRes.status).toBe(200)
 
@@ -1328,32 +1344,34 @@ describe('session capability', () => {
           messageJson: JSON.stringify({
             id: messageId,
             role: 'assistant',
-            parts: [{ type: 'text', text: 'cleanup sentinel text' }]
+            parts: [{ type: 'text', text: 'cleanup sentinel text' }],
           }),
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         })
         .run()
       indexMessage(sessionId, 'CLI Cleanup Session', messageId, 'cleanup sentinel text')
       expect(searchThreads({ query: 'cleanup sentinel' })).toEqual([
-        expect.objectContaining({ sessionId })
+        expect.objectContaining({ sessionId }),
       ])
 
       const deleteRes = await app.handle(
-        new Request(`http://localhost/sessions/${sessionId}`, { method: 'DELETE' })
+        new Request(`http://localhost/sessions/${sessionId}`, { method: 'DELETE' }),
       )
       expect(deleteRes.status).toBe(200)
       expect(await deleteRes.json()).toEqual({ ok: true })
 
       await waitForCondition(() => !ptyTimeline.hasSession(sessionId))
       expect(searchThreads({ query: 'cleanup sentinel' })).toEqual([])
-    } finally {
+    }
+ finally {
       shutdownInfra()
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
       if (previousDataDir === undefined) {
         delete process.env.CRADLE_DATA_DIR
-      } else {
+      }
+ else {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }

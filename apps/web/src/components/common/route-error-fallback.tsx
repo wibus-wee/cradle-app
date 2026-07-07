@@ -1,10 +1,10 @@
-import type { ErrorComponentProps } from '@tanstack/react-router'
-import { useNavigate, useRouter } from '@tanstack/react-router'
 import {
   Home4Line as HomeIcon,
   RefreshAnticlockwise1Line as RefreshIcon,
   WarningLine as WarningIcon,
 } from '@mingcute/react'
+import type { ErrorComponentProps } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 

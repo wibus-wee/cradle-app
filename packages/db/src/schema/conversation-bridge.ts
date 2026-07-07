@@ -1,8 +1,8 @@
 import { index, int, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-import { agents, agentCredentials } from './identity'
-import { providerTargets } from './provider-target'
 import { sessions } from './chat'
+import { agentCredentials, agents } from './identity'
+import { providerTargets } from './provider-target'
 import { textPk, timestamps, workspaces } from './shared'
 
 export const conversationBridgeConnections = sqliteTable('conversation_bridge_connections', {
@@ -30,12 +30,10 @@ export const conversationBridgeConnections = sqliteTable('conversation_bridge_co
 
 export const conversationBridgeChannelBindings = sqliteTable('conversation_bridge_channel_bindings', {
   id: textPk(),
-  connectionId: text('connection_id').notNull()
-    .references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
+  connectionId: text('connection_id').notNull().references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
   externalWorkspaceId: text('external_workspace_id').notNull(),
   externalChannelId: text('external_channel_id').notNull(),
-  cradleWorkspaceId: text('cradle_workspace_id').notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  cradleWorkspaceId: text('cradle_workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
   sessionAgentId: text('session_agent_id')
     .references(() => agents.id, { onDelete: 'set null' }),
   sessionProviderTargetId: text('session_provider_target_id')
@@ -53,13 +51,11 @@ export const conversationBridgeChannelBindings = sqliteTable('conversation_bridg
 
 export const conversationBridgeThreadBindings = sqliteTable('conversation_bridge_thread_bindings', {
   id: textPk(),
-  connectionId: text('connection_id').notNull()
-    .references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
+  connectionId: text('connection_id').notNull().references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
   externalWorkspaceId: text('external_workspace_id').notNull(),
   externalChannelId: text('external_channel_id').notNull(),
   externalThreadId: text('external_thread_id').notNull(),
-  sessionId: text('session_id').notNull()
-    .references(() => sessions.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   cradleWorkspaceId: text('cradle_workspace_id')
     .references(() => workspaces.id, { onDelete: 'set null' }),
   createdByExternalActorId: text('created_by_external_actor_id'),
@@ -75,8 +71,7 @@ export const conversationBridgeThreadBindings = sqliteTable('conversation_bridge
 
 export const conversationBridgeInboundEvents = sqliteTable('conversation_bridge_inbound_events', {
   id: textPk(),
-  connectionId: text('connection_id').notNull()
-    .references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
+  connectionId: text('connection_id').notNull().references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
   externalEventId: text('external_event_id').notNull(),
   externalWorkspaceId: text('external_workspace_id'),
   externalChannelId: text('external_channel_id'),
@@ -100,13 +95,11 @@ export const conversationBridgeInboundEvents = sqliteTable('conversation_bridge_
 
 export const conversationBridgeDeliveryAttempts = sqliteTable('conversation_bridge_delivery_attempts', {
   id: textPk(),
-  connectionId: text('connection_id').notNull()
-    .references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
+  connectionId: text('connection_id').notNull().references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
   externalWorkspaceId: text('external_workspace_id').notNull(),
   externalChannelId: text('external_channel_id').notNull(),
   externalThreadId: text('external_thread_id').notNull(),
-  sessionId: text('session_id').notNull()
-    .references(() => sessions.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   cradleMessageId: text('cradle_message_id'),
   runId: text('run_id'),
   payloadJson: text('payload_json').notNull().default('{}'),
@@ -126,11 +119,9 @@ export const conversationBridgeDeliveryAttempts = sqliteTable('conversation_brid
 
 export const conversationBridgeConnectionSecrets = sqliteTable('conversation_bridge_connection_secrets', {
   id: textPk(),
-  connectionId: text('connection_id').notNull()
-    .references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
+  connectionId: text('connection_id').notNull().references(() => conversationBridgeConnections.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  secretRef: text('secret_ref').notNull()
-    .references(() => agentCredentials.id, { onDelete: 'restrict' }),
+  secretRef: text('secret_ref').notNull().references(() => agentCredentials.id, { onDelete: 'restrict' }),
   ...timestamps(),
 }, table => ({
   byConnectionName: uniqueIndex('conversation_bridge_connection_secrets_connection_name_unique')

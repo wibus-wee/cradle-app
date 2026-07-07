@@ -1,15 +1,15 @@
 import { x25519 } from '@noble/curves/ed25519'
 
 import { AppError } from '../../errors/app-error'
+import type { RelayCryptoRole, RelayDerivedKeys } from './crypto'
 import {
   computeRelayConfirm,
   computeRelaySharedSecret,
   deriveRelayKeys,
   RelayCipher,
   relayPublicKeyFingerprint,
-  type RelayCryptoRole,
-  type RelayDerivedKeys,
 } from './crypto'
+import type { InnerFrame, RelayEnvelope } from './protocol'
 import {
   encryptedPayloadSchema,
   helloFrameSchema,
@@ -21,8 +21,6 @@ import {
   RELAY_PROTOCOL_VERSION,
   RELAY_STREAM_CREDIT_BYTES,
   relayErrorPayloadSchema,
-  type InnerFrame,
-  type RelayEnvelope,
 } from './protocol'
 
 /**
@@ -154,8 +152,10 @@ export class RelaySession {
     return this.peerPubkey
   }
 
-  /** Begin the handshake. The controller sends its `hello` immediately; the
-   *  host waits and sends its hello reactively when the controller's arrives. */
+  /**
+   * Begin the handshake. The controller sends its `hello` immediately; the
+   *  host waits and sends its hello reactively when the controller's arrives.
+   */
   start(): void {
     if (this.helloSent || this.state === 'closed') {
       return

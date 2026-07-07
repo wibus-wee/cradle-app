@@ -1,8 +1,8 @@
-import { arrayMove } from '@dnd-kit/helpers'
 import { PointerActivationConstraints, PointerSensor } from '@dnd-kit/dom'
+import { arrayMove } from '@dnd-kit/helpers'
 import { DragDropProvider } from '@dnd-kit/react'
 import { useSortable } from '@dnd-kit/react/sortable'
-import { DotsVerticalLine as GripVerticalIcon, DeleteLine as TrashIcon } from '@mingcute/react'
+import { DeleteLine as TrashIcon, DotsVerticalLine as GripVerticalIcon } from '@mingcute/react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -47,15 +47,15 @@ export function StatusManager({ workspaceId }: StatusManagerProps) {
     updateStatus.mutate({ id: statusId, workspaceId, patch: { name } })
   }
 
-  const handleDragEnd = (event: { operation: { source: { id: string | number } | null; target: { id: string | number } | null }; canceled: boolean }) => {
+  const handleDragEnd = (event: { operation: { source: { id: string | number } | null, target: { id: string | number } | null }, canceled: boolean }) => {
     const { operation, canceled } = event
-    if (canceled) return
+    if (canceled) { return }
     const { source, target } = operation
-    if (!source || !target || source.id === target.id) return
+    if (!source || !target || source.id === target.id) { return }
     const items = statuses.data ?? []
     const oldIdx = items.findIndex(s => s.id === source.id)
     const newIdx = items.findIndex(s => s.id === target.id)
-    if (oldIdx === -1 || newIdx === -1) return
+    if (oldIdx === -1 || newIdx === -1) { return }
     const reordered = arrayMove(items, oldIdx, newIdx)
     reorderStatuses.mutate({ workspaceId, orderedIds: reordered.map(s => s.id) })
   }
@@ -93,8 +93,8 @@ export function StatusManager({ workspaceId }: StatusManagerProps) {
 
       {/* Status list */}
       <DragDropProvider
-        sensors={(defaults) => [
-          ...defaults.filter((sensor) => sensor !== PointerSensor),
+        sensors={defaults => [
+          ...defaults.filter(sensor => sensor !== PointerSensor),
           PointerSensor.configure({
             activationConstraints: () => [new PointerActivationConstraints.Distance({ value: 3 })],
           }),

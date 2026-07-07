@@ -10,7 +10,7 @@ import { bindReadableStreamToAbortSignal } from '../stream/sse'
 const EVENT_STREAM_HEADERS = {
   'content-type': 'text/event-stream',
   'cache-control': 'no-cache',
-  connection: 'keep-alive',
+  'connection': 'keep-alive',
 } as const
 
 export const chatRuntimeEventRoutes = new Elysia({

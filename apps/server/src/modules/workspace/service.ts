@@ -9,7 +9,8 @@ import { desc, eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db, getServerConfig } from '../../infra'
-import { migrateIssues, type MigrateIssuesOptions, type MigrateIssuesResult } from '../issue/service'
+import type { MigrateIssuesOptions, MigrateIssuesResult } from '../issue/service'
+import { migrateIssues } from '../issue/service'
 import { assertAppFeatureFlagEnabled, isAppFeatureFlagEnabled } from '../preferences/service'
 import * as RemoteHosts from '../remote-hosts/service'
 import { subscribeWorkspaceFileChanges } from './file-watch'
@@ -27,6 +28,7 @@ import {
   searchWorkspaceFiles,
   writeTextFile,
 } from './files'
+import type { WorkspaceGitIdentity, WorkspaceLocator } from './workspace-locator'
 import {
   isLocalWorkspaceLocator,
   localWorkspaceLocator,
@@ -34,8 +36,6 @@ import {
   readWorkspaceLocatorJson,
   serializeWorkspaceGitIdentity,
   serializeWorkspaceLocator,
-  type WorkspaceGitIdentity,
-  type WorkspaceLocator,
 } from './workspace-locator'
 
 // ── helpers ──
@@ -44,7 +44,7 @@ const NON_ALPHA_RE = /[^A-Z]/g
 const AD_HOC_WORKSPACE_ROOT_ENV = 'CRADLE_AD_HOC_WORKSPACE_ROOT'
 const MULTI_WORKSPACE_ROOT_ENV = 'CRADLE_MULTI_WORKSPACE_ROOT'
 const MULTI_WORKSPACE_CONFIG_FILE = 'cradle-workspace.json'
-const WORKSPACE_ENTRY_NAME_RE = /^[A-Za-z0-9._-]+$/
+const WORKSPACE_ENTRY_NAME_RE = /^[\w.-]+$/
 
 export interface MultiFolderWorkspaceFolder {
   name: string
@@ -346,7 +346,8 @@ export function migrateWorkspace(sourceId: string, targetId: string, options: Mi
   if (entities.includes('kanban') && !dryRun) {
     const result = db().update(kanbanBoards).set({ workspaceId: targetId, updatedAt: Math.floor(Date.now() / 1000) }).where(eq(kanbanBoards.workspaceId, sourceId)).run()
     boardsMoved = result.changes
-  } else if (entities.includes('kanban') && dryRun) {
+  }
+ else if (entities.includes('kanban') && dryRun) {
     const rows = db().select({ id: kanbanBoards.id }).from(kanbanBoards).where(eq(kanbanBoards.workspaceId, sourceId)).all()
     boardsMoved = rows.length
   }
@@ -356,7 +357,8 @@ export function migrateWorkspace(sourceId: string, targetId: string, options: Mi
   if (entities.includes('automation') && !dryRun) {
     const result = db().update(automationDefinitions).set({ workspaceId: targetId, updatedAt: Math.floor(Date.now() / 1000) }).where(eq(automationDefinitions.workspaceId, sourceId)).run()
     definitionsMoved = result.changes
-  } else if (entities.includes('automation') && dryRun) {
+  }
+ else if (entities.includes('automation') && dryRun) {
     const rows = db().select({ id: automationDefinitions.id }).from(automationDefinitions).where(eq(automationDefinitions.workspaceId, sourceId)).all()
     definitionsMoved = rows.length
   }

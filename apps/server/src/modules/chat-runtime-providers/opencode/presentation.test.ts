@@ -41,7 +41,7 @@ describe('createOpencodeRuntimePresentation', () => {
   })
 })
 
-describe('OPENCODE_RUNTIME_CAPABILITIES', () => {
+describe('oPENCODE_RUNTIME_CAPABILITIES', () => {
   it('declares implemented runtime hooks', () => {
     expect(OPENCODE_RUNTIME_CAPABILITIES).toMatchObject({
       supportsShellExecution: true,

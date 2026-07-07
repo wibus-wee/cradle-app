@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
+import type { CodexConfig } from '../../../provider-contracts/provider-base'
+import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
+import {
+  buildCodexAuthEnvironment,
+  buildCodexBedrockModelProviderConfig,
+  resolveCodexAuthMode,
+} from '../config/runtime-config'
 import {
   CODEX_BEDROCK_API_KEY_SECRET_KIND,
   CODEX_CHATGPT_AUTH_SECRET_KIND,
   CODEX_PERSONAL_ACCESS_TOKEN_SECRET_KIND,
   resolveCodexAppServerAuth,
 } from './chatgpt-auth'
-import {
-  buildCodexAuthEnvironment,
-  buildCodexBedrockModelProviderConfig,
-  resolveCodexAuthMode,
-} from '../config/runtime-config'
-import type { CodexConfig } from '../../../provider-contracts/provider-base'
-import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
 
 function createSecretMetadata(id: string, kind: string, secret: string) {
   return {

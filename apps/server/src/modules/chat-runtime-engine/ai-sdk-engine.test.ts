@@ -2,7 +2,8 @@ import type { UIMessage } from 'ai'
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test'
 import { describe, expect, it } from 'vitest'
 
-import { buildModelMessages, executeAiSdkTurn, type TokenUsage } from './ai-sdk-engine'
+import type { TokenUsage } from './ai-sdk-engine'
+import { buildModelMessages, executeAiSdkTurn } from './ai-sdk-engine'
 
 describe('buildModelMessages', () => {
   it('preserves user file parts when building AI SDK model messages', async () => {
@@ -109,7 +110,7 @@ describe('executeAiSdkTurn', () => {
     for await (const chunk of executeAiSdkTurn({
       model,
       messages: [{ role: 'user', content: 'hello' }],
-      onUsage: nextUsage => { usage = nextUsage },
+      onUsage: (nextUsage) => { usage = nextUsage },
     })) {
       if (chunk.type === 'finish') {
         break

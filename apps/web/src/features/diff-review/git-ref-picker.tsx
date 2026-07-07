@@ -3,13 +3,13 @@ import {
   GitBranchLine as GitBranchIcon,
   GitCommitLine as GitCommitIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { ScrollArea } from '~/components/ui/scroll-area'
+import { Spinner } from '~/components/ui/spinner'
 import { useGitBranches, useGitGraph } from '~/features/git/use-git'
 import { cn } from '~/lib/cn'
 

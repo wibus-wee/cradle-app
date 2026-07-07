@@ -1,18 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ResolvedProviderTarget } from '../../../provider-targets/service'
 import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
-import { CODEX_CHATGPT_AUTH_SECRET_KIND } from './chatgpt-auth'
+import type { ResolvedProviderTarget } from '../../../provider-targets/service'
 import type { CodexAppServerClientLike } from '../types'
-import type { CodexAppServerClientOptions } from './client'
-import { codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
+import type { CodexWhamEndpointKey, CodexWhamEndpointResult } from './account-diagnostics'
 import {
   consumeCodexRateLimitResetCredit,
   readCodexAccountDiagnostics,
   readCodexWhamDiagnostics,
-  type CodexWhamEndpointKey,
-  type CodexWhamEndpointResult,
 } from './account-diagnostics'
+import { CODEX_CHATGPT_AUTH_SECRET_KIND } from './chatgpt-auth'
+import type { CodexAppServerClientOptions } from './client'
+import { codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
 
 class FakeCodexAccountClient implements CodexAppServerClientLike {
   readonly requests: Array<{ method: string, params?: unknown }> = []
@@ -158,7 +157,7 @@ describe('codex account diagnostics', () => {
       resolve: null,
       promise: Promise.resolve(),
     }
-    accountReadStarted.promise = new Promise(resolve => {
+    accountReadStarted.promise = new Promise((resolve) => {
       accountReadStarted.resolve = resolve
     })
     const originalRequest = client.request.bind(client)
@@ -241,7 +240,7 @@ describe('codex account diagnostics', () => {
     const fetchWhamEndpoint = vi.fn(async (
       key: CodexWhamEndpointKey,
       url: string,
-      auth: { accessToken: string, chatgptAccountId: string },
+      _auth: { accessToken: string, chatgptAccountId: string },
     ): Promise<CodexWhamEndpointResult> => ({
       key,
       url,

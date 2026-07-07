@@ -6,22 +6,22 @@ import { AppError } from '../../../errors/app-error'
 import { readProviderStateSnapshot } from '../../chat-runtime-providers/kit/state-snapshot'
 import {
   appendSideConversationHistory,
-  readSideConversation
+  readSideConversation,
 } from '../../provider-runtime/side-conversation-registry'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
 import { resolveSessionSystemPrompt } from '../context/turn-context'
 import type { ChatContextPart } from '../context-parts'
 import type { ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../runtime-provider-types'
 import {
-  mergeRuntimeSettings,
-  normalizeRuntimeSettingsPatch,
-  readSessionRuntimeSettings
-} from '../runtime-settings'
-import {
   assertProviderBoundRunContext,
   assertRunnableSession,
-  assertRuntimeCompatibleTarget
+  assertRuntimeCompatibleTarget,
 } from '../runtime-session-context'
+import {
+  mergeRuntimeSettings,
+  normalizeRuntimeSettingsPatch,
+  readSessionRuntimeSettings,
+} from '../runtime-settings'
 import { createUserMessage } from '../ui-message'
 import { createLiveSideConversationStream } from './live-stream'
 
@@ -43,7 +43,7 @@ export interface StreamSideConversationResponseResult {
 }
 
 export async function streamSideConversationResponse(
-  input: StreamSideConversationResponseInput
+  input: StreamSideConversationResponseInput,
 ): Promise<StreamSideConversationResponseResult> {
   const record = readSideConversation(input.sideConversationId)
   if (!record) {
@@ -51,12 +51,12 @@ export async function streamSideConversationResponse(
       code: 'side_chat_expired',
       status: 410,
       message: 'Side conversation is no longer attached to its live provider thread',
-      details: { sideConversationId: input.sideConversationId }
+      details: { sideConversationId: input.sideConversationId },
     })
   }
   const parentContext = assertProviderBoundRunContext(
     assertRuntimeCompatibleTarget(assertRunnableSession(record.parentSessionId)),
-    'Side conversation'
+    'Side conversation',
   )
   if (parentContext.providerTarget.id !== record.providerTargetId) {
     throw new AppError({
@@ -67,8 +67,8 @@ export async function streamSideConversationResponse(
         sideConversationId: input.sideConversationId,
         parentSessionId: record.parentSessionId,
         providerTargetId: parentContext.providerTarget.id,
-        sideProviderTargetId: record.providerTargetId
-      }
+        sideProviderTargetId: record.providerTargetId,
+      },
     })
   }
   const runtime = getRuntimeRegistry().get(record.runtimeKind)
@@ -76,7 +76,7 @@ export async function streamSideConversationResponse(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${record.runtimeKind}`
+      message: `Runtime is not available: ${record.runtimeKind}`,
     })
   }
 
@@ -88,7 +88,7 @@ export async function streamSideConversationResponse(
       code: 'chat_message_empty',
       status: 400,
       message: 'Side conversation message requires text, context, or at least one file attachment',
-      details: { sideConversationId: input.sideConversationId }
+      details: { sideConversationId: input.sideConversationId },
     })
   }
 
@@ -98,14 +98,14 @@ export async function streamSideConversationResponse(
   const parentRuntimeSettings = readSessionRuntimeSettings(parentContext.session.configJson)
   const runtimeSettings = mergeRuntimeSettings(
     parentRuntimeSettings,
-    normalizeRuntimeSettingsPatch(input.runtimeSettings)
+    normalizeRuntimeSettingsPatch(input.runtimeSettings),
   )
   const message = createUserMessage(userMessageId, userText, files, contextParts)
-  const modelId =
-    input.modelId ??
-    record.requestedModelId ??
-    readProviderStateSnapshot(record.runtimeSession.providerStateSnapshot).models.currentModelId ??
-    undefined
+  const modelId
+    = input.modelId
+      ?? record.requestedModelId
+      ?? readProviderStateSnapshot(record.runtimeSession.providerStateSnapshot).models.currentModelId
+      ?? undefined
   return {
     runId,
     assistantMessageId,
@@ -122,11 +122,11 @@ export async function streamSideConversationResponse(
       runtimeSettings,
       systemPrompt: resolveSessionSystemPrompt(parentContext.session),
       history: record.history,
-      onComplete: (assistantMessage) =>
+      onComplete: assistantMessage =>
         appendSideConversationHistory(input.sideConversationId, [message, assistantMessage]),
       workspaceId: parentContext.session.workspaceId,
       workspacePath: parentContext.workspacePath,
-      agentId: parentContext.session.agentId
-    })
+      agentId: parentContext.session.agentId,
+    }),
   }
 }

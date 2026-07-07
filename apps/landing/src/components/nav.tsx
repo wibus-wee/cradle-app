@@ -116,7 +116,7 @@ export function Nav() {
   )
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({ href, children }: { href: string, children: React.ReactNode }) {
   const [hovered, setHovered] = useState(false)
   return (
     <a

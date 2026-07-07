@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 
-import { uploadAsset, type CradleAsset } from './assets-api'
+import type { CradleAsset } from './assets-api'
+import { uploadAsset } from './assets-api'
 
 interface UseUploadAssetOptions {
   workspaceId?: string | null

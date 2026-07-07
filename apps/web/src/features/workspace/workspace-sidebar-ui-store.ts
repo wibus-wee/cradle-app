@@ -12,7 +12,7 @@ export type WorkspaceSidebarProjectFilter = 'all' | 'pinned' | 'unpinned' | 'unr
 export const SESSION_PREVIEW_LIMIT_OPTIONS = [3, 5, 8, 10, 15, 20] as const
 export const DEFAULT_SESSION_PREVIEW_LIMIT = 5
 export const MIN_SESSION_PREVIEW_LIMIT = SESSION_PREVIEW_LIMIT_OPTIONS[0]
-export const MAX_SESSION_PREVIEW_LIMIT = SESSION_PREVIEW_LIMIT_OPTIONS[SESSION_PREVIEW_LIMIT_OPTIONS.length - 1]
+export const MAX_SESSION_PREVIEW_LIMIT = SESSION_PREVIEW_LIMIT_OPTIONS.at(-1) ?? DEFAULT_SESSION_PREVIEW_LIMIT
 
 interface WorkspaceSidebarUiState {
   collapsedWorkspaceIds: WorkspaceSidebarFlagMap
@@ -133,7 +133,7 @@ export const useWorkspaceSidebarUiStore = create<WorkspaceSidebarUiState>()(
       setProjectSortKey: projectSortKey => set(state => state.projectSortKey === projectSortKey ? state : { projectSortKey }),
       setProjectSortDirection: projectSortDirection => set(state => state.projectSortDirection === projectSortDirection ? state : { projectSortDirection }),
       setProjectPinnedFirst: projectPinnedFirst => set(state => state.projectPinnedFirst === projectPinnedFirst ? state : { projectPinnedFirst }),
-      setSessionPreviewLimit: limit => set(state => {
+      setSessionPreviewLimit: limit => set((state) => {
         const normalized = normalizeSessionPreviewLimit(limit)
         return state.sessionPreviewLimit === normalized ? state : { sessionPreviewLimit: normalized }
       }),

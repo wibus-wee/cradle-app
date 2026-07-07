@@ -6,14 +6,13 @@ import {
   SafeShieldLine as ShieldCheckIcon,
   SandglassLine as HourglassIcon,
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
 import type { Workspace } from '~/features/workspace/types'
@@ -174,8 +173,7 @@ function CheckRow({ name, required, isBypassed, onToggle, isPending }: {
   )
 }
 
-function DiscoveredRepoSection({ workspaceId, repoFullName, rules, createMut, removeMut }: {
-  workspaceId: string
+function DiscoveredRepoSection({ repoFullName, rules, createMut, removeMut }: {
   repoFullName: string
   rules: BypassRule[]
   createMut: ReturnType<typeof useBypassRuleMutations>['create']
@@ -436,7 +434,6 @@ const WorkspaceBypassSection = ({ workspace }: { workspace: Workspace }) => {
           {discoveredRepos.map(repo => (
             <DiscoveredRepoSection
               key={repo}
-              workspaceId={workspace.id}
               repoFullName={repo}
               rules={rules.filter(r => r.repo === repo)}
               createMut={create}

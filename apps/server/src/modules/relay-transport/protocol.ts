@@ -25,10 +25,10 @@ export const RELAY_ENVELOPE_KIND = {
   relayError: 'relay_error',
 } as const
 
-export type RelayEnvelopeKind =
-  | typeof RELAY_ENVELOPE_KIND.dataFrame
-  | typeof RELAY_ENVELOPE_KIND.peerClosed
-  | typeof RELAY_ENVELOPE_KIND.relayError
+export type RelayEnvelopeKind
+  = | typeof RELAY_ENVELOPE_KIND.dataFrame
+    | typeof RELAY_ENVELOPE_KIND.peerClosed
+    | typeof RELAY_ENVELOPE_KIND.relayError
 
 /** Outer envelope as relayd forwards it. `payload` is a raw JSON value. */
 export const relayEnvelopeSchema = z.object({
@@ -73,13 +73,13 @@ export const INNER_FRAME_KIND = {
   streamClose: 'stream_close',
 } as const
 
-export type InnerFrameKind =
-  | typeof INNER_FRAME_KIND.hello
-  | typeof INNER_FRAME_KIND.helloConfirm
-  | typeof INNER_FRAME_KIND.streamOpen
-  | typeof INNER_FRAME_KIND.streamData
-  | typeof INNER_FRAME_KIND.streamAck
-  | typeof INNER_FRAME_KIND.streamClose
+export type InnerFrameKind
+  = | typeof INNER_FRAME_KIND.hello
+    | typeof INNER_FRAME_KIND.helloConfirm
+    | typeof INNER_FRAME_KIND.streamOpen
+    | typeof INNER_FRAME_KIND.streamData
+    | typeof INNER_FRAME_KIND.streamAck
+    | typeof INNER_FRAME_KIND.streamClose
 
 /**
  * Handshake step 1: exchange X25519 public keys.

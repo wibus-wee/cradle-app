@@ -35,7 +35,7 @@ type AddStatus = 'idle' | 'installing' | 'success' | 'error'
 
 function nullableText(value: string): string | null {
   const trimmed = value.trim()
-  return trimmed ? trimmed : null
+  return trimmed || null
 }
 
 function syncDesktopSource(sourceId: string): void {
@@ -355,7 +355,8 @@ function DiscoveredPluginRow({ plugin }: { plugin: PostPluginsSourcesResponse['d
             {plugin.displayName || plugin.name}
           </span>
           <span className="shrink-0 font-mono text-[10.5px] text-muted-foreground">
-            v{plugin.version}
+            v
+{plugin.version}
           </span>
         </div>
         {plugin.description && (

@@ -3,8 +3,8 @@ import { convertFileListToFileUIParts } from 'ai'
 import type { ChangeEvent, ClipboardEvent, RefObject } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { isLocalMode } from '~/lib/electron'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
+import { isLocalMode } from '~/lib/electron'
 
 export interface ComposerAttachmentController {
   attachments: FileUIPart[]

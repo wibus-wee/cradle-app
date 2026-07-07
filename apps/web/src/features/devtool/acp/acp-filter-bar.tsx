@@ -7,8 +7,8 @@ import { cn } from '~/lib/cn'
 import {
   useAcpAgentIds,
   useAcpDevtoolStore,
-  useAcpFiltersStore,
   useAcpFilteredEvents,
+  useAcpFiltersStore,
 } from './use-acp-events'
 
 const STREAMS = [

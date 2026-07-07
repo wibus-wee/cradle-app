@@ -2,8 +2,8 @@ import { cors } from '@elysiajs/cors'
 import { node } from '@elysiajs/node'
 import { Elysia } from 'elysia'
 
-import { createOpenApiPlugin, registerOpenApiAlias } from './http/openapi'
 import { createAuthPlugin } from './http/auth'
+import { createOpenApiPlugin, registerOpenApiAlias } from './http/openapi'
 import { createRequestIdPlugin } from './http/request-id'
 import { acp } from './modules/acp'
 import { agentIdentity } from './modules/agent-identity'
@@ -13,7 +13,7 @@ import { automation } from './modules/automation'
 import { chatRuntime } from './modules/chat-runtime'
 import {
   chatRuntimeEventRoutes,
-  chatRuntimeGlobalEventRoutes
+  chatRuntimeGlobalEventRoutes,
 } from './modules/chat-runtime/http/events.routes'
 import { chronicle } from './modules/chronicle'
 import { conversationBridge } from './modules/conversation-bridge'
@@ -38,7 +38,6 @@ import { profiles } from './modules/profiles'
 import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
-import { registerSyncGatewayRoutes } from './modules/sync-gateway'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { remoteHosts } from './modules/remote-hosts'
@@ -47,11 +46,12 @@ import { secrets } from './modules/secrets'
 import { session } from './modules/session'
 import { sessionAwait } from './modules/session-await'
 import { skills } from './modules/skills'
+import { registerSyncGatewayRoutes } from './modules/sync-gateway'
 import { testReset } from './modules/test-reset'
 import { usage } from './modules/usage'
 import { workflowRules } from './modules/workflow-rules'
-import { worktree } from './modules/worktree'
 import { workspace } from './modules/workspace'
+import { worktree } from './modules/worktree'
 
 interface CreateServerAppOptions {
   startBackgroundTasks?: boolean
@@ -64,7 +64,7 @@ interface CreateServerContractAppOptions {
 
 const HOSTED_WEB_APP_ORIGINS = new Set([
   'http://app.cradle.wibus.ren',
-  'https://app.cradle.wibus.ren'
+  'https://app.cradle.wibus.ren',
 ])
 
 function isAllowedCorsOriginValue(origin: string | null): boolean {
@@ -79,10 +79,11 @@ function isAllowedCorsOriginValue(origin: string | null): boolean {
 
     const parsed = new URL(origin)
     return (
-      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
-      ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
     )
-  } catch {
+  }
+ catch {
     return false
   }
 }
@@ -96,13 +97,13 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   const app = new Elysia({
     name: 'cradle.server.elysia',
     adapter: node(),
-    normalize: 'typebox'
+    normalize: 'typebox',
   })
 
   app.onRequest(({ request, set }) => {
     if (
-      request.headers.get('access-control-request-private-network') === 'true' &&
-      isAllowedCorsOriginValue(request.headers.get('origin'))
+      request.headers.get('access-control-request-private-network') === 'true'
+      && isAllowedCorsOriginValue(request.headers.get('origin'))
     ) {
       set.headers['access-control-allow-private-network'] = 'true'
     }
@@ -113,16 +114,16 @@ export async function createServerContractApp(options: CreateServerContractAppOp
       exposeHeaders: [
         'x-cradle-run-id',
         'x-cradle-assistant-message-id',
-        'x-cradle-user-message-id'
-      ]
-    })
+        'x-cradle-user-message-id',
+      ],
+    }),
   )
   app.use(createRequestIdPlugin())
   app.use(createAuthPlugin())
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
       import('./http/request-logger'),
-      import('./http/error-mapping')
+      import('./http/error-mapping'),
     ])
     app.use(createRequestLoggerPlugin())
     app.onError(createErrorHandler())
@@ -184,7 +185,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 export async function createServerApp(options: CreateServerAppOptions = {}) {
   const {
     recoverPersistedRunsOnCreate = false,
-    startBackgroundTasks = process.env.NODE_ENV !== 'test'
+    startBackgroundTasks = process.env.NODE_ENV !== 'test',
   } = options
   const [
     { shutdownInfra, getServerConfig },
@@ -201,7 +202,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     { destroyWorkspaceFileIndexes },
     localRelaydSupervisor,
     { startOpencodeServer, stopOpencodeServer },
-    { initHostConnectorService, getHostConnectorService }
+    { initHostConnectorService, getHostConnectorService },
   ] = await Promise.all([
     import('./infra'),
     import('./modules/chat-runtime/runtime'),
@@ -217,7 +218,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/workspace/files'),
     import('./modules/relay-servers/local-relayd-supervisor'),
     import('./modules/chat-runtime-providers/opencode/runtime-context'),
-    import('./modules/relay-transport/host-connector')
+    import('./modules/relay-transport/host-connector'),
   ])
   if (recoverPersistedRunsOnCreate) {
     recoverPersistedRunProjections()
@@ -252,7 +253,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     () => chronicleCleanup(),
     () => shutdownTraceStreams(),
     () => destroyWorkspaceFileIndexes(),
-    () => shutdownInfra()
+    () => shutdownInfra(),
   ])
 
   // Start chronicle daemon if enabled
@@ -264,7 +265,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
           if (result.status === 'error') {
             console.error('[external-provider-sources] Source refresh failed:', {
               sourceKey: result.sourceKey,
-              message: result.message ?? 'Unknown sync error'
+              message: result.message ?? 'Unknown sync error',
             })
           }
         }

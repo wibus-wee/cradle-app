@@ -52,29 +52,29 @@ export interface ListRuntimeModelsInput {
 }
 
 export type RuntimeObservabilitySeverity = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
-export type RuntimeObservabilityCategory =
-  | 'chat'
-  | 'provider'
-  | 'event-bus'
-  | 'ipc'
-  | 'system'
-  | 'performance'
-  | 'diagnostics'
-export type RuntimeObservabilitySource =
-  | 'chat-engine'
-  | 'domain-event-bus'
-  | 'ipc'
-  | 'provider'
-  | 'renderer'
-  | 'http'
-  | 'desktop-main'
-  | 'server'
+export type RuntimeObservabilityCategory
+  = | 'chat'
+    | 'provider'
+    | 'event-bus'
+    | 'ipc'
+    | 'system'
+    | 'performance'
+    | 'diagnostics'
+export type RuntimeObservabilitySource
+  = | 'chat-engine'
+    | 'domain-event-bus'
+    | 'ipc'
+    | 'provider'
+    | 'renderer'
+    | 'http'
+    | 'desktop-main'
+    | 'server'
 
 export interface RuntimeLogger {
-  debug(message: string, fields?: Record<string, unknown>): void
-  info(message: string, fields?: Record<string, unknown>): void
-  warn(message: string, fields?: Record<string, unknown>): void
-  error(message: string, fields?: Record<string, unknown>): void
+  debug: (message: string, fields?: Record<string, unknown>) => void
+  info: (message: string, fields?: Record<string, unknown>) => void
+  warn: (message: string, fields?: Record<string, unknown>) => void
+  error: (message: string, fields?: Record<string, unknown>) => void
 }
 
 export interface RuntimeObservabilityEventInput {
@@ -105,8 +105,8 @@ export interface RuntimeLiveResourceLease<Resource = unknown> {
   readonly hostId?: string
   readonly pinned?: boolean
   readonly resource: Resource
-  refresh(ttlMs?: number): void
-  release(): void
+  refresh: (ttlMs?: number) => void
+  release: () => void
 }
 
 export interface CradleTurnTranscript {
@@ -208,49 +208,49 @@ export const cradleToolKinds = [
 ] as const
 export type CradleToolKind = (typeof cradleToolKinds)[number]
 
-export type RuntimeUiSlotSurface =
-  | 'slashCommand'
-  | 'toolbarPicker'
-  | 'composerState'
-  | 'messageInline'
-  | 'runtimePanel'
+export type RuntimeUiSlotSurface
+  = | 'slashCommand'
+    | 'toolbarPicker'
+    | 'composerState'
+    | 'messageInline'
+    | 'runtimePanel'
   // Stream evidence is rendered from provider-emitted message/tool chunks, not from polled slot state.
-  | 'streamEvidence'
-  | 'recordOnly'
+    | 'streamEvidence'
+    | 'recordOnly'
 
-export type RuntimeUiSlotIconKey =
-  | 'alert'
-  | 'approvals'
-  | 'code-review'
-  | 'compact'
-  | 'config'
-  | 'diff'
-  | 'feedback'
-  | 'filesystem'
-  | 'goal'
-  | 'crew'
-  | 'ide-context'
-  | 'mcp'
-  | 'model'
-  | 'personality'
-  | 'plugin'
-  | 'plan'
-  | 'progress'
-  | 'quick-question'
-  | 'user-input'
-  | 'reasoning'
-  | 'search'
-  | 'side-chat'
-  | 'skills'
-  | 'status'
-  | 'terminal'
-  | 'tool-activity'
-  | 'usage'
+export type RuntimeUiSlotIconKey
+  = | 'alert'
+    | 'approvals'
+    | 'code-review'
+    | 'compact'
+    | 'config'
+    | 'diff'
+    | 'feedback'
+    | 'filesystem'
+    | 'goal'
+    | 'crew'
+    | 'ide-context'
+    | 'mcp'
+    | 'model'
+    | 'personality'
+    | 'plugin'
+    | 'plan'
+    | 'progress'
+    | 'quick-question'
+    | 'user-input'
+    | 'reasoning'
+    | 'search'
+    | 'side-chat'
+    | 'skills'
+    | 'status'
+    | 'terminal'
+    | 'tool-activity'
+    | 'usage'
 
-export type RuntimeUiSlotCommandAction =
-  | { kind: 'insertText' }
-  | { kind: 'submitText'; requiresEmptyComposer?: boolean }
-  | { kind: 'uiAction'; actionId: string }
+export type RuntimeUiSlotCommandAction
+  = | { kind: 'insertText' }
+    | { kind: 'submitText', requiresEmptyComposer?: boolean }
+    | { kind: 'uiAction', actionId: string }
 
 export interface RuntimeUiSlot {
   id: string
@@ -266,47 +266,47 @@ export interface RuntimeUiSlot {
   surfaces: RuntimeUiSlotSurface[]
 }
 
-export type RuntimeUiSlotStateKind =
-  | 'alert'
-  | 'approvals'
-  | 'compact'
-  | 'config'
-  | 'crew'
-  | 'diff'
-  | 'filesystem'
-  | 'goal'
-  | 'mcp'
-  | 'model'
-  | 'plan'
-  | 'progress'
-  | 'plugin'
-  | 'reasoning'
-  | 'search'
-  | 'skills'
-  | 'status'
-  | 'terminal'
-  | 'toolActivity'
-  | 'usage'
-  | 'userInput'
+export type RuntimeUiSlotStateKind
+  = | 'alert'
+    | 'approvals'
+    | 'compact'
+    | 'config'
+    | 'crew'
+    | 'diff'
+    | 'filesystem'
+    | 'goal'
+    | 'mcp'
+    | 'model'
+    | 'plan'
+    | 'progress'
+    | 'plugin'
+    | 'reasoning'
+    | 'search'
+    | 'skills'
+    | 'status'
+    | 'terminal'
+    | 'toolActivity'
+    | 'usage'
+    | 'userInput'
 
-export type RuntimeGoalStatus =
-  | 'active'
-  | 'paused'
-  | 'blocked'
-  | 'usageLimited'
-  | 'budgetLimited'
-  | 'complete'
+export type RuntimeGoalStatus
+  = | 'active'
+    | 'paused'
+    | 'blocked'
+    | 'usageLimited'
+    | 'budgetLimited'
+    | 'complete'
 export type RuntimeCompactStatus = 'idle' | 'running' | 'nearLimit' | 'overLimit' | 'compacted'
 export type RuntimeThreadStatus = 'notLoaded' | 'idle' | 'systemError' | 'active'
 export type RuntimePlanStepStatus = 'pending' | 'inProgress' | 'completed'
 export type RuntimeToolActivityStatus = 'running' | 'completed' | 'failed'
 export type RuntimeMcpServerStatus = 'starting' | 'ready' | 'failed' | 'cancelled' | 'unknown'
-export type RuntimeMcpAuthStatus =
-  | 'unsupported'
-  | 'notLoggedIn'
-  | 'bearerToken'
-  | 'oAuth'
-  | 'unknown'
+export type RuntimeMcpAuthStatus
+  = | 'unsupported'
+    | 'notLoggedIn'
+    | 'bearerToken'
+    | 'oAuth'
+    | 'unknown'
 export type RuntimeApprovalStatus = 'pending' | 'approved' | 'denied' | 'timedOut' | 'aborted'
 export type RuntimeAlertSeverity = 'info' | 'warning' | 'error'
 
@@ -412,7 +412,7 @@ export interface RuntimeReasoningUiSlotState {
   threadId: string
   effort: string | null
   summary: string | null
-  supportedEfforts: Array<{ id: string; description: string }>
+  supportedEfforts: Array<{ id: string, description: string }>
   updatedAt: number
 }
 
@@ -712,28 +712,28 @@ export interface RuntimeUserInputUiSlotState {
   updatedAt: number
 }
 
-export type RuntimeUiSlotState =
-  | RuntimeAlertUiSlotState
-  | RuntimeApprovalsUiSlotState
-  | RuntimeCompactUiSlotState
-  | RuntimeConfigUiSlotState
-  | RuntimeCrewUiSlotState
-  | RuntimeDiffUiSlotState
-  | RuntimeFilesystemUiSlotState
-  | RuntimeGoalUiSlotState
-  | RuntimeMcpUiSlotState
-  | RuntimeModelUiSlotState
-  | RuntimePlanUiSlotState
-  | RuntimeProgressUiSlotState
-  | RuntimePluginUiSlotState
-  | RuntimeReasoningUiSlotState
-  | RuntimeSearchUiSlotState
-  | RuntimeSkillsUiSlotState
-  | RuntimeStatusUiSlotState
-  | RuntimeTerminalUiSlotState
-  | RuntimeToolActivityUiSlotState
-  | RuntimeUsageUiSlotState
-  | RuntimeUserInputUiSlotState
+export type RuntimeUiSlotState
+  = | RuntimeAlertUiSlotState
+    | RuntimeApprovalsUiSlotState
+    | RuntimeCompactUiSlotState
+    | RuntimeConfigUiSlotState
+    | RuntimeCrewUiSlotState
+    | RuntimeDiffUiSlotState
+    | RuntimeFilesystemUiSlotState
+    | RuntimeGoalUiSlotState
+    | RuntimeMcpUiSlotState
+    | RuntimeModelUiSlotState
+    | RuntimePlanUiSlotState
+    | RuntimeProgressUiSlotState
+    | RuntimePluginUiSlotState
+    | RuntimeReasoningUiSlotState
+    | RuntimeSearchUiSlotState
+    | RuntimeSkillsUiSlotState
+    | RuntimeStatusUiSlotState
+    | RuntimeTerminalUiSlotState
+    | RuntimeToolActivityUiSlotState
+    | RuntimeUsageUiSlotState
+    | RuntimeUserInputUiSlotState
 
 export interface RuntimePresentationCapabilities {
   runtimeKind: RuntimeKind
@@ -743,13 +743,13 @@ export interface RuntimePresentationCapabilities {
 }
 
 export function createEmptyRuntimePresentation(
-  runtimeKind: RuntimeKind
+  runtimeKind: RuntimeKind,
 ): RuntimePresentationCapabilities {
   return {
     runtimeKind,
     slashCommands: [],
     uiSlots: [],
-    skills: []
+    skills: [],
   }
 }
 
@@ -796,41 +796,41 @@ export interface ChatRuntimeHealthItem extends ProviderHealthStatus {
   hasHealthCheck: boolean
 }
 
-export type ChatSessionTailEventType =
-  | 'UserMessageAppended'
-  | 'MessageImported'
-  | 'RunStarted'
-  | 'AssistantMessageSnapshotted'
-  | 'AssistantMessageCompleted'
-  | 'RunCompleted'
-  | 'RunFailed'
-  | 'RunAborted'
-  | 'InteractionRequested'
-  | 'InteractionResolved'
-  | 'PlanImplementationResponded'
-  | 'QueueItemEnqueued'
-  | 'QueueItemClaimed'
-  | 'QueueItemReleased'
-  | 'QueueItemFailed'
-  | 'QueueItemReordered'
-  | 'QueueItemUpdated'
-  | 'QueueItemProviderTargetCleared'
-  | 'QueueItemCancelled'
-  | 'SteerApplied'
-  | 'LastTurnRolledBack'
-  | 'TitleChanged'
-  | 'SnapshotRequired'
+export type ChatSessionTailEventType
+  = | 'UserMessageAppended'
+    | 'MessageImported'
+    | 'RunStarted'
+    | 'AssistantMessageSnapshotted'
+    | 'AssistantMessageCompleted'
+    | 'RunCompleted'
+    | 'RunFailed'
+    | 'RunAborted'
+    | 'InteractionRequested'
+    | 'InteractionResolved'
+    | 'PlanImplementationResponded'
+    | 'QueueItemEnqueued'
+    | 'QueueItemClaimed'
+    | 'QueueItemReleased'
+    | 'QueueItemFailed'
+    | 'QueueItemReordered'
+    | 'QueueItemUpdated'
+    | 'QueueItemProviderTargetCleared'
+    | 'QueueItemCancelled'
+    | 'SteerApplied'
+    | 'LastTurnRolledBack'
+    | 'TitleChanged'
+    | 'SnapshotRequired'
 
-export type ChatSessionTailEventPayload =
-  | { messageId: string }
-  | {
+export type ChatSessionTailEventPayload
+  = | { messageId: string }
+    | {
       runId: string
       assistantMessageId: string | null
       queueItemId: string | null
       runtimeSettings?: ChatRuntimeSettings
     }
-  | { messageId: string; status: 'streaming' | 'complete' | 'aborted' | 'failed' }
-  | {
+    | { messageId: string, status: 'streaming' | 'complete' | 'aborted' | 'failed' }
+    | {
       runId: string
       queueItemId: string | null
       bindingId: string | null
@@ -838,7 +838,7 @@ export type ChatSessionTailEventPayload =
       stopReason: string
       errorText: string | null
     }
-  | {
+    | {
       runId: string
       requestId: string
       interactionKind: 'toolApproval' | 'userInput'
@@ -846,29 +846,29 @@ export type ChatSessionTailEventPayload =
       toolCallId: string
       questionCount: number | null
     }
-  | {
+    | {
       runId: string
       requestId: string
       interactionKind: 'toolApproval' | 'userInput'
       resolution: 'submitted' | 'cancelled'
       approved: boolean | null
     }
-  | { messageId: string; approvalId: string; approved: boolean }
-  | {
+    | { messageId: string, approvalId: string, approved: boolean }
+    | {
       reason: 'tail_gap'
       latestVersion: number
       latestSequenceId: number
     }
-  | { queueItemId: string; status?: string; startedRunId?: string | null }
-  | { queueItemId: string; position: number }
-  | { queueItemId: string; updatedAt: number }
-  | {
+    | { queueItemId: string, status?: string, startedRunId?: string | null }
+    | { queueItemId: string, position: number }
+    | { queueItemId: string, updatedAt: number }
+    | {
       messageIds: string[]
       providerRuntimeKind: string
       providerSessionId: string | null
       providerRolledBackTurns: number
     }
-  | { title: string; titleSource: 'provider' | 'user' }
+    | { title: string, titleSource: 'provider' | 'user' }
 
 export interface ChatSessionTailEvent {
   scope: 'session'
@@ -959,20 +959,20 @@ export interface RuntimeToolApprovalResolution {
   reason?: string
 }
 
-export type ProviderError =
-  | { _tag: 'provider_unsupported'; provider: string }
-  | { _tag: 'session_not_found'; provider: string; sessionId: string }
-  | { _tag: 'session_closed'; provider: string; sessionId: string }
-  | { _tag: 'request_failed'; provider: string; method: string; detail: string }
-  | { _tag: 'process_error'; provider: string; detail: string }
-  | { _tag: 'auth_failed'; provider: string }
-  | { _tag: 'rate_limited'; provider: string; retryAfter?: number }
-  | { _tag: 'model_not_found'; provider: string; model: string }
+export type ProviderError
+  = | { _tag: 'provider_unsupported', provider: string }
+    | { _tag: 'session_not_found', provider: string, sessionId: string }
+    | { _tag: 'session_closed', provider: string, sessionId: string }
+    | { _tag: 'request_failed', provider: string, method: string, detail: string }
+    | { _tag: 'process_error', provider: string, detail: string }
+    | { _tag: 'auth_failed', provider: string }
+    | { _tag: 'rate_limited', provider: string, retryAfter?: number }
+    | { _tag: 'model_not_found', provider: string, model: string }
 
 export class ProviderRuntimeError extends Error {
   constructor(
     readonly providerError: ProviderError,
-    options?: { cause?: unknown }
+    options?: { cause?: unknown },
   ) {
     super(formatProviderErrorMessage(providerError), options)
     this.name = 'ProviderRuntimeError'
@@ -1007,56 +1007,56 @@ function formatProviderErrorMessage(error: ProviderError): string {
 export const ProviderErrors = {
   providerUnsupported: (provider: string): ProviderError => ({
     _tag: 'provider_unsupported',
-    provider
+    provider,
   }),
   sessionNotFound: (provider: string, sessionId: string): ProviderError => ({
     _tag: 'session_not_found',
     provider,
-    sessionId
+    sessionId,
   }),
   sessionClosed: (provider: string, sessionId: string): ProviderError => ({
     _tag: 'session_closed',
     provider,
-    sessionId
+    sessionId,
   }),
   requestFailed: (provider: string, method: string, detail: string): ProviderError => ({
     _tag: 'request_failed',
     provider,
     method,
-    detail
+    detail,
   }),
   processError: (provider: string, detail: string): ProviderError => ({
     _tag: 'process_error',
     provider,
-    detail
+    detail,
   }),
   authFailed: (provider: string): ProviderError => ({
     _tag: 'auth_failed',
-    provider
+    provider,
   }),
   rateLimited: (provider: string, retryAfter?: number): ProviderError => ({
     _tag: 'rate_limited',
     provider,
-    ...(retryAfter === undefined ? {} : { retryAfter })
+    ...(retryAfter === undefined ? {} : { retryAfter }),
   }),
   modelNotFound: (provider: string, model: string): ProviderError => ({
     _tag: 'model_not_found',
     provider,
-    model
-  })
+    model,
+  }),
 } as const
 
 export function requireRuntimeProviderTargetProfile(
   profile: RuntimeProviderTargetProfile | null,
-  runtimeKind: RuntimeKind
+  runtimeKind: RuntimeKind,
 ): RuntimeProviderTargetProfile {
   if (!profile) {
     throw new ProviderRuntimeError(
       ProviderErrors.requestFailed(
         runtimeKind,
         'provider-binding',
-        `Runtime requires a provider target profile: ${runtimeKind}`
-      )
+        `Runtime requires a provider target profile: ${runtimeKind}`,
+      ),
     )
   }
   return profile
@@ -1201,17 +1201,17 @@ export interface ProviderSyntheticTurnEvent {
   chunks: UIMessageChunk[]
 }
 
-export type ProviderThreadSourceKind =
-  | 'cli'
-  | 'vscode'
-  | 'exec'
-  | 'appServer'
-  | 'subAgent'
-  | 'subAgentReview'
-  | 'subAgentCompact'
-  | 'subAgentThreadSpawn'
-  | 'subAgentOther'
-  | 'unknown'
+export type ProviderThreadSourceKind
+  = | 'cli'
+    | 'vscode'
+    | 'exec'
+    | 'appServer'
+    | 'subAgent'
+    | 'subAgentReview'
+    | 'subAgentCompact'
+    | 'subAgentThreadSpawn'
+    | 'subAgentOther'
+    | 'unknown'
 
 export interface ProviderThreadListInput extends GetCapabilitiesInput {
   cursor?: string | null
@@ -1466,10 +1466,10 @@ export interface ChatRuntime {
   deleteProviderThread?: (input: ProviderThreadDeleteInput) => Promise<ProviderThreadDeleteResult>
   listProviderThreadTurns?: (input: ProviderThreadTurnsInput) => Promise<ProviderThreadTurnsResult>
   listBackgroundTerminals?: (
-    input: ListBackgroundTerminalsInput
+    input: ListBackgroundTerminalsInput,
   ) => Promise<BackgroundTerminalListResult>
   terminateBackgroundTerminal?: (
-    input: TerminateBackgroundTerminalInput
+    input: TerminateBackgroundTerminalInput,
   ) => Promise<BackgroundTerminalTerminateResult>
   generateSessionTitle?: (input: GenerateSessionTitleInput) => Promise<string | null>
   /**

@@ -1,12 +1,12 @@
 // Chat settings for default continuation behavior and archived session recovery.
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  UnarchiveLine as ArchiveRestoreIcon,
   BrainLine as BrainIcon,
   CheckLine as CheckIcon,
   Message1Line as MessageSquareIcon,
-  SearchLine as SearchIcon
+  SearchLine as SearchIcon,
+  UnarchiveLine as ArchiveRestoreIcon,
 } from '@mingcute/react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,6 +20,7 @@ import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { runtimeCatalogItemUsesModelSelection } from '~/features/agent-runtime/runtime-catalog'
+import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
@@ -28,7 +29,6 @@ import { filterThinkingOptionsForModel, selectSupportedThinkingValue } from '~/f
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
 import { cn } from '~/lib/cn'
-import type { ModelDescriptor } from '~/features/agent-runtime/types'
 
 import type { WorkspaceSession } from '../workspace/use-session'
 import { sessionsQueryKey, useAllSessions } from '../workspace/use-session'

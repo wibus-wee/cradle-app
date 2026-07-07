@@ -2,8 +2,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
 import type { Static } from 'elysia'
-import { EnvHttpProxyAgent, ProxyAgent, Socks5ProxyAgent } from 'undici'
 import type { Dispatcher } from 'undici'
+import { EnvHttpProxyAgent, ProxyAgent, Socks5ProxyAgent } from 'undici'
 
 import type { PreferencesModel } from '../modules/preferences/model'
 import { getNetworkPreferencesSync } from '../modules/preferences/service'
@@ -397,7 +397,7 @@ export function parseMacScutilProxy(raw: string): {
       }
       continue
     }
-    const match = trimmed.match(/^([A-Za-z0-9]+)\s*:\s*(.+)$/)
+    const match = trimmed.match(/^([A-Z0-9]+)\s*:\s*(.+)$/i)
     if (match?.[1] && match[2]) {
       values.set(match[1], match[2].trim())
     }

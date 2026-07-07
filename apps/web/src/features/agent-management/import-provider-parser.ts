@@ -18,7 +18,7 @@ export interface ParseResult {
   providers: ParsedProvider[]
 }
 
-const URL_RE = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&()*+,;=%-]+/g
+const URL_RE = /https?:\/\/[\w.~:/?#[\]@!$&()*+,;=%-]+/g
 
 const ENV_VAR_DEFS: { prefix: string, providerKind: ApiProviderKind }[] = [
   { prefix: 'ANTHROPIC_', providerKind: 'anthropic' },
@@ -185,7 +185,7 @@ const COMMON_WORDS = new Set([
 'api_key',
 ])
 
-const KNOWN_API_KEY_RE = /(?:^|[^\w-])((?:sk-ant-|sk-|tp-|ak-|key-|api-)[A-Za-z0-9][A-Za-z0-9._+/=-]{5,})/i
+const KNOWN_API_KEY_RE = /(?:^|[^\w-])((?:sk-ant-|sk-|tp-|ak-|key-|api-)[A-Z0-9][\w.+/=-]{5,})/i
 
 function candidateTokens(text: string): string[] {
   const withoutUrls = text.replace(URL_RE, ' ')

@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -177,6 +181,55 @@ describe('mapCodexAppServerNotificationToChunks', () => {
         url: imageUrl,
       },
     ])
+  })
+
+  it('projects Codex image view local files as browser-renderable data URLs', () => {
+    const state = createCodexAppServerMapperState('text-1')
+    const tempDir = mkdtempSync(join(tmpdir(), 'cradle-codex-image-view-'))
+    const imageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+    const imagePath = join(tempDir, 'capture.png')
+
+    try {
+      writeFileSync(imagePath, Buffer.from(imageBase64, 'base64'))
+
+      expect(mapCodexAppServerNotificationToChunks({
+        method: 'item/completed',
+        params: {
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          item: {
+            id: 'view-1',
+            type: 'imageView',
+            path: imagePath,
+          },
+        },
+      }, state)).toEqual([
+        {
+          type: 'tool-output-available',
+          toolCallId: 'view-1',
+          output: {
+            type: 'cradle.builtin-tool-call.result.v1',
+            identifier: 'codex',
+            apiName: 'image_view',
+            kind: 'generic',
+            args: {
+              path: imagePath,
+            },
+            result: {
+              path: imagePath,
+            },
+          },
+        },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          url: `data:image/png;base64,${imageBase64}`,
+        },
+      ])
+    }
+    finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
   })
 
   it('preserves Codex command and MCP metadata in tool payloads', () => {

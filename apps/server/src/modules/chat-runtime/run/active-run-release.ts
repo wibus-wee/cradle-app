@@ -2,24 +2,25 @@ import type { UIMessageChunk } from 'ai'
 
 import { rejectPendingToolApprovalsForRun } from '../pending-tool-approval'
 import { rejectPendingUserInputsForRun } from '../pending-user-input'
+import type { ActiveRun } from '../run-registry'
+import { runRegistry } from '../run-registry'
 import { runSubscribers } from '../stream/live-run-streams'
-import { runRegistry, type ActiveRun } from '../run-registry'
 import type { RunWriteFence } from './run-write-fence'
 import { terminalChunkForFence } from './terminal-finalizer'
 
 export interface ActiveRunReleaseDeps {
-  stopSnapshotTimer(activeRun: ActiveRun): void
-  stopPendingRunDeltaFlush(activeRun: ActiveRun): void
-  publishUIMessageChunk(activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean): void
+  stopSnapshotTimer: (activeRun: ActiveRun) => void
+  stopPendingRunDeltaFlush: (activeRun: ActiveRun) => void
+  publishUIMessageChunk: (activeRun: ActiveRun, chunk: UIMessageChunk, terminal: boolean) => void
 }
 
 export interface ActiveRunReleaseController {
-  releaseActiveRun(activeRun: ActiveRun): void
-  releaseStaleActiveRun(activeRun: ActiveRun, fence: RunWriteFence): void
+  releaseActiveRun: (activeRun: ActiveRun) => void
+  releaseStaleActiveRun: (activeRun: ActiveRun, fence: RunWriteFence) => void
 }
 
 export function createActiveRunReleaseController(
-  deps: ActiveRunReleaseDeps
+  deps: ActiveRunReleaseDeps,
 ): ActiveRunReleaseController {
   function releaseStaleActiveRun(activeRun: ActiveRun, fence: RunWriteFence): void {
     if (fence.status !== 'streaming' && fence.status !== 'missing') {
@@ -34,11 +35,11 @@ export function createActiveRunReleaseController(
     deps.stopPendingRunDeltaFlush(activeRun)
     rejectPendingUserInputsForRun(
       activeRun.runId,
-      new Error('Chat run ended before pending user input was submitted')
+      new Error('Chat run ended before pending user input was submitted'),
     )
     rejectPendingToolApprovalsForRun(
       activeRun.runId,
-      new Error('Chat run ended before pending tool approval was submitted')
+      new Error('Chat run ended before pending tool approval was submitted'),
     )
     runRegistry.deleteActiveRun(activeRun.runId)
     runSubscribers.delete(activeRun.runId)
@@ -60,6 +61,6 @@ export function createActiveRunReleaseController(
 
   return {
     releaseActiveRun,
-    releaseStaleActiveRun
+    releaseStaleActiveRun,
   }
 }

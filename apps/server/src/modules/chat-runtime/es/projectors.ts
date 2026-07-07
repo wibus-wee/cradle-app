@@ -1,9 +1,9 @@
 import {
-  backendRunSnapshots,
   backendRuns,
+  backendRunSnapshots,
   chatSessionQueueItems,
   messages,
-  sessions
+  sessions,
 } from '@cradle/db'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
@@ -26,7 +26,7 @@ import type {
   QueueItemUpdatedPayload,
   QueueProjectionStatus,
   RunTerminalPayload,
-  StoredChatSessionEvent
+  StoredChatSessionEvent,
 } from './events'
 
 type ProjectorDb = Pick<ChatRuntimeWriteDb, 'select' | 'insert' | 'update'>
@@ -35,7 +35,7 @@ type ProjectorDb = Pick<ChatRuntimeWriteDb, 'select' | 'insert' | 'update'>
 export function projectSessionEvent(d: ProjectorDb, event: StoredChatSessionEvent): void {
   projectChatSessionEvent(d, {
     type: event.type,
-    payload: event.payload
+    payload: event.payload,
   } as ChatSessionEvent)
 }
 
@@ -52,7 +52,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           hasProjectedMessage(
             d,
             event.payload.assistantMessage.id,
-            event.payload.assistantMessage.sessionId
+            event.payload.assistantMessage.sessionId,
           )
         ) {
           d.update(messages)
@@ -61,17 +61,18 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
               errorText: event.payload.assistantMessage.errorText ?? null,
               content: event.payload.assistantMessage.content,
               messageJson: event.payload.assistantMessage.messageJson,
-              updatedAt: event.payload.assistantMessage.updatedAt
+              updatedAt: event.payload.assistantMessage.updatedAt,
             })
             .where(
               and(
                 eq(messages.id, event.payload.assistantMessage.id),
                 eq(messages.sessionId, event.payload.assistantMessage.sessionId),
-                eq(messages.role, 'assistant')
-              )
+                eq(messages.role, 'assistant'),
+              ),
             )
             .run()
-        } else {
+        }
+ else {
           d.insert(messages).values(event.payload.assistantMessage).run()
         }
       }
@@ -81,7 +82,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           queueItemId: event.payload.queueItemId,
           sessionId: event.payload.run.chatSessionId,
           startedRunId: event.payload.run.id,
-          updatedAt: event.payload.run.startedAt
+          updatedAt: event.payload.run.startedAt,
         })
       }
       touchSession(d, event.payload.run.chatSessionId, event.payload.run.startedAt)
@@ -96,13 +97,13 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           messageJson: event.payload.message.messageJson,
           status: event.payload.message.status,
           errorText: event.payload.message.errorText,
-          updatedAt: event.payload.message.updatedAt
+          updatedAt: event.payload.message.updatedAt,
         })
         .where(
           and(
             eq(messages.id, event.payload.message.id),
-            eq(messages.sessionId, event.payload.message.sessionId)
-          )
+            eq(messages.sessionId, event.payload.message.sessionId),
+          ),
         )
         .run()
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
@@ -153,8 +154,8 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           .where(
             and(
               eq(messages.sessionId, event.payload.sessionId),
-              inArray(messages.id, event.payload.messageIds)
-            )
+              inArray(messages.id, event.payload.messageIds),
+            ),
           )
           .run()
       }
@@ -165,7 +166,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
         .set({
           title: event.payload.title,
           titleSource: event.payload.titleSource,
-          updatedAt: event.payload.updatedAt
+          updatedAt: event.payload.updatedAt,
         })
         .where(eq(sessions.id, event.payload.sessionId))
         .run()
@@ -175,7 +176,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
 
 function projectAssistantMessageSnapshotted(
   d: ProjectorDb,
-  payload: AssistantMessageSnapshottedPayload
+  payload: AssistantMessageSnapshottedPayload,
 ): void {
   d.update(messages)
     .set({
@@ -183,14 +184,14 @@ function projectAssistantMessageSnapshotted(
       messageJson: payload.message.messageJson,
       status: payload.message.status,
       errorText: payload.message.errorText,
-      updatedAt: payload.message.updatedAt
+      updatedAt: payload.message.updatedAt,
     })
     .where(
       and(
         eq(messages.id, payload.message.id),
         eq(messages.sessionId, payload.message.sessionId),
-        eq(messages.role, 'assistant')
-      )
+        eq(messages.role, 'assistant'),
+      ),
     )
     .run()
   touchSession(d, payload.message.sessionId, payload.message.updatedAt)
@@ -199,7 +200,7 @@ function projectAssistantMessageSnapshotted(
 function hasProjectedMessage(
   d: ProjectorDb,
   messageId: string,
-  sessionId: string
+  sessionId: string,
 ): boolean {
   return (
     d.select({ id: messages.id })
@@ -212,7 +213,7 @@ function hasProjectedMessage(
 
 function projectPlanImplementationResponded(
   d: ProjectorDb,
-  payload: PlanImplementationRespondedPayload
+  payload: PlanImplementationRespondedPayload,
 ): void {
   const row = d
     .select()
@@ -221,8 +222,8 @@ function projectPlanImplementationResponded(
       and(
         eq(messages.id, payload.messageId),
         eq(messages.sessionId, payload.sessionId),
-        eq(messages.role, 'assistant')
-      )
+        eq(messages.role, 'assistant'),
+      ),
     )
     .get()
   if (!row) {
@@ -236,9 +237,9 @@ function projectPlanImplementationResponded(
         sessionId: payload.sessionId,
         messageId: payload.messageId,
         approvalId: payload.approvalId,
-        approved: payload.approved
-      })
-    )
+        approved: payload.approved,
+      }),
+    ),
   )
   const messageJson = JSON.stringify(message)
   d.update(messages)
@@ -247,7 +248,7 @@ function projectPlanImplementationResponded(
       messageJson,
       status: row.status as ChatMessageStatus,
       errorText: row.errorText,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(and(eq(messages.id, payload.messageId), eq(messages.sessionId, payload.sessionId)))
     .run()
@@ -261,7 +262,7 @@ function projectRunTerminal(d: ProjectorDb, payload: RunTerminalPayload): void {
       status: payload.status,
       stopReason: payload.stopReason,
       errorText: payload.errorText,
-      finishedAt: payload.finishedAt
+      finishedAt: payload.finishedAt,
     })
     .where(eq(backendRuns.id, payload.runId))
     .run()
@@ -278,7 +279,7 @@ function projectRunTerminal(d: ProjectorDb, payload: RunTerminalPayload): void {
             : 'failed',
       startedRunId: payload.runId,
       errorText: payload.errorText,
-      updatedAt: payload.finishedAt
+      updatedAt: payload.finishedAt,
     })
   }
   d.update(backendRunSnapshots)
@@ -286,16 +287,16 @@ function projectRunTerminal(d: ProjectorDb, payload: RunTerminalPayload): void {
       status: payload.status,
       completedAt: payload.finishedAt * 1000,
       completionReason: payload.stopReason,
-      errorText: payload.errorText
+      errorText: payload.errorText,
     })
     .where(
       and(
         eq(backendRunSnapshots.runId, payload.runId),
         or(
           eq(backendRunSnapshots.status, 'running'),
-          sql`${backendRunSnapshots.status} != ${payload.status}`
-        )
-      )
+          sql`${backendRunSnapshots.status} != ${payload.status}`,
+        ),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.finishedAt)
@@ -306,7 +307,7 @@ function projectQueueItemCancelled(d: ProjectorDb, payload: QueueItemCancelledPa
     .set({
       status: 'cancelled',
       errorText: null,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
@@ -317,10 +318,10 @@ function projectQueueItemCancelled(d: ProjectorDb, payload: QueueItemCancelledPa
           eq(chatSessionQueueItems.status, 'pending'),
           and(
             eq(chatSessionQueueItems.status, 'running'),
-            isNull(chatSessionQueueItems.startedRunId)
-          )
-        )
-      )
+            isNull(chatSessionQueueItems.startedRunId),
+          ),
+        ),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -334,14 +335,14 @@ function projectQueueItemClaimed(d: ProjectorDb, payload: QueueItemClaimedPayloa
       ...(payload.startedRunId !== undefined && payload.startedRunId !== null
         ? { startedRunId: payload.startedRunId }
         : {}),
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -353,14 +354,14 @@ function projectQueueItemReleased(d: ProjectorDb, payload: QueueItemReleasedPayl
       status: 'pending',
       startedRunId: null,
       errorText: null,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -371,14 +372,14 @@ function projectQueueItemFailed(d: ProjectorDb, payload: QueueItemFailedPayload)
     .set({
       status: 'failed',
       errorText: payload.errorText,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -389,14 +390,14 @@ function projectQueueItemReordered(d: ProjectorDb, payload: QueueItemReorderedPa
     .set({
       status: 'pending',
       position: payload.position,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -413,15 +414,15 @@ function projectQueueItemUpdated(d: ProjectorDb, payload: QueueItemUpdatedPayloa
       thinkingEffort: payload.thinkingEffort,
       runtimeAccessMode: payload.runtimeAccessMode,
       runtimeInteractionMode: payload.runtimeInteractionMode,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
         eq(chatSessionQueueItems.mode, 'queue'),
-        eq(chatSessionQueueItems.status, 'pending')
-      )
+        eq(chatSessionQueueItems.status, 'pending'),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -429,20 +430,20 @@ function projectQueueItemUpdated(d: ProjectorDb, payload: QueueItemUpdatedPayloa
 
 function projectQueueItemProviderTargetCleared(
   d: ProjectorDb,
-  payload: QueueItemProviderTargetClearedPayload
+  payload: QueueItemProviderTargetClearedPayload,
 ): void {
   d.update(chatSessionQueueItems)
     .set({
       providerTargetId: null,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
         eq(chatSessionQueueItems.mode, 'queue'),
-        eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId)
-      )
+        eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -464,21 +465,21 @@ function projectRunTerminalQueueItem(
     startedRunId: string
     errorText: string | null
     updatedAt: number
-  }
+  },
 ): void {
   d.update(chatSessionQueueItems)
     .set({
       status: payload.status,
       startedRunId: payload.startedRunId,
       errorText: payload.errorText,
-      updatedAt: payload.updatedAt
+      updatedAt: payload.updatedAt,
     })
     .where(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)

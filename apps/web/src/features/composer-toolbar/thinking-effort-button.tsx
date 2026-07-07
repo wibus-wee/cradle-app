@@ -1,7 +1,7 @@
-import type { KeyboardEvent, PointerEvent } from 'react'
-import { useRef, useState } from 'react'
 import type { Transition } from 'motion/react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
+import type { KeyboardEvent, PointerEvent } from 'react'
+import { useRef, useState } from 'react'
 
 import { BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS } from '~/features/browser/native-surface-occlusion'
 import { cn } from '~/lib/cn'

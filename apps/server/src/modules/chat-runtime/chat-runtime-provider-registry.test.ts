@@ -91,7 +91,7 @@ describe('runtime capability validation', () => {
         }),
       }),
       resumeChatSession: async input => input.runtimeSession,
-      streamTurn: async function* () {},
+      async* streamTurn() {},
       cancelTurn: async () => undefined,
     } satisfies ChatRuntime
 
@@ -103,7 +103,7 @@ describe('runtime capability validation', () => {
         runtimeKind: 'test-runtime',
         label: 'Test Runtime',
         providerKinds: ['openai-compatible'],
-      })
+      }),
     )
   })
 
@@ -131,12 +131,12 @@ describe('runtime capability validation', () => {
       resumeChatSession: async () => {
         throw new Error('not used')
       },
-      streamTurn: async function* () {},
+      async* streamTurn() {},
       cancelTurn: async () => undefined,
     } as ChatRuntime
 
     expect(() => registerRuntime(runtime)).toThrow(
-      'Runtime test-rollback-runtime declares rollbackLastTurn support but does not implement the hook.'
+      'Runtime test-rollback-runtime declares rollbackLastTurn support but does not implement the hook.',
     )
   })
 })

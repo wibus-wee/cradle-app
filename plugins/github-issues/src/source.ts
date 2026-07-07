@@ -204,7 +204,7 @@ function buildIssuesUrl(apiBaseUrl: string, owner: string, repo: string): string
 
 function buildHeaders(config: GitHubIssuesSourceConfig, etag?: string | null): HeadersInit {
   const headers: Record<string, string> = {
-    accept: 'application/vnd.github+json',
+    'accept': 'application/vnd.github+json',
     'x-github-api-version': '2022-11-28',
     'user-agent': 'Cradle-GitHub-Issues-Plugin',
   }

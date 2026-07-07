@@ -1,15 +1,15 @@
-import type { ChatSessionEvent } from './es/events'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AppError } from '../../errors/app-error'
+import type { ChatSessionEvent } from './es/events'
 import {
   resetRuntimeInteractionEventRecorder,
   setRuntimeInteractionEventRecorder,
 } from './interaction/event-recorder'
 import {
   requestRuntimeToolApproval,
-  submitRuntimeToolApprovalIfPending,
   submitRuntimeToolApproval,
+  submitRuntimeToolApprovalIfPending,
 } from './pending-tool-approval'
 
 describe('pending runtime tool approval', () => {

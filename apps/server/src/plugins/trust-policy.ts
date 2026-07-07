@@ -1,5 +1,5 @@
-import type { PluginSourceDescriptor } from '@cradle/plugin-sdk'
 import { relayHostEnrollments } from '@cradle/db'
+import type { PluginSourceDescriptor } from '@cradle/plugin-sdk'
 
 import { db } from '../infra'
 import { MARKETPLACE_INSTALL_RECEIPT_FILE } from './install-receipt'

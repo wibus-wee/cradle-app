@@ -26,9 +26,9 @@ export interface DiffData {
 }
 
 /** Per-thread annotation metadata carried on a CodeView line. */
-export type ThreadAnnotation =
-  | { kind: 'thread', threadId: string }
-  | { kind: 'composer' }
+export type ThreadAnnotation
+  = | { kind: 'thread', threadId: string }
+    | { kind: 'composer' }
 
 export type CodeViewLineSelection = {
   id: string

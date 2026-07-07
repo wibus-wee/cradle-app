@@ -24,6 +24,8 @@ export interface ChatSessionRuntimeControls {
 export function useChatSessionRuntimeControls(chatSessionId: string | null): ChatSessionRuntimeControls {
   const queryClient = useQueryClient()
   const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const queueRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const queueRefreshInFlightRef = useRef(false)
 
   const snapshotRowsQueryKey = useMemo(
     () => chatSessionId
@@ -69,18 +71,35 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
     void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(chatSessionId) })
   }, [chatSessionId, queryClient])
 
+  const runQueueRefresh = useCallback(() => {
+    if (queueRefreshInFlightRef.current || queryClient.isFetching({ queryKey: queueQueryKey, exact: true }) > 0) {
+      return
+    }
+    queueRefreshInFlightRef.current = true
+    void queryClient.refetchQueries(
+      { queryKey: queueQueryKey, type: 'active', exact: true },
+      { cancelRefetch: false },
+    ).finally(() => {
+      queueRefreshInFlightRef.current = false
+    })
+  }, [queryClient, queueQueryKey])
+
   const refreshQueue = useCallback((delay = 0) => {
+    if (queueRefreshTimerRef.current) {
+      clearTimeout(queueRefreshTimerRef.current)
+      queueRefreshTimerRef.current = null
+    }
+
     if (delay <= 0) {
-      void queryClient.invalidateQueries({ queryKey: queueQueryKey })
-      void queryClient.refetchQueries({ queryKey: queueQueryKey, type: 'active' })
+      runQueueRefresh()
       return
     }
 
-    window.setTimeout(() => {
-      void queryClient.invalidateQueries({ queryKey: queueQueryKey })
-      void queryClient.refetchQueries({ queryKey: queueQueryKey, type: 'active' })
+    queueRefreshTimerRef.current = setTimeout(() => {
+      queueRefreshTimerRef.current = null
+      runQueueRefresh()
     }, delay)
-  }, [queryClient, queueQueryKey])
+  }, [runQueueRefresh])
 
   useEffect(() => {
     return () => {
@@ -88,6 +107,11 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
         clearTimeout(snapshotTimerRef.current)
         snapshotTimerRef.current = null
       }
+      if (queueRefreshTimerRef.current) {
+        clearTimeout(queueRefreshTimerRef.current)
+        queueRefreshTimerRef.current = null
+      }
+      queueRefreshInFlightRef.current = false
     }
   }, [chatSessionId])
 

@@ -4,11 +4,11 @@ import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 
 import * as Workspace from '../workspace/service'
+import type { ResolvedRootBoundary } from './path-boundary'
 import {
   assertWithinAllowedRoots,
   isPathWithinRoot,
   resolveDirectoryBoundary,
-  type ResolvedRootBoundary,
 } from './path-boundary'
 
 export interface DirectoryEntry {

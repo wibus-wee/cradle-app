@@ -1,6 +1,6 @@
 import * as React from 'react'
-import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import type { Components, UrlTransform } from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'

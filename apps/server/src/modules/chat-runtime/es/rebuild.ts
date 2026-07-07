@@ -1,15 +1,15 @@
 import {
   backendRuns,
   chatSessionQueueItems,
-  messages
+  messages,
 } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
 import { db } from '../../../infra'
 import { readSessionEvents } from './event-store'
+import type { ChatEsParityReport } from './parity'
 import {
   checkChatSessionProjectionParity,
-  type ChatEsParityReport
 } from './parity'
 import { projectSessionEvent } from './projectors'
 import { runSessionActorTask } from './session-actor'
@@ -21,7 +21,7 @@ export interface ChatSessionProjectionRebuildResult {
 }
 
 export async function rebuildSessionProjections(
-  sessionId: string
+  sessionId: string,
 ): Promise<ChatSessionProjectionRebuildResult> {
   return await runSessionActorTask(sessionId, () => rebuildSessionProjectionsInActor(sessionId))
 }
@@ -50,6 +50,6 @@ function rebuildSessionProjectionsInActor(sessionId: string): ChatSessionProject
   return {
     sessionId,
     eventsReplayed,
-    parity: checkChatSessionProjectionParity(sessionId)
+    parity: checkChatSessionProjectionParity(sessionId),
   }
 }

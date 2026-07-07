@@ -7,26 +7,25 @@ import {
   chatSessionQueueItems,
   messages,
   sessionEvents,
-  sessions
+  sessions,
 } from '@cradle/db'
 import { asc, eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
 import { commitSessionEventsInTransaction } from './commands'
+import type { ChatSessionEvent, UserMessageAppendedPayload } from './events'
 import {
   CHAT_SESSION_AGGREGATE_TYPE,
   CHAT_SESSION_EVENT_SCHEMA_VERSION,
   parseStoredChatSessionEvent,
-  type ChatSessionEvent,
-  type UserMessageAppendedPayload
 } from './events'
 import { checkChatSessionProjectionParity } from './parity'
 import { projectSessionEvent } from './projectors'
 import { rebuildSessionProjections } from './rebuild'
 import {
   abortProjectedStreamingRun,
-  finalizeInterruptedSessionEventStream
+  finalizeInterruptedSessionEventStream,
 } from './recovery'
 
 function restoreEnv(name: string, previousValue: string | undefined): void {
@@ -46,7 +45,8 @@ async function withTempDataDir<T>(callback: () => Promise<T> | T): Promise<T> {
 
   try {
     return await callback()
-  } finally {
+  }
+ finally {
     shutdownInfra()
     rmSync(dataDir, { recursive: true, force: true })
     restoreEnv('CRADLE_DATA_DIR', previousDataDir)
@@ -63,7 +63,7 @@ function seedSession(sessionId: string): void {
       titleSource: 'initial',
       runtimeKind: 'standard',
       createdAt: 100,
-      updatedAt: 100
+      updatedAt: 100,
     })
     .run()
 }
@@ -72,7 +72,7 @@ function userMessagePayload(
   id: string,
   sessionId: string,
   content: string,
-  createdAt: number
+  createdAt: number,
 ): UserMessageAppendedPayload['message'] {
   return {
     id,
@@ -87,7 +87,7 @@ function userMessagePayload(
     messageJson: JSON.stringify({ id, role: 'user', parts: [{ type: 'text', text: content }] }),
     errorText: null,
     createdAt,
-    updatedAt: createdAt
+    updatedAt: createdAt,
   }
 }
 
@@ -95,8 +95,8 @@ function userMessageEvent(id: string, sessionId: string, content: string, create
   return {
     type: 'UserMessageAppended',
     payload: {
-      message: userMessagePayload(id, sessionId, content, createdAt)
-    }
+      message: userMessagePayload(id, sessionId, content, createdAt),
+    },
   }
 }
 
@@ -105,7 +105,7 @@ function assistantMessage(
   sessionId: string,
   content: string,
   status: 'streaming',
-  createdAt: number
+  createdAt: number,
 ) {
   return {
     id,
@@ -120,7 +120,7 @@ function assistantMessage(
     messageJson: JSON.stringify({ id, role: 'assistant', parts: content ? [{ type: 'text', text: content }] : [] }),
     errorText: null,
     createdAt,
-    updatedAt: createdAt
+    updatedAt: createdAt,
   }
 }
 
@@ -144,11 +144,11 @@ function runStartedEvent(input: {
         stopReason: null,
         errorText: null,
         startedAt: input.startedAt,
-        finishedAt: null
+        finishedAt: null,
       },
       assistantMessage: assistantMessage(input.messageId, input.sessionId, '', 'streaming', input.startedAt),
-      queueItemId: input.queueItemId ?? null
-    }
+      queueItemId: input.queueItemId ?? null,
+    },
   }
 }
 
@@ -156,7 +156,7 @@ function assistantCompletedEvent(
   sessionId: string,
   messageId: string,
   content: string,
-  updatedAt: number
+  updatedAt: number,
 ): ChatSessionEvent {
   return {
     type: 'AssistantMessageCompleted',
@@ -168,9 +168,9 @@ function assistantCompletedEvent(
         messageJson: JSON.stringify({ id: messageId, role: 'assistant', parts: [{ type: 'text', text: content }] }),
         status: 'complete',
         errorText: null,
-        updatedAt
-      }
-    }
+        updatedAt,
+      },
+    },
   }
 }
 
@@ -179,12 +179,12 @@ function assistantSnapshottedEvent(
   runId: string,
   messageId: string,
   content: string,
-  updatedAt: number
+  updatedAt: number,
 ): ChatSessionEvent {
   const messageJson = JSON.stringify({
     id: messageId,
     role: 'assistant',
-    parts: [{ type: 'text', text: content }]
+    parts: [{ type: 'text', text: content }],
   })
   return {
     type: 'AssistantMessageSnapshotted',
@@ -197,10 +197,10 @@ function assistantSnapshottedEvent(
         messageJson,
         status: 'streaming',
         errorText: null,
-        updatedAt
+        updatedAt,
       },
-      messageJsonBytes: Buffer.byteLength(messageJson)
-    }
+      messageJsonBytes: Buffer.byteLength(messageJson),
+    },
   }
 }
 
@@ -220,8 +220,8 @@ function runCompletedEvent(input: {
       status: 'complete',
       stopReason: 'response.completed',
       errorText: null,
-      finishedAt: input.finishedAt
-    }
+      finishedAt: input.finishedAt,
+    },
   }
 }
 
@@ -254,9 +254,9 @@ function queueItemEnqueuedEvent(input: {
         startedRunId: null,
         errorText: null,
         createdAt: input.createdAt,
-        updatedAt: input.createdAt
-      }
-    }
+        updatedAt: input.createdAt,
+      },
+    },
   }
 }
 
@@ -283,7 +283,7 @@ function readProjectionSnapshot(sessionId: string): {
       .from(chatSessionQueueItems)
       .where(eq(chatSessionQueueItems.sessionId, sessionId))
       .orderBy(asc(chatSessionQueueItems.id))
-      .all()
+      .all(),
   }
 }
 
@@ -300,7 +300,7 @@ function readEventTypes(sessionId: string): string[] {
 function appendV1EventAndProject(
   sessionId: string,
   version: number,
-  event: { type: ChatSessionEvent['type']; payload: object }
+  event: { type: ChatSessionEvent['type'], payload: object },
 ): void {
   db().transaction((tx) => {
     const row = tx
@@ -311,7 +311,7 @@ function appendV1EventAndProject(
         version,
         eventType: event.type,
         payload: JSON.stringify(event.payload),
-        occurredAt: 100 + version
+        occurredAt: 100 + version,
       })
       .returning()
       .get()
@@ -349,16 +349,16 @@ describe('checkChatSessionProjectionParity', () => {
               startedRunId: null,
               errorText: null,
               createdAt: 102,
-              updatedAt: 102
-            }
-          }
+              updatedAt: 102,
+            },
+          },
         },
         runStartedEvent({
           sessionId,
           runId: 'run-1',
           messageId: 'assistant-1',
           queueItemId: 'queue-1',
-          startedAt: 103
+          startedAt: 103,
         }),
         assistantCompletedEvent(sessionId, 'assistant-1', 'done', 110),
         runCompletedEvent({ sessionId, runId: 'run-1', queueItemId: 'queue-1', finishedAt: 110 }),
@@ -367,9 +367,9 @@ describe('checkChatSessionProjectionParity', () => {
           payload: {
             message: {
               ...userMessagePayload('steer-1', sessionId, 'steer', 111),
-              parentMessageId: 'assistant-1'
-            }
-          }
+              parentMessageId: 'assistant-1',
+            },
+          },
         },
         {
           type: 'LastTurnRolledBack',
@@ -380,9 +380,9 @@ describe('checkChatSessionProjectionParity', () => {
             providerSessionId: 'provider-session-1',
             providerRolledBackTurns: 1,
             fileChangesReverted: false,
-            updatedAt: 120
-          }
-        }
+            updatedAt: 120,
+          },
+        },
       ]
 
       commitSessionEventsInTransaction(sessionId, events)
@@ -393,10 +393,10 @@ describe('checkChatSessionProjectionParity', () => {
         eventsReplayed: events.length,
         diffCount: 0,
         expectedLoglessDiffs: [],
-        unexplainedDiffs: []
+        unexplainedDiffs: [],
       })
       expect(db().select().from(messages).where(eq(messages.sessionId, sessionId)).all()).toEqual([
-        expect.objectContaining({ id: 'steer-1' })
+        expect.objectContaining({ id: 'steer-1' }),
       ])
       expect(readEventTypes(sessionId)).toEqual(events.map(event => event.type))
     })
@@ -414,14 +414,14 @@ describe('checkChatSessionProjectionParity', () => {
           queueItemId: 'queue-1',
           text: 'queued hello',
           position: 1,
-          createdAt: 102
+          createdAt: 102,
         }),
         runStartedEvent({
           sessionId,
           runId: 'run-1',
           messageId: 'assistant-1',
           queueItemId: 'queue-1',
-          startedAt: 103
+          startedAt: 103,
         }),
         assistantCompletedEvent(sessionId, 'assistant-1', 'done', 110),
         runCompletedEvent({ sessionId, runId: 'run-1', queueItemId: 'queue-1', finishedAt: 110 }),
@@ -430,24 +430,24 @@ describe('checkChatSessionProjectionParity', () => {
           queueItemId: 'queue-cancelled',
           text: 'cancel me',
           position: 2,
-          createdAt: 111
+          createdAt: 111,
         }),
         {
           type: 'QueueItemCancelled',
           payload: {
             queueItemId: 'queue-cancelled',
             sessionId,
-            updatedAt: 112
-          }
+            updatedAt: 112,
+          },
         },
         {
           type: 'SteerApplied',
           payload: {
             message: {
               ...userMessagePayload('steer-1', sessionId, 'steer', 113),
-              parentMessageId: 'assistant-1'
-            }
-          }
+              parentMessageId: 'assistant-1',
+            },
+          },
         },
         {
           type: 'LastTurnRolledBack',
@@ -458,9 +458,9 @@ describe('checkChatSessionProjectionParity', () => {
             providerSessionId: 'provider-session-1',
             providerRolledBackTurns: 1,
             fileChangesReverted: false,
-            updatedAt: 120
-          }
-        }
+            updatedAt: 120,
+          },
+        },
       ]
 
       commitSessionEventsInTransaction(sessionId, events)
@@ -474,8 +474,8 @@ describe('checkChatSessionProjectionParity', () => {
         parity: {
           diffCount: 0,
           expectedLoglessDiffs: [],
-          unexplainedDiffs: []
-        }
+          unexplainedDiffs: [],
+        },
       })
       expect(readProjectionSnapshot(sessionId)).toEqual(before)
     })
@@ -490,8 +490,8 @@ describe('checkChatSessionProjectionParity', () => {
           sessionId,
           runId: 'run-abort',
           messageId: 'assistant-abort',
-          startedAt: 101
-        })
+          startedAt: 101,
+        }),
       ])
 
       const run = db()
@@ -505,28 +505,28 @@ describe('checkChatSessionProjectionParity', () => {
       expect(readEventTypes(sessionId)).toEqual([
         'RunStarted',
         'AssistantMessageCompleted',
-        'RunAborted'
+        'RunAborted',
       ])
       expect(
         db()
           .select()
           .from(messages)
           .where(eq(messages.id, 'assistant-abort'))
-          .get()
+          .get(),
       ).toMatchObject({
         status: 'aborted',
-        errorText: null
+        errorText: null,
       })
       expect(
         db()
           .select()
           .from(backendRuns)
           .where(eq(backendRuns.id, 'run-abort'))
-          .get()
+          .get(),
       ).toMatchObject({
         status: 'aborted',
         stopReason: 'response.cancelled',
-        errorText: null
+        errorText: null,
       })
       expect(checkChatSessionProjectionParity(sessionId).unexplainedDiffs).toEqual([])
     })
@@ -541,8 +541,8 @@ describe('checkChatSessionProjectionParity', () => {
           sessionId,
           runId: 'run-interrupted',
           messageId: 'assistant-interrupted',
-          startedAt: 101
-        })
+          startedAt: 101,
+        }),
       ])
 
       await expect(finalizeInterruptedSessionEventStream(sessionId)).resolves.toBe(true)
@@ -550,28 +550,28 @@ describe('checkChatSessionProjectionParity', () => {
       expect(readEventTypes(sessionId)).toEqual([
         'RunStarted',
         'AssistantMessageCompleted',
-        'RunFailed'
+        'RunFailed',
       ])
       expect(
         db()
           .select()
           .from(messages)
           .where(eq(messages.id, 'assistant-interrupted'))
-          .get()
+          .get(),
       ).toMatchObject({
         status: 'failed',
-        errorText: expect.stringContaining('server process exited')
+        errorText: expect.stringContaining('server process exited'),
       })
       expect(
         db()
           .select()
           .from(backendRuns)
           .where(eq(backendRuns.id, 'run-interrupted'))
-          .get()
+          .get(),
       ).toMatchObject({
         status: 'failed',
         stopReason: 'response.interrupted',
-        errorText: expect.stringContaining('server process exited')
+        errorText: expect.stringContaining('server process exited'),
       })
       expect(checkChatSessionProjectionParity(sessionId).unexplainedDiffs).toEqual([])
     })
@@ -585,19 +585,19 @@ describe('checkChatSessionProjectionParity', () => {
         sessionId,
         runId: 'run-v1',
         messageId: 'assistant-v1',
-        startedAt: 102
+        startedAt: 102,
       })
-      const events: Array<{ type: ChatSessionEvent['type']; payload: object }> = [
+      const events: Array<{ type: ChatSessionEvent['type'], payload: object }> = [
         userMessageEvent('user-v1', sessionId, 'hello from v1', 101),
         {
           type: runStarted.type,
           payload: {
             ...runStarted.payload,
-            assistantMessageProjection: 'insert' as const
-          }
+            assistantMessageProjection: 'insert' as const,
+          },
         },
         assistantCompletedEvent(sessionId, 'assistant-v1', 'done from v1', 110),
-        runCompletedEvent({ sessionId, runId: 'run-v1', finishedAt: 110 })
+        runCompletedEvent({ sessionId, runId: 'run-v1', finishedAt: 110 }),
       ]
 
       events.forEach((event, index) => appendV1EventAndProject(sessionId, index + 1, event))
@@ -611,7 +611,7 @@ describe('checkChatSessionProjectionParity', () => {
           .from(sessionEvents)
           .where(eq(sessionEvents.aggregateId, sessionId))
           .all()
-          .map(row => parseStoredChatSessionEvent(row).payload.v)
+          .map(row => parseStoredChatSessionEvent(row).payload.v),
       ).toEqual(events.map(() => CHAT_SESSION_EVENT_SCHEMA_VERSION))
     })
   })
@@ -625,15 +625,15 @@ describe('checkChatSessionProjectionParity', () => {
           sessionId,
           runId: 'run-streaming-snapshot',
           messageId: 'assistant-streaming-snapshot',
-          startedAt: 101
+          startedAt: 101,
         }),
         assistantSnapshottedEvent(
           sessionId,
           'run-streaming-snapshot',
           'assistant-streaming-snapshot',
           'partial',
-          105
-        )
+          105,
+        ),
       ])
 
       expect(
@@ -641,11 +641,11 @@ describe('checkChatSessionProjectionParity', () => {
           .select()
           .from(messages)
           .where(eq(messages.id, 'assistant-streaming-snapshot'))
-          .get()
+          .get(),
       ).toMatchObject({
         status: 'streaming',
         content: 'partial',
-        updatedAt: 105
+        updatedAt: 105,
       })
 
       const report = checkChatSessionProjectionParity(sessionId)
@@ -664,8 +664,8 @@ describe('checkChatSessionProjectionParity', () => {
           sessionId,
           runId: 'run-streaming',
           messageId: 'assistant-streaming',
-          startedAt: 101
-        })
+          startedAt: 101,
+        }),
       ])
 
       db()
@@ -675,9 +675,9 @@ describe('checkChatSessionProjectionParity', () => {
           messageJson: JSON.stringify({
             id: 'assistant-streaming',
             role: 'assistant',
-            parts: [{ type: 'text', text: 'partial' }]
+            parts: [{ type: 'text', text: 'partial' }],
           }),
-          updatedAt: 105
+          updatedAt: 105,
         })
         .where(eq(messages.id, 'assistant-streaming'))
         .run()
@@ -690,8 +690,8 @@ describe('checkChatSessionProjectionParity', () => {
           rowId: 'assistant-streaming',
           kind: 'changed_projection_row',
           category: 'unexplained_projection_drift',
-          changedFields: ['content', 'messageJson', 'updatedAt']
-        })
+          changedFields: ['content', 'messageJson', 'updatedAt'],
+        }),
       ])
     })
   })
@@ -701,7 +701,7 @@ describe('checkChatSessionProjectionParity', () => {
       const sessionId = 'session-parity-complete-drift'
       seedSession(sessionId)
       commitSessionEventsInTransaction(sessionId, [
-        userMessageEvent('user-complete', sessionId, 'original', 101)
+        userMessageEvent('user-complete', sessionId, 'original', 101),
       ])
 
       db()
@@ -711,9 +711,9 @@ describe('checkChatSessionProjectionParity', () => {
           messageJson: JSON.stringify({
             id: 'user-complete',
             role: 'user',
-            parts: [{ type: 'text', text: 'mutated' }]
+            parts: [{ type: 'text', text: 'mutated' }],
           }),
-          updatedAt: 105
+          updatedAt: 105,
         })
         .where(eq(messages.id, 'user-complete'))
         .run()
@@ -726,8 +726,8 @@ describe('checkChatSessionProjectionParity', () => {
           rowId: 'user-complete',
           kind: 'changed_projection_row',
           category: 'unexplained_projection_drift',
-          changedFields: ['content', 'messageJson', 'updatedAt']
-        })
+          changedFields: ['content', 'messageJson', 'updatedAt'],
+        }),
       ])
     })
   })
@@ -747,10 +747,10 @@ describe('checkChatSessionProjectionParity', () => {
           messageJson: JSON.stringify({
             id: 'imported-message-1',
             role: 'user',
-            parts: [{ type: 'text', text: 'imported' }]
+            parts: [{ type: 'text', text: 'imported' }],
           }),
           createdAt: 101,
-          updatedAt: 101
+          updatedAt: 101,
         })
         .run()
 
@@ -761,8 +761,8 @@ describe('checkChatSessionProjectionParity', () => {
           table: 'messages',
           rowId: 'imported-message-1',
           kind: 'extra_projection_row',
-          category: 'unexplained_projection_drift'
-        })
+          category: 'unexplained_projection_drift',
+        }),
       ])
     })
   })
@@ -776,10 +776,10 @@ describe('checkChatSessionProjectionParity', () => {
           sessionId,
           runId: 'run-1',
           messageId: 'assistant-1',
-          startedAt: 101
+          startedAt: 101,
         }),
         assistantCompletedEvent(sessionId, 'assistant-1', 'done', 110),
-        runCompletedEvent({ sessionId, runId: 'run-1', finishedAt: 110 })
+        runCompletedEvent({ sessionId, runId: 'run-1', finishedAt: 110 }),
       ])
 
       db()
@@ -796,8 +796,8 @@ describe('checkChatSessionProjectionParity', () => {
           rowId: 'run-1',
           kind: 'changed_projection_row',
           category: 'unexplained_projection_drift',
-          changedFields: ['errorText', 'status']
-        })
+          changedFields: ['errorText', 'status'],
+        }),
       ])
     })
   })

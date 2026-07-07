@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { lstat, readFile, readdir, readlink } from 'node:fs/promises'
+import { lstat, readdir, readFile, readlink } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 
 import { MARKETPLACE_INSTALL_RECEIPT_FILE } from './install-receipt'

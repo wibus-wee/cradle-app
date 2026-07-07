@@ -56,7 +56,7 @@ export function MeshGradient({ style }: MeshGradientProps) {
   )
 }
 
-function Layer({ blend, background }: { blend: 'screen' | 'normal'; background: string }) {
+function Layer({ blend, background }: { blend: 'screen' | 'normal', background: string }) {
   return (
     <div
       style={{

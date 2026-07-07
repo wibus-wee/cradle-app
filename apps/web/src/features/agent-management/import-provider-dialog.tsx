@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertLine as CircleAlertIcon,
   DownloadLine as DownloadIcon,
@@ -6,6 +5,7 @@ import {
   Key2Line as KeyIcon,
   SparklesLine as SparklesIcon,
 } from '@mingcute/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
 
@@ -492,7 +492,15 @@ function ProviderCard({
               ? (
                   <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/8 px-2 py-1 text-[11px] leading-snug text-emerald-700 dark:text-emerald-300">
                     <SparklesIcon className="size-3 shrink-0" />
-                    <span>{template.name} — {template.models.length} models will be auto-configured</span>
+                    <span>
+{template.name}
+{' '}
+—
+{' '}
+{template.models.length}
+{' '}
+models will be auto-configured
+                    </span>
                   </div>
                 )
               : null

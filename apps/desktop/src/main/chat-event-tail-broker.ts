@@ -262,7 +262,8 @@ export class ChatEventTailBroker {
       : new URL('/events', this.serverUrl)
     if (entry.scope === 'session') {
       url.searchParams.set('afterVersion', String(entry.afterVersion))
-    } else {
+    }
+ else {
       url.searchParams.set('scope', 'sessions')
       url.searchParams.set('afterSequenceId', String(entry.afterSequenceId))
       if (entry.workspaceId) {
@@ -352,8 +353,8 @@ export class ChatEventTailBroker {
         continue
       }
       if (
-        entry.scope === 'sessions' &&
-        (item.sequenceId === null || item.sequenceId <= subscriber.afterSequenceId)
+        entry.scope === 'sessions'
+        && (item.sequenceId === null || item.sequenceId <= subscriber.afterSequenceId)
       ) {
         continue
       }

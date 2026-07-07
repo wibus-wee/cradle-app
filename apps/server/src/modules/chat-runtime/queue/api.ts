@@ -10,24 +10,24 @@ import {
   cancelQueuedSessionItem,
   commitSessionEvents,
   normalizeSessionQueuePositions,
-  recordQueuePositions
+  recordQueuePositions,
 } from '../es/commands'
-import {
-  mergeRuntimeSettings,
-  normalizeRuntimeSettingsPatch,
-  readSessionRuntimeSettings
-} from '../runtime-settings'
+import { runRegistry } from '../run-registry'
 import {
   assertRunnableSession,
   assertRuntimeCompatibleTarget,
   assertStoredSession,
-  getSessionRunContext
+  getSessionRunContext,
 } from '../runtime-session-context'
-import { runRegistry } from '../run-registry'
+import {
+  mergeRuntimeSettings,
+  normalizeRuntimeSettingsPatch,
+  readSessionRuntimeSettings,
+} from '../runtime-settings'
 import type {
   ChatSessionQueueItemDto,
   EnqueueSessionQueueItemInput,
-  UpdateSessionQueueItemInput
+  UpdateSessionQueueItemInput,
 } from './session-queue'
 import {
   compareQueueRows,
@@ -35,7 +35,7 @@ import {
   readPersistedThinkingEffort,
   serializeQueueContextParts,
   serializeQueueFiles,
-  toQueueItemDto
+  toQueueItemDto,
 } from './session-queue'
 
 export interface SessionQueueApiDeps {
@@ -50,27 +50,27 @@ export function listSessionQueueItems(sessionId: string): ChatSessionQueueItemDt
     .select()
     .from(chatSessionQueueItems)
     .where(
-      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue'))
+      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue')),
     )
     .all()
     .sort(compareQueueRows)
-    .map((row) => toQueueItemDto(row, runtimeSettings))
+    .map(row => toQueueItemDto(row, runtimeSettings))
 }
 
 export async function enqueueSessionQueueItem(
   input: EnqueueSessionQueueItemInput,
-  deps: SessionQueueApiDeps
+  deps: SessionQueueApiDeps,
 ): Promise<ChatSessionQueueItemDto> {
   await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(input.sessionId)
   const context = getSessionRunContext(input.sessionId, {
-    providerTargetId: input.providerTargetId
+    providerTargetId: input.providerTargetId,
   })
   if (!context) {
     throw new AppError({
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
   assertRuntimeCompatibleTarget(context, input.providerTargetId)
@@ -83,18 +83,18 @@ export async function enqueueSessionQueueItem(
       code: 'chat_queue_item_empty',
       status: 400,
       message: 'Chat queue item requires text, context, or at least one file attachment',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
 
   const pendingRows = listPendingQueueRows(input.sessionId)
-  const position =
-    pendingRows.reduce((maxPosition, row) => Math.max(maxPosition, row.position), 0) + 1
+  const position
+    = pendingRows.reduce((maxPosition, row) => Math.max(maxPosition, row.position), 0) + 1
   const now = currentUnixSeconds()
   const baseRuntimeSettings = readSessionRuntimeSettings(context.session.configJson)
   const runtimeSettings = mergeRuntimeSettings(
     baseRuntimeSettings,
-    normalizeRuntimeSettingsPatch(input.runtimeSettings)
+    normalizeRuntimeSettingsPatch(input.runtimeSettings),
   )
   const row = {
     id: randomUUID(),
@@ -115,13 +115,13 @@ export async function enqueueSessionQueueItem(
     startedRunId: null,
     errorText: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   }
   await commitSessionEvents(input.sessionId, [
     {
       type: 'QueueItemEnqueued',
-      payload: { item: row }
-    }
+      payload: { item: row },
+    },
   ])
 
   deps.scheduleSessionQueueDrain(input.sessionId)
@@ -130,7 +130,7 @@ export async function enqueueSessionQueueItem(
 
 export async function cancelSessionQueueItem(
   sessionId: string,
-  queueItemId: string
+  queueItemId: string,
 ): Promise<ChatSessionQueueItemDto> {
   assertRunnableSession(sessionId)
   const row = db()
@@ -140,8 +140,8 @@ export async function cancelSessionQueueItem(
       and(
         eq(chatSessionQueueItems.id, queueItemId),
         eq(chatSessionQueueItems.sessionId, sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .get()
   if (!row) {
@@ -149,7 +149,7 @@ export async function cancelSessionQueueItem(
       code: 'chat_queue_item_not_found',
       status: 404,
       message: 'Chat queue item not found',
-      details: { sessionId, queueItemId }
+      details: { sessionId, queueItemId },
     })
   }
   if (row.status !== 'pending') {
@@ -157,7 +157,7 @@ export async function cancelSessionQueueItem(
       code: 'chat_queue_item_not_pending',
       status: 409,
       message: 'Only pending chat queue items can be cancelled',
-      details: { sessionId, queueItemId, status: row.status }
+      details: { sessionId, queueItemId, status: row.status },
     })
   }
 
@@ -170,15 +170,15 @@ export async function cancelSessionQueueItem(
         and(
           eq(chatSessionQueueItems.id, queueItemId),
           eq(chatSessionQueueItems.sessionId, sessionId),
-          eq(chatSessionQueueItems.mode, 'queue')
-        )
+          eq(chatSessionQueueItems.mode, 'queue'),
+        ),
       )
       .get()
     throw new AppError({
       code: 'chat_queue_item_not_pending',
       status: 409,
       message: 'Only pending chat queue items can be cancelled',
-      details: { sessionId, queueItemId, status: current?.status ?? 'missing' }
+      details: { sessionId, queueItemId, status: current?.status ?? 'missing' },
     })
   }
   await normalizeSessionQueuePositions(sessionId)
@@ -187,41 +187,41 @@ export async function cancelSessionQueueItem(
 
 export async function reorderSessionQueueItems(
   sessionId: string,
-  queueItemIds: string[]
+  queueItemIds: string[],
 ): Promise<ChatSessionQueueItemDto[]> {
   assertRunnableSession(sessionId)
   const pendingRows = listPendingQueueRows(sessionId)
-  const pendingIds = pendingRows.map((row) => row.id)
+  const pendingIds = pendingRows.map(row => row.id)
   const requestedIds = new Set(queueItemIds)
   const pendingIdSet = new Set(pendingIds)
-  const hasSameItems =
-    queueItemIds.length === pendingIds.length &&
-    queueItemIds.every((id) => pendingIdSet.has(id)) &&
-    pendingIds.every((id) => requestedIds.has(id))
+  const hasSameItems
+    = queueItemIds.length === pendingIds.length
+      && queueItemIds.every(id => pendingIdSet.has(id))
+      && pendingIds.every(id => requestedIds.has(id))
   if (!hasSameItems) {
     throw new AppError({
       code: 'chat_queue_reorder_invalid',
       status: 400,
       message: 'Queue reorder must include every pending chat queue item exactly once',
-      details: { sessionId, pendingIds, queueItemIds }
+      details: { sessionId, pendingIds, queueItemIds },
     })
   }
 
-  const rowsById = new Map(pendingRows.map((row) => [row.id, row]))
+  const rowsById = new Map(pendingRows.map(row => [row.id, row]))
   await recordQueuePositions(
     sessionId,
     queueItemIds
-      .map((queueItemId) => rowsById.get(queueItemId))
-      .filter((row): row is (typeof pendingRows)[number] => Boolean(row))
+      .map(queueItemId => rowsById.get(queueItemId))
+      .filter((row): row is (typeof pendingRows)[number] => Boolean(row)),
   )
 
   const session = assertStoredSession(sessionId)
   const runtimeSettings = readSessionRuntimeSettings(session.configJson)
-  return listPendingQueueRows(sessionId).map((row) => toQueueItemDto(row, runtimeSettings))
+  return listPendingQueueRows(sessionId).map(row => toQueueItemDto(row, runtimeSettings))
 }
 
 export async function updateSessionQueueItem(
-  input: UpdateSessionQueueItemInput
+  input: UpdateSessionQueueItemInput,
 ): Promise<ChatSessionQueueItemDto> {
   assertRunnableSession(input.sessionId)
   const row = db()
@@ -231,8 +231,8 @@ export async function updateSessionQueueItem(
       and(
         eq(chatSessionQueueItems.id, input.queueItemId),
         eq(chatSessionQueueItems.sessionId, input.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue')
-      )
+        eq(chatSessionQueueItems.mode, 'queue'),
+      ),
     )
     .get()
   if (!row) {
@@ -240,7 +240,7 @@ export async function updateSessionQueueItem(
       code: 'chat_queue_item_not_found',
       status: 404,
       message: 'Chat queue item not found',
-      details: { sessionId: input.sessionId, queueItemId: input.queueItemId }
+      details: { sessionId: input.sessionId, queueItemId: input.queueItemId },
     })
   }
   if (row.status !== 'pending') {
@@ -248,7 +248,7 @@ export async function updateSessionQueueItem(
       code: 'chat_queue_item_not_pending',
       status: 409,
       message: 'Only pending chat queue items can be edited',
-      details: { sessionId: input.sessionId, queueItemId: input.queueItemId, status: row.status }
+      details: { sessionId: input.sessionId, queueItemId: input.queueItemId, status: row.status },
     })
   }
 
@@ -260,7 +260,7 @@ export async function updateSessionQueueItem(
       code: 'chat_queue_item_empty',
       status: 400,
       message: 'Chat queue item requires text, context, or at least one file attachment',
-      details: { sessionId: input.sessionId, queueItemId: input.queueItemId }
+      details: { sessionId: input.sessionId, queueItemId: input.queueItemId },
     })
   }
 
@@ -268,7 +268,7 @@ export async function updateSessionQueueItem(
   const baseRuntimeSettings = readSessionRuntimeSettings(session.configJson)
   const runtimeSettings = mergeRuntimeSettings(
     baseRuntimeSettings,
-    normalizeRuntimeSettingsPatch(input.runtimeSettings)
+    normalizeRuntimeSettingsPatch(input.runtimeSettings),
   )
   const now = currentUnixSeconds()
   await commitSessionEvents(input.sessionId, [
@@ -285,9 +285,9 @@ export async function updateSessionQueueItem(
         thinkingEffort: readPersistedThinkingEffort(input.thinkingEffort),
         runtimeAccessMode: runtimeSettings.accessMode,
         runtimeInteractionMode: runtimeSettings.interactionMode,
-        updatedAt: now
-      }
-    }
+        updatedAt: now,
+      },
+    },
   ])
 
   const updatedRow = db()

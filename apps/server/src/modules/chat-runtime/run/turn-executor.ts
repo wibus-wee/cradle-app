@@ -3,49 +3,49 @@ import type { UIMessage, UIMessageChunk } from 'ai'
 import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contract'
 import * as Observability from '../../observability/service'
 import { readDurableProviderRuntimeBinding } from '../../provider-runtime/service'
-import { attachBinding, isProviderTargetAvailable } from '../runtime-session-context'
-import { publishProviderThreadEvent } from '../provider-threads/live-streams'
-import { providerThreadStreamStore } from '../stream/live-run-streams'
 import { truncateSnapshotPayload } from '../message-snapshot-compaction'
-import { reportRuntimeSessionTitle } from '../title-service'
-import {
-  type RuntimeGoalContinuationScheduleInput,
-  shouldScheduleRuntimeGoalContinuation,
-  updateRuntimeGoalContinuationBackoff
-} from './runtime-goal-continuation'
-import {
-  accumulateDiagnostics,
-  createTurnOutputDiagnostics,
-  resolveTerminalChunkWithDiagnostics
-} from './output-diagnostics'
-import type { TurnOutputDiagnostics } from './output-diagnostics'
-import { recordChatRuntimeProfile, startChatRuntimeProfile } from './profile'
-import type { ChatRuntimeProfile } from './profile'
-import { createProviderSyntheticTurnEventHandler } from './provider-synthetic-turn'
-import {
-  estimateRunUsageCost,
-  insertRunUsage,
-  insertRuntimeStepUsages,
-  UNKNOWN_MODEL_ID
-} from './usage'
+import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun } from '../run-registry'
 import type {
   ChatRuntimeSettings,
   ChatThinkingEffort,
   RuntimeGoalContinuationOptions,
-  RuntimeProviderTargetProfile
+  RuntimeProviderTargetProfile,
 } from '../runtime-provider-types'
+import { attachBinding, isProviderTargetAvailable } from '../runtime-session-context'
+import { providerThreadStreamStore } from '../stream/live-run-streams'
+import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
+import { reportRuntimeSessionTitle } from '../title-service'
+import type { CradleTurnTranscript } from '../transcript'
 import type { SerializedChatError } from './errors'
 import { resolveTurnFailureObservabilityCode, serializeChatError } from './errors'
-import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
-import type { CradleTurnTranscript } from '../transcript'
+import type { TurnOutputDiagnostics } from './output-diagnostics'
+import {
+  accumulateDiagnostics,
+  createTurnOutputDiagnostics,
+  resolveTerminalChunkWithDiagnostics,
+} from './output-diagnostics'
+import type { ChatRuntimeProfile } from './profile'
+import { recordChatRuntimeProfile, startChatRuntimeProfile } from './profile'
+import { createProviderSyntheticTurnEventHandler } from './provider-synthetic-turn'
+import type { RuntimeGoalContinuationScheduleInput } from './runtime-goal-continuation'
+import {
+  shouldScheduleRuntimeGoalContinuation,
+  updateRuntimeGoalContinuationBackoff,
+} from './runtime-goal-continuation'
 import {
   readHarnessSnapshotPhase,
   shouldRecordHarnessSnapshotChunk,
-  summarizeSnapshotChunk
+  summarizeSnapshotChunk,
 } from './snapshot-events'
 import { isTerminalUIMessageChunk } from './stream-chunks'
 import { terminalChunkForStatus } from './terminal-finalizer'
+import {
+  estimateRunUsageCost,
+  insertRuntimeStepUsages,
+  insertRunUsage,
+  UNKNOWN_MODEL_ID,
+} from './usage'
 
 export interface ExecuteRunInput {
   message: UIMessage
@@ -64,16 +64,16 @@ export interface ExecuteRunInput {
 
 export interface TurnExecutorDeps {
   stream: {
-    flushPendingRunDelta(activeRun: ActiveRun): void
-    publishRunStartChunk(activeRun: ActiveRun): void
-    publishRuntimeChunk(activeRun: ActiveRun, chunk: UIMessageChunk): void
+    flushPendingRunDelta: (activeRun: ActiveRun) => void
+    publishRunStartChunk: (activeRun: ActiveRun) => void
+    publishRuntimeChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => void
   }
-  publishTerminalChunk(
+  publishTerminalChunk: (
     activeRun: ActiveRun,
     chunk: UIMessageChunk,
-    profile?: ChatRuntimeProfile
-  ): Promise<boolean>
-  recordSnapshotEvent(
+    profile?: ChatRuntimeProfile,
+  ) => Promise<boolean>
+  recordSnapshotEvent: (
     activeRun: ActiveRun,
     input: {
       phase: string
@@ -87,29 +87,29 @@ export interface TurnExecutorDeps {
       estimatedCostUsd?: number | null
       durationMs?: number | null
       payload?: Record<string, unknown>
-    }
-  ): void
-  finalizeSnapshot(
+    },
+  ) => void
+  finalizeSnapshot: (
     activeRun: ActiveRun,
     finalChunk: UIMessageChunk,
     input: {
       modelId: string | null
       diagnostics: TurnOutputDiagnostics
       profile: ChatRuntimeProfile
-    }
-  ): void
-  releaseActiveRun(activeRun: ActiveRun): void
-  scheduleQueueDrain(sessionId: string): void
-  scheduleRuntimeGoalContinuation(input: RuntimeGoalContinuationScheduleInput): void
-  pendingQueueItemCount(sessionId: string): number
+    },
+  ) => void
+  releaseActiveRun: (activeRun: ActiveRun) => void
+  scheduleQueueDrain: (sessionId: string) => void
+  scheduleRuntimeGoalContinuation: (input: RuntimeGoalContinuationScheduleInput) => void
+  pendingQueueItemCount: (sessionId: string) => number
   /**
    * Generic goal-continuation degradation options (see `RuntimeGoalContinuation` on
    * `ChatRuntime`). Orchestrator code must not know which runtime kind, if any, actually
    * interprets `includeBlockedGoals` — that mapping lives entirely at the composition root.
    */
-  readRuntimeGoalContinuationOptions(): RuntimeGoalContinuationOptions
-  warn(message: string, payload: Record<string, unknown>): void
-  error(message: string, payload: Record<string, unknown>): void
+  readRuntimeGoalContinuationOptions: () => RuntimeGoalContinuationOptions
+  warn: (message: string, payload: Record<string, unknown>) => void
+  error: (message: string, payload: Record<string, unknown>) => void
 }
 
 interface RunStreamPumpResult {
@@ -120,7 +120,7 @@ interface RunStreamPumpResult {
 export async function executeRun(
   activeRun: ActiveRun,
   input: ExecuteRunInput,
-  deps: TurnExecutorDeps
+  deps: TurnExecutorDeps,
 ): Promise<void> {
   const diagnostics = createTurnOutputDiagnostics()
   const profile = startChatRuntimeProfile()
@@ -141,7 +141,7 @@ export async function executeRun(
       input,
       diagnostics,
       profile,
-      deps
+      deps,
     )
     const { actualModelId, shouldFinalizeDiagnostics } = await persistRunTerminalAndUsage(
       activeRun,
@@ -149,7 +149,7 @@ export async function executeRun(
       failurePayload,
       diagnostics,
       profile,
-      deps
+      deps,
     )
     completeRun(
       activeRun,
@@ -158,7 +158,7 @@ export async function executeRun(
       profile,
       actualModelId,
       shouldFinalizeDiagnostics,
-      deps
+      deps,
     )
   }
   finally {
@@ -171,7 +171,7 @@ async function pumpRuntimeStream(
   input: ExecuteRunInput,
   diagnostics: TurnOutputDiagnostics,
   profile: ChatRuntimeProfile,
-  deps: TurnExecutorDeps
+  deps: TurnExecutorDeps,
 ): Promise<RunStreamPumpResult> {
   let finalChunk: UIMessageChunk = { type: 'finish', finishReason: 'stop' }
   let failurePayload: SerializedChatError['payload'] | undefined
@@ -193,7 +193,7 @@ async function pumpRuntimeStream(
         input.thinkingEffort || input.runtimeSettings
           ? {
               ...(input.thinkingEffort ? { thinkingEffort: input.thinkingEffort } : {}),
-              ...(input.runtimeSettings ? { runtimeSettings: input.runtimeSettings } : {})
+              ...(input.runtimeSettings ? { runtimeSettings: input.runtimeSettings } : {}),
             }
           : undefined,
       systemPrompt: input.systemPrompt,
@@ -203,18 +203,18 @@ async function pumpRuntimeStream(
         void reportRuntimeSessionTitle({ sessionId: activeRun.sessionId, title }).catch((error) => {
           deps.warn('failed to persist runtime session title event', {
             error,
-            sessionId: activeRun.sessionId
+            sessionId: activeRun.sessionId,
           })
         })
       },
-      onProviderThreadEvent: (event) =>
+      onProviderThreadEvent: event =>
         publishProviderThreadEvent({
           store: providerThreadStreamStore,
           sessionId: activeRun.sessionId,
           event,
-          isTerminalChunk: isTerminalUIMessageChunk
+          isTerminalChunk: isTerminalUIMessageChunk,
         }),
-      onProviderSyntheticTurnEvent
+      onProviderSyntheticTurnEvent,
     })) {
       if (activeRun.terminalStatus) {
         break
@@ -227,7 +227,7 @@ async function pumpRuntimeStream(
           runtimeKind: activeRun.runtimeSession.runtimeKind,
           providerSessionId: activeRun.runtimeSession.providerSessionId,
           phase: 'runtime_chunk',
-          payload: chunk
+          payload: chunk,
         })
       }
       accumulateDiagnostics(diagnostics, chunk)
@@ -235,20 +235,20 @@ async function pumpRuntimeStream(
         activeRun.firstTokenDeltaSnapshotRecorded = true
         deps.recordSnapshotEvent(activeRun, {
           phase: 'model_first_token_delta',
-          chunk
+          chunk,
         })
       }
       if (chunk.type === 'text-delta' && !activeRun.firstTextDeltaSnapshotRecorded) {
         activeRun.firstTextDeltaSnapshotRecorded = true
         deps.recordSnapshotEvent(activeRun, {
           phase: 'model_text_first_delta',
-          chunk
+          chunk,
         })
       }
       if (shouldRecordHarnessSnapshotChunk(chunk)) {
         deps.recordSnapshotEvent(activeRun, {
           phase: readHarnessSnapshotPhase(chunk),
-          chunk
+          chunk,
         })
       }
       if (isTerminalUIMessageChunk(chunk)) {
@@ -276,23 +276,25 @@ async function pumpRuntimeStream(
     finalChunk = activeRun.terminalStatus
       ? terminalChunkForStatus(activeRun.terminalStatus)
       : resolveTerminalChunkWithDiagnostics(finalChunk, diagnostics, {
-          allowEmptyAssistantOutput: isRuntimeGoalNoOutputCommandTurn(activeRun, input.message)
+          allowEmptyAssistantOutput: isRuntimeGoalNoOutputCommandTurn(activeRun, input.message),
         })
     deps.recordSnapshotEvent(activeRun, {
       phase: 'stream_finished',
       chunk: finalChunk,
       payload: {
         terminalChunk: summarizeSnapshotChunk(finalChunk, truncateSnapshotPayload),
-        diagnostics
-      }
+        diagnostics,
+      },
     })
     profile.streamFinishedAtMs = performance.now()
-  } catch (error) {
+  }
+ catch (error) {
     deps.stream.flushPendingRunDelta(activeRun)
     profile.streamFinishedAtMs = performance.now()
     if (isAbortError(error, activeRun)) {
       finalChunk = { type: 'abort', reason: 'user' }
-    } else {
+    }
+ else {
       const serializedError = serializeChatError(error)
       failurePayload = serializedError.payload
       finalChunk = { type: 'error', errorText: serializedError.text }
@@ -303,8 +305,8 @@ async function pumpRuntimeStream(
       payload: {
         terminalChunk: summarizeSnapshotChunk(finalChunk, truncateSnapshotPayload),
         diagnostics,
-        ...(failurePayload ? { payload: failurePayload } : {})
-      }
+        ...(failurePayload ? { payload: failurePayload } : {}),
+      },
     })
   }
 
@@ -317,8 +319,8 @@ async function persistRunTerminalAndUsage(
   failurePayload: SerializedChatError['payload'] | undefined,
   diagnostics: TurnOutputDiagnostics,
   profile: ChatRuntimeProfile,
-  deps: TurnExecutorDeps
-): Promise<{ actualModelId: string | null; shouldFinalizeDiagnostics: boolean }> {
+  deps: TurnExecutorDeps,
+): Promise<{ actualModelId: string | null, shouldFinalizeDiagnostics: boolean }> {
   let actualModelId = activeRun.modelId
   try {
     if (!activeRun.cancelRequested) {
@@ -345,7 +347,7 @@ async function persistRunTerminalAndUsage(
               ? createDedupeKey({
                   code: observabilityCode,
                   chatSessionId: activeRun.sessionId,
-                  runId: null
+                  runId: null,
                 })
               : undefined,
           attrs: {
@@ -353,8 +355,8 @@ async function persistRunTerminalAndUsage(
             runtimeKind: activeRun.runtimeSession.runtimeKind,
             providerSessionId: activeRun.runtimeSession.providerSessionId,
             diagnostics,
-            ...(failurePayload ? { payload: failurePayload } : {})
-          }
+            ...(failurePayload ? { payload: failurePayload } : {}),
+          },
         })
       }
 
@@ -366,7 +368,7 @@ async function persistRunTerminalAndUsage(
           messageId: activeRun.messageId,
           providerTargetId: activeRun.providerTargetId,
           modelId: actualModelId,
-          usage
+          usage,
         })
         deps.recordSnapshotEvent(activeRun, {
           phase: 'usage',
@@ -374,8 +376,8 @@ async function persistRunTerminalAndUsage(
           usage,
           estimatedCostUsd: estimateRunUsageCost(actualModelId, usage),
           payload: {
-            source: activeRun.runtime?.totalUsage ? 'runtime.totalUsage' : 'runtime.lastUsage'
-          }
+            source: activeRun.runtime?.totalUsage ? 'runtime.totalUsage' : 'runtime.lastUsage',
+          },
         })
       }
 
@@ -386,7 +388,7 @@ async function persistRunTerminalAndUsage(
           runId: activeRun.runId,
           sessionId: activeRun.sessionId,
           fallbackModelId,
-          steps
+          steps,
         })
         for (const step of recordedSteps) {
           deps.recordSnapshotEvent(activeRun, {
@@ -396,15 +398,16 @@ async function persistRunTerminalAndUsage(
             estimatedCostUsd: step.estimatedCostUsd,
             payload: {
               stepNumber: step.stepNumber,
-              stepType: step.stepType
-            }
+              stepType: step.stepType,
+            },
           })
         }
       }
     }
-  } catch (error) {
+  }
+ catch (error) {
     deps.error('failed to persist run finalization (session may have been deleted)', {
-      error
+      error,
     })
   }
   return { actualModelId, shouldFinalizeDiagnostics: true }
@@ -417,7 +420,7 @@ function completeRun(
   profile: ChatRuntimeProfile,
   actualModelId: string | null,
   shouldFinalizeDiagnostics: boolean,
-  deps: TurnExecutorDeps
+  deps: TurnExecutorDeps,
 ): void {
   try {
     attachBinding({
@@ -425,17 +428,18 @@ function completeRun(
       providerTargetId: activeRun.providerTargetId,
       runtimeKind: activeRun.runtimeSession.runtimeKind,
       runtimeSession: activeRun.runtimeSession,
-      requestedModelId: actualModelId
+      requestedModelId: actualModelId,
     })
-  } catch {
+  }
+ catch {
     // session may have been deleted during the run
   }
   updateRuntimeGoalContinuationBackoff(
     {
       sessionId: activeRun.sessionId,
-      internalContinuation: activeRun.internalContinuation
+      internalContinuation: activeRun.internalContinuation,
     },
-    finalChunk
+    finalChunk,
   )
   const binding = readDurableProviderRuntimeBinding(activeRun.sessionId)
   const shouldContinueRuntimeGoal = shouldScheduleRuntimeGoalContinuation({
@@ -443,21 +447,21 @@ function completeRun(
       sessionId: activeRun.sessionId,
       runtime: activeRun.runtime,
       cancelRequested: activeRun.cancelRequested === true,
-      internalContinuation: activeRun.internalContinuation
+      internalContinuation: activeRun.internalContinuation,
     },
     finalChunk,
     binding,
     providerTargetAvailable: Boolean(
-      binding && isProviderTargetAvailable(binding.providerTargetId)
+      binding && isProviderTargetAvailable(binding.providerTargetId),
     ),
     pendingQueueItemCount: deps.pendingQueueItemCount(activeRun.sessionId),
-    options: deps.readRuntimeGoalContinuationOptions()
+    options: deps.readRuntimeGoalContinuationOptions(),
   })
   if (shouldFinalizeDiagnostics) {
     deps.finalizeSnapshot(activeRun, finalChunk, {
       modelId: actualModelId,
       diagnostics,
-      profile
+      profile,
     })
   }
   recordChatRuntimeProfile({
@@ -470,10 +474,10 @@ function completeRun(
       modelId: activeRun.modelId,
       terminalStatus: activeRun.terminalStatus,
       replayChunkCount: activeRun.chunkBuffer.length,
-      finalPartCount: activeRun.finalMessage.parts.length
+      finalPartCount: activeRun.finalMessage.parts.length,
     },
     diagnostics,
-    profile
+    profile,
   })
   if (shouldContinueRuntimeGoal) {
     if (!activeRun.providerTargetId) {
@@ -483,7 +487,7 @@ function completeRun(
       sessionId: activeRun.sessionId,
       providerTargetId: activeRun.providerTargetId,
       modelId: actualModelId ?? undefined,
-      options: deps.readRuntimeGoalContinuationOptions()
+      options: deps.readRuntimeGoalContinuationOptions(),
     })
   }
 }
@@ -511,10 +515,10 @@ function isAbortError(error: unknown, activeRun: ActiveRun): boolean {
 
 function isNamedAbortError(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    (error as { name?: unknown }).name === 'AbortError'
+    typeof error === 'object'
+    && error !== null
+    && 'name' in error
+    && (error as { name?: unknown }).name === 'AbortError'
   )
 }
 

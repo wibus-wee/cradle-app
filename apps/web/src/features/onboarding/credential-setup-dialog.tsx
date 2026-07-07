@@ -1,9 +1,13 @@
+import { ArrowRightLine as ArrowRightIcon, ShuffleLine as ShuffleIcon } from '@mingcute/react'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
 
-import { ArrowRightLine as ArrowRightIcon, ShuffleLine as ShuffleIcon } from '@mingcute/react'
-
+import {
+  getExternalProviderSourcesOptions,
+  getExternalProviderSourcesRecordsOptions,
+} from '~/api-gen/@tanstack/react-query.gen'
+import { ProviderIcon } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -12,18 +16,13 @@ import {
   DialogFooter,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { ProviderIcon } from '~/components/common/provider-icons'
 import { toastManager } from '~/components/ui/toast'
-import { cn } from '~/lib/cn'
-import {
-  getExternalProviderSourcesOptions,
-  getExternalProviderSourcesRecordsOptions,
-} from '~/api-gen/@tanstack/react-query.gen'
-import { openSettingsSection } from '~/navigation/navigation-commands'
-import { useOnboardingStore } from '~/features/onboarding/onboarding-store'
-import { useCredentialSetupStore } from '~/features/onboarding/credential-setup-store'
 import { PROVIDER_PRESETS } from '~/features/agent-management/provider-templates'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
+import { useCredentialSetupStore } from '~/features/onboarding/credential-setup-store'
+import { useOnboardingStore } from '~/features/onboarding/onboarding-store'
+import { cn } from '~/lib/cn'
+import { openSettingsSection } from '~/navigation/navigation-commands'
 
 const CC_SWITCH_SOURCE_ID = 'cc-switch'
 
@@ -64,8 +63,8 @@ export function CredentialSetupDialog() {
     () =>
       (externalSources as Array<{ sourceId?: string }>).some(
         source => source.sourceId === CC_SWITCH_SOURCE_ID,
-      ) ||
-      (externalRecords as Array<{ sourceKind?: string; sourceKey?: string }>).some(
+      )
+      || (externalRecords as Array<{ sourceKind?: string, sourceKey?: string }>).some(
         record => record.sourceKind === CC_SWITCH_SOURCE_ID,
       ),
     [externalSources, externalRecords],
@@ -128,7 +127,7 @@ export function CredentialSetupDialog() {
   ]
 
   return (
-    <Dialog open={open} onOpenChange={next => { if (!next) handleSkip() }}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) { handleSkip() } }}>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]" showCloseButton={false}>
         {/* Header */}
         <div className="px-5 pt-5 pb-4">

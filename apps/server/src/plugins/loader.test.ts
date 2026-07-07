@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { pluginActivationPolicies, pluginSources, relayHostEnrollments } from '@cradle/db'
-import { Elysia } from 'elysia'
 import { eq } from 'drizzle-orm'
+import { Elysia } from 'elysia'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { db } from '../infra'
@@ -15,11 +15,11 @@ import { resolveCodexRuntimeContext } from '../modules/chat-runtime-providers/co
 import { setAppPreferences } from '../modules/preferences/service'
 import { resetNativeSkillProjectionTargets } from '../modules/skills/native-skill-projection'
 import { setPluginActivationPolicy } from './activation-policy'
-import { addPluginSource, deletePluginSource } from './source-registry'
 import { activateServerPlugins, deactivateAllPlugins, disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from './loader'
 import { getRegisteredMcpServers } from './mcp-registry'
 import { calculatePluginPackageChecksum } from './package-checksum'
 import { listPluginDescriptors } from './runtime-registry'
+import { addPluginSource, deletePluginSource } from './source-registry'
 import { deletePluginTrustGrantsForPlugin, grantPluginTrust } from './trust-grants'
 
 let tempPluginsDir: string | undefined

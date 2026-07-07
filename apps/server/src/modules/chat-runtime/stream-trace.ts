@@ -187,7 +187,7 @@ function normalizeTracePayload(payload: unknown): unknown {
     arrayLimit: readPositiveIntegerEnv('CRADLE_CHAT_STREAM_TRACE_ARRAY_LIMIT', DEFAULT_ARRAY_LIMIT),
     objectKeyLimit: readPositiveIntegerEnv(
       'CRADLE_CHAT_STREAM_TRACE_OBJECT_KEY_LIMIT',
-      DEFAULT_OBJECT_KEY_LIMIT
+      DEFAULT_OBJECT_KEY_LIMIT,
     ),
     depthLimit: readPositiveIntegerEnv('CRADLE_CHAT_STREAM_TRACE_DEPTH_LIMIT', DEFAULT_DEPTH_LIMIT),
   })
@@ -239,7 +239,7 @@ export function readChatRunTrace(runId: string): ChatRunTrace {
 
   const limit = readPositiveIntegerEnv(
     'CRADLE_CHAT_STREAM_TRACE_READ_LIMIT',
-    DEFAULT_TRACE_READ_LIMIT
+    DEFAULT_TRACE_READ_LIMIT,
   )
   const lines = readTraceTailLines(
     path,
@@ -259,7 +259,7 @@ export function readChatRunTraceDto(runId: string): ChatRunTraceDto {
       code: 'chat_run_not_found',
       status: 404,
       message: 'Chat run not found',
-      details: { runId }
+      details: { runId },
     })
   }
   return toChatRunTraceDto(run)
@@ -275,7 +275,7 @@ export function listChatSessionTraceDtos(sessionId: string): ChatSessionTraceDto
 
   return {
     sessionId,
-    traces: rows.map(toChatRunTraceDto)
+    traces: rows.map(toChatRunTraceDto),
   }
 }
 
@@ -294,7 +294,7 @@ function toChatRunTraceDto(run: BackendRun): ChatRunTraceDto {
     finishedAt: run.finishedAt,
     path: trace.path,
     recordCount: trace.recordCount,
-    records: trace.records
+    records: trace.records,
   }
 }
 

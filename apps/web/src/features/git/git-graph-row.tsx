@@ -1,7 +1,6 @@
-
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
-import { cn } from '~/lib/cn'
 import { getI18n } from '~/i18n/instance'
+import { cn } from '~/lib/cn'
 
 import type { LayoutCommit } from './graph-layout'
 import { LANE_COLORS } from './graph-layout'

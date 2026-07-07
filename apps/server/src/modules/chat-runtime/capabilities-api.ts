@@ -4,32 +4,32 @@ import type { RuntimeKind } from '../provider-contracts/types'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { resolveSessionSystemPrompt } from './context/turn-context'
 import { appendPendingRuntimeUserInputSlotStates } from './pending-user-input'
+import { runRegistry } from './run-registry'
+import type {
+  BackgroundTerminalListResult,
+  BackgroundTerminalTerminateResult,
+  ListBackgroundTerminalsInput,
+  ProviderThreadDeleteResult,
+  ProviderThreadListInput,
+  ProviderThreadListResult,
+  ProviderThreadReadResult,
+  ProviderThreadSourceKind,
+  ProviderThreadTurnsResult,
+  RuntimeContextUsage,
+  RuntimePresentationCapabilities,
+  RuntimeUiSlotState,
+  TerminateBackgroundTerminalInput,
+} from './runtime-provider-types'
+import {
+  createEmptyRuntimePresentation,
+} from './runtime-provider-types'
 import {
   assertStoredSession,
   buildRuntimeProviderInput,
   getSessionRunContext,
   resolveExistingRuntimeSessionForContext,
-  resolveRuntimeSessionContext
+  resolveRuntimeSessionContext,
 } from './runtime-session-context'
-import {
-  createEmptyRuntimePresentation
-} from './runtime-provider-types'
-import type {
-  BackgroundTerminalListResult,
-  BackgroundTerminalTerminateResult,
-  ListBackgroundTerminalsInput,
-  ProviderThreadListInput,
-  ProviderThreadListResult,
-  ProviderThreadDeleteResult,
-  ProviderThreadReadResult,
-  ProviderThreadSourceKind,
-  ProviderThreadTurnsResult,
-  TerminateBackgroundTerminalInput,
-  RuntimeContextUsage,
-  RuntimePresentationCapabilities,
-  RuntimeUiSlotState
-} from './runtime-provider-types'
-import { runRegistry } from './run-registry'
 
 export interface ChatSessionContextUsageDto {
   sessionId: string
@@ -39,7 +39,7 @@ export interface ChatSessionContextUsageDto {
 }
 
 export async function getCapabilities(
-  sessionId: string
+  sessionId: string,
 ): Promise<RuntimePresentationCapabilities> {
   const context = getSessionRunContext(sessionId)
   if (!context) {
@@ -54,7 +54,7 @@ export async function getCapabilities(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${runtimeKind}`
+      message: `Runtime is not available: ${runtimeKind}`,
     })
   }
 
@@ -72,11 +72,10 @@ export async function getCapabilities(
       workspacePath: context.workspacePath,
       agentId: context.session.agentId,
       modelId:
-        activeRun.modelId ??
-        readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models
-          .currentModelId ??
-        undefined,
-      systemPrompt: resolveSessionSystemPrompt(context.session)
+        activeRun.modelId
+        ?? readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models.currentModelId
+        ?? undefined,
+      systemPrompt: resolveSessionSystemPrompt(context.session),
     })
   }
 
@@ -84,7 +83,7 @@ export async function getCapabilities(
     sessionId,
     context,
     runtimeKind,
-    runtime
+    runtime,
   })
   if (!resolved) {
     return createEmptyRuntimePresentation(runtimeKind)
@@ -97,23 +96,22 @@ export async function getCapabilities(
     workspacePath: context.workspacePath,
     agentId: context.session.agentId,
     modelId:
-      resolved.requestedModelId ??
-      readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models
-        .currentModelId ??
-      undefined,
-    systemPrompt: resolveSessionSystemPrompt(context.session)
+      resolved.requestedModelId
+      ?? readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models.currentModelId
+      ?? undefined,
+    systemPrompt: resolveSessionSystemPrompt(context.session),
   })
 }
 
 export async function getUiSlotStates(
-  sessionId: string
-): Promise<{ runtimeKind: RuntimeKind; states: RuntimeUiSlotState[] }> {
+  sessionId: string,
+): Promise<{ runtimeKind: RuntimeKind, states: RuntimeUiSlotState[] }> {
   const context = getSessionRunContext(sessionId)
   if (!context) {
     const session = assertStoredSession(sessionId)
     return {
       runtimeKind: session.runtimeKind ?? 'standard',
-      states: []
+      states: [],
     }
   }
 
@@ -124,15 +122,15 @@ export async function getUiSlotStates(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${runtimeKind}`
+      message: `Runtime is not available: ${runtimeKind}`,
     })
   }
 
   const activeRunId = runRegistry.getActiveRunIdForSession(sessionId)
   const activeRun = activeRunId ? runRegistry.getActiveRun(activeRunId) : undefined
   if (activeRun?.runtimeSession.runtimeKind === runtimeKind) {
-    const providerStates =
-      runtime.capabilities.supportsUiSlotStates && runtime.getUiSlotStates
+    const providerStates
+      = runtime.capabilities.supportsUiSlotStates && runtime.getUiSlotStates
         ? await runtime.getUiSlotStates({
             runtimeSession: activeRun.runtimeSession,
             profile: context.profile,
@@ -140,9 +138,8 @@ export async function getUiSlotStates(
             workspacePath: context.workspacePath,
             agentId: context.session.agentId,
             modelId:
-              readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models
-                .currentModelId ?? undefined,
-            systemPrompt: resolveSessionSystemPrompt(context.session)
+              readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models.currentModelId ?? undefined,
+            systemPrompt: resolveSessionSystemPrompt(context.session),
           })
         : []
     return {
@@ -150,8 +147,8 @@ export async function getUiSlotStates(
       states: appendPendingRuntimeUserInputSlotStates(providerStates, {
         sessionId,
         runtimeKind,
-        threadId: activeRun.runtimeSession.providerSessionId
-      })
+        threadId: activeRun.runtimeSession.providerSessionId,
+      }),
     }
   }
 
@@ -161,8 +158,8 @@ export async function getUiSlotStates(
       states: appendPendingRuntimeUserInputSlotStates([], {
         sessionId,
         runtimeKind,
-        threadId: null
-      })
+        threadId: null,
+      }),
     }
   }
 
@@ -170,7 +167,7 @@ export async function getUiSlotStates(
     sessionId,
     context,
     runtimeKind,
-    runtime
+    runtime,
   })
   if (!resolved) {
     return {
@@ -178,8 +175,8 @@ export async function getUiSlotStates(
       states: appendPendingRuntimeUserInputSlotStates([], {
         sessionId,
         runtimeKind,
-        threadId: null
-      })
+        threadId: null,
+      }),
     }
   }
 
@@ -190,19 +187,18 @@ export async function getUiSlotStates(
     workspacePath: context.workspacePath,
     agentId: context.session.agentId,
     modelId:
-      resolved.requestedModelId ??
-      readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models
-        .currentModelId ??
-      undefined,
-    systemPrompt: resolveSessionSystemPrompt(context.session)
+      resolved.requestedModelId
+      ?? readProviderStateSnapshot(resolved.runtimeSession.providerStateSnapshot).models.currentModelId
+      ?? undefined,
+    systemPrompt: resolveSessionSystemPrompt(context.session),
   })
   return {
     runtimeKind,
     states: appendPendingRuntimeUserInputSlotStates(states, {
       sessionId,
       runtimeKind,
-      threadId: resolved.runtimeSession.providerSessionId
-    })
+      threadId: resolved.runtimeSession.providerSessionId,
+    }),
   }
 }
 
@@ -216,7 +212,7 @@ export async function listProviderThreads(
     sourceKinds?: ProviderThreadSourceKind[] | null
     archived?: boolean | null
     searchTerm?: string | null
-  } = {}
+  } = {},
 ): Promise<ProviderThreadListResult> {
   const resolved = await resolveRuntimeSessionContext(sessionId)
   if (!resolved.runtime.listProviderThreads) {
@@ -225,18 +221,18 @@ export async function listProviderThreads(
       providerSessionId: resolved.runtimeSession.providerSessionId,
       threads: [],
       nextCursor: null,
-      backwardsCursor: null
+      backwardsCursor: null,
     }
   }
   return await resolved.runtime.listProviderThreads({
     ...buildRuntimeProviderInput(resolved),
-    ...query
+    ...query,
   } satisfies ProviderThreadListInput)
 }
 
 export async function readProviderThread(
   sessionId: string,
-  threadId: string
+  threadId: string,
 ): Promise<ProviderThreadReadResult> {
   const resolved = await resolveRuntimeSessionContext(sessionId)
   if (!resolved.runtime.readProviderThread) {
@@ -244,19 +240,19 @@ export async function readProviderThread(
       code: 'chat_provider_threads_not_supported',
       status: 501,
       message: 'Runtime does not support provider thread reads',
-      details: { sessionId, runtimeKind: resolved.runtimeKind }
+      details: { sessionId, runtimeKind: resolved.runtimeKind },
     })
   }
   return await resolved.runtime.readProviderThread({
     ...buildRuntimeProviderInput(resolved),
     threadId,
-    includeTurns: false
+    includeTurns: false,
   })
 }
 
 export async function deleteProviderThread(
   sessionId: string,
-  threadId: string
+  threadId: string,
 ): Promise<ProviderThreadDeleteResult> {
   const resolved = await resolveRuntimeSessionContext(sessionId)
   if (!resolved.runtime.deleteProviderThread) {
@@ -264,12 +260,12 @@ export async function deleteProviderThread(
       code: 'chat_provider_threads_not_supported',
       status: 501,
       message: 'Runtime does not support provider thread deletes',
-      details: { sessionId, runtimeKind: resolved.runtimeKind }
+      details: { sessionId, runtimeKind: resolved.runtimeKind },
     })
   }
   return await resolved.runtime.deleteProviderThread({
     ...buildRuntimeProviderInput(resolved),
-    threadId
+    threadId,
   })
 }
 
@@ -280,7 +276,7 @@ export async function listProviderThreadTurns(
     cursor?: string | null
     limit?: number | null
     sortDirection?: 'asc' | 'desc' | null
-  } = {}
+  } = {},
 ): Promise<ProviderThreadTurnsResult> {
   const resolved = await resolveRuntimeSessionContext(sessionId)
   if (!resolved.runtime.listProviderThreadTurns) {
@@ -288,13 +284,13 @@ export async function listProviderThreadTurns(
       code: 'chat_provider_threads_not_supported',
       status: 501,
       message: 'Runtime does not support provider thread turns',
-      details: { sessionId, runtimeKind: resolved.runtimeKind }
+      details: { sessionId, runtimeKind: resolved.runtimeKind },
     })
   }
   return await resolved.runtime.listProviderThreadTurns({
     ...buildRuntimeProviderInput(resolved),
     threadId,
-    ...query
+    ...query,
   })
 }
 
@@ -303,7 +299,7 @@ export async function listBackgroundTerminals(
   query: {
     cursor?: string | null
     limit?: number | null
-  } = {}
+  } = {},
 ): Promise<BackgroundTerminalListResult> {
   const resolved = await resolveRuntimeSessionContext(sessionId)
   if (!resolved.runtime.listBackgroundTerminals) {
@@ -311,18 +307,18 @@ export async function listBackgroundTerminals(
       code: 'chat_background_terminals_not_supported',
       status: 501,
       message: 'Runtime does not support background terminal listing',
-      details: { sessionId, runtimeKind: resolved.runtimeKind }
+      details: { sessionId, runtimeKind: resolved.runtimeKind },
     })
   }
   return await resolved.runtime.listBackgroundTerminals({
     ...buildRuntimeProviderInput(resolved),
-    ...query
+    ...query,
   } satisfies ListBackgroundTerminalsInput)
 }
 
 export async function terminateBackgroundTerminal(
   sessionId: string,
-  processId: string
+  processId: string,
 ): Promise<BackgroundTerminalTerminateResult> {
   const resolved = await resolveRuntimeSessionContext(sessionId)
   if (!resolved.runtime.terminateBackgroundTerminal) {
@@ -330,12 +326,12 @@ export async function terminateBackgroundTerminal(
       code: 'chat_background_terminals_not_supported',
       status: 501,
       message: 'Runtime does not support background terminal termination',
-      details: { sessionId, runtimeKind: resolved.runtimeKind }
+      details: { sessionId, runtimeKind: resolved.runtimeKind },
     })
   }
   return await resolved.runtime.terminateBackgroundTerminal({
     ...buildRuntimeProviderInput(resolved),
-    processId
+    processId,
   } satisfies TerminateBackgroundTerminalInput)
 }
 
@@ -346,7 +342,7 @@ export async function readContextUsage(sessionId: string): Promise<ChatSessionCo
       sessionId,
       runtimeKind: resolved.runtimeKind,
       providerSessionId: resolved.runtimeSession.providerSessionId,
-      usage: null
+      usage: null,
     }
   }
 
@@ -354,6 +350,6 @@ export async function readContextUsage(sessionId: string): Promise<ChatSessionCo
     sessionId,
     runtimeKind: resolved.runtimeKind,
     providerSessionId: resolved.runtimeSession.providerSessionId,
-    usage: await resolved.runtime.getContextUsage(buildRuntimeProviderInput(resolved))
+    usage: await resolved.runtime.getContextUsage(buildRuntimeProviderInput(resolved)),
   }
 }

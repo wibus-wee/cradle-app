@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import {
   addGitWorktree,
   getHeadSha,
@@ -17,6 +16,7 @@ import {
   removeGitWorktree,
   stashAndPopAcrossCheckouts,
 } from '../src/modules/git/worktree-ops'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 interface GitStatus {
   repositoryPath: string

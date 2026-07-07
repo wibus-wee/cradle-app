@@ -13,14 +13,14 @@ import { isSyncSocketEnabled, subscribeSyncSessionRunChunks } from '~/lib/sync-s
 
 import type { ChatResponseRequestBody } from '../commands/chat-response-command'
 import { startChatResponse, subscribeChatSessionStream } from '../commands/chat-response-command'
+import type { ChatStreamChunk } from './chat-stream-types'
+import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
 import {
   buildUIMessageChunkStreamFromResponse,
   emitChatRunActivity,
   emitChatRunSettled,
   readTerminalChunkStatus,
 } from './sse-chat-transport'
-import type { ChatStreamChunk } from './chat-stream-types'
-import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
 
 export interface ChatStreamTransportResult {
   streamId: string | null

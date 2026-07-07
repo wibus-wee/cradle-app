@@ -5,24 +5,24 @@ import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-snapshot'
+import * as SessionService from '../session/service'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { commitSessionEvents } from './es/commands'
 import { createSessionTitleGenerationError } from './run/errors'
-import {
-  extractMessageText,
-  parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot
-} from './ui-message'
+import { runRegistry } from './run-registry'
+import type { GenerateSessionTitleInput } from './runtime-provider-types'
+import type { ResolvedRuntimeSessionContext } from './runtime-session-context'
 import {
   assertRunnableSession,
   assertRuntimeCompatibleTarget,
   attachBinding,
   buildRuntimeProviderInput,
-  resolveRuntimeSessionForContext
+  resolveRuntimeSessionForContext,
 } from './runtime-session-context'
-import type { ResolvedRuntimeSessionContext } from './runtime-session-context'
-import { runRegistry } from './run-registry'
-import type { GenerateSessionTitleInput } from './runtime-provider-types'
-import * as SessionService from '../session/service'
+import {
+  extractMessageText,
+  parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot,
+} from './ui-message'
 
 const messageInsertOrder = sql`messages.rowid`
 
@@ -45,8 +45,8 @@ export function reportRuntimeSessionTitle(input: {
     return Promise.resolve()
   }
   if (
-    session.title === title &&
-    (!input.overwriteUserTitle || session.titleSource === 'provider')
+    session.title === title
+    && (!input.overwriteUserTitle || session.titleSource === 'provider')
   ) {
     return Promise.resolve()
   }
@@ -67,14 +67,14 @@ export function reportRuntimeSessionTitle(input: {
         sessionId: input.sessionId,
         title,
         titleSource: 'provider',
-        updatedAt
-      }
-    }
+        updatedAt,
+      },
+    },
   ])
 }
 
 export async function regenerateSessionTitle(
-  sessionId: string
+  sessionId: string,
 ): Promise<SessionService.SessionView> {
   const context = assertRuntimeCompatibleTarget(assertRunnableSession(sessionId))
   const promptText = readFirstUserPromptText(sessionId)
@@ -83,7 +83,7 @@ export async function regenerateSessionTitle(
       code: 'chat_session_title_prompt_not_found',
       status: 400,
       message: 'Chat session does not have a user prompt to name',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
 
@@ -94,7 +94,7 @@ export async function regenerateSessionTitle(
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${runtimeKind}`
+      message: `Runtime is not available: ${runtimeKind}`,
     })
   }
   if (!runtime.generateSessionTitle) {
@@ -102,7 +102,7 @@ export async function regenerateSessionTitle(
       code: 'chat_runtime_title_generation_not_supported',
       status: 501,
       message: 'Runtime does not support session title generation',
-      details: { sessionId, runtimeKind }
+      details: { sessionId, runtimeKind },
     })
   }
 
@@ -116,17 +116,17 @@ export async function regenerateSessionTitle(
       runtime: activeRun.runtime,
       runtimeSession: activeRun.runtimeSession,
       modelId:
-        activeRun.modelId ??
-        readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models
-          .currentModelId ??
-        undefined
+        activeRun.modelId
+        ?? readProviderStateSnapshot(activeRun.runtimeSession.providerStateSnapshot).models.currentModelId
+        ?? undefined,
     }
-  } else {
+  }
+ else {
     const runtimeResolution = await resolveRuntimeSessionForContext({
       sessionId,
       context,
       runtimeKind,
-      runtime
+      runtime,
     })
     resolved = {
       context,
@@ -134,10 +134,9 @@ export async function regenerateSessionTitle(
       runtime,
       runtimeSession: runtimeResolution.runtimeSession,
       modelId:
-        runtimeResolution.requestedModelId ??
-        readProviderStateSnapshot(runtimeResolution.runtimeSession.providerStateSnapshot).models
-          .currentModelId ??
-        undefined
+        runtimeResolution.requestedModelId
+        ?? readProviderStateSnapshot(runtimeResolution.runtimeSession.providerStateSnapshot).models.currentModelId
+        ?? undefined,
     }
   }
 
@@ -145,14 +144,15 @@ export async function regenerateSessionTitle(
   try {
     title = await runtime.generateSessionTitle({
       ...buildRuntimeProviderInput(resolved),
-      promptText
+      promptText,
     } satisfies GenerateSessionTitleInput)
-  } catch (error) {
+  }
+ catch (error) {
     throw createSessionTitleGenerationError({
       sessionId,
       runtimeKind: resolved.runtimeKind,
       providerTargetId: resolved.context.providerTarget?.id ?? null,
-      error
+      error,
     })
   }
   if (!title) {
@@ -160,21 +160,21 @@ export async function regenerateSessionTitle(
       sessionId,
       runtimeKind: resolved.runtimeKind,
       providerTargetId: resolved.context.providerTarget?.id ?? null,
-      reason: 'empty_title'
+      reason: 'empty_title',
     })
   }
 
   await reportRuntimeSessionTitle({
     sessionId,
     title,
-    overwriteUserTitle: true
+    overwriteUserTitle: true,
   })
   attachBinding({
     sessionId,
     providerTargetId: resolved.context.providerTarget?.id ?? null,
     runtimeKind: resolved.runtimeSession.runtimeKind,
     runtimeSession: resolved.runtimeSession,
-    requestedModelId: resolved.modelId ?? null
+    requestedModelId: resolved.modelId ?? null,
   })
 
   const updated = SessionService.get(sessionId)
@@ -183,7 +183,7 @@ export async function regenerateSessionTitle(
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
   return updated
@@ -200,11 +200,11 @@ function isTrivialContinuationTitle(title: string): boolean {
     .replace(/[.!?。！？]+$/g, '')
     .trim()
   return (
-    normalized === 'continue' ||
-    normalized === '继续' ||
-    normalized === '接着' ||
-    normalized === '继续执行' ||
-    normalized === '继续吧'
+    normalized === 'continue'
+    || normalized === '继续'
+    || normalized === '接着'
+    || normalized === '继续执行'
+    || normalized === '继续吧'
   )
 }
 
@@ -212,7 +212,7 @@ function readFirstUserPromptText(sessionId: string): string | null {
   const rows = db()
     .select({
       messageJson: messages.messageJson,
-      content: messages.content
+      content: messages.content,
     })
     .from(messages)
     .where(
@@ -222,10 +222,10 @@ function readFirstUserPromptText(sessionId: string): string | null {
         or(
           eq(messages.status, 'complete'),
           eq(messages.status, 'aborted'),
-          eq(messages.status, 'failed')
+          eq(messages.status, 'failed'),
         ),
-        isNull(messages.parentMessageId)
-      )
+        isNull(messages.parentMessageId),
+      ),
     )
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()
@@ -236,7 +236,8 @@ function readFirstUserPromptText(sessionId: string): string | null {
       if (text && !isTrivialContinuationTitle(text)) {
         return text
       }
-    } catch {
+    }
+ catch {
       // Fall back to the denormalized content column for old or malformed snapshots.
     }
 

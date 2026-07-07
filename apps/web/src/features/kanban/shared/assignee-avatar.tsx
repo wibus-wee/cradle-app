@@ -1,4 +1,5 @@
 import { User2Line as UserIcon } from '@mingcute/react'
+
 import { cn } from '~/lib/cn'
 
 export function AssigneeAvatar({ name, size = 20, className }: {

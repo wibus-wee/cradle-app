@@ -36,8 +36,8 @@ export function createSessionTitleGenerationError(input: {
   reason?: string
   error?: unknown
 }): AppError {
-  const providerError =
-    input.error instanceof ProviderRuntimeError ? input.error.providerError : null
+  const providerError
+    = input.error instanceof ProviderRuntimeError ? input.error.providerError : null
   const errorDetails = input.error === undefined ? null : serializeTitleGenerationError(input.error)
   const failureReason = input.reason ?? providerError?._tag ?? 'provider_error'
   const message = errorDetails?.message
@@ -54,15 +54,15 @@ export function createSessionTitleGenerationError(input: {
     dedupeKey: createDedupeKey({
       code: OBSERVABILITY_CODES.chatSessionTitleGenerationFailed,
       chatSessionId: input.sessionId,
-      runId: null
+      runId: null,
     }),
     attrs: {
       runtimeKind: input.runtimeKind,
       providerTargetId: input.providerTargetId,
       reason: failureReason,
       ...(providerError ? { providerError } : {}),
-      ...(errorDetails ? { error: errorDetails } : {})
-    }
+      ...(errorDetails ? { error: errorDetails } : {}),
+    },
   })
 
   return new AppError({
@@ -75,8 +75,8 @@ export function createSessionTitleGenerationError(input: {
       providerTargetId: input.providerTargetId,
       reason: failureReason,
       ...(providerError ? { providerError } : {}),
-      ...(errorDetails ? { error: omitTitleGenerationErrorStack(errorDetails) } : {})
-    }
+      ...(errorDetails ? { error: omitTitleGenerationErrorStack(errorDetails) } : {}),
+    },
   })
 }
 
@@ -86,7 +86,7 @@ export function serializeChatError(error: unknown): SerializedChatError {
   }
 
   const payload: SerializedChatError['payload'] = {
-    message: error instanceof Error ? error.message : String(error)
+    message: error instanceof Error ? error.message : String(error),
   }
 
   if (error instanceof Error) {
@@ -95,7 +95,7 @@ export function serializeChatError(error: unknown): SerializedChatError {
   }
 
   if (error && typeof error === 'object') {
-    const candidate = error as { code?: unknown; data?: unknown }
+    const candidate = error as { code?: unknown, data?: unknown }
     if (typeof candidate.code === 'string' || typeof candidate.code === 'number') {
       payload.code = candidate.code
     }
@@ -127,7 +127,7 @@ function serializeTitleGenerationError(error: unknown): {
     data?: unknown
     stack?: string
   } = {
-    message: error instanceof Error ? error.message : String(error)
+    message: error instanceof Error ? error.message : String(error),
   }
 
   if (error instanceof Error) {
@@ -135,7 +135,7 @@ function serializeTitleGenerationError(error: unknown): {
     output.stack = error.stack
   }
   if (error && typeof error === 'object') {
-    const candidate = error as { code?: unknown; data?: unknown }
+    const candidate = error as { code?: unknown, data?: unknown }
     if (typeof candidate.code === 'string' || typeof candidate.code === 'number') {
       output.code = candidate.code
     }
@@ -147,7 +147,7 @@ function serializeTitleGenerationError(error: unknown): {
 }
 
 function omitTitleGenerationErrorStack(
-  error: ReturnType<typeof serializeTitleGenerationError>
+  error: ReturnType<typeof serializeTitleGenerationError>,
 ): Omit<ReturnType<typeof serializeTitleGenerationError>, 'stack'> {
   const { stack: _stack, ...safeError } = error
   return safeError
@@ -160,12 +160,12 @@ function serializeProviderRuntimeError(error: ProviderRuntimeError): SerializedC
     message: error.message,
     code: providerError._tag,
     data: providerError,
-    stack: error.stack
+    stack: error.stack,
   }
 
   return {
     text: formatProviderRuntimeErrorText(providerError),
-    payload
+    payload,
   }
 }
 
@@ -211,7 +211,8 @@ function stringifyErrorValue(value: unknown): string | null {
   }
   try {
     return JSON.stringify(value)
-  } catch {
+  }
+ catch {
     return String(value)
   }
 }

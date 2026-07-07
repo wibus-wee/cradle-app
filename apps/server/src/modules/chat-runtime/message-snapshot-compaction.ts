@@ -21,9 +21,10 @@ export function truncateJsonPayload(value: unknown, maxChars: number): unknown {
     return {
       type: 'cradle.truncated-json-payload.v1',
       originalChars: json.length,
-      preview: json.slice(0, maxChars)
+      preview: json.slice(0, maxChars),
     }
-  } catch {
+  }
+ catch {
     const text = String(value)
     if (text.length <= maxChars) {
       return text
@@ -31,7 +32,7 @@ export function truncateJsonPayload(value: unknown, maxChars: number): unknown {
     return {
       type: 'cradle.truncated-text-payload.v1',
       originalChars: text.length,
-      preview: text.slice(0, maxChars)
+      preview: text.slice(0, maxChars),
     }
   }
 }
@@ -41,8 +42,8 @@ export function truncateSnapshotPayload(value: unknown): unknown {
     value,
     readPositiveIntegerEnv(
       'CRADLE_CHAT_STORED_TOOL_PAYLOAD_MAX_CHARS',
-      DEFAULT_STORED_TOOL_PAYLOAD_MAX_CHARS
-    )
+      DEFAULT_STORED_TOOL_PAYLOAD_MAX_CHARS,
+    ),
   )
 }
 
@@ -52,7 +53,7 @@ export function compactStoredMessageSnapshotForRead<Message extends UIMessage>(i
 }): Message {
   const repairMinChars = readPositiveIntegerEnv(
     'CRADLE_CHAT_STORED_MESSAGE_REPAIR_MIN_CHARS',
-    DEFAULT_STORED_MESSAGE_REPAIR_MIN_CHARS
+    DEFAULT_STORED_MESSAGE_REPAIR_MIN_CHARS,
   )
   if (input.rawJson.length < repairMinChars) {
     return input.message
@@ -74,15 +75,15 @@ export function compactStoredMessageSnapshotForRead<Message extends UIMessage>(i
 export function compactStoredMessageSnapshot(message: UIMessage): UIMessage {
   const textLimit = readPositiveIntegerEnv(
     'CRADLE_CHAT_STORED_TEXT_MAX_CHARS',
-    DEFAULT_STORED_MESSAGE_TEXT_MAX_CHARS
+    DEFAULT_STORED_MESSAGE_TEXT_MAX_CHARS,
   )
   const reasoningLimit = readPositiveIntegerEnv(
     'CRADLE_CHAT_STORED_REASONING_MAX_CHARS',
-    DEFAULT_STORED_MESSAGE_REASONING_MAX_CHARS
+    DEFAULT_STORED_MESSAGE_REASONING_MAX_CHARS,
   )
   const toolPayloadLimit = readPositiveIntegerEnv(
     'CRADLE_CHAT_STORED_TOOL_PAYLOAD_MAX_CHARS',
-    DEFAULT_STORED_TOOL_PAYLOAD_MAX_CHARS
+    DEFAULT_STORED_TOOL_PAYLOAD_MAX_CHARS,
   )
   let changed = false
   let remainingText = textLimit
@@ -90,8 +91,8 @@ export function compactStoredMessageSnapshot(message: UIMessage): UIMessage {
 
   const parts = message.parts.map((part) => {
     if (part.type === 'text') {
-      const nextText =
-        part.text.length <= remainingText ? part.text : part.text.slice(0, remainingText)
+      const nextText
+        = part.text.length <= remainingText ? part.text : part.text.slice(0, remainingText)
       remainingText = Math.max(0, remainingText - nextText.length)
       if (nextText !== part.text) {
         changed = true
@@ -102,20 +103,20 @@ export function compactStoredMessageSnapshot(message: UIMessage): UIMessage {
             ...readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata),
             cradle: {
               ...readObjectRecord(
-                readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata).cradle
+                readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata).cradle,
               ),
               truncated: true,
-              originalChars: part.text.length
-            }
-          }
+              originalChars: part.text.length,
+            },
+          },
         } as UIMessage['parts'][number]
       }
       return part
     }
 
     if (part.type === 'reasoning') {
-      const nextText =
-        part.text.length <= remainingReasoning ? part.text : part.text.slice(0, remainingReasoning)
+      const nextText
+        = part.text.length <= remainingReasoning ? part.text : part.text.slice(0, remainingReasoning)
       remainingReasoning = Math.max(0, remainingReasoning - nextText.length)
       if (nextText !== part.text) {
         changed = true
@@ -126,12 +127,12 @@ export function compactStoredMessageSnapshot(message: UIMessage): UIMessage {
             ...readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata),
             cradle: {
               ...readObjectRecord(
-                readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata).cradle
+                readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata).cradle,
               ),
               truncated: true,
-              originalChars: part.text.length
-            }
-          }
+              originalChars: part.text.length,
+            },
+          },
         } as UIMessage['parts'][number]
       }
       return part

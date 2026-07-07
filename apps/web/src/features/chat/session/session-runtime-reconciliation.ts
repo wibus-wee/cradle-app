@@ -105,11 +105,20 @@ export function deriveRuntimeTerminalRunRefresh(
 
 export function readTerminalRunReleaseCandidate(
   runtimeStatus: RuntimeSessionStatus | null | undefined,
+  previousReleaseRunId: string | null = null,
 ): RuntimeSessionRunStatus | null {
   if (!runtimeStatus || runtimeStatus.activeRun) {
     return null
   }
-  return runtimeStatus.latestRun ?? null
+  const latestRun = runtimeStatus.latestRun
+  if (
+    !latestRun?.runId
+    || latestRun.runId === previousReleaseRunId
+    || !isTerminalChatRunStatus(latestRun.status)
+  ) {
+    return null
+  }
+  return latestRun
 }
 
 export function deriveRuntimeQueueRefresh(

@@ -1,12 +1,12 @@
-import Editor from '@monaco-editor/react'
 import {
   CheckLine as CheckIcon,
-  SaveLine as SaveIcon
+  SaveLine as SaveIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
+import Editor from '@monaco-editor/react'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 import { useThemeStore } from '~/store/theme'
 

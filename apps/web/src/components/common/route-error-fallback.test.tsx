@@ -1,4 +1,3 @@
-import { cleanup, render, screen } from '@testing-library/react'
 import {
   createMemoryHistory,
   createRootRoute,
@@ -7,6 +6,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '~/i18n/client'
@@ -18,7 +18,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('RouteErrorFallback', () => {
+describe('routeErrorFallback', () => {
   it('renders a route-scoped fallback while the parent shell stays mounted', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
 

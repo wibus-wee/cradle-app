@@ -1511,7 +1511,8 @@ export function migrateIssues(sourceId: string, targetId: string, options: Migra
     if (target) {
       statusIdMap.set(src.id, target.id)
       statusesMapped.push({ from: src.name, to: target.name })
-    } else {
+    }
+ else {
       statusIdMap.set(src.id, defaultTargetStatusId)
       statusesMapped.push({ from: src.name, to: targetStatuses[0]?.name ?? '(none)' })
     }
@@ -1531,7 +1532,8 @@ export function migrateIssues(sourceId: string, targetId: string, options: Migra
     if (target) {
       milestoneIdMap.set(src.id, target.id)
       milestonesMapped.push({ from: src.title, to: target.title })
-    } else {
+    }
+ else {
       milestoneIdMap.set(src.id, null)
       milestonesMapped.push({ from: src.title, to: null })
     }
@@ -1552,7 +1554,8 @@ export function migrateIssues(sourceId: string, targetId: string, options: Migra
         const parent = db().select({ workspaceId: issues.workspaceId }).from(issues).where(eq(issues.id, issue.parentIssueId)).get()
         if (parent && parent.workspaceId === sourceId) {
           // parent also in source — will move together, keep ref
-        } else if (parent && parent.workspaceId !== targetId) {
+        }
+ else if (parent && parent.workspaceId !== targetId) {
           parentIssuesCleared++
         }
       }

@@ -12,7 +12,7 @@ import {
   providerTargets,
   sessionAwaits,
   sessions,
-  workspaces
+  workspaces,
 } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,7 +25,7 @@ import {
   registerSource,
   requestRun,
   runOnce,
-  unregisterSource
+  unregisterSource,
 } from '../src/modules/session-await/poller'
 import {
   fetchAvailableChecks,
@@ -33,20 +33,20 @@ import {
   listBySession,
   register,
   retryDelivery,
-  trigger
+  trigger,
 } from '../src/modules/session-await/service'
 import {
   CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
-  cradleIssueAgentSource
+  cradleIssueAgentSource,
 } from '../src/modules/session-await/sources/cradle-issue-agent'
 import {
   CRADLE_ISSUE_STATUS_AWAIT_SOURCE,
-  cradleIssueStatusSource
+  cradleIssueStatusSource,
 } from '../src/modules/session-await/sources/cradle-issue-status'
 import { resetTokenCache } from '../src/modules/session-await/sources/github-ci'
 
 vi.mock('../src/modules/chat-runtime/runtime', () => ({
-  enqueueSessionQueueItem: vi.fn()
+  enqueueSessionQueueItem: vi.fn(),
 }))
 
 const mockedEnqueueSessionQueueItem = vi.mocked(enqueueSessionQueueItem)
@@ -74,7 +74,7 @@ describe('session-await trigger', () => {
     rmSync(dataDir, { recursive: true, force: true })
   })
 
-  function seedSession(): { workspaceId: string; sessionId: string } {
+  function seedSession(): { workspaceId: string, sessionId: string } {
     const d = db()
     const workspaceId = randomUUID()
     const providerTargetId = randomUUID()
@@ -84,7 +84,7 @@ describe('session-await trigger', () => {
       .values({
         id: workspaceId,
         name: 'ws',
-        locatorJson: JSON.stringify({ kind: 'local', path: '/tmp/ws' })
+        locatorJson: JSON.stringify({ kind: 'local', path: '/tmp/ws' }),
       })
       .run()
     d.insert(providerTargets)
@@ -92,7 +92,7 @@ describe('session-await trigger', () => {
         id: providerTargetId,
         kind: 'manual',
         providerKind: 'openai-compatible',
-        displayName: 'p'
+        displayName: 'p',
       })
       .run()
     d.insert(sessions)
@@ -100,14 +100,14 @@ describe('session-await trigger', () => {
         id: sessionId,
         workspaceId,
         providerTargetId,
-        title: 'test'
+        title: 'test',
       })
       .run()
 
     return { workspaceId, sessionId }
   }
 
-  function seedAwait(): { awaitId: string; sessionId: string } {
+  function seedAwait(): { awaitId: string, sessionId: string } {
     const { workspaceId, sessionId } = seedSession()
     const awaitId = randomUUID()
 
@@ -119,7 +119,7 @@ describe('session-await trigger', () => {
         workspaceId,
         source: 'github-ci',
         status: 'pending',
-        filterJson: '{}'
+        filterJson: '{}',
       })
       .run()
 
@@ -133,14 +133,14 @@ describe('session-await trigger', () => {
       agentSessionId?: string
       status?: 'created' | 'active' | 'completed' | 'stopped' | 'failed'
       createdAt?: number
-    } = {}
-  ): { issueId: string; agentId: string; providerTargetId: string; agentSessionId: string } {
+    } = {},
+  ): { issueId: string, agentId: string, providerTargetId: string, agentSessionId: string } {
     const now = Math.floor(Date.now() / 1000)
     const providerTargetId = `provider-${randomUUID()}`
     const agentId = `agent-${randomUUID()}`
     const issue = Issue.createIssue({
       workspaceId,
-      title: input.title ?? 'Delegated child issue'
+      title: input.title ?? 'Delegated child issue',
     })
 
     db()
@@ -150,7 +150,7 @@ describe('session-await trigger', () => {
         kind: 'manual',
         providerKind: 'openai-compatible',
         displayName: 'Issue Worker Provider',
-        enabled: true
+        enabled: true,
       })
       .run()
     db()
@@ -163,7 +163,7 @@ describe('session-await trigger', () => {
         runtimeKind: 'standard',
         enabled: true,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       })
       .run()
     Issue.updateIssueDelegation(issue.id, { agentId, providerTargetId })
@@ -179,7 +179,7 @@ describe('session-await trigger', () => {
         chatSessionId: null,
         status: input.status ?? 'active',
         createdAt: input.createdAt ?? now,
-        updatedAt: input.createdAt ?? now
+        updatedAt: input.createdAt ?? now,
       })
       .run()
 
@@ -193,13 +193,13 @@ describe('session-await trigger', () => {
       new AppError({
         code: 'chat_session_not_found',
         status: 404,
-        message: 'Chat session not found'
-      })
+        message: 'Chat session not found',
+      }),
     )
 
     const result = await trigger({
       awaitId,
-      resumeText: 'CI passed'
+      resumeText: 'CI passed',
     })
 
     expect(result).not.toBeNull()
@@ -219,7 +219,7 @@ describe('session-await trigger', () => {
     const failed = await trigger({
       awaitId,
       resumeText: 'CI passed',
-      resumePayloadJson: '{"state":"success"}'
+      resumePayloadJson: '{"state":"success"}',
     })
 
     expect(failed).toEqual(
@@ -227,8 +227,8 @@ describe('session-await trigger', () => {
         status: 'failed',
         failureKind: 'delivery',
         resumeText: 'CI passed',
-        resumePayloadJson: '{"state":"success"}'
-      })
+        resumePayloadJson: '{"state":"success"}',
+      }),
     )
 
     const retried = await retryDelivery({ awaitId })
@@ -239,12 +239,12 @@ describe('session-await trigger', () => {
         failureKind: null,
         lastErrorText: null,
         resumeText: 'CI passed',
-        resumePayloadJson: '{"state":"success"}'
-      })
+        resumePayloadJson: '{"state":"success"}',
+      }),
     )
     expect(mockedEnqueueSessionQueueItem).toHaveBeenLastCalledWith({
       sessionId,
-      text: 'CI passed'
+      text: 'CI passed',
     })
   })
 
@@ -255,14 +255,14 @@ describe('session-await trigger', () => {
       .set({
         status: 'failed',
         failureKind: 'source',
-        lastErrorText: 'GitHub CI target not found'
+        lastErrorText: 'GitHub CI target not found',
       })
       .where(eq(sessionAwaits.id, awaitId))
       .run()
 
     const retried = await retryDelivery({
       awaitId,
-      resumeText: 'Proceed anyway'
+      resumeText: 'Proceed anyway',
     })
 
     expect(retried).toBeNull()
@@ -276,7 +276,7 @@ describe('session-await trigger', () => {
 
     const result = await trigger({
       awaitId,
-      resumeText: 'CI passed'
+      resumeText: 'CI passed',
     })
 
     expect(result).not.toBeNull()
@@ -285,7 +285,7 @@ describe('session-await trigger', () => {
     expect(result!.resumeText).toBe('CI passed')
     expect(mockedEnqueueSessionQueueItem).toHaveBeenCalledWith({
       sessionId,
-      text: 'CI passed'
+      text: 'CI passed',
     })
   })
 
@@ -295,8 +295,8 @@ describe('session-await trigger', () => {
     await expect(
       trigger({
         awaitId,
-        resumeText: '   '
-      })
+        resumeText: '   ',
+      }),
     ).rejects.toThrow('resumeText must include non-whitespace content')
 
     expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
@@ -314,7 +314,7 @@ describe('session-await trigger', () => {
         workspaceId,
         source: 'test-source',
         status: 'pending',
-        filterJson: '{}'
+        filterJson: '{}',
       })
       .run()
 
@@ -322,7 +322,7 @@ describe('session-await trigger', () => {
       source: 'test-source',
       async checkPending() {
         return [{ awaitId, matched: true, resumeText: '   ' }]
-      }
+      },
     })
 
     await runOnce()
@@ -332,8 +332,8 @@ describe('session-await trigger', () => {
       expect.objectContaining({
         status: 'failed',
         failureKind: 'source',
-        lastErrorText: 'Source adapter matched without a resume message'
-      })
+        lastErrorText: 'Source adapter matched without a resume message',
+      }),
     )
     expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
   })
@@ -350,14 +350,14 @@ describe('session-await trigger', () => {
         workspaceId,
         source: 'test-source',
         status: 'pending',
-        filterJson: '{}'
+        filterJson: '{}',
       })
       .run()
 
     const checkPending = vi.fn(async () => [{ awaitId, matched: false as const }])
     registerSource({
       source: 'test-source',
-      checkPending
+      checkPending,
     })
 
     requestRun()
@@ -377,8 +377,8 @@ describe('session-await trigger', () => {
         chatSessionId: sessionId,
         workspaceId,
         source: 'slack-thread',
-        filterJson: '{}'
-      })
+        filterJson: '{}',
+      }),
     ).rejects.toEqual(
       expect.objectContaining({
         code: 'session_await_source_unsupported',
@@ -389,10 +389,10 @@ describe('session-await trigger', () => {
             'manual',
             'timer',
             CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
-            CRADLE_ISSUE_STATUS_AWAIT_SOURCE
-          ]
-        }
-      })
+            CRADLE_ISSUE_STATUS_AWAIT_SOURCE,
+          ],
+        },
+      }),
     )
     expect(db().select().from(sessionAwaits).all()).toHaveLength(0)
   })
@@ -405,15 +405,15 @@ describe('session-await trigger', () => {
       workspaceId,
       source: 'manual',
       filterJson: '{}',
-      reason: 'Waiting for a human to trigger this session'
+      reason: 'Waiting for a human to trigger this session',
     })
 
     expect(result).toEqual(
       expect.objectContaining({
         chatSessionId: sessionId,
         source: 'manual',
-        status: 'pending'
-      })
+        status: 'pending',
+      }),
     )
   })
 
@@ -425,12 +425,12 @@ describe('session-await trigger', () => {
         chatSessionId: sessionId,
         workspaceId,
         source: 'timer',
-        filterJson: '{}'
-      })
+        filterJson: '{}',
+      }),
     ).rejects.toEqual(
       expect.objectContaining({
-        code: 'session_await_timer_fire_at_required'
-      })
+        code: 'session_await_timer_fire_at_required',
+      }),
     )
 
     await expect(
@@ -439,12 +439,12 @@ describe('session-await trigger', () => {
         workspaceId,
         source: 'manual',
         filterJson: '{}',
-        fireAt: 200
-      })
+        fireAt: 200,
+      }),
     ).rejects.toEqual(
       expect.objectContaining({
-        code: 'session_await_fire_at_unsupported'
-      })
+        code: 'session_await_fire_at_unsupported',
+      }),
     )
   })
 
@@ -456,15 +456,15 @@ describe('session-await trigger', () => {
       workspaceId,
       source: 'timer',
       filterJson: '{}',
-      fireAt: 0
+      fireAt: 0,
     })
 
     expect(result).toEqual(
       expect.objectContaining({
         source: 'timer',
         fireAt: 0,
-        status: 'pending'
-      })
+        status: 'pending',
+      }),
     )
   })
 
@@ -472,7 +472,7 @@ describe('session-await trigger', () => {
     const { workspaceId, sessionId } = seedSession()
     const issue = Issue.createIssue({
       workspaceId,
-      title: 'Not delegated yet'
+      title: 'Not delegated yet',
     })
 
     await expect(
@@ -482,13 +482,13 @@ describe('session-await trigger', () => {
         source: CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
         filterJson: JSON.stringify({
           issueIds: [issue.id],
-          mode: 'all-current-delegations'
-        })
-      })
+          mode: 'all-current-delegations',
+        }),
+      }),
     ).rejects.toEqual(
       expect.objectContaining({
-        code: 'cradle_issue_agent_await_target_invalid'
-      })
+        code: 'cradle_issue_agent_await_target_invalid',
+      }),
     )
   })
 
@@ -498,7 +498,7 @@ describe('session-await trigger', () => {
       title: 'Worker target',
       agentSessionId: 'agent-session-original',
       status: 'active',
-      createdAt: 100
+      createdAt: 100,
     })
 
     const row = await register({
@@ -507,8 +507,8 @@ describe('session-await trigger', () => {
       source: CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
       filterJson: JSON.stringify({
         issueIds: [delegated.issueId],
-        mode: 'all-current-delegations'
-      })
+        mode: 'all-current-delegations',
+      }),
     })
 
     expect(JSON.parse(row.filterJson)).toEqual({
@@ -516,9 +516,9 @@ describe('session-await trigger', () => {
       issues: [
         {
           issueId: delegated.issueId,
-          agentSessionId: 'agent-session-original'
-        }
-      ]
+          agentSessionId: 'agent-session-original',
+        },
+      ],
     })
 
     db()
@@ -531,7 +531,7 @@ describe('session-await trigger', () => {
         chatSessionId: null,
         status: 'completed',
         createdAt: 200,
-        updatedAt: 200
+        updatedAt: 200,
       })
       .run()
 
@@ -539,8 +539,8 @@ describe('session-await trigger', () => {
 
     expect(db().select().from(sessionAwaits).where(eq(sessionAwaits.id, row.id)).get()).toEqual(
       expect.objectContaining({
-        status: 'pending'
-      })
+        status: 'pending',
+      }),
     )
     expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
 
@@ -556,12 +556,12 @@ describe('session-await trigger', () => {
     expect(db().select().from(sessionAwaits).where(eq(sessionAwaits.id, row.id)).get()).toEqual(
       expect.objectContaining({
         status: 'triggered',
-        failureKind: null
-      })
+        failureKind: null,
+      }),
     )
     expect(mockedEnqueueSessionQueueItem).toHaveBeenCalledWith({
       sessionId,
-      text: expect.stringContaining('Cradle issue agent work finished.')
+      text: expect.stringContaining('Cradle issue agent work finished.'),
     })
   })
 
@@ -570,12 +570,12 @@ describe('session-await trigger', () => {
     const failed = seedDelegatedIssue(workspaceId, {
       title: 'Failed child',
       agentSessionId: 'agent-session-failed',
-      status: 'failed'
+      status: 'failed',
     })
     const stopped = seedDelegatedIssue(workspaceId, {
       title: 'Stopped child',
       agentSessionId: 'agent-session-stopped',
-      status: 'stopped'
+      status: 'stopped',
     })
 
     const row = await register({
@@ -584,8 +584,8 @@ describe('session-await trigger', () => {
       source: CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
       filterJson: JSON.stringify({
         issueIds: [failed.issueId, stopped.issueId],
-        mode: 'all-current-delegations'
-      })
+        mode: 'all-current-delegations',
+      }),
     })
 
     mockedEnqueueSessionQueueItem.mockResolvedValueOnce({} as never)
@@ -595,8 +595,8 @@ describe('session-await trigger', () => {
     expect(updated).toEqual(
       expect.objectContaining({
         status: 'triggered',
-        failureKind: null
-      })
+        failureKind: null,
+      }),
     )
     expect(updated?.resumeText).toContain('failed')
     expect(updated?.resumeText).toContain('stopped')
@@ -605,9 +605,9 @@ describe('session-await trigger', () => {
         source: CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
         results: expect.arrayContaining([
           expect.objectContaining({ agentSessionId: 'agent-session-failed', status: 'failed' }),
-          expect.objectContaining({ agentSessionId: 'agent-session-stopped', status: 'stopped' })
-        ])
-      })
+          expect.objectContaining({ agentSessionId: 'agent-session-stopped', status: 'stopped' }),
+        ]),
+      }),
     )
   })
 
@@ -623,23 +623,23 @@ describe('session-await trigger', () => {
       filterJson: JSON.stringify({
         issueIds: [first.id, second.id],
         mode: 'all',
-        categories: ['completed']
-      })
+        categories: ['completed'],
+      }),
     })
 
     await runOnce()
     expect(db().select().from(sessionAwaits).where(eq(sessionAwaits.id, row.id)).get()).toEqual(
       expect.objectContaining({
-        status: 'pending'
-      })
+        status: 'pending',
+      }),
     )
 
     Issue.moveIssueToStatusName(first.id, 'Done')
     await runOnce()
     expect(db().select().from(sessionAwaits).where(eq(sessionAwaits.id, row.id)).get()).toEqual(
       expect.objectContaining({
-        status: 'pending'
-      })
+        status: 'pending',
+      }),
     )
 
     mockedEnqueueSessionQueueItem.mockResolvedValueOnce({} as never)
@@ -650,8 +650,8 @@ describe('session-await trigger', () => {
     expect(updated).toEqual(
       expect.objectContaining({
         status: 'triggered',
-        failureKind: null
-      })
+        failureKind: null,
+      }),
     )
     expect(JSON.parse(updated?.resumePayloadJson ?? '{}')).toEqual(
       expect.objectContaining({
@@ -659,9 +659,9 @@ describe('session-await trigger', () => {
         mode: 'all',
         results: expect.arrayContaining([
           expect.objectContaining({ issueId: first.id, category: 'completed', matched: true }),
-          expect.objectContaining({ issueId: second.id, category: 'completed', matched: true })
-        ])
-      })
+          expect.objectContaining({ issueId: second.id, category: 'completed', matched: true }),
+        ]),
+      }),
     )
   })
 
@@ -678,8 +678,8 @@ describe('session-await trigger', () => {
       filterJson: JSON.stringify({
         issueIds: [first.id, second.id],
         mode: 'any',
-        statusNames: ['Done']
-      })
+        statusNames: ['Done'],
+      }),
     })
 
     mockedEnqueueSessionQueueItem.mockResolvedValueOnce({} as never)
@@ -690,13 +690,13 @@ describe('session-await trigger', () => {
     expect(updated).toEqual(
       expect.objectContaining({
         status: 'triggered',
-        failureKind: null
-      })
+        failureKind: null,
+      }),
     )
     expect(JSON.parse(updated?.filterJson ?? '{}')).toEqual({
       issueIds: [first.id, second.id],
       mode: 'any',
-      statusIds: [doneStatusId]
+      statusIds: [doneStatusId],
     })
   })
 
@@ -714,7 +714,7 @@ describe('session-await trigger', () => {
           status: 'pending',
           filterJson: '{}',
           reason: 'Second wait',
-          createdAt: 200
+          createdAt: 200,
         },
         {
           id: 'await-older',
@@ -724,8 +724,8 @@ describe('session-await trigger', () => {
           status: 'pending',
           filterJson: '{}',
           reason: 'First wait',
-          createdAt: 100
-        }
+          createdAt: 100,
+        },
       ])
       .run()
 
@@ -734,10 +734,10 @@ describe('session-await trigger', () => {
         awaiting: true,
         pendingCount: 2,
         primaryAwaitId: 'await-older',
-        reason: 'First wait'
-      })
+        reason: 'First wait',
+      }),
     )
-    expect(listBySession(sessionId).map((row) => row.id)).toEqual(['await-newer', 'await-older'])
+    expect(listBySession(sessionId).map(row => row.id)).toEqual(['await-newer', 'await-older'])
   })
 
   it('rejects GitHub CI registration when the commit target is not found', async () => {
@@ -747,8 +747,8 @@ describe('session-await trigger', () => {
       async () =>
         new Response(JSON.stringify({ message: 'Not Found' }), {
           status: 404,
-          headers: { 'content-type': 'application/json' }
-        })
+          headers: { 'content-type': 'application/json' },
+        }),
     ) as typeof fetch
 
     const { workspaceId, sessionId } = seedSession()
@@ -758,13 +758,13 @@ describe('session-await trigger', () => {
         chatSessionId: sessionId,
         workspaceId,
         source: 'github-ci',
-        filterJson: JSON.stringify({ repo: 'acme/app', sha: 'missing-sha' })
-      })
+        filterJson: JSON.stringify({ repo: 'acme/app', sha: 'missing-sha' }),
+      }),
     ).rejects.toEqual(
       expect.objectContaining({
         code: 'github_await_target_invalid',
-        message: 'GitHub CI target not found or inaccessible: acme/app commit missing-sha.'
-      })
+        message: 'GitHub CI target not found or inaccessible: acme/app commit missing-sha.',
+      }),
     )
     expect(db().select().from(sessionAwaits).all()).toHaveLength(0)
   })
@@ -776,16 +776,16 @@ describe('session-await trigger', () => {
       async () =>
         new Response(JSON.stringify({ message: 'Not Found' }), {
           status: 404,
-          headers: { 'content-type': 'application/json' }
-        })
+          headers: { 'content-type': 'application/json' },
+        }),
     ) as typeof fetch
 
     await expect(fetchAvailableChecks('acme', 'missing')).rejects.toEqual(
       expect.objectContaining({
         code: 'github_repo_not_found',
         status: 404,
-        message: 'Repository acme/missing not found or inaccessible'
-      })
+        message: 'Repository acme/missing not found or inaccessible',
+      }),
     )
   })
 })

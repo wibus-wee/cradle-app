@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import { getServerUrl } from '~/lib/electron'
 import type { ChronicleSearchHit } from '~/features/search/types'
+import { getServerUrl } from '~/lib/electron'
 
 import { ChronicleSearchHitsSchema } from './chronicle-search-normalize'
 

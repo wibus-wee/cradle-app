@@ -12,8 +12,8 @@ import { Markdown } from 'tiptap-markdown'
 
 import { toastManager } from '~/components/ui/toast'
 import { withAssetDisplaySize } from '~/features/assets/asset-url'
-import { cn } from '~/lib/cn'
 import { getI18n } from '~/i18n/instance'
+import { cn } from '~/lib/cn'
 
 import { AssetImage } from './asset-image-extension'
 import { EditorBubbleMenu } from './editor-bubble-menu'

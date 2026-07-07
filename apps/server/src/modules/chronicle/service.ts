@@ -676,7 +676,7 @@ interface CrystallizedKnowledgeCardDraft {
 
 function stripModelJsonMarkdownFence(raw: string): string {
   const trimmed = raw.trim()
-  const fenced = /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i.exec(trimmed)
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\n?```$/i.exec(trimmed)
   return fenced ? fenced[1].trim() : trimmed
 }
 

@@ -13,10 +13,10 @@ import type { TerminalChatMessageStatus } from './stream-chunks'
  * call this before writing and stop if the run is already terminal or missing,
  * so a stale active run cannot reverse a terminal fact.
  */
-export type RunWriteFence =
-  | { status: 'streaming' }
-  | { status: TerminalChatMessageStatus; errorText: string | null }
-  | { status: 'missing' }
+export type RunWriteFence
+  = | { status: 'streaming' }
+    | { status: TerminalChatMessageStatus, errorText: string | null }
+    | { status: 'missing' }
 
 export function readRunWriteFence(runId: string): RunWriteFence {
   const run = db().select().from(backendRuns).where(eq(backendRuns.id, runId)).get()

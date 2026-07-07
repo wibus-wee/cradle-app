@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import type { SkillInventoryEntry } from '../src/modules/skills/skills.store'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 interface DiscoveredSkill {
   name: string

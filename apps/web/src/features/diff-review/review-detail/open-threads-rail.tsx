@@ -1,7 +1,7 @@
 import {
-  RightSmallLine as ChevronRightIcon,
+  CloseLine as XIcon,
   Message4Line as MessagesSquareIcon,
-  CloseLine as XIcon
+  RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
 
 import { Button } from '~/components/ui/button'

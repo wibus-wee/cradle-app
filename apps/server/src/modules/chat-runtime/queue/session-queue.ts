@@ -1,6 +1,5 @@
-import type { FileUIPart, UIMessage } from 'ai'
-
 import { chatSessionQueueItems } from '@cradle/db'
+import type { FileUIPart, UIMessage } from 'ai'
 import { and, eq } from 'drizzle-orm'
 
 import { AppError } from '../../../errors/app-error'
@@ -9,13 +8,13 @@ import type { ChatContextPart } from '../context-parts'
 import type {
   ChatRuntimeSettings,
   ChatRuntimeSettingsPatch,
-  ChatThinkingEffort
+  ChatThinkingEffort,
 } from '../runtime-provider-types'
 import {
   DEFAULT_RUNTIME_SETTINGS,
   mergeRuntimeSettings,
   normalizeRuntimeAccessMode,
-  normalizeRuntimeInteractionMode
+  normalizeRuntimeInteractionMode,
 } from '../runtime-settings'
 
 export type PersistedThinkingEffort = Extract<ChatThinkingEffort, 'low' | 'medium' | 'high' | 'xhigh'>
@@ -95,14 +94,15 @@ type QueueItemRow = typeof chatSessionQueueItems.$inferSelect
 export function parseQueueFiles(filesJson: string): FileUIPart[] {
   try {
     return JSON.parse(filesJson) as FileUIPart[]
-  } catch (error) {
+  }
+ catch (error) {
     throw new AppError({
       code: 'chat_queue_item_invalid',
       status: 500,
       message: 'Stored chat queue item is invalid',
       details: {
-        reason: error instanceof Error ? error.message : 'Invalid file attachment payload'
-      }
+        reason: error instanceof Error ? error.message : 'Invalid file attachment payload',
+      },
     })
   }
 }
@@ -110,14 +110,15 @@ export function parseQueueFiles(filesJson: string): FileUIPart[] {
 export function parseQueueContextParts(contextPartsJson: string): ChatContextPart[] {
   try {
     return JSON.parse(contextPartsJson) as ChatContextPart[]
-  } catch (error) {
+  }
+ catch (error) {
     throw new AppError({
       code: 'chat_queue_item_invalid',
       status: 500,
       message: 'Stored chat queue item is invalid',
       details: {
-        reason: error instanceof Error ? error.message : 'Invalid context part payload'
-      }
+        reason: error instanceof Error ? error.message : 'Invalid context part payload',
+      },
     })
   }
 }
@@ -132,17 +133,17 @@ export function serializeQueueContextParts(contextParts: ChatContextPart[]): str
 
 export function readQueueItemRuntimeSettings(
   row: Pick<QueueItemRow, 'permissionMode' | 'runtimeAccessMode' | 'runtimeInteractionMode'>,
-  sessionRuntimeSettings: ChatRuntimeSettings
+  sessionRuntimeSettings: ChatRuntimeSettings,
 ): ChatRuntimeSettings {
-  const accessMode =
-    normalizeRuntimeAccessMode(row.runtimeAccessMode) ??
-    (row.permissionMode === 'plan' ? 'approval-required' : DEFAULT_RUNTIME_SETTINGS.accessMode)
-  const interactionMode =
-    normalizeRuntimeInteractionMode(row.runtimeInteractionMode) ??
-    (row.permissionMode === 'plan' ? 'plan' : DEFAULT_RUNTIME_SETTINGS.interactionMode)
+  const accessMode
+    = normalizeRuntimeAccessMode(row.runtimeAccessMode)
+      ?? (row.permissionMode === 'plan' ? 'approval-required' : DEFAULT_RUNTIME_SETTINGS.accessMode)
+  const interactionMode
+    = normalizeRuntimeInteractionMode(row.runtimeInteractionMode)
+      ?? (row.permissionMode === 'plan' ? 'plan' : DEFAULT_RUNTIME_SETTINGS.interactionMode)
   return mergeRuntimeSettings(sessionRuntimeSettings, {
     accessMode,
-    interactionMode
+    interactionMode,
   })
 }
 
@@ -154,7 +155,7 @@ export function readPersistedThinkingEffort(effort: unknown): PersistedThinkingE
 
 export function toQueueItemDto(
   row: QueueItemRow,
-  sessionRuntimeSettings: ChatRuntimeSettings = DEFAULT_RUNTIME_SETTINGS
+  sessionRuntimeSettings: ChatRuntimeSettings = DEFAULT_RUNTIME_SETTINGS,
 ): ChatSessionQueueItemDto {
   const runtimeSettings = readQueueItemRuntimeSettings(row, sessionRuntimeSettings)
   return {
@@ -174,7 +175,7 @@ export function toQueueItemDto(
     startedRunId: row.startedRunId,
     errorText: row.errorText,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -184,7 +185,7 @@ export function compareQueueRows(left: QueueItemRow, right: QueueItemRow): numbe
     pending: 1,
     completed: 2,
     cancelled: 2,
-    failed: 2
+    failed: 2,
   }
   const leftRank = statusRank[left.status] ?? 3
   const rightRank = statusRank[right.status] ?? 3
@@ -205,8 +206,8 @@ export function listPendingQueueRows(sessionId: string): QueueItemRow[] {
       and(
         eq(chatSessionQueueItems.sessionId, sessionId),
         eq(chatSessionQueueItems.mode, 'queue'),
-        eq(chatSessionQueueItems.status, 'pending')
-      )
+        eq(chatSessionQueueItems.status, 'pending'),
+      ),
     )
     .orderBy(chatSessionQueueItems.position, chatSessionQueueItems.createdAt)
     .all()

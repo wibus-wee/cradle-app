@@ -1,5 +1,5 @@
-import { realpath, stat } from 'node:fs/promises'
 import { realpathSync, statSync } from 'node:fs'
+import { realpath, stat } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 
 import { AppError } from '../../errors/app-error'

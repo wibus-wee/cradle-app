@@ -16,7 +16,7 @@ export const relayTransport = new Elysia({
 })
   .get('/host-enrollments', () => HostEnrollment.listHostEnrollments(), {
     detail: {
-      summary: 'List relay host enrollments',
+      'summary': 'List relay host enrollments',
       'x-cradle-cli': { command: ['relay-transport', 'host-enrollment', 'list'] },
     },
     response: { 200: t.Array(RelayHostEnrollmentModel.hostEnrollment) },
@@ -27,7 +27,7 @@ export const relayTransport = new Elysia({
     relayUrl: body.relayUrl,
   }), {
     detail: {
-      summary: 'Create a relay host enrollment and start pairing',
+      'summary': 'Create a relay host enrollment and start pairing',
       'x-cradle-cli': { command: ['relay-transport', 'host-enrollment', 'create'] },
     },
     body: RelayHostEnrollmentModel.createEnrollmentBody,
@@ -35,7 +35,7 @@ export const relayTransport = new Elysia({
   })
   .get('/host-enrollments/:enrollmentId', ({ params }) => HostEnrollment.readHostEnrollment(params.enrollmentId), {
     detail: {
-      summary: 'Read a relay host enrollment',
+      'summary': 'Read a relay host enrollment',
       'x-cradle-cli': { command: ['relay-transport', 'host-enrollment', 'get'] },
     },
     params: RelayHostEnrollmentModel.enrollmentIdParams,
@@ -43,7 +43,7 @@ export const relayTransport = new Elysia({
   })
   .get('/host-enrollments/:enrollmentId/pairing-string', ({ params }) => HostEnrollment.readHostEnrollmentPairingString(params.enrollmentId), {
     detail: {
-      summary: 'Re-read the pairing string for an enrollment',
+      'summary': 'Re-read the pairing string for an enrollment',
       'x-cradle-cli': { command: ['relay-transport', 'host-enrollment', 'pairing-string'] },
     },
     params: RelayHostEnrollmentModel.enrollmentIdParams,
@@ -54,7 +54,7 @@ export const relayTransport = new Elysia({
     return { ok: true as const }
   }, {
     detail: {
-      summary: 'Delete a relay host enrollment',
+      'summary': 'Delete a relay host enrollment',
       'x-cradle-cli': { command: ['relay-transport', 'host-enrollment', 'delete'] },
     },
     params: RelayHostEnrollmentModel.enrollmentIdParams,

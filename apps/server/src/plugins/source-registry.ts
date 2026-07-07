@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
-import { pluginSources } from '@cradle/db'
 import type { PluginSource } from '@cradle/db'
+import { pluginSources } from '@cradle/db'
 import { eq, sql } from 'drizzle-orm'
 
 import { db } from '../infra'
@@ -19,7 +19,7 @@ export interface AddPluginSourceInput {
 
 function trimNullable(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
-  return trimmed ? trimmed : null
+  return trimmed || null
 }
 
 export function listPluginSources(): PluginSource[] {

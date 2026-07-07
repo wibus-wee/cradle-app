@@ -1,4 +1,3 @@
-import type { DiffReviewFile } from '@cradle/db'
 import { diffReviewFiles } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
@@ -25,9 +24,7 @@ export function normalizeCommitPlanGroups(
     })
   }
 
-  const files = db().select().from(diffReviewFiles)
-    .where(eq(diffReviewFiles.revisionId, revisionId))
-    .all()
+  const files = db().select().from(diffReviewFiles).where(eq(diffReviewFiles.revisionId, revisionId)).all()
   const fileById = new Map(files.map(file => [file.id, file]))
   const groupIds = new Set<string>()
   const fileIdToGroupIds = new Map<string, string[]>()
@@ -69,7 +66,8 @@ export function normalizeCommitPlanGroups(
       const existing = fileIdToGroupIds.get(fileId)
       if (existing) {
         existing.push(group.id)
-      } else {
+      }
+ else {
         fileIdToGroupIds.set(fileId, [group.id])
       }
       paths.push(file.path)
@@ -117,12 +115,10 @@ export function commitGroupsForPlan(
   revisionId: string,
   groups: ReviewCommitPlanGroupView[],
 ): GitCommitFileGroupInput[] {
-  const files = db().select().from(diffReviewFiles)
-    .where(eq(diffReviewFiles.revisionId, revisionId))
-    .all()
+  const files = db().select().from(diffReviewFiles).where(eq(diffReviewFiles.revisionId, revisionId)).all()
   const fileById = new Map(files.map(file => [file.id, file]))
   const committedFileIds = new Set<string>()
-  return groups.map(group => {
+  return groups.map((group) => {
     const paths: string[] = []
     for (const fileId of group.fileIds) {
       if (committedFileIds.has(fileId)) {

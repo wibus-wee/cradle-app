@@ -5,7 +5,7 @@ import { getSessionRuntimeSettings, updateSessionRuntimeSettings } from '../runt
 import { regenerateSessionTitle } from '../title-service'
 
 export const chatRuntimeSettingsRoutes = new Elysia({
-  detail: { tags: ['chat-runtime'] }
+  detail: { tags: ['chat-runtime'] },
 })
   // POST /chat/sessions/:sessionId/title/regenerate -> regenerate the persisted session title through the active runtime
   .post(
@@ -15,11 +15,11 @@ export const chatRuntimeSettingsRoutes = new Elysia({
     },
     {
       detail: {
-        summary: 'Regenerate chat session title'
+        summary: 'Regenerate chat session title',
       },
       params: ChatRuntimeModel.sessionIdParams,
-      response: { 200: ChatRuntimeModel.regeneratedTitleResponse }
-    }
+      response: { 200: ChatRuntimeModel.regeneratedTitleResponse },
+    },
   )
   // GET /chat/sessions/:sessionId/runtime-settings -> read Cradle-owned runtime controls
   .get(
@@ -29,14 +29,14 @@ export const chatRuntimeSettingsRoutes = new Elysia({
     },
     {
       detail: {
-        summary: 'Get runtime settings for a chat session',
+        'summary': 'Get runtime settings for a chat session',
         'x-cradle-cli': {
-          command: ['chat', 'runtime-settings', 'get']
-        }
+          command: ['chat', 'runtime-settings', 'get'],
+        },
       },
       params: ChatRuntimeModel.sessionIdParams,
-      response: { 200: ChatRuntimeModel.runtimeSettingsResponse }
-    }
+      response: { 200: ChatRuntimeModel.runtimeSettingsResponse },
+    },
   )
   // PATCH /chat/sessions/:sessionId/runtime-settings -> update Cradle-owned runtime controls
   .patch(
@@ -44,18 +44,18 @@ export const chatRuntimeSettingsRoutes = new Elysia({
     async ({ params, body }) => {
       return await updateSessionRuntimeSettings({
         sessionId: params.sessionId,
-        patch: body
+        patch: body,
       })
     },
     {
       detail: {
-        summary: 'Update runtime settings for a chat session',
+        'summary': 'Update runtime settings for a chat session',
         'x-cradle-cli': {
-          command: ['chat', 'runtime-settings', 'set']
-        }
+          command: ['chat', 'runtime-settings', 'set'],
+        },
       },
       params: ChatRuntimeModel.sessionIdParams,
       body: ChatRuntimeModel.runtimeSettingsBody,
-      response: { 200: ChatRuntimeModel.runtimeSettingsResponse }
-    }
+      response: { 200: ChatRuntimeModel.runtimeSettingsResponse },
+    },
   )

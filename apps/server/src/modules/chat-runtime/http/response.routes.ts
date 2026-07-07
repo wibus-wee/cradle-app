@@ -4,8 +4,8 @@ import { createChildLogger } from '../../../logging/logger'
 import { ChatRuntimeModel } from '../model'
 import { bindReadableStreamToAbortSignal } from '../stream/sse'
 import { readChatThinkingEffort, readOptionalModelId } from './request-normalizers'
-import { loadChatRuntime } from './runtime-loader'
 import type { ChatRuntimeService } from './runtime-loader'
+import { loadChatRuntime } from './runtime-loader'
 
 type StreamResponseInput = Parameters<ChatRuntimeService['streamResponse']>[0]
 
@@ -14,7 +14,7 @@ const DESKTOP_UPSTREAM_MODE_HEADER = 'x-cradle-desktop-chat-upstream-mode'
 const responseLogger = createChildLogger({ module: 'chat-runtime.response' })
 
 export const chatRuntimeResponseRoutes = new Elysia({
-  detail: { tags: ['chat-runtime'] }
+  detail: { tags: ['chat-runtime'] },
 })
   // POST /chat/sessions/:sessionId/response -> SSE stream (send message and get streaming response)
   .post(
@@ -54,7 +54,7 @@ export const chatRuntimeResponseRoutes = new Elysia({
           providerTargetId: body.providerTargetId?.trim() || undefined,
           modelId: readOptionalModelId(body.modelId),
           thinkingEffort: readChatThinkingEffort(body.thinkingEffort),
-          runtimeSettings: body.runtimeSettings
+          runtimeSettings: body.runtimeSettings,
         })
         accepted = true
         request.signal.removeEventListener('abort', logAbortBeforeHeaders)
@@ -69,13 +69,14 @@ export const chatRuntimeResponseRoutes = new Elysia({
           headers: {
             'content-type': 'text/event-stream',
             'cache-control': 'no-cache',
-            connection: 'keep-alive',
+            'connection': 'keep-alive',
             'x-cradle-run-id': response.runId,
             'x-cradle-assistant-message-id': response.assistantMessageId,
-            'x-cradle-user-message-id': response.userMessageId
-          }
+            'x-cradle-user-message-id': response.userMessageId,
+          },
         })
-      } catch (err) {
+      }
+ catch (err) {
         request.signal.removeEventListener('abort', logAbortBeforeHeaders)
         responseLogger.error('chat response request failed before headers', {
           ...baseFields,
@@ -95,18 +96,18 @@ export const chatRuntimeResponseRoutes = new Elysia({
             content: {
               'text/event-stream': {
                 schema: {
-                  type: 'string'
+                  type: 'string',
                 },
                 example:
-                  'data: {"type":"start","messageId":"msg_main"}\n\ndata: {"type":"text-start","id":"text_1"}\n\ndata: {"type":"text-delta","id":"text_1","delta":"Hello"}\n\ndata: {"type":"text-end","id":"text_1"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n'
-              }
-            }
-          }
-        }
+                  'data: {"type":"start","messageId":"msg_main"}\n\ndata: {"type":"text-start","id":"text_1"}\n\ndata: {"type":"text-delta","id":"text_1","delta":"Hello"}\n\ndata: {"type":"text-end","id":"text_1"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
+              },
+            },
+          },
+        },
       },
       params: ChatRuntimeModel.sessionIdParams,
-      body: ChatRuntimeModel.responseBody
-    }
+      body: ChatRuntimeModel.responseBody,
+    },
   )
   // POST /chat/side-conversations/:sideConversationId/response -> stream a live-only side conversation turn
   .post(
@@ -121,24 +122,24 @@ export const chatRuntimeResponseRoutes = new Elysia({
         contextParts: body.contextParts,
         modelId: readOptionalModelId(body.modelId),
         thinkingEffort: readChatThinkingEffort(body.thinkingEffort),
-        runtimeSettings: body.runtimeSettings
+        runtimeSettings: body.runtimeSettings,
       })
       return new Response(response.stream, {
         headers: {
           'content-type': 'text/event-stream',
           'cache-control': 'no-cache',
-          connection: 'keep-alive',
+          'connection': 'keep-alive',
           'x-cradle-run-id': response.runId,
           'x-cradle-assistant-message-id': response.assistantMessageId,
-          'x-cradle-user-message-id': response.userMessageId
-        }
+          'x-cradle-user-message-id': response.userMessageId,
+        },
       })
     },
     {
       detail: {
-        summary: 'Send message and stream response for a live-only side conversation'
+        summary: 'Send message and stream response for a live-only side conversation',
       },
       params: ChatRuntimeModel.sideConversationParams,
-      body: ChatRuntimeModel.responseBody
-    }
+      body: ChatRuntimeModel.responseBody,
+    },
   )

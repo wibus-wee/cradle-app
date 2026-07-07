@@ -1,12 +1,10 @@
-import type { UIMessage } from 'ai'
 import {
+  Chat1Line as MessageCircleIcon,
   ClipboardLine as ClipboardIcon,
   DownloadLine as DownloadIcon,
   PicLine as ImageDownIcon,
-  Chat1Line as MessageCircleIcon
 } from '@mingcute/react'
-
-import { Spinner } from '~/components/ui/spinner'
+import type { UIMessage } from 'ai'
 import { domToPng } from 'modern-screenshot'
 import { useRef, useState } from 'react'
 
@@ -21,10 +19,12 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { ScrollArea } from '~/components/ui/scroll-area'
+import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 import { chatSelectors, useChatStore } from '~/store/chat'
+
 import { MessageBubble } from '../rendering/message-bubble'
 
 type ExportScope = 'all' | 'selected'

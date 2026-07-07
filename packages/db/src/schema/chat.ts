@@ -5,8 +5,8 @@ import { index, int, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sq
 import { agents } from './identity'
 import { issues } from './issue'
 import { providerTargets } from './provider-target'
-import { worktrees } from './worktree'
 import { createdAt, textPk, timestamps, workspaces } from './shared'
+import { worktrees } from './worktree'
 
 export const sessions = sqliteTable('sessions', {
   id: textPk(),

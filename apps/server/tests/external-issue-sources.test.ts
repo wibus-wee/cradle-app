@@ -9,9 +9,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { workspaceFixture } from './helpers/workspace-fixture'
 import { resetTokenCache } from '../src/lib/github-api'
 import { registerExternalIssueSource } from '../src/plugins/external-issue-source-registry'
+import { workspaceFixture } from './helpers/workspace-fixture'
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
@@ -320,7 +320,10 @@ describe('external issue sources capability', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
       }))
-      while (readCount === 0) {
+      for (;;) {
+        if (readCount > 0) {
+          break
+        }
         await new Promise(resolve => setTimeout(resolve, 0))
       }
       await new Promise(resolve => setTimeout(resolve, 0))

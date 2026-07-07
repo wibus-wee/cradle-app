@@ -6,7 +6,8 @@ import { mkdir, mkdtemp, open, readdir, readFile, realpath, rename, rm, stat, wr
 import { tmpdir } from 'node:os'
 import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:path'
 
-import { FileFinder, type MixedItem } from '@ff-labs/fff-node'
+import type { MixedItem } from '@ff-labs/fff-node'
+import { FileFinder } from '@ff-labs/fff-node'
 import ignore from 'ignore'
 
 import { createChildLogger } from '../../logging/logger'

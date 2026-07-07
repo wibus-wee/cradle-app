@@ -1,12 +1,12 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ClockLine as ClockIcon,
+  DeleteLine as Trash2Icon,
   More2Line as MoreHorizontalIcon,
   Plugin2Line as PlugZapIcon,
   PowerLine as PowerIcon,
   Refresh1Line as RefreshCwIcon,
-  DeleteLine as Trash2Icon
 } from '@mingcute/react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -407,7 +407,11 @@ export function ExternalIssueSourceSettings() {
               <TooltipContent side="bottom" className="max-w-xs space-y-1 text-xs">
                 {errorBindings.map(b => (
                   <div key={b.id}>
-                    <span className="font-medium">{b.repositoryOwner}/{b.repositoryName}</span>
+                    <span className="font-medium">
+{b.repositoryOwner}
+/
+{b.repositoryName}
+                    </span>
                     {b.lastRefreshError && (
                       <span className="block text-muted-foreground">{b.lastRefreshError}</span>
                     )}

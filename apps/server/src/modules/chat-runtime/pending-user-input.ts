@@ -8,10 +8,10 @@ import {
   recordRuntimeInteractionResolved,
 } from './interaction/event-recorder'
 import type {
+  RuntimeUiSlotState,
   RuntimeUserInputRequest,
   RuntimeUserInputResolution,
   RuntimeUserInputUiSlotState,
-  RuntimeUiSlotState
 } from './runtime-provider-types'
 
 interface PendingUserInputState {
@@ -43,7 +43,7 @@ export function setRuntimeUserInputPublisher(nextPublisher: RuntimeUserInputPubl
 }
 
 export async function requestRuntimeUserInput(
-  input: RuntimeUserInputRequest
+  input: RuntimeUserInputRequest,
 ): Promise<RuntimeUserInputResolution> {
   const pendingKey = readPendingKey(input.sessionId, input.providerRequestId)
   if (pendingUserInputById.has(pendingKey)) {
@@ -52,8 +52,8 @@ export async function requestRuntimeUserInput(
         code: 'chat_runtime_user_input_duplicate',
         status: 409,
         message: 'Runtime user input request is already pending',
-        details: { requestId: input.providerRequestId, sessionId: input.sessionId }
-      })
+        details: { requestId: input.providerRequestId, sessionId: input.sessionId },
+      }),
     )
   }
 
@@ -63,7 +63,7 @@ export async function requestRuntimeUserInput(
       request: input,
       createdAt,
       resolve,
-      reject
+      reject,
     })
   })
 
@@ -78,9 +78,10 @@ export async function requestRuntimeUserInput(
       providerMethod: input.providerMethod,
       toolCallId: input.toolCallId,
       questionCount: input.questions.length,
-      createdAt
+      createdAt,
     })
-  } catch (error) {
+  }
+ catch (error) {
     const current = pendingUserInputById.get(pendingKey)
     if (current?.request === input) {
       pendingUserInputById.delete(pendingKey)
@@ -104,14 +105,14 @@ export async function submitRuntimeUserInput(input: {
       code: 'chat_runtime_user_input_not_found',
       status: 404,
       message: 'Pending runtime user input request was not found',
-      details: { requestId: input.requestId, sessionId: input.sessionId }
+      details: { requestId: input.requestId, sessionId: input.sessionId },
     })
   }
 
   pendingUserInputById.delete(pendingKey)
   const resolution: RuntimeUserInputResolution = {
     requestId: input.requestId,
-    answers: input.answers
+    answers: input.answers,
   }
   pending.resolve(resolution)
   publisher?.(pending.request.runId, {
@@ -121,8 +122,8 @@ export async function submitRuntimeUserInput(input: {
       type: 'cradle.runtime-user-input.resolved.v1',
       requestId: input.requestId,
       answers: input.answers,
-      acceptedAt: currentUnixSeconds()
-    }
+      acceptedAt: currentUnixSeconds(),
+    },
   })
   await recordRuntimeInteractionResolved({
     sessionId: pending.request.sessionId,
@@ -130,7 +131,7 @@ export async function submitRuntimeUserInput(input: {
     requestId: input.requestId,
     interactionKind: 'userInput',
     resolution: 'submitted',
-    updatedAt: currentUnixSeconds()
+    updatedAt: currentUnixSeconds(),
   })
   return resolution
 }
@@ -156,7 +157,7 @@ export function listPendingRuntimeUserInputStates(input: {
       questionCount: pending.request.questions.length,
       questions: pending.request.questions,
       createdAt: pending.createdAt,
-      updatedAt: pending.createdAt
+      updatedAt: pending.createdAt,
     })
   }
   return states.sort((a, b) => a.createdAt - b.createdAt || a.requestId.localeCompare(b.requestId))
@@ -183,7 +184,7 @@ export function listPendingRuntimeUserInputSummaries(input: {
       questionCount: pending.request.questions.length,
       firstQuestion: pending.request.questions[0]?.question ?? null,
       createdAt: pending.createdAt,
-      updatedAt: pending.createdAt
+      updatedAt: pending.createdAt,
     })
   }
   return summaries.sort((a, b) => a.createdAt - b.createdAt || a.requestId.localeCompare(b.requestId))
@@ -195,12 +196,12 @@ export function appendPendingRuntimeUserInputSlotStates(
     sessionId: string
     runtimeKind: RuntimeKind
     threadId: string | null
-  }
+  },
 ): RuntimeUiSlotState[] {
   const pendingStates = listPendingRuntimeUserInputStates({
     sessionId: input.sessionId,
     slotId: `${input.runtimeKind}:user-input`,
-    threadId: input.threadId
+    threadId: input.threadId,
   })
   if (pendingStates.length === 0) {
     return states
@@ -208,9 +209,8 @@ export function appendPendingRuntimeUserInputSlotStates(
   const pendingRequestIds = new Set(pendingStates.map(state => state.requestId))
   return [
     ...states.filter(state =>
-      state.kind !== 'userInput' || !pendingRequestIds.has(state.requestId)
-    ),
-    ...pendingStates
+      state.kind !== 'userInput' || !pendingRequestIds.has(state.requestId)),
+    ...pendingStates,
   ]
 }
 
@@ -227,7 +227,7 @@ export function rejectPendingUserInputsForRun(runId: string, error: Error): void
       requestId: pending.request.providerRequestId,
       interactionKind: 'userInput',
       resolution: 'cancelled',
-      updatedAt: currentUnixSeconds()
+      updatedAt: currentUnixSeconds(),
     }).catch(() => undefined)
   }
 }

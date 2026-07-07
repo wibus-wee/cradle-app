@@ -1,19 +1,19 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 
+import { serializeChatError } from '../run/errors'
+import type { FinalMessageProjectionRun } from '../run/final-message-projection'
 import {
   createFinalMessageProjectionState,
   flushFinalMessageProjection,
-  projectFinalMessageChunk
+  projectFinalMessageChunk,
 } from '../run/final-message-projection'
-import type { FinalMessageProjectionRun } from '../run/final-message-projection'
-import { serializeChatError } from '../run/errors'
 import { isTerminalUIMessageChunk } from '../run/stream-chunks'
 import type {
   ChatRuntime,
   ChatRuntimeSettings,
   ChatThinkingEffort,
   RuntimeProviderTargetProfile,
-  RuntimeSession
+  RuntimeSession,
 } from '../runtime-provider-types'
 import { createAssistantMessage } from '../ui-message'
 
@@ -36,7 +36,7 @@ export interface LiveSideConversationStreamInput {
 }
 
 export function createLiveSideConversationStream(
-  input: LiveSideConversationStreamInput
+  input: LiveSideConversationStreamInput,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
   const controller = new AbortController()
@@ -74,10 +74,10 @@ export function createLiveSideConversationStream(
             input.thinkingEffort || input.runtimeSettings
               ? {
                   ...(input.thinkingEffort ? { thinkingEffort: input.thinkingEffort } : {}),
-                  runtimeSettings: input.runtimeSettings
+                  runtimeSettings: input.runtimeSettings,
                 }
               : undefined,
-          systemPrompt: input.systemPrompt
+          systemPrompt: input.systemPrompt,
         })) {
           if (controller.signal.aborted) {
             publish({ type: 'abort', reason: 'user' }, true)
@@ -100,13 +100,16 @@ export function createLiveSideConversationStream(
         if (completed) {
           input.onComplete?.(sideProjection.finalMessage)
         }
-      } catch (error) {
+      }
+ catch (error) {
         if (controller.signal.aborted) {
           publish({ type: 'abort', reason: 'user' }, true)
-        } else {
+        }
+ else {
           publish({ type: 'error', errorText: serializeChatError(error).text }, true)
         }
-      } finally {
+      }
+ finally {
         streamController.close()
       }
     },
@@ -115,18 +118,19 @@ export function createLiveSideConversationStream(
       try {
         await input.runtime.cancelTurn({
           runtimeSession: input.runtimeSession,
-          profile: input.profile
+          profile: input.profile,
         })
-      } catch {
+      }
+ catch {
         /* best-effort live side cancellation */
       }
-    }
+    },
   })
 }
 
 function createSideMessageProjection(messageId: string): FinalMessageProjectionRun {
   return {
     finalMessage: createAssistantMessage(messageId),
-    finalProjection: createFinalMessageProjectionState()
+    finalProjection: createFinalMessageProjectionState(),
   }
 }

@@ -5,7 +5,7 @@ import {
   LaptopLine as LaptopIcon,
   Refresh1Line as RefreshCwIcon,
   ServerLine as ServerIcon,
-  WarningLine as TriangleAlertIcon
+  WarningLine as TriangleAlertIcon,
 } from '@mingcute/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,6 @@ import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import { createStore } from 'zustand/vanilla'
 
-import { BetaNotice } from '~/components/common/beta-notice'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'

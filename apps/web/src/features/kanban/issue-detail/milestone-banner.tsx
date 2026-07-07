@@ -1,6 +1,7 @@
 import { CalendarLine as CalendarIcon, Flag2Line as FlagIcon } from '@mingcute/react'
-import { cn } from '~/lib/cn'
+
 import type { KanbanMilestone } from '~/features/kanban/types'
+import { cn } from '~/lib/cn'
 
 import type { MilestoneProgressSummary } from './milestone-progress'
 

@@ -1,31 +1,31 @@
-import type { ConsumeAccountRateLimitResetCreditParams } from '../app-server-protocol/v2/ConsumeAccountRateLimitResetCreditParams'
-import type { ConsumeAccountRateLimitResetCreditResponse } from '../app-server-protocol/v2/ConsumeAccountRateLimitResetCreditResponse'
-import type { GetAccountResponse } from '../app-server-protocol/v2/GetAccountResponse'
-import type { GetAccountRateLimitsResponse } from '../app-server-protocol/v2/GetAccountRateLimitsResponse'
-import type { GetAccountTokenUsageResponse } from '../app-server-protocol/v2/GetAccountTokenUsageResponse'
-import type { RateLimitSnapshot } from '../app-server-protocol/v2/RateLimitSnapshot'
-import type { RateLimitWindow } from '../app-server-protocol/v2/RateLimitWindow'
-import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
 import { AppError } from '../../../../errors/app-error'
 import { outboundFetch } from '../../../../lib/outbound-network'
 import * as Preferences from '../../../preferences/service'
+import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
 import * as ProviderTargets from '../../../provider-targets/service'
 import * as Secrets from '../../../secrets/service'
-import { CODEX_RUNTIME_KIND } from '../metadata'
+import type { ConsumeAccountRateLimitResetCreditParams } from '../app-server-protocol/v2/ConsumeAccountRateLimitResetCreditParams'
+import type { ConsumeAccountRateLimitResetCreditResponse } from '../app-server-protocol/v2/ConsumeAccountRateLimitResetCreditResponse'
+import type { GetAccountRateLimitsResponse } from '../app-server-protocol/v2/GetAccountRateLimitsResponse'
+import type { GetAccountResponse } from '../app-server-protocol/v2/GetAccountResponse'
+import type { GetAccountTokenUsageResponse } from '../app-server-protocol/v2/GetAccountTokenUsageResponse'
+import type { RateLimitSnapshot } from '../app-server-protocol/v2/RateLimitSnapshot'
+import type { RateLimitWindow } from '../app-server-protocol/v2/RateLimitWindow'
 import { buildCodexConfig } from '../config/runtime-config'
 import { resolveCodexRuntimeContext } from '../config/runtime-context'
-import type { CodexAppServerClientOptions } from './client'
+import { CODEX_RUNTIME_KIND } from '../metadata'
+import type { CodexAppServerClientLike } from '../types'
 import { buildDefaultCodexAppServerRequestResult } from './bridge'
+import type { CodexAppServerAuthResolution } from './chatgpt-auth'
 import {
-  type CodexAppServerAuthResolution,
   ensureCodexChatgptAuthAccessToken,
   readCodexApiKeyAuth,
   readCodexChatgptAuth,
   resolveCodexAppServerAuth,
 } from './chatgpt-auth'
+import type { CodexAppServerClientOptions } from './client'
 import { buildCodexAppServerEnv } from './env'
 import { acquireCodexAppServerHostLease, codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
-import type { CodexAppServerClientLike } from '../types'
 
 export interface CodexRateLimitWindowDiagnostics {
   usedPercent: number
@@ -95,13 +95,13 @@ export interface CodexRateLimitResetCreditConsumption {
 
 export type CodexWhamEndpointKey = 'usage' | 'rateLimitResetCredits' | 'referralEligibilityRules'
 
-export type CodexWhamJsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | CodexWhamJsonValue[]
-  | { [key: string]: CodexWhamJsonValue }
+export type CodexWhamJsonValue
+  = | string
+    | number
+    | boolean
+    | null
+    | CodexWhamJsonValue[]
+    | { [key: string]: CodexWhamJsonValue }
 
 export interface CodexWhamEndpointResult {
   key: CodexWhamEndpointKey
@@ -153,9 +153,9 @@ interface UnsupportedCodexAccountDiagnosticsTarget {
   unavailableReason: string
 }
 
-type CodexAccountDiagnosticsTarget =
-  | SupportedCodexAccountDiagnosticsTarget
-  | UnsupportedCodexAccountDiagnosticsTarget
+type CodexAccountDiagnosticsTarget
+  = | SupportedCodexAccountDiagnosticsTarget
+    | UnsupportedCodexAccountDiagnosticsTarget
 
 const DEFAULT_CODEX_ACCOUNT_DIAGNOSTICS_DEPS: CodexAccountDiagnosticsDeps = {
   resolveProviderTarget: ProviderTargets.resolveProviderTarget,

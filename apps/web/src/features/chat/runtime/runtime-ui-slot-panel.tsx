@@ -1,26 +1,26 @@
 import {
-  HeartbeatLine as ActivityIcon,
-  WarningLine as AlertTriangleIcon,
-  RobotLine as BotIcon,
-  RoundLine as CircleIcon,
-  CodeLine as Code2Icon,
   ChipLine as CpuIcon,
-  GitCompareLine as FileDiffIcon,
-  TreeLine as FolderTreeIcon,
-  GitPullRequestLine as GitPullRequestIcon,
+  CodeLine as Code2Icon,
   DriveLine as HardDriveIcon,
-  QuestionLine as HelpCircleIcon,
+  FlashLine as ZapIcon,
+  GitCompareLine as FileDiffIcon,
+  GitPullRequestLine as GitPullRequestIcon,
+  HeartbeatLine as ActivityIcon,
   Key2Line as KeyRoundIcon,
   ListCheckLine as ListChecksIcon,
   PackageLine as PackageIcon,
   Plugin2Line,
+  QuestionLine as HelpCircleIcon,
+  RobotLine as BotIcon,
+  RoundLine as CircleIcon,
   SearchLine as SearchIcon,
   ServerLine as ServerIcon,
   Settings2Line as Settings2Icon,
   SparklesLine as SparklesIcon,
   TerminalLine as TerminalIcon,
   ToolLine as WrenchIcon,
-  FlashLine as ZapIcon
+  TreeLine as FolderTreeIcon,
+  WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
 import type { ComponentType, SVGProps } from 'react'
 
@@ -39,7 +39,7 @@ import type {
   ChatRuntimeUiSlot,
   ChatRuntimeUiSlotIconKey,
   ChatRuntimeUiSlotState,
-  ChatRuntimeUiSlotSurface
+  ChatRuntimeUiSlotSurface,
 } from '../capabilities/chat-capabilities'
 
 interface RuntimeUiSlotPanelProps {
@@ -77,7 +77,7 @@ interface SlotCardLine {
 const GROUP_LABELS: Record<SlotGroupKey, string> = {
   environment: 'Environment',
   activity: 'Activity',
-  available: 'Available'
+  available: 'Available',
 }
 
 const GROUP_ORDER: SlotGroupKey[] = ['environment', 'activity', 'available']
@@ -86,14 +86,14 @@ const RUNTIME_PANEL_OWNED_ELSEWHERE = new Set<ChatRuntimeUiSlotState['kind']>([
   'compact',
   'goal',
   'plan',
-  'progress'
+  'progress',
 ])
 
 const RUNTIME_PANEL_EXCLUDED_ICON_KEYS = new Set<ChatRuntimeUiSlotIconKey>([
   'compact',
   'goal',
   'plan',
-  'progress'
+  'progress',
 ])
 
 const KIND_GROUPS: Partial<Record<ChatRuntimeUiSlotState['kind'], SlotGroupKey>> = {
@@ -114,7 +114,7 @@ const KIND_GROUPS: Partial<Record<ChatRuntimeUiSlotState['kind'], SlotGroupKey>>
   terminal: 'activity',
   toolActivity: 'activity',
   usage: 'environment',
-  userInput: 'activity'
+  userInput: 'activity',
 }
 
 const STATE_ORDER: Record<ChatRuntimeUiSlotState['kind'], number> = {
@@ -138,7 +138,7 @@ const STATE_ORDER: Record<ChatRuntimeUiSlotState['kind'], number> = {
   approvals: 240,
   filesystem: 250,
   search: 260,
-  alert: 270
+  alert: 270,
 }
 
 const SURFACE_LABELS: Record<ChatRuntimeUiSlotSurface, string> = {
@@ -148,7 +148,7 @@ const SURFACE_LABELS: Record<ChatRuntimeUiSlotSurface, string> = {
   runtimePanel: 'Panel',
   slashCommand: 'Command',
   streamEvidence: 'Stream',
-  toolbarPicker: 'Picker'
+  toolbarPicker: 'Picker',
 }
 
 export function RuntimeUiSlotPanel({ slots, states, loading = false }: RuntimeUiSlotPanelProps) {
@@ -168,7 +168,7 @@ export function RuntimeUiSlotPanel({ slots, states, loading = false }: RuntimeUi
   return (
     <>
       {GROUP_ORDER.map((group) => {
-        const groupCards = cards.filter((card) => card.group === group)
+        const groupCards = cards.filter(card => card.group === group)
         if (groupCards.length === 0) {
           return null
         }
@@ -176,7 +176,7 @@ export function RuntimeUiSlotPanel({ slots, states, loading = false }: RuntimeUi
           <section key={group} className="space-y-2">
             <PanelHeading icon={readGroupIcon(group)} label={GROUP_LABELS[group]} />
             <div className="space-y-1.5">
-              {groupCards.map((card) => (
+              {groupCards.map(card => (
                 <SlotStateCard key={card.id} card={card} />
               ))}
             </div>
@@ -189,9 +189,9 @@ export function RuntimeUiSlotPanel({ slots, states, loading = false }: RuntimeUi
 
 function buildSlotCards(
   slots: ChatRuntimeUiSlot[],
-  states: ChatRuntimeUiSlotState[]
+  states: ChatRuntimeUiSlotState[],
 ): SlotCardModel[] {
-  const slotById = new Map(slots.map((slot) => [slot.id, slot]))
+  const slotById = new Map(slots.map(slot => [slot.id, slot]))
   const stateCards = states
     .map((state) => {
       const slot = slotById.get(state.slotId) ?? null
@@ -205,7 +205,7 @@ function buildSlotCards(
     })
     .filter((card): card is SlotCardModel => card !== null)
 
-  const stateSlotIds = new Set(states.map((state) => state.slotId))
+  const stateSlotIds = new Set(states.map(state => state.slotId))
   const capabilityCards: SlotCardModel[] = []
   for (const slot of slots) {
     if (!stateSlotIds.has(slot.id) && shouldRenderRuntimePanelSlot(slot)) {
@@ -234,7 +234,7 @@ function shouldRenderRuntimePanelSlot(slot: ChatRuntimeUiSlot | null): boolean {
 
 function projectStateCard(
   state: ChatRuntimeUiSlotState,
-  slot: ChatRuntimeUiSlot | null
+  slot: ChatRuntimeUiSlot | null,
 ): SlotCardModel {
   const view = readStateView(state)
   return {
@@ -245,7 +245,7 @@ function projectStateCard(
     icon: readSlotIcon(slot?.iconKey, state.kind),
     slot,
     state,
-    ...view
+    ...view,
   }
 }
 
@@ -262,10 +262,10 @@ function projectCapabilityCard(slot: ChatRuntimeUiSlot): SlotCardModel {
     progress: null,
     lines: [
       { label: 'Surface', value: formatSurfaces(slot.surfaces) },
-      { label: 'Command', value: slot.commandText?.trim() || 'none' }
+      { label: 'Command', value: slot.commandText?.trim() || 'none' },
     ],
     state: null,
-    slot
+    slot,
   }
 }
 
@@ -281,7 +281,7 @@ function SlotStateCard({ card }: { card: SlotCardModel }) {
         <span
           className={cn(
             'mt-0.5 grid size-6 shrink-0 place-items-center rounded-md',
-            readToneContainerClassName(card.tone)
+            readToneContainerClassName(card.tone),
           )}
         >
           <Icon className="size-3.5" aria-hidden="true" />
@@ -294,7 +294,7 @@ function SlotStateCard({ card }: { card: SlotCardModel }) {
             <span
               className={cn(
                 'shrink-0 rounded-sm px-1.5 py-0.5 text-[9px] font-medium tabular-nums',
-                readTonePillClassName(card.tone)
+                readTonePillClassName(card.tone),
               )}
             >
               {card.summary}
@@ -308,7 +308,7 @@ function SlotStateCard({ card }: { card: SlotCardModel }) {
           {card.progress !== null && <Progress value={card.progress} className="mt-1.5 h-1" />}
           {card.lines.length > 0 && (
             <div className="mt-1.5 space-y-1">
-              {card.lines.map((line) => (
+              {card.lines.map(line => (
                 <KeyValueLine key={`${card.id}:${line.label}`} line={line} />
               ))}
             </div>
@@ -327,7 +327,7 @@ function KeyValueLine({ line }: { line: SlotCardLine }) {
       <span
         className={cn(
           'min-w-0 flex-1 truncate text-right tabular-nums',
-          readToneTextClassName(line.tone ?? 'neutral')
+          readToneTextClassName(line.tone ?? 'neutral'),
         )}
       >
         {line.value}
@@ -355,14 +355,14 @@ function CrewSlotDetails({ state }: { state: ChatRuntimeCrewUiSlotState }) {
       )}
       {collaborationModes.length > 0 && (
         <CrewDetailSection label="Modes">
-          {collaborationModes.slice(0, 4).map((mode) => (
+          {collaborationModes.slice(0, 4).map(mode => (
             <CrewModeRow key={mode.name} mode={mode} />
           ))}
         </CrewDetailSection>
       )}
       {calls.length > 0 && (
         <CrewDetailSection label="Calls">
-          {calls.slice(0, 4).map((call) => (
+          {calls.slice(0, 4).map(call => (
             <CrewCallRow key={call.id} call={call} />
           ))}
         </CrewDetailSection>
@@ -371,7 +371,7 @@ function CrewSlotDetails({ state }: { state: ChatRuntimeCrewUiSlotState }) {
   )
 }
 
-function CrewDetailSection({ label, children }: { label: string; children: React.ReactNode }) {
+function CrewDetailSection({ label, children }: { label: string, children: React.ReactNode }) {
   return (
     <div className="space-y-1">
       <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
@@ -382,7 +382,7 @@ function CrewDetailSection({ label, children }: { label: string; children: React
   )
 }
 
-function CrewAgentRow({ agent, index }: { agent: ChatRuntimeCrewAgentItem; index: number }) {
+function CrewAgentRow({ agent, index }: { agent: ChatRuntimeCrewAgentItem, index: number }) {
   const status = agent.status ? formatStatusLike(agent.status) : 'Unknown'
   const label = readCrewAgentLabel(agent)
   const details = readCrewAgentDetails(agent)
@@ -392,7 +392,7 @@ function CrewAgentRow({ agent, index }: { agent: ChatRuntimeCrewAgentItem; index
         <span
           className={cn(
             'grid size-3 shrink-0 place-items-center rounded-[3px]',
-            readCrewSwatchClassName(index)
+            readCrewSwatchClassName(index),
           )}
         >
           <span className="size-1.5 rounded-[2px] bg-current opacity-80" />
@@ -429,7 +429,7 @@ function CrewCallRow({ call }: { call: ChatRuntimeCrewCallItem }) {
   const detail = [
     receiverThreadIds.length > 0 ? `${receiverThreadIds.length} targets` : null,
     call.model,
-    call.reasoningEffort
+    call.reasoningEffort,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -439,7 +439,7 @@ function CrewCallRow({ call }: { call: ChatRuntimeCrewCallItem }) {
         <span
           className={cn(
             'shrink-0 tabular-nums',
-            readToneTextClassName(readToolActivityTone(call.status))
+            readToneTextClassName(readToolActivityTone(call.status)),
           )}
         >
           {formatStatusLike(call.status)}
@@ -459,7 +459,7 @@ function CrewCallRow({ call }: { call: ChatRuntimeCrewCallItem }) {
 }
 
 function readStateView(
-  state: ChatRuntimeUiSlotState
+  state: ChatRuntimeUiSlotState,
 ): Omit<SlotCardModel, 'id' | 'group' | 'label' | 'description' | 'icon' | 'slot' | 'state'> {
   switch (state.kind) {
     case 'status':
@@ -473,7 +473,7 @@ function readStateView(
         summary: formatStatusLike(state.status),
         meta: state.activeFlags.length > 0 ? state.activeFlags.join(', ') : 'No active flags',
         progress: null,
-        lines: [{ label: 'Updated', value: formatRelativeTimestamp(state.updatedAt) }]
+        lines: [{ label: 'Updated', value: formatRelativeTimestamp(state.updatedAt) }],
       }
     case 'model':
       return {
@@ -485,12 +485,12 @@ function readStateView(
           { label: 'Tier', value: state.serviceTier ?? 'default' },
           {
             label: 'Images',
-            value: state.supportsImages === null ? 'unknown' : state.supportsImages ? 'yes' : 'no'
+            value: state.supportsImages === null ? 'unknown' : state.supportsImages ? 'yes' : 'no',
           },
           {
             label: 'Web',
             value:
-              state.supportsWebSearch === null ? 'unknown' : state.supportsWebSearch ? 'yes' : 'no'
+              state.supportsWebSearch === null ? 'unknown' : state.supportsWebSearch ? 'yes' : 'no',
           },
           {
             label: 'Namespace tools',
@@ -499,9 +499,9 @@ function readStateView(
                 ? 'unknown'
                 : state.supportsNamespaceTools
                   ? 'yes'
-                  : 'no'
-          }
-        ]
+                  : 'no',
+          },
+        ],
       }
     case 'reasoning':
       return {
@@ -512,9 +512,9 @@ function readStateView(
         lines: [
           {
             label: 'Supported',
-            value: state.supportedEfforts.map((effort) => effort.id).join(', ') || 'unknown'
-          }
-        ]
+            value: state.supportedEfforts.map(effort => effort.id).join(', ') || 'unknown',
+          },
+        ],
       }
     case 'toolActivity':
       return {
@@ -522,11 +522,11 @@ function readStateView(
         summary: `${state.activeCount} active`,
         meta: `${state.completedCount} completed / ${state.failedCount} failed`,
         progress: null,
-        lines: state.recentItems.slice(0, 4).map((item) => ({
+        lines: state.recentItems.slice(0, 4).map(item => ({
           label: formatStatusLike(item.status),
           value: item.label,
-          tone: readToolActivityTone(item.status)
-        }))
+          tone: readToolActivityTone(item.status),
+        })),
       }
     case 'mcp':
       return {
@@ -535,11 +535,11 @@ function readStateView(
         meta: state.recentProgress ?? `${state.needsLoginCount} need login`,
         progress:
           state.serverCount > 0 ? clampPercent((state.readyCount / state.serverCount) * 100) : null,
-        lines: state.servers.slice(0, 4).map((server) => ({
+        lines: state.servers.slice(0, 4).map(server => ({
           label: formatStatusLike(server.status),
           value: `${server.name} · ${server.toolCount} tools`,
-          tone: readMcpServerTone(server.status)
-        }))
+          tone: readMcpServerTone(server.status),
+        })),
       }
     case 'diff':
       return {
@@ -547,7 +547,7 @@ function readStateView(
         summary: `${state.fileCount} files`,
         meta: `+${state.addedLines} -${state.removedLines}`,
         progress: null,
-        lines: [{ label: 'Updated', value: formatRelativeTimestamp(state.updatedAt) }]
+        lines: [{ label: 'Updated', value: formatRelativeTimestamp(state.updatedAt) }],
       }
     case 'terminal':
       return {
@@ -560,10 +560,10 @@ function readStateView(
           {
             label: 'Failed',
             value: String(state.failedCount),
-            tone: state.failedCount > 0 ? 'error' : 'neutral'
+            tone: state.failedCount > 0 ? 'error' : 'neutral',
           },
-          { label: 'Output', value: state.lastOutputPreview ?? 'none' }
-        ]
+          { label: 'Output', value: state.lastOutputPreview ?? 'none' },
+        ],
       }
     case 'approvals':
       return {
@@ -571,11 +571,11 @@ function readStateView(
         summary: `${state.pendingCount} pending`,
         meta: `${state.approvedCount} approved / ${state.deniedCount} denied`,
         progress: null,
-        lines: state.recentItems.slice(0, 4).map((item) => ({
+        lines: state.recentItems.slice(0, 4).map(item => ({
           label: formatStatusLike(item.status),
           value: item.label,
-          tone: readApprovalTone(item.status)
-        }))
+          tone: readApprovalTone(item.status),
+        })),
       }
     case 'alert':
       return {
@@ -583,7 +583,7 @@ function readStateView(
         summary: `${state.warningCount + state.errorCount}`,
         meta: `${state.warningCount} warnings / ${state.errorCount} errors`,
         progress: null,
-        lines: state.recentItems.slice(0, 4).map((item) => ({
+        lines: state.recentItems.slice(0, 4).map(item => ({
           label: formatStatusLike(item.severity),
           value: item.message,
           tone:
@@ -591,8 +591,8 @@ function readStateView(
               ? 'error'
               : item.severity === 'warning'
                 ? 'warning'
-                : 'neutral'
-        }))
+                : 'neutral',
+        })),
       }
     case 'filesystem':
       return {
@@ -600,7 +600,7 @@ function readStateView(
         summary: `${state.changedPathCount} paths`,
         meta: state.recentPaths[0] ?? 'No file activity',
         progress: null,
-        lines: state.recentPaths.slice(0, 4).map((path) => ({ label: 'Path', value: path }))
+        lines: state.recentPaths.slice(0, 4).map(path => ({ label: 'Path', value: path })),
       }
     case 'skills':
       return {
@@ -608,7 +608,7 @@ function readStateView(
         summary: `${state.enabledCount} enabled`,
         meta: `${state.disabledCount} disabled / ${state.errorCount} errors`,
         progress: null,
-        lines: state.roots.slice(0, 4).map((root) => ({ label: 'Root', value: root }))
+        lines: state.roots.slice(0, 4).map(root => ({ label: 'Root', value: root })),
       }
     case 'plugin':
       return {
@@ -621,9 +621,9 @@ function readStateView(
           {
             label: 'Errors',
             value: String(state.errorCount),
-            tone: state.errorCount > 0 ? 'error' : 'neutral'
-          }
-        ]
+            tone: state.errorCount > 0 ? 'error' : 'neutral',
+          },
+        ],
       }
     case 'search':
       return {
@@ -635,7 +635,7 @@ function readStateView(
         summary: state.fuzzySessionActive ? 'Active' : `${state.recentResultCount} results`,
         meta: state.recentQuery ?? 'No recent query',
         progress: null,
-        lines: [{ label: 'Updated', value: formatRelativeTimestamp(state.updatedAt) }]
+        lines: [{ label: 'Updated', value: formatRelativeTimestamp(state.updatedAt) }],
       }
     case 'crew':
       return {
@@ -643,11 +643,11 @@ function readStateView(
         summary: `${state.activeCount} active`,
         meta: `${state.collaborationModeCount} modes`,
         progress: null,
-        lines: state.recentItems.slice(0, 4).map((item) => ({
+        lines: state.recentItems.slice(0, 4).map(item => ({
           label: formatStatusLike(item.status),
           value: item.label,
-          tone: readToolActivityTone(item.status)
-        }))
+          tone: readToolActivityTone(item.status),
+        })),
       }
     case 'usage':
       return {
@@ -665,15 +665,15 @@ function readStateView(
             value:
               state.secondaryUsedPercent === null
                 ? 'unknown'
-                : `${Math.round(state.secondaryUsedPercent)}%`
+                : `${Math.round(state.secondaryUsedPercent)}%`,
           },
           {
             label: 'Credits',
             value:
-              state.creditsBalance ??
-              (state.hasCredits === null ? 'unknown' : state.hasCredits ? 'yes' : 'no')
-          }
-        ]
+              state.creditsBalance
+              ?? (state.hasCredits === null ? 'unknown' : state.hasCredits ? 'yes' : 'no'),
+          },
+        ],
       }
     case 'config':
       return {
@@ -688,23 +688,23 @@ function readStateView(
             value:
               state.allowedApprovalPolicyCount === null
                 ? 'unknown'
-                : String(state.allowedApprovalPolicyCount)
+                : String(state.allowedApprovalPolicyCount),
           },
           {
             label: 'Sandbox modes',
             value:
               state.allowedSandboxModeCount === null
                 ? 'unknown'
-                : String(state.allowedSandboxModeCount)
+                : String(state.allowedSandboxModeCount),
           },
           {
             label: 'Requirements',
             value:
               state.featureRequirementCount === null
                 ? 'unknown'
-                : String(state.featureRequirementCount)
-          }
-        ]
+                : String(state.featureRequirementCount),
+          },
+        ],
       }
     case 'userInput':
       return {
@@ -712,11 +712,11 @@ function readStateView(
         summary: state.questionCount === 1 ? '1 question' : `${state.questionCount} questions`,
         meta: state.questions[0]?.question ?? state.providerMethod,
         progress: null,
-        lines: state.questions.slice(0, 4).map((question) => ({
+        lines: state.questions.slice(0, 4).map(question => ({
           label: question.header || 'Question',
           value: question.question,
-          tone: 'warning'
-        }))
+          tone: 'warning',
+        })),
       }
     default:
       return {
@@ -724,12 +724,12 @@ function readStateView(
         summary: 'Ready',
         meta: null,
         progress: null,
-        lines: []
+        lines: [],
       }
   }
 }
 
-function PanelHeading({ icon: Icon, label }: { icon: SlotIconComponent; label: string }) {
+function PanelHeading({ icon: Icon, label }: { icon: SlotIconComponent, label: string }) {
   return (
     <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
       <Icon className="size-3.5" aria-hidden="true" />
@@ -874,7 +874,7 @@ function readCrewAgents(state: ChatRuntimeCrewUiSlotState): ChatRuntimeCrewAgent
         preview: null,
         modelProvider: null,
         agentNickname: null,
-        agentRole: null
+        agentRole: null,
       })
     }
     for (const agent of readCrewCallAgents(call)) {
@@ -909,7 +909,7 @@ function readCrewAgentDetails(agent: ChatRuntimeCrewAgentItem): string | null {
     [
       agent.agentRole,
       agent.name && agent.name !== agent.agentNickname ? agent.name : null,
-      agent.modelProvider
+      agent.modelProvider,
     ]
       .filter(Boolean)
       .join(' · ') || null
@@ -923,7 +923,7 @@ function readCrewSwatchClassName(index: number): string {
     'bg-violet-400/15 text-violet-400',
     'bg-rose-400/15 text-rose-400',
     'bg-orange-400/15 text-orange-400',
-    'bg-emerald-400/15 text-emerald-400'
+    'bg-emerald-400/15 text-emerald-400',
   ]
   return classes[index % classes.length] ?? classes[0]
 }
@@ -1004,7 +1004,7 @@ function formatStatusLike(value: string): string {
   return value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/\b\w/g, char => char.toUpperCase())
 }
 
 function formatThreadId(threadId: string): string {
@@ -1015,7 +1015,7 @@ function formatThreadId(threadId: string): string {
 }
 
 function formatSurfaces(surfaces: ChatRuntimeUiSlotSurface[]): string {
-  return surfaces.map((surface) => SURFACE_LABELS[surface]).join(' / ')
+  return surfaces.map(surface => SURFACE_LABELS[surface]).join(' / ')
 }
 
 function formatRelativeTimestamp(timestamp: number): string {

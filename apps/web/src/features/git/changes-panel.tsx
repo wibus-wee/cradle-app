@@ -4,7 +4,6 @@ import {
   GitCompareLine as FileDiffIcon,
   Scan2Line as ScanEyeIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import { prepareFileTreeInput } from '@pierre/trees'
 import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -17,6 +16,7 @@ import {
   getWorkspacesByWorkspaceIdGitStatusQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { WorkspaceFileIcon, WorkspaceFileIconSpriteSheet } from '~/components/common/workspace-file-icon'
+import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import type { GitFileStatus, GitRepository } from '~/features/git/types'

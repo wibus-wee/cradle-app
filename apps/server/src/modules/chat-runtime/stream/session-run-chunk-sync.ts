@@ -1,9 +1,9 @@
 import type { UIMessageChunk } from 'ai'
 
-import { runRegistry } from '../run-registry'
 import { isTerminalUIMessageChunk } from '../run/stream-chunks'
-import type { ChunkSubscriber } from './subscriber-registry'
+import { runRegistry } from '../run-registry'
 import { runSubscribers } from './live-run-streams'
+import type { ChunkSubscriber } from './subscriber-registry'
 
 export interface SessionRunChunkReplayItem {
   seq: number

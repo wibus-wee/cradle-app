@@ -5,10 +5,11 @@
  * usage slot state; this renderer keeps that account state near the composer.
  */
 import {
-  WarningLine as AlertTriangleIcon,
+  CloseLine as XIcon,
   Dashboard2Line as GaugeIcon,
-  CloseLine as XIcon
+  WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
+
 import { Progress } from '~/components/ui/progress'
 import { cn } from '~/lib/cn'
 import { clampPercent } from '~/lib/number-format'

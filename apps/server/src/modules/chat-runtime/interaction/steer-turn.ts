@@ -9,21 +9,21 @@ import type {
   ChatSessionQueueItemDto,
   EnqueueSessionQueueItemInput,
   SessionSteerTurnDto,
-  SubmitSessionSteerTurnInput
+  SubmitSessionSteerTurnInput,
 } from '../queue/session-queue'
 import { serializeChatError } from '../run/errors'
+import { annotateContinuationMessage, insertCompletedUserMessage } from '../run/turn-draft'
 import { runRegistry } from '../run-registry'
 import {
   assertRuntimeCompatibleTarget,
-  getSessionRunContext
+  getSessionRunContext,
 } from '../runtime-session-context'
-import { annotateContinuationMessage, insertCompletedUserMessage } from '../run/turn-draft'
 import { createUserMessage } from '../ui-message'
 
 export interface SubmitSessionSteerTurnDeps {
-  finalizeInterruptedPersistedStreamingSessionIfIdle(sessionId: string): Promise<void>
-  scheduleSessionQueueDrain(sessionId: string): void
-  warn(message: string, payload: Record<string, unknown>): void
+  finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
+  scheduleSessionQueueDrain: (sessionId: string) => void
+  warn: (message: string, payload: Record<string, unknown>) => void
 }
 
 /**
@@ -34,30 +34,30 @@ export interface SubmitSessionSteerTurnDeps {
  */
 async function enqueueSteerRequestAsQueueItem(
   input: SubmitSessionSteerTurnInput,
-  deps: SubmitSessionSteerTurnDeps
+  deps: SubmitSessionSteerTurnDeps,
 ): Promise<SessionSteerTurnDto> {
   const enqueueInput: EnqueueSessionQueueItemInput = {
     sessionId: input.sessionId,
     text: input.text,
     files: input.files,
     contextParts: input.contextParts,
-    providerTargetId: input.providerTargetId
+    providerTargetId: input.providerTargetId,
   }
   const queueItem: ChatSessionQueueItemDto = await enqueueSessionQueueItem(enqueueInput, {
     finalizeInterruptedPersistedStreamingSessionIfIdle: deps.finalizeInterruptedPersistedStreamingSessionIfIdle,
-    scheduleSessionQueueDrain: deps.scheduleSessionQueueDrain
+    scheduleSessionQueueDrain: deps.scheduleSessionQueueDrain,
   })
   return {
     mode: 'queued',
     ok: true,
     sessionId: input.sessionId,
-    queueItem
+    queueItem,
   }
 }
 
 export async function submitSessionSteerTurn(
   input: SubmitSessionSteerTurnInput,
-  deps: SubmitSessionSteerTurnDeps
+  deps: SubmitSessionSteerTurnDeps,
 ): Promise<SessionSteerTurnDto> {
   const text = input.text?.trim() ?? ''
   const files = input.files ?? []
@@ -67,21 +67,21 @@ export async function submitSessionSteerTurn(
       code: 'chat_steer_empty',
       status: 400,
       message: 'Chat steer requires text, context, or at least one file attachment',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
 
   await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(input.sessionId)
 
   const context = getSessionRunContext(input.sessionId, {
-    providerTargetId: input.providerTargetId
+    providerTargetId: input.providerTargetId,
   })
   if (!context) {
     throw new AppError({
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
   assertRuntimeCompatibleTarget(context, input.providerTargetId)
@@ -93,7 +93,7 @@ export async function submitSessionSteerTurn(
       code: 'chat_steer_not_supported',
       status: 409,
       message: 'Chat runtime does not support live steering or queueing a steer request',
-      details: { sessionId: input.sessionId, runtimeKind }
+      details: { sessionId: input.sessionId, runtimeKind },
     })
   }
 
@@ -101,11 +101,11 @@ export async function submitSessionSteerTurn(
   const activeRun = runId ? runRegistry.getActiveRun(runId) : undefined
   const requestedProviderTargetId = input.providerTargetId?.trim() || null
   const steerHook = activeRun?.runtime.steerTurn
-  const hasMatchingActiveRun =
-    !!activeRun &&
-    !activeRun.terminalStatus &&
-    !!steerHook &&
-    (!requestedProviderTargetId || requestedProviderTargetId === activeRun.providerTargetId)
+  const hasMatchingActiveRun
+    = !!activeRun
+      && !activeRun.terminalStatus
+      && !!steerHook
+      && (!requestedProviderTargetId || requestedProviderTargetId === activeRun.providerTargetId)
 
   // Server-side auto-fallback (doc §3.4): the client never branches on a fallback error code.
   // `queue-fallback` runtimes always queue; `native` runtimes queue only when there's no active
@@ -119,26 +119,27 @@ export async function submitSessionSteerTurn(
   const splitParts = structuredClone(activeRun.finalMessage.parts) as UIMessage['parts']
   const steerMessage = annotateContinuationMessage(
     createUserMessage(`steer-${randomUUID()}`, text, files, contextParts),
-    { mode: 'steer', sourceMessageId, splitParts }
+    { mode: 'steer', sourceMessageId, splitParts },
   )
   try {
     await steerHook.call(activeRun.runtime, {
       runtimeSession: activeRun.runtimeSession,
       profile: context.profile,
-      message: steerMessage
+      message: steerMessage,
     })
-  } catch (error) {
+  }
+ catch (error) {
     deps.warn('runtime live steer failed', {
       error,
       sessionId: input.sessionId,
       runId: activeRun.runId,
-      runtimeKind: activeRun.runtimeSession.runtimeKind
+      runtimeKind: activeRun.runtimeSession.runtimeKind,
     })
     throw new AppError({
       code: 'chat_steer_rejected',
       status: 409,
       message: 'Runtime rejected live steer',
-      details: { sessionId: input.sessionId, runId: activeRun.runId, error: serializeChatError(error).text }
+      details: { sessionId: input.sessionId, runId: activeRun.runId, error: serializeChatError(error).text },
     })
   }
 
@@ -146,14 +147,15 @@ export async function submitSessionSteerTurn(
     await insertCompletedUserMessage({
       sessionId: input.sessionId,
       message: steerMessage,
-      parentMessageId: sourceMessageId
+      parentMessageId: sourceMessageId,
     })
-  } catch (error) {
+  }
+ catch (error) {
     deps.warn('runtime live steer was applied but history persistence failed', {
       error,
       sessionId: input.sessionId,
       runId: activeRun.runId,
-      runtimeKind: activeRun.runtimeSession.runtimeKind
+      runtimeKind: activeRun.runtimeSession.runtimeKind,
     })
     throw error
   }
@@ -164,6 +166,6 @@ export async function submitSessionSteerTurn(
     sessionId: input.sessionId,
     runId: activeRun.runId,
     sourceMessageId,
-    message: steerMessage
+    message: steerMessage,
   }
 }

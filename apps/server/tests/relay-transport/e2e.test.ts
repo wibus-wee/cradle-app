@@ -1,7 +1,10 @@
-import { spawn, type ChildProcess } from 'node:child_process'
-import { createServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
-import { mkdtempSync, rmSync } from 'node:fs'
+import type { ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import type { Server } from 'node:http'
+import { createServer } from 'node:http'
+import type { AddressInfo, Socket } from 'node:net'
+import { connect, createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,15 +12,15 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 
+import type { SignedRelayAssertion } from '../../src/modules/relay-servers/relay-signature-service'
 import {
   createRelayRoomId,
   generateRelaySigningKeyPair,
   relayAssertionHeaders,
   signRelayAssertion,
-  type SignedRelayAssertion,
 } from '../../src/modules/relay-servers/relay-signature-service'
-import { generateRelayKeyPair, relayPublicKeyFingerprint } from '../../src/modules/relay-transport/crypto'
 import { startRelayControllerTransport } from '../../src/modules/relay-transport/controller-transport'
+import { generateRelayKeyPair, relayPublicKeyFingerprint } from '../../src/modules/relay-transport/crypto'
 import { relayEnvelopeSchema } from '../../src/modules/relay-transport/protocol'
 import { RelaySession } from '../../src/modules/relay-transport/session'
 
@@ -53,8 +56,7 @@ function resolveRelaydSourceDir(): string | null {
 
 function existsSyncSafe(path: string): boolean {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('node:fs').existsSync(path)
+    return existsSync(path)
   }
   catch {
     return false
@@ -89,9 +91,7 @@ async function spawnRelayd(): Promise<RelaydHandle> {
 
 function allocatePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const net = require('node:net') as typeof import('node:net')
-    const server = net.createServer()
+    const server = createNetServer()
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => {
       const address = server.address() as AddressInfo
@@ -209,9 +209,7 @@ async function startHostBridge(opts: {
   targetHost: string
   targetPort: number
 }): Promise<HostBridge> {
-  const streams = new Map<string, import('node:net').Socket>()
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const net = require('node:net') as typeof import('node:net')
+  const streams = new Map<string, Socket>()
   const wsUrl = toWsUrl(opts.relayUrl, '/ws/host')
   const ws = new WebSocket(wsUrl, { headers: relayAssertionHeaders(opts.hostWsAssertion) })
 
@@ -226,7 +224,7 @@ async function startHostBridge(opts: {
         }
       },
       onStreamOpen: (streamId) => {
-        const socket = net.connect({ host: opts.targetHost, port: opts.targetPort })
+        const socket = connect({ host: opts.targetHost, port: opts.targetPort })
         streams.set(streamId, socket)
         socket.on('data', (chunk: Buffer) => session.writeStreamData(streamId, new Uint8Array(chunk)))
         socket.on('close', () => { session.closeStream(streamId, 'target closed'); streams.delete(streamId) })
@@ -346,7 +344,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
 
   afterAll(async () => {
     await stopRelayd(relayd.child)
-    await new Promise<void>((resolve) => fakeHost.server.close(() => resolve()))
+    await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
     rmSync(dataDir, { recursive: true, force: true })
   })
 
@@ -477,9 +475,7 @@ async function startHostBridgePinned(opts: {
   targetHost: string
   targetPort: number
 }): Promise<HostBridge> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const net = require('node:net') as typeof import('node:net')
-  const streams = new Map<string, import('node:net').Socket>()
+  const streams = new Map<string, Socket>()
   const wsUrl = toWsUrl(opts.relayUrl, '/ws/host')
   const ws = new WebSocket(wsUrl, { headers: relayAssertionHeaders(opts.hostWsAssertion) })
 
@@ -494,7 +490,7 @@ async function startHostBridgePinned(opts: {
         }
       },
       onStreamOpen: (streamId) => {
-        const socket = net.connect({ host: opts.targetHost, port: opts.targetPort })
+        const socket = connect({ host: opts.targetHost, port: opts.targetPort })
         streams.set(streamId, socket)
         socket.on('data', (chunk: Buffer) => session.writeStreamData(streamId, new Uint8Array(chunk)))
         socket.on('close', () => { session.closeStream(streamId, 'target closed'); streams.delete(streamId) })

@@ -1,16 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
 import {
   ArrowUpLine as ArrowUpIcon,
-  RightSmallLine as ChevronRightIcon,
   CodeLine as CodeIcon,
   DownloadLine as DownloadIcon,
   FileLine as FileIcon,
   FileLine as FileTextIcon,
   FolderLine as FolderIcon,
   Home2Line as HomeIcon,
-  MonitorLine as MonitorIcon
+  MonitorLine as MonitorIcon,
+  RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -25,6 +24,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { ScrollArea } from '~/components/ui/scroll-area'
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 
 const LAST_PATH_KEY = 'directory-browser-last-path'

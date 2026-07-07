@@ -1,10 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import type { TFunction } from 'i18next'
 import {
   DotCircleLine as CircleDotIcon,
   HistoryLine as HistoryIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
+import { useQuery } from '@tanstack/react-query'
+import type { TFunction } from 'i18next'
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -12,6 +11,7 @@ import { getSessionsOptions } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetSessionsResponse } from '~/api-gen/types.gen'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { ScrollArea } from '~/components/ui/scroll-area'
+import { Spinner } from '~/components/ui/spinner'
 import { useNow } from '~/hooks/use-now'
 import { cn } from '~/lib/cn'
 

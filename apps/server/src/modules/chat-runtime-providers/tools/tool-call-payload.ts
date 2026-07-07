@@ -1,4 +1,5 @@
-import { cradleToolKinds, type CradleToolKind } from '../../chat-runtime/runtime-provider-types'
+import type { CradleToolKind } from '../../chat-runtime/runtime-provider-types'
+import { cradleToolKinds } from '../../chat-runtime/runtime-provider-types'
 
 export const BUILTIN_TOOL_CALL_INPUT_PAYLOAD_TYPE = 'cradle.builtin-tool-call.input.v1'
 export const BUILTIN_TOOL_CALL_RESULT_PAYLOAD_TYPE = 'cradle.builtin-tool-call.result.v1'

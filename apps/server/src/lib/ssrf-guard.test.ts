@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ProviderRequest } from '../modules/provider-contracts/types'
 import { ProviderCatalog } from '../modules/provider-catalog/catalog'
+import type { ProviderRequest } from '../modules/provider-contracts/types'
 import {
   guardedFetch,
   setSsrAddressLookupForTests,

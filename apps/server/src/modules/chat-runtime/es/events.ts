@@ -1,5 +1,5 @@
-import type { ChatMessageStatus } from '../run/stream-chunks'
 import type { PersistedThinkingEffort } from '../queue/session-queue'
+import type { ChatMessageStatus } from '../run/stream-chunks'
 import type { ChatRuntimeSettings } from '../runtime-provider-types'
 
 export const CHAT_SESSION_AGGREGATE_TYPE = 'ChatSession'
@@ -9,27 +9,27 @@ export type ChatSessionEventSchemaVersion = typeof CHAT_SESSION_EVENT_SCHEMA_VER
 
 export type TerminalRunEventType = 'RunCompleted' | 'RunFailed' | 'RunAborted'
 
-export type ChatSessionEventType =
-  | 'UserMessageAppended'
-  | 'MessageImported'
-  | 'RunStarted'
-  | 'AssistantMessageSnapshotted'
-  | 'AssistantMessageCompleted'
-  | TerminalRunEventType
-  | 'InteractionRequested'
-  | 'InteractionResolved'
-  | 'PlanImplementationResponded'
-  | 'QueueItemEnqueued'
-  | 'QueueItemClaimed'
-  | 'QueueItemReleased'
-  | 'QueueItemFailed'
-  | 'QueueItemReordered'
-  | 'QueueItemUpdated'
-  | 'QueueItemProviderTargetCleared'
-  | 'QueueItemCancelled'
-  | 'SteerApplied'
-  | 'LastTurnRolledBack'
-  | 'TitleChanged'
+export type ChatSessionEventType
+  = | 'UserMessageAppended'
+    | 'MessageImported'
+    | 'RunStarted'
+    | 'AssistantMessageSnapshotted'
+    | 'AssistantMessageCompleted'
+    | TerminalRunEventType
+    | 'InteractionRequested'
+    | 'InteractionResolved'
+    | 'PlanImplementationResponded'
+    | 'QueueItemEnqueued'
+    | 'QueueItemClaimed'
+    | 'QueueItemReleased'
+    | 'QueueItemFailed'
+    | 'QueueItemReordered'
+    | 'QueueItemUpdated'
+    | 'QueueItemProviderTargetCleared'
+    | 'QueueItemCancelled'
+    | 'SteerApplied'
+    | 'LastTurnRolledBack'
+    | 'TitleChanged'
 
 export type QueueProjectionStatus = 'pending' | 'running' | 'cancelled' | 'completed' | 'failed'
 
@@ -100,7 +100,7 @@ export interface QueueItemFact {
 }
 
 export interface UserMessageAppendedPayload extends VersionedChatSessionPayload {
-  message: MessageRecordedFact & { role: 'user'; status: 'complete' }
+  message: MessageRecordedFact & { role: 'user', status: 'complete' }
 }
 
 export interface MessageImportedPayload extends VersionedChatSessionPayload {
@@ -109,7 +109,7 @@ export interface MessageImportedPayload extends VersionedChatSessionPayload {
 
 export interface RunStartedPayload extends VersionedChatSessionPayload {
   run: BackendRunStartedFact
-  assistantMessage?: (MessageRecordedFact & { role: 'assistant'; status: 'streaming' }) | null
+  assistantMessage?: (MessageRecordedFact & { role: 'assistant', status: 'streaming' }) | null
   queueItemId?: string | null
   runtimeSettings?: ChatRuntimeSettings
 }
@@ -210,7 +210,7 @@ export interface QueueItemCancelledPayload extends VersionedChatSessionPayload {
 }
 
 export interface SteerAppliedPayload extends VersionedChatSessionPayload {
-  message: MessageRecordedFact & { role: 'user'; status: 'complete' }
+  message: MessageRecordedFact & { role: 'user', status: 'complete' }
 }
 
 export interface LastTurnRolledBackPayload extends VersionedChatSessionPayload {
@@ -262,33 +262,33 @@ export interface PlanImplementationRespondedPayload extends VersionedChatSession
   updatedAt: number
 }
 
-export type ChatSessionEvent =
-  | { type: 'UserMessageAppended'; payload: UserMessageAppendedPayload }
-  | { type: 'MessageImported'; payload: MessageImportedPayload }
-  | { type: 'RunStarted'; payload: RunStartedPayload }
-  | { type: 'AssistantMessageSnapshotted'; payload: AssistantMessageSnapshottedPayload }
-  | { type: 'AssistantMessageCompleted'; payload: AssistantMessageCompletedPayload }
-  | { type: 'RunCompleted'; payload: RunTerminalPayload }
-  | { type: 'RunFailed'; payload: RunTerminalPayload }
-  | { type: 'RunAborted'; payload: RunTerminalPayload }
-  | { type: 'InteractionRequested'; payload: InteractionRequestedPayload }
-  | { type: 'InteractionResolved'; payload: InteractionResolvedPayload }
-  | { type: 'PlanImplementationResponded'; payload: PlanImplementationRespondedPayload }
-  | { type: 'QueueItemEnqueued'; payload: QueueItemEnqueuedPayload }
-  | { type: 'QueueItemClaimed'; payload: QueueItemClaimedPayload }
-  | { type: 'QueueItemReleased'; payload: QueueItemReleasedPayload }
-  | { type: 'QueueItemFailed'; payload: QueueItemFailedPayload }
-  | { type: 'QueueItemReordered'; payload: QueueItemReorderedPayload }
-  | { type: 'QueueItemUpdated'; payload: QueueItemUpdatedPayload }
-  | { type: 'QueueItemProviderTargetCleared'; payload: QueueItemProviderTargetClearedPayload }
-  | { type: 'QueueItemCancelled'; payload: QueueItemCancelledPayload }
-  | { type: 'SteerApplied'; payload: SteerAppliedPayload }
-  | { type: 'LastTurnRolledBack'; payload: LastTurnRolledBackPayload }
-  | { type: 'TitleChanged'; payload: TitleChangedPayload }
+export type ChatSessionEvent
+  = | { type: 'UserMessageAppended', payload: UserMessageAppendedPayload }
+    | { type: 'MessageImported', payload: MessageImportedPayload }
+    | { type: 'RunStarted', payload: RunStartedPayload }
+    | { type: 'AssistantMessageSnapshotted', payload: AssistantMessageSnapshottedPayload }
+    | { type: 'AssistantMessageCompleted', payload: AssistantMessageCompletedPayload }
+    | { type: 'RunCompleted', payload: RunTerminalPayload }
+    | { type: 'RunFailed', payload: RunTerminalPayload }
+    | { type: 'RunAborted', payload: RunTerminalPayload }
+    | { type: 'InteractionRequested', payload: InteractionRequestedPayload }
+    | { type: 'InteractionResolved', payload: InteractionResolvedPayload }
+    | { type: 'PlanImplementationResponded', payload: PlanImplementationRespondedPayload }
+    | { type: 'QueueItemEnqueued', payload: QueueItemEnqueuedPayload }
+    | { type: 'QueueItemClaimed', payload: QueueItemClaimedPayload }
+    | { type: 'QueueItemReleased', payload: QueueItemReleasedPayload }
+    | { type: 'QueueItemFailed', payload: QueueItemFailedPayload }
+    | { type: 'QueueItemReordered', payload: QueueItemReorderedPayload }
+    | { type: 'QueueItemUpdated', payload: QueueItemUpdatedPayload }
+    | { type: 'QueueItemProviderTargetCleared', payload: QueueItemProviderTargetClearedPayload }
+    | { type: 'QueueItemCancelled', payload: QueueItemCancelledPayload }
+    | { type: 'SteerApplied', payload: SteerAppliedPayload }
+    | { type: 'LastTurnRolledBack', payload: LastTurnRolledBackPayload }
+    | { type: 'TitleChanged', payload: TitleChangedPayload }
 
-export type StoredChatSessionEvent =
-  Omit<ChatSessionEventRow, 'eventType' | 'payload'>
-  & ChatSessionEvent
+export type StoredChatSessionEvent
+  = Omit<ChatSessionEventRow, 'eventType' | 'payload'>
+    & ChatSessionEvent
 
 type V1RunStartedPayload = Omit<RunStartedPayload, 'v'> & {
   assistantMessageProjection?: 'insert' | 'update' | null
@@ -303,13 +303,13 @@ export function parseStoredChatSessionEvent(row: ChatSessionEventRow): StoredCha
   return {
     ...row,
     type,
-    payload: upcastChatSessionEventPayload(type, JSON.parse(row.payload))
+    payload: upcastChatSessionEventPayload(type, JSON.parse(row.payload)),
   } as StoredChatSessionEvent
 }
 
 export function upcastChatSessionEventPayload(
   eventType: ChatSessionEventType,
-  rawPayload: ChatSessionEvent['payload']
+  rawPayload: ChatSessionEvent['payload'],
 ): ChatSessionEvent['payload'] {
   if (rawPayload.v === CHAT_SESSION_EVENT_SCHEMA_VERSION) {
     return rawPayload
@@ -323,7 +323,7 @@ export function upcastChatSessionEventPayload(
 
 function upcastV1ChatSessionEventPayload(
   eventType: ChatSessionEventType,
-  payload: ChatSessionEvent['payload']
+  payload: ChatSessionEvent['payload'],
 ): ChatSessionEvent['payload'] {
   if (eventType === 'RunStarted') {
     const {
@@ -337,10 +337,10 @@ function upcastV1ChatSessionEventPayload(
 }
 
 function addCurrentPayloadVersion<TPayload extends ChatSessionEvent['payload']>(
-  payload: TPayload
+  payload: TPayload,
 ): TPayload & { v: ChatSessionEventSchemaVersion } {
   return {
     ...payload,
-    v: CHAT_SESSION_EVENT_SCHEMA_VERSION
+    v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
   }
 }

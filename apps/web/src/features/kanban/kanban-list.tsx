@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { cn } from '~/lib/cn'
 import type { KanbanBoardIssue, KanbanMilestone, KanbanStatus } from '~/features/kanban/types'
+import { cn } from '~/lib/cn'
 
 import { KanbanGroupHeader } from './kanban-group-header'
 import { KanbanListRow } from './kanban-list-row'

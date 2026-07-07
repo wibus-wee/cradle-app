@@ -1,4 +1,3 @@
-
 import { useObservabilityDevtoolStore } from './use-observability-events'
 
 export function ObservabilityEventDetail() {

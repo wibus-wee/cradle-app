@@ -15,8 +15,8 @@ import type { Event as OpencodeEvent } from '@opencode-ai/sdk/v2'
 import type { UIMessageChunk } from 'ai'
 
 import type { ProviderThread } from '../../chat-runtime/runtime-provider-types'
-import { OpencodeEventStreamProjector } from './event-stream'
 import type { OpencodeStreamEvent } from './event-stream'
+import { OpencodeEventStreamProjector } from './event-stream'
 
 export interface OpencodeSubagentBinding {
   toolCallId: string
@@ -362,7 +362,7 @@ function projectOpencodeSessionProviderThread(session: OpencodeSession, childCou
 
 function normalizeProviderThreadTitle(text: string | null | undefined): string | null {
   const trimmed = text?.trim()
-  return trimmed ? trimmed : null
+  return trimmed || null
 }
 
 function readMetadataSessionId(metadata: Record<string, unknown> | undefined): string | null {
@@ -455,7 +455,7 @@ export function readOpencodeSubagentBindingFromSessionCreated(
     return null
   }
   const unmatched = pendingTaskParts.filter(part => !readOpencodeTaskChildSessionId(part))
-  const part = unmatched[unmatched.length - 1] ?? pendingTaskParts[pendingTaskParts.length - 1]
+  const part = unmatched.at(-1) ?? pendingTaskParts.at(-1)
   if (!part) {
     return null
   }

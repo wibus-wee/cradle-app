@@ -280,12 +280,12 @@ export interface ConversationBridgeControlResponse {
   blocks?: ConversationBridgeControlBlock[]
 }
 
-export type ConversationBridgeControlBlock =
-  | ConversationBridgeControlHeaderBlock
-  | ConversationBridgeControlSectionBlock
-  | ConversationBridgeControlContextBlock
-  | ConversationBridgeControlDividerBlock
-  | ConversationBridgeControlActionsBlock
+export type ConversationBridgeControlBlock
+  = | ConversationBridgeControlHeaderBlock
+    | ConversationBridgeControlSectionBlock
+    | ConversationBridgeControlContextBlock
+    | ConversationBridgeControlDividerBlock
+    | ConversationBridgeControlActionsBlock
 
 export interface ConversationBridgeControlHeaderBlock {
   type: 'header'
@@ -312,9 +312,9 @@ export interface ConversationBridgeControlActionsBlock {
   elements: ConversationBridgeControlElement[]
 }
 
-export type ConversationBridgeControlElement =
-  | ConversationBridgeControlButtonElement
-  | ConversationBridgeControlSelectElement
+export type ConversationBridgeControlElement
+  = | ConversationBridgeControlButtonElement
+    | ConversationBridgeControlSelectElement
 
 export interface ConversationBridgeControlButtonElement {
   type: 'button'

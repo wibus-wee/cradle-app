@@ -8,7 +8,7 @@ import type { SandboxPolicy } from '../app-server-protocol/v2/SandboxPolicy'
 export function toSandboxPolicy(
   sandboxMode: CodexConfig['sandboxMode'],
   writableRoots: string[],
-  additionalDirectories: string[]
+  additionalDirectories: string[],
 ): SandboxPolicy {
   if (sandboxMode === 'danger-full-access') {
     return { type: 'dangerFullAccess' }
@@ -21,6 +21,6 @@ export function toSandboxPolicy(
     writableRoots: [...new Set([...writableRoots, ...additionalDirectories])],
     networkAccess: false,
     excludeTmpdirEnvVar: false,
-    excludeSlashTmp: false
+    excludeSlashTmp: false,
   }
 }

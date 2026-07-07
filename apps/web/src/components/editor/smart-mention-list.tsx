@@ -1,10 +1,10 @@
 import {
-  RobotLine as BotIcon,
   Box3Line as BoxesIcon,
   FileLine as FileIcon,
   Flag2Line as FlagIcon,
   GitPullRequestLine as GitPullRequestIcon,
-  Message1Line as MessageSquareIcon
+  Message1Line as MessageSquareIcon,
+  RobotLine as BotIcon,
 } from '@mingcute/react'
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 

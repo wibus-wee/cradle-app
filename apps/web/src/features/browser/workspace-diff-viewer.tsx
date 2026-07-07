@@ -1,4 +1,9 @@
 // Renders workspace Git patches with Pierre's virtualized diff viewer.
+import {
+  Columns2Line as Columns2Icon,
+  GitCompareLine as FileDiffIcon,
+  Rows3Line as Rows3Icon,
+} from '@mingcute/react'
 import type { CodeViewItem, CodeViewOptions } from '@pierre/diffs'
 import { parsePatchFiles } from '@pierre/diffs'
 import type {
@@ -12,14 +17,9 @@ import {
   WorkerPoolContextProvider,
 } from '@pierre/diffs/react'
 import WorkerUrl from '@pierre/diffs/worker/worker.js?worker&url'
-import {
-  Columns2Line as Columns2Icon,
-  GitCompareLine as FileDiffIcon,
-  Rows3Line as Rows3Icon
-} from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import { useDeferredValue, useEffect, useRef, useState, useTransition } from 'react'
 
+import { Spinner } from '~/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { cn } from '~/lib/cn'
 import { DEFAULT_BROWSER_PANEL_OWNER_ID, useBrowserPanelStore } from '~/store/browser-panel'

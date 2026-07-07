@@ -17,7 +17,7 @@ interface TitleRegenerationState {
 
 export const useTitleRegenerationStore = create<TitleRegenerationState>()((set, get) => ({
   regeneratingSessionIds: new Set(),
-  beginRegeneration: (sessionId) =>
+  beginRegeneration: sessionId =>
     set((state) => {
       if (state.regeneratingSessionIds.has(sessionId)) {
         return state
@@ -26,7 +26,7 @@ export const useTitleRegenerationStore = create<TitleRegenerationState>()((set, 
       next.add(sessionId)
       return { regeneratingSessionIds: next }
     }),
-  endRegeneration: (sessionId) =>
+  endRegeneration: sessionId =>
     set((state) => {
       if (!state.regeneratingSessionIds.has(sessionId)) {
         return state
@@ -35,5 +35,5 @@ export const useTitleRegenerationStore = create<TitleRegenerationState>()((set, 
       next.delete(sessionId)
       return { regeneratingSessionIds: next }
     }),
-  isRegenerating: (sessionId) => get().regeneratingSessionIds.has(sessionId),
+  isRegenerating: sessionId => get().regeneratingSessionIds.has(sessionId),
 }))

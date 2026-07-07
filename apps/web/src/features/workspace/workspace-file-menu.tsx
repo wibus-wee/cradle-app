@@ -1,5 +1,3 @@
-import type { ContextMenuItem as TreeContextMenuItem, ContextMenuOpenContext as TreeContextMenuOpenContext } from '@pierre/trees'
-import type { TFunction } from 'i18next'
 import {
   ClipboardLine as ClipboardIcon,
   CopyLine as CopyIcon,
@@ -7,8 +5,10 @@ import {
   ExternalLinkLine as ExternalLinkIcon,
   FileNewLine as FilePlusIcon,
   FolderOpenLine as FolderOpenIcon,
-  NewFolderLine as FolderPlusIcon
+  NewFolderLine as FolderPlusIcon,
 } from '@mingcute/react'
+import type { ContextMenuItem as TreeContextMenuItem, ContextMenuOpenContext as TreeContextMenuOpenContext } from '@pierre/trees'
+import type { TFunction } from 'i18next'
 import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 

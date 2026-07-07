@@ -7,9 +7,9 @@ import {
   generateRelayKeyPair,
   loadPrivateKeyBytes,
   publicKeyFromPrivate,
-  relayPublicKeyFingerprint,
   receiveKeyForRole,
   RelayCipher,
+  relayPublicKeyFingerprint,
   sendKeyForRole,
 } from '../../src/modules/relay-transport/crypto'
 

@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import { compare, valid } from 'semver'
+import { z } from 'zod'
 
 import type {
   DesktopUpdateArtifact,
@@ -18,7 +18,7 @@ type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respons
 const updateArtifactSchema = z.object({
   url: z.string().url(),
   size: z.number().int().nonnegative().nullable().optional(),
-  sha256: z.string().regex(/^[a-fA-F0-9]{64}$/).nullable().optional(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/i).nullable().optional(),
   platform: z.literal('darwin').nullable().optional(),
   arch: z.union([
     z.literal('arm64'),

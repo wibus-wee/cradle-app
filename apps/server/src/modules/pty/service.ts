@@ -10,10 +10,10 @@ import {
 import { getSystemWorkflow } from '../../helpers/system-workflow'
 import { db } from '../../infra'
 import { reportRuntimeSessionTitle } from '../chat-runtime/title-service'
+import type { ResolvedRootBoundary } from '../filesystem/path-boundary'
 import {
   assertWithinAllowedRoots,
   resolveDirectoryBoundarySync,
-  type ResolvedRootBoundary,
 } from '../filesystem/path-boundary'
 import { runtimeUsesAgentTerminalLaunch } from '../provider-contracts/runtime-compatibility'
 import * as SessionService from '../session/service'

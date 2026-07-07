@@ -41,18 +41,18 @@ export function resolveTurnContext(input: {
 }): ChatTurnContext {
   const session = db().select().from(sessions).where(eq(sessions.id, input.sessionId)).get()
 
-  let systemPrompt = resolveSessionSystemPrompt(session)
+  const systemPrompt = resolveSessionSystemPrompt(session)
   // Chronicle per-turn memory context is intentionally disabled for now.
   // It is dynamic and unstable; when re-enabled, decide whether it belongs in system prompt or a lower-authority context channel.
   const transcript = resolveBoundedTurnHistory({
     sessionId: input.sessionId,
-    excludedMessageIds: new Set([input.draftMessageId, input.draftUserMessageId])
+    excludedMessageIds: new Set([input.draftMessageId, input.draftUserMessageId]),
   })
 
   return {
     systemPrompt,
     transcript,
-    history: transcript.history.length > 0 ? transcript.history : undefined
+    history: transcript.history.length > 0 ? transcript.history : undefined,
   }
 }
 
@@ -65,11 +65,11 @@ function resolveBoundedTurnHistory(input: {
     excludedMessageIds: input.excludedMessageIds,
     maxMessages: readPositiveIntegerEnv(
       'CRADLE_CHAT_TURN_CONTEXT_MAX_MESSAGES',
-      DEFAULT_TURN_CONTEXT_MAX_MESSAGES
+      DEFAULT_TURN_CONTEXT_MAX_MESSAGES,
     ),
     maxChars: readPositiveIntegerEnv(
       'CRADLE_CHAT_TURN_CONTEXT_MAX_CHARS',
-      DEFAULT_TURN_CONTEXT_MAX_CHARS
-    )
+      DEFAULT_TURN_CONTEXT_MAX_CHARS,
+    ),
   })
 }

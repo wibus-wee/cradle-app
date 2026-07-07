@@ -1,4 +1,5 @@
 import { ArrowRightUpLine as InheritIcon } from '@mingcute/react'
+
 import { Spinner } from '~/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import type { ClaudeAgentAliasKey, ClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
@@ -122,7 +123,7 @@ export function ClaudeModelMatrixEditor({
                     <span>inherit</span>
                   </TierChip>
 
-                  {modelOptions.map(model => {
+                  {modelOptions.map((model) => {
                     const active = model.id === currentValue
                     return (
                       <TierChip

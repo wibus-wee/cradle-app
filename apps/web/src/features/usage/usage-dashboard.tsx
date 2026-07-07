@@ -1,90 +1,32 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { ScrollArea } from '~/components/ui/scroll-area'
+import { Skeleton } from '~/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { cn } from '~/lib/cn'
-import { boundedPercent, formatPercentFromRatio, formatTokenCount, formatUsd } from '~/lib/number-format'
+import { formatTokenCount } from '~/lib/number-format'
 
+import { UsageBreakdown } from './usage-breakdown'
 import { UsageHeatmap } from './usage-heatmap'
-import type { DailyCost, DailyUsage } from './use-usage-overview'
+import { UsageHeroCards } from './usage-hero-cards'
+import { UsagePatterns } from './usage-patterns'
+import { UsageRecentSessions } from './usage-recent-sessions'
+import type { UsageRangeKey } from './usage-time-range'
+import { USAGE_RANGE_OPTIONS } from './usage-time-range'
+import { UsageTrendChart } from './usage-trend-chart'
+import type { UsageStats, UsageSummary } from './use-usage-overview'
 import { useUsageOverview } from './use-usage-overview'
 
-/** Tiny SVG sparkline for the last 30 days */
-function Sparkline({ data }: { data: DailyUsage[] }) {
-  const last30 = data.slice(-30)
-  if (last30.length < 2) {
-    return null
-  }
-  const max = Math.max(...last30.map(d => d.totalTokens), 1)
-  const w = 180
-  const h = 40
-  const points = last30.map((d, i) => {
-    const x = (i / (last30.length - 1)) * w
-    const y = h - (d.totalTokens / max) * (h - 4) - 2
-    return `${x},${y}`
-  })
-  const pathD = `M${points.join(' L')}`
-  // Area fill
-  const areaD = `${pathD} L${w},${h} L0,${h} Z`
-
-  return (
-    <svg width={w} height={h} className="overflow-visible">
-      <defs>
-        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaD} fill="url(#sparkFill)" />
-      <path d={pathD} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-/** Tiny SVG sparkline for daily cost */
-function CostSparkline({ data }: { data: DailyCost[] }) {
-  const last30 = data.slice(-30)
-  if (last30.length < 2) {
-    return null
-  }
-  const max = Math.max(...last30.map(d => d.costUsd), 0.001)
-  const w = 400
-  const h = 40
-  const points = last30.map((d, i) => {
-    const x = (i / (last30.length - 1)) * w
-    const y = h - (d.costUsd / max) * (h - 4) - 2
-    return `${x},${y}`
-  })
-  const pathD = `M${points.join(' L')}`
-  const areaD = `${pathD} L${w},${h} L0,${h} Z`
-
-  return (
-    <svg width={w} height={h} className="overflow-visible" data-testid="cost-sparkline">
-      <defs>
-        <linearGradient id="costSparkFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaD} fill="url(#costSparkFill)" />
-      <path d={pathD} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 export function UsageDashboard() {
-  const { t, i18n } = useTranslation('usage')
-  const [rankingMode, setRankingMode] = useState<'tokens' | 'cost'>('tokens')
+  const { t } = useTranslation('usage')
+  const [range, setRange] = useState<UsageRangeKey>('30d')
   const { daily, summary, stats, costSummary, dailyCost, usageReady, hasData } = useUsageOverview()
-  const locale = i18n.language
 
+  const hasCost = Boolean(costSummary && costSummary.totalCostUsd > 0)
   const hasRankedUsage = Boolean(
     summary
     && (summary.byModel.length > 0 || summary.byAgent.length > 0 || summary.byProviderTarget.length > 0),
   )
-
-  const hasCostData = Boolean(costSummary && costSummary.totalCostUsd > 0)
 
   return (
     <div
@@ -92,205 +34,92 @@ export function UsageDashboard() {
       data-testid="usage-dashboard"
       data-usage-ready={usageReady ? 'true' : 'false'}
     >
-      <div className="mx-auto max-w-5xl px-8 py-10">
-        {/* Header row with streak */}
-        <div className="flex items-end justify-between">
+      <div className="relative mx-auto max-w-5xl px-8 py-10">
+        {/* Soft ambient glow behind the header/hero region — the one deliberate
+            spot of "texture" on an otherwise flat, functional page. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-32 left-1/2 -z-10 h-80 w-[640px] -translate-x-1/2 rounded-full bg-blue-500/[0.07] blur-3xl"
+        />
+
+        {/* Header row with time range selector */}
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-foreground text-balance" data-testid="usage-dashboard-title">{t('title')}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{t('description')}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground text-balance" data-testid="usage-dashboard-title">{t('title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
           </div>
-          {stats && stats.currentStreak > 0 && (
-            <div className="flex items-center gap-1.5 text-sm text-foreground">
-              <span className="font-semibold tabular-nums">{stats.currentStreak}</span>
-              <span className="text-muted-foreground text-xs">{t('streak.day')}</span>
-            </div>
+          {hasData && (
+            <ToggleGroup
+              type="single"
+              value={range}
+              onValueChange={(value) => {
+                if (value) { setRange(value as UsageRangeKey) }
+              }}
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-px rounded-md"
+            >
+              {USAGE_RANGE_OPTIONS.map(option => (
+                <ToggleGroupItem key={option.key} value={option.key} className="h-7 px-2.5 text-xs tabular-nums">
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           )}
         </div>
 
-        {/* Stat pills row */}
-        {stats && hasData && (
-          <div className="mt-6 flex flex-wrap gap-3">
-            {costSummary && costSummary.totalCostUsd > 0 && (
-              <Pill label={t('pill.totalCost')} value={formatUsd(costSummary.totalCostUsd)} dataTestId="usage-pill-total-cost" accent />
-            )}
-            <Pill label={t('pill.today')} value={formatTokenCount(stats.todayTokens)} dataTestId="usage-pill-today-tokens" />
-            <Pill label={t('pill.prompt')} value={formatTokenCount(summary!.totalPromptTokens)} dataTestId="usage-pill-prompt-tokens" />
-            <Pill label={t('pill.completion')} value={formatTokenCount(summary!.totalCompletionTokens)} dataTestId="usage-pill-completion-tokens" />
-            <Pill label={t('pill.turns')} value={String(summary!.totalTurns)} dataTestId="usage-pill-total-turns" />
-            <Pill label={t('pill.avgDaily')} value={formatTokenCount(stats.avgDailyTokens)} dataTestId="usage-pill-avg-daily-tokens" />
-            <Pill label={t('pill.activeDays')} value={String(stats.activeDays)} dataTestId="usage-pill-active-days" />
-            <Pill label={t('pill.bestStreak')} value={`${stats.longestStreak}d`} dataTestId="usage-pill-best-streak" />
-            {stats.peakDay && (
-              <Pill label={t('pill.peak')} value={t('pill.peakValue', { tokens: formatTokenCount(stats.peakDay.totalTokens), date: stats.peakDay.date.slice(5) })} dataTestId="usage-pill-peak-day" />
-            )}
-          </div>
-        )}
+        {/* Loading skeleton — first paint only, before any cached data exists */}
+        {!usageReady && !hasData && <UsageDashboardSkeleton />}
 
-        {/* Sparkline + Totals row */}
-        {hasData && (
-          <div className="mt-8 flex items-end gap-8">
-            <div className="flex-1">
-              <p className="text-[11px] text-muted-foreground mb-1.5">{t('chart.last30Days')}</p>
-              <Sparkline data={daily} />
+        {/* Main dashboard body */}
+        {usageReady && hasData && summary && stats && (
+          <div className="mt-8 space-y-10">
+            <UsageHeroCards
+              daily={daily}
+              dailyCost={dailyCost}
+              summary={summary}
+              stats={stats}
+              costSummary={costSummary}
+              range={range}
+            />
 
-              {/* Cost sparkline */}
-              {dailyCost.length > 1 && (
-                <div className="mt-6">
-                  <p className="text-[11px] text-muted-foreground mb-1.5">{t('chart.dailyCostLast30Days')}</p>
-                  <CostSparkline data={dailyCost} />
-                </div>
-              )}
-            </div>
-            <div className="text-right">
-              {costSummary && costSummary.totalCostUsd > 0 && (
-                <>
-                  <p className="text-3xl font-semibold tabular-nums text-foreground" data-testid="usage-total-cost">{formatUsd(costSummary.totalCostUsd)}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{t('summary.estimatedCost')}</p>
-                </>
-              )}
-              <p
-                className={cn(
-                  'font-semibold tabular-nums text-foreground',
-                  costSummary && costSummary.totalCostUsd > 0 ? 'mt-2 text-lg' : 'text-3xl',
-                )}
-                data-testid="usage-total-tokens"
-              >
-                {formatTokenCount(summary!.totalTokens)}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{t('summary.totalTokens')}</p>
-            </div>
-          </div>
-        )}
+            <SecondaryStats summary={summary} stats={stats} />
 
-        {/* Heatmap */}
-        <div className="mt-8">
-          <UsageHeatmap data={daily} />
-        </div>
+            <SectionCard>
+              <UsageTrendChart daily={daily} dailyCost={dailyCost} range={range} hasCost={hasCost} />
+            </SectionCard>
 
-        {/* Top Usage Section */}
-        {hasData && hasRankedUsage && (
-          <div className="mt-10">
-            <div className="mb-4 flex items-center justify-between">
+            <SectionCard>
               <div>
-                <h2 className="text-sm font-semibold text-foreground">{t('topUsage.title')}</h2>
-                <p className="mt-1 text-xs text-muted-foreground">{t('topUsage.description')}</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-blue-500" />
+                  <h2 className="text-sm font-semibold text-foreground">{t('heatmap.title')}</h2>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{t('heatmap.description')}</p>
               </div>
-              {hasCostData && (
-                <ToggleGroup
-                  type="single"
-                  value={rankingMode}
-                  onValueChange={(value) => {
-                    if (value === 'tokens' || value === 'cost') {
-                      setRankingMode(value)
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 gap-px rounded-md"
-                >
-                  <ToggleGroupItem value="tokens" className="h-7 px-2.5 text-xs">
-                    {t('topUsage.toggleTokens')}
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="cost" className="h-7 px-2.5 text-xs">
-                    {t('topUsage.toggleCost')}
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {/* Models ranking */}
-              {rankingMode === 'tokens' && summary!.byModel.length > 0 && (
-                <RankGroup title={t('topUsage.models')}>
-                  {summary!.byModel.map(item => (
-                    <RankedUsageRow
-                      key={item.modelId}
-                      label={item.modelId}
-                      tokens={item.totalTokens}
-                      maxTokens={summary!.byModel[0]?.totalTokens ?? 0}
-                      totalTokens={summary!.totalTokens}
-                      turnsLabel={t('topUsage.turnCount', { value: new Intl.NumberFormat(locale).format(item.count) })}
-                    />
-                  ))}
-                </RankGroup>
-              )}
-              {rankingMode === 'cost' && costSummary && costSummary.byModel.length > 0 && (
-                <RankGroup title={t('topUsage.models')}>
-                  {costSummary.byModel.map(item => (
-                    <RankedCostRow
-                      key={item.modelId}
-                      label={item.modelId}
-                      costUsd={item.costUsd}
-                      maxCost={costSummary.byModel[0]?.costUsd ?? 0}
-                      totalCost={costSummary.totalCostUsd}
-                      tokens={item.totalTokens}
-                    />
-                  ))}
-                </RankGroup>
-              )}
-              {/* Agents ranking */}
-              {rankingMode === 'tokens' && summary!.byAgent.length > 0 && (
-                <RankGroup title={t('topUsage.agents')}>
-                  {summary!.byAgent.map(item => (
-                    <RankedUsageRow
-                      key={item.agentId}
-                      label={item.agentName}
-                      tokens={item.totalTokens}
-                      maxTokens={summary!.byAgent[0]?.totalTokens ?? 0}
-                      totalTokens={summary!.totalTokens}
-                      turnsLabel={t('topUsage.turnCount', { value: new Intl.NumberFormat(locale).format(item.count) })}
-                    />
-                  ))}
-                </RankGroup>
-              )}
-              {rankingMode === 'cost' && costSummary && costSummary.byAgent.length > 0 && (
-                <RankGroup title={t('topUsage.agents')}>
-                  {costSummary.byAgent.map(item => (
-                    <RankedCostRow
-                      key={item.agentId}
-                      label={item.agentName}
-                      costUsd={item.costUsd}
-                      maxCost={costSummary.byAgent[0]?.costUsd ?? 0}
-                      totalCost={costSummary.totalCostUsd}
-                      tokens={item.totalTokens}
-                    />
-                  ))}
-                </RankGroup>
-              )}
-              {/* Providers ranking */}
-              {rankingMode === 'tokens' && summary!.byProviderTarget.length > 0 && (
-                <RankGroup title={t('topUsage.providers')}>
-                  {summary!.byProviderTarget.map(item => (
-                    <RankedUsageRow
-                      key={item.providerTargetId}
-                      label={item.providerTargetName ?? item.providerTargetId}
-                      tokens={item.totalTokens}
-                      maxTokens={summary!.byProviderTarget[0]?.totalTokens ?? 0}
-                      totalTokens={summary!.totalTokens}
-                      turnsLabel={t('topUsage.turnCount', { value: new Intl.NumberFormat(locale).format(item.count) })}
-                    />
-                  ))}
-                </RankGroup>
-              )}
-              {rankingMode === 'cost' && costSummary && costSummary.byProviderTarget.length > 0 && (
-                <RankGroup title={t('topUsage.providers')}>
-                  {costSummary.byProviderTarget.map(item => (
-                    <RankedCostRow
-                      key={item.providerTargetId}
-                      label={item.providerTargetName ?? item.providerTargetId}
-                      costUsd={item.costUsd}
-                      maxCost={costSummary.byProviderTarget[0]?.costUsd ?? 0}
-                      totalCost={costSummary.totalCostUsd}
-                      tokens={item.totalTokens}
-                    />
-                  ))}
-                </RankGroup>
-              )}
-            </div>
+              <div className="mt-4">
+                <UsageHeatmap data={daily} />
+              </div>
+            </SectionCard>
+
+            {hasRankedUsage && (
+              <SectionCard>
+                <UsageBreakdown summary={summary} costSummary={costSummary} />
+              </SectionCard>
+            )}
+
+            <SectionCard>
+              <UsagePatterns daily={daily} summary={summary} />
+            </SectionCard>
+
+            <SectionCard>
+              <UsageRecentSessions summary={summary} />
+            </SectionCard>
           </div>
         )}
 
         {/* Empty state */}
-        {summary && summary.totalTokens === 0 && (
+        {usageReady && summary && summary.totalTokens === 0 && (
           <div className="mt-20 text-center" data-testid="usage-empty-state">
             <p className="text-sm text-muted-foreground">
               {t('empty.noData')}
@@ -302,108 +131,79 @@ export function UsageDashboard() {
   )
 }
 
-function Pill({ label, value, dataTestId, accent }: { label: string, value: string, dataTestId?: string, accent?: boolean }) {
+function SectionCard({ children, className }: { children: React.ReactNode, className?: string }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 rounded-full border px-3 py-1',
-        accent ? 'border-accent/40 bg-accent/5' : 'border-border/40',
+        'rounded-2xl bg-card p-5 ring-1 ring-foreground/8 shadow-[0_1px_2px_rgba(0,0,0,0.03),0_4px_10px_-4px_rgba(0,0,0,0.04)]',
+        className,
       )}
-      data-testid={dataTestId}
     >
-      <span className="text-[10px] text-muted-foreground" data-testid={dataTestId ? `${dataTestId}-label` : undefined}>{label}</span>
-      <span
-        className={cn(
-          'text-xs font-medium tabular-nums',
-          accent ? 'text-accent-foreground' : 'text-foreground',
-        )}
-        data-testid={dataTestId ? `${dataTestId}-value` : undefined}
-      >
-        {value}
-      </span>
+      {children}
     </div>
   )
 }
 
-function RankGroup({ title, children }: { title: string, children: React.ReactNode }) {
+const SKELETON_HERO_KEYS = ['hero-1', 'hero-2', 'hero-3', 'hero-4']
+const SKELETON_STAT_KEYS = ['stat-1', 'stat-2', 'stat-3', 'stat-4', 'stat-5', 'stat-6']
+
+function UsageDashboardSkeleton() {
   return (
-    <div className="min-w-0">
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-normal text-muted-foreground">{title}</h3>
-      <ScrollArea
-        className="max-h-80 pr-2"
-        viewportClassName="max-h-80"
-        contentClassName="space-y-3"
-      >
-        {children}
-      </ScrollArea>
+    <div className="mt-8 space-y-10">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {SKELETON_HERO_KEYS.map(key => (
+          <Skeleton key={key} className="h-28 rounded-2xl" />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {SKELETON_STAT_KEYS.map(key => (
+          <Skeleton key={key} className="h-7 w-24 rounded-full" />
+        ))}
+      </div>
+      <Skeleton className="h-64 rounded-2xl" />
+      <Skeleton className="h-48 rounded-2xl" />
     </div>
   )
 }
 
-function RankedUsageRow({
-  label,
-  tokens,
-  maxTokens,
-  totalTokens,
-  turnsLabel,
-}: {
-  label: string
-  tokens: number
-  maxTokens: number
-  totalTokens: number
-  turnsLabel: string
-}) {
-  const tokenShare = totalTokens > 0 ? tokens / totalTokens : 0
-  return (
-    <div className="min-w-0">
-      <div className="mb-1 flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{label}</span>
-        <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">{formatTokenCount(tokens)}</span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/5">
-        <div
-          className="h-full rounded-full bg-foreground/55"
-          style={{ width: `${boundedPercent(tokens, maxTokens)}%` }}
-        />
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
-        <span className="truncate">{turnsLabel}</span>
-        <span className="shrink-0 tabular-nums">{formatPercentFromRatio(tokenShare)}</span>
-      </div>
-    </div>
-  )
-}
+// Secondary detail row — a quiet "meta stats" strip beneath the flashier hero
+// cards above. Deliberately neutral/monochrome (color already lives in the
+// hero cards and charts — see Von Restorff, if everything is colorful nothing
+// stands out), but housed in the same card shell as every other section below
+// it so it reads as "grounded detail", not stray floating text.
+function SecondaryStats({ summary, stats }: { summary: UsageSummary, stats: UsageStats }) {
+  const { t } = useTranslation('usage')
+  const cells: Array<{ label: string, value: string, testId: string }> = [
+    { label: t('pill.today'), value: formatTokenCount(stats.todayTokens), testId: 'usage-pill-today-tokens' },
+    { label: t('pill.prompt'), value: formatTokenCount(summary.totalPromptTokens), testId: 'usage-pill-prompt-tokens' },
+    { label: t('pill.completion'), value: formatTokenCount(summary.totalCompletionTokens), testId: 'usage-pill-completion-tokens' },
+    { label: t('pill.turns'), value: String(summary.totalTurns), testId: 'usage-pill-total-turns' },
+    { label: t('pill.avgDaily'), value: formatTokenCount(stats.avgDailyTokens), testId: 'usage-pill-avg-daily-tokens' },
+    { label: t('pill.activeDays'), value: String(stats.activeDays), testId: 'usage-pill-active-days' },
+    { label: t('pill.bestStreak'), value: `${stats.longestStreak}d`, testId: 'usage-pill-best-streak' },
+  ]
+  if (stats.peakDay) {
+    cells.push({
+      label: t('pill.peak'),
+      value: t('pill.peakValue', { tokens: formatTokenCount(stats.peakDay.totalTokens), date: stats.peakDay.date.slice(5) }),
+      testId: 'usage-pill-peak-day',
+    })
+  }
 
-function RankedCostRow({
-  label,
-  costUsd,
-  maxCost,
-  totalCost,
-  tokens,
-}: {
-  label: string
-  costUsd: number
-  maxCost: number
-  totalCost: number
-  tokens: number
-}) {
-  const costShare = totalCost > 0 ? costUsd / totalCost : 0
   return (
-    <div className="min-w-0">
-      <div className="mb-1 flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{label}</span>
-        <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">{formatUsd(costUsd)}</span>
+    <SectionCard className="p-2">
+      <div className="flex flex-wrap">
+        {cells.map(cell => (
+          <div
+            key={cell.testId}
+            className="min-w-[104px] flex-1 rounded-xl px-3.5 py-2.5 transition-colors duration-150 hover:bg-foreground/[0.03]"
+            data-testid={cell.testId}
+          >
+            <p className="text-[10.5px] text-muted-foreground" data-testid={`${cell.testId}-label`}>{cell.label}</p>
+            <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground" data-testid={`${cell.testId}-value`}>{cell.value}</p>
+          </div>
+        ))}
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/5">
-        <div
-          className="h-full rounded-full bg-foreground/55"
-          style={{ width: `${boundedPercent(costUsd, maxCost)}%` }}
-        />
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
-        <span className="truncate">{formatTokenCount(tokens)}</span>
-        <span className="shrink-0 tabular-nums">{formatPercentFromRatio(costShare)}</span>
-      </div>
-    </div>
+    </SectionCard>
   )
 }

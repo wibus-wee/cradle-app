@@ -3,31 +3,32 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
-  backendRunSnapshots,
   backendRuns,
+  backendRunSnapshots,
   chatSessionQueueItems,
   messages,
   sessionEvents,
-  sessions
+  sessions,
 } from '@cradle/db'
 import { eq, sql } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../src/infra'
 import {
+  recoverChatRuntimeProjections,
   recoverChatRuntimeSession,
-  recoverChatRuntimeProjections
 } from '../src/modules/chat-runtime/es/recovery'
 import { getMessageGroups } from '../src/modules/chat-runtime/history-api'
 import { recoverPersistedRunProjections } from '../src/modules/chat-runtime/runtime'
 
-const INTERRUPTED_RUN_ERROR_TEXT =
-  'Response interrupted because the Cradle server process exited while the run was streaming.'
+const INTERRUPTED_RUN_ERROR_TEXT
+  = 'Response interrupted because the Cradle server process exited while the run was streaming.'
 
 function restoreEnv(name: string, previousValue: string | undefined): void {
   if (previousValue === undefined) {
     delete process.env[name]
-  } else {
+  }
+ else {
     process.env[name] = previousValue
   }
 }
@@ -39,7 +40,8 @@ async function withTempDataDir<T>(callback: () => Promise<T> | T): Promise<T> {
 
   try {
     return await callback()
-  } finally {
+  }
+ finally {
     shutdownInfra()
     rmSync(dataDir, { recursive: true, force: true })
     restoreEnv('CRADLE_DATA_DIR', previousDataDir)
@@ -55,7 +57,7 @@ function seedSession(sessionId: string): void {
       titleSource: 'initial',
       runtimeKind: 'standard',
       createdAt: 1700000000,
-      updatedAt: 1700000000
+      updatedAt: 1700000000,
     })
     .run()
 }
@@ -85,11 +87,11 @@ function seedAssistantMessage(input: {
       messageJson: JSON.stringify({
         id: input.id,
         role: 'assistant',
-        parts: [{ type: 'text', text: content }]
+        parts: [{ type: 'text', text: content }],
       }),
       errorText: input.errorText ?? null,
       createdAt: input.createdAt ?? 1700000000,
-      updatedAt: input.updatedAt ?? 1700000000
+      updatedAt: input.updatedAt ?? 1700000000,
     })
     .run()
 }
@@ -116,7 +118,7 @@ function seedBackendRun(input: {
       stopReason: input.stopReason ?? null,
       errorText: input.errorText ?? null,
       startedAt: input.startedAt ?? 1700000000,
-      finishedAt: input.finishedAt ?? null
+      finishedAt: input.finishedAt ?? null,
     })
     .run()
 }
@@ -149,7 +151,7 @@ function seedQueueItem(input: {
       startedRunId: input.startedRunId,
       errorText: null,
       createdAt: 1700000000,
-      updatedAt: 1700000000
+      updatedAt: 1700000000,
     })
     .run()
 }
@@ -159,7 +161,8 @@ function countSessionEvents(sessionId: string): number {
     .select({ count: sql<number>`count(*)` })
     .from(sessionEvents)
     .where(eq(sessionEvents.aggregateId, sessionId))
-    .get()!.count
+    .get()!
+.count
 }
 
 describe('chat runtime recovery', () => {
@@ -169,7 +172,7 @@ describe('chat runtime recovery', () => {
       seedAssistantMessage({
         id: 'message-read-no-repair',
         sessionId: 'session-read-no-repair',
-        status: 'streaming'
+        status: 'streaming',
       })
       seedBackendRun({
         id: 'run-read-no-repair',
@@ -177,7 +180,7 @@ describe('chat runtime recovery', () => {
         messageId: 'message-read-no-repair',
         status: 'aborted',
         stopReason: 'response.cancelled',
-        finishedAt: 1700000100
+        finishedAt: 1700000100,
       })
 
       expect(countSessionEvents('session-read-no-repair')).toBe(0)
@@ -187,8 +190,8 @@ describe('chat runtime recovery', () => {
       expect(rows).toEqual([
         expect.objectContaining({
           messageId: 'message-read-no-repair',
-          status: 'streaming'
-        })
+          status: 'streaming',
+        }),
       ])
       expect(countSessionEvents('session-read-no-repair')).toBe(0)
     })
@@ -201,7 +204,7 @@ describe('chat runtime recovery', () => {
         id: 'message-terminal-recovery',
         sessionId: 'session-terminal-recovery',
         status: 'streaming',
-        content: 'terminal projection drift'
+        content: 'terminal projection drift',
       })
       seedBackendRun({
         id: 'run-terminal-recovery',
@@ -209,12 +212,12 @@ describe('chat runtime recovery', () => {
         messageId: 'message-terminal-recovery',
         status: 'aborted',
         stopReason: 'response.cancelled',
-        finishedAt: 1700000100
+        finishedAt: 1700000100,
       })
       seedQueueItem({
         id: 'queue-terminal-recovery',
         sessionId: 'session-terminal-recovery',
-        startedRunId: 'run-terminal-recovery'
+        startedRunId: 'run-terminal-recovery',
       })
 
       const first = await recoverChatRuntimeSession('session-terminal-recovery')
@@ -223,33 +226,33 @@ describe('chat runtime recovery', () => {
       expect(first).toEqual({
         interruptedRunsFinalized: 0,
         terminalFactsProjected: 1,
-        terminalProjectionDriftsRepaired: 0
+        terminalProjectionDriftsRepaired: 0,
       })
       expect(second).toEqual({
         interruptedRunsFinalized: 0,
         terminalFactsProjected: 0,
-        terminalProjectionDriftsRepaired: 0
+        terminalProjectionDriftsRepaired: 0,
       })
 
       expect(
-        db().select().from(messages).where(eq(messages.id, 'message-terminal-recovery')).get()
+        db().select().from(messages).where(eq(messages.id, 'message-terminal-recovery')).get(),
       ).toEqual(
         expect.objectContaining({
           status: 'aborted',
-          errorText: null
-        })
+          errorText: null,
+        }),
       )
       expect(
         db()
           .select()
           .from(chatSessionQueueItems)
           .where(eq(chatSessionQueueItems.id, 'queue-terminal-recovery'))
-          .get()
+          .get(),
       ).toEqual(
         expect.objectContaining({
           status: 'cancelled',
-          startedRunId: 'run-terminal-recovery'
-        })
+          startedRunId: 'run-terminal-recovery',
+        }),
       )
       expect(
         db()
@@ -257,12 +260,12 @@ describe('chat runtime recovery', () => {
           .from(sessionEvents)
           .where(eq(sessionEvents.aggregateId, 'session-terminal-recovery'))
           .orderBy(sessionEvents.version)
-          .all()
+          .all(),
       ).toEqual([
         { eventType: 'QueueItemEnqueued', subjectRunId: null },
         { eventType: 'RunStarted', subjectRunId: 'run-terminal-recovery' },
         { eventType: 'AssistantMessageCompleted', subjectRunId: null },
-        { eventType: 'RunAborted', subjectRunId: 'run-terminal-recovery' }
+        { eventType: 'RunAborted', subjectRunId: 'run-terminal-recovery' },
       ])
     })
   })
@@ -273,18 +276,18 @@ describe('chat runtime recovery', () => {
       seedAssistantMessage({
         id: 'message-streaming-recovery',
         sessionId: 'session-streaming-recovery',
-        status: 'streaming'
+        status: 'streaming',
       })
       seedBackendRun({
         id: 'run-streaming-recovery',
         sessionId: 'session-streaming-recovery',
         messageId: 'message-streaming-recovery',
-        status: 'streaming'
+        status: 'streaming',
       })
       seedQueueItem({
         id: 'queue-streaming-recovery',
         sessionId: 'session-streaming-recovery',
-        startedRunId: 'run-streaming-recovery'
+        startedRunId: 'run-streaming-recovery',
       })
 
       const first = await recoverPersistedRunProjections()
@@ -293,43 +296,43 @@ describe('chat runtime recovery', () => {
       expect(first).toEqual({
         interruptedRunsFinalized: 1,
         terminalFactsProjected: 0,
-        terminalProjectionDriftsRepaired: 0
+        terminalProjectionDriftsRepaired: 0,
       })
       expect(second).toEqual({
         interruptedRunsFinalized: 0,
         terminalFactsProjected: 0,
-        terminalProjectionDriftsRepaired: 0
+        terminalProjectionDriftsRepaired: 0,
       })
       expect(
-        db().select().from(backendRuns).where(eq(backendRuns.id, 'run-streaming-recovery')).get()
+        db().select().from(backendRuns).where(eq(backendRuns.id, 'run-streaming-recovery')).get(),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
           stopReason: 'response.interrupted',
           errorText: INTERRUPTED_RUN_ERROR_TEXT,
-          finishedAt: expect.any(Number)
-        })
+          finishedAt: expect.any(Number),
+        }),
       )
       expect(
-        db().select().from(messages).where(eq(messages.id, 'message-streaming-recovery')).get()
+        db().select().from(messages).where(eq(messages.id, 'message-streaming-recovery')).get(),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
-          errorText: INTERRUPTED_RUN_ERROR_TEXT
-        })
+          errorText: INTERRUPTED_RUN_ERROR_TEXT,
+        }),
       )
       expect(
         db()
           .select()
           .from(chatSessionQueueItems)
           .where(eq(chatSessionQueueItems.id, 'queue-streaming-recovery'))
-          .get()
+          .get(),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
           errorText: INTERRUPTED_RUN_ERROR_TEXT,
-          startedRunId: 'run-streaming-recovery'
-        })
+          startedRunId: 'run-streaming-recovery',
+        }),
       )
     })
   })
@@ -342,7 +345,7 @@ describe('chat runtime recovery', () => {
         sessionId: 'session-terminal-drift',
         status: 'streaming',
         content: 'late streaming overwrite',
-        updatedAt: 1700000200
+        updatedAt: 1700000200,
       })
       seedBackendRun({
         id: 'run-terminal-drift',
@@ -351,7 +354,7 @@ describe('chat runtime recovery', () => {
         status: 'failed',
         stopReason: 'response.interrupted',
         errorText: 'terminal failure',
-        finishedAt: 1700000100
+        finishedAt: 1700000100,
       })
       db()
         .insert(backendRunSnapshots)
@@ -373,7 +376,7 @@ describe('chat runtime recovery', () => {
           completedAt: 1700000200000,
           completionReason: 'response.completed',
           errorText: null,
-          summaryJson: '{}'
+          summaryJson: '{}',
         })
         .run()
       db()
@@ -392,14 +395,14 @@ describe('chat runtime recovery', () => {
                 messageJson: JSON.stringify({
                   id: 'message-terminal-drift',
                   role: 'assistant',
-                  parts: [{ type: 'text', text: 'failed response' }]
+                  parts: [{ type: 'text', text: 'failed response' }],
                 }),
                 status: 'failed',
                 errorText: 'terminal failure',
-                updatedAt: 1700000100
-              }
+                updatedAt: 1700000100,
+              },
             }),
-            occurredAt: 1700000100
+            occurredAt: 1700000100,
           },
           {
             aggregateId: 'session-terminal-drift',
@@ -413,10 +416,10 @@ describe('chat runtime recovery', () => {
               status: 'failed',
               stopReason: 'response.interrupted',
               errorText: 'terminal failure',
-              finishedAt: 1700000100
+              finishedAt: 1700000100,
             }),
-            occurredAt: 1700000100
-          }
+            occurredAt: 1700000100,
+          },
         ])
         .run()
 
@@ -427,40 +430,40 @@ describe('chat runtime recovery', () => {
       expect(first).toEqual({
         interruptedRunsFinalized: 0,
         terminalFactsProjected: 0,
-        terminalProjectionDriftsRepaired: 1
+        terminalProjectionDriftsRepaired: 1,
       })
       expect(second).toEqual({
         interruptedRunsFinalized: 0,
         terminalFactsProjected: 0,
-        terminalProjectionDriftsRepaired: 0
+        terminalProjectionDriftsRepaired: 0,
       })
       expect(countSessionEvents('session-terminal-drift')).toBe(eventsBefore)
       expect(
-        db().select().from(messages).where(eq(messages.id, 'message-terminal-drift')).get()
+        db().select().from(messages).where(eq(messages.id, 'message-terminal-drift')).get(),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
           content: 'failed response',
           errorText: 'terminal failure',
-          updatedAt: 1700000100
-        })
+          updatedAt: 1700000100,
+        }),
       )
       expect(
-        db().select().from(backendRuns).where(eq(backendRuns.id, 'run-terminal-drift')).get()
+        db().select().from(backendRuns).where(eq(backendRuns.id, 'run-terminal-drift')).get(),
       ).toEqual(expect.objectContaining({ status: 'failed' }))
       expect(
         db()
           .select()
           .from(backendRunSnapshots)
           .where(eq(backendRunSnapshots.id, 'snapshot-terminal-drift'))
-          .get()
+          .get(),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
           completedAt: 1700000100000,
           completionReason: 'response.interrupted',
-          errorText: 'terminal failure'
-        })
+          errorText: 'terminal failure',
+        }),
       )
     })
   })
@@ -480,9 +483,9 @@ describe('chat runtime recovery', () => {
             status: 'failed',
             stopReason: 'response.failed',
             errorText: 'first failure',
-            finishedAt: 1700000100
+            finishedAt: 1700000100,
           }),
-          occurredAt: 1700000100
+          occurredAt: 1700000100,
         })
         .run()
 
@@ -500,14 +503,13 @@ describe('chat runtime recovery', () => {
               status: 'aborted',
               stopReason: 'response.cancelled',
               errorText: null,
-              finishedAt: 1700000101
+              finishedAt: 1700000101,
             }),
-            occurredAt: 1700000101
+            occurredAt: 1700000101,
           })
-          .run()
-      ).toThrow(/UNIQUE constraint failed/)
+          .run()).toThrow(/UNIQUE constraint failed/)
 
-      const planRows: Array<{ id: number; parent: number; notused: number; detail: string }> = db()
+      const planRows: Array<{ id: number, parent: number, notused: number, detail: string }> = db()
         .all(sql`
           explain query plan
           select 1
@@ -517,8 +519,8 @@ describe('chat runtime recovery', () => {
             and event_type in ('RunCompleted', 'RunFailed', 'RunAborted')
         `)
 
-      expect(planRows.map((row) => row.detail).join('\n')).toContain(
-        'session_events_terminal_fact_run_unique'
+      expect(planRows.map(row => row.detail).join('\n')).toContain(
+        'session_events_terminal_fact_run_unique',
       )
     })
   })

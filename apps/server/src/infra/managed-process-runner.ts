@@ -1,4 +1,5 @@
-import { fork, spawn, type ChildProcess } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
+import { fork, spawn } from 'node:child_process'
 
 interface BaseTarget {
   cwd?: string

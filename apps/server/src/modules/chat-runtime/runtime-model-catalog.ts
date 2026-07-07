@@ -1,7 +1,7 @@
 import { AppError } from '../../errors/app-error'
-import type { RuntimeKind, RuntimeModelCatalog } from './runtime-provider-types'
-import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import * as Workspace from '../workspace/service'
+import { getRuntimeRegistry } from './chat-runtime-provider-registry'
+import type { RuntimeKind, RuntimeModelCatalog } from './runtime-provider-types'
 
 export async function listRuntimeModels(input: {
   runtimeKind: RuntimeKind
@@ -12,14 +12,14 @@ export async function listRuntimeModels(input: {
     throw new AppError({
       code: 'chat_runtime_not_available',
       status: 501,
-      message: `Runtime is not available: ${input.runtimeKind}`
+      message: `Runtime is not available: ${input.runtimeKind}`,
     })
   }
   if (!runtime.listModels) {
     throw new AppError({
       code: 'runtime_model_catalog_unavailable',
       status: 404,
-      message: `Runtime does not expose a native model catalog: ${input.runtimeKind}`
+      message: `Runtime does not expose a native model catalog: ${input.runtimeKind}`,
     })
   }
 
@@ -30,11 +30,11 @@ export async function listRuntimeModels(input: {
     throw new AppError({
       code: 'workspace_not_found',
       status: 404,
-      message: `Workspace was not found: ${input.workspaceId}`
+      message: `Workspace was not found: ${input.workspaceId}`,
     })
   }
 
   return await runtime.listModels({
-    ...(workspacePath ? { workspacePath } : {})
+    ...(workspacePath ? { workspacePath } : {}),
   })
 }

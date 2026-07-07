@@ -20,6 +20,7 @@ import type { DiscoveredPluginPackage } from './discovery'
 import { discoverPluginPackages } from './discovery'
 import { resetExternalIssueSourceRegistry } from './external-issue-source-registry'
 import { resetExternalProviderSourceRegistry } from './external-provider-source-registry'
+import { calculatePluginPackageChecksum } from './package-checksum'
 import { clearPluginRoutes, dispatchPluginRoute, resetPluginRouteRegistry } from './route-registry'
 import {
   classifyPluginSource,
@@ -35,10 +36,9 @@ import {
   unregisterPluginDescriptor,
 } from './runtime-registry'
 import { resetPluginSkillRegistry } from './skill-registry'
-import { listPluginSources, readPluginSource } from './source-registry'
 import { deletePluginSourceCache, refreshPluginSourceDirectory, resolvePluginSourceDirectory } from './source-installer'
+import { listPluginSources, readPluginSource } from './source-registry'
 import { createPluginStaticServer, rewritePluginWebBundleImports } from './static-server'
-import { calculatePluginPackageChecksum } from './package-checksum'
 import { grantPluginTrust } from './trust-grants'
 import { evaluatePluginSourceTrust, isExternalLocalCodeSource, readRelayHostExposure } from './trust-policy'
 import { validatePluginModule } from './validation'

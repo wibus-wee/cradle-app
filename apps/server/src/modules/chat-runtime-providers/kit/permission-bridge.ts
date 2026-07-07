@@ -34,7 +34,7 @@ export interface ProviderToolApprovalPolicy {
   resolveOverride?: () => RuntimeToolApprovalResolution | null | undefined
   /** Extend/replace the request metadata with provider-specific fields (e.g. SDK request options). */
   describeRequest?: (
-    metadata: Record<string, unknown> | undefined
+    metadata: Record<string, unknown> | undefined,
   ) => Record<string, unknown> | undefined
   /**
    * Runs once `resolveOverride` has been checked and found no shortcut, immediately before the

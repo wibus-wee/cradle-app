@@ -1,4 +1,5 @@
 import type { CradleToolKind } from '@cradle/chat-runtime-contracts'
+
 import { formatCompactBytes } from '~/lib/number-format'
 
 import {
@@ -572,11 +573,11 @@ function readWorkflowEscapedChar(char: string): string {
 }
 
 function isWorkflowIdentifierStart(char: string): boolean {
-  return /^[A-Za-z_$]$/.test(char)
+  return /^[A-Z_$]$/i.test(char)
 }
 
 function isWorkflowIdentifierChar(char: string): boolean {
-  return /^[A-Za-z0-9_$]$/.test(char)
+  return /^[\w$]$/.test(char)
 }
 
 function isWorkflowLiteralRecord(value: WorkflowLiteral | null): value is Record<string, WorkflowLiteral> {
@@ -1518,12 +1519,13 @@ function readWorkflowSummary(input: ToolPayload, output: ToolPayload): string | 
       return 'Failed'
     case 'stopped':
       return 'Stopped'
-    default:
+    default: {
       const phases = output.workflowPhases.length > 0 ? output.workflowPhases : input.workflowPhases
       if (phases.length > 0) {
         return `${phases.length} declared phase${phases.length === 1 ? '' : 's'}`
       }
       return output.status ?? output.workflowRunId ?? null
+    }
   }
 }
 

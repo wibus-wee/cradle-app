@@ -3,7 +3,7 @@ import { Given, Then, When } from '@cucumber/cucumber'
 import type { Locator } from '@playwright/test'
 import { expect } from '@playwright/test'
 
-import { MockLlmServer, type MockToolCall } from '../support/mock-llm-server'
+import { MockLlmServer } from '../support/mock-llm-server'
 import {
   expectPromptEditorToContain,
   fillPromptEditor,
@@ -29,14 +29,6 @@ const CONTEXT_RESPONSES = [
 ]
 const MARKDOWN_RESPONSE = 'Markdown 导出助手回复：请复制我。'
 const REASONING_TEXT = '第一步分析问题\n第二步形成答案'
-const TOOL_CALLS: MockToolCall[] = [{
-  id: 'mock-tool-call-1',
-  type: 'function',
-  function: {
-    name: 'read_file',
-    arguments: '{"path":"demo.txt"}',
-  },
-}]
 const CHAT_VIEW_TIMEOUT = 20_000
 const CHAT_STATUS_TIMEOUT = 30_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'

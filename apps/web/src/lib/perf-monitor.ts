@@ -48,7 +48,6 @@ const vitals: VitalEntry[] = []
 const longTasks: LongTaskSnapshot[] = []
 const paints: PaintSnapshot[] = []
 let intervalId: ReturnType<typeof setInterval> | null = null
-let userTimingCleanupIntervalId: ReturnType<typeof setInterval> | null = null
 let longTaskObserver: PerformanceObserver | null = null
 let paintObserver: PerformanceObserver | null = null
 let consecutiveIncreases = 0
@@ -226,7 +225,7 @@ export function initPerfMonitor() {
   sampleMemory()
   intervalId = setInterval(sampleMemory, SAMPLE_INTERVAL_MS)
   cleanupUserTimingEntries()
-  userTimingCleanupIntervalId = setInterval(cleanupUserTimingEntries, USER_TIMING_CLEANUP_INTERVAL_MS)
+  setInterval(cleanupUserTimingEntries, USER_TIMING_CLEANUP_INTERVAL_MS)
   collectWebVitals()
   collectLongTasks()
   collectPaints()

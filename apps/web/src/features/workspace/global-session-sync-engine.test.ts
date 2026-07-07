@@ -35,7 +35,7 @@ class FakeEventSource implements GlobalSessionEventSource {
   }
 }
 
-describe('GlobalSessionSyncEngine', () => {
+describe('globalSessionSyncEngine', () => {
   it('builds a global sessions event tail URL', () => {
     expect(buildGlobalSessionEventTailUrl({
       serverBaseUrl: 'http://127.0.0.1:21423',

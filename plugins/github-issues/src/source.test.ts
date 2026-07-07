@@ -27,7 +27,7 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   })
 }
 
-describe('GitHub Issues source', () => {
+describe('gitHub Issues source', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     delete process.env.CRADLE_GITHUB_API_BASE_URL
@@ -60,7 +60,7 @@ describe('GitHub Issues source', () => {
       },
     ], {
       headers: {
-        etag: '"etag-1"',
+        'etag': '"etag-1"',
         'x-ratelimit-remaining': '4999',
         'x-ratelimit-reset': '1780000000',
       },
@@ -73,7 +73,7 @@ describe('GitHub Issues source', () => {
     const call = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit]
     const [, init] = call
     expect(init?.headers).toEqual(expect.objectContaining({
-      authorization: 'Bearer token-value',
+      'authorization': 'Bearer token-value',
       'if-none-match': '"old-etag"',
     }))
     expect(snapshot.source).toEqual(expect.objectContaining({
@@ -125,7 +125,7 @@ describe('GitHub Issues source', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, {
       status: 304,
       headers: {
-        etag: '"same"',
+        'etag': '"same"',
         'x-ratelimit-remaining': '4998',
       },
     })))

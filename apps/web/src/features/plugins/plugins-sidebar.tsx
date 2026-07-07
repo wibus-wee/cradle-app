@@ -1,4 +1,5 @@
 import { Plugin2Line } from '@mingcute/react'
+
 import { cn } from '~/lib/cn'
 import { usePluginStore } from '~/lib/plugin-store'
 import { useActiveSurface } from '~/navigation/active-surface'

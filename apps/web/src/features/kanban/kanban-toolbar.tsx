@@ -1,12 +1,12 @@
 import {
-  DotCircleLine as CircleDotIcon,
   Columns2Line as ColumnsIcon,
+  DotCircleLine as CircleDotIcon,
   FilterLine as FilterIcon,
   GroupLine as GroupIcon,
   PlaylistLine as ListIcon,
   PlusLine as PlusIcon,
   SelectorHorizontalLine as SlidersHorizontalIcon,
-  SortAscendingLine as SortAscIcon
+  SortAscendingLine as SortAscIcon,
 } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 

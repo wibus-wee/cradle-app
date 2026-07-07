@@ -1,6 +1,7 @@
-import { createServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
+import type { Server } from 'node:http'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -15,7 +16,7 @@ type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 
 interface FakeRemoteCradleServer {
   baseUrl: string
-  close(): Promise<void>
+  close: () => Promise<void>
 }
 
 function makeTempDir(prefix: string): string {

@@ -1,8 +1,8 @@
 {
   "name": "@cradle/relayd",
+  "type": "module",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "build:desktop-resource": "node scripts/build-desktop-resource.mjs",
     "test": "go test ./..."

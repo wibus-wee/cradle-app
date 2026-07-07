@@ -36,7 +36,7 @@ export default defineConfig({
         return NODE_BUILT_IN_MODULES.has(id) || isExternalDependency(id)
       },
       input: {
-        main: resolve(__dirname, 'src/index.ts'),
+        'main': resolve(__dirname, 'src/index.ts'),
         'managed-process-runner': resolve(__dirname, 'src/infra/managed-process-runner.ts'),
       },
     },

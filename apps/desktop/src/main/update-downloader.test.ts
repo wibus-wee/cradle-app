@@ -56,7 +56,7 @@ afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-describe('DesktopUpdateDownloader', () => {
+describe('desktopUpdateDownloader', () => {
   it('downloads an artifact and verifies its SHA-256 digest', async () => {
     const payload = Buffer.from('zip-payload')
     const sha256 = createHash('sha256').update(payload).digest('hex')

@@ -1,7 +1,7 @@
+import type { ConversationBridgeConnection } from '@cradle/db'
 import {
-  conversationBridgeConnectionSecrets,
   conversationBridgeConnections,
-  type ConversationBridgeConnection,
+  conversationBridgeConnectionSecrets,
 } from '@cradle/db'
 import type {
   ConversationBridgeAdapterRuntime,

@@ -15,7 +15,7 @@ import {
   annotateBangCommandMessage,
   annotateBangResultMessage,
   createUserMessage,
-  extractMessageText
+  extractMessageText,
 } from './ui-message'
 
 const BANG_COMMAND_TIMEOUT_MS = 30_000
@@ -48,7 +48,7 @@ function createBoundedBuffer(): BoundedBuffer {
   return {
     chunks: [],
     bytes: 0,
-    truncated: false
+    truncated: false,
   }
 }
 
@@ -82,7 +82,7 @@ function readBangCommandCwd(sessionId: string): string {
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session was not found',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
   if (!session.workspaceId) {
@@ -90,7 +90,7 @@ function readBangCommandCwd(sessionId: string): string {
       code: 'chat_session_workspace_required',
       status: 400,
       message: 'Bang commands require a workspace-backed chat session',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
 
@@ -100,7 +100,7 @@ function readBangCommandCwd(sessionId: string): string {
       code: 'chat_session_local_workspace_required',
       status: 409,
       message: 'Bang commands require a local workspace-backed chat session',
-      details: { sessionId, workspaceId: session.workspaceId }
+      details: { sessionId, workspaceId: session.workspaceId },
     })
   }
 
@@ -114,8 +114,8 @@ function readProviderVisibleResultText(input: {
   timedOut: boolean
   truncated: boolean
 }): string {
-  const text =
-    input.stdout.length > 0
+  const text
+    = input.stdout.length > 0
       ? input.stdout
       : input.stderr.length > 0
         ? input.stderr
@@ -145,7 +145,7 @@ export async function persistBangCommandMessages(input: {
   const resultMessageId = randomUUID()
   const userMessage = annotateBangCommandMessage(
     createUserMessage(userMessageId, `!${input.command}`),
-    input.command
+    input.command,
   )
   const resultText = readProviderVisibleResultText(input)
   const resultMessage = annotateBangResultMessage(createUserMessage(resultMessageId, resultText), {
@@ -155,7 +155,7 @@ export async function persistBangCommandMessages(input: {
     exitCode: input.exitCode,
     durationMs: input.durationMs,
     timedOut: input.timedOut,
-    truncated: input.truncated
+    truncated: input.truncated,
   })
   const now = currentUnixSeconds()
 
@@ -175,9 +175,9 @@ export async function persistBangCommandMessages(input: {
           content: extractMessageText(userMessage),
           messageJson: JSON.stringify(userMessage),
           createdAt: now,
-          updatedAt: now
-        }
-      }
+          updatedAt: now,
+        },
+      },
     },
     {
       type: 'UserMessageAppended',
@@ -194,17 +194,17 @@ export async function persistBangCommandMessages(input: {
           content: extractMessageText(resultMessage),
           messageJson: JSON.stringify(resultMessage),
           createdAt: now,
-          updatedAt: now
-        }
-      }
-    }
+          updatedAt: now,
+        },
+      },
+    },
   ])
 
   return {
     userMessageId,
     resultMessageId,
     userMessage: userMessage as ChatBangMessage,
-    resultMessage: resultMessage as ChatBangMessage
+    resultMessage: resultMessage as ChatBangMessage,
   }
 }
 
@@ -218,14 +218,14 @@ export async function executeLocalBangCommand(input: {
     throw new AppError({
       code: 'chat_bang_command_empty',
       status: 400,
-      message: 'Bang command must not be empty'
+      message: 'Bang command must not be empty',
     })
   }
   if (command.includes('\n') || command.includes('\r')) {
     throw new AppError({
       code: 'chat_bang_command_multiline_unsupported',
       status: 400,
-      message: 'Bang command must be a single line'
+      message: 'Bang command must be a single line',
     })
   }
 
@@ -241,7 +241,7 @@ export async function executeLocalBangCommand(input: {
     const child = spawn(command, {
       shell: true,
       cwd,
-      env: process.env
+      env: process.env,
     })
     let settled = false
     let forceKillTimer: ReturnType<typeof setTimeout> | null = null
@@ -272,8 +272,8 @@ export async function executeLocalBangCommand(input: {
       reject(new DOMException('Bang command aborted', 'AbortError'))
     }
 
-    child.stdout?.on('data', (chunk) => appendBoundedChunk(stdout, chunk as Buffer | string))
-    child.stderr?.on('data', (chunk) => appendBoundedChunk(stderr, chunk as Buffer | string))
+    child.stdout?.on('data', chunk => appendBoundedChunk(stdout, chunk as Buffer | string))
+    child.stderr?.on('data', chunk => appendBoundedChunk(stderr, chunk as Buffer | string))
     input.signal?.addEventListener('abort', abort, { once: true })
     child.once('error', (error) => {
       if (settled) {
@@ -303,15 +303,15 @@ export async function executeLocalBangCommand(input: {
     exitCode: result.exitCode,
     durationMs,
     timedOut,
-    truncated: stdout.truncated || stderr.truncated
+    truncated: stdout.truncated || stderr.truncated,
   }
   const persisted = await persistBangCommandMessages({
     sessionId: input.sessionId,
-    ...output
+    ...output,
   })
 
   return {
     ...output,
-    ...persisted
+    ...persisted,
   }
 }

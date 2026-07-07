@@ -156,5 +156,4 @@ describe('database module', () => {
       sqlite.close()
     }
   })
-
 })

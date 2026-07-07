@@ -1,9 +1,9 @@
-import type { TFunction } from 'i18next'
 import {
   Refresh1Line as RefreshCwIcon,
   SearchLine as SearchIcon,
-  SparklesLine as SparklesIcon
+  SparklesLine as SparklesIcon,
 } from '@mingcute/react'
+import type { TFunction } from 'i18next'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -13,8 +13,8 @@ import { Checkbox } from '~/components/ui/checkbox'
 import { Input } from '~/components/ui/input'
 import { Spinner } from '~/components/ui/spinner'
 import { modelIsVisible, ModelVisibilitySchema } from '~/features/agent-runtime/model-visibility'
-import { cn } from '~/lib/cn'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
+import { cn } from '~/lib/cn'
 
 import { ModelRegistryMappingDialog } from '../model-registry/mapping-dialog'
 import type { SearchResult } from '../model-registry/schemas'

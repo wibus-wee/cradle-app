@@ -1,10 +1,10 @@
-import { prepareFileTreeInput } from '@pierre/trees'
-import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react'
 import {
   CheckLine as CheckIcon,
   PlaylistLine as ListIcon,
-  TreeLine as ListTreeIcon
+  TreeLine as ListTreeIcon,
 } from '@mingcute/react'
+import { prepareFileTreeInput } from '@pierre/trees'
+import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '~/components/ui/button'

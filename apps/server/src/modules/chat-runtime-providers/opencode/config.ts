@@ -8,15 +8,15 @@ import type { Config } from '@opencode-ai/sdk'
 
 import type { RegisteredMcpServer } from '../../../plugins/mcp-registry'
 import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
+import type { RuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
 import type { ModelRegistryMappingEntry, ModelsDevModel } from '../../model-registry/model-info-registry'
 import { lookupModelRawExact } from '../../model-registry/model-info-registry'
-import type { RuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
+import { resolveAnthropicWireAuth } from '../../provider-catalog/provider-endpoint-registry'
 import {
   readTrustedAnthropicConfig,
   readTrustedOpenAICompatibleConfig,
   readTrustedUniversalConfig,
 } from '../../provider-contracts/provider-base'
-import { resolveAnthropicWireAuth } from '../../provider-catalog/provider-endpoint-registry'
 import type { CustomModelEntry } from '../../provider-targets/service'
 
 export interface OpencodeResolvedConfig {
@@ -329,7 +329,7 @@ function readModelID(modelId: string | null | undefined, fallback: string): stri
 }
 
 function createOpencodeProviderId(profile: RuntimeProviderTargetProfile): string {
-  return `cradle-${profile.providerTargetKind}-${profile.providerTargetId.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  return `cradle-${profile.providerTargetKind}-${profile.providerTargetId.replace(/[^\w-]/g, '-')}`
 }
 
 function buildOpencodeMcpServersConfig(): NonNullable<Config['mcp']> {

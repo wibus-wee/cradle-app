@@ -3,16 +3,16 @@ import { z } from 'zod'
 
 import { getChatSessionsBySessionIdMessages, getIssuesSearch } from '~/api-gen/sdk.gen'
 import { MarkdownEditor } from '~/components/editor/markdown-editor'
-import { useUploadAsset } from '~/features/assets/use-upload-asset'
 import type {
   SmartMentionAttrs,
   SmartMentionItem,
   SmartMentionKind,
 } from '~/components/editor/smart-mention-utils'
 import { useAgents } from '~/features/agent-runtime/use-agents'
+import { useUploadAsset } from '~/features/assets/use-upload-asset'
 import type { KanbanBoard, KanbanIssue } from '~/features/kanban/types'
-import { useWorkspaceSessions } from '~/features/workspace/use-session'
 import { getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { useWorkspaceSessions } from '~/features/workspace/use-session'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { openChatSession, openKanbanBoard, openSettingsSection, openWorkspaceDetail } from '~/navigation/navigation-commands'

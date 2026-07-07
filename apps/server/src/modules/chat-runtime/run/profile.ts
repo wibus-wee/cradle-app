@@ -42,7 +42,7 @@ export function startChatRuntimeProfile(): ChatRuntimeProfile {
     finalizeFinishedAtMs: null,
     memoryStarted: enabled ? process.memoryUsage() : null,
     memoryFinished: null,
-    finalMessageJsonBytes: null
+    finalMessageJsonBytes: null,
   }
 }
 
@@ -72,7 +72,7 @@ export function recordChatRuntimeProfile(input: {
     timingsMs: {
       stream: Math.round(streamFinishedAtMs - profile.streamStartedAtMs),
       finalize: Math.round(finalizeFinishedAtMs - finalizeStartedAtMs),
-      total: Math.round(finalizeFinishedAtMs - profile.startedAtMs)
+      total: Math.round(finalizeFinishedAtMs - profile.startedAtMs),
     },
     memory: {
       startHeapUsed: memoryStarted?.heapUsed ?? null,
@@ -80,13 +80,13 @@ export function recordChatRuntimeProfile(input: {
       deltaHeapUsed: memoryStarted ? memoryFinished.heapUsed - memoryStarted.heapUsed : null,
       startRss: memoryStarted?.rss ?? null,
       endRss: memoryFinished.rss,
-      deltaRss: memoryStarted ? memoryFinished.rss - memoryStarted.rss : null
+      deltaRss: memoryStarted ? memoryFinished.rss - memoryStarted.rss : null,
     },
     activeRun: {
       replayChunks: run.replayChunkCount,
       finalParts: run.finalPartCount,
-      finalMessageJsonBytes: profile.finalMessageJsonBytes
+      finalMessageJsonBytes: profile.finalMessageJsonBytes,
     },
-    diagnostics
+    diagnostics,
   })
 }

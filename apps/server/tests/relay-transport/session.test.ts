@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { generateRelayKeyPair } from '../../src/modules/relay-transport/crypto'
-import { relayEnvelopeSchema, type RelayEnvelope } from '../../src/modules/relay-transport/protocol'
+import type { RelayEnvelope } from '../../src/modules/relay-transport/protocol'
+import { relayEnvelopeSchema } from '../../src/modules/relay-transport/protocol'
 import { RelaySession } from '../../src/modules/relay-transport/session'
 
 /**
@@ -195,18 +196,11 @@ describe('relay session', () => {
 
   it('does not mark ready when an encrypted stream frame arrives before the handshake', () => {
     const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
 
     const host = new RelaySession(
       'host',
       hostKeys.privateKeyBase64,
       { roomId: 'r', pairingCode: 'CODE', ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      { send: () => {}, onError: () => {} },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId: 'r', pairingCode: 'CODE', ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
       { send: () => {}, onError: () => {} },
     )
 
@@ -257,7 +251,7 @@ describe('relay session', () => {
     // 1 MiB payload — forces multiple 256 KiB chunks.
     const payload = new Uint8Array(1024 * 1024)
     for (let i = 0; i < payload.length; i++) {
-      payload[i] = i & 0xff
+      payload[i] = i & 0xFF
     }
     controller.writeStreamData('c1', payload)
 

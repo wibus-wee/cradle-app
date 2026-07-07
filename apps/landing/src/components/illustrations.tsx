@@ -43,8 +43,14 @@ export function UnifiedIllustration() {
 /* 2. Field — radar over a scattered field of dots. */
 export function FieldIllustration() {
   const dots: Array<[number, number]> = [
-    [12, 12], [36, 12], [12, 36], [36, 36],
-    [24, 8], [8, 24], [40, 24], [24, 40],
+    [12, 12],
+[36, 12],
+[12, 36],
+[36, 36],
+    [24, 8],
+[8, 24],
+[40, 24],
+[24, 40],
   ]
   return (
     <svg viewBox="0 0 48 48" fill="none" style={size} aria-hidden="true">

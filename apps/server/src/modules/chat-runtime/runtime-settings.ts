@@ -1,17 +1,15 @@
+import { parseJsonObject, readObjectRecord } from '../../helpers/json-record'
+import type { ClaudeAgentConfigPatch, ClaudeAgentConfigPatchInput, ClaudeAgentConfigView } from '../provider-contracts/claude-agent-config'
+import {
+  applyClaudeAgentConfigPatch,
+  readClaudeAgentConfig,
+} from '../provider-contracts/claude-agent-config'
 import type {
   ChatRuntimeAccessMode,
   ChatRuntimeInteractionMode,
   ChatRuntimeSettings,
   ChatRuntimeSettingsPatch,
 } from './runtime-provider-types'
-import { parseJsonObject, readObjectRecord } from '../../helpers/json-record'
-import {
-  applyClaudeAgentConfigPatch,
-  readClaudeAgentConfig,
-  type ClaudeAgentConfigPatch,
-  type ClaudeAgentConfigPatchInput,
-  type ClaudeAgentConfigView,
-} from '../provider-contracts/claude-agent-config'
 
 export const DEFAULT_RUNTIME_SETTINGS: ChatRuntimeSettings = {
   accessMode: 'full-access',
@@ -99,7 +97,7 @@ export function writeSessionRuntimeConfigJson(input: {
 }
 
 export type {
+  ClaudeAgentConfigView as SessionClaudeAgentConfig,
   ClaudeAgentConfigPatch as SessionClaudeAgentConfigPatch,
   ClaudeAgentConfigPatchInput as SessionClaudeAgentConfigPatchInput,
-  ClaudeAgentConfigView as SessionClaudeAgentConfig,
 }

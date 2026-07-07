@@ -10,9 +10,8 @@ export interface GlobalSessionSyncEngineCallbacks {
 }
 
 export interface GlobalSessionEventSource {
-  addEventListener(type: 'sessions', listener: (event: MessageEvent<string>) => void): void
-  addEventListener(type: 'error', listener: (event: Event) => void): void
-  close(): void
+  addEventListener: ((type: 'sessions', listener: (event: MessageEvent<string>) => void) => void) & ((type: 'error', listener: (event: Event) => void) => void)
+  close: () => void
 }
 
 export type GlobalSessionEventSourceFactory = (url: string) => GlobalSessionEventSource
@@ -143,7 +142,8 @@ function readGlobalSessionTailEvent(value: string): ChatGlobalSessionTailEvent |
       return null
     }
     return parsed as ChatGlobalSessionTailEvent
-  } catch {
+  }
+ catch {
     return null
   }
 }

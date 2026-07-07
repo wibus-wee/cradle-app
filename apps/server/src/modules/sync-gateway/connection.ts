@@ -1,5 +1,5 @@
-import type { ElysiaWS } from 'elysia/ws'
 import type { SyncClientFrame, SyncServerFrame } from '@cradle/chat-runtime-contracts'
+import type { ElysiaWS } from 'elysia/ws'
 
 import { createBoundedSender } from './buffer'
 import {

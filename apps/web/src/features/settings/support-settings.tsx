@@ -1,9 +1,9 @@
 import {
+  AnticlockwiseLine as RotateCcwIcon,
   ClipboardLine as ClipboardIcon,
   FolderOpenLine as FolderOpenIcon,
   LifebuoyLine as LifeBuoyIcon,
-  AnticlockwiseLine as RotateCcwIcon,
-  Share2Line as Share2Icon
+  Share2Line as Share2Icon,
 } from '@mingcute/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'

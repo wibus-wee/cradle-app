@@ -2,6 +2,11 @@ import {
   CLI_TUI_RUNTIME_KIND,
   CLI_TUI_RUNTIME_METADATA,
 } from '../chat-runtime/catalog-only-runtime-metadata'
+import type {
+  RuntimeModelDescriptor,
+  RuntimeOwnedProviderTarget,
+  RuntimeOwnedProviderTargets,
+} from '../chat-runtime/runtime-provider-types'
 import {
   ACP_RUNTIME_KIND,
   ACP_RUNTIME_METADATA,
@@ -24,15 +29,10 @@ import {
 } from '../chat-runtime-providers/opencode/metadata'
 import { OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS } from '../chat-runtime-providers/opencode/owned-provider-targets'
 import {
-  SYSTEM_AGENT_RUNTIME_KIND,
   SYSTEM_AGENT_RUNTIME_ACTOR,
+  SYSTEM_AGENT_RUNTIME_KIND,
   SYSTEM_AGENT_RUNTIME_METADATA,
 } from '../chat-runtime-providers/system-agent/metadata'
-import type {
-  RuntimeModelDescriptor,
-  RuntimeOwnedProviderTarget,
-  RuntimeOwnedProviderTargets,
-} from '../chat-runtime/runtime-provider-types'
 import type { ProviderKind, RuntimeKind } from './types'
 
 export type RuntimeProviderBinding = 'required' | 'runtime-owned'

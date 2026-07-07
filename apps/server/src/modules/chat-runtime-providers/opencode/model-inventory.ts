@@ -6,12 +6,12 @@ import type {
   RuntimeModelDescriptor,
 } from '../../chat-runtime/runtime-provider-types'
 import type { ProviderKind } from '../../provider-contracts/types'
-import { acquireOpencodeRuntimeResource } from './runtime-context'
 import {
   OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID,
   readOpenCodeRuntimeNativeProviderId,
   toOpenCodeRuntimeNativeProviderTargetId,
 } from './native-provider-target-id'
+import { acquireOpencodeRuntimeResource } from './runtime-context'
 
 export {
   isOpenCodeRuntimeNativeProviderTargetId,
@@ -163,8 +163,7 @@ export function flattenOpenCodeProviders(input: {
   return input.providers.flatMap(provider =>
     Object.values(provider.models)
       .map(model => projectOpenCodeModel(input.runtimeKind, provider, model))
-      .sort((left, right) => left.label.localeCompare(right.label)),
-  )
+      .sort((left, right) => left.label.localeCompare(right.label)))
 }
 
 function projectOpenCodeModel(

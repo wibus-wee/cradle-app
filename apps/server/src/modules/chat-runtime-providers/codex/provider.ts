@@ -104,13 +104,13 @@ import {
 } from './config/runtime-config'
 import { resolveCodexRuntimeContext } from './config/runtime-context'
 import { toSandboxPolicy } from './config/sandbox-policy'
+import { createCodexGoalContinuation } from './goal-continuation'
 import {
   CODEX_RUNTIME_CAPABILITIES,
   CODEX_RUNTIME_KIND as RUNTIME_KIND,
   CODEX_RUNTIME_METADATA,
 } from './metadata'
 import { createCodexRuntimePresentation } from './presentation'
-import { createCodexGoalContinuation } from './goal-continuation'
 import { projectCodexEstimatedContextUsage } from './projection/context-usage-projector'
 import {
   clearCodexGoalSnapshot,
@@ -126,6 +126,7 @@ import {
 } from './projection/state-projector'
 import { projectCodexUiSlotStates } from './projection/ui-slot-projector'
 import { codexRequestError, formatUnknownError } from './provider-errors'
+import { readLocalImageDataUrl } from './local-image-data-url'
 import type { CodexAppServerItem } from './tools/mapper'
 import { buildCodexToolInput, buildCodexToolOutput, readCodexToolError, readCodexToolName } from './tools/mapper'
 import { CodexActiveTurnRegistry } from './turn/active-turn-registry'
@@ -2073,9 +2074,14 @@ function projectCodexTurnsToUiMessages(threadId: string, turns: Turn[]): UIMessa
         }
         case 'hookPrompt':
           break
-        default:
+        default: {
           assistantParts.push(projectCodexToolItemToUiPart(item as CodexAppServerItem, threadId, turn.id))
+          const imagePart = projectCodexToolItemImageFilePart(item as CodexAppServerItem)
+          if (imagePart) {
+            assistantParts.push(imagePart)
+          }
           break
+        }
       }
     }
     flushAssistant()
@@ -2094,7 +2100,7 @@ function projectCodexUserInputsToUiParts(inputs: UserInput[]): UIMessage['parts'
         parts.push({ type: 'file', mediaType: 'image/*', url: input.url })
         break
       case 'localImage':
-        parts.push({ type: 'file', mediaType: 'image/*', url: `file://${input.path}` })
+        parts.push(projectLocalImageFilePart(input.path))
         break
       case 'skill':
       case 'mention':
@@ -2103,6 +2109,54 @@ function projectCodexUserInputsToUiParts(inputs: UserInput[]): UIMessage['parts'
     }
   }
   return parts.length > 0 ? parts : [{ type: 'text', text: '', state: 'done' }]
+}
+
+function projectLocalImageFilePart(filePath: string): Extract<UIMessage['parts'][number], { type: 'file' }> {
+  const image = readLocalImageDataUrl(filePath)
+  return {
+    type: 'file',
+    mediaType: image?.mediaType ?? 'image/*',
+    url: image?.url ?? `file://${filePath}`,
+  }
+}
+
+function projectCodexToolItemImageFilePart(
+  item: CodexAppServerItem,
+): Extract<UIMessage['parts'][number], { type: 'file' }> | null {
+  switch (item.type) {
+    case 'imageGeneration': {
+      const savedPath = (item as { savedPath?: string | null }).savedPath
+      if (savedPath) {
+        return projectLocalImageFilePart(savedPath)
+      }
+      const result = (item as { result?: string | null }).result
+      const mediaType = readImageDataUrlMediaType(result)
+      if (mediaType && result) {
+        return { type: 'file', mediaType, url: result }
+      }
+      if (result && /^https?:\/\//i.test(result)) {
+        return { type: 'file', mediaType: 'image/*', url: result }
+      }
+      if (result) {
+        return { type: 'file', mediaType: 'image/png', url: `data:image/png;base64,${result}` }
+      }
+      return null
+    }
+    case 'imageView': {
+      const path = (item as { path?: string | null }).path
+      return path ? projectLocalImageFilePart(path) : null
+    }
+    default:
+      return null
+  }
+}
+
+function readImageDataUrlMediaType(value: string | null | undefined): string | null {
+  if (!value) {
+    return null
+  }
+  const match = /^data:(image\/[a-z0-9.+-]+);base64,/i.exec(value)
+  return match?.[1] ?? null
 }
 
 function projectCodexToolItemToUiPart(

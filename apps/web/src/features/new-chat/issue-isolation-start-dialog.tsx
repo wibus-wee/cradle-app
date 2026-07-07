@@ -11,9 +11,8 @@ import {
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
-import { cn } from '~/lib/cn'
-
 import type { IssueIsolationContextGroup } from '~/features/session/use-session-isolation'
+import { cn } from '~/lib/cn'
 
 export type IssueIsolationStartChoice = 'main' | 'continue' | 'new-isolated'
 

@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto'
 import { File } from 'node:buffer'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 
@@ -105,7 +105,7 @@ function assertSafeStorageSegment(value: string, field: string): void {
 
 function normalizeWorkspaceId(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
-  return trimmed ? trimmed : null
+  return trimmed || null
 }
 
 function requireWorkspace(workspaceId: string): void {

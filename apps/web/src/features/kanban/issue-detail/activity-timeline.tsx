@@ -1,13 +1,13 @@
-import type { TFunction } from 'i18next'
 import {
   AddCircleLine as CirclePlusIcon,
+  DeleteLine as Trash2Icon,
   GitBranchLine as GitBranchIcon,
   PicLine as PicIcon,
   SparklesLine as SparklesIcon,
-  DeleteLine as Trash2Icon,
   UserFollowLine as UserRoundCheckIcon,
-  UserRemoveLine as UserRoundMinusIcon
+  UserRemoveLine as UserRoundMinusIcon,
 } from '@mingcute/react'
+import type { TFunction } from 'i18next'
 import type { ElementType, ReactNode } from 'react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'

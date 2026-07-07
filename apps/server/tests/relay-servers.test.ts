@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
-import { db, shutdownInfra } from '../src/infra'
+import { shutdownInfra } from '../src/infra'
 import { shouldStartManagedLocalRelayd, startManagedLocalRelayd, stopManagedLocalRelayd } from '../src/modules/relay-servers/local-relayd-supervisor'
 
 type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>

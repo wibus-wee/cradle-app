@@ -81,14 +81,16 @@ export function IpcEventsTable() {
               className="cursor-pointer select-none border-b border-border px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
               style={{ width: 100 }}
             >
-              Time{sortIndicator('startedAt')}
+              Time
+{sortIndicator('startedAt')}
             </th>
             <th
               onClick={() => handleSort('channel')}
               className="cursor-pointer select-none border-b border-border px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
               style={{ width: 260 }}
             >
-              Channel{sortIndicator('channel')}
+              Channel
+{sortIndicator('channel')}
             </th>
             <th
               className="select-none border-b border-border px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -101,14 +103,16 @@ export function IpcEventsTable() {
               className="cursor-pointer select-none border-b border-border px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
               style={{ width: 72 }}
             >
-              Status{sortIndicator('status')}
+              Status
+{sortIndicator('status')}
             </th>
             <th
               onClick={() => handleSort('durationMs')}
               className="cursor-pointer select-none border-b border-border px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
               style={{ width: 80 }}
             >
-              Duration{sortIndicator('durationMs')}
+              Duration
+{sortIndicator('durationMs')}
             </th>
             <th
               className="select-none border-b border-border px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"

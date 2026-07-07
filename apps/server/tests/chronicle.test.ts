@@ -499,8 +499,7 @@ describe('chronicle module', () => {
       expect(body.memoryId).toBeTruthy()
       expect(mockedGenerateText).toHaveBeenCalledTimes(2)
       expect(db().select().from(chronicleEvents).where(eq(chronicleEvents.status, 'warning')).all().some(event =>
-        event.message.includes('Chronicle model generation retry') && event.message.includes('Invalid JSON response'),
-      )).toBe(true)
+        event.message.includes('Chronicle model generation retry') && event.message.includes('Invalid JSON response'))).toBe(true)
     }
     finally {
       stopActivityPipelineScheduler()

@@ -40,12 +40,12 @@ export interface CodexChatgptAuthDeps {
   updateSecretValue?: (credentialRef: string, secret: string) => void
 }
 
-export type CodexAppServerAuthResolution =
-  | { kind: 'apiKey', apiKey: string }
-  | { kind: 'chatgptAuthTokens', chatgptAuth: CodexChatgptAuthCredential }
-  | { kind: 'personalAccessToken', personalAccessToken: string }
-  | { kind: 'bedrockApiKey', bedrockApiKey: string, region: string }
-  | { kind: 'none' }
+export type CodexAppServerAuthResolution
+  = | { kind: 'apiKey', apiKey: string }
+    | { kind: 'chatgptAuthTokens', chatgptAuth: CodexChatgptAuthCredential }
+    | { kind: 'personalAccessToken', personalAccessToken: string }
+    | { kind: 'bedrockApiKey', bedrockApiKey: string, region: string }
+    | { kind: 'none' }
 
 export interface CodexAppServerAuthCarrier {
   credentialRef?: string | null

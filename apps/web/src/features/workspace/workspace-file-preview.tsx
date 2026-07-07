@@ -3,11 +3,11 @@ import {
   FileUnknownLine as FileQuestionIcon,
   PicLine as ImageIcon,
 } from '@mingcute/react'
-import { Spinner } from '~/components/ui/spinner'
 import { useEffect, useRef, useState } from 'react'
 import type { BundledLanguage } from 'shiki'
 
 import { DARK_THEME, getHighlighter, LIGHT_THEME, loadLanguage } from '~/components/editor/shiki-highlighter'
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 
 import type { WorkspaceFileInfo } from './use-workspace-file-content'

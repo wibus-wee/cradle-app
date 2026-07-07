@@ -21,7 +21,6 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
   GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponse,
-  GetProviderTargetsByProviderTargetIdCodexWhamDiagnosticsResponse,
 } from '~/api-gen/types.gen'
 import {
   AlertDialog,
@@ -56,8 +55,6 @@ type CodexAccountDiagnostics = GetProviderTargetsByProviderTargetIdCodexAccountD
 type RateLimitSnapshot = NonNullable<CodexAccountDiagnostics['rateLimits']>
 type RateLimitWindow = NonNullable<RateLimitSnapshot['primary']>
 type DailyBucket = NonNullable<CodexAccountDiagnostics['tokenUsage']>['dailyUsageBuckets'][number]
-
-type CodexWhamDiagnostics = GetProviderTargetsByProviderTargetIdCodexWhamDiagnosticsResponse
 
 type StatusKind = 'idle' | 'available' | 'limited' | 'unsupported' | 'error'
 type AgentManagementKey = keyof typeof import('~/locales/default').default.agentManagement
@@ -716,7 +713,10 @@ function WhamResetCreditRow({ credit, index }: { credit: WhamResetCredit, index:
     <div className="rounded-lg bg-muted/30 px-3 py-2.5 ring-1 ring-foreground/5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 text-[10.5px] font-medium text-muted-foreground/70">#{index + 1}</span>
+          <span className="shrink-0 text-[10.5px] font-medium text-muted-foreground/70">
+#
+{index + 1}
+          </span>
           <span className="truncate text-[12px] font-medium text-foreground">
             {credit.title ?? 'Rate-limit reset credit'}
           </span>

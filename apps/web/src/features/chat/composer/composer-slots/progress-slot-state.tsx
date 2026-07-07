@@ -6,6 +6,7 @@
  * continuous percentage, so the dots stay the most faithful representation.
  */
 import { CheckCircleLine as CheckCircle2Icon, ListCheckLine as ListChecksIcon } from '@mingcute/react'
+
 import { cn } from '~/lib/cn'
 
 import type {

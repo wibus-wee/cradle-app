@@ -5,20 +5,22 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
-import * as SessionService from '../session/service'
-import { readReusableDurableProviderRuntimeBinding } from '../provider-runtime/service'
 import type { RuntimeKind } from '../provider-contracts/types'
+import { readReusableDurableProviderRuntimeBinding } from '../provider-runtime/service'
+import * as SessionService from '../session/service'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { listPendingRuntimeUserInputSummaries } from './pending-user-input'
+import type { RuntimeGoalContinuationScheduleInput } from './run/runtime-goal-continuation'
 import {
   hasContinuableRuntimeGoal,
-  type RuntimeGoalContinuationScheduleInput,
 } from './run/runtime-goal-continuation'
-import { readDeltaChunkTextLength, type ChatMessageStatus } from './run/stream-chunks'
+import type { ChatMessageStatus } from './run/stream-chunks'
+import { readDeltaChunkTextLength } from './run/stream-chunks'
+import type { ActiveRun } from './run-registry'
+import { runRegistry } from './run-registry'
 import type { ChatRuntimeSettings, RuntimeGoalContinuationOptions } from './runtime-provider-types'
-import { DEFAULT_RUNTIME_SETTINGS, readSessionRuntimeSettings } from './runtime-settings'
 import { isProviderTargetAvailable } from './runtime-session-context'
-import { runRegistry, type ActiveRun } from './run-registry'
+import { DEFAULT_RUNTIME_SETTINGS, readSessionRuntimeSettings } from './runtime-settings'
 
 export interface ActiveRunSummary {
   runId: string
@@ -51,12 +53,12 @@ export interface PendingRuntimeUserInputDto {
   updatedAt: number
 }
 
-export type RuntimeSessionStatusKind =
-  | 'idle'
-  | 'pending'
-  | 'streaming'
-  | 'waitingForUserInput'
-  | 'cancelling'
+export type RuntimeSessionStatusKind
+  = | 'idle'
+    | 'pending'
+    | 'streaming'
+    | 'waitingForUserInput'
+    | 'cancelling'
 
 export interface RuntimeSessionRunDto {
   runId: string
@@ -105,7 +107,7 @@ export function listActiveRunSummaries(): ActiveRunSummary[] {
 }
 
 export function getActiveRunReplayBufferSummary(
-  runId: string
+  runId: string,
 ): ActiveRunReplayBufferSummary | null {
   const run = runRegistry.getActiveRun(runId)
   if (!run) {
@@ -114,16 +116,16 @@ export function getActiveRunReplayBufferSummary(
   return {
     runId,
     chunkCount: run.chunkBuffer.length,
-    textDeltaCount: run.chunkBuffer.filter((chunk) => chunk.type === 'text-delta').length,
-    reasoningDeltaCount: run.chunkBuffer.filter((chunk) => chunk.type === 'reasoning-delta').length,
-    toolInputDeltaCount: run.chunkBuffer.filter((chunk) => chunk.type === 'tool-input-delta')
+    textDeltaCount: run.chunkBuffer.filter(chunk => chunk.type === 'text-delta').length,
+    reasoningDeltaCount: run.chunkBuffer.filter(chunk => chunk.type === 'reasoning-delta').length,
+    toolInputDeltaCount: run.chunkBuffer.filter(chunk => chunk.type === 'tool-input-delta')
       .length,
-    toolOutputCount: run.chunkBuffer.filter((chunk) => chunk.type === 'tool-output-available')
+    toolOutputCount: run.chunkBuffer.filter(chunk => chunk.type === 'tool-output-available')
       .length,
     maxDeltaChars: run.chunkBuffer.reduce(
       (max, chunk) => Math.max(max, readDeltaChunkTextLength(chunk)),
-      0
-    )
+      0,
+    ),
   }
 }
 
@@ -138,7 +140,7 @@ export function getActiveSessionRun(sessionId: string): ActiveRunSummary | null 
 
 export async function getRuntimeSessionStatus(
   sessionId: string,
-  deps: RuntimeSessionStatusDeps
+  deps: RuntimeSessionStatusDeps,
 ): Promise<ChatRuntimeSessionStatusDto> {
   const session = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) {
@@ -146,7 +148,7 @@ export async function getRuntimeSessionStatus(
       code: 'chat_session_not_found',
       status: 404,
       message: 'Chat session not found',
-      details: { sessionId }
+      details: { sessionId },
     })
   }
 
@@ -156,7 +158,7 @@ export async function getRuntimeSessionStatus(
     ? readReusableDurableProviderRuntimeBinding({
         chatSessionId: sessionId,
         providerTargetId: session.providerTargetId,
-        runtimeKind: session.runtimeKind as RuntimeKind
+        runtimeKind: session.runtimeKind as RuntimeKind,
       })
     : undefined
   const activeRunId = runRegistry.getActiveRunIdForSession(sessionId)
@@ -170,11 +172,11 @@ export async function getRuntimeSessionStatus(
     .get()
   const queueRows = db()
     .select({
-      status: chatSessionQueueItems.status
+      status: chatSessionQueueItems.status,
     })
     .from(chatSessionQueueItems)
     .where(
-      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue'))
+      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue')),
     )
     .all()
   const queue = queueRows.reduce(
@@ -187,35 +189,35 @@ export async function getRuntimeSessionStatus(
       }
       return counts
     },
-    { pending: 0, running: 0 }
+    { pending: 0, running: 0 },
   )
 
-  const runtimeKind =
-    activeRun?.runtimeSession.runtimeKind ??
-    (binding?.runtimeKind as RuntimeKind | undefined) ??
-    session.runtimeKind
-  const providerTargetId =
-    activeRun?.providerTargetId ?? binding?.providerTargetId ?? session.providerTargetId
-  const providerSessionId =
-    activeRun?.runtimeSession.providerSessionId ?? binding?.backendSessionId ?? null
-  const modelId =
-    activeRun?.modelId ??
-    SessionService.readSessionModelPreference(session.configJson) ??
-    binding?.requestedModelId ??
-    null
-  const runtimeSettings =
-    activeRun?.runtimeSettings ?? readSessionRuntimeSettings(session.configJson)
+  const runtimeKind
+    = activeRun?.runtimeSession.runtimeKind
+      ?? (binding?.runtimeKind as RuntimeKind | undefined)
+      ?? session.runtimeKind
+  const providerTargetId
+    = activeRun?.providerTargetId ?? binding?.providerTargetId ?? session.providerTargetId
+  const providerSessionId
+    = activeRun?.runtimeSession.providerSessionId ?? binding?.backendSessionId ?? null
+  const modelId
+    = activeRun?.modelId
+      ?? SessionService.readSessionModelPreference(session.configJson)
+      ?? binding?.requestedModelId
+      ?? null
+  const runtimeSettings
+    = activeRun?.runtimeSettings ?? readSessionRuntimeSettings(session.configJson)
   const pendingUserInputs = activeRun
     ? listPendingRuntimeUserInputSummaries({ sessionId, runId: activeRun.runId })
     : []
   const providerTargetAvailable = activeRun ? true : isProviderTargetAvailable(providerTargetId)
   const goalContinuationOptions = deps.readRuntimeGoalContinuationOptions()
   const runtime = binding ? getRuntimeRegistry().get(binding.runtimeKind) : undefined
-  const hasActiveGoal =
-    hasContinuableRuntimeGoal({
+  const hasActiveGoal
+    = hasContinuableRuntimeGoal({
       runtime,
       binding,
-      options: goalContinuationOptions
+      options: goalContinuationOptions,
     }) && providerTargetAvailable
   const status: RuntimeSessionStatusKind = activeRun
     ? activeRun.cancelRequested
@@ -231,7 +233,7 @@ export async function getRuntimeSessionStatus(
       sessionId,
       providerTargetId: providerTargetId ?? undefined,
       modelId: modelId ?? undefined,
-      options: goalContinuationOptions
+      options: goalContinuationOptions,
     })
   }
 
@@ -254,10 +256,10 @@ export async function getRuntimeSessionStatus(
       ? toRuntimeSessionRunDto(null, latestRun, {
           modelId,
           providerSessionId: binding?.backendSessionId ?? null,
-          runtimeSettings
+          runtimeSettings,
         })
       : null,
-    queue
+    queue,
   }
 }
 
@@ -276,7 +278,7 @@ function toActiveRunSummary(run: ActiveRun): ActiveRunSummary {
     messageId: run.messageId,
     providerTargetKind: run.providerTargetKind,
     providerTargetId: run.providerTargetId,
-    modelId: run.modelId
+    modelId: run.modelId,
   }
 }
 
@@ -287,7 +289,7 @@ function toRuntimeSessionRunDto(
     modelId?: string | null
     providerSessionId?: string | null
     runtimeSettings?: ChatRuntimeSettings
-  } = {}
+  } = {},
 ): RuntimeSessionRunDto {
   return {
     runId: activeRun?.runId ?? run?.id ?? '',
@@ -301,6 +303,6 @@ function toRuntimeSessionRunDto(
       activeRun?.runtimeSession.providerSessionId ?? fallback.providerSessionId ?? null,
     queueItemId: activeRun?.queueItemId ?? null,
     runtimeSettings:
-      activeRun?.runtimeSettings ?? fallback.runtimeSettings ?? DEFAULT_RUNTIME_SETTINGS
+      activeRun?.runtimeSettings ?? fallback.runtimeSettings ?? DEFAULT_RUNTIME_SETTINGS,
   }
 }

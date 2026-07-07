@@ -1,13 +1,13 @@
 import {
-  RobotLine as BotIcon,
+  DeleteLine as Trash2Icon,
   DownloadLine as DownloadIcon,
-  TreeLine as FolderTreeIcon,
   GlobeLine as GlobeIcon,
   PencilLine as PencilIcon,
   PlusLine as PlusIcon,
+  RobotLine as BotIcon,
   SearchLine as SearchIcon,
-  DeleteLine as Trash2Icon,
-  UploadLine as UploadIcon
+  TreeLine as FolderTreeIcon,
+  UploadLine as UploadIcon,
 } from '@mingcute/react'
 import { useEffect, useReducer } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -28,8 +28,8 @@ import { Spinner } from '~/components/ui/spinner'
 import { Textarea } from '~/components/ui/textarea'
 import { TruncatedText } from '~/components/ui/truncated-text'
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
-import { cn } from '~/lib/cn'
 import type { SkillInventoryEntry, SkillScope } from '~/features/skills/types'
+import { cn } from '~/lib/cn'
 
 import { SettingsDivider, SettingsSectionHeader } from '../settings/settings-row'
 import { SkillImportDialog } from './skill-import-dialog'

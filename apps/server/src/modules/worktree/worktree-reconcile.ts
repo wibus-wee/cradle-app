@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 
-import { worktrees } from '@cradle/db'
 import type { Worktree } from '@cradle/db'
+import { worktrees } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../helpers/time'

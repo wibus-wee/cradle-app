@@ -8,17 +8,17 @@ import { toastManager } from '~/components/ui/toast'
 import { getServerUrl } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
-import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
+import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
 import { createChatSessionEventSource } from '../transport/chat-event-tail-transport'
 import { openPassiveSessionStream } from './session-passive-stream'
-import { SessionSyncEngine } from './session-sync-engine'
 import {
   deriveSessionPassiveStreamProjection,
   deriveSessionSnapshotProjection,
   deriveStableSessionSnapshotProjection,
 } from './session-snapshot-projection'
+import { SessionSyncEngine } from './session-sync-engine'
 import { readStableMessageRows, writeStableMessageRows } from './stable-message-cache'
 import { useChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 import type { ChatSessionMessageRow } from './use-chat-session-types'
@@ -33,8 +33,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
   const {
     scheduleSnapshotRefresh,
     refreshQueue,
-    refreshRuntimeUiSlotStates,
-    refreshSessionLists,
   } = controls
   const controlsRef = useRef(controls)
   controlsRef.current = controls

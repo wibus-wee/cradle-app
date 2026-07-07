@@ -43,7 +43,9 @@ function Trigger({ onFire, label }: { onFire: () => void, label: string }) {
         cursor: 'pointer',
       }}
     >
-      ▶ {label}
+      ▶
+{' '}
+{label}
     </button>
   )
 }
@@ -111,8 +113,8 @@ export default function Motion({ lang }: MotionProps) {
 
   // Auto-fire once on mount so the section is not visually inert
   useEffect(() => {
-    const t1 = setTimeout(() => setLinearOn(true), 300)
-    const t2 = setTimeout(() => setSpringOn(true), 300)
+    const t1 = setTimeout(setLinearOn, 300, true)
+    const t2 = setTimeout(setSpringOn, 300, true)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)

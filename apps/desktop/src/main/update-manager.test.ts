@@ -210,7 +210,7 @@ function createWindowsUpdateInfo() {
   }
 }
 
-describe('DesktopUpdateManager', () => {
+describe('desktopUpdateManager', () => {
   const originalPlatform = process.platform
 
   beforeEach(() => {

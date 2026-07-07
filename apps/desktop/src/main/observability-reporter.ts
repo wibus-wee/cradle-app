@@ -25,8 +25,8 @@ interface DesktopRuntimeSample {
   diagnostics?: Record<string, unknown>
 }
 
-type DesktopRuntimeDiagnosticsProvider =
-  () => Record<string, unknown> | Promise<Record<string, unknown>>
+type DesktopRuntimeDiagnosticsProvider
+  = () => Record<string, unknown> | Promise<Record<string, unknown>>
 
 function serializeError(error: unknown): Record<string, unknown> {
   if (error instanceof Error) {

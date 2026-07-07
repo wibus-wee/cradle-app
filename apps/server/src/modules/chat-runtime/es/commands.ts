@@ -2,21 +2,22 @@ import type { ChatSessionQueueItem } from '@cradle/db'
 import { chatSessionQueueItems } from '@cradle/db'
 import { and, eq, isNull } from 'drizzle-orm'
 
+import { AppError } from '../../../errors/app-error'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import type { ChatMessageStatus } from '../run/stream-chunks'
-import { AppError } from '../../../errors/app-error'
-import { publishSessionTailEvents } from './event-tail'
 import { reduceChatSessionEvents } from './aggregate'
-import { decideChatSessionEvents, type ChatSessionDomainError } from './decide'
-import { appendSessionEvent, readSessionEvents } from './event-store'
+import type { ChatSessionDomainError } from './decide'
+import { decideChatSessionEvents } from './decide'
 import type { ChatRuntimeTx } from './event-store'
+import { appendSessionEvent, readSessionEvents } from './event-store'
+import { publishSessionTailEvents } from './event-tail'
 import type {
   ChatSessionEvent,
   MessageRecordedFact,
   QueueProjectionStatus,
   StoredChatSessionEvent,
-  TerminalRunEventType
+  TerminalRunEventType,
 } from './events'
 import { projectSessionEvent } from './projectors'
 import { runSessionActorTask } from './session-actor'
@@ -26,8 +27,7 @@ export function commitSessionEvents(sessionId: string, events: ChatSessionEvent[
     return Promise.resolve()
   }
   return runSessionActorTask(sessionId, () =>
-    commitSessionEventsInTransaction(sessionId, events)
-  ).then((storedEvents) => {
+    commitSessionEventsInTransaction(sessionId, events)).then((storedEvents) => {
     publishSessionTailEvents(storedEvents)
   })
 }
@@ -35,7 +35,7 @@ export function commitSessionEvents(sessionId: string, events: ChatSessionEvent[
 export function commitSessionEventsWithProjection(
   sessionId: string,
   events: ChatSessionEvent[],
-  projectAdditionalChanges: (tx: ChatRuntimeTx) => void
+  projectAdditionalChanges: (tx: ChatRuntimeTx) => void,
 ): Promise<void> {
   return runSessionActorTask(sessionId, () => {
     const storedEvents: StoredChatSessionEvent[] = []
@@ -51,7 +51,7 @@ export function commitSessionEventsWithProjection(
 
 export function commitSessionEventsInTransaction(
   sessionId: string,
-  events: ChatSessionEvent[]
+  events: ChatSessionEvent[],
 ): StoredChatSessionEvent[] {
   const storedEvents: StoredChatSessionEvent[] = []
   db().transaction((tx) => {
@@ -66,7 +66,7 @@ export function appendDecidedSessionEvents(
   events: ChatSessionEvent[],
   options: {
     projectEvent?: (event: StoredChatSessionEvent) => boolean
-  } = {}
+  } = {},
 ): StoredChatSessionEvent[] {
   if (events.length === 0) {
     return []
@@ -85,7 +85,7 @@ export function appendDecidedSessionEvents(
     const stored = appendSessionEvent(tx, {
       aggregateId: sessionId,
       event,
-      expectedVersion
+      expectedVersion,
     })
     if (options.projectEvent?.(stored) ?? true) {
       projectSessionEvent(tx, stored)
@@ -97,7 +97,7 @@ export function appendDecidedSessionEvents(
 }
 
 export function readRunTerminalEventType(
-  status: Exclude<ChatMessageStatus, 'streaming'>
+  status: Exclude<ChatMessageStatus, 'streaming'>,
 ): TerminalRunEventType {
   return status === 'complete' ? 'RunCompleted' : status === 'aborted' ? 'RunAborted' : 'RunFailed'
 }
@@ -111,14 +111,14 @@ export function readRunStopReason(status: Exclude<ChatMessageStatus, 'streaming'
 }
 
 export function readQueueTerminalStatus(
-  status: Exclude<ChatMessageStatus, 'streaming'>
+  status: Exclude<ChatMessageStatus, 'streaming'>,
 ): QueueProjectionStatus {
   return status === 'complete' ? 'completed' : status === 'aborted' ? 'cancelled' : 'failed'
 }
 
 export async function claimSessionQueueItem(
   sessionId: string,
-  queueItemId: string
+  queueItemId: string,
 ): Promise<ChatSessionQueueItem | undefined> {
   const result = await runSessionActorTask(sessionId, () => {
     return db().transaction((tx) => {
@@ -130,8 +130,8 @@ export async function claimSessionQueueItem(
             eq(chatSessionQueueItems.id, queueItemId),
             eq(chatSessionQueueItems.sessionId, sessionId),
             eq(chatSessionQueueItems.mode, 'queue'),
-            eq(chatSessionQueueItems.status, 'pending')
-          )
+            eq(chatSessionQueueItems.status, 'pending'),
+          ),
         )
         .get()
       if (!row) {
@@ -144,18 +144,18 @@ export async function claimSessionQueueItem(
           payload: {
             queueItemId,
             sessionId,
-            updatedAt
-          }
-        }
+            updatedAt,
+          },
+        },
       ])
       return {
         item: {
           ...row,
           status: 'running' as const,
           errorText: null,
-          updatedAt
+          updatedAt,
         },
-        storedEvents
+        storedEvents,
       }
     })
   })
@@ -165,14 +165,14 @@ export async function claimSessionQueueItem(
 
 export async function releaseSessionQueueItem(
   sessionId: string,
-  queueItemId: string
+  queueItemId: string,
 ): Promise<void> {
   const updatedAt = currentUnixSeconds()
   await commitSessionEvents(sessionId, [
     {
       type: 'QueueItemReleased',
-      payload: { queueItemId, sessionId, updatedAt }
-    }
+      payload: { queueItemId, sessionId, updatedAt },
+    },
   ])
 }
 
@@ -195,9 +195,9 @@ export async function commitLastTurnRolledBack(input: {
         providerSessionId: input.providerSessionId,
         providerRolledBackTurns: input.providerRolledBackTurns,
         fileChangesReverted: input.fileChangesReverted,
-        updatedAt: input.updatedAt ?? currentUnixSeconds()
-      }
-    }
+        updatedAt: input.updatedAt ?? currentUnixSeconds(),
+      },
+    },
   ])
 }
 
@@ -209,8 +209,8 @@ export async function recordImportedSessionMessages(input: {
     input.sessionId,
     input.messages.map((message): ChatSessionEvent => ({
       type: 'MessageImported',
-      payload: { message }
-    }))
+      payload: { message },
+    })),
   )
 }
 
@@ -237,11 +237,11 @@ export async function recordAssistantMessageSnapshot(input: {
           messageJson: input.message.messageJson,
           status: 'streaming',
           errorText: null,
-          updatedAt: input.message.updatedAt
+          updatedAt: input.message.updatedAt,
         },
-        messageJsonBytes: input.messageJsonBytes
-      }
-    }
+        messageJsonBytes: input.messageJsonBytes,
+      },
+    },
   ])
 }
 
@@ -250,12 +250,12 @@ export function clearProviderTargetFromSessionQueuesInTransaction(
   input: {
     providerTargetId: string
     updatedAt: number
-  }
+  },
 ): StoredChatSessionEvent[] {
   const rows = tx
     .select({
       id: chatSessionQueueItems.id,
-      sessionId: chatSessionQueueItems.sessionId
+      sessionId: chatSessionQueueItems.sessionId,
     })
     .from(chatSessionQueueItems)
     .where(eq(chatSessionQueueItems.providerTargetId, input.providerTargetId))
@@ -269,7 +269,8 @@ export function clearProviderTargetFromSessionQueuesInTransaction(
     const sessionRows = rowsBySessionId.get(row.sessionId)
     if (sessionRows) {
       sessionRows.push(row)
-    } else {
+    }
+ else {
       rowsBySessionId.set(row.sessionId, [row])
     }
   }
@@ -286,10 +287,10 @@ export function clearProviderTargetFromSessionQueuesInTransaction(
             queueItemId: row.id,
             sessionId,
             providerTargetId: input.providerTargetId,
-            updatedAt: input.updatedAt
-          }
-        }))
-      )
+            updatedAt: input.updatedAt,
+          },
+        })),
+      ),
     )
   }
   return storedEvents
@@ -298,14 +299,14 @@ export function clearProviderTargetFromSessionQueuesInTransaction(
 export async function failSessionQueueItem(
   sessionId: string,
   queueItemId: string,
-  errorText: string
+  errorText: string,
 ): Promise<void> {
   const updatedAt = currentUnixSeconds()
   await commitSessionEvents(sessionId, [
     {
       type: 'QueueItemFailed',
-      payload: { queueItemId, sessionId, errorText, updatedAt }
-    }
+      payload: { queueItemId, sessionId, errorText, updatedAt },
+    },
   ])
 }
 
@@ -320,8 +321,8 @@ export async function recoverOrphanedQueueItemClaims(sessionId: string): Promise
             eq(chatSessionQueueItems.sessionId, sessionId),
             eq(chatSessionQueueItems.mode, 'queue'),
             eq(chatSessionQueueItems.status, 'running'),
-            isNull(chatSessionQueueItems.startedRunId)
-          )
+            isNull(chatSessionQueueItems.startedRunId),
+          ),
         )
         .all()
       if (rows.length === 0) {
@@ -337,9 +338,9 @@ export async function recoverOrphanedQueueItemClaims(sessionId: string): Promise
           payload: {
             queueItemId: row.id,
             sessionId,
-            updatedAt
-          }
-        }))
+            updatedAt,
+          },
+        })),
       )
       return { count: rows.length, storedEvents }
     })
@@ -358,8 +359,8 @@ export async function normalizeSessionQueuePositions(sessionId: string): Promise
           and(
             eq(chatSessionQueueItems.sessionId, sessionId),
             eq(chatSessionQueueItems.mode, 'queue'),
-            eq(chatSessionQueueItems.status, 'pending')
-          )
+            eq(chatSessionQueueItems.status, 'pending'),
+          ),
         )
         .orderBy(chatSessionQueueItems.position, chatSessionQueueItems.createdAt)
         .all()
@@ -378,8 +379,8 @@ export async function normalizeSessionQueuePositions(sessionId: string): Promise
             queueItemId: row.id,
             sessionId,
             position,
-            updatedAt
-          }
+            updatedAt,
+          },
         })
         changed += 1
       })
@@ -393,7 +394,7 @@ export async function normalizeSessionQueuePositions(sessionId: string): Promise
 
 export async function cancelQueuedSessionItem(
   sessionId: string,
-  queueItemId: string
+  queueItemId: string,
 ): Promise<ChatSessionQueueItem | undefined> {
   const result = await runSessionActorTask(sessionId, () => {
     return db().transaction((tx) => {
@@ -404,13 +405,13 @@ export async function cancelQueuedSessionItem(
           and(
             eq(chatSessionQueueItems.id, queueItemId),
             eq(chatSessionQueueItems.sessionId, sessionId),
-            eq(chatSessionQueueItems.mode, 'queue')
-          )
+            eq(chatSessionQueueItems.mode, 'queue'),
+          ),
         )
         .get()
-      const cancellable =
-        row !== undefined &&
-        (row.status === 'pending' || (row.status === 'running' && row.startedRunId === null))
+      const cancellable
+        = row !== undefined
+          && (row.status === 'pending' || (row.status === 'running' && row.startedRunId === null))
       if (!row || !cancellable) {
         return { item: row, storedEvents: [] }
       }
@@ -418,17 +419,17 @@ export async function cancelQueuedSessionItem(
       const storedEvents = appendDecidedSessionEvents(tx, sessionId, [
         {
           type: 'QueueItemCancelled',
-          payload: { queueItemId, sessionId, updatedAt }
-        }
+          payload: { queueItemId, sessionId, updatedAt },
+        },
       ])
       return {
         item: {
           ...row,
           status: 'cancelled' as const,
           errorText: null,
-          updatedAt
+          updatedAt,
         },
-        storedEvents
+        storedEvents,
       }
     })
   })
@@ -438,7 +439,7 @@ export async function cancelQueuedSessionItem(
 
 export async function recordQueuePositions(
   sessionId: string,
-  rows: Array<Pick<ChatSessionQueueItem, 'id' | 'sessionId' | 'status' | 'position'>>
+  rows: Array<Pick<ChatSessionQueueItem, 'id' | 'sessionId' | 'status' | 'position'>>,
 ): Promise<void> {
   const updatedAt = currentUnixSeconds()
   const events = rows.map(
@@ -448,9 +449,9 @@ export async function recordQueuePositions(
         queueItemId: row.id,
         sessionId,
         position: index + 1,
-        updatedAt
-      }
-    })
+        updatedAt,
+      },
+    }),
   )
   await commitSessionEvents(sessionId, events)
 }
@@ -460,6 +461,6 @@ function throwDomainError(error: ChatSessionDomainError): never {
     code: `chat_session_${error.code}`,
     status: 409,
     message: error.message,
-    details: error.details
+    details: error.details,
   })
 }

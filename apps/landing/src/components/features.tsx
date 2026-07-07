@@ -7,8 +7,9 @@
  */
 
 import { motion } from 'motion/react'
-import { useState } from 'react'
 import type { ComponentType } from 'react'
+import { useState } from 'react'
+
 import {
   CoordinateIllustration,
   FieldIllustration,
@@ -35,7 +36,7 @@ const FEATURES: Feature[] = [
   },
   {
     Illustration: CoordinateIllustration,
-    title: "Coordinate, don't babysit",
+    title: 'Coordinate, don\'t babysit',
     desc: 'Chain agents, gate on CI and reviews, hand off automatically. Cradle does the waiting for you.',
   },
   {
@@ -108,7 +109,7 @@ export function FeaturesSection() {
   )
 }
 
-function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
+function FeatureCard({ feature, index }: { feature: Feature, index: number }) {
   const [hovered, setHovered] = useState(false)
   const { Illustration, title, desc } = feature
 

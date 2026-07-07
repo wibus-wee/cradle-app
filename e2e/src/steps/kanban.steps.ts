@@ -5,8 +5,6 @@ import { expect } from '@playwright/test'
 
 import type { CradleWorld } from '../support/world'
 
-const COLUMN_RE = /column/
-
 const KANBAN_SIDEBAR = '[data-testid="kanban-sidebar"]'
 const KANBAN_BOARD = '[data-testid="kanban-board"]'
 const KANBAN_BOARD_INPUT = '[data-testid="kanban-new-board-input"]'

@@ -183,7 +183,7 @@ Then('Jarvis 模型选择器应显示模型{string}', async function (this: Crad
   await expect(selector).toBeVisible({ timeout: SETTINGS_TIMEOUT })
   // Model loads lazily after provider selection — poll until it appears
   await expect.poll(async () => {
-    const text = await selector.innerText().catch(() => '')
+    const text = await selector.textContent().catch(() => '')
     return text.includes(model) ? true : text
   }, { timeout: 30_000, message: `Expected Jarvis selector to contain "${model}"` }).toBe(true)
 })

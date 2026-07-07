@@ -40,12 +40,12 @@ import type {
   ResumeChatSessionInput,
   RollbackLastTurnInput,
   RollbackLastTurnResult,
+  RuntimeContextUsage,
   RuntimeLiveResourceLease,
   RuntimeModelCatalog,
   RuntimePresentationCapabilities,
   RuntimeSession,
   RuntimeUiSlotState,
-  RuntimeContextUsage,
   RuntimeUserInputQuestion,
   RuntimeUserInputResolution,
   StartChatSessionInput,
@@ -60,11 +60,11 @@ import { providerChunk } from '../kit/chunk-mapper'
 import { requestProviderToolApproval } from '../kit/permission-bridge'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import { resolveOpencodeConfig } from './config'
+import type { OpencodeStreamEvent } from './event-stream'
 import {
   isTerminalOpencodeAssistant,
   OpencodeEventStreamProjector,
   readOpencodeTerminalAssistantForTurn,
-  type OpencodeStreamEvent,
 } from './event-stream'
 import {
   projectOpencodePromptParts,
@@ -79,6 +79,9 @@ import {
 import { listOpencodeRuntimeModels, OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID } from './model-inventory'
 import { OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS } from './owned-provider-targets'
 import { createOpencodeRuntimePresentation } from './presentation'
+import type { OpencodeRuntimeResource } from './runtime-context'
+import { acquireOpencodeRuntimeResource } from './runtime-context'
+import type { OpencodeSubagentBinding } from './subagent-bridge'
 import {
   OpencodeSubagentRegistry,
   projectOpencodeCrewAgentProviderThread,
@@ -89,10 +92,7 @@ import {
   readOpencodeSubagentBindingFromTaskPart,
   readOpencodeTaskBindingsFromMessages,
   resolveOpencodeProviderThreadTarget,
-  type OpencodeSubagentBinding,
 } from './subagent-bridge'
-import type { OpencodeRuntimeResource } from './runtime-context'
-import { acquireOpencodeRuntimeResource } from './runtime-context'
 import { buildOpencodePermissionInput, buildOpencodePermissionOutput } from './tools/mapper'
 
 interface OpencodeTurnResult {
@@ -530,7 +530,7 @@ export class OpencodeProvider implements ChatRuntime {
         threadId: input.threadId,
         parentSessionId: input.runtimeSession.providerSessionId,
         registry,
-        readChildSession: async sessionId => {
+        readChildSession: async (sessionId) => {
           const result = await handle.client.session.get({
             path: { id: sessionId },
             query: { directory: input.workspacePath },
@@ -1369,10 +1369,7 @@ export class OpencodeProvider implements ChatRuntime {
       return
     }
 
-    const questions = projectOpencodeQuestionToolQuestions(input.part)
-    if (questions.length === 0) {
-      return
-    }
+    projectOpencodeQuestionToolQuestions(input.part)
   }
 
   private async handleOpencodeQuestionRequest(input: {
@@ -2213,8 +2210,7 @@ function projectOpencodeCrewState(
 ): RuntimeUiSlotState {
   const sortedBindings = [...bindings].sort((left, right) =>
     (right.startedAt ?? 0) - (left.startedAt ?? 0)
-      || left.toolCallId.localeCompare(right.toolCallId),
-  )
+    || left.toolCallId.localeCompare(right.toolCallId))
   const agents = sortedBindings.map(binding => ({
     threadId: binding.toolCallId,
     status: binding.status,
@@ -2517,7 +2513,7 @@ async function resolveOpencodeQuestionRequestById(input: {
 
 async function readOpencodeSessionQuestionRequests(
   resource: OpencodeRuntimeResource,
-  sessionId: string
+  sessionId: string,
 ): Promise<QuestionV2Request[]> {
   const result = await resource.v2Client.v2.session.question.list({
     sessionID: sessionId,
@@ -2560,7 +2556,7 @@ function projectOpencodeQuestionToolQuestions(part: OpencodeToolPart): RuntimeUs
 }
 
 function projectOpencodeQuestionInfos(
-  questions: Array<QuestionV2Info | OpencodeQuestionToolQuestion>
+  questions: Array<QuestionV2Info | OpencodeQuestionToolQuestion>,
 ): RuntimeUserInputQuestion[] {
   return questions.map((question, index) => ({
     id: `question-${index + 1}`,
@@ -2626,12 +2622,12 @@ function projectOpencodeContextUsage(input: {
     sectionsByKind.set(kind, section)
   }
 
-  const totalTokens =
-    tokenBreakdown.inputTokens
-    + tokenBreakdown.cachedInputTokens
-    + tokenBreakdown.cacheWriteTokens
-    + tokenBreakdown.outputTokens
-    + tokenBreakdown.reasoningOutputTokens
+  const totalTokens
+    = tokenBreakdown.inputTokens
+      + tokenBreakdown.cachedInputTokens
+      + tokenBreakdown.cacheWriteTokens
+      + tokenBreakdown.outputTokens
+      + tokenBreakdown.reasoningOutputTokens
   const model = input.modelId ?? readLatestOpencodeContextModel(input.messages)
 
   return {

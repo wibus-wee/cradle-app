@@ -273,11 +273,3 @@ const TRAILING_SLASH_RE = /\/+$/
 export function normalizeBaseUrl(url: string): string {
   return url.replace(TRAILING_SLASH_RE, '')
 }
-
-function readOptionalString(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-  const normalized = value.trim()
-  return normalized.length > 0 ? normalized : null
-}

@@ -19,10 +19,10 @@ export type ChunkSubscriber = (chunk: UIMessageChunk, terminal: boolean) => void
  * subscriber fanout.
  */
 export interface SubscriberRegistry {
-  subscribe(key: string, subscriber: ChunkSubscriber): () => void
-  publish(key: string, chunk: UIMessageChunk, terminal: boolean): void
-  size(key: string): number
-  delete(key: string): void
+  subscribe: (key: string, subscriber: ChunkSubscriber) => () => void
+  publish: (key: string, chunk: UIMessageChunk, terminal: boolean) => void
+  size: (key: string) => number
+  delete: (key: string) => void
 }
 
 export function createSubscriberRegistry(): SubscriberRegistry {
@@ -52,7 +52,8 @@ export function createSubscriberRegistry(): SubscriberRegistry {
       for (const subscriber of set) {
         try {
           subscriber(chunk, terminal)
-        } catch {
+        }
+ catch {
           dead.push(subscriber)
         }
       }
@@ -68,6 +69,6 @@ export function createSubscriberRegistry(): SubscriberRegistry {
     },
     delete(key) {
       subscribers.delete(key)
-    }
+    },
   }
 }

@@ -7,9 +7,9 @@ import type { StatusResult } from 'simple-git'
 import simpleGit from 'simple-git'
 
 import { AppError } from '../../errors/app-error'
-import { runGitCommand } from './git-command'
-import { resolveSessionExecutionRootById } from '../worktree/service'
 import * as Workspace from '../workspace/service'
+import { resolveSessionExecutionRootById } from '../worktree/service'
+import { runGitCommand } from './git-command'
 
 export interface GitStatusView {
   repositoryPath: string
@@ -898,6 +898,8 @@ function joinDiffs(diffs: string[]): string {
     .join('\n')
 }
 
+export { runGitCommand } from './git-command'
+export type { GitWorktreeEntryView } from './worktree-ops'
 export {
   addGitWorktree,
   deleteLocalBranch,
@@ -911,5 +913,3 @@ export {
   resolveWorktreeAbsolutePath,
   stashAndPopAcrossCheckouts,
 } from './worktree-ops'
-export type { GitWorktreeEntryView } from './worktree-ops'
-export { runGitCommand } from './git-command'

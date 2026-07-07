@@ -123,7 +123,8 @@ describe('pending runtime user input', () => {
         requestId: 'missing-request',
         answers: {},
       })
-    } catch (error) {
+    }
+ catch (error) {
       expect(error).toMatchObject({
         code: 'chat_runtime_user_input_not_found',
         status: 404,

@@ -1,21 +1,22 @@
 import {
-  RobotLine as BotIcon,
   CalendarLine as CalendarIcon,
   CheckLine as CheckIcon,
+  ClockwiseLine as RotateCwIcon,
+  CloseLine as XIcon,
+  DeleteLine as Trash2Icon,
   ExternalLinkLine as ExternalLinkIcon,
   PencilLine as PencilIcon,
   PlusLine as PlusIcon,
-  ClockwiseLine as RotateCwIcon,
+  RobotLine as BotIcon,
   SearchLine as SearchIcon,
   TagLine as TagsIcon,
-  DeleteLine as Trash2Icon,
   UserXLine as UserRoundXIcon,
-  CloseLine as XIcon
 } from '@mingcute/react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Calendar } from '~/components/ui/calendar'
+import { Checkbox } from '~/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { Checkbox } from '~/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { AgentAvatar } from '~/features/agent-runtime/agent-avatar'
 import { useAgents } from '~/features/agent-runtime/use-agents'
@@ -677,7 +677,7 @@ function AgentDelegatePicker({
           <Checkbox
             id={`issue-delegate-isolation-${issue.id}`}
             checked={runInIsolation}
-            onCheckedChange={(checked) => setRunInIsolation(checked === true)}
+            onCheckedChange={checked => setRunInIsolation(checked === true)}
             data-testid="issue-delegate-isolation"
           />
           <label

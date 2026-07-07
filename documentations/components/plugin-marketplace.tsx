@@ -8,9 +8,9 @@ import {
   LayersLine as Layers,
   PackageLine as Package,
   PluginLine as Plug,
-  SearchLine as Search,
   SafeShieldLine as ShieldCheck,
-  SparklesLine as Sparkles
+  SearchLine as Search,
+  SparklesLine as Sparkles,
 } from '@mingcute/react'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'

@@ -9,17 +9,17 @@ import * as Session from './service'
 
 export const session = new Elysia({
   prefix: '/sessions',
-  detail: { tags: ['session'] }
+  detail: { tags: ['session'] },
 })
   .get('/', ({ query }) => Session.list(query), {
     detail: {
-      summary: 'List sessions',
+      'summary': 'List sessions',
       'x-cradle-cli': {
-        command: ['session', 'list']
-      }
+        command: ['session', 'list'],
+      },
     },
     query: SessionModel.listQuery,
-    response: { 200: t.Array(SessionModel.session) }
+    response: { 200: t.Array(SessionModel.session) },
   })
   .get(
     '/:id',
@@ -32,39 +32,39 @@ export const session = new Elysia({
     },
     {
       detail: {
-        summary: 'Get session by ID',
+        'summary': 'Get session by ID',
         'x-cradle-cli': {
-          command: ['session', 'get']
-        }
+          command: ['session', 'get'],
+        },
       },
       params: SessionModel.idParams,
-      response: { 200: SessionModel.session }
-    }
+      response: { 200: SessionModel.session },
+    },
   )
   .post('/', ({ body }) => Session.create(body), {
     detail: {
-      summary: 'Create session',
+      'summary': 'Create session',
       'x-cradle-cli': {
-        command: ['session', 'create']
-      }
+        command: ['session', 'create'],
+      },
     },
     body: SessionModel.createBody,
-    response: { 200: SessionModel.session }
+    response: { 200: SessionModel.session },
   })
   .patch(
     '/:id',
     async ({ params, body }) => {
       if (
-        body.title === undefined &&
-        body.pinned === undefined &&
-        body.providerTargetId === undefined &&
-        body.modelId === undefined &&
-        body.thinkingEffort === undefined
+        body.title === undefined
+        && body.pinned === undefined
+        && body.providerTargetId === undefined
+        && body.modelId === undefined
+        && body.thinkingEffort === undefined
       ) {
         throw new AppError({
           code: 'invalid_session_input',
           status: 400,
-          message: 'at least one session field is required'
+          message: 'at least one session field is required',
         })
       }
       const result = await Session.update({ id: params.id, ...body })
@@ -75,15 +75,15 @@ export const session = new Elysia({
     },
     {
       detail: {
-        summary: 'Update session',
+        'summary': 'Update session',
         'x-cradle-cli': {
-          command: ['session', 'update']
-        }
+          command: ['session', 'update'],
+        },
       },
       params: SessionModel.idParams,
       body: SessionModel.updateBody,
-      response: { 200: SessionModel.session }
-    }
+      response: { 200: SessionModel.session },
+    },
   )
   .post(
     '/:id/archive',
@@ -96,15 +96,15 @@ export const session = new Elysia({
     },
     {
       detail: {
-        summary: 'Archive or restore session',
+        'summary': 'Archive or restore session',
         'x-cradle-cli': {
-          command: ['session', 'archive']
-        }
+          command: ['session', 'archive'],
+        },
       },
       params: SessionModel.idParams,
       body: SessionModel.archiveBody,
-      response: { 200: SessionModel.session }
-    }
+      response: { 200: SessionModel.session },
+    },
   )
   .post(
     '/:id/read',
@@ -117,11 +117,11 @@ export const session = new Elysia({
     },
     {
       detail: {
-        summary: 'Mark session as read'
+        summary: 'Mark session as read',
       },
       params: SessionModel.idParams,
-      response: { 200: SessionModel.session }
-    }
+      response: { 200: SessionModel.session },
+    },
   )
   .post(
     '/:id/unread',
@@ -134,11 +134,11 @@ export const session = new Elysia({
     },
     {
       detail: {
-        summary: 'Mark session as unread'
+        summary: 'Mark session as unread',
       },
       params: SessionModel.idParams,
-      response: { 200: SessionModel.session }
-    }
+      response: { 200: SessionModel.session },
+    },
   )
   .delete(
     '/:id',
@@ -148,57 +148,57 @@ export const session = new Elysia({
     },
     {
       detail: {
-        summary: 'Delete session',
+        'summary': 'Delete session',
         'x-cradle-cli': {
-          command: ['session', 'delete']
-        }
+          command: ['session', 'delete'],
+        },
       },
       params: SessionModel.idParams,
-      response: { 200: t.Object({ ok: t.Literal(true) }) }
-    }
+      response: { 200: t.Object({ ok: t.Literal(true) }) },
+    },
   )
   .get('/:id/export/markdown', ({ params }) => ({ markdown: Session.exportMarkdown(params.id) }), {
     detail: {
-      summary: 'Export session as markdown',
+      'summary': 'Export session as markdown',
       'x-cradle-cli': {
-        command: ['session', 'export', 'markdown']
-      }
+        command: ['session', 'export', 'markdown'],
+      },
     },
     params: SessionModel.idParams,
-    response: { 200: SessionModel.exportMarkdownResponse }
+    response: { 200: SessionModel.exportMarkdownResponse },
   })
 
   // ── linked issue ──
   .get('/:id/linked-issue', ({ params }) => Issue.getLinkedIssue(params.id), {
     detail: {
-      summary: 'Get linked issue',
+      'summary': 'Get linked issue',
       'x-cradle-cli': {
-        command: ['session', 'linked-issue', 'get']
-      }
+        command: ['session', 'linked-issue', 'get'],
+      },
     },
     params: SessionModel.idParams,
-    response: { 200: t.Object({ issueId: t.Nullable(t.String()) }) }
+    response: { 200: t.Object({ issueId: t.Nullable(t.String()) }) },
   })
   .post('/:id/linked-issue', ({ params, body }) => Issue.linkIssue(params.id, body.issueId), {
     detail: {
-      summary: 'Link issue to session',
+      'summary': 'Link issue to session',
       'x-cradle-cli': {
-        command: ['session', 'linked-issue', 'link']
-      }
+        command: ['session', 'linked-issue', 'link'],
+      },
     },
     params: SessionModel.idParams,
     body: t.Object({ issueId: t.String({ minLength: 1 }) }),
-    response: { 200: t.Object({ ok: t.Literal(true) }) }
+    response: { 200: t.Object({ ok: t.Literal(true) }) },
   })
   .delete('/:id/linked-issue', ({ params }) => Issue.unlinkIssue(params.id), {
     detail: {
-      summary: 'Unlink issue from session',
+      'summary': 'Unlink issue from session',
       'x-cradle-cli': {
-        command: ['session', 'linked-issue', 'unlink']
-      }
+        command: ['session', 'linked-issue', 'unlink'],
+      },
     },
     params: SessionModel.idParams,
-    response: { 200: t.Object({ ok: t.Literal(true) }) }
+    response: { 200: t.Object({ ok: t.Literal(true) }) },
   })
   .post('/:id/isolation/start', async ({ params, body }) => {
     return await Worktree.startSessionIsolation({
@@ -207,7 +207,7 @@ export const session = new Elysia({
     })
   }, {
     detail: {
-      summary: 'Start session isolation',
+      'summary': 'Start session isolation',
       'x-cradle-cli': { command: ['session', 'isolation', 'start'] },
     },
     params: SessionModel.idParams,
@@ -222,7 +222,7 @@ export const session = new Elysia({
     return { ok: true as const }
   }, {
     detail: {
-      summary: 'Activate pending session isolation',
+      'summary': 'Activate pending session isolation',
       'x-cradle-cli': { command: ['session', 'isolation', 'activate'] },
     },
     params: SessionModel.idParams,
@@ -237,7 +237,7 @@ export const session = new Elysia({
     return { ok: true as const }
   }, {
     detail: {
-      summary: 'Cancel pending session isolation',
+      'summary': 'Cancel pending session isolation',
       'x-cradle-cli': { command: ['session', 'isolation', 'cancel'] },
     },
     params: SessionModel.idParams,
@@ -248,7 +248,7 @@ export const session = new Elysia({
     return { ok: true as const }
   }, {
     detail: {
-      summary: 'Leave isolated execution for session',
+      'summary': 'Leave isolated execution for session',
       'x-cradle-cli': { command: ['session', 'isolation', 'leave'] },
     },
     params: SessionModel.idParams,
@@ -259,7 +259,7 @@ export const session = new Elysia({
     return { worktree }
   }, {
     detail: {
-      summary: 'Recreate missing isolated checkout for session',
+      'summary': 'Recreate missing isolated checkout for session',
       'x-cradle-cli': { command: ['session', 'isolation', 'repair'] },
     },
     params: SessionModel.idParams,

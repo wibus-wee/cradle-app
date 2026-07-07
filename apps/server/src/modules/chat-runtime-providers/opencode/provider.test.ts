@@ -1,11 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
-
 import type {
   AssistantMessage as OpencodeAssistantMessage,
   Event as OpencodeLegacyEvent,
   Part as OpencodePart,
 } from '@opencode-ai/sdk'
 import type { Event as OpencodeRootEvent } from '@opencode-ai/sdk/v2'
+import { describe, expect, it, vi } from 'vitest'
+
 import type {
   RuntimeSession,
   RuntimeToolApprovalRequest,
@@ -13,8 +13,8 @@ import type {
   RuntimeUserInputRequest,
   RuntimeUserInputResolution,
 } from '../../chat-runtime/runtime-provider-types'
-import type { OpencodeRuntimeResource } from './runtime-context'
 import { formatOpencodeAssistantError, OpencodeProvider } from './provider'
+import type { OpencodeRuntimeResource } from './runtime-context'
 
 type OpencodeAssistantError = NonNullable<OpencodeAssistantMessage['error']>
 type OpencodeEvent = OpencodeLegacyEvent | OpencodeRootEvent
@@ -25,6 +25,7 @@ class AsyncEventStream<T> implements AsyncIterable<T> {
     values: T[]
     waiters: Array<(value: IteratorResult<T>) => void>
   }>()
+
   private closed = false
 
   push(value: T): void {
@@ -170,7 +171,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     error: undefined,
   }))
   const message = vi.fn(async (options?: { path?: { messageID?: string } }) => ({
-    data: state.sessionMessagesData.find((entry) =>
+    data: state.sessionMessagesData.find(entry =>
       Boolean(
         entry
         && typeof entry === 'object'
@@ -179,8 +180,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
         && typeof entry.info === 'object'
         && 'id' in entry.info
         && entry.info.id === options?.path?.messageID,
-      ),
-    ) ?? {
+      )) ?? {
       info: assistantMessage(),
       parts: [textPart()],
     },
@@ -300,7 +300,7 @@ describe('formatOpencodeAssistantError', () => {
   })
 })
 
-describe('OpencodeProvider provider threads', () => {
+describe('opencodeProvider provider threads', () => {
   it('lists native OpenCode sessions and hydrates message turns', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -492,8 +492,7 @@ describe('OpencodeProvider provider threads', () => {
           && typeof entry.info === 'object'
           && 'sessionID' in entry.info
           && entry.info.sessionID === options?.path?.id,
-        ),
-      ),
+        )),
       error: undefined,
     }))
     fake.state.sessionMessagesData = [
@@ -578,7 +577,7 @@ describe('OpencodeProvider provider threads', () => {
   })
 })
 
-describe('OpencodeProvider UI slot states', () => {
+describe('opencodeProvider UI slot states', () => {
   it('projects status, todo, and diff from native OpenCode session APIs', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -758,7 +757,7 @@ describe('OpencodeProvider UI slot states', () => {
   })
 })
 
-describe('OpencodeProvider native user-input submission', () => {
+describe('opencodeProvider native user-input submission', () => {
   it('replies to pending v2 session questions by request id', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -814,7 +813,7 @@ describe('OpencodeProvider native user-input submission', () => {
   })
 })
 
-describe('OpencodeProvider context usage', () => {
+describe('opencodeProvider context usage', () => {
   it('projects v2 session context messages into context usage sections', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -901,7 +900,7 @@ describe('OpencodeProvider context usage', () => {
   })
 })
 
-describe('OpencodeProvider streamTurn', () => {
+describe('opencodeProvider streamTurn', () => {
   it('uses promptAsync with the build agent and closes from terminal OpenCode events', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -1504,7 +1503,7 @@ describe('OpencodeProvider streamTurn', () => {
       resolve?: (resolution: RuntimeToolApprovalResolution) => void
     } = {}
     const requestToolApproval = vi.fn((_request: RuntimeToolApprovalRequest) =>
-      new Promise<RuntimeToolApprovalResolution>(resolve => {
+      new Promise<RuntimeToolApprovalResolution>((resolve) => {
         approvalResolver.resolve = resolve
       }))
     const provider = new OpencodeProvider({
@@ -1591,7 +1590,7 @@ describe('OpencodeProvider streamTurn', () => {
       resolve?: (resolution: RuntimeUserInputResolution) => void
     } = {}
     const requestUserInput = vi.fn((_request: RuntimeUserInputRequest) =>
-      new Promise<RuntimeUserInputResolution>(resolve => {
+      new Promise<RuntimeUserInputResolution>((resolve) => {
         userInputResolver.resolve = resolve
       }))
     const provider = new OpencodeProvider({
@@ -1723,7 +1722,7 @@ describe('OpencodeProvider streamTurn', () => {
       resolve?: (resolution: RuntimeUserInputResolution) => void
     } = {}
     const requestUserInput = vi.fn((_request: RuntimeUserInputRequest) =>
-      new Promise<RuntimeUserInputResolution>(resolve => {
+      new Promise<RuntimeUserInputResolution>((resolve) => {
         userInputResolver.resolve = resolve
       }))
     const provider = new OpencodeProvider({
@@ -1859,5 +1858,4 @@ describe('OpencodeProvider streamTurn', () => {
     })
     await stream.return(undefined)
   })
-
 })

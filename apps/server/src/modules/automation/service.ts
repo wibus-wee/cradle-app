@@ -6,7 +6,7 @@ import {
   automationArtifacts,
   automationDefinitions,
   automationEvents,
-  automationRuns
+  automationRuns,
 } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
 import { and, desc, eq, isNull, lte, or } from 'drizzle-orm'
@@ -20,11 +20,11 @@ import * as Session from '../session/service'
 import type { AutomationTrigger, DueOccurrence } from './scheduler'
 import { getNextOccurrence, listDueOccurrences } from './scheduler'
 
-export type AutomationInput =
-  | { type: 'file_ref'; path: string }
-  | { type: 'inline_file'; name: string; content: string }
-  | { type: 'text'; name: string; content: string }
-  | { type: 'url'; url: string }
+export type AutomationInput
+  = | { type: 'file_ref', path: string }
+    | { type: 'inline_file', name: string, content: string }
+    | { type: 'text', name: string, content: string }
+    | { type: 'url', url: string }
 
 export interface AutomationArtifactRequest {
   kind: 'markdown' | 'text' | 'json' | 'file_ref'
@@ -97,7 +97,8 @@ export interface AutomationArtifactView {
 function readJson<T>(json: string, fallback: T): T {
   try {
     return JSON.parse(json) as T
-  } catch {
+  }
+ catch {
     return fallback
   }
 }
@@ -112,21 +113,21 @@ function toDefinitionView(row: AutomationDefinition): AutomationDefinitionView {
     trigger: readJson<AutomationTrigger>(row.triggerJson, {
       type: 'rrule',
       rrule: '',
-      timezone: 'UTC'
+      timezone: 'UTC',
     }),
     recipe: readJson<AutomationRecipe>(row.recipeJson, {
       kind: 'agent_task',
       prompt: '',
       inputs: [],
       artifactRequests: [],
-      providerTargetId: ''
+      providerTargetId: '',
     }),
     createdByKind: row.createdByKind,
     createdById: row.createdById,
     lastRunAt: row.lastRunAt,
     nextRunAt: row.nextRunAt,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -141,14 +142,14 @@ function toRunView(row: AutomationRun): AutomationRunView {
     triggerSnapshot: readJson<AutomationTrigger>(row.triggerSnapshotJson, {
       type: 'rrule',
       rrule: '',
-      timezone: 'UTC'
+      timezone: 'UTC',
     }),
     recipeSnapshot: readJson<AutomationRecipe>(row.recipeSnapshotJson, {
       kind: 'agent_task',
       prompt: '',
       inputs: [],
       artifactRequests: [],
-      providerTargetId: ''
+      providerTargetId: '',
     }),
     chatSessionId: row.chatSessionId,
     backendRunId: row.backendRunId,
@@ -159,7 +160,7 @@ function toRunView(row: AutomationRun): AutomationRunView {
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -174,7 +175,7 @@ function toArtifactView(row: AutomationArtifact): AutomationArtifactView {
     content: row.content,
     metadata: readJson<Record<string, unknown>>(row.metadataJson, {}),
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -189,7 +190,7 @@ function getDefinitionRow(id: string): AutomationDefinition {
       code: 'automation_not_found',
       status: 404,
       message: 'Automation not found',
-      details: { id }
+      details: { id },
     })
   }
   return row
@@ -210,7 +211,7 @@ function getRunRow(runId: string, definitionId?: string): AutomationRun {
       code: 'automation_run_not_found',
       status: 404,
       message: 'Automation run not found',
-      details: { runId }
+      details: { runId },
     })
   }
   return row
@@ -232,7 +233,7 @@ function writeEvent(input: {
       type: input.type,
       message: input.message,
       attrsJson: JSON.stringify(input.attrs ?? {}),
-      createdAt: currentUnixSeconds()
+      createdAt: currentUnixSeconds(),
     })
     .run()
 }
@@ -251,11 +252,11 @@ function formatInput(input: AutomationInput): string {
 }
 
 function buildRunPrompt(recipe: AutomationRecipe): string {
-  const inputs =
-    recipe.inputs.length > 0 ? `\n\nInputs:\n${recipe.inputs.map(formatInput).join('\n\n')}` : ''
-  const artifacts =
-    recipe.artifactRequests.length > 0
-      ? `\n\nRequested artifacts:\n${recipe.artifactRequests.map((item) => `- ${item.kind}: ${item.name}${item.description ? ` - ${item.description}` : ''}`).join('\n')}`
+  const inputs
+    = recipe.inputs.length > 0 ? `\n\nInputs:\n${recipe.inputs.map(formatInput).join('\n\n')}` : ''
+  const artifacts
+    = recipe.artifactRequests.length > 0
+      ? `\n\nRequested artifacts:\n${recipe.artifactRequests.map(item => `- ${item.kind}: ${item.name}${item.description ? ` - ${item.description}` : ''}`).join('\n')}`
       : ''
   return `${recipe.prompt}${inputs}${artifacts}`
 }
@@ -267,7 +268,7 @@ function validateRecipe(recipe: AutomationRecipe): void {
         code: 'automation_file_ref_must_be_absolute',
         status: 400,
         message: 'Automation file references must use absolute paths',
-        details: { path: input.path }
+        details: { path: input.path },
       })
     }
   }
@@ -276,7 +277,7 @@ function validateRecipe(recipe: AutomationRecipe): void {
 function refreshDefinitionSchedule(
   definitionId: string,
   trigger: AutomationTrigger,
-  now = currentUnixSeconds()
+  now = currentUnixSeconds(),
 ): void {
   const nextRunAt = getNextOccurrence(trigger, now)
   db()
@@ -314,7 +315,7 @@ export function create(input: {
       createdById: input.createdById ?? null,
       nextRunAt: getNextOccurrence(input.trigger, now),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .run()
   writeEvent({ definitionId: id, type: 'automation.created', message: 'Automation created' })
@@ -354,7 +355,7 @@ export function update(
     recipe?: AutomationRecipe
     createdByKind?: 'agent' | 'user' | 'system'
     createdById?: string | null
-  }
+  },
 ): AutomationDefinitionView {
   const existing = getDefinitionRow(id)
   const now = currentUnixSeconds()
@@ -399,21 +400,21 @@ export function setEnabled(id: string, enabled: boolean): AutomationDefinitionVi
   const trigger = readJson<AutomationTrigger>(existing.triggerJson, {
     type: 'rrule',
     rrule: '',
-    timezone: 'UTC'
+    timezone: 'UTC',
   })
   db()
     .update(automationDefinitions)
     .set({
       enabled,
       nextRunAt: enabled ? getNextOccurrence(trigger, now) : null,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(automationDefinitions.id, id))
     .run()
   writeEvent({
     definitionId: id,
     type: enabled ? 'automation.enabled' : 'automation.disabled',
-    message: enabled ? 'Automation enabled' : 'Automation disabled'
+    message: enabled ? 'Automation enabled' : 'Automation disabled',
   })
   return get(id)
 }
@@ -438,14 +439,14 @@ function insertRun(input: {
       recipeSnapshotJson: input.definition.recipeJson,
       scheduledFor: input.scheduledFor ?? null,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning()
     .get()
 }
 
 export function enqueueDueRuns(
-  input: { now?: number; lookbackSeconds?: number; limit?: number } = {}
+  input: { now?: number, lookbackSeconds?: number, limit?: number } = {},
 ): AutomationRunView[] {
   const now = input.now ?? currentUnixSeconds()
   const lookbackSeconds = input.lookbackSeconds ?? 3600
@@ -455,8 +456,8 @@ export function enqueueDueRuns(
     .where(
       and(
         eq(automationDefinitions.enabled, true),
-        or(lte(automationDefinitions.nextRunAt, now), isNull(automationDefinitions.nextRunAt))
-      )
+        or(lte(automationDefinitions.nextRunAt, now), isNull(automationDefinitions.nextRunAt)),
+      ),
     )
     .all()
 
@@ -465,14 +466,14 @@ export function enqueueDueRuns(
     const trigger = readJson<AutomationTrigger>(definition.triggerJson, {
       type: 'rrule',
       rrule: '',
-      timezone: 'UTC'
+      timezone: 'UTC',
     })
-    const windowStart =
-      definition.nextRunAt ?? Math.max(0, (definition.lastRunAt ?? now) - lookbackSeconds)
+    const windowStart
+      = definition.nextRunAt ?? Math.max(0, (definition.lastRunAt ?? now) - lookbackSeconds)
     const due = listDueOccurrences(trigger, {
       windowStart,
       windowEnd: now,
-      limit: input.limit
+      limit: input.limit,
     })
     for (const occurrence of due) {
       const run = insertScheduledRunIfMissing(definition, occurrence)
@@ -488,23 +489,24 @@ export function enqueueDueRuns(
 
 function insertScheduledRunIfMissing(
   definition: AutomationDefinition,
-  occurrence: DueOccurrence
+  occurrence: DueOccurrence,
 ): AutomationRun | null {
   try {
     return insertRun({
       definition,
       triggerType: 'scheduled',
       occurrenceKey: occurrence.occurrenceKey,
-      scheduledFor: occurrence.scheduledFor
+      scheduledFor: occurrence.scheduledFor,
     })
-  } catch {
+  }
+ catch {
     return null
   }
 }
 
 export async function runNow(
   id: string,
-  input: { occurrenceKey?: string; scheduledFor?: number } = {}
+  input: { occurrenceKey?: string, scheduledFor?: number } = {},
 ): Promise<AutomationRunView> {
   const definition = getDefinitionRow(id)
   let run: AutomationRun
@@ -513,15 +515,16 @@ export async function runNow(
       definition,
       triggerType: input.occurrenceKey ? 'scheduled' : 'manual',
       occurrenceKey: input.occurrenceKey ?? `manual:${randomUUID()}`,
-      scheduledFor: input.scheduledFor ?? null
+      scheduledFor: input.scheduledFor ?? null,
     })
-  } catch (error) {
+  }
+ catch (error) {
     if (input.occurrenceKey) {
       throw new AppError({
         code: 'automation_run_exists',
         status: 409,
         message: 'Automation run already exists for this occurrence',
-        details: { automationDefinitionId: id, occurrenceKey: input.occurrenceKey }
+        details: { automationDefinitionId: id, occurrenceKey: input.occurrenceKey },
       })
     }
     throw error
@@ -536,7 +539,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
     prompt: '',
     inputs: [],
     artifactRequests: [],
-    providerTargetId: ''
+    providerTargetId: '',
   })
   const now = currentUnixSeconds()
   const claimed = db()
@@ -545,7 +548,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       status: 'running',
       claimedAt: run.claimedAt ?? now,
       startedAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(and(eq(automationRuns.id, run.id), eq(automationRuns.status, 'queued')))
     .run()
@@ -565,14 +568,14 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       origin: 'automation',
       providerTargetId: recipe.providerTargetId,
       agentId: recipe.agentId,
-      runtimeKind: recipe.runtimeKind
+      runtimeKind: recipe.runtimeKind,
     })
     chatSessionId = session.id
     const backendRun = await ChatRuntime.createRun({
       sessionId: session.id,
       text: buildRunPrompt(recipe),
       modelId: recipe.modelId,
-      thinkingEffort: recipe.thinkingEffort
+      thinkingEffort: recipe.thinkingEffort,
     })
     backendRunId = backendRun.runId
     db()
@@ -580,7 +583,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       .set({
         chatSessionId,
         backendRunId,
-        updatedAt: currentUnixSeconds()
+        updatedAt: currentUnixSeconds(),
       })
       .where(eq(automationRuns.id, run.id))
       .run()
@@ -604,7 +607,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
         content: markdown,
         metadataJson: JSON.stringify({ chatSessionId, backendRunId }),
         createdAt: currentUnixSeconds(),
-        updatedAt: currentUnixSeconds()
+        updatedAt: currentUnixSeconds(),
       })
       .run()
 
@@ -616,7 +619,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
         artifactCount: 1,
         errorText: null,
         finishedAt,
-        updatedAt: finishedAt
+        updatedAt: finishedAt,
       })
       .where(eq(automationRuns.id, run.id))
       .run()
@@ -624,7 +627,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       .update(automationDefinitions)
       .set({
         lastRunAt: finishedAt,
-        updatedAt: finishedAt
+        updatedAt: finishedAt,
       })
       .where(eq(automationDefinitions.id, run.automationDefinitionId))
       .run()
@@ -632,9 +635,10 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       definitionId: run.automationDefinitionId,
       runId: run.id,
       type: 'automation.run.completed',
-      message: 'Automation run completed'
+      message: 'Automation run completed',
     })
-  } catch (error) {
+  }
+ catch (error) {
     const errorText = error instanceof Error ? error.message : String(error)
     const failedAt = currentUnixSeconds()
     db()
@@ -645,7 +649,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
         backendRunId,
         errorText,
         finishedAt: failedAt,
-        updatedAt: failedAt
+        updatedAt: failedAt,
       })
       .where(eq(automationRuns.id, run.id))
       .run()
@@ -654,7 +658,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       runId: run.id,
       type: 'automation.run.failed',
       message: 'Automation run failed',
-      attrs: { errorText, chatSessionId, backendRunId }
+      attrs: { errorText, chatSessionId, backendRunId },
     })
   }
 
@@ -700,8 +704,8 @@ export function getArtifact(definitionId: string, artifactId: string): Automatio
     .where(
       and(
         eq(automationArtifacts.id, artifactId),
-        eq(automationArtifacts.automationDefinitionId, definitionId)
-      )
+        eq(automationArtifacts.automationDefinitionId, definitionId),
+      ),
     )
     .get()
   if (!row) {
@@ -709,7 +713,7 @@ export function getArtifact(definitionId: string, artifactId: string): Automatio
       code: 'automation_artifact_not_found',
       status: 404,
       message: 'Automation artifact not found',
-      details: { artifactId }
+      details: { artifactId },
     })
   }
   return toArtifactView(row)

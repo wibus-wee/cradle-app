@@ -103,7 +103,7 @@ describe('elysia migration skeleton', () => {
     const rejectedPreflight = await app.handle(new Request('http://localhost/health', {
       method: 'OPTIONS',
       headers: {
-        origin: 'https://example.com',
+        'origin': 'https://example.com',
         'access-control-request-method': 'GET',
         'access-control-request-private-network': 'true',
       },

@@ -5,15 +5,16 @@ import { asc, eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { upsertSecret } from '../secrets/service'
+import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import {
   createRelayRoomId,
   generateRelaySigningKeyPair,
   signRelayAssertion,
-  type SignedRelayAssertion,
 } from '../relay-servers/relay-signature-service'
+import { upsertSecret } from '../secrets/service'
 import { generateRelayKeyPair, relayPublicKeyFingerprint } from './crypto'
-import { getHostConnectorService, type HostEnrollmentLiveState } from './host-connector'
+import type { HostEnrollmentLiveState } from './host-connector'
+import { getHostConnectorService } from './host-connector'
 import { upsertHostRelayAuthToken } from './relay-auth-token-service'
 
 /**
@@ -85,7 +86,7 @@ export async function createHostEnrollment(input: CreateHostEnrollmentInput): Pr
   if (!relayUrl) {
     throw new AppError({ code: 'relay_host_enrollment_relay_url_required', status: 400, message: 'Relay URL is required.' })
   }
-  new URL(relayUrl) // throws on invalid
+  const normalizedRelayUrl = new URL(relayUrl).toString().replace(/\/+$/, '')
 
   const id = input.id ?? randomUUID()
   const keypair = generateRelayKeyPair()
@@ -99,7 +100,7 @@ export async function createHostEnrollment(input: CreateHostEnrollmentInput): Pr
     roomId,
   })
 
-  const startResponse = await callPairingStart(relayUrl, {
+  const startResponse = await callPairingStart(normalizedRelayUrl, {
     assertion: pairingStart,
   })
 
@@ -129,7 +130,7 @@ export async function createHostEnrollment(input: CreateHostEnrollmentInput): Pr
     .values({
       id,
       displayName: input.displayName.trim(),
-      relayUrl,
+    relayUrl: normalizedRelayUrl,
       roomId,
       hostPubkey: keypair.publicKeyBase64,
       hostPrivateKeySecretId: secretId,

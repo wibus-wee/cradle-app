@@ -2,17 +2,17 @@ import { CheckLine as CheckIcon } from '@mingcute/react'
 import { startTransition, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
+import {
+  SESSION_PREVIEW_LIMIT_OPTIONS,
+  useWorkspaceSidebarUiStore,
+} from '~/features/workspace/workspace-sidebar-ui-store'
 import { useI18n } from '~/i18n/i18n-context'
 import type { SupportedLocale } from '~/i18n/locales'
 import { localeOptions, normalizeLocale } from '~/i18n/locales'
 import { cn } from '~/lib/cn'
 import type { ThemeMode } from '~/store/theme'
 import { useThemeStore } from '~/store/theme'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
-import {
-  SESSION_PREVIEW_LIMIT_OPTIONS,
-  useWorkspaceSidebarUiStore,
-} from '~/features/workspace/workspace-sidebar-ui-store'
 
 import { SettingsGroup, SettingsPage } from './settings-container'
 import { SettingsRow } from './settings-row'
@@ -182,7 +182,7 @@ function SessionPreviewSettings() {
     >
       <Select
         value={String(sessionPreviewLimit)}
-        onValueChange={(value) => setSessionPreviewLimit(Number(value))}
+        onValueChange={value => setSessionPreviewLimit(Number(value))}
       >
         <SelectTrigger
           size="sm"
@@ -193,7 +193,7 @@ function SessionPreviewSettings() {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {SESSION_PREVIEW_LIMIT_OPTIONS.map((option) => (
+          {SESSION_PREVIEW_LIMIT_OPTIONS.map(option => (
             <SelectItem key={option} value={String(option)}>
               {option}
             </SelectItem>

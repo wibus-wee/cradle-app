@@ -7,7 +7,7 @@ export function runSessionActorTask<T>(sessionId: string, task: SessionActorTask
   const result = previous ? previous.catch(() => undefined).then(task) : runTaskImmediately(task)
   const next = result.then(
     () => undefined,
-    () => undefined
+    () => undefined,
   )
   sessionChains.set(sessionId, next)
   void next.finally(() => {
@@ -21,7 +21,8 @@ export function runSessionActorTask<T>(sessionId: string, task: SessionActorTask
 function runTaskImmediately<T>(task: SessionActorTask<T>): Promise<T> {
   try {
     return Promise.resolve(task())
-  } catch (error) {
+  }
+ catch (error) {
     return Promise.reject(error)
   }
 }

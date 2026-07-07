@@ -8,7 +8,6 @@ import { I18nextProvider, initReactI18next } from 'react-i18next'
 import enUS, { allNamespaces } from '~/locales/default'
 
 import { applyDocumentLocale, writeLocaleCookie } from './browser-locale'
-import type { I18nContextValue } from './i18n-context'
 import { I18nContext } from './i18n-context'
 import { setI18nInstance } from './instance'
 import type { SupportedLocale } from './locales'

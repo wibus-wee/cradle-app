@@ -14,14 +14,14 @@ import { providerThreadStreamStore } from '../stream/live-run-streams'
 import {
   createAssistantMessage,
   extractMessageText,
-  normalizeMessageSnapshot
+  normalizeMessageSnapshot,
 } from '../ui-message'
 import type { FinalMessageProjectionRun } from './final-message-projection'
 import {
   createFinalMessageProjectionState,
   finalizeFinalMessageProjection,
   flushProjectedToolInputs,
-  projectFinalMessageChunk
+  projectFinalMessageChunk,
 } from './final-message-projection'
 import { isTerminalUIMessageChunk, readTerminalStatus } from './stream-chunks'
 
@@ -38,7 +38,7 @@ interface ProviderSyntheticTurnState extends FinalMessageProjectionRun {
 }
 
 export function createProviderSyntheticTurnEventHandler(
-  activeRun: ActiveRun
+  activeRun: ActiveRun,
 ): (event: ProviderSyntheticTurnEvent) => Promise<void> {
   const syntheticTurns = new Map<string, ProviderSyntheticTurnState>()
 
@@ -55,9 +55,9 @@ export function createProviderSyntheticTurnEventHandler(
           providerThreadId: event.providerThreadId,
           providerTurnId: event.providerTurnId,
           notification: { type: 'providerSyntheticTurn' },
-          chunks: event.chunks
+          chunks: event.chunks,
         },
-        isTerminalChunk: isTerminalUIMessageChunk
+        isTerminalChunk: isTerminalUIMessageChunk,
       })
       return
     }
@@ -76,14 +76,15 @@ export function createProviderSyntheticTurnEventHandler(
           break
         }
       }
-    } catch (error) {
+    }
+ catch (error) {
       if (syntheticTurn && !syntheticTurn.terminalStatus) {
         syntheticTurns.delete(event.providerTurnId)
         await finalizeProviderSyntheticTurn(
           syntheticTurn,
           'failed',
           error instanceof Error ? error.message : String(error),
-          { type: 'error', errorText: error instanceof Error ? error.message : String(error) }
+          { type: 'error', errorText: error instanceof Error ? error.message : String(error) },
         )
       }
       throw error
@@ -93,7 +94,7 @@ export function createProviderSyntheticTurnEventHandler(
 
 function startProviderSyntheticTurn(
   parentRun: ActiveRun,
-  event: ProviderSyntheticTurnEvent
+  event: ProviderSyntheticTurnEvent,
 ): ProviderSyntheticTurnState {
   const messageId = randomUUID()
   const assistantMessage = createAssistantMessage(messageId)
@@ -108,13 +109,13 @@ function startProviderSyntheticTurn(
     providerTargetId: parentRun.providerTargetId,
     modelId: parentRun.modelId,
     finalMessage: assistantMessage,
-    finalProjection: createFinalMessageProjectionState()
+    finalProjection: createFinalMessageProjectionState(),
   }
 }
 
 async function applyProviderSyntheticTurnChunk(
   syntheticTurn: ProviderSyntheticTurnState,
-  chunk: UIMessageChunk
+  chunk: UIMessageChunk,
 ): Promise<void> {
   if (syntheticTurn.terminalStatus) {
     return
@@ -129,7 +130,7 @@ async function applyProviderSyntheticTurnChunk(
     syntheticTurn,
     readTerminalStatus(chunk),
     chunk.type === 'error' ? chunk.errorText : null,
-    chunk
+    chunk,
   )
 }
 
@@ -137,7 +138,7 @@ async function finalizeProviderSyntheticTurn(
   syntheticTurn: ProviderSyntheticTurnState,
   status: TerminalChatMessageStatus,
   errorText: string | null,
-  terminalChunk: UIMessageChunk
+  terminalChunk: UIMessageChunk,
 ): Promise<void> {
   if (syntheticTurn.terminalStatus) {
     return
@@ -161,7 +162,7 @@ async function finalizeProviderSyntheticTurn(
     stopReason: null,
     errorText: null,
     startedAt: now,
-    finishedAt: null
+    finishedAt: null,
   } satisfies BackendRunStartedFact
   syntheticTurn.runId = run.id
   await commitSessionEvents(syntheticTurn.sessionId, [
@@ -182,10 +183,10 @@ async function finalizeProviderSyntheticTurn(
           messageJson,
           errorText: null,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         },
-        queueItemId: null
-      }
+        queueItemId: null,
+      },
     },
     {
       type: 'AssistantMessageCompleted',
@@ -197,9 +198,9 @@ async function finalizeProviderSyntheticTurn(
           messageJson,
           status,
           errorText,
-          updatedAt: now
-        }
-      }
+          updatedAt: now,
+        },
+      },
     },
     {
       type: readRunTerminalEventType(status),
@@ -211,14 +212,14 @@ async function finalizeProviderSyntheticTurn(
         status,
         stopReason: readRunStopReason(status),
         errorText,
-        finishedAt: now
-      }
-    }
+        finishedAt: now,
+      },
+    },
   ])
 }
 
 function recordProviderSyntheticTurnBindingId(
-  syntheticTurn: ProviderSyntheticTurnState
+  syntheticTurn: ProviderSyntheticTurnState,
 ): string | undefined {
   try {
     return attachBinding({
@@ -226,9 +227,10 @@ function recordProviderSyntheticTurnBindingId(
       providerTargetId: syntheticTurn.providerTargetId,
       runtimeKind: syntheticTurn.runtimeSession.runtimeKind,
       runtimeSession: syntheticTurn.runtimeSession,
-      requestedModelId: syntheticTurn.modelId
+      requestedModelId: syntheticTurn.modelId,
     })?.id
-  } catch {
+  }
+ catch {
     return undefined
   }
 }

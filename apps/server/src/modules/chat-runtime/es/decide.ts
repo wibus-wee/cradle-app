@@ -2,18 +2,17 @@ import type { ChatSessionState } from './aggregate'
 import { createInitialChatSessionState, evolveChatSessionState } from './aggregate'
 import type {
   ChatSessionEvent,
-  ChatSessionEventType,
   StoredChatSessionEvent,
-  TerminalRunEventType
+  TerminalRunEventType,
 } from './events'
 import { CHAT_SESSION_AGGREGATE_TYPE } from './events'
 
-export type ChatSessionDomainErrorCode =
-  | 'run_already_active'
-  | 'run_not_active'
-  | 'run_message_mismatch'
-  | 'queue_item_not_pending'
-  | 'rollback_run_active'
+export type ChatSessionDomainErrorCode
+  = | 'run_already_active'
+    | 'run_not_active'
+    | 'run_message_mismatch'
+    | 'queue_item_not_pending'
+    | 'rollback_run_active'
 
 export interface ChatSessionDomainError {
   code: ChatSessionDomainErrorCode
@@ -21,26 +20,26 @@ export interface ChatSessionDomainError {
   details: Record<string, unknown>
 }
 
-export type ChatSessionDecisionResult =
-  | { ok: true; events: ChatSessionEvent[] }
-  | { ok: false; error: ChatSessionDomainError }
+export type ChatSessionDecisionResult
+  = | { ok: true, events: ChatSessionEvent[] }
+    | { ok: false, error: ChatSessionDomainError }
 
-export type ChatSessionCommand =
-  | { type: 'startRun'; event: Extract<ChatSessionEvent, { type: 'RunStarted' }> }
-  | {
+export type ChatSessionCommand
+  = | { type: 'startRun', event: Extract<ChatSessionEvent, { type: 'RunStarted' }> }
+    | {
       type: 'snapshotAssistantMessage'
       event: Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }>
     }
-  | { type: 'completeRun'; event: Extract<ChatSessionEvent, { type: 'RunCompleted' }> }
-  | { type: 'failRun'; event: Extract<ChatSessionEvent, { type: 'RunFailed' }> }
-  | { type: 'abortRun'; event: Extract<ChatSessionEvent, { type: 'RunAborted' }> }
-  | { type: 'claimQueueItem'; event: Extract<ChatSessionEvent, { type: 'QueueItemClaimed' }> }
-  | { type: 'rollbackLastTurn'; event: Extract<ChatSessionEvent, { type: 'LastTurnRolledBack' }> }
-  | { type: 'recordEvent'; event: ChatSessionEvent }
+    | { type: 'completeRun', event: Extract<ChatSessionEvent, { type: 'RunCompleted' }> }
+    | { type: 'failRun', event: Extract<ChatSessionEvent, { type: 'RunFailed' }> }
+    | { type: 'abortRun', event: Extract<ChatSessionEvent, { type: 'RunAborted' }> }
+    | { type: 'claimQueueItem', event: Extract<ChatSessionEvent, { type: 'QueueItemClaimed' }> }
+    | { type: 'rollbackLastTurn', event: Extract<ChatSessionEvent, { type: 'LastTurnRolledBack' }> }
+    | { type: 'recordEvent', event: ChatSessionEvent }
 
 export function decide(
   state: ChatSessionState,
-  command: ChatSessionCommand
+  command: ChatSessionCommand,
 ): ChatSessionDecisionResult {
   switch (command.type) {
     case 'startRun':
@@ -62,7 +61,7 @@ export function decide(
 
 export function decideChatSessionEvents(
   initialState: ChatSessionState,
-  events: ChatSessionEvent[]
+  events: ChatSessionEvent[],
 ): ChatSessionDecisionResult {
   const state = cloneChatSessionState(initialState)
   const decidedEvents: ChatSessionEvent[] = []
@@ -83,26 +82,26 @@ export function decideChatSessionEvents(
 
 function decideStartRun(
   state: ChatSessionState,
-  event: Extract<ChatSessionEvent, { type: 'RunStarted' }>
+  event: Extract<ChatSessionEvent, { type: 'RunStarted' }>,
 ): ChatSessionDecisionResult {
   if (event.payload.run.origin !== 'system' && state.activeRun) {
     return domainError('run_already_active', 'Chat session already has an active run', {
       activeRunId: state.activeRun.runId,
-      runId: event.payload.run.id
+      runId: event.payload.run.id,
     })
   }
 
   if (event.payload.queueItemId) {
     const queueItem = state.queueItemById.get(event.payload.queueItemId)
-    const isStartableQueueItem =
-      queueItem?.status === 'pending' ||
-      (queueItem?.status === 'running' && queueItem.startedRunId === null)
+    const isStartableQueueItem
+      = queueItem?.status === 'pending'
+        || (queueItem?.status === 'running' && queueItem.startedRunId === null)
     if (!isStartableQueueItem) {
       return domainError('queue_item_not_pending', 'Queue item is not pending', {
         queueItemId: event.payload.queueItemId,
         status: queueItem?.status ?? 'missing',
         startedRunId: queueItem?.startedRunId ?? null,
-        runId: event.payload.run.id
+        runId: event.payload.run.id,
       })
     }
   }
@@ -112,7 +111,7 @@ function decideStartRun(
 
 function decideTerminalRun(
   state: ChatSessionState,
-  event: Extract<ChatSessionEvent, { type: TerminalRunEventType }>
+  event: Extract<ChatSessionEvent, { type: TerminalRunEventType }>,
 ): ChatSessionDecisionResult {
   if (state.runOriginById.get(event.payload.runId) === 'system') {
     return { ok: true, events: [event] }
@@ -121,7 +120,7 @@ function decideTerminalRun(
     return domainError('run_not_active', 'Terminal run event does not match the active run', {
       activeRunId: state.activeRun?.runId ?? null,
       runId: event.payload.runId,
-      eventType: event.type
+      eventType: event.type,
     })
   }
 
@@ -130,13 +129,13 @@ function decideTerminalRun(
 
 function decideAssistantMessageSnapshot(
   state: ChatSessionState,
-  event: Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }>
+  event: Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }>,
 ): ChatSessionDecisionResult {
   if (state.runStatusById.get(event.payload.runId) !== 'streaming') {
     return domainError('run_not_active', 'Snapshot event does not match an active run', {
       activeRunId: state.activeRun?.runId ?? null,
       runId: event.payload.runId,
-      eventType: event.type
+      eventType: event.type,
     })
   }
 
@@ -145,7 +144,7 @@ function decideAssistantMessageSnapshot(
     return domainError('run_message_mismatch', 'Snapshot event does not match the run message', {
       runId: event.payload.runId,
       messageId: event.payload.message.id,
-      expectedMessageId: messageId ?? null
+      expectedMessageId: messageId ?? null,
     })
   }
 
@@ -154,13 +153,13 @@ function decideAssistantMessageSnapshot(
 
 function decideClaimQueueItem(
   state: ChatSessionState,
-  event: Extract<ChatSessionEvent, { type: 'QueueItemClaimed' }>
+  event: Extract<ChatSessionEvent, { type: 'QueueItemClaimed' }>,
 ): ChatSessionDecisionResult {
   const queueItem = state.queueItemById.get(event.payload.queueItemId)
   if (queueItem?.status !== 'pending') {
     return domainError('queue_item_not_pending', 'Queue item is not pending', {
       queueItemId: event.payload.queueItemId,
-      status: queueItem?.status ?? 'missing'
+      status: queueItem?.status ?? 'missing',
     })
   }
 
@@ -169,12 +168,12 @@ function decideClaimQueueItem(
 
 function decideRollbackLastTurn(
   state: ChatSessionState,
-  event: Extract<ChatSessionEvent, { type: 'LastTurnRolledBack' }>
+  event: Extract<ChatSessionEvent, { type: 'LastTurnRolledBack' }>,
 ): ChatSessionDecisionResult {
   if (state.activeRun) {
     return domainError('rollback_run_active', 'Cannot roll back while a run is active', {
       activeRunId: state.activeRun.runId,
-      messageIds: event.payload.messageIds
+      messageIds: event.payload.messageIds,
     })
   }
 
@@ -204,7 +203,7 @@ function commandForEvent(event: ChatSessionEvent): ChatSessionCommand {
 
 function syntheticStoredEvent(
   state: ChatSessionState,
-  event: ChatSessionEvent
+  event: ChatSessionEvent,
 ): StoredChatSessionEvent {
   return {
     sequenceId: state.version + 1,
@@ -214,7 +213,7 @@ function syntheticStoredEvent(
     type: event.type,
     payload: event.payload,
     subjectRunId: readSyntheticSubjectRunId(event),
-    occurredAt: 0
+    occurredAt: 0,
   } as StoredChatSessionEvent
 }
 
@@ -233,10 +232,6 @@ function readSyntheticSubjectRunId(event: ChatSessionEvent): string | null {
   }
 }
 
-function isTerminalRunEventType(eventType: ChatSessionEventType): eventType is TerminalRunEventType {
-  return eventType === 'RunCompleted' || eventType === 'RunFailed' || eventType === 'RunAborted'
-}
-
 function cloneChatSessionState(state: ChatSessionState): ChatSessionState {
   return {
     aggregateId: state.aggregateId,
@@ -245,25 +240,25 @@ function cloneChatSessionState(state: ChatSessionState): ChatSessionState {
     messageStatusById: new Map(state.messageStatusById),
     assistantMessageById: new Map(state.assistantMessageById),
     queueItemById: new Map(
-      [...state.queueItemById].map(([queueItemId, queueItem]) => [
+      Array.from(state.queueItemById, ([queueItemId, queueItem]) => [
         queueItemId,
-        { ...queueItem }
-      ])
+        { ...queueItem },
+      ]),
     ),
     runOriginById: new Map(state.runOriginById),
     runMessageIdById: new Map(state.runMessageIdById),
-    runStatusById: new Map(state.runStatusById)
+    runStatusById: new Map(state.runStatusById),
   }
 }
 
 function domainError(
   code: ChatSessionDomainErrorCode,
   message: string,
-  details: Record<string, unknown>
+  details: Record<string, unknown>,
 ): ChatSessionDecisionResult {
   return {
     ok: false,
-    error: { code, message, details }
+    error: { code, message, details },
   }
 }
 

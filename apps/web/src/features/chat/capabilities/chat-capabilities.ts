@@ -72,10 +72,10 @@ export type ChatRuntimeUiSlotIconKey
     | 'tool-activity'
     | 'usage'
 
-export type ChatRuntimeUiSlotCommandAction =
-  | { kind: 'insertText' }
-  | { kind: 'submitText'; requiresEmptyComposer?: boolean }
-  | { kind: 'uiAction'; actionId: string }
+export type ChatRuntimeUiSlotCommandAction
+  = | { kind: 'insertText' }
+    | { kind: 'submitText', requiresEmptyComposer?: boolean }
+    | { kind: 'uiAction', actionId: string }
 
 export interface ChatRuntimeUiSlot {
   id: string

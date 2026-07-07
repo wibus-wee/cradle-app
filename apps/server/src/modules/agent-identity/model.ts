@@ -28,23 +28,6 @@ const importAppEnum = t.Union([
   t.Literal('kimi'),
 ])
 
-interface AgentIdentityRecord {
-  id: string
-  name: string
-  description: string | null
-  avatarUrl: string | null
-  avatarStyle: string
-  avatarSeed: string
-  providerTargetId: string | null
-  modelId: string | null
-  thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh'
-  runtimeKind: string
-  configJson: string
-  enabled: boolean
-  createdAt: number
-  updatedAt: number
-}
-
 const nullableString = t.Union([t.String(), t.Null()])
 
 const agentRecord = t.Object({

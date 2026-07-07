@@ -10,11 +10,11 @@ import { loadChatRuntime } from './runtime-loader'
 const EVENT_STREAM_HEADERS = {
   'content-type': 'text/event-stream',
   'cache-control': 'no-cache',
-  connection: 'keep-alive'
+  'connection': 'keep-alive',
 } as const
 
 export const chatRuntimeInteractionRoutes = new Elysia({
-  detail: { tags: ['chat-runtime'] }
+  detail: { tags: ['chat-runtime'] },
 })
   // POST /chat/sessions/:sessionId/bang-command -> execute a user-entered command through the session runtime and persist transcript context
   .post(
@@ -25,17 +25,17 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       ).executeBangCommand({
         sessionId: params.sessionId,
         command: body.command,
-        signal: request.signal
+        signal: request.signal,
       })
     },
     {
       detail: {
-        summary: 'Execute a user-entered shell command and persist the output as chat context'
+        summary: 'Execute a user-entered shell command and persist the output as chat context',
       },
       params: ChatRuntimeModel.sessionIdParams,
       body: ChatRuntimeModel.bangCommandBody,
-      response: { 200: ChatRuntimeModel.bangCommandResponse }
-    }
+      response: { 200: ChatRuntimeModel.bangCommandResponse },
+    },
   )
   // POST /chat/sessions/:sessionId/side-chat -> fork a live-only provider side conversation from the current chat session
   .post(
@@ -46,17 +46,17 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       ).createSideChat({
         parentSessionId: params.sessionId,
         providerTargetId: body.providerTargetId?.trim() || undefined,
-        modelId: readOptionalModelId(body.modelId)
+        modelId: readOptionalModelId(body.modelId),
       })
     },
     {
       detail: {
-        summary: 'Create a live-only side conversation from the current session'
+        summary: 'Create a live-only side conversation from the current session',
       },
       params: ChatRuntimeModel.sessionIdParams,
       body: ChatRuntimeModel.sideChatBody,
-      response: { 200: ChatRuntimeModel.sideChatResponse }
-    }
+      response: { 200: ChatRuntimeModel.sideChatResponse },
+    },
   )
   // POST /chat/sessions/:sessionId/quick-question -> stream a stateless quick question (no tools, not persisted)
   .post(
@@ -66,10 +66,10 @@ export const chatRuntimeInteractionRoutes = new Elysia({
         await loadChatRuntime()
       ).streamQuickQuestion({
         sessionId: params.sessionId,
-        question: body.question
+        question: body.question,
       })
       return new Response(stream, {
-        headers: EVENT_STREAM_HEADERS
+        headers: EVENT_STREAM_HEADERS,
       })
     },
     {
@@ -80,15 +80,15 @@ export const chatRuntimeInteractionRoutes = new Elysia({
             description: 'Server-sent event stream with AI SDK UIMessageChunk JSON frames',
             content: {
               'text/event-stream': {
-                schema: { type: 'string' }
-              }
-            }
-          }
-        }
+                schema: { type: 'string' },
+              },
+            },
+          },
+        },
       },
       params: ChatRuntimeModel.sessionIdParams,
-      body: ChatRuntimeModel.quickQuestionBody
-    }
+      body: ChatRuntimeModel.quickQuestionBody,
+    },
   )
   // POST /chat/sessions/:sessionId/user-input/:requestId -> resolve a provider pending user input request
   .post(
@@ -97,17 +97,17 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       return await submitChatRuntimeUserInput({
         sessionId: params.sessionId,
         requestId: params.requestId,
-        answers: body.answers
+        answers: body.answers,
       })
     },
     {
       detail: {
-        summary: 'Submit answers for a pending runtime user input request'
+        summary: 'Submit answers for a pending runtime user input request',
       },
       params: ChatRuntimeModel.userInputParams,
       body: ChatRuntimeModel.userInputBody,
-      response: { 200: ChatRuntimeModel.userInputResponse }
-    }
+      response: { 200: ChatRuntimeModel.userInputResponse },
+    },
   )
   // POST /chat/sessions/:sessionId/tool-approval/:requestId -> resolve a provider pending tool approval request
   .post(
@@ -117,17 +117,17 @@ export const chatRuntimeInteractionRoutes = new Elysia({
         sessionId: params.sessionId,
         requestId: params.requestId,
         approved: body.approved,
-        reason: body.reason
+        reason: body.reason,
       })
     },
     {
       detail: {
-        summary: 'Submit a decision for a pending runtime tool approval request'
+        summary: 'Submit a decision for a pending runtime tool approval request',
       },
       params: ChatRuntimeModel.toolApprovalParams,
       body: ChatRuntimeModel.toolApprovalBody,
-      response: { 200: ChatRuntimeModel.toolApprovalResponse }
-    }
+      response: { 200: ChatRuntimeModel.toolApprovalResponse },
+    },
   )
   // DELETE /chat/side-conversations/:sideConversationId -> release a live side conversation
   .delete(
@@ -138,11 +138,11 @@ export const chatRuntimeInteractionRoutes = new Elysia({
     },
     {
       detail: {
-        summary: 'Release a live-only side conversation'
+        summary: 'Release a live-only side conversation',
       },
       params: ChatRuntimeModel.sideConversationParams,
-      response: { 200: ChatRuntimeModel.cancelResponse }
-    }
+      response: { 200: ChatRuntimeModel.cancelResponse },
+    },
   )
   // POST /chat/sessions/:sessionId/messages/:messageId/plan-implementation-approval -> resolve a synthetic provider plan implementation approval
   .post(
@@ -152,15 +152,15 @@ export const chatRuntimeInteractionRoutes = new Elysia({
         sessionId: params.sessionId,
         messageId: params.messageId,
         approvalId: body.approvalId,
-        approved: body.approved
+        approved: body.approved,
       })
     },
     {
       detail: {
-        summary: 'Resolve a synthetic provider plan implementation approval'
+        summary: 'Resolve a synthetic provider plan implementation approval',
       },
       params: ChatRuntimeModel.planImplementationApprovalParams,
       body: ChatRuntimeModel.planImplementationApprovalBody,
-      response: { 200: ChatRuntimeModel.planImplementationApprovalResponse }
-    }
+      response: { 200: ChatRuntimeModel.planImplementationApprovalResponse },
+    },
   )

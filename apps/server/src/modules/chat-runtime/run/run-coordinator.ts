@@ -8,40 +8,41 @@ import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
 import { resolveSessionSystemPrompt, resolveTurnContext } from '../context/turn-context'
 import type { ChatContextPart } from '../context-parts'
 import { cancelQueuedSessionItem } from '../es/commands'
+import type { ChatSessionQueueMode } from '../queue/session-queue'
+import type { ActiveRun, PendingRunState } from '../run-registry'
+import { runRegistry } from '../run-registry'
 import type {
   ChatRuntimeSettingsPatch,
-  ChatThinkingEffort
+  ChatThinkingEffort,
 } from '../runtime-provider-types'
-import {
-  mergeRuntimeSettings,
-  normalizeRuntimeSettingsPatch,
-  readSessionRuntimeSettings
-} from '../runtime-settings'
-import type { ChatSessionQueueMode } from '../queue/session-queue'
-import { cancelPendingRuntimeGoalContinuation } from './runtime-goal-continuation'
-import {
-  createFinalMessageProjectionState
-} from './final-message-projection'
-import { runRegistry, type ActiveRun, type PendingRunState } from '../run-registry'
 import {
   assertRuntimeCompatibleTarget,
   attachBinding,
   getSessionRunContext,
   readSessionRequestedModelId,
   readSessionRequestedThinkingEffort,
-  resolveRuntimeSessionForContext
+  resolveRuntimeSessionForContext,
 } from '../runtime-session-context'
 import {
+  mergeRuntimeSettings,
+  normalizeRuntimeSettingsPatch,
+  readSessionRuntimeSettings,
+} from '../runtime-settings'
+import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
+import {
   createAssistantMessage,
-  createUserMessage
+  createUserMessage,
 } from '../ui-message'
+import {
+  createFinalMessageProjectionState,
+} from './final-message-projection'
+import { cancelPendingRuntimeGoalContinuation } from './runtime-goal-continuation'
 import {
   createDraftTurn,
   createDraftTurnFromUserMessage,
-  startRun
+  startRun,
 } from './turn-draft'
 import type { ExecuteRunInput } from './turn-executor'
-import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
 
 export interface CreateRunInput {
   sessionId: string
@@ -65,31 +66,31 @@ export interface CreateRunResult {
 }
 
 export interface RunCoordinatorDeps {
-  finalizeInterruptedPersistedStreamingSessionIfIdle(sessionId: string): Promise<void>
-  startActiveRunSnapshot(
+  finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
+  startActiveRunSnapshot: (
     activeRun: ActiveRun,
-    input: { workspaceId?: string | null; agentId?: string | null }
-  ): void
-  startSnapshotTimer(activeRun: ActiveRun): void
-  scheduleQueueDrain(sessionId: string): void
-  executeRun(activeRun: ActiveRun, input: ExecuteRunInput): void
-  warn(message: string, payload: Record<string, unknown>): void
+    input: { workspaceId?: string | null, agentId?: string | null },
+  ) => void
+  startSnapshotTimer: (activeRun: ActiveRun) => void
+  scheduleQueueDrain: (sessionId: string) => void
+  executeRun: (activeRun: ActiveRun, input: ExecuteRunInput) => void
+  warn: (message: string, payload: Record<string, unknown>) => void
 }
 
 export async function createRun(
   input: CreateRunInput,
-  deps: RunCoordinatorDeps
+  deps: RunCoordinatorDeps,
 ): Promise<CreateRunResult> {
   await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(input.sessionId)
   if (
-    runRegistry.hasActiveRunForSession(input.sessionId) ||
-    runRegistry.hasPendingRun(input.sessionId)
+    runRegistry.hasActiveRunForSession(input.sessionId)
+    || runRegistry.hasPendingRun(input.sessionId)
   ) {
     throw new AppError({
       code: 'chat_run_in_progress',
       status: 409,
       message: 'Chat session already has an active run',
-      details: { sessionId: input.sessionId }
+      details: { sessionId: input.sessionId },
     })
   }
   if (input.internalContinuation !== 'runtimeGoal') {
@@ -105,17 +106,17 @@ export async function createRun(
     const requestMessages = input.messages
     const lastRequestMessage = requestMessages?.at(-1)
     if (
-      !input.internalContinuation &&
-      !requestMessages &&
-      !userText.trim() &&
-      files.length === 0 &&
-      contextParts.length === 0
+      !input.internalContinuation
+      && !requestMessages
+      && !userText.trim()
+      && files.length === 0
+      && contextParts.length === 0
     ) {
       throw new AppError({
         code: 'chat_message_empty',
         status: 400,
         message: 'Chat message requires text or at least one file attachment',
-        details: { sessionId: input.sessionId }
+        details: { sessionId: input.sessionId },
       })
     }
     if (requestMessages && !lastRequestMessage) {
@@ -123,13 +124,13 @@ export async function createRun(
         code: 'chat_message_empty',
         status: 400,
         message: 'Chat message history cannot be empty',
-        details: { sessionId: input.sessionId }
+        details: { sessionId: input.sessionId },
       })
     }
     if (
-      lastRequestMessage &&
-      lastRequestMessage.role !== 'user' &&
-      lastRequestMessage.role !== 'assistant'
+      lastRequestMessage
+      && lastRequestMessage.role !== 'user'
+      && lastRequestMessage.role !== 'assistant'
     ) {
       throw new AppError({
         code: 'chat_message_invalid',
@@ -137,21 +138,21 @@ export async function createRun(
         message: 'Chat message history must end with a user or assistant message',
         details: {
           sessionId: input.sessionId,
-          role: lastRequestMessage.role
-        }
+          role: lastRequestMessage.role,
+        },
       })
     }
 
     const requestedProviderTargetId = input.providerTargetId
     const context = getSessionRunContext(input.sessionId, {
-      providerTargetId: requestedProviderTargetId
+      providerTargetId: requestedProviderTargetId,
     })
     if (!context) {
       throw new AppError({
         code: 'chat_session_not_found',
         status: 404,
         message: 'Chat session not found',
-        details: { sessionId: input.sessionId }
+        details: { sessionId: input.sessionId },
       })
     }
     assertRuntimeCompatibleTarget(context, requestedProviderTargetId)
@@ -161,8 +162,8 @@ export async function createRun(
         status: 409,
         message: 'Provider target is disabled',
         details: {
-          providerTargetId: context.providerTarget?.id ?? null
-        }
+          providerTargetId: context.providerTarget?.id ?? null,
+        },
       })
     }
 
@@ -173,7 +174,7 @@ export async function createRun(
       throw new AppError({
         code: 'chat_runtime_not_available',
         status: 501,
-        message: `Runtime is not available: ${runtimeKind}`
+        message: `Runtime is not available: ${runtimeKind}`,
       })
     }
     const runtimeRequestMessages = requestMessages
@@ -181,50 +182,50 @@ export async function createRun(
     const sessionRuntimeSettings = readSessionRuntimeSettings(context.session.configJson)
     const runtimeSettings = mergeRuntimeSettings(
       sessionRuntimeSettings,
-      normalizeRuntimeSettingsPatch(input.runtimeSettings)
+      normalizeRuntimeSettingsPatch(input.runtimeSettings),
     )
-    const requestedModelId =
-      input.modelId !== undefined
+    const requestedModelId
+      = input.modelId !== undefined
         ? input.modelId
         : readSessionRequestedModelId({
             session: context.session,
-            requestedProviderTargetId
+            requestedProviderTargetId,
           })
-    const requestedThinkingEffort =
-      input.thinkingEffort ??
-      readSessionRequestedThinkingEffort({
+    const requestedThinkingEffort
+      = input.thinkingEffort
+        ?? readSessionRequestedThinkingEffort({
         session: context.session,
-        requestedProviderTargetId
+        requestedProviderTargetId,
       })
 
-    const runtimeGoalContinuation =
-      input.internalContinuation === 'runtimeGoal' ? runtime.goalContinuation : undefined
+    const runtimeGoalContinuation
+      = input.internalContinuation === 'runtimeGoal' ? runtime.goalContinuation : undefined
     if (input.internalContinuation === 'runtimeGoal' && !runtimeGoalContinuation) {
       throw new AppError({
         code: 'chat_runtime_goal_continuation_not_supported',
         status: 501,
         message: 'Runtime does not support goal continuation',
-        details: { sessionId: input.sessionId, runtimeKind }
+        details: { sessionId: input.sessionId, runtimeKind },
       })
     }
 
-    const draft =
-      input.internalContinuation === 'runtimeGoal'
+    const draft
+      = input.internalContinuation === 'runtimeGoal'
         ? {
             userMessageId: '',
             assistantMessageId: randomUUID(),
             userMessage: runtimeGoalContinuation!.annotateContinuationMessage({
               message: createUserMessage(
                 randomUUID(),
-                runtimeGoalContinuation!.continuationPrompt
-              )
-            })
+                runtimeGoalContinuation!.continuationPrompt,
+              ),
+            }),
           }
         : lastRequestMessage?.role === 'assistant'
           ? {
               userMessageId: '',
               assistantMessageId: lastRequestMessage.id,
-              userMessage: lastRequestMessage
+              userMessage: lastRequestMessage,
             }
           : lastRequestMessage?.role === 'user'
             ? await createDraftTurnFromUserMessage({
@@ -232,7 +233,7 @@ export async function createRun(
                 userMessage: lastRequestMessage,
                 continuation: input.continuationMode
                   ? { mode: input.continuationMode, queueItemId: input.queueItemId }
-                  : undefined
+                  : undefined,
               })
             : await createDraftTurn({
                 sessionId: input.sessionId,
@@ -242,7 +243,7 @@ export async function createRun(
                 goalContinuation: runtime.goalContinuation,
                 continuation: input.continuationMode
                   ? { mode: input.continuationMode, queueItemId: input.queueItemId }
-                  : undefined
+                  : undefined,
               })
 
     const runtimeResolution = await resolveRuntimeSessionForContext({
@@ -251,7 +252,7 @@ export async function createRun(
       runtimeKind,
       runtime,
       modelId: requestedModelId,
-      requestedProviderTargetId
+      requestedProviderTargetId,
     })
     const runtimeSession = runtimeResolution.runtimeSession
 
@@ -261,18 +262,19 @@ export async function createRun(
       }
       try {
         await runtime.cancelTurn({ runtimeSession, profile: context.profile })
-      } catch (error) {
+      }
+ catch (error) {
         deps.warn('runtime turn cancellation failed before chat run was created', {
           error,
           sessionId: input.sessionId,
-          queueItemId: input.queueItemId
+          queueItemId: input.queueItemId,
         })
       }
       throw new AppError({
         code: 'chat_run_cancelled',
         status: 409,
         message: 'Chat run was cancelled before it started',
-        details: { sessionId: input.sessionId, queueItemId: input.queueItemId }
+        details: { sessionId: input.sessionId, queueItemId: input.queueItemId },
       })
     }
 
@@ -281,7 +283,7 @@ export async function createRun(
       providerTargetId: context.providerTarget?.id ?? null,
       runtimeKind: runtimeSession.runtimeKind,
       runtimeSession,
-      requestedModelId: runtimeResolution.requestedModelId
+      requestedModelId: runtimeResolution.requestedModelId,
     })
 
     const run = await startRun({
@@ -292,7 +294,7 @@ export async function createRun(
         lastRequestMessage?.role === 'assistant'
           ? lastRequestMessage
           : createAssistantMessage(draft.assistantMessageId),
-      queueItemId: input.queueItemId ?? null
+      queueItemId: input.queueItemId ?? null,
     })
     const activeRun: ActiveRun = {
       runId: run.id,
@@ -325,12 +327,12 @@ export async function createRun(
       runSnapshotSeq: 0,
       snapshotEventIdByCoalesceKey: new Map(),
       runSnapshotTruncatedEventId: null,
-      runSnapshotDroppedEventCount: 0
+      runSnapshotDroppedEventCount: 0,
     }
     runRegistry.setActiveRun(run.id, activeRun)
     deps.startActiveRunSnapshot(activeRun, {
       workspaceId: context.session.workspaceId,
-      agentId: context.session.agentId
+      agentId: context.session.agentId,
     })
     deps.startSnapshotTimer(activeRun)
     runRegistry.setActiveRunIdForSession(input.sessionId, run.id)
@@ -346,8 +348,8 @@ export async function createRun(
           providerTargetId: activeRun.providerTargetId,
           modelId: activeRun.modelId,
           queueItemId: activeRun.queueItemId ?? null,
-          runtimeSettings: activeRun.runtimeSettings
-        }
+          runtimeSettings: activeRun.runtimeSettings,
+        },
       })
     }
     runRegistry.deletePendingRun(input.sessionId)
@@ -355,12 +357,12 @@ export async function createRun(
     const turnContext = requestMessages
       ? {
           systemPrompt: resolveSessionSystemPrompt(context.session),
-          history: requestMessages.slice(0, -1)
+          history: requestMessages.slice(0, -1),
         }
       : resolveTurnContext({
           sessionId: input.sessionId,
           draftMessageId: draft.assistantMessageId,
-          draftUserMessageId: draft.userMessageId
+          draftUserMessageId: draft.userMessageId,
         })
 
     deps.executeRun(activeRun, {
@@ -378,22 +380,23 @@ export async function createRun(
       originalMessages: runtimeRequestMessages,
       workspaceId: context.session.workspaceId,
       workspacePath: context.workspacePath,
-      agentId: context.session.agentId
+      agentId: context.session.agentId,
     })
 
     return {
       runId: run.id,
       assistantMessageId: draft.assistantMessageId,
-      userMessageId: draft.userMessageId
+      userMessageId: draft.userMessageId,
     }
-  } catch (error) {
+  }
+ catch (error) {
     const pending = runRegistry.getPendingRun(input.sessionId)
     runRegistry.deletePendingRun(input.sessionId)
     const cancelledClaimedQueueItem = Boolean(
-      input.queueItemId &&
-        pending?.cancelled &&
-        error instanceof AppError &&
-        error.code === 'chat_run_cancelled'
+      input.queueItemId
+      && pending?.cancelled
+      && error instanceof AppError
+      && error.code === 'chat_run_cancelled',
     )
     if (!cancelledClaimedQueueItem) {
       deps.scheduleQueueDrain(input.sessionId)

@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
 import { Dashboard2Line as GaugeIcon } from '@mingcute/react'
+import { useQuery } from '@tanstack/react-query'
 import { m } from 'motion/react'
 
 import { cn } from '~/lib/cn'
@@ -96,8 +96,7 @@ export function ContextWindowViewer({
               <ContextWindowSummary aggregate={aggregate} />
               {sections.length > 0
                 ? <ContextSectionList sections={sections} totalTokens={aggregate.totalTokens} />
-                : <ContextAggregateFallback compactState={compactState ?? null} />
-              }
+                : <ContextAggregateFallback compactState={compactState ?? null} />}
             </>
           )
           : (
@@ -174,7 +173,8 @@ function ContextSectionList({
               {formatTokenCount(section.tokenCount)}
             </span>
             <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-(--color-neutral-6)">
-              {percent}%
+              {percent}
+%
             </span>
           </div>
         )
