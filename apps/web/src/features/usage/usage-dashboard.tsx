@@ -89,7 +89,7 @@ export function UsageDashboard() {
             <SecondaryStats summary={summary} stats={stats} />
 
             <div className="mt-10">
-              <UsageTrendChart daily={daily} dailyCost={dailyCost} range={range} hasCost={hasCost} />
+              <UsageTrendChart daily={daily} dailyCost={dailyCost} dailyByModel={dailyByModel} range={range} hasCost={hasCost} />
             </div>
 
             <div className="mt-12 space-y-8 border-t border-foreground/8 pt-10">

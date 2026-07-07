@@ -2,6 +2,7 @@
 // real from the daily series (every usage row already carries a date, so the
 // weekday split needs no new backend work). The hour-of-day chart is MOCK —
 // see usage-mock-data.ts for exactly which backend endpoint would replace it.
+import type { TFunction } from 'i18next'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bar, BarChart, Cell, XAxis } from 'recharts'
@@ -15,7 +16,7 @@ import { formatPercentFromRatio, formatTokenCount } from '~/lib/number-format'
 import type { ModelTokenShare } from './usage-insights'
 import { modelBreakdownByWeekday, weekdayBreakdown, weekdayLabel } from './usage-insights'
 import { mockHourOfDayDistribution } from './usage-mock-data'
-import { ModelShareRows } from './usage-model-tooltip'
+import { ModelShareRows, TOOLTIP_CARD_CLASS } from './usage-model-tooltip'
 import type { DailyUsage, DailyUsageByModel, UsageSummary } from './use-usage-overview'
 
 interface UsagePatternsProps {
@@ -69,7 +70,7 @@ export function UsagePatterns({ daily, dailyByModel, summary }: UsagePatternsPro
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{t('patterns.description')}</p>
 
-      <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 items-start gap-6 sm:grid-cols-2">
         <div>
           <p className="text-[11px] font-medium text-muted-foreground">{t('patterns.byWeekday')}</p>
           <ChartContainer config={WEEKDAY_CHART_CONFIG} className="mt-2 aspect-auto h-[140px] w-full">
@@ -77,7 +78,9 @@ export function UsagePatterns({ daily, dailyByModel, summary }: UsagePatternsPro
               <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.55 }} />
               <ChartTooltip
                 cursor={{ fill: 'currentColor', fillOpacity: 0.04 }}
-                content={({ active, payload }) => renderWeekdayTooltip(active, payload, modelSharesByWeekday)}
+                allowEscapeViewBox={{ x: true, y: true }}
+                wrapperStyle={{ zIndex: 50 }}
+                content={({ active, payload }) => renderWeekdayTooltip(active, payload, modelSharesByWeekday, t)}
               />
               <Bar dataKey="tokens" radius={[3, 3, 0, 0]} maxBarSize={28}>
                 {weekdayData.map(entry => (
@@ -115,6 +118,8 @@ export function UsagePatterns({ daily, dailyByModel, summary }: UsagePatternsPro
               />
               <ChartTooltip
                 cursor={{ fill: 'currentColor', fillOpacity: 0.04 }}
+                allowEscapeViewBox={{ x: true, y: true }}
+                wrapperStyle={{ zIndex: 50 }}
                 content={({ active, payload }) => renderPatternTooltip(active, payload)}
               />
               <Bar dataKey="tokens" radius={[3, 3, 0, 0]} maxBarSize={10}>
@@ -150,9 +155,14 @@ function renderPatternTooltip(active: boolean | undefined, payload: ReadonlyArra
     return null
   }
   const tokens = typeof payload[0].value === 'number' ? payload[0].value : Number(payload[0].value ?? 0)
+  const label = payload[0].payload?.label ?? ''
+  const hourLabel = label ? `${label.padStart(2, '0')}:00` : ''
   return (
-    <div className="rounded-md border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
-      <p className="tabular-nums font-medium text-foreground">{formatTokenCount(tokens)}</p>
+    <div className={cn(TOOLTIP_CARD_CLASS, 'min-w-40')}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-medium text-foreground">{hourLabel}</p>
+        <p className="tabular-nums text-[11px] text-muted-foreground">{formatTokenCount(tokens)}</p>
+      </div>
     </div>
   )
 }
@@ -163,16 +173,21 @@ function renderWeekdayTooltip(
   active: boolean | undefined,
   payload: ReadonlyArray<{ value?: unknown, payload?: { weekdayIndex: number } }> | undefined,
   modelSharesByWeekday: Map<number, ModelTokenShare[]>,
+  t: TFunction<'usage'>,
 ) {
   if (!active || !payload?.[0]) {
     return null
   }
   const tokens = typeof payload[0].value === 'number' ? payload[0].value : Number(payload[0].value ?? 0)
   const weekdayIndex = payload[0].payload?.weekdayIndex
+  const weekdayName = weekdayIndex !== undefined ? t(`patterns.weekdayFull.${weekdayLabel(weekdayIndex)}`) : ''
   const shares = weekdayIndex !== undefined ? modelSharesByWeekday.get(weekdayIndex) ?? [] : []
   return (
-    <div className="rounded-md border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
-      <p className="tabular-nums font-medium text-foreground">{formatTokenCount(tokens)}</p>
+    <div className={cn(TOOLTIP_CARD_CLASS, 'min-w-52')}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-medium text-foreground">{weekdayName}</p>
+        <p className="tabular-nums text-[11px] text-muted-foreground">{formatTokenCount(tokens)}</p>
+      </div>
       <ModelShareRows shares={shares} tone="default" />
     </div>
   )
