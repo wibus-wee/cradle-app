@@ -3,6 +3,8 @@ import { createContext, memo, useCallback, useContext, useEffect, useRef, useSta
 import type { Highlighter } from 'shiki'
 import { createHighlighter } from 'shiki'
 
+import { MermaidDiagram } from './mermaid-diagram'
+
 // Context to detect block vs inline code
 const PreContext = createContext(false)
 
@@ -214,6 +216,10 @@ export const HighlightedCode = memo<HighlightedCodeProps>(({ children, className
   const rawLang = langMatch?.[1]
   const lang = normalizeLang(rawLang)
   const code = extractText(children)
+
+  if (lang === 'mermaid') {
+    return <MermaidDiagram code={code.replace(TRAILING_NEWLINE_RE, '')} />
+  }
 
   return <FencedCodeBlock code={code} language={lang} className={className} />
 })

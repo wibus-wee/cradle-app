@@ -21,6 +21,7 @@ export {
   MarkdownLink,
   resolveExternalMarkdownHref,
 } from './components/markdown-link'
+export { MermaidDiagram } from './components/mermaid-diagram'
 export { StreamingErrorBoundary } from './components/streaming-error-boundary'
 
 // Context
@@ -48,6 +49,7 @@ export { PRESETS } from './presets/types'
 
 // Utilities
 export { findOpenFenceLanguage, shouldBypassSmoother } from './core/fence-state'
+export { createCoreRehypePlugins, markdownHtmlSchema } from './plugins/markdown-html'
 export { patchIncomplete } from './plugins/remark-incomplete'
 
 // Types
