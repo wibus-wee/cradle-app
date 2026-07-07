@@ -20,16 +20,16 @@ export const WINDOWS_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = 
   side: 'right',
   x: 0,
   y: 0,
-  width: 140,
-  height: 36
+  width: 130,
+  height: 50
 }
 
 export const LINUX_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
   side: 'right',
   x: 0,
   y: 0,
-  width: 100,
-  height: 44
+  width: 90,
+  height: 50
 }
 
 export function resolveWindowControlsSafeArea(
