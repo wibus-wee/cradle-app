@@ -12,24 +12,36 @@ export const MACOS_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
   side: 'left',
   x: 16,
   y: 18,
-  width: 68,
+  width: 70,
   height: 44
 }
 
-export const NON_MACOS_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
+export const WINDOWS_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
   side: 'right',
   x: 0,
   y: 0,
-  width: 138,
+  width: 140,
   height: 36
+}
+
+export const LINUX_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
+  side: 'right',
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 44
 }
 
 export function resolveWindowControlsSafeArea(
   platform: NodeJS.Platform
 ): DesktopWindowControlsSafeArea {
-  return platform === 'darwin'
-    ? MACOS_WINDOW_CONTROLS_SAFE_AREA
-    : NON_MACOS_WINDOW_CONTROLS_SAFE_AREA
+  if (platform === 'darwin') {
+    return MACOS_WINDOW_CONTROLS_SAFE_AREA
+  }
+  if (platform === 'win32') {
+    return WINDOWS_WINDOW_CONTROLS_SAFE_AREA
+  }
+  return LINUX_WINDOW_CONTROLS_SAFE_AREA
 }
 
 export function resolveTrafficLightPosition(safeArea = MACOS_WINDOW_CONTROLS_SAFE_AREA): {
