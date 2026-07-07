@@ -16,6 +16,14 @@ export const UsageModel = {
     count: t.Number(),
   }),
 
+  hourlyUsage: t.Object({
+    hour: t.Number(),
+    promptTokens: t.Number(),
+    completionTokens: t.Number(),
+    totalTokens: t.Number(),
+    count: t.Number(),
+  }),
+
   usageSummary: t.Object({
     totalPromptTokens: t.Number(),
     totalCompletionTokens: t.Number(),
@@ -59,8 +67,28 @@ export const UsageModel = {
     count: t.Number(),
   }),
 
+  recentSession: t.Object({
+    sessionId: t.String(),
+    title: t.String(),
+    agentId: t.Nullable(t.String()),
+    agentName: t.Nullable(t.String()),
+    modelId: t.String(),
+    costUsd: t.Number(),
+    promptTokens: t.Number(),
+    completionTokens: t.Number(),
+    totalTokens: t.Number(),
+    turnCount: t.Number(),
+    createdAt: t.Number(),
+    updatedAt: t.Number(),
+    lastUsageAt: t.Number(),
+  }),
+
   dailyQuery: t.Object({
     days: t.Optional(t.Numeric({ minimum: 1 })),
+  }),
+
+  recentSessionsQuery: t.Object({
+    limit: t.Optional(t.Numeric({ minimum: 1, maximum: 20 })),
   }),
 
   sessionParams: t.Object({

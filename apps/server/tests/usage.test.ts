@@ -46,6 +46,13 @@ describe('usage capability', () => {
       const agentTwoId = randomUUID()
       const sessionOneId = randomUUID()
       const sessionTwoId = randomUUID()
+      const sessionOneCreatedAt = unixDaysAgo(3)
+      const sessionOneUpdatedAt = unixDaysAgo(1)
+      const sessionTwoCreatedAt = unixDaysAgo(1)
+      const sessionTwoUpdatedAt = unixDaysAgo(0)
+      const sessionOneFirstUsageAt = unixDaysAgo(2)
+      const sessionOneLatestUsageAt = unixDaysAgo(1)
+      const sessionTwoLatestUsageAt = unixDaysAgo(0)
 
       d.insert(workspaces).values({
         id: workspaceId,
@@ -61,8 +68,24 @@ describe('usage capability', () => {
         { id: agentTwoId, name: 'Agent Two', avatarSeed: 'agent-two', providerTargetId: providerTargetTwoId },
       ]).run()
       d.insert(sessions).values([
-        { id: sessionOneId, workspaceId, title: 'Session One', providerTargetId: providerTargetOneId, agentId: agentOneId },
-        { id: sessionTwoId, workspaceId, title: 'Session Two', providerTargetId: providerTargetTwoId, agentId: agentTwoId },
+        {
+          id: sessionOneId,
+          workspaceId,
+          title: 'Session One',
+          providerTargetId: providerTargetOneId,
+          agentId: agentOneId,
+          createdAt: sessionOneCreatedAt,
+          updatedAt: sessionOneUpdatedAt,
+        },
+        {
+          id: sessionTwoId,
+          workspaceId,
+          title: 'Session Two',
+          providerTargetId: providerTargetTwoId,
+          agentId: agentTwoId,
+          createdAt: sessionTwoCreatedAt,
+          updatedAt: sessionTwoUpdatedAt,
+        },
       ]).run()
       d.insert(usageLogs).values([
         {
@@ -74,7 +97,7 @@ describe('usage capability', () => {
           promptTokens: 10,
           completionTokens: 5,
           totalTokens: 15,
-          createdAt: unixDaysAgo(2),
+          createdAt: sessionOneFirstUsageAt,
         },
         {
           id: randomUUID(),
@@ -85,7 +108,7 @@ describe('usage capability', () => {
           promptTokens: 20,
           completionTokens: 10,
           totalTokens: 30,
-          createdAt: unixDaysAgo(1),
+          createdAt: sessionOneLatestUsageAt,
         },
         {
           id: randomUUID(),
@@ -96,7 +119,7 @@ describe('usage capability', () => {
           promptTokens: 8,
           completionTokens: 7,
           totalTokens: 15,
-          createdAt: unixDaysAgo(0),
+          createdAt: sessionTwoLatestUsageAt,
         },
       ]).run()
 
@@ -115,6 +138,25 @@ describe('usage capability', () => {
         { date: isoDaysAgo(1), modelId: 'gpt-4o', totalTokens: 30, count: 1 },
         { date: isoDaysAgo(0), modelId: 'gpt-4o-mini', totalTokens: 15, count: 1 },
       ])
+
+      const hourlyRes = await app.handle(new Request('http://localhost/usage/patterns/hourly'))
+      expect(hourlyRes.status).toBe(200)
+      const hourly = await hourlyRes.json() as Array<{
+        hour: number
+        promptTokens: number
+        completionTokens: number
+        totalTokens: number
+        count: number
+      }>
+      expect(hourly).toHaveLength(24)
+      expect(hourly.find(bucket => bucket.hour === 12)).toEqual({
+        hour: 12,
+        promptTokens: 38,
+        completionTokens: 22,
+        totalTokens: 60,
+        count: 3,
+      })
+      expect(hourly.filter(bucket => bucket.totalTokens > 0)).toHaveLength(1)
 
       const summaryRes = await app.handle(new Request('http://localhost/usage/summary'))
       expect(summaryRes.status).toBe(200)
@@ -177,6 +219,41 @@ describe('usage capability', () => {
         completionTokens: 15,
         count: 2,
       })
+
+      const recentSessionsRes = await app.handle(new Request('http://localhost/usage/sessions/recent?limit=2'))
+      expect(recentSessionsRes.status).toBe(200)
+      expect(await recentSessionsRes.json()).toEqual([
+        {
+          sessionId: sessionTwoId,
+          title: 'Session Two',
+          agentId: agentTwoId,
+          agentName: 'Agent Two',
+          modelId: 'gpt-4o-mini',
+          costUsd: 0.0000054,
+          promptTokens: 8,
+          completionTokens: 7,
+          totalTokens: 15,
+          turnCount: 1,
+          createdAt: sessionTwoCreatedAt,
+          updatedAt: sessionTwoUpdatedAt,
+          lastUsageAt: sessionTwoLatestUsageAt,
+        },
+        {
+          sessionId: sessionOneId,
+          title: 'Session One',
+          agentId: agentOneId,
+          agentName: 'Agent One',
+          modelId: 'gpt-4o',
+          costUsd: 0.000225,
+          promptTokens: 30,
+          completionTokens: 15,
+          totalTokens: 45,
+          turnCount: 2,
+          createdAt: sessionOneCreatedAt,
+          updatedAt: sessionOneUpdatedAt,
+          lastUsageAt: sessionOneLatestUsageAt,
+        },
+      ])
 
       const invalidDaily = await app.handle(new Request('http://localhost/usage/daily?days=0'))
       expect(invalidDaily.status).toBe(400)

@@ -19,6 +19,14 @@ export interface DailyUsageByModel {
   count: number
 }
 
+export interface HourlyUsage {
+  hour: number
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  count: number
+}
+
 export interface UsageSummary {
   totalPromptTokens: number
   totalCompletionTokens: number
@@ -86,6 +94,38 @@ export function getDailyUsageByModel(days = 365): DailyUsageByModel[] {
     totalTokens: row.total_tokens,
     count: row.count,
   }))
+}
+
+export function getHourlyUsagePattern(): HourlyUsage[] {
+  const rows = db().all<{
+    hour: number
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+    count: number
+  }>(sql`
+    SELECT
+      CAST(strftime('%H', ${usageLogs.createdAt}, 'unixepoch', 'localtime') AS INTEGER) AS hour,
+      SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.completionTokens}) AS completion_tokens,
+      SUM(${usageLogs.totalTokens}) AS total_tokens,
+      COUNT(*) AS count
+    FROM ${usageLogs}
+    GROUP BY hour
+    ORDER BY hour ASC
+  `)
+
+  const rowsByHour = new Map(rows.map(row => [row.hour, row]))
+  return Array.from({ length: 24 }, (_, hour) => {
+    const row = rowsByHour.get(hour)
+    return {
+      hour,
+      promptTokens: row?.prompt_tokens ?? 0,
+      completionTokens: row?.completion_tokens ?? 0,
+      totalTokens: row?.total_tokens ?? 0,
+      count: row?.count ?? 0,
+    }
+  })
 }
 
 export function getUsageSummary(): UsageSummary {
@@ -467,6 +507,22 @@ export interface SessionCostEntry {
   stepCount: number
 }
 
+export interface RecentUsageSession {
+  sessionId: string
+  title: string
+  agentId: string | null
+  agentName: string | null
+  modelId: string
+  costUsd: number
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  turnCount: number
+  createdAt: number
+  updatedAt: number
+  lastUsageAt: number
+}
+
 export function getSessionsCost(from?: string, to?: string): SessionCostEntry[] {
   const { fromEpoch, toEpoch } = resolveTimeRange(from, to)
 
@@ -516,6 +572,106 @@ export function getSessionsCost(from?: string, to?: string): SessionCostEntry[] 
   return Array.from(sessionMap.entries())
     .map(([sessionId, data]) => ({ sessionId, ...data }))
     .sort((a, b) => b.costUsd - a.costUsd)
+}
+
+export function getRecentUsageSessions(limit = 6): RecentUsageSession[] {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 20)
+
+  const rows = db().all<{
+    session_id: string
+    title: string
+    agent_id: string | null
+    agent_name: string | null
+    model_id: string
+    cost_model_id: string
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+    turn_count: number
+    created_at: number
+    updated_at: number
+    last_usage_at: number
+  }>(sql`
+    WITH recent_sessions AS (
+      SELECT
+        usage_session_logs.session_id AS session_id,
+        MAX(usage_session_logs.created_at) AS last_usage_at,
+        (
+          SELECT COALESCE(latest_usage_logs.model_id, 'unknown')
+          FROM usage_logs latest_usage_logs
+          WHERE latest_usage_logs.session_id = usage_session_logs.session_id
+          ORDER BY latest_usage_logs.created_at DESC, latest_usage_logs.id DESC
+          LIMIT 1
+        ) AS model_id
+      FROM usage_logs usage_session_logs
+      GROUP BY usage_session_logs.session_id
+      ORDER BY last_usage_at DESC
+      LIMIT ${safeLimit}
+    )
+    SELECT
+      recent_sessions.session_id AS session_id,
+      ${sessions.title} AS title,
+      ${sessions.agentId} AS agent_id,
+      ${agents.name} AS agent_name,
+      recent_sessions.model_id AS model_id,
+      COALESCE(${usageLogs.modelId}, 'unknown') AS cost_model_id,
+      SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.completionTokens}) AS completion_tokens,
+      SUM(${usageLogs.totalTokens}) AS total_tokens,
+      COUNT(*) AS turn_count,
+      ${sessions.createdAt} AS created_at,
+      ${sessions.updatedAt} AS updated_at,
+      recent_sessions.last_usage_at AS last_usage_at
+    FROM recent_sessions
+    INNER JOIN ${usageLogs} ON ${usageLogs.sessionId} = recent_sessions.session_id
+    INNER JOIN ${sessions} ON ${sessions.id} = recent_sessions.session_id
+    LEFT JOIN ${agents} ON ${agents.id} = ${sessions.agentId}
+    GROUP BY
+      recent_sessions.session_id,
+      ${sessions.title},
+      ${sessions.agentId},
+      ${agents.name},
+      recent_sessions.model_id,
+      cost_model_id,
+      ${sessions.createdAt},
+      ${sessions.updatedAt},
+      recent_sessions.last_usage_at
+    ORDER BY recent_sessions.last_usage_at DESC, recent_sessions.session_id ASC
+  `)
+
+  const sessionMap = new Map<string, RecentUsageSession>()
+  for (const row of rows) {
+    const costUsd = estimateCost(row.cost_model_id, {
+      promptTokens: row.prompt_tokens,
+      completionTokens: row.completion_tokens,
+    })
+    const current = sessionMap.get(row.session_id)
+    if (current) {
+      current.costUsd += costUsd
+      current.promptTokens += row.prompt_tokens
+      current.completionTokens += row.completion_tokens
+      current.totalTokens += row.total_tokens
+      current.turnCount += row.turn_count
+      continue
+    }
+    sessionMap.set(row.session_id, {
+      sessionId: row.session_id,
+      title: row.title,
+      agentId: row.agent_id,
+      agentName: row.agent_name,
+      modelId: row.model_id,
+      costUsd,
+      promptTokens: row.prompt_tokens,
+      completionTokens: row.completion_tokens,
+      totalTokens: row.total_tokens,
+      turnCount: row.turn_count,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      lastUsageAt: row.last_usage_at,
+    })
+  }
+
+  return Array.from(sessionMap.values())
 }
 
 export interface DailyCostEntry {

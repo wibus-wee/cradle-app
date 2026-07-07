@@ -27,6 +27,15 @@ export const usage = new Elysia({
     query: UsageModel.dailyQuery,
     response: { 200: t.Array(UsageModel.dailyUsageByModel) },
   })
+  .get('/patterns/hourly', () => Usage.getHourlyUsagePattern(), {
+    detail: {
+      'summary': 'Get hourly usage pattern',
+      'x-cradle-cli': {
+        command: ['usage', 'patterns', 'hourly'],
+      },
+    },
+    response: { 200: t.Array(UsageModel.hourlyUsage) },
+  })
   .get('/summary', () => Usage.getUsageSummary(), {
     detail: {
       'summary': 'Get usage summary',
@@ -44,6 +53,16 @@ export const usage = new Elysia({
       },
     },
     response: { 200: UsageModel.usageStats },
+  })
+  .get('/sessions/recent', ({ query }) => Usage.getRecentUsageSessions(query.limit), {
+    detail: {
+      'summary': 'Get recent usage sessions',
+      'x-cradle-cli': {
+        command: ['usage', 'sessions', 'recent'],
+      },
+    },
+    query: UsageModel.recentSessionsQuery,
+    response: { 200: t.Array(UsageModel.recentSession) },
   })
   .get('/sessions/:sessionId', ({ params }) => Usage.getSessionUsage(params.sessionId), {
     detail: {

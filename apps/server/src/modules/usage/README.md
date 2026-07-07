@@ -1,6 +1,6 @@
 # Usage Module
 
-Provides read-model analytics for `usage_logs` including daily totals, dashboard summary, streak stats, per-session totals, and cost summaries.
+Provides read-model analytics for `usage_logs` including daily totals, hourly patterns, dashboard summary, streak stats, per-session totals, recent session feed rows, and cost summaries.
 Token and cost breakdowns use `sessions.agentId` for Agent attribution and `usage_logs.providerTargetId` for provider-target attribution.
 Route metadata includes `x-cradle-cli` descriptors for generated CLI commands.
 
