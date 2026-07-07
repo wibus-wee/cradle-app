@@ -414,7 +414,7 @@ describe('sessionSyncEngine', () => {
     })).toMatchObject({
       requestSnapshotRefresh: false,
       requestQueueRefresh: false,
-      terminalRunReleaseCandidate: completeRun,
+      terminalRunReleaseCandidate: null,
     })
   })
 })

@@ -21,6 +21,7 @@ import {
   readCodexToolError,
   readCodexToolName,
 } from '../tools/mapper'
+import { readLocalImageDataUrl } from '../local-image-data-url'
 
 export interface CodexAppServerMapperState {
   openReasoningItemIds: Set<string>
@@ -349,7 +350,8 @@ function projectCodexImageFileChunk(item: CodexAppServerItem): UIMessageChunk | 
 function projectCodexImageGenerationFileChunk(item: CodexAppServerItem): UIMessageChunk | null {
   const savedPath = (item as { savedPath?: string | null }).savedPath
   if (savedPath) {
-    return providerChunk.file({ mediaType: 'image/*', url: `file://${savedPath}` })
+    const image = readLocalImageDataUrl(savedPath)
+    return providerChunk.file(image ?? { mediaType: 'image/*', url: `file://${savedPath}` })
   }
   const result = (item as { result?: string | null }).result
   return projectImageResultStringFileChunk(result)
@@ -357,7 +359,11 @@ function projectCodexImageGenerationFileChunk(item: CodexAppServerItem): UIMessa
 
 function projectCodexImageViewFileChunk(item: CodexAppServerItem): UIMessageChunk | null {
   const path = (item as { path?: string | null }).path
-  return path ? providerChunk.file({ mediaType: 'image/*', url: `file://${path}` }) : null
+  if (!path) {
+    return null
+  }
+  const image = readLocalImageDataUrl(path)
+  return providerChunk.file(image ?? { mediaType: 'image/*', url: `file://${path}` })
 }
 
 function readImageDataUrlMediaType(value: string | null | undefined): string | null {

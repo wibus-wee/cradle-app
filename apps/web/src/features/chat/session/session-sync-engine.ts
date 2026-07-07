@@ -128,6 +128,7 @@ export class SessionSyncEngine {
   private requestedRuntimeActiveRunMessageId: string | null = null
   private runtimeQueueSignature: string | null = null
   private latestTerminalRunRefreshId: string | null = null
+  private latestTerminalRunReleaseId: string | null = null
 
   constructor(options: SessionSyncEngineOptions) {
     this.sessionId = options.sessionId
@@ -201,6 +202,11 @@ export class SessionSyncEngine {
       previousSignature: this.runtimeQueueSignature,
     })
     this.runtimeQueueSignature = queueRefresh.nextSignature
+    const terminalRunReleaseCandidate = readTerminalRunReleaseCandidate(
+      input.runtimeStatus,
+      this.latestTerminalRunReleaseId,
+    )
+    this.latestTerminalRunReleaseId = terminalRunReleaseCandidate?.runId ?? this.latestTerminalRunReleaseId
 
     return {
       runDisplay: input.activeRun && input.activeRun.messageId
@@ -212,7 +218,7 @@ export class SessionSyncEngine {
       requestSnapshotRefresh: activeRunRefresh.requestSnapshotRefresh
         || terminalRunRefresh.requestSnapshotRefresh,
       requestQueueRefresh: queueRefresh.requestQueueRefresh,
-      terminalRunReleaseCandidate: readTerminalRunReleaseCandidate(input.runtimeStatus),
+      terminalRunReleaseCandidate,
     }
   }
 
@@ -220,6 +226,7 @@ export class SessionSyncEngine {
     this.requestedRuntimeActiveRunMessageId = null
     this.runtimeQueueSignature = null
     this.latestTerminalRunRefreshId = null
+    this.latestTerminalRunReleaseId = null
   }
 
   private readonly handleSessionEvent = (message: MessageEvent<string>): void => {
