@@ -350,7 +350,6 @@ export function BrowserColorPalette({ value, onChange, label = 'Color', classNam
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-doctor/exhaustive-deps
     return () => eyeDropperAbortRef.current?.abort()
   }, [])
 

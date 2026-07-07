@@ -61,16 +61,6 @@ async function openSettingsSection(world: CradleWorld, navTestId: string, pageSe
   await expect(world.page.locator(pageSelector)).toBeVisible({ timeout: 10_000 })
 }
 
-async function selectOption(world: CradleWorld, triggerSelector: string, value: string): Promise<void> {
-  const trigger = world.page.locator(triggerSelector)
-  await expect(trigger).toBeVisible({ timeout: 10_000 })
-  await trigger.click()
-
-  const option = world.page.getByRole('option', { name: value })
-  await expect(option).toBeVisible({ timeout: 10_000 })
-  await option.click()
-}
-
 async function startSkillsMockProvider(world: CradleWorld): Promise<string> {
   if (world.mockLlmServer) {
     await world.mockLlmServer.stop()

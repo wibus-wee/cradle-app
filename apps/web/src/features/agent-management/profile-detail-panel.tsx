@@ -1070,7 +1070,6 @@ function ProfileGeneralSettings({
   const claudeAuthMode = isClaudeProvider
     ? normalizeClaudeAuthMode(values.authMode)
     : CLAUDE_AUTH_MODE_API_KEY
-  const claudeAiLogin = isClaudeProvider && claudeAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI
   const endpointDisabled = readOnly
     || (isCodexProvider && codexAuthMode !== CODEX_AUTH_MODE_API_KEY)
     || (isClaudeProvider

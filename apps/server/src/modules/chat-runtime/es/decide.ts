@@ -2,7 +2,6 @@ import type { ChatSessionState } from './aggregate'
 import { createInitialChatSessionState, evolveChatSessionState } from './aggregate'
 import type {
   ChatSessionEvent,
-  ChatSessionEventType,
   StoredChatSessionEvent,
   TerminalRunEventType,
 } from './events'
@@ -231,10 +230,6 @@ function readSyntheticSubjectRunId(event: ChatSessionEvent): string | null {
     default:
       return null
   }
-}
-
-function isTerminalRunEventType(eventType: ChatSessionEventType): eventType is TerminalRunEventType {
-  return eventType === 'RunCompleted' || eventType === 'RunFailed' || eventType === 'RunAborted'
 }
 
 function cloneChatSessionState(state: ChatSessionState): ChatSessionState {

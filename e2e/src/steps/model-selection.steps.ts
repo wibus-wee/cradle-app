@@ -108,7 +108,7 @@ Then('Provider 与模型选择器应显示模型{string}', async function (this:
   await expect(selector).toBeVisible({ timeout: SELECTOR_TIMEOUT })
   // Model loads lazily after provider selection — poll until it appears
   await expect.poll(async () => {
-    const text = await selector.innerText().catch(() => '')
+    const text = await selector.textContent().catch(() => '')
     return text.includes(model) ? true : text
   }, { timeout: 30_000, message: `Expected selector to contain "${model}"` }).toBe(true)
 })

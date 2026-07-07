@@ -3,27 +3,6 @@ import { t } from 'elysia'
 const nonBlankString = t.String({ minLength: 1, pattern: '.*\\S.*' })
 const nullableString = t.Union([t.String(), t.Null()])
 
-interface WorkspaceRecord {
-  id: string
-  name: string
-  locator: {
-    hostId: string
-    path: string
-    kind?: 'project' | 'managed-worktree'
-    sourceWorkspaceId?: string | null
-  }
-  gitIdentity: {
-    originUrl?: string | null
-    repoRoot?: string | null
-    headSha?: string | null
-    branch?: string | null
-  }
-  identifier: string
-  pinned: number
-  createdAt: number
-  updatedAt: number
-}
-
 const workspaceLocator = t.Object({
   hostId: nonBlankString,
   path: nonBlankString,

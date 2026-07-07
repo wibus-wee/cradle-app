@@ -1,11 +1,8 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { fixMacOSFrameworkSymlinks } from './scripts/fix-macos-framework-symlinks.mjs'
 import { copyCodexRuntimeToPackagedResources } from './scripts/sync-codex-runtime.mjs'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const updateServerUrl = process.env.CRADLE_DESKTOP_UPDATE_URL?.trim()
 const hasAppleSigningIdentity = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
@@ -225,7 +222,7 @@ const config = {
       'nsis',
       'zip',
     ],
-    artifactName: '${productName}-${os}-${arch}.${ext}',
+    artifactName: ['$', '{productName}-', '$', '{os}-', '$', '{arch}.', '$', '{ext}'].join(''),
   },
 
   linux: {
@@ -239,7 +236,7 @@ const config = {
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
-    artifactName: '${productName}-setup.${ext}',
+    artifactName: ['$', '{productName}-setup.', '$', '{ext}'].join(''),
     include: 'build/installer.nsh',
   },
 }

@@ -14,7 +14,7 @@ const INVARIANTS = [
   { title: 'Spatial separation first', desc: 'Prefer layout gap over visible borders where space already separates.' },
   { title: 'Accent is semantic', desc: 'Each accent maps to a content category. Never used decoratively.' },
   { title: 'No uppercase labels', desc: 'Section headers: sentence case or lowercase only.' },
-  { title: 'Static Tailwind classes only', desc: 'Never construct class names dynamically (e.g. `bg-${color}-500`).' },
+  { title: 'Static Tailwind classes only', desc: 'Never construct class names dynamically (e.g. `bg-$' + '{color}-500`).' },
   { title: 'No gradient backgrounds', desc: 'Flat surfaces with subtle inset-shadow texture only.' },
 ]
 

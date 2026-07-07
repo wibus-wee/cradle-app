@@ -33,8 +33,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
   const {
     scheduleSnapshotRefresh,
     refreshQueue,
-    refreshRuntimeUiSlotStates,
-    refreshSessionLists,
   } = controls
   const controlsRef = useRef(controls)
   controlsRef.current = controls

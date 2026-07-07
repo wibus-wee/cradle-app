@@ -1519,12 +1519,13 @@ function readWorkflowSummary(input: ToolPayload, output: ToolPayload): string | 
       return 'Failed'
     case 'stopped':
       return 'Stopped'
-    default:
+    default: {
       const phases = output.workflowPhases.length > 0 ? output.workflowPhases : input.workflowPhases
       if (phases.length > 0) {
         return `${phases.length} declared phase${phases.length === 1 ? '' : 's'}`
       }
       return output.status ?? output.workflowRunId ?? null
+    }
   }
 }
 

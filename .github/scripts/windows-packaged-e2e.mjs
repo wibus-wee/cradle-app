@@ -137,7 +137,7 @@ try {
   }
 
   const health = await waitForJson(`${desktopEnv.serverUrl}/health`, 60_000)
-  await page.waitForFunction(() => document.body.innerText.trim().length > 0, undefined, { timeout: 30_000 })
+  await page.waitForFunction(() => document.body.textContent?.trim().length > 0, undefined, { timeout: 30_000 })
 
   const beforeOnboardingState = await capturePageState(page)
   console.log(`[packaged-e2e] before onboarding: ${JSON.stringify(beforeOnboardingState, null, 2)}`)
@@ -257,15 +257,16 @@ async function waitForPage(context, timeoutMs) {
   }
 
   return new Promise((resolvePage, reject) => {
-    const timeout = setTimeout(() => {
-      context.off('page', onPage)
-      reject(new Error('Timed out waiting for Electron renderer page.'))
-    }, timeoutMs)
+    let timeout
     const onPage = (nextPage) => {
       clearTimeout(timeout)
       context.off('page', onPage)
       resolvePage(nextPage)
     }
+    timeout = setTimeout(() => {
+      context.off('page', onPage)
+      reject(new Error('Timed out waiting for Electron renderer page.'))
+    }, timeoutMs)
     context.on('page', onPage)
   })
 }
@@ -303,7 +304,7 @@ async function waitForReadyAppContent(page, timeoutMs) {
       return true
     }
 
-    const bodyText = document.body.innerText
+    const bodyText = document.body.textContent ?? ''
     return !location.hash.includes('/onboarding')
       && bodyText.length > 200
       && (bodyText.includes('Settings') || bodyText.includes('Providers') || bodyText.includes('New chat'))
@@ -360,8 +361,8 @@ async function capturePageState(page) {
       search: location.search,
       title: document.title,
       readyState: document.readyState,
-      bodyTextLength: document.body.innerText.length,
-      bodyTextSample: document.body.innerText.slice(0, 2000),
+      bodyTextLength: document.body.textContent?.length ?? 0,
+      bodyTextSample: document.body.textContent?.slice(0, 2000) ?? '',
       activeElement: document.activeElement
         ? {
             tagName: document.activeElement.tagName,

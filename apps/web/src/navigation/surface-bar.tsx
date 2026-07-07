@@ -246,7 +246,6 @@ export const SurfaceBar = memo(({
   const dragReleasePointerRef = useRef<ScreenCoordinates | null>(null)
   const dragReleaseClientPointerRef = useRef<ClientCoordinates | null>(null)
   const dragCleanupRef = useRef<(() => void) | null>(null)
-  const [draggingSurfaceId, setDraggingSurfaceId] = useState<string | null>(null)
   const [showMetaTabHints, setShowMetaTabHints] = useState(false)
   surfacesRef.current = surfaces
 
@@ -256,7 +255,6 @@ export const SurfaceBar = memo(({
     dragStartPointerRef.current = null
     dragReleasePointerRef.current = null
     dragReleaseClientPointerRef.current = null
-    setDraggingSurfaceId(null)
   }, [])
 
   const handleActivate = useCallback((surfaceId: string) => {
@@ -388,10 +386,6 @@ export const SurfaceBar = memo(({
     dragReleasePointerRef.current = startPointer
     dragReleaseClientPointerRef.current = startClientPointer
     dragCleanupRef.current?.()
-
-    const sourceId = event.operation.source?.id
-    const source = surfacesRef.current.find(surface => surface.id === sourceId)
-    setDraggingSurfaceId(source?.closable ? source.id : null)
 
     const updateReleasePointer = (pointerEvent: MouseEvent | PointerEvent | TouchEvent) => {
       dragReleasePointerRef.current = getEventScreenCoordinates(pointerEvent, window)

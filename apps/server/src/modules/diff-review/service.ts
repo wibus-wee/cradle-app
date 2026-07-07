@@ -2580,10 +2580,6 @@ function buildCommitPlanAgentPrompt(input: {
     = input.review.repositoryPath === '.'
       ? 'git'
       : `git -C ${shellQuote(input.review.repositoryPath)}`
-  const patchSummary = input.revision
-    ? `Revision ${input.revision.id} has patch hash ${input.revision.patchHash}, ${input.revision.fileCount} files, +${input.revision.additions}/-${input.revision.deletions}.`
-    : 'The review currently has no active revision.'
-
   return [
     'You are generating a Cradle Diffs commit plan for the current local working tree.',
     '',

@@ -1369,10 +1369,7 @@ export class OpencodeProvider implements ChatRuntime {
       return
     }
 
-    const questions = projectOpencodeQuestionToolQuestions(input.part)
-    if (questions.length === 0) {
-
-    }
+    projectOpencodeQuestionToolQuestions(input.part)
   }
 
   private async handleOpencodeQuestionRequest(input: {

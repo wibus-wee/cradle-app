@@ -314,28 +314,27 @@ class ControllerTransport {
   }
 
   toHandle(): RelayControllerTransportHandle {
-    const self = this
+    const { hostId } = this.options
+    const { localPort, keypair, exitListeners } = this
     return {
-      hostId: self.options.hostId,
-      localPort: self.localPort,
-      localBaseUrl: `http://127.0.0.1:${self.localPort}`,
+      hostId,
+      localPort,
+      localBaseUrl: `http://127.0.0.1:${localPort}`,
       pid: null,
       stderr: '',
       get controllerPrivateKeyBase64() {
-        return self.keypair.privateKeyBase64
+        return keypair.privateKeyBase64
       },
       get controllerPublicKeyBase64() {
-        return self.keypair.publicKeyBase64
+        return keypair.publicKeyBase64
       },
-      get hostPublicKeyBase64() {
-        return self.hostPublicKeyBase64
+      hostPublicKeyBase64: this.hostPublicKeyBase64,
+      onExit: (listener) => {
+        exitListeners.add(listener)
       },
-      onExit(listener) {
-        self.exitListeners.add(listener)
-      },
-      async close() {
-        self.closed = true
-        await self.teardown()
+      close: async () => {
+        this.closed = true
+        await this.teardown()
       },
     }
   }

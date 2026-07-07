@@ -17,7 +17,6 @@ import { resolveDesktopPrimaryPluginsDir, resolveDesktopPrimaryPluginsSourceKind
 
 let serverProcess: ManagedChildProcess | null = null
 let restartCount = 0
-let isServerShutdownRequested = false
 let locatedServerPid: number | null = null
 const MAX_RESTARTS = 3
 const SERVER_STARTUP_TIMEOUT_MS = 90_000
@@ -138,7 +137,6 @@ export function readDesktopServerAccessMode(dataDir: string): DesktopServerAcces
  * Returns the full URL the server is listening on.
  */
 export async function startServer(): Promise<string> {
-  isServerShutdownRequested = false
   expectedServerExit = null
   lastServerSignalBeforeExit = null
   restartCount = 0
@@ -677,7 +675,6 @@ export async function stopServer(timeoutMs = 5_000): Promise<void> {
     return
   }
 
-  isServerShutdownRequested = true
   serverProcess = null
   locatedServerPid = null
   removeCliServerLocator()

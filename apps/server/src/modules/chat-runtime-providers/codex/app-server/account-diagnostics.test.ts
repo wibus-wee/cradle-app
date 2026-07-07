@@ -240,7 +240,7 @@ describe('codex account diagnostics', () => {
     const fetchWhamEndpoint = vi.fn(async (
       key: CodexWhamEndpointKey,
       url: string,
-      auth: { accessToken: string, chatgptAccountId: string },
+      _auth: { accessToken: string, chatgptAccountId: string },
     ): Promise<CodexWhamEndpointResult> => ({
       key,
       url,

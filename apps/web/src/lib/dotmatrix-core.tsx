@@ -269,13 +269,17 @@ const C = Math.floor(MATRIX_SIZE / 2)
 const CELLS = N * N
 const MAX_TRBL = (N - 1) * 2
 
+function createOrderIndexMap(): number[] {
+  return Array.from({ length: CELLS }).fill(-1) as number[]
+}
+
 export function trBlPathNormFromIndex(index: number): number {
   const { row, col } = indexToCoord(index)
   return (row + (N - 1 - col)) / MAX_TRBL
 }
 
 function buildSnakeOrderToIndexMap(): number[] {
-  const pathOrder = Array.from({ length: CELLS })
+  const pathOrder = createOrderIndexMap()
   const key = (row: number, col: number) => rowMajorIndex(row, col)
   let t = 0
   for (let row = 0; row < N; row += 1) {
@@ -306,7 +310,7 @@ export function snakePathOrderValue(index: number): number {
 }
 
 function buildSpiralInwardOrderToIndexMap(): number[] {
-  const order = Array.from({ length: CELLS })
+  const order = createOrderIndexMap()
   let top = 0
   let bottom = N - 1
   let left = 0
@@ -358,7 +362,7 @@ export function spiralInwardOrderValue(index: number): number {
 }
 
 function buildOuterRingClockwiseOrderToIndexMap(): number[] {
-  const order = Array.from({ length: CELLS }).fill(-1)
+  const order = createOrderIndexMap()
   const coords: Array<[number, number]> = [
     [0, 0],
     [0, 1],
@@ -387,7 +391,7 @@ function buildOuterRingClockwiseOrderToIndexMap(): number[] {
 }
 
 function buildMiddleRingAntiClockwiseOrderToIndexMap(): number[] {
-  const order = Array.from({ length: CELLS }).fill(-1)
+  const order = createOrderIndexMap()
   const coords: Array<[number, number]> = [
     [1, 1],
     [2, 1],
@@ -429,7 +433,7 @@ export function middleRingAntiClockwiseNormFromIndex(index: number): number {
 }
 
 function buildDiagonalSnakeOrderToIndexMap(): number[] {
-  const order = Array.from({ length: CELLS })
+  const order = createOrderIndexMap()
   let t = 0
 
   for (let diagonal = 0; diagonal <= (N - 1) * 2; diagonal += 1) {
@@ -466,7 +470,7 @@ export function diagonalSnakeNormFromIndex(index: number): number {
 }
 
 function buildRowWaveSnakeOrderToIndexMap(): number[] {
-  const order = Array.from({ length: CELLS })
+  const order = createOrderIndexMap()
   const route: Array<{ col: number, dir: 'up' | 'down' }> = [
     { col: 0, dir: 'up' },
     { col: 2, dir: 'down' },

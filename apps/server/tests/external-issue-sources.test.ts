@@ -320,7 +320,10 @@ describe('external issue sources capability', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
       }))
-      while (readCount === 0) {
+      for (;;) {
+        if (readCount > 0) {
+          break
+        }
         await new Promise(resolve => setTimeout(resolve, 0))
       }
       await new Promise(resolve => setTimeout(resolve, 0))

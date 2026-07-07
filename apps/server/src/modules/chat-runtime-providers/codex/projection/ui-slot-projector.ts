@@ -1267,26 +1267,6 @@ function projectCodexCrewCallsFromTurns(
   return calls.slice(0, 24)
 }
 
-function projectCodexCrewStateFromSnapshot(
-  threadId: string,
-  snapshot: CodexProviderSnapshot,
-  collaborationModes: CodexCollaborationModeListResponse | null,
-  threadMetadata: Map<string, CodexThreadMetadata>,
-): RuntimeCrewUiSlotState | null {
-  const activity = snapshot.codex?.toolActivity
-  const calls = projectCodexCrewCallsFromSnapshot(snapshot)
-  const recentItems = (activity?.items ?? []).filter(item => item.type === 'collabAgentToolCall')
-  return projectCodexCrewStateFromCalls(
-    threadId,
-    calls,
-    collaborationModes,
-    threadMetadata,
-    [],
-    activity?.updatedAt ?? 0,
-    recentItems,
-  )
-}
-
 function projectCodexCrewCallsFromSnapshot(snapshot: CodexProviderSnapshot): RuntimeCrewCallItem[] {
   return (snapshot.codex?.toolActivity?.items ?? [])
     .filter(item => item.type === 'collabAgentToolCall')

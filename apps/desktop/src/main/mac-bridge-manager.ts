@@ -1,6 +1,5 @@
 /* Manages the cradle-mac-bridge sidecar process for desktop-owned macOS APIs. */
-import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process'
-import type { spawn } from 'node:child_process'
+import type { ChildProcess, ChildProcessWithoutNullStreams, spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'

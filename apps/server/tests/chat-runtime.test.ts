@@ -14,7 +14,6 @@ import {
   workspaces,
 } from '@cradle/db'
 import type { UIMessage, UIMessageChunk } from 'ai'
-import { readUIMessageStream } from 'ai'
 import { eq, sql } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -371,26 +370,6 @@ async function collectSseChunks(response: Response): Promise<UIMessageChunk[]> {
       }
       return [JSON.parse(data) as UIMessageChunk]
     })
-}
-
-async function readMessageFromUiChunks(chunks: UIMessageChunk[]): Promise<UIMessage | null> {
-  let latest: UIMessage | null = null
-  const stream = new ReadableStream<UIMessageChunk>({
-    start(controller) {
-      for (const chunk of chunks) {
-        controller.enqueue(chunk)
-      }
-      controller.close()
-    },
-  })
-  for await (const message of readUIMessageStream<UIMessage>({
-    message: { id: 'assistant-test', role: 'assistant', parts: [] },
-    stream,
-    terminateOnError: true,
-  })) {
-    latest = message
-  }
-  return latest
 }
 
 class TestCodexGoalContinuationRuntime implements ChatRuntime {

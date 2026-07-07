@@ -1344,7 +1344,9 @@ async function runSessionTurn(
   const reader = response.stream.getReader()
   void (async () => {
     try {
-      while (!(await reader.read()).done) {}
+      while (!(await reader.read()).done) {
+        // Drain the stream so the runtime can complete while the caller awaits the final run.
+      }
     }
  finally {
       reader.releaseLock()

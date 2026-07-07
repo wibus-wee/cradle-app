@@ -21,7 +21,6 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
   GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponse,
-  GetProviderTargetsByProviderTargetIdCodexWhamDiagnosticsResponse,
 } from '~/api-gen/types.gen'
 import {
   AlertDialog,
@@ -56,8 +55,6 @@ type CodexAccountDiagnostics = GetProviderTargetsByProviderTargetIdCodexAccountD
 type RateLimitSnapshot = NonNullable<CodexAccountDiagnostics['rateLimits']>
 type RateLimitWindow = NonNullable<RateLimitSnapshot['primary']>
 type DailyBucket = NonNullable<CodexAccountDiagnostics['tokenUsage']>['dailyUsageBuckets'][number]
-
-type CodexWhamDiagnostics = GetProviderTargetsByProviderTargetIdCodexWhamDiagnosticsResponse
 
 type StatusKind = 'idle' | 'available' | 'limited' | 'unsupported' | 'error'
 type AgentManagementKey = keyof typeof import('~/locales/default').default.agentManagement

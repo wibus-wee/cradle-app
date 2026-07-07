@@ -210,7 +210,7 @@ describe('notificationCenterManager', () => {
   it('queues a reply when the session is already busy', async () => {
     const notifications: FakeNotification[] = []
     const broker = { startResponseDetached: vi.fn() }
-    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input)
       if (url.includes('/runtime-status')) {
         return createJsonResponse({ status: 'streaming' })

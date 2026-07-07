@@ -31,13 +31,13 @@ type RequireWhen<T, Key extends keyof T, Required_> = Required_ extends true
   : T
 
 type CapabilityHookRequirements<C extends ChatRuntimeCapabilities>
-  = (C['steer'] extends 'native' ? { steerTurn: NonNullable<ChatRuntime['steerTurn']> } : {})
-    & (C['supportsShellExecution'] extends true ? { executeShellCommand: NonNullable<ChatRuntime['executeShellCommand']> } : {})
-    & (C['supportsLastTurnRollback'] extends true ? { rollbackLastTurn: NonNullable<ChatRuntime['rollbackLastTurn']> } : {})
-    & (C['supportsRuntimeSettings'] extends true ? { updateRuntimeSettings: NonNullable<ChatRuntime['updateRuntimeSettings']> } : {})
-    & (C['supportsUiSlotStates'] extends true ? { getUiSlotStates: NonNullable<ChatRuntime['getUiSlotStates']> } : {})
-    & (C['supportsDynamicCapabilities'] extends true ? { getDynamicCapabilities: NonNullable<ChatRuntime['getDynamicCapabilities']> } : {})
-    & (C['supportsTitleGeneration'] extends true ? { generateSessionTitle: NonNullable<ChatRuntime['generateSessionTitle']> } : {})
+  = (C['steer'] extends 'native' ? { steerTurn: NonNullable<ChatRuntime['steerTurn']> } : unknown)
+    & (C['supportsShellExecution'] extends true ? { executeShellCommand: NonNullable<ChatRuntime['executeShellCommand']> } : unknown)
+    & (C['supportsLastTurnRollback'] extends true ? { rollbackLastTurn: NonNullable<ChatRuntime['rollbackLastTurn']> } : unknown)
+    & (C['supportsRuntimeSettings'] extends true ? { updateRuntimeSettings: NonNullable<ChatRuntime['updateRuntimeSettings']> } : unknown)
+    & (C['supportsUiSlotStates'] extends true ? { getUiSlotStates: NonNullable<ChatRuntime['getUiSlotStates']> } : unknown)
+    & (C['supportsDynamicCapabilities'] extends true ? { getDynamicCapabilities: NonNullable<ChatRuntime['getDynamicCapabilities']> } : unknown)
+    & (C['supportsTitleGeneration'] extends true ? { generateSessionTitle: NonNullable<ChatRuntime['generateSessionTitle']> } : unknown)
 
 /**
  * Given a specific (literal) `ChatRuntimeCapabilities`, computes the `ChatRuntime` shape with

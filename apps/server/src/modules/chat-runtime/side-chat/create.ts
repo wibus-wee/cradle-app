@@ -143,7 +143,7 @@ export async function createSideChat(
           providerTargetId: context.providerTarget.id,
         })
 
-    const record = registerSideConversation({
+    registerSideConversation({
       sideConversationId,
       parentSessionId: input.parentSessionId,
       runtimeKind: childRuntimeSession.runtimeKind,

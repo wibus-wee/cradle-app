@@ -103,7 +103,7 @@ describe('desktopUpdateInstaller', () => {
     childProcessMocks.promisifiedExecFile.mockClear()
     childProcessMocks.promisifiedExecFile.mockImplementation(async (file: string, args: string[]) => {
       if (file === '/usr/bin/ditto') {
-        const targetDirectory = args.at(-1)
+        const targetDirectory = args.at(-1)!
         const appPath = join(targetDirectory, 'Cradle.app')
         await mkdir(join(appPath, 'Contents'), { recursive: true })
         await writeFile(join(appPath, 'Contents', 'Info.plist'), '')
@@ -261,7 +261,7 @@ describe('desktopUpdateInstaller', () => {
   it('rejects a staged bundle with a mismatched version', async () => {
     childProcessMocks.promisifiedExecFile.mockImplementation(async (file: string, args: string[]) => {
       if (file === '/usr/bin/ditto') {
-        const targetDirectory = args.at(-1)
+        const targetDirectory = args.at(-1)!
         const appPath = join(targetDirectory, 'Cradle.app')
         await mkdir(join(appPath, 'Contents'), { recursive: true })
         await writeFile(join(appPath, 'Contents', 'Info.plist'), '')

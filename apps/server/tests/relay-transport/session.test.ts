@@ -196,18 +196,11 @@ describe('relay session', () => {
 
   it('does not mark ready when an encrypted stream frame arrives before the handshake', () => {
     const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
 
     const host = new RelaySession(
       'host',
       hostKeys.privateKeyBase64,
       { roomId: 'r', pairingCode: 'CODE', ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      { send: () => {}, onError: () => {} },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId: 'r', pairingCode: 'CODE', ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
       { send: () => {}, onError: () => {} },
     )
 

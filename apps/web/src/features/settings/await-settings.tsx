@@ -173,8 +173,7 @@ function CheckRow({ name, required, isBypassed, onToggle, isPending }: {
   )
 }
 
-function DiscoveredRepoSection({ workspaceId, repoFullName, rules, createMut, removeMut }: {
-  workspaceId: string
+function DiscoveredRepoSection({ repoFullName, rules, createMut, removeMut }: {
   repoFullName: string
   rules: BypassRule[]
   createMut: ReturnType<typeof useBypassRuleMutations>['create']
@@ -435,7 +434,6 @@ const WorkspaceBypassSection = ({ workspace }: { workspace: Workspace }) => {
           {discoveredRepos.map(repo => (
             <DiscoveredRepoSection
               key={repo}
-              workspaceId={workspace.id}
               repoFullName={repo}
               rules={rules.filter(r => r.repo === repo)}
               createMut={create}
