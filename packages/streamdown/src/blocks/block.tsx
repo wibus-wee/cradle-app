@@ -9,6 +9,7 @@ import type { PluggableList } from 'unified'
 import { HighlightedCode, HighlightedPre } from '../components/highlighted-code'
 import { MarkdownLink } from '../components/markdown-link'
 import type { BlockState } from '../hooks/use-block-queue'
+import { createCoreRehypePlugins } from '../plugins/markdown-html'
 import rehypeStreamAnimate from '../plugins/rehype-stream-animate'
 
 interface BlockProps {
@@ -51,7 +52,7 @@ const Block = memo<BlockProps>(({
   extraRemarkPlugins,
 }) => {
   // eslint-disable-next-line ts/no-explicit-any
-  const rehypePlugins: any[] = [rehypeKatex]
+  const rehypePlugins: any[] = createCoreRehypePlugins() as any[]
 
   if (animated && !settled) {
     rehypePlugins.push([rehypeStreamAnimate, {
@@ -65,6 +66,8 @@ const Block = memo<BlockProps>(({
   if (extraRehypePlugins) {
     rehypePlugins.push(...extraRehypePlugins)
   }
+
+  rehypePlugins.push(rehypeKatex)
 
   const remarkPluginsList: PluggableList = [remarkGfm, remarkMath, ...((extraRemarkPlugins as PluggableList | undefined) ?? [])]
 

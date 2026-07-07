@@ -8,6 +8,7 @@ import type { PluggableList } from 'unified'
 
 import { HighlightedCode, HighlightedPre } from './components/highlighted-code'
 import { MarkdownLink } from './components/markdown-link'
+import { createCoreRehypePlugins } from './plugins/markdown-html'
 
 interface StaticRenderProps {
   content: string
@@ -47,7 +48,7 @@ export function StaticRender({
     <Component className={className} data-pre-mounted="">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath, ...(remarkPlugins || [])]}
-        rehypePlugins={[rehypeKatex, ...(rehypePlugins || [])]}
+        rehypePlugins={[...createCoreRehypePlugins(rehypePlugins), rehypeKatex]}
         components={merged}
         urlTransform={urlTransform}
       >
