@@ -41,6 +41,7 @@ import type {
   MacPermissionsRequestResult,
   MacPermissionsStatus,
 } from './mac-bridge-protocol'
+import { resolveWindowControlsSafeArea } from '../shared/window-controls-safe-area'
 import type { MacScreenshotSinkId, MacScreenshotSinkResult } from './mac-screenshot-sinks'
 import { runMacScreenshotSink } from './mac-screenshot-sinks'
 import type { CodexAppshotObservedAsset, CodexAppshotObserveResult } from './native-appshot-codex-assets'
@@ -590,6 +591,11 @@ function readScreenAppshotAnimationTarget(
 
 const pointerMonitors = new Map<number, ReturnType<typeof setInterval>>()
 
+interface WindowTitleBarOverlayInput {
+  color: string
+  symbolColor: string
+}
+
 class WindowService extends IpcService {
   static readonly groupName = 'window'
 
@@ -709,6 +715,23 @@ class WindowService extends IpcService {
   @IpcMethod()
   async focusCurrent(): Promise<boolean> {
     return focusBrowserWindow(readIpcSenderWindow())
+  }
+
+  @IpcMethod()
+  async setTitleBarOverlay(input: WindowTitleBarOverlayInput): Promise<void> {
+    const win = readIpcSenderWindow()
+    if (!win || win.isDestroyed()) {
+      return
+    }
+    const safeArea = resolveWindowControlsSafeArea(process.platform)
+    win.setBackgroundColor(input.color)
+    if (process.platform !== 'darwin') {
+      win.setTitleBarOverlay({
+        color: input.color,
+        symbolColor: input.symbolColor,
+        height: safeArea.height,
+      })
+    }
   }
 
   @IpcMethod()

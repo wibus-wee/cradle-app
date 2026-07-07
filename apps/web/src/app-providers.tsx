@@ -9,7 +9,7 @@ import { DirectoryPickerProvider } from '~/features/filesystem/directory-picker-
 import { createKanbanContextProvider } from '~/features/kanban/kanban-context'
 import { createExplicitContextProvider } from '~/features/system-agent/explicit-context'
 import { createSystemAgentContextProvider } from '~/features/system-agent/system-context-provider'
-import { subscribeDesktopQuitGuardArmed } from '~/lib/electron'
+import { subscribeDesktopQuitGuardArmed, syncDesktopWindowControlsOverlay } from '~/lib/electron'
 import { ShortcutProvider } from '~/lib/shortcut-provider'
 import { useResolvedThemeMode } from '~/store/theme'
 
@@ -61,5 +61,8 @@ export function useThemeClass(): void {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', resolvedMode === 'dark')
+    syncDesktopWindowControlsOverlay()
+    const timeout = window.setTimeout(syncDesktopWindowControlsOverlay, 100)
+    return () => window.clearTimeout(timeout)
   }, [resolvedMode])
 }

@@ -1,6 +1,6 @@
 import { join, resolve } from 'node:path'
 
-import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, screen } from 'electron'
 import windowStateKeeper from 'electron-window-state'
 
 import {
@@ -51,6 +51,11 @@ import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
 import { readStoredWindowBounds, resolveVisibleWindowBounds } from './window-state'
+import {
+  resolveWindowControlsSafeArea,
+  resolveTrafficLightPosition,
+  resolveWindowControlsOverlay,
+} from '../shared/window-controls-safe-area'
 
 let mainWindow: BrowserWindow | null = null
 let windowManager: WindowManager | undefined
@@ -152,6 +157,11 @@ async function createMainWindow(serverUrl: string): Promise<BrowserWindow> {
   )
 
   const isMacOS = process.platform === 'darwin'
+  const windowControlsSafeArea = resolveWindowControlsSafeArea(process.platform)
+  const windowControlsOverlay = resolveWindowControlsOverlay(
+    nativeTheme.shouldUseDarkColors,
+    windowControlsSafeArea,
+  )
 
   const win = new BrowserWindow({
     x: restoredBounds.x,
@@ -160,15 +170,10 @@ async function createMainWindow(serverUrl: string): Promise<BrowserWindow> {
     height: restoredBounds.height,
     minWidth: MAIN_WINDOW_MIN_WIDTH,
     minHeight: MAIN_WINDOW_MIN_HEIGHT,
-    titleBarStyle: isMacOS ? 'hiddenInset' : 'default',
-    titleBarOverlay: isMacOS
-      ? true
-      : {
-          color: '#00000000',
-          symbolColor: '#ffffff',
-          height: 36,
-        },
-    ...(isMacOS && { trafficLightPosition: { x: 16, y: 18 } }),
+    titleBarStyle: isMacOS ? 'hiddenInset' : 'hidden',
+    backgroundColor: windowControlsOverlay.color,
+    titleBarOverlay: isMacOS ? true : windowControlsOverlay,
+    ...(isMacOS && { trafficLightPosition: resolveTrafficLightPosition(windowControlsSafeArea) }),
     webPreferences: {
       preload: resolveDesktopPreloadPath(__dirname),
       contextIsolation: true,
