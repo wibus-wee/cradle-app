@@ -266,6 +266,13 @@ export const zGetUsageDailyByModelQuery = z.object({
     ]).optional()
 });
 
+export const zGetUsageSessionsRecentQuery = z.object({
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(20)
+    ]).optional()
+});
+
 export const zGetUsageSessionsBySessionIdPath = z.object({
     sessionId: z.string().min(1)
 });
@@ -1218,6 +1225,7 @@ export const zGetAssetsByIdContentPath = z.object({
 export const zGetSessionsQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     origin: z.string().min(1).optional(),
+    sessionGroupId: z.string().min(1).optional(),
     archived: z.boolean().optional()
 });
 
@@ -1247,6 +1255,7 @@ export const zPostSessionsBody = z.object({
         'xhigh'
     ]).optional(),
     linkedIssueId: z.string().min(1).nullish(),
+    sessionGroupId: z.string().min(1).nullish(),
     worktreeId: z.string().min(1).optional(),
     id: z.string().optional()
 });
@@ -1264,7 +1273,8 @@ export const zPatchSessionsByIdBody = z.object({
     pinned: z.boolean().optional(),
     providerTargetId: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
-    thinkingEffort: z.string().nullish()
+    thinkingEffort: z.string().nullish(),
+    sessionGroupId: z.string().min(1).nullish()
 });
 
 export const zPatchSessionsByIdPath = z.object({
@@ -1349,6 +1359,52 @@ export const zPostSessionsByIdIsolationAttachPath = z.object({
 
 export const zGetSessionsByIdIsolationPath = z.object({
     id: z.string().min(1)
+});
+
+export const zGetSessionGroupsQuery = z.object({
+    workspaceId: z.string().min(1).optional(),
+    linkedIssueId: z.string().min(1).optional(),
+    archived: z.boolean().optional()
+});
+
+export const zPostSessionGroupsBody = z.object({
+    workspaceId: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().min(1).nullish(),
+    linkedIssueId: z.string().min(1).nullish(),
+    sessionIds: z.array(z.string().min(1)).optional()
+});
+
+export const zDeleteSessionGroupsByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zGetSessionGroupsByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPatchSessionGroupsByIdBody = z.object({
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).nullish(),
+    linkedIssueId: z.string().min(1).nullish(),
+    archived: z.boolean().optional()
+});
+
+export const zPatchSessionGroupsByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostSessionGroupsByIdMembersBody = z.object({
+    sessionIds: z.array(z.string().min(1)).min(1)
+});
+
+export const zPostSessionGroupsByIdMembersPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zDeleteSessionGroupsByIdMembersBySessionIdPath = z.object({
+    id: z.string().min(1),
+    sessionId: z.string().min(1)
 });
 
 export const zGetSessionAwaitsQuery = z.object({
@@ -1574,6 +1630,10 @@ export const zPatchIssuesByIdPath = z.object({
 });
 
 export const zGetIssuesByIdSessionsPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zGetIssuesByIdSessionGroupsPath = z.object({
     id: z.string().min(1)
 });
 

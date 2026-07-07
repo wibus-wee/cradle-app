@@ -240,8 +240,9 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `search` | 2 | Search Cradle data. | `cradle man search` |
 | `secret` | 2 | Manage secret metadata. | `cradle man secret` |
 | `session` | 22 | Manage chat sessions and session links. | `cradle man session` |
+| `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
-| `usage` | 7 | Inspect usage and cost data. | `cradle man usage` |
+| `usage` | 10 | Inspect usage and cost data. | `cradle man usage` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
 | `workspace` | 53 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 

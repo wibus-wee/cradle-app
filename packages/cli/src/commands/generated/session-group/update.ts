@@ -12,10 +12,10 @@ const spec = {
     }
   ],
   "command": [
-    "session",
+    "session-group",
     "update"
   ],
-  "description": "Update session",
+  "description": "Update session group",
   "flags": [
     {
       "name": "title",
@@ -24,38 +24,26 @@ const spec = {
       "type": "string"
     },
     {
-      "name": "pinned",
+      "name": "description",
       "required": false,
-      "target": "body.pinned",
+      "target": "body.description",
+      "type": "string"
+    },
+    {
+      "name": "linkedIssueId",
+      "required": false,
+      "target": "body.linkedIssueId",
+      "type": "string"
+    },
+    {
+      "name": "archived",
+      "required": false,
+      "target": "body.archived",
       "type": "boolean"
-    },
-    {
-      "name": "providerTargetId",
-      "required": false,
-      "target": "body.providerTargetId",
-      "type": "string"
-    },
-    {
-      "name": "modelId",
-      "required": false,
-      "target": "body.modelId",
-      "type": "string"
-    },
-    {
-      "name": "thinkingEffort",
-      "required": false,
-      "target": "body.thinkingEffort",
-      "type": "string"
-    },
-    {
-      "name": "sessionGroupId",
-      "required": false,
-      "target": "body.sessionGroupId",
-      "type": "string"
     }
   ],
   "method": "patch",
-  "path": "/sessions/{id}"
+  "path": "/session-groups/{id}"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

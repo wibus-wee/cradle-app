@@ -79,6 +79,12 @@ const spec = {
       "type": "string"
     },
     {
+      "name": "sessionGroupId",
+      "required": false,
+      "target": "body.sessionGroupId",
+      "type": "string"
+    },
+    {
       "name": "worktreeId",
       "required": false,
       "target": "body.worktreeId",

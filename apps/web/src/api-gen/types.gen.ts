@@ -1281,6 +1281,28 @@ export type GetUsageDailyByModelResponses = {
 
 export type GetUsageDailyByModelResponse = GetUsageDailyByModelResponses[keyof GetUsageDailyByModelResponses];
 
+export type GetUsagePatternsHourlyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/usage/patterns/hourly';
+};
+
+export type GetUsagePatternsHourlyResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        hour: number;
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+        count: number;
+    }>;
+};
+
+export type GetUsagePatternsHourlyResponse = GetUsagePatternsHourlyResponses[keyof GetUsagePatternsHourlyResponses];
+
 export type GetUsageSummaryData = {
     body?: never;
     path?: never;
@@ -1344,6 +1366,38 @@ export type GetUsageStatsResponses = {
 };
 
 export type GetUsageStatsResponse = GetUsageStatsResponses[keyof GetUsageStatsResponses];
+
+export type GetUsageSessionsRecentData = {
+    body?: never;
+    path?: never;
+    query?: {
+        limit?: string | number;
+    };
+    url: '/usage/sessions/recent';
+};
+
+export type GetUsageSessionsRecentResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        sessionId: string;
+        title: string;
+        agentId: string | null;
+        agentName: string | null;
+        modelId: string;
+        costUsd: number;
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+        turnCount: number;
+        createdAt: number;
+        updatedAt: number;
+        lastUsageAt: number;
+    }>;
+};
+
+export type GetUsageSessionsRecentResponse = GetUsageSessionsRecentResponses[keyof GetUsageSessionsRecentResponses];
 
 export type GetUsageSessionsBySessionIdData = {
     body?: never;
@@ -5536,6 +5590,7 @@ export type GetSessionsData = {
     query?: {
         workspaceId?: string;
         origin?: string;
+        sessionGroupId?: string;
         archived?: boolean;
     };
     url: '/sessions/';
@@ -5557,6 +5612,7 @@ export type GetSessionsResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -5601,6 +5657,7 @@ export type PostSessionsData = {
         };
         thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
         linkedIssueId?: string | null;
+        sessionGroupId?: string | null;
         worktreeId?: string;
         id?: string;
     };
@@ -5625,6 +5682,7 @@ export type PostSessionsResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -5692,6 +5750,7 @@ export type GetSessionsByIdResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -5721,6 +5780,7 @@ export type PatchSessionsByIdData = {
         providerTargetId?: string;
         modelId?: string | null;
         thinkingEffort?: string | null;
+        sessionGroupId?: string | null;
     };
     path: {
         id: string;
@@ -5745,6 +5805,7 @@ export type PatchSessionsByIdResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -5794,6 +5855,7 @@ export type PostSessionsByIdArchiveResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -5841,6 +5903,7 @@ export type PostSessionsByIdReadResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -5888,6 +5951,7 @@ export type PostSessionsByIdUnreadResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -6166,6 +6230,262 @@ export type GetSessionsByIdIsolationResponses = {
 };
 
 export type GetSessionsByIdIsolationResponse = GetSessionsByIdIsolationResponses[keyof GetSessionsByIdIsolationResponses];
+
+export type GetSessionGroupsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        linkedIssueId?: string;
+        archived?: boolean;
+    };
+    url: '/session-groups';
+};
+
+export type GetSessionGroupsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+    }>;
+};
+
+export type GetSessionGroupsResponse = GetSessionGroupsResponses[keyof GetSessionGroupsResponses];
+
+export type PostSessionGroupsData = {
+    body: {
+        workspaceId: string;
+        title: string;
+        description?: string | null;
+        linkedIssueId?: string | null;
+        sessionIds?: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/session-groups';
+};
+
+export type PostSessionGroupsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+        sessions: Array<{
+            id: string;
+            title: string | null;
+            status: 'idle' | 'streaming' | 'error';
+            latestUserMessageAt: number | null;
+        }>;
+    };
+};
+
+export type PostSessionGroupsResponse = PostSessionGroupsResponses[keyof PostSessionGroupsResponses];
+
+export type DeleteSessionGroupsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/session-groups/{id}';
+};
+
+export type DeleteSessionGroupsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteSessionGroupsByIdResponse = DeleteSessionGroupsByIdResponses[keyof DeleteSessionGroupsByIdResponses];
+
+export type GetSessionGroupsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/session-groups/{id}';
+};
+
+export type GetSessionGroupsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+        sessions: Array<{
+            id: string;
+            title: string | null;
+            status: 'idle' | 'streaming' | 'error';
+            latestUserMessageAt: number | null;
+        }>;
+    };
+};
+
+export type GetSessionGroupsByIdResponse = GetSessionGroupsByIdResponses[keyof GetSessionGroupsByIdResponses];
+
+export type PatchSessionGroupsByIdData = {
+    body: {
+        title?: string;
+        description?: string | null;
+        linkedIssueId?: string | null;
+        archived?: boolean;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/session-groups/{id}';
+};
+
+export type PatchSessionGroupsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+        sessions: Array<{
+            id: string;
+            title: string | null;
+            status: 'idle' | 'streaming' | 'error';
+            latestUserMessageAt: number | null;
+        }>;
+    };
+};
+
+export type PatchSessionGroupsByIdResponse = PatchSessionGroupsByIdResponses[keyof PatchSessionGroupsByIdResponses];
+
+export type PostSessionGroupsByIdMembersData = {
+    body: {
+        sessionIds: Array<string>;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/session-groups/{id}/members';
+};
+
+export type PostSessionGroupsByIdMembersResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+        sessions: Array<{
+            id: string;
+            title: string | null;
+            status: 'idle' | 'streaming' | 'error';
+            latestUserMessageAt: number | null;
+        }>;
+    };
+};
+
+export type PostSessionGroupsByIdMembersResponse = PostSessionGroupsByIdMembersResponses[keyof PostSessionGroupsByIdMembersResponses];
+
+export type DeleteSessionGroupsByIdMembersBySessionIdData = {
+    body?: never;
+    path: {
+        id: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/session-groups/{id}/members/{sessionId}';
+};
+
+export type DeleteSessionGroupsByIdMembersBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+        sessions: Array<{
+            id: string;
+            title: string | null;
+            status: 'idle' | 'streaming' | 'error';
+            latestUserMessageAt: number | null;
+        }>;
+    };
+};
+
+export type DeleteSessionGroupsByIdMembersBySessionIdResponse = DeleteSessionGroupsByIdMembersBySessionIdResponses[keyof DeleteSessionGroupsByIdMembersBySessionIdResponses];
 
 export type GetSessionAwaitsData = {
     body?: never;
@@ -7122,6 +7442,7 @@ export type GetIssuesByIdSessionsResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;
@@ -7143,6 +7464,38 @@ export type GetIssuesByIdSessionsResponses = {
 };
 
 export type GetIssuesByIdSessionsResponse = GetIssuesByIdSessionsResponses[keyof GetIssuesByIdSessionsResponses];
+
+export type GetIssuesByIdSessionGroupsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/issues/{id}/session-groups';
+};
+
+export type GetIssuesByIdSessionGroupsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        workspaceId: string;
+        title: string;
+        description: string | null;
+        linkedIssueId: string | null;
+        status: 'active' | 'archived';
+        configJson: string;
+        archivedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+        sessionCount: number;
+        statusAggregate: 'idle' | 'streaming' | 'error';
+        latestActivityAt: number | null;
+    }>;
+};
+
+export type GetIssuesByIdSessionGroupsResponse = GetIssuesByIdSessionGroupsResponses[keyof GetIssuesByIdSessionGroupsResponses];
 
 export type GetIssuesByIdIsolationContextData = {
     body?: never;
@@ -16759,6 +17112,7 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         modelId: string | null;
         thinkingEffort: string | null;
         linkedIssueId: string | null;
+        sessionGroupId: string | null;
         runtimeKind: string;
         status: 'idle' | 'streaming' | 'error';
         pinned: number;

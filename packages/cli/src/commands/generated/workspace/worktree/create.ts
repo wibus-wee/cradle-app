@@ -37,6 +37,12 @@ const spec = {
       "required": false,
       "target": "body.bindSession",
       "type": "boolean"
+    },
+    {
+      "name": "confirmedSetupHooks",
+      "required": false,
+      "target": "body.confirmedSetupHooks",
+      "type": "boolean"
     }
   ],
   "method": "post",

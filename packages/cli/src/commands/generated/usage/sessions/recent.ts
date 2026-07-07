@@ -5,27 +5,21 @@ import type { Command } from 'commander'
 const spec = {
   "arguments": [],
   "command": [
-    "preferences",
-    "app",
-    "set"
+    "usage",
+    "sessions",
+    "recent"
   ],
-  "description": "Set app preferences",
+  "description": "Get recent usage sessions",
   "flags": [
     {
-      "name": "featureFlags",
-      "required": true,
-      "target": "body.featureFlags",
-      "type": "json"
-    },
-    {
-      "name": "worktreeCleanup",
+      "name": "limit",
       "required": false,
-      "target": "body.worktreeCleanup",
-      "type": "json"
+      "target": "query.limit",
+      "type": "string"
     }
   ],
-  "method": "put",
-  "path": "/preferences/app"
+  "method": "get",
+  "path": "/usage/sessions/recent"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

@@ -218,6 +218,13 @@ import { register as registerSessionLinkedIssueLink } from './session/linked-iss
 import { register as registerSessionLinkedIssueUnlink } from './session/linked-issue/unlink'
 import { register as registerSessionList } from './session/list'
 import { register as registerSessionUpdate } from './session/update'
+import { register as registerSessionGroupAddMember } from './session-group/add-member'
+import { register as registerSessionGroupCreate } from './session-group/create'
+import { register as registerSessionGroupDelete } from './session-group/delete'
+import { register as registerSessionGroupGet } from './session-group/get'
+import { register as registerSessionGroupList } from './session-group/list'
+import { register as registerSessionGroupRemoveMember } from './session-group/remove-member'
+import { register as registerSessionGroupUpdate } from './session-group/update'
 import { register as registerSkillCreate } from './skill/create'
 import { register as registerSkillDocumentDelete } from './skill/document/delete'
 import { register as registerSkillDocumentGet } from './skill/document/get'
@@ -232,7 +239,10 @@ import { register as registerUsageCostDaily } from './usage/cost/daily'
 import { register as registerUsageCostSessions } from './usage/cost/sessions'
 import { register as registerUsageCostSummary } from './usage/cost/summary'
 import { register as registerUsageDaily } from './usage/daily'
+import { register as registerUsageDailyByModel } from './usage/daily-by-model'
+import { register as registerUsagePatternsHourly } from './usage/patterns/hourly'
 import { register as registerUsageSession } from './usage/session'
+import { register as registerUsageSessionsRecent } from './usage/sessions/recent'
 import { register as registerUsageStats } from './usage/stats'
 import { register as registerUsageSummary } from './usage/summary'
 import { register as registerWorkflowRuleDelete } from './workflow-rule/delete'
@@ -512,6 +522,13 @@ export function registerGeneratedCommands(program: Command): void {
   registerSessionLinkedIssueUnlink(program)
   registerSessionList(program)
   registerSessionUpdate(program)
+  registerSessionGroupAddMember(program)
+  registerSessionGroupCreate(program)
+  registerSessionGroupDelete(program)
+  registerSessionGroupGet(program)
+  registerSessionGroupList(program)
+  registerSessionGroupRemoveMember(program)
+  registerSessionGroupUpdate(program)
   registerSkillCreate(program)
   registerSkillDocumentDelete(program)
   registerSkillDocumentGet(program)
@@ -526,7 +543,10 @@ export function registerGeneratedCommands(program: Command): void {
   registerUsageCostSessions(program)
   registerUsageCostSummary(program)
   registerUsageDaily(program)
+  registerUsageDailyByModel(program)
+  registerUsagePatternsHourly(program)
   registerUsageSession(program)
+  registerUsageSessionsRecent(program)
   registerUsageStats(program)
   registerUsageSummary(program)
   registerWorkflowRuleDelete(program)

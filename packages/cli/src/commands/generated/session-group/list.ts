@@ -5,10 +5,10 @@ import type { Command } from 'commander'
 const spec = {
   "arguments": [],
   "command": [
-    "session",
+    "session-group",
     "list"
   ],
-  "description": "List sessions",
+  "description": "List session groups",
   "flags": [
     {
       "description": "Defaults to CRADLE_WORKSPACE_ID. Pass --all-workspaces to query every workspace.",
@@ -20,15 +20,9 @@ const spec = {
       "disableEnvDefaultFlag": "allWorkspaces"
     },
     {
-      "name": "origin",
+      "name": "linkedIssueId",
       "required": false,
-      "target": "query.origin",
-      "type": "string"
-    },
-    {
-      "name": "sessionGroupId",
-      "required": false,
-      "target": "query.sessionGroupId",
+      "target": "query.linkedIssueId",
       "type": "string"
     },
     {
@@ -39,7 +33,7 @@ const spec = {
     }
   ],
   "method": "get",
-  "path": "/sessions/"
+  "path": "/session-groups"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {
