@@ -1,7 +1,11 @@
 export const DEFAULT_TERMINAL_FONT_FAMILY = [
-  '"JetBrainsMono Nerd Font"',
-  '"Cascadia Code"',
-  '"Fira Mono"',
+  'ui-monospace',
+  'SFMono-Regular',
+  'Menlo',
+  'Monaco',
+  'Consolas',
+  '"Liberation Mono"',
+  '"Courier New"',
   'monospace',
 ].join(', ')
 
