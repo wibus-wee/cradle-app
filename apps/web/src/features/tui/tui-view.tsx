@@ -15,6 +15,7 @@ import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
+import { resolveTerminalFontFamily, useTerminalPreferencesStore } from './terminal-preferences'
 
 const EXIT_BANNER = '\r\n\x1B[2m[Process exited]\x1B[0m\r\n'
 
@@ -35,7 +36,7 @@ export function TuiView({ sessionId }: TuiViewProps) {
 
     const terminal = new Terminal({
       theme: getAppTerminalTheme(),
-      fontFamily: '"GeistMono", "Cascadia Code", "Fira Mono", monospace',
+      fontFamily: resolveTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily),
       fontSize: 13,
       lineHeight: 1.4,
       cursorBlink: true,
@@ -59,6 +60,7 @@ export function TuiView({ sessionId }: TuiViewProps) {
     let lastCols = 0
     let lastRows = 0
     let resizeTimer: ReturnType<typeof setTimeout> | null = null
+    let fontFrame: number | null = null
     let pendingCols = 0
     let pendingRows = 0
 
@@ -84,6 +86,14 @@ export function TuiView({ sessionId }: TuiViewProps) {
         lastRows = pendingRows
         channel.sendResize(lastCols, lastRows)
       }, 100)
+    }
+
+    function refitAndNotify() {
+      const dims = fitAddon.proposeDimensions()
+      if (!dims || dims.cols <= 0 || dims.rows <= 0) {
+        return
+      }
+      applyResize(dims.cols, dims.rows)
     }
 
     let exitShown = false
@@ -143,6 +153,22 @@ export function TuiView({ sessionId }: TuiViewProps) {
       terminal.options.theme = getAppTerminalTheme()
     })
 
+    const stopWatchingTerminalPreferences = useTerminalPreferencesStore.subscribe((state, previousState) => {
+      const nextFontFamily = resolveTerminalFontFamily(state.fontFamily)
+      if (nextFontFamily === resolveTerminalFontFamily(previousState.fontFamily)) {
+        return
+      }
+
+      terminal.options.fontFamily = nextFontFamily
+      if (fontFrame !== null) {
+        cancelAnimationFrame(fontFrame)
+      }
+      fontFrame = requestAnimationFrame(() => {
+        fontFrame = null
+        refitAndNotify()
+      })
+    })
+
     // Forward keystrokes to the server
     const dataDisposable = terminal.onData((data) => {
       channel.sendInput(data)
@@ -150,11 +176,7 @@ export function TuiView({ sessionId }: TuiViewProps) {
 
     // Resize observer: refit on container size change
     const resizeObserver = new ResizeObserver(() => {
-      const dims = fitAddon.proposeDimensions()
-      if (!dims || dims.cols <= 0 || dims.rows <= 0) {
-        return
-      }
-      applyResize(dims.cols, dims.rows)
+      refitAndNotify()
     })
     resizeObserver.observe(containerRef.current)
 
@@ -162,11 +184,15 @@ export function TuiView({ sessionId }: TuiViewProps) {
       if (resizeTimer) {
         clearTimeout(resizeTimer)
       }
+      if (fontFrame !== null) {
+        cancelAnimationFrame(fontFrame)
+      }
       channelRef.current = null
       channel.close()
       dataDisposable.dispose()
       resizeObserver.disconnect()
       stopWatchingTheme()
+      stopWatchingTerminalPreferences()
       terminal.dispose()
     }
   }, [sessionId])
