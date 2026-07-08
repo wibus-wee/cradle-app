@@ -724,7 +724,7 @@ export default {
   'appearance.sessionPreview.info': 'Pinned and running sessions always stay visible even when the preview limit is small.',
   'appearance.terminalFont.label': 'Terminal font',
   'appearance.terminalFont.description': 'Font family used by built-in terminals on this device. Leave blank to use Cradle defaults.',
-  'appearance.terminalFont.placeholder': 'e.g. MesloLGM Nerd Font Mono, CaskaydiaCove Nerd Font',
+  'appearance.terminalFont.placeholder': 'MesloLGM Nerd Font Mono, CaskaydiaCove Nerd Font',
   'await.page.title': 'Await',
   'await.page.description': 'Configure CI check bypass rules for session awaits. Bypassed checks are skipped during polling and do not block await completion.',
   'await.workspace.label': 'Workspace',

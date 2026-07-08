@@ -50,7 +50,7 @@
   "appearance.sessionPreview.label": "折りたたみ時のセッションプレビュー数",
   "appearance.terminalFont.description": "このデバイスの内蔵ターミナルで使うフォントファミリーです。空欄なら Cradle の既定値を使います。",
   "appearance.terminalFont.label": "ターミナルフォント",
-  "appearance.terminalFont.placeholder": "例: MesloLGM Nerd Font Mono, CaskaydiaCove Nerd Font",
+  "appearance.terminalFont.placeholder": "MesloLGM Nerd Font Mono, CaskaydiaCove Nerd Font",
   "appearance.theme.dark": "ダーク",
   "appearance.theme.description": "アプリのカラーテーマを選択します。",
   "appearance.theme.info": "ライトとダークのテーマは環境に合わせて使えます。システム設定は OS の設定に従います。",
