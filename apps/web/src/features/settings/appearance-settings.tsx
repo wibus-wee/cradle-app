@@ -2,7 +2,12 @@ import { CheckLine as CheckIcon } from '@mingcute/react'
 import { startTransition, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Input } from '~/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
+import {
+  normalizeTerminalFontFamily,
+  useTerminalPreferencesStore,
+} from '~/features/tui/terminal-preferences'
 import {
   SESSION_PREVIEW_LIMIT_OPTIONS,
   useWorkspaceSidebarUiStore,
@@ -163,9 +168,60 @@ export function AppearanceSettings() {
         </SettingsRow>
 
         <LanguageSettings />
+        <TerminalFontSettings />
         <SessionPreviewSettings />
       </SettingsGroup>
     </SettingsPage>
+  )
+}
+
+function TerminalFontSettings() {
+  const { t } = useTranslation('settings')
+  const terminalFontFamily = useTerminalPreferencesStore(s => s.fontFamily)
+  const setTerminalFontFamily = useTerminalPreferencesStore(s => s.setFontFamily)
+  const label = t('appearance.terminalFont.label')
+
+  return (
+    <SettingsRow
+      label={label}
+      description={t('appearance.terminalFont.description')}
+      vertical
+    >
+      <TerminalFontInput
+        key={terminalFontFamily ?? ''}
+        value={terminalFontFamily ?? ''}
+        label={label}
+        placeholder={t('appearance.terminalFont.placeholder')}
+        onSave={setTerminalFontFamily}
+      />
+    </SettingsRow>
+  )
+}
+
+interface TerminalFontInputProps {
+  value: string
+  label: string
+  placeholder: string
+  onSave: (fontFamily: string | null) => void
+}
+
+function TerminalFontInput({ value, label, placeholder, onSave }: TerminalFontInputProps) {
+  function saveDraft(input: HTMLInputElement) {
+    const normalized = normalizeTerminalFontFamily(input.value)
+    input.value = normalized ?? ''
+    onSave(normalized)
+  }
+
+  return (
+    <Input
+      defaultValue={value}
+      onBlur={event => saveDraft(event.currentTarget)}
+      onKeyDown={event => event.key === 'Enter' && event.currentTarget.blur()}
+      placeholder={placeholder}
+      aria-label={label}
+      data-testid="appearance-terminal-font-family"
+      className="font-mono text-[12px]"
+    />
   )
 }
 

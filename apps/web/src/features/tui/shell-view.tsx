@@ -17,6 +17,8 @@ import {
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
+import { getTerminalFontFamily } from './terminal-font'
+import { useTerminalPreferencesStore } from './terminal-preferences'
 import type { TerminalMetadata } from './terminal-metadata'
 import { mergeTerminalMetadata, readTerminalMetadata } from './terminal-metadata'
 
@@ -121,7 +123,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     const el = containerRef.current
     const terminal = new Terminal({
       theme: getAppTerminalTheme(),
-      fontFamily: '"GeistMono", "Cascadia Code", "Fira Mono", monospace',
+      fontFamily: getTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily),
       fontSize: 13,
       lineHeight: 1.4,
       cursorBlink: true,
@@ -198,6 +200,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     let pendingOscBuffer = ''
     let pendingTranscript = ''
     let transcriptFrame: number | null = null
+    let fontFrame: number | null = null
 
     function setTranscript(next: string) {
       pendingTranscript = ''
@@ -387,6 +390,22 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
       terminal.options.theme = getAppTerminalTheme()
     })
 
+    const stopWatchingTerminalPreferences = useTerminalPreferencesStore.subscribe((state, previousState) => {
+      const nextFontFamily = getTerminalFontFamily(state.fontFamily)
+      if (nextFontFamily === getTerminalFontFamily(previousState.fontFamily)) {
+        return
+      }
+
+      terminal.options.fontFamily = nextFontFamily
+      if (fontFrame !== null) {
+        cancelAnimationFrame(fontFrame)
+      }
+      fontFrame = requestAnimationFrame(() => {
+        fontFrame = null
+        fitAndNotify()
+      })
+    })
+
     const dataDisposable = terminal.onData((data) => {
       if (!visibleRef.current) {
         return
@@ -409,6 +428,9 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
       if (transcriptFrame !== null) {
         cancelAnimationFrame(transcriptFrame)
       }
+      if (fontFrame !== null) {
+        cancelAnimationFrame(fontFrame)
+      }
       if (focusFrameRef.current !== null) {
         cancelAnimationFrame(focusFrameRef.current)
         focusFrameRef.current = null
@@ -422,6 +444,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
       dataDisposable.dispose()
       resizeObserver.disconnect()
       stopWatchingTheme()
+      stopWatchingTerminalPreferences()
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
