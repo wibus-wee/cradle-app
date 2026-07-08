@@ -17,7 +17,8 @@ import {
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
-import { resolveTerminalFontFamily, useTerminalPreferencesStore } from './terminal-preferences'
+import { getTerminalFontFamily } from './terminal-font'
+import { useTerminalPreferencesStore } from './terminal-preferences'
 import type { TerminalMetadata } from './terminal-metadata'
 import { mergeTerminalMetadata, readTerminalMetadata } from './terminal-metadata'
 
@@ -122,7 +123,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     const el = containerRef.current
     const terminal = new Terminal({
       theme: getAppTerminalTheme(),
-      fontFamily: resolveTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily),
+      fontFamily: getTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily),
       fontSize: 13,
       lineHeight: 1.4,
       cursorBlink: true,
@@ -390,8 +391,8 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     })
 
     const stopWatchingTerminalPreferences = useTerminalPreferencesStore.subscribe((state, previousState) => {
-      const nextFontFamily = resolveTerminalFontFamily(state.fontFamily)
-      if (nextFontFamily === resolveTerminalFontFamily(previousState.fontFamily)) {
+      const nextFontFamily = getTerminalFontFamily(state.fontFamily)
+      if (nextFontFamily === getTerminalFontFamily(previousState.fontFamily)) {
         return
       }
 

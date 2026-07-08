@@ -15,7 +15,8 @@ import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
-import { resolveTerminalFontFamily, useTerminalPreferencesStore } from './terminal-preferences'
+import { getTerminalFontFamily } from './terminal-font'
+import { useTerminalPreferencesStore } from './terminal-preferences'
 
 const EXIT_BANNER = '\r\n\x1B[2m[Process exited]\x1B[0m\r\n'
 
@@ -36,7 +37,7 @@ export function TuiView({ sessionId }: TuiViewProps) {
 
     const terminal = new Terminal({
       theme: getAppTerminalTheme(),
-      fontFamily: resolveTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily),
+      fontFamily: getTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily),
       fontSize: 13,
       lineHeight: 1.4,
       cursorBlink: true,
@@ -154,8 +155,8 @@ export function TuiView({ sessionId }: TuiViewProps) {
     })
 
     const stopWatchingTerminalPreferences = useTerminalPreferencesStore.subscribe((state, previousState) => {
-      const nextFontFamily = resolveTerminalFontFamily(state.fontFamily)
-      if (nextFontFamily === resolveTerminalFontFamily(previousState.fontFamily)) {
+      const nextFontFamily = getTerminalFontFamily(state.fontFamily)
+      if (nextFontFamily === getTerminalFontFamily(previousState.fontFamily)) {
         return
       }
 

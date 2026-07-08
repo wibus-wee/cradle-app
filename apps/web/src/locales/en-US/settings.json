@@ -50,7 +50,7 @@
   "appearance.sessionPreview.label": "Collapsed session preview",
   "appearance.terminalFont.description": "Font family used by built-in terminals on this device. Leave blank to use Cradle defaults.",
   "appearance.terminalFont.label": "Terminal font",
-  "appearance.terminalFont.placeholder": "MesloLGM Nerd Font Mono, CaskaydiaCove Nerd Font",
+  "appearance.terminalFont.placeholder": "\"MesloLGM Nerd Font Mono\", \"CaskaydiaCove Nerd Font\", ui-monospace, monospace",
   "appearance.theme.dark": "Dark",
   "appearance.theme.description": "Choose the app color theme.",
   "appearance.theme.info": "Light and dark themes fit different environments. System mode follows your operating system preference.",
