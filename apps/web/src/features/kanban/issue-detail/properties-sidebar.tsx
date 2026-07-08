@@ -436,7 +436,8 @@ function AgentSessionPanel({
         <div className={cn(
           'space-y-1.5',
           (currentSession || linkedSessionGroups.length > 0) && 'mt-3 border-t border-border pt-2.5',
-        )}>
+        )}
+        >
           <div className="text-[12px] font-medium text-muted-foreground">
             {ordinaryLinkedSessions.length === 1 ? 'Linked chat' : 'Linked chats'}
           </div>

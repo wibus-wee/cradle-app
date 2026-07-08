@@ -77,7 +77,7 @@ interface WorkspaceSessionGroupSectionProps {
   onDeleteGroup: (group: WorkspaceSessionGroup) => void
 }
 
-export const WorkspaceSessionGroupSection = memo(function WorkspaceSessionGroupSection({
+export const WorkspaceSessionGroupSection = memo(({
   group,
   sessions,
   workspaceId,
@@ -85,7 +85,7 @@ export const WorkspaceSessionGroupSection = memo(function WorkspaceSessionGroupS
   children,
   onRenameGroup,
   onDeleteGroup,
-}: WorkspaceSessionGroupSectionProps) {
+}: WorkspaceSessionGroupSectionProps) => {
   const expanded = useWorkspaceSidebarUiStore(
     state => state.expandedSessionGroupIds[group.id] === true,
   )

@@ -4,9 +4,9 @@ import { sessionGroups, sessions, workspaces } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { localWorkspaceLocatorJson } from '../../../tests/helpers/workspace-fixture'
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { localWorkspaceLocatorJson } from '../../../tests/helpers/workspace-fixture'
 import * as SessionGroup from './service'
 
 const WORKSPACE_ID = 'workspace-session-group-test'

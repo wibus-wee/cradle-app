@@ -142,6 +142,7 @@ import { useTitleRegenerationStore } from '~/store/title-regeneration'
 import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
 import type { WorkspaceSession } from './use-session'
 import { isManualSession, sessionsQueryKey, updateSessionReadState, useAllSessions } from './use-session'
+import type { WorkspaceSessionGroup } from './use-session-group'
 import {
   useAddSessionGroupMembers,
   useCreateSessionGroup,
@@ -149,13 +150,7 @@ import {
   useRemoveSessionGroupMember,
   useSessionGroups,
   useUpdateSessionGroup,
-  type WorkspaceSessionGroup,
 } from './use-session-group'
-import {
-  partitionWorkspaceSessions,
-  SessionGroupMenuItems,
-  WorkspaceSessionGroupSection,
-} from './workspace-session-groups'
 import type { CreateWorkspaceInput, WorkspaceRecognition } from './use-workspace'
 import {
   useAddWorkspace,
@@ -164,6 +159,11 @@ import {
   useWorkspaces,
   WORKSPACES_QUERY_KEY,
 } from './use-workspace'
+import {
+  partitionWorkspaceSessions,
+  SessionGroupMenuItems,
+  WorkspaceSessionGroupSection,
+} from './workspace-session-groups'
 import type {
   WorkspaceSidebarProjectFilter,
   WorkspaceSidebarProjectSortDirection,

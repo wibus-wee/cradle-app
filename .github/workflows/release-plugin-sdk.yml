@@ -15,7 +15,7 @@ on:
           - dev
           - release
       version:
-        description: 'Dev display version (e.g. 20260707.1) or release SemVer (e.g. 0.2.1)'
+        description: Dev display version (e.g. 20260707.1) or release SemVer (e.g. 0.2.1)
         required: true
 
 permissions:

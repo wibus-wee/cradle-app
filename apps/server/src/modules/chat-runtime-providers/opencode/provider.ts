@@ -69,9 +69,8 @@ import {
   OpencodeEventStreamProjector,
   readOpencodeTerminalAssistantForTurn,
 } from './event-stream'
+import type { OpencodePromptAsyncBody, OpencodePromptBody } from './input-projector'
 import {
-  type OpencodePromptAsyncBody,
-  type OpencodePromptBody,
   projectOpencodePromptParts,
   projectOpencodeQuickQuestionParts,
   projectOpencodeReasoningVariant,

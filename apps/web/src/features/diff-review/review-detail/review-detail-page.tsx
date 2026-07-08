@@ -12,8 +12,8 @@ import {
   formatSelectedReviewRange,
   getSelectedReviewRange,
 } from '../shared/diff-items'
-import { navigateToCommitView, navigateToGuideView, navigateToReviewsList } from '../shared/navigation'
 import { reviewSupportsCommitPlan, reviewSupportsGuide } from '../shared/guide-insights'
+import { navigateToCommitView, navigateToGuideView, navigateToReviewsList } from '../shared/navigation'
 import type { DiffStyle, ReviewFile, ReviewThread } from '../shared/types'
 import { useReview } from '../shared/use-review'
 import { AgentRail } from './agent-rail'

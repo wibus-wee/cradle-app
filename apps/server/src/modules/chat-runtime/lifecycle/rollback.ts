@@ -171,8 +171,7 @@ export function shouldRollbackProviderTurn(tailRows: (typeof messages.$inferSele
       row.status !== 'failed'
       || row.content.trim().length > 0
       || hasNonEmptyMessageParts(row.messageJson)
-    ),
-  )
+    ))
 }
 
 function hasNonEmptyMessageParts(messageJson: string): boolean {

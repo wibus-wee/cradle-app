@@ -2,8 +2,8 @@ import { Streamdown } from '@cradle/streamdown'
 import {
   AlertLine as AlertCircleIcon,
   AnticlockwiseLine as RotateCcwIcon,
-  CloseCircleLine as XCircleIcon,
   Clock2Line as Clock3Icon,
+  CloseCircleLine as XCircleIcon,
   HeartbeatLine as ActivityIcon,
   SparklesLine as SparklesIcon,
   TreeLine as ListTreeIcon,

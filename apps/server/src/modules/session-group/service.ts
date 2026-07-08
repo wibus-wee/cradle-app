@@ -7,11 +7,10 @@ import { and, desc, eq, inArray, isNotNull, isNull, max } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import * as Issue from '../issue/service'
+import type { SessionStatus, SessionView } from '../session/service'
 import {
   aggregateSessionStatus,
   listBySessionGroupId,
-  type SessionStatus,
-  type SessionView,
 } from '../session/service'
 import * as Workspace from '../workspace/service'
 

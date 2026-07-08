@@ -1182,7 +1182,7 @@ describe('opencodeProvider streamTurn', () => {
 
     const chunks = await chunksPromise
     expect(chunks.some(chunk => chunk.type === 'text-delta' && chunk.delta === 'Done.')).toBe(true)
-    expect(chunks[chunks.length - 1]).toMatchObject({ type: 'finish' })
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish' })
   })
 
   it('omits the variant field when thinkingEffort is not set', async () => {
@@ -1225,7 +1225,7 @@ describe('opencodeProvider streamTurn', () => {
 
     const chunks = await chunksPromise
     expect(chunks.some(chunk => chunk.type === 'text-delta' && chunk.delta === 'Done.')).toBe(true)
-    expect(chunks[chunks.length - 1]).toMatchObject({ type: 'finish' })
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish' })
   })
 
   it('fails fast when the event stream subscription fails before async prompt recovery is ready', async () => {

@@ -28,7 +28,7 @@ import {
   formatAnchorRange,
   guideAnchorsForPath,
 } from '../shared/diff-items'
-import { isGuideGenerationActive, isGuideReady } from '../shared/guide-insights'
+import { isGuideReady } from '../shared/guide-insights'
 import { navigateToReview, navigateToReviewAtAnchor } from '../shared/navigation'
 import type { GenerateGuideInput, ReviewFile, ReviewGuideAnchor, ReviewGuideStep, ReviewThread } from '../shared/types'
 import { useReview } from '../shared/use-review'
@@ -156,7 +156,6 @@ export function GuideView({ workspaceId, repositoryPath, reviewId, onBack }: Gui
     </div>
   )
 }
-
 
 function GuideReading({
   review,
