@@ -1,5 +1,7 @@
 import { Elysia, t } from 'elysia'
 
+import { pluginMarketplaceRoutes } from '../plugin-marketplace'
+
 import { PluginsModel } from './model'
 import * as Plugins from './service'
 
@@ -7,6 +9,7 @@ export const plugins = new Elysia({
   prefix: '/plugins',
   detail: { tags: ['plugins'] },
 })
+  .use(pluginMarketplaceRoutes)
   .get('/', () => Plugins.listPlugins(), {
     detail: {
       'summary': 'List plugins',
@@ -40,6 +43,13 @@ export const plugins = new Elysia({
     },
     body: PluginsModel.addPluginSourceBody,
     response: { 200: PluginsModel.addPluginSourceResult },
+  })
+  .post('/sources/preview', ({ body }) => Plugins.previewSource(body), {
+    detail: {
+      summary: 'Preview plugin source (no install)',
+    },
+    body: PluginsModel.previewPluginSourceBody,
+    response: { 200: PluginsModel.pluginSourcePreview },
   })
   .get('/sources/:id', ({ params }) => Plugins.getSource(params.id), {
     detail: {

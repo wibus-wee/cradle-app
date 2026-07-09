@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 
@@ -10,14 +11,18 @@ import type {
   PluginDescriptor,
   PluginLayer,
   PluginLayerState,
+  PluginManifest,
+  PluginSourceDescriptor,
 } from '@cradle/plugin-sdk'
 
 import { AppError } from '../../errors/app-error'
 import { disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from '../../plugins/loader'
-import { getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
+import { discoverPluginPackages } from '../../plugins/discovery'
+import { classifyPluginSource, createPluginDescriptor, getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
 import { resolvePluginSourceDirectory } from '../../plugins/source-installer'
 import type { AddPluginSourceInput } from '../../plugins/source-registry'
 import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource } from '../../plugins/source-registry'
+import { evaluatePluginSourceTrust, readRelayHostExposure } from '../../plugins/trust-policy'
 
 export interface PluginMentionCapability {
   id: string
@@ -138,6 +143,32 @@ export interface PluginSourceRegistryEntryView {
 export interface AddPluginSourceResult {
   source: PluginSourceRegistryEntryView
   discoveredPlugins: PluginDescriptorView[]
+}
+
+export interface PluginPreviewItem {
+  name: string
+  version: string
+  displayName: string
+  description: string | null
+  iconAvailable: boolean
+  trusted: boolean
+  trustReason: string | null
+  declaredPermissions: PluginDeclaredPermissionView[]
+  warnings: string[]
+  hasWeb: boolean
+  hasServer: boolean
+  hasDesktop: boolean
+}
+
+export interface PluginSourcePreview {
+  source: { kind: 'git' | 'npm', location: string, ref: string | null, subPath: string | null }
+  plugins: PluginPreviewItem[]
+  warnings: string[]
+}
+
+function trimNullable(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed || null
 }
 
 const iconMimeTypesByExtension: Record<string, string> = {
@@ -403,6 +434,98 @@ export async function createSource(input: AddPluginSourceInput): Promise<AddPlug
       source: await toPluginSourceRegistryEntryView(source),
       discoveredPlugins: [],
     }
+  }
+}
+
+/**
+ * Stateless preview of a plugin source: download to the hash-keyed cache,
+ * discover packages, evaluate trust, and return - **no DB row, no runtime
+ * registration, no activation**. The cache is reused by a subsequent real
+ * install (same `{kind,location,ref,subPath}` -> same hash -> no second fetch).
+ */
+export async function previewSource(input: AddPluginSourceInput): Promise<PluginSourcePreview> {
+  if (input.kind !== 'git' && input.kind !== 'npm') {
+    throw new AppError({
+      code: 'invalid_plugin_source',
+      status: 400,
+      message: 'Preview only supports git and npm plugin sources.',
+    })
+  }
+  const kind = input.kind
+
+  const tempSource: PluginSource = {
+    id: `preview:${randomUUID()}`,
+    kind,
+    location: input.location.trim(),
+    ref: trimNullable(input.ref),
+    subPath: trimNullable(input.subPath),
+    label: null,
+    addedReason: 'preview',
+    createdAt: 0,
+    updatedAt: 0,
+  }
+
+  const pluginsDir = await resolvePluginSourceDirectory(tempSource)
+  const packages = await discoverPluginPackages(pluginsDir)
+  const relayHostExposed = readRelayHostExposure()
+
+  const plugins: PluginPreviewItem[] = []
+  const warnings: string[] = []
+
+  for (const pkg of packages) {
+    const manifest: PluginManifest | undefined = pkg.manifest
+    if (!manifest) {
+      warnings.push(pkg.error ?? `Invalid plugin package at ${pkg.packageDir}.`)
+      continue
+    }
+
+    const baseSource: PluginSourceDescriptor = {
+      ...classifyPluginSource(pkg.packageDir, pluginsDir, 'externalLocal'),
+      provenance: pkg.provenance,
+    }
+
+    let trustedSource: PluginSourceDescriptor
+    try {
+      trustedSource = await evaluatePluginSourceTrust({
+        pluginName: manifest.name,
+        source: baseSource,
+        relayHostExposed,
+      })
+    }
+    catch (err) {
+      trustedSource = {
+        ...baseSource,
+        trusted: false,
+        reason: err instanceof Error ? err.message : String(err),
+      }
+    }
+
+    const descriptor = createPluginDescriptor(manifest, trustedSource)
+    plugins.push({
+      name: descriptor.name,
+      version: descriptor.version,
+      displayName: descriptor.displayName,
+      description: descriptor.description ?? null,
+      iconAvailable: !!descriptor.icon,
+      trusted: trustedSource.trusted,
+      trustReason: trustedSource.reason ?? null,
+      declaredPermissions: descriptor.declaredPermissions.map(toDeclaredPermissionView),
+      warnings: descriptor.warnings,
+      hasWeb: descriptor.hasWeb,
+      hasServer: descriptor.hasServer,
+      hasDesktop: descriptor.hasDesktop,
+    })
+  }
+
+  return {
+    source: {
+      kind,
+      location: tempSource.location,
+      ref: tempSource.ref,
+      subPath: tempSource.subPath,
+    },
+    plugins,
+    warnings,
   }
 }
 

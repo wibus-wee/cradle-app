@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-06T12:00:00Z",
+  "plugins": [
+    {
+      "id": "browser-use",
+      "displayName": "Browser Use",
+      "description": "Browser automation MCP server + skill. Lets agents drive a real browser to read pages, fill forms, and complete web tasks.",
+      "icon": "https://raw.githubusercontent.com/wibus-wee/cradle-app/main/plugins/browser-use/assets/icon.svg",
+      "category": "automation",
+      "tags": ["browser", "mcp", "automation"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    },
+    {
+      "id": "cc-switch",
+      "displayName": "CC Switch",
+      "description": "Switch the active provider/credential context without leaving the conversation. Handy for rotating between accounts and models.",
+      "icon": null,
+      "category": "dev",
+      "tags": ["provider", "switcher"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    },
+    {
+      "id": "codex-plus-plus",
+      "displayName": "Codex++",
+      "description": "Enhancements for the Codex runtime: extra tooling and quality-of-life improvements for Codex-driven sessions.",
+      "icon": null,
+      "category": "dev",
+      "tags": ["codex", "runtime"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    },
+    {
+      "id": "github-issues",
+      "displayName": "GitHub Issues",
+      "description": "Two-way GitHub Issues integration: pull issues into Cradle and push status updates back to GitHub.",
+      "icon": null,
+      "category": "integration",
+      "tags": ["github", "issues", "integration"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    },
+    {
+      "id": "nowledge-mem",
+      "displayName": "Nowledge Mem",
+      "description": "Persistent knowledge memory for agents. Captures decisions, learnings, and context so they survive across sessions.",
+      "icon": null,
+      "category": "integration",
+      "tags": ["memory", "knowledge"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    },
+    {
+      "id": "slack-conversation-bridge",
+      "displayName": "Slack Conversation Bridge",
+      "description": "Bridge Cradle conversations to Slack channels so teams can follow and reply from Slack.",
+      "icon": null,
+      "category": "integration",
+      "tags": ["slack", "bridge", "integration"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    },
+    {
+      "id": "system-info",
+      "displayName": "System Info",
+      "description": "Exposes host system information (OS, resources, runtime) to agents as a read-only capability.",
+      "icon": null,
+      "category": "dev",
+      "tags": ["system", "diagnostics"],
+      "author": { "name": "Cradle", "url": "https://github.com/wibus-wee" },
+      "homepage": "https://github.com/wibus-wee/cradle-app",
+      "bundled": true,
+      "featured": true
+    }
+  ]
+}
