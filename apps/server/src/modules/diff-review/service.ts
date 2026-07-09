@@ -2365,7 +2365,7 @@ export async function generateGuide(input: {
     })
   }
 
-  const session = Session.create({
+  const session = await Session.create({
     workspaceId: review.workspaceId,
     title: `Diff guide: ${review.title}`,
     origin: 'cradle-review',
@@ -3189,7 +3189,7 @@ async function startAgentFixRun(
           .where(eq(agents.id, agentId))
           .get()
       : null
-    const session = Session.create({
+    const session = await Session.create({
       workspaceId: review.workspaceId,
       title: `Diff fix: ${review.title}`,
       origin: 'cradle-review',

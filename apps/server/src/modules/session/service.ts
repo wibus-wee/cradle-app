@@ -38,9 +38,20 @@ import {
 } from '../provider-targets/service'
 import * as Workspace from '../workspace/service'
 import { attachSessionToWorktree, readSessionIsolation } from '../worktree/service'
+import {
+  createRemoteProjectedSession,
+  isRemoteProjectedSession,
+  readSessionExecutionTarget,
+  removeRemoteProjectedSession,
+  type SessionExecutionTarget,
+} from './remote-projection'
+import { isLocalWorkspaceLocator } from '../workspace/workspace-locator'
+
+export type { SessionExecutionTarget }
 
 export type SessionStatus = 'idle' | 'streaming' | 'error'
 export type SessionView = Session & {
+  execution: SessionExecutionTarget
   modelId: string | null
   thinkingEffort: ChatThinkingEffort | null
   status: SessionStatus
@@ -319,6 +330,7 @@ function toSessionView(
   const isolation = readSessionIsolation(session)
   return {
     ...session,
+    execution: readSessionExecutionTarget(session.id),
     providerTargetId: session.providerTargetId,
     modelId,
     thinkingEffort: readSessionThinkingEffortPreference(session.configJson),
@@ -598,7 +610,7 @@ export function markUnread(id: string): SessionView | null {
   return get(id)
 }
 
-export function create(input: {
+export async function create(input: {
   id?: string
   workspaceId?: string | null
   title: string
@@ -615,10 +627,35 @@ export function create(input: {
   sessionGroupId?: string | null
   worktreeId?: string | null
   configJson?: string
-}): SessionView {
+}): Promise<SessionView> {
   const parsed = SessionCreateInputSchema.parse(input)
-  const resolved = resolveSessionCreateInput(parsed)
   const workspaceId = resolveSessionWorkspaceId(parsed)
+  if (workspaceId) {
+    const workspace = Workspace.get(workspaceId)
+    if (workspace && !isLocalWorkspaceLocator(workspace.locator)) {
+      const projected = await createRemoteProjectedSession({
+        id: parsed.id,
+        workspaceId,
+        title: parsed.title,
+        origin: parsed.origin,
+        runtimeKind: parsed.runtimeKind as RuntimeKind | undefined,
+        linkedIssueId: parsed.linkedIssueId,
+        sessionGroupId: parsed.sessionGroupId,
+      })
+      const view = get(projected.localSessionId)
+      if (!view) {
+        throw new AppError({
+          code: 'session_not_found',
+          status: 500,
+          message: 'Local session projection was not found after create.',
+          details: { sessionId: projected.localSessionId },
+        })
+      }
+      return view
+    }
+  }
+
+  const resolved = resolveSessionCreateInput(parsed)
   const sessionGroupId = assertSessionGroupAssignment({
     sessionGroupId: parsed.sessionGroupId,
     workspaceId,
@@ -1006,7 +1043,10 @@ function cleanupSessionResources(id: string): void {
   }
 }
 
-export function remove(id: string): void {
+export async function remove(id: string): Promise<void> {
+  if (isRemoteProjectedSession(id)) {
+    await removeRemoteProjectedSession(id)
+  }
   cleanupSessionResources(id)
   db().delete(sessions).where(eq(sessions.id, id)).run()
 }

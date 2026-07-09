@@ -92,6 +92,11 @@ The workspace module still exposes local `/workspaces/:id/files...` routes for
 registered remote locators; those call the upstream-backed helpers in
 `service.ts` rather than duplicating proxy routes here.
 
+Linked chat sessions (plan 033) also forward session-scoped `/chat/...` and
+`DELETE /sessions/:id` calls through this gateway after rewriting local session
+ids to `remoteSessionId`. See `session/remote-projection.ts` and
+`session/README.md`.
+
 ## Ownership Boundary
 
 This module deliberately does not define a second remote agent protocol. The target Cradle Server already owns workspace, session, runtime, provider, and file semantics. Local Cradle connects to that server and calls its HTTP APIs through the upstream gateway. If a new remote capability is needed, add it to the owning target Cradle Server module first; it becomes reachable automatically once exposed on the remote server.

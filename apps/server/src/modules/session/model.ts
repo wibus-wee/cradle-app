@@ -19,9 +19,21 @@ const thinkingEffortSchema = t.Union([
 const sessionStatusSchema = t.Union([t.Literal('idle'), t.Literal('streaming'), t.Literal('error')])
 const sideContextSourceSchema = t.Union([t.Literal('provider-native'), t.Literal('cradle-context')])
 
+const sessionExecutionSchema = t.Union([
+  t.Object({
+    kind: t.Literal('local'),
+  }),
+  t.Object({
+    kind: t.Literal('remote-host'),
+    hostId: t.String(),
+    remoteSessionId: t.String(),
+  }),
+])
+
 export const SessionModel = {
   session: t.Object({
     id: t.String(),
+    execution: sessionExecutionSchema,
     parentSessionId: nullableString,
     sideContextSource: t.Nullable(sideContextSourceSchema),
     workspaceId: nullableString,

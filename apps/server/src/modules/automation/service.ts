@@ -563,7 +563,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
     if (recipe.kind !== 'agent_task') {
       throw new Error(`Unsupported automation recipe kind: ${(recipe as { kind?: string }).kind}`)
     }
-    const session = Session.create({
+    const session = await Session.create({
       workspaceId: run.workspaceId,
       title: `Automation: ${getDefinitionRow(run.automationDefinitionId).title}`,
       origin: 'automation',

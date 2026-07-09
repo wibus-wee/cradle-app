@@ -7,6 +7,25 @@ Session exposes user title edits through `PATCH /sessions/:id`, but title persis
 Session origin is owned by this module as coarse source metadata for list and search filtering. Ordinary sessions default to `manual`; workflow-owned callers may set broad origins such as `automation`, `cradle-review`, or `cradle-issue`. Detailed lifecycle records stay in the owning workflow namespace, for example diff-review guide or agent-fix rows that link back by session id and run id.
 Side chat parentage is stored on Session rows through `parentSessionId` and `sideContextSource`, but side chat creation semantics are owned by Chat Runtime. Session only persists the relationship and exposes it to list/get responses so renderers can navigate and future lifecycle policies can reason about side children without writing into provider namespaces.
 Session lists default to active rows (`archivedAt` is null) sorted by latest user message time, falling back to session creation time before a user turn exists. Pass `archived=true` to list archived rows without deleting session-owned messages, usage, or runtime binding history. Archiving emits a lifecycle hook so runtime owners can release live resources while preserving persisted session history.
+
+## Remote session projection
+
+Sessions created on a workspace mounted from a remote Cradle Server host are **local projections** linked to the authoritative remote session through `remote_session_links`. List/get responses expose `execution.kind`:
+
+- `local` — chat runs on this Cradle Server through Chat Runtime.
+- `remote-host` — chat runs on the linked remote host; local Chat Runtime hard-rejects these sessions with `chat_session_executes_on_remote_host` (HTTP 409).
+
+Creating a projection:
+
+1. Resolve the remote workspace id from `locator.sourceWorkspaceId` or upstream workspace list + path match.
+2. `POST` the remote session through the plan 032 upstream gateway (`ensureRemoteHostConnected` + `upstreamJsonByBaseUrl`).
+3. Insert the local `sessions` row and `remote_session_links` mapping `{ hostId, remoteSessionId, remoteWorkspaceId }`.
+
+Deleting a local projection (`DELETE /sessions/:id`) **cascades** to `DELETE` the remote session upstream first. If upstream delete fails, the local projection and link remain and the API returns an error — no silent orphan cleanup.
+
+Linked chat traffic is forwarded through `/remote-hosts/:hostId/upstream/*` with `remoteSessionId` substituted in session-scoped paths. See `session/remote-projection.ts` and Chat Runtime `linked-session-proxy.ts`.
+
+Provider targets for remote projections are owned by the remote server; local create omits `providerTargetId` unless a future UI explicitly supplies a remote target id (plan 034).
 Provider-backed session creation resolves a stable agent persona and stores `agentId`, so CLI calls carrying the session context can be attributed to an Agent identity.
 Session creation rejects disabled agents and provider-backed agents whose selected provider target is disabled, returning a conflict before any runtime launch is attempted.
 Agent-terminal session creation is driven by runtime session launch descriptors and must start from an agent with terminal launch configuration; provider-launched sessions continue to resolve provider targets through provider compatibility metadata.

@@ -4,6 +4,10 @@ import { createChildLogger } from '../../../logging/logger'
 import { ChatRuntimeModel } from '../model'
 import { bindReadableStreamToAbortSignal } from '../stream/sse'
 import { readChatThinkingEffort, readOptionalModelId } from './request-normalizers'
+import {
+  chatSessionUpstreamPath,
+  proxyLinkedChatSessionIfNeeded,
+} from './linked-session-proxy'
 import type { ChatRuntimeService } from './runtime-loader'
 import { loadChatRuntime } from './runtime-loader'
 
@@ -20,6 +24,16 @@ export const chatRuntimeResponseRoutes = new Elysia({
   .post(
     '/sessions/:sessionId/response',
     async ({ params, body, request }) => {
+      const proxied = await proxyLinkedChatSessionIfNeeded({
+        localSessionId: params.sessionId,
+        upstreamPathWithQuery: chatSessionUpstreamPath(params.sessionId, '/response'),
+        request,
+        jsonBody: body,
+      })
+      if (proxied) {
+        return proxied
+      }
+
       const startedAtMs = performance.now()
       const desktopUpstreamRequestId = request.headers.get(DESKTOP_UPSTREAM_REQUEST_ID_HEADER)?.trim() || null
       const desktopUpstreamMode = request.headers.get(DESKTOP_UPSTREAM_MODE_HEADER)?.trim() || null

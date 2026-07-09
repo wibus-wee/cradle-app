@@ -41,7 +41,7 @@ export const session = new Elysia({
       response: { 200: SessionModel.session },
     },
   )
-  .post('/', ({ body }) => Session.create(body), {
+  .post('/', async ({ body }) => await Session.create(body), {
     detail: {
       'summary': 'Create session',
       'x-cradle-cli': {
@@ -143,8 +143,8 @@ export const session = new Elysia({
   )
   .delete(
     '/:id',
-    ({ params }) => {
-      Session.remove(params.id)
+    async ({ params }) => {
+      await Session.remove(params.id)
       return { ok: true as const }
     },
     {

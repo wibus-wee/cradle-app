@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 
 import { ChatRuntimeModel } from '../model'
 import { bindReadableStreamToAbortSignal } from '../stream/sse'
+import { chatSessionUpstreamPath, proxyLinkedChatSessionIfNeeded } from './linked-session-proxy'
 import { loadChatRuntime } from './runtime-loader'
 
 export const chatRuntimeStreamRoutes = new Elysia({
@@ -11,6 +12,16 @@ export const chatRuntimeStreamRoutes = new Elysia({
   .get(
     '/sessions/:sessionId/stream',
     async ({ params, request }) => {
+      const url = new URL(request.url)
+      const proxied = await proxyLinkedChatSessionIfNeeded({
+        localSessionId: params.sessionId,
+        upstreamPathWithQuery: chatSessionUpstreamPath(params.sessionId, '/stream', url.search),
+        request,
+      })
+      if (proxied) {
+        return proxied
+      }
+
       const runtime = await loadChatRuntime()
       const stream = await runtime.openSessionRunStream(params.sessionId)
       const activeRun = runtime.getActiveSessionRun(params.sessionId)
