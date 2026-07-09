@@ -14,6 +14,11 @@ export type CliResolver = 'workspace'
 export interface CliArgumentSpec {
   name: string
   description?: string
+  /**
+   * When set, an omitted value falls back to `process.env[envDefault]`.
+   * For positional arguments this also makes the Commander arg optional (`[name]`),
+   * matching ambient workspace resolution.
+   */
   envDefault?: string
   /** Human-facing flag/argument label, if different from `name` (e.g. `workspace` instead of `workspaceId`). */
   flagName?: string

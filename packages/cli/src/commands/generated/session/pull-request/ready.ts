@@ -15,13 +15,13 @@ const spec = {
   ],
   "command": [
     "session",
-    "isolation",
-    "leave"
+    "pull-request",
+    "ready"
   ],
-  "description": "Leave isolated execution for session",
+  "description": "Mark the session-bound pull request ready for review",
   "flags": [],
   "method": "post",
-  "path": "/sessions/{id}/isolation/leave"
+  "path": "/sessions/{id}/pull-request/ready"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

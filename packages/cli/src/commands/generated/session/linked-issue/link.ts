@@ -5,10 +5,12 @@ import type { Command } from 'commander'
 const spec = {
   "arguments": [
     {
+      "description": "Defaults to CRADLE_CHAT_SESSION_ID.",
       "name": "id",
       "required": true,
       "target": "path.id",
-      "type": "string"
+      "type": "string",
+      "envDefault": "CRADLE_CHAT_SESSION_ID"
     }
   ],
   "command": [

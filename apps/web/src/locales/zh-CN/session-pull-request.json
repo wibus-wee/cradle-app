@@ -1,0 +1,11 @@
+{
+  "chrome.draft": "草稿",
+  "chrome.ready": "可审阅",
+  "chrome.closed": "已关闭",
+  "chrome.merged": "已合并",
+  "chrome.markReady": "标记可审阅",
+  "chrome.markingReady": "标记中…",
+  "chrome.readySuccessTitle": "PR 已可审阅",
+  "chrome.readySuccessDescription": "PR #{{number}} 已标记为可审阅。",
+  "chrome.errorTitle": "PR 操作失败"
+}

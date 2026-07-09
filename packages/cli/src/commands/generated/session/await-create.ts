@@ -11,10 +11,12 @@ const spec = {
   "description": "Register a new session await",
   "flags": [
     {
+      "description": "Defaults to CRADLE_CHAT_SESSION_ID.",
       "name": "chatSessionId",
       "required": true,
       "target": "body.chatSessionId",
-      "type": "string"
+      "type": "string",
+      "envDefault": "CRADLE_CHAT_SESSION_ID"
     },
     {
       "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.",

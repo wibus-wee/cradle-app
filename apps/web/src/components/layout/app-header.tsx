@@ -15,6 +15,7 @@ import { Button } from '~/components/ui/button'
 import { ResourcesPopover } from '~/features/devtool/resources/resources-popover'
 import { SessionExecutionChrome } from '~/features/remote-hosts/session-execution-chrome'
 import { SessionIsolationChrome } from '~/features/session/session-isolation-chrome'
+import { SessionPullRequestChrome } from '~/features/session/session-pull-request-chrome'
 import { cn } from '~/lib/cn'
 import { isTearoffWindow, windowControlsSafeArea } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
@@ -162,6 +163,7 @@ export function AppHeader({
                     sessionId={scopedSessionId}
                     workspaceId={scopedSessionLayout?.workspaceId ?? null}
                   />
+                  <SessionPullRequestChrome sessionId={scopedSessionId} />
                 </>
               )}
             </div>

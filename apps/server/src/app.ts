@@ -38,6 +38,7 @@ import { preferences } from './modules/preferences'
 import { profiles } from './modules/profiles'
 import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
+import { pullRequest } from './modules/pull-request'
 import { registerPtyRoutes } from './modules/pty'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
@@ -151,6 +152,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(automation)
   app.use(assets)
   app.use(session)
+  app.use(pullRequest)
   app.use(sessionGroup)
   app.use(sessionAwait)
   app.use(issue)

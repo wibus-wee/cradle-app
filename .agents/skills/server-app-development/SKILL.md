@@ -68,6 +68,11 @@ detail: {
 }
 ```
 
+Optional ambient defaults the generator understands:
+
+- `defaultWorkspaceId: true` — path/query/body `workspaceId` resolves from explicit value, then `CRADLE_WORKSPACE_ID`, then cwd.
+- `defaultChatSessionId: true` — chat-session id fields (`path.id` on `/sessions/{id}...`, or `chatSessionId` / `sessionId`) default from `CRADLE_CHAT_SESSION_ID`. Use for session self-ops (pull-request, isolation, linked-issue, await). Do **not** set this on destructive session commands (`delete`, `archive`, `update`, `get`) or await **record** ids.
+
 Do not add `operationId` for CLI generation. The CLI generator does not need it.
 
 Do not duplicate schema data in `x-cradle-cli`:

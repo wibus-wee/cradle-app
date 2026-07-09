@@ -210,7 +210,13 @@ export function registerOperationCommand(root: Command, rawSpec: CliOperationSpe
   leaf.option('--json [fields]', 'Print JSON, optionally selecting comma-separated fields')
 
   for (const argument of spec.arguments) {
-    const hasAmbientFallback = argument.resolver !== undefined && argument.resolverAmbient !== false
+    // Ambient fallbacks: workspace resolver (env/cwd) or a plain envDefault
+    // (e.g. CRADLE_CHAT_SESSION_ID). Either makes a required path arg optional
+    // at the Commander layer so callers can omit it.
+    const hasAmbientFallback = (
+      (argument.resolver !== undefined && argument.resolverAmbient !== false)
+      || argument.envDefault !== undefined
+    )
     const label = argument.flagName ?? argument.name
     const name = argument.required === false || hasAmbientFallback ? `[${label}]` : `<${label}>`
     leaf.argument(name, argument.description)

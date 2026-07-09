@@ -3,25 +3,16 @@ import type { CliOperationSpec } from '../../../../runtime/types'
 import type { Command } from 'commander'
 
 const spec = {
-  "arguments": [
-    {
-      "description": "Defaults to CRADLE_CHAT_SESSION_ID.",
-      "name": "id",
-      "required": true,
-      "target": "path.id",
-      "type": "string",
-      "envDefault": "CRADLE_CHAT_SESSION_ID"
-    }
-  ],
+  "arguments": [],
   "command": [
-    "session",
-    "isolation",
-    "leave"
+    "plugin",
+    "marketplace",
+    "refresh"
   ],
-  "description": "Leave isolated execution for session",
+  "description": "Force-refresh marketplace catalog",
   "flags": [],
   "method": "post",
-  "path": "/sessions/{id}/isolation/leave"
+  "path": "/plugins/marketplace/refresh"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

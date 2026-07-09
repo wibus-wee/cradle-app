@@ -1,0 +1,11 @@
+{
+  "chrome.draft": "下書き",
+  "chrome.ready": "レビュー可",
+  "chrome.closed": "クローズ",
+  "chrome.merged": "マージ済み",
+  "chrome.markReady": "レビュー可能にする",
+  "chrome.markingReady": "更新中…",
+  "chrome.readySuccessTitle": "PR をレビュー可能にしました",
+  "chrome.readySuccessDescription": "PR #{{number}} はレビュー可能です。",
+  "chrome.errorTitle": "PR 操作に失敗しました"
+}

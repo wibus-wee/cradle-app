@@ -20,6 +20,45 @@ Key operations:
 
 Use status names for issue status changes. Status names are matched as lower-case slugs with spaces converted to underscores, so `In Progress` can be passed as `in_progress`.
 
+## How to Open a Draft Pull Request
+
+When you finish isolated work in a session worktree and the user wants a GitHub PR, **do not use `gh pr create`**. Use Cradle:
+
+```bash
+# Create a draft PR from the current isolated session (pushes the branch, opens draft):
+cradle session pull-request create \
+  --title "Short summary of the change" \
+  --body "$(cat <<'EOF'
+## Summary
+- What changed and why
+
+## Test plan
+- [ ] How to verify
+EOF
+)"
+
+# Inspect the bound PR:
+cradle session pull-request get --json pullRequest
+
+# Mark ready for review only when the user asks (or they can do it in the Cradle UI):
+cradle session pull-request ready
+```
+
+Rules:
+
+1. Only create a PR from an **isolated** session (`session isolation`). Cradle will push the worktree branch and open a **draft** PR.
+2. Commit your changes first. Cradle rejects dirty worktrees.
+3. On every commit you create for this work, include this trailer at the end of the commit message (blank line before it):
+
+   ```text
+   Co-authored-by: Cradle Agent <cradleagent@wibus.ren>
+   ```
+
+   Do not put the co-author only in the PR body — GitHub attributes co-authors from commit trailers. Skip adding it again if the trailer is already present.
+4. Write a clear PR title and body (summary + test plan). Cradle does not invent the description for you.
+5. Do **not** automatically wait for CI after opening a PR. Only register `cradle session await github-ci ...` when the user asks you to wait.
+6. Prefer Cradle mark-ready over `gh pr ready`. The user can also mark ready in the Cradle UI.
+
 ## How to Wait for External Events
 
 When you need to wait for an external condition (CI passing, PR review, deployment), **do not poll yourself**. Instead, register a session await and end your turn:
@@ -53,7 +92,7 @@ cradle session await manual \
 
 After registering, tell the user what you're waiting for and end your turn. Cradle's background poller will monitor the condition and resume your session with the result as a new message. You will have full conversation history when resumed.
 
-> **Note**: `$CRADLE_CHAT_SESSION_ID` and `$CRADLE_WORKSPACE_ID` are automatically available as environment variables — no need to look them up manually.
+> **Note**: Cradle-managed shells inject `CRADLE_CHAT_SESSION_ID` and `CRADLE_WORKSPACE_ID`. Session self-ops (pull-request, isolation, linked-issue, await) and workspace-scoped commands use those defaults when you omit the id — pass an explicit id only when targeting another session or workspace.
 
 Supported sources:
 - `github-ci` — waits for all CI checks to complete, or one explicit GitHub check run. Use `cradle session await github-ci <repo> --pr <number>`, `--sha <commit-sha>`, or `--run-id <check-run-id>`.

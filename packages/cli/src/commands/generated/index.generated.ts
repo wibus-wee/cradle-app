@@ -153,6 +153,8 @@ import { register as registerObservabilityRuntimeSnapshot } from './observabilit
 import { register as registerOpencodeServerResources } from './opencode/server/resources'
 import { register as registerPluginGet } from './plugin/get'
 import { register as registerPluginList } from './plugin/list'
+import { register as registerPluginMarketplaceList } from './plugin/marketplace/list'
+import { register as registerPluginMarketplaceRefresh } from './plugin/marketplace/refresh'
 import { register as registerPluginSetEnabled } from './plugin/set-enabled'
 import { register as registerPluginSourceAdd } from './plugin/source/add'
 import { register as registerPluginSourceGet } from './plugin/source/get'
@@ -216,6 +218,9 @@ import { register as registerSessionLinkedIssueGet } from './session/linked-issu
 import { register as registerSessionLinkedIssueLink } from './session/linked-issue/link'
 import { register as registerSessionLinkedIssueUnlink } from './session/linked-issue/unlink'
 import { register as registerSessionList } from './session/list'
+import { register as registerSessionPullRequestCreate } from './session/pull-request/create'
+import { register as registerSessionPullRequestGet } from './session/pull-request/get'
+import { register as registerSessionPullRequestReady } from './session/pull-request/ready'
 import { register as registerSessionUpdate } from './session/update'
 import { register as registerSessionGroupAddMember } from './session-group/add-member'
 import { register as registerSessionGroupCreate } from './session-group/create'
@@ -456,6 +461,8 @@ export function registerGeneratedCommands(program: Command): void {
   registerOpencodeServerResources(program)
   registerPluginGet(program)
   registerPluginList(program)
+  registerPluginMarketplaceList(program)
+  registerPluginMarketplaceRefresh(program)
   registerPluginSetEnabled(program)
   registerPluginSourceAdd(program)
   registerPluginSourceGet(program)
@@ -519,6 +526,9 @@ export function registerGeneratedCommands(program: Command): void {
   registerSessionLinkedIssueLink(program)
   registerSessionLinkedIssueUnlink(program)
   registerSessionList(program)
+  registerSessionPullRequestCreate(program)
+  registerSessionPullRequestGet(program)
+  registerSessionPullRequestReady(program)
   registerSessionUpdate(program)
   registerSessionGroupAddMember(program)
   registerSessionGroupCreate(program)

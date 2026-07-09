@@ -42,6 +42,8 @@ interface OpenApiOperation {
   'x-cradle-cli'?: {
     command: string[]
     defaultWorkspaceId?: boolean
+    /** When true, chat-session id fields default from CRADLE_CHAT_SESSION_ID. */
+    defaultChatSessionId?: boolean
     hidden?: boolean
   }
 }
@@ -199,47 +201,98 @@ function withWorkspaceQueryScopeFlag(flag: CliFlagSpec): CliFlagSpec {
   }
 }
 
-function collectArguments(operation: OpenApiOperation): CliArgumentSpec[] {
+/**
+ * Chat-session identity fields that may ambient-default from
+ * CRADLE_CHAT_SESSION_ID when the route opts in via defaultChatSessionId.
+ *
+ * - path `id` on `/sessions/{id}...` (session self-ops)
+ * - body/query `chatSessionId` or `sessionId` when that means the chat session
+ *
+ * Await *record* path ids (`/session-awaits/{id}`) are never matched here
+ * because their parameter name is still `id` but the path is not under
+ * `/sessions/{id}` — callers must pass those explicitly.
+ */
+function isChatSessionIdField(spec: Pick<CliArgumentSpec, 'name' | 'target' | 'type'>, routePath: string): boolean {
+  if (spec.type !== 'string') {
+    return false
+  }
+  if (spec.name === 'chatSessionId' || spec.name === 'sessionId') {
+    return true
+  }
+  if (spec.name === 'id' && spec.target === 'path.id') {
+    return routePath.startsWith('/sessions/{id}') || routePath.startsWith('/sessions/:id')
+  }
+  return false
+}
+
+function withChatSessionEnvDefault<T extends CliArgumentSpec | CliFlagSpec>(
+  spec: T,
+  options: { enabled: boolean, routePath: string },
+): T {
+  if (!options.enabled || !isChatSessionIdField(spec, options.routePath)) {
+    return spec
+  }
+
+  const hint = 'Defaults to CRADLE_CHAT_SESSION_ID.'
+  return {
+    ...spec,
+    description: spec.description ? `${spec.description} ${hint}` : hint,
+    envDefault: 'CRADLE_CHAT_SESSION_ID',
+  }
+}
+
+function collectArguments(operation: OpenApiOperation, routePath: string): CliArgumentSpec[] {
   const ambientPathWorkspaceId = operation['x-cradle-cli']?.defaultWorkspaceId === true
+  const ambientChatSessionId = operation['x-cradle-cli']?.defaultChatSessionId === true
   return (operation.parameters ?? [])
     .filter(parameter => parameter.in === 'path')
-    .map(parameter => withWorkspaceResolver({
+    .map(parameter => withChatSessionEnvDefault(withWorkspaceResolver({
       description: parameter.description ?? parameter.schema?.description,
       name: parameter.name,
       required: parameter.required !== false,
       target: `path.${parameter.name}`,
       type: inferValueType(parameter.schema),
-    }, { ambient: ambientPathWorkspaceId }))
+    }, { ambient: ambientPathWorkspaceId }), {
+      enabled: ambientChatSessionId,
+      routePath,
+    }))
 }
 
-function collectFlags(operation: OpenApiOperation): CliFlagSpec[] {
+function collectFlags(operation: OpenApiOperation, routePath: string): CliFlagSpec[] {
   const flags: CliFlagSpec[] = []
+  const ambientChatSessionId = operation['x-cradle-cli']?.defaultChatSessionId === true
 
   for (const parameter of operation.parameters ?? []) {
     if (parameter.in !== 'query') {
       continue
     }
-    flags.push(withWorkspaceQueryScopeFlag(withWorkspaceResolver({
+    flags.push(withChatSessionEnvDefault(withWorkspaceQueryScopeFlag(withWorkspaceResolver({
       description: parameter.description ?? parameter.schema?.description,
       name: parameter.name,
       required: parameter.required === true,
       target: `query.${parameter.name}`,
       type: inferValueType(parameter.schema),
       values: getSchemaValues(parameter.schema),
-    })))
+    })), {
+      enabled: ambientChatSessionId,
+      routePath,
+    }))
   }
 
   const bodySchema = getJsonBodySchema(operation)
   if (bodySchema?.properties) {
     const required = new Set(bodySchema.required ?? [])
     for (const [name, schema] of Object.entries(bodySchema.properties)) {
-      flags.push(withWorkspaceResolver({
+      flags.push(withChatSessionEnvDefault(withWorkspaceResolver({
         description: schema.description,
         name,
         required: required.has(name),
         target: `body.${name}`,
         type: inferValueType(schema),
         values: getSchemaValues(schema),
+      }), {
+        enabled: ambientChatSessionId,
+        routePath,
       }))
     }
   }
@@ -315,10 +368,10 @@ function collectOperations(document: OpenApiDocument): CliOperationSpec[] {
       }
 
       operations.push({
-        arguments: collectArguments(operation),
+        arguments: collectArguments(operation, routePath),
         command,
         description: operation.summary,
-        flags: collectFlags(operation),
+        flags: collectFlags(operation, routePath),
         method,
         path: routePath,
       })

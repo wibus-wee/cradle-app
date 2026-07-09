@@ -31,6 +31,8 @@ Server route metadata controls only command placement:
 ```typescript
 'x-cradle-cli': {
   command: ['workspace', 'git', 'status'],
+  defaultWorkspaceId: true, // optional ambient workspace
+  // defaultChatSessionId: true, // optional ambient chat session
 }
 ```
 
@@ -43,6 +45,8 @@ Generator responsibilities:
 - Array schema fields -> comma-separated or repeated string input handling.
 - Object schema fields -> JSON string parsing.
 - Enum schema fields -> allowed values in help text.
+- `defaultWorkspaceId: true` -> workspace name/id resolver with ambient env/cwd fallback.
+- `defaultChatSessionId: true` -> `envDefault: 'CRADLE_CHAT_SESSION_ID'` on chat-session id fields (makes path `[id]` optional).
 
 ## Output Philosophy
 

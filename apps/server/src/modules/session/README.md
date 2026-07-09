@@ -35,6 +35,7 @@ Session creation rejects disabled agents and provider-backed agents whose select
 Agent-terminal session creation is driven by runtime session launch descriptors and must start from an agent with terminal launch configuration; provider-launched sessions continue to resolve provider targets through provider compatibility metadata.
 Session creation 支持 no-project chats 缺省 `workspaceId`。这种情况下，本 module 会委托 workspace module 创建 ad-hoc workspace，并在任何 runtime launch 前把返回的 workspace id 写入 session。调用方显式传入 `workspaceId: null` 时，session 保持 workspace-unbound；Jarvis 使用这个路径保持系统会话隐藏，实际 jar-core 数据由 chat-runtime 写入 Cradle data dir。
 Route metadata includes `x-cradle-cli` descriptors for generated CLI commands.
+Session-bound GitHub draft PR create/get/ready lives in the `pull-request` module (`/sessions/:id/pull-request*`), not in this module's route file.
 
 ## Files
 

@@ -31,6 +31,7 @@ export const sessionAwait = new Elysia({
       'summary': 'Register a new session await',
       'x-cradle-cli': {
         command: ['session', 'await-create'],
+        defaultChatSessionId: true,
       },
     },
     body: SessionAwaitModel.createBody,
@@ -57,6 +58,7 @@ export const sessionAwait = new Elysia({
       'summary': 'List session awaits',
       'x-cradle-cli': {
         command: ['session', 'await-list'],
+        defaultChatSessionId: true,
       },
     },
     query: SessionAwaitModel.listQuery,
@@ -125,6 +127,7 @@ export const sessionAwait = new Elysia({
       'summary': 'Get await summary for a session',
       'x-cradle-cli': {
         command: ['session', 'await-summary'],
+        defaultChatSessionId: true,
       },
     },
     query: SessionAwaitModel.summaryQuery,

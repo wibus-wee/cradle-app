@@ -11,10 +11,12 @@ const spec = {
   "description": "List session awaits",
   "flags": [
     {
+      "description": "Defaults to CRADLE_CHAT_SESSION_ID.",
       "name": "sessionId",
       "required": true,
       "target": "query.sessionId",
-      "type": "string"
+      "type": "string",
+      "envDefault": "CRADLE_CHAT_SESSION_ID"
     }
   ],
   "method": "get",

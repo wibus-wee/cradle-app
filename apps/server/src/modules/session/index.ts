@@ -175,6 +175,7 @@ export const session = new Elysia({
       'summary': 'Get linked issue',
       'x-cradle-cli': {
         command: ['session', 'linked-issue', 'get'],
+        defaultChatSessionId: true,
       },
     },
     params: SessionModel.idParams,
@@ -185,6 +186,7 @@ export const session = new Elysia({
       'summary': 'Link issue to session',
       'x-cradle-cli': {
         command: ['session', 'linked-issue', 'link'],
+        defaultChatSessionId: true,
       },
     },
     params: SessionModel.idParams,
@@ -196,6 +198,7 @@ export const session = new Elysia({
       'summary': 'Unlink issue from session',
       'x-cradle-cli': {
         command: ['session', 'linked-issue', 'unlink'],
+        defaultChatSessionId: true,
       },
     },
     params: SessionModel.idParams,
@@ -209,7 +212,10 @@ export const session = new Elysia({
   }, {
     detail: {
       'summary': 'Start session isolation',
-      'x-cradle-cli': { command: ['session', 'isolation', 'start'] },
+      'x-cradle-cli': {
+        command: ['session', 'isolation', 'start'],
+        defaultChatSessionId: true,
+      },
     },
     params: SessionModel.idParams,
     body: SessionModel.isolationStartBody,
@@ -224,7 +230,10 @@ export const session = new Elysia({
   }, {
     detail: {
       'summary': 'Activate pending session isolation',
-      'x-cradle-cli': { command: ['session', 'isolation', 'activate'] },
+      'x-cradle-cli': {
+        command: ['session', 'isolation', 'activate'],
+        defaultChatSessionId: true,
+      },
     },
     params: SessionModel.idParams,
     body: SessionModel.isolationActivateBody,
@@ -239,7 +248,10 @@ export const session = new Elysia({
   }, {
     detail: {
       'summary': 'Cancel pending session isolation',
-      'x-cradle-cli': { command: ['session', 'isolation', 'cancel'] },
+      'x-cradle-cli': {
+        command: ['session', 'isolation', 'cancel'],
+        defaultChatSessionId: true,
+      },
     },
     params: SessionModel.idParams,
     response: { 200: t.Object({ ok: t.Literal(true) }) },
@@ -250,7 +262,10 @@ export const session = new Elysia({
   }, {
     detail: {
       'summary': 'Leave isolated execution for session',
-      'x-cradle-cli': { command: ['session', 'isolation', 'leave'] },
+      'x-cradle-cli': {
+        command: ['session', 'isolation', 'leave'],
+        defaultChatSessionId: true,
+      },
     },
     params: SessionModel.idParams,
     response: { 200: t.Object({ ok: t.Literal(true) }) },
@@ -261,7 +276,10 @@ export const session = new Elysia({
   }, {
     detail: {
       'summary': 'Recreate missing isolated checkout for session',
-      'x-cradle-cli': { command: ['session', 'isolation', 'repair'] },
+      'x-cradle-cli': {
+        command: ['session', 'isolation', 'repair'],
+        defaultChatSessionId: true,
+      },
     },
     params: SessionModel.idParams,
     response: { 200: t.Object({ worktree: WorktreeModel.worktreeView }) },

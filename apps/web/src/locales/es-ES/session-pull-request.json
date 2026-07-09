@@ -1,0 +1,11 @@
+{
+  "chrome.draft": "Borrador",
+  "chrome.ready": "Listo",
+  "chrome.closed": "Cerrado",
+  "chrome.merged": "Fusionado",
+  "chrome.markReady": "Marcar listo",
+  "chrome.markingReady": "Marcando…",
+  "chrome.readySuccessTitle": "PR listo para revisión",
+  "chrome.readySuccessDescription": "El PR #{{number}} está listo para revisión.",
+  "chrome.errorTitle": "Error en la acción del PR"
+}

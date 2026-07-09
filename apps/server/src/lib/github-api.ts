@@ -103,9 +103,16 @@ export function isGitHubMissingTarget(err: unknown): boolean {
   return err instanceof GitHubApiError && (err.status === 404 || err.status === 422)
 }
 
-async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | null> {
+function buildGitHubHeaders(options?: { etag?: string, requireToken?: boolean }): Record<string, string> {
   const token = resolveGitHubToken()
-  const url = `https://api.github.com${path}`
+  if (options?.requireToken && !token) {
+    throw new GitHubApiError({
+      status: 401,
+      path: '',
+      message: 'GitHub authentication required. Set GH_TOKEN / GITHUB_TOKEN or run `gh auth login`.',
+    })
+  }
+
   const headers: Record<string, string> = {
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
@@ -113,11 +120,16 @@ async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | nu
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }
-
-  const cached = etagCache.get(url)
-  if (cached?.etag) {
-    headers['If-None-Match'] = cached.etag
+  if (options?.etag) {
+    headers['If-None-Match'] = options.etag
   }
+  return headers
+}
+
+async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | null> {
+  const url = `https://api.github.com${path}`
+  const cached = etagCache.get(url)
+  const headers = buildGitHubHeaders({ etag: cached?.etag })
 
   const res = await fetch(url, { headers })
   recordRateLimit(res.headers)
@@ -144,6 +156,33 @@ async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | nu
   return data
 }
 
+async function githubMutate<T>(
+  method: 'POST' | 'PATCH',
+  path: string,
+  body: Record<string, unknown>,
+  schema: JsonSchema<T>,
+): Promise<T> {
+  const headers = buildGitHubHeaders({ requireToken: true })
+  headers['Content-Type'] = 'application/json'
+
+  const res = await fetch(`https://api.github.com${path}`, {
+    method,
+    headers,
+    body: JSON.stringify(body),
+  })
+  recordRateLimit(res.headers)
+
+  if (!res.ok) {
+    throw new GitHubApiError({
+      status: res.status,
+      path,
+      message: await readGitHubErrorMessage(res),
+    })
+  }
+
+  return schema.parse(await res.json())
+}
+
 async function githubGetPaged<T>(path: string, schema: JsonSchema<T[]>, maxPages = 10): Promise<T[] | null> {
   const items: T[] = []
   for (let page = 1; page <= maxPages; page++) {
@@ -164,9 +203,31 @@ export interface GitHubPullRequest {
   number: number
   title: string
   state: 'open' | 'closed'
+  draft?: boolean
   merged: boolean
   mergeable: boolean | null
   mergeable_state?: string
+  html_url?: string
+  head: { sha: string, ref: string }
+  base: { ref: string }
+}
+
+export interface CreatePullRequestInput {
+  owner: string
+  repo: string
+  title: string
+  head: string
+  base: string
+  body?: string
+  draft?: boolean
+}
+
+export interface CreatedGitHubPullRequest {
+  number: number
+  title: string
+  draft: boolean
+  html_url: string
+  state: 'open' | 'closed'
   head: { sha: string, ref: string }
   base: { ref: string }
 }
@@ -267,9 +328,21 @@ const GitHubPullRequestSchema = z.object({
   number: z.number().finite(),
   title: z.string(),
   state: z.enum(['open', 'closed']),
+  draft: z.boolean().optional(),
   merged: z.boolean(),
   mergeable: z.boolean().nullable(),
   mergeable_state: z.string().optional(),
+  html_url: z.string().optional(),
+  head: z.object({ sha: z.string(), ref: z.string() }),
+  base: z.object({ ref: z.string() }),
+}).passthrough()
+
+const CreatedGitHubPullRequestSchema = z.object({
+  number: z.number().finite(),
+  title: z.string(),
+  draft: z.boolean(),
+  html_url: z.string(),
+  state: z.enum(['open', 'closed']),
   head: z.object({ sha: z.string(), ref: z.string() }),
   base: z.object({ ref: z.string() }),
 }).passthrough()
@@ -368,6 +441,30 @@ export function hasGitHubToken(): boolean {
 
 export function fetchPullRequest(owner: string, repo: string, pr: number): Promise<GitHubPullRequest | null> {
   return githubGet(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestSchema)
+}
+
+export function createPullRequest(input: CreatePullRequestInput): Promise<CreatedGitHubPullRequest> {
+  return githubMutate(
+    'POST',
+    `/repos/${input.owner}/${input.repo}/pulls`,
+    {
+      title: input.title,
+      head: input.head,
+      base: input.base,
+      body: input.body ?? '',
+      draft: input.draft ?? true,
+    },
+    CreatedGitHubPullRequestSchema,
+  )
+}
+
+export function markPullRequestReady(owner: string, repo: string, pr: number): Promise<CreatedGitHubPullRequest> {
+  return githubMutate(
+    'PATCH',
+    `/repos/${owner}/${repo}/pulls/${pr}`,
+    { draft: false },
+    CreatedGitHubPullRequestSchema,
+  )
 }
 
 export async function fetchCheckRuns(owner: string, repo: string, ref: string): Promise<GitHubCheckRunsResponse | null> {

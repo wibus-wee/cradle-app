@@ -30,17 +30,30 @@ Use `cradle` to manage Cradle or query its state from the terminal. You can use 
 | Schedule or inspect recurring work | `cradle automation ...` | cron scripts outside Cradle |
 | Inspect cost, tokens, incidents, traces, or runtime diagnostics | `cradle usage ...`, `cradle observability ...`, `cradle chat ...` | manual log spelunking first |
 | Manage agents, profiles, skills, ACP, providers, preferences | `cradle agent ...`, `cradle profile ...`, `cradle skill ...`, `cradle acp ...` | editing registry files by hand |
+| Open or inspect a session-bound draft PR | `cradle session pull-request create|get|ready` | `gh pr create` / `gh pr ready` |
 
 ## Environment Variables
 
-Cradle automatically injects these environment variables into your shell — no manual setup needed:
+Cradle-managed shells inject these environment variables — no manual setup needed:
 
 | Variable | Description |
 | --- | --- |
 | `CRADLE_CHAT_SESSION_ID` | Your current chat session ID |
 | `CRADLE_WORKSPACE_ID` | The workspace ID for this session |
 
-Use them directly in commands (e.g. `$CRADLE_CHAT_SESSION_ID`). They are available in both GUI (Claude Agent) and TUI (terminal) modes.
+Prefer omitting ids and letting commands resolve ambiently. Pass an explicit id only when targeting another session or workspace. Available in both GUI (Claude Agent) and TUI (terminal) modes.
+
+### Session resolution
+
+Session self-ops (pull-request, isolation, linked-issue, and await chat-session fields) omit the session id by default and use `CRADLE_CHAT_SESSION_ID` when set:
+
+```bash
+cradle session pull-request create --title "..." --body "..."
+cradle session pull-request get
+cradle session await-summary
+```
+
+Pass `<id>` / `--session-id` / `--chat-session-id` only when operating on another session. Destructive session commands (`session delete`, `archive`, `update`, `get`) always require an explicit id.
 
 ### Workspace resolution
 
@@ -130,6 +143,21 @@ cradle chat trace run <runId> --json records
 
 Inspect phases in order: `provider_raw`, `mapper_output`, `runtime_chunk`, `projection_apply`, `sse_emit`.
 
+## Session Pull Request (Draft → Ready)
+
+When finishing isolated work, open a draft PR through Cradle — not `gh pr create`:
+
+```bash
+cradle session pull-request create \
+  --title "Fix login redirect" \
+  --body "Summary + test plan"
+
+cradle session pull-request get --json pullRequest
+cradle session pull-request ready
+```
+
+Do not auto-await CI after create. Only register `cradle session await github-ci ...` when the user asks.
+
 ## Session Await (Pause & Resume)
 
 Register an await to pause your session and let Cradle automatically resume it when an external condition is met:
@@ -163,17 +191,16 @@ cradle session await manual \
 # Register a timed wait with the raw generated command
 fire_at=$(($(date +%s) + 1800))
 cradle session await-create \
-  --chat-session-id "$CRADLE_CHAT_SESSION_ID" \
   --source timer \
   --filter-json '{}' \
   --fire-at "$fire_at" \
   --reason "Waiting 30 minutes before checking again"
 
 # Check await status
-cradle session await-summary --session-id "$CRADLE_CHAT_SESSION_ID"
+cradle session await-summary
 
 # List all awaits for current session
-cradle session await-list --session-id "$CRADLE_CHAT_SESSION_ID"
+cradle session await-list
 
 # Cancel an await
 cradle session await-cancel <awaitId>
@@ -186,7 +213,7 @@ cradle session await retry <awaitId>
 ```
 
 **Key rules for await usage**:
-- `$CRADLE_CHAT_SESSION_ID` and `$CRADLE_WORKSPACE_ID` are automatically injected as environment variables by Cradle — they are always available in your shell without any setup.
+- Omit session ids for current-session awaits; Cradle-managed shells inject `CRADLE_CHAT_SESSION_ID` / `CRADLE_WORKSPACE_ID` as ambient defaults. Pass an explicit id only when targeting another session.
 - After registering an await, end your turn. Cradle will resume the session with the trigger payload as a new user message.
 - Prefer the task-shaped `cradle session await ...` commands. The raw generated `cradle session await-create` command is still available when you need to pass a custom source/filter payload directly.
 - Supported task-shaped sources: `github-ci` (`--pr`, `--sha`, or `--run-id`), `github-review` (`--mode approved|changes-requested|reviewed`), and `manual`.
@@ -239,7 +266,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `link-preview` | 1 | Generated Cradle CLI module. | `cradle man link-preview` |
 | `observability` | 5 | Inspect local observability events, incidents, and exports. | `cradle man observability` |
 | `opencode` | 1 | Generated Cradle CLI module. | `cradle man opencode` |
-| `plugin` | 7 | Generated Cradle CLI module. | `cradle man plugin` |
+| `plugin` | 9 | Generated Cradle CLI module. | `cradle man plugin` |
 | `preferences` | 10 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |
@@ -248,7 +275,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `remote-host` | 8 | Generated Cradle CLI module. | `cradle man remote-host` |
 | `search` | 2 | Search Cradle data. | `cradle man search` |
 | `secret` | 2 | Manage secret metadata. | `cradle man secret` |
-| `session` | 22 | Manage chat sessions and session links. | `cradle man session` |
+| `session` | 25 | Manage chat sessions and session links. | `cradle man session` |
 | `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
 | `usage` | 10 | Inspect usage and cost data. | `cradle man usage` |

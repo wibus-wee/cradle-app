@@ -16,11 +16,13 @@ function createProgram(context: CommandContext): Command {
 describe('registerOperationCommand', () => {
   beforeEach(() => {
     delete process.env.CRADLE_WORKSPACE_ID
+    delete process.env.CRADLE_CHAT_SESSION_ID
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     delete process.env.CRADLE_WORKSPACE_ID
+    delete process.env.CRADLE_CHAT_SESSION_ID
   })
 
   it('preserves true, false, and omitted boolean flags', async () => {
@@ -232,6 +234,110 @@ describe('registerOperationCommand', () => {
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       path: { workspaceId: '11111111-1111-1111-1111-111111111111' },
+    }))
+  })
+
+  it('defaults a required path session id from CRADLE_CHAT_SESSION_ID when omitted', async () => {
+    process.env.CRADLE_CHAT_SESSION_ID = 'session-ambient-1'
+    const request = vi.fn().mockResolvedValue({ pullRequest: null })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+
+    registerOperationCommand(program, {
+      arguments: [{
+        description: 'Defaults to CRADLE_CHAT_SESSION_ID.',
+        envDefault: 'CRADLE_CHAT_SESSION_ID',
+        name: 'id',
+        required: true,
+        target: 'path.id',
+        type: 'string',
+      }],
+      command: ['session', 'pull-request', 'get'],
+      method: 'get',
+      path: '/sessions/{id}/pull-request',
+    })
+
+    await program.parseAsync(['session', 'pull-request', 'get'], { from: 'user' })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      path: { id: 'session-ambient-1' },
+    }))
+  })
+
+  it('lets an explicit session id override CRADLE_CHAT_SESSION_ID', async () => {
+    process.env.CRADLE_CHAT_SESSION_ID = 'session-ambient-1'
+    const request = vi.fn().mockResolvedValue({ pullRequest: null })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+
+    registerOperationCommand(program, {
+      arguments: [{
+        envDefault: 'CRADLE_CHAT_SESSION_ID',
+        name: 'id',
+        required: true,
+        target: 'path.id',
+        type: 'string',
+      }],
+      command: ['session', 'pull-request', 'get'],
+      method: 'get',
+      path: '/sessions/{id}/pull-request',
+    })
+
+    await program.parseAsync(['session', 'pull-request', 'get', 'session-explicit-9'], { from: 'user' })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      path: { id: 'session-explicit-9' },
+    }))
+  })
+
+  it('fails clearly when a required session id is omitted and env is unset', async () => {
+    const request = vi.fn().mockResolvedValue({ pullRequest: null })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+
+    registerOperationCommand(program, {
+      arguments: [{
+        envDefault: 'CRADLE_CHAT_SESSION_ID',
+        name: 'id',
+        required: true,
+        target: 'path.id',
+        type: 'string',
+      }],
+      command: ['session', 'pull-request', 'get'],
+      method: 'get',
+      path: '/sessions/{id}/pull-request',
+    })
+
+    await expect(program.parseAsync(['session', 'pull-request', 'get'], { from: 'user' }))
+      .rejects.toThrow('CRADLE_CHAT_SESSION_ID')
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('defaults a required chatSessionId flag from CRADLE_CHAT_SESSION_ID', async () => {
+    process.env.CRADLE_CHAT_SESSION_ID = 'session-ambient-1'
+    const request = vi.fn().mockResolvedValue({ id: 'await-1' })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+
+    registerOperationCommand(program, {
+      command: ['session', 'await-create'],
+      flags: [{
+        description: 'Defaults to CRADLE_CHAT_SESSION_ID.',
+        envDefault: 'CRADLE_CHAT_SESSION_ID',
+        name: 'chatSessionId',
+        required: true,
+        target: 'body.chatSessionId',
+        type: 'string',
+      }, {
+        name: 'source',
+        required: true,
+        target: 'body.source',
+        type: 'string',
+      }],
+      method: 'post',
+      path: '/session-awaits/',
+    })
+
+    await program.parseAsync(['session', 'await-create', '--source', 'manual'], { from: 'user' })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      body: { chatSessionId: 'session-ambient-1', source: 'manual' },
     }))
   })
 })

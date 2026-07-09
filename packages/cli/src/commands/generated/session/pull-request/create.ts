@@ -15,13 +15,32 @@ const spec = {
   ],
   "command": [
     "session",
-    "isolation",
-    "leave"
+    "pull-request",
+    "create"
   ],
-  "description": "Leave isolated execution for session",
-  "flags": [],
+  "description": "Create a draft GitHub pull request for an isolated session",
+  "flags": [
+    {
+      "name": "title",
+      "required": true,
+      "target": "body.title",
+      "type": "string"
+    },
+    {
+      "name": "body",
+      "required": false,
+      "target": "body.body",
+      "type": "string"
+    },
+    {
+      "name": "base",
+      "required": false,
+      "target": "body.base",
+      "type": "string"
+    }
+  ],
   "method": "post",
-  "path": "/sessions/{id}/isolation/leave"
+  "path": "/sessions/{id}/pull-request"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

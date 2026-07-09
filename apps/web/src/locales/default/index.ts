@@ -15,6 +15,7 @@ import newChat from './new-chat'
 import onboarding from './onboarding'
 import search from './search'
 import sessionIsolation from './session-isolation'
+import sessionPullRequest from './session-pull-request'
 import settings from './settings'
 import skills from './skills'
 import systemAgent from './system-agent'
@@ -39,6 +40,7 @@ const resources = {
   onboarding,
   search,
   'session-isolation': sessionIsolation,
+  'session-pull-request': sessionPullRequest,
   settings,
   skills,
   'system-agent': systemAgent,

@@ -3,25 +3,16 @@ import type { CliOperationSpec } from '../../../../runtime/types'
 import type { Command } from 'commander'
 
 const spec = {
-  "arguments": [
-    {
-      "description": "Defaults to CRADLE_CHAT_SESSION_ID.",
-      "name": "id",
-      "required": true,
-      "target": "path.id",
-      "type": "string",
-      "envDefault": "CRADLE_CHAT_SESSION_ID"
-    }
-  ],
+  "arguments": [],
   "command": [
-    "session",
-    "linked-issue",
-    "get"
+    "plugin",
+    "marketplace",
+    "list"
   ],
-  "description": "Get linked issue",
+  "description": "List marketplace plugin catalog",
   "flags": [],
   "method": "get",
-  "path": "/sessions/{id}/linked-issue"
+  "path": "/plugins/marketplace"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {
