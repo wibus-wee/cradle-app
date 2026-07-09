@@ -34,6 +34,7 @@ import {
   runtimeUiSlotStateSchema,
 } from './model/ui-slot-schemas'
 import {
+  runtimeSettingsPatchSchema,
   runtimeSettingsSchema,
   sessionClaudeAgentConfigSchema,
   sessionRuntimeSettingsPatchSchema,
@@ -162,7 +163,7 @@ export const ChatRuntimeModel = {
     providerTargetId: t.Optional(t.String()),
     modelId: t.Optional(nullableModelIdSchema),
     thinkingEffort: t.Optional(thinkingEffortSchema),
-    runtimeSettings: t.Optional(sessionRuntimeSettingsPatchSchema),
+    runtimeSettings: t.Optional(runtimeSettingsPatchSchema),
   }),
 
   bangCommandBody: t.Object({
@@ -429,7 +430,7 @@ export const ChatRuntimeModel = {
     providerTargetId: t.Optional(t.String()),
     modelId: t.Optional(nullableModelIdSchema),
     thinkingEffort: t.Optional(thinkingEffortSchema),
-    runtimeSettings: t.Optional(sessionRuntimeSettingsPatchSchema),
+    runtimeSettings: t.Optional(runtimeSettingsPatchSchema),
   }),
 
   steerBody: t.Object({
@@ -467,6 +468,6 @@ export const ChatRuntimeModel = {
     providerTargetId: t.Optional(t.String()),
     modelId: t.Optional(nullableModelIdSchema),
     thinkingEffort: t.Optional(thinkingEffortSchema),
-    runtimeSettings: t.Optional(sessionRuntimeSettingsPatchSchema),
+    runtimeSettings: t.Optional(runtimeSettingsPatchSchema),
   }),
 }

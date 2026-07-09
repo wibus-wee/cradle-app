@@ -12,8 +12,9 @@ import type { ChatSessionQueueMode } from '../queue/session-queue'
 import type { ActiveRun, PendingRunState } from '../run-registry'
 import { runRegistry } from '../run-registry'
 import type {
-  RuntimeSettingsPatch,
   ChatThinkingEffort,
+  RuntimeSettings,
+  RuntimeSettingsPatch,
 } from '../runtime-provider-types'
 import {
   assertRuntimeCompatibleTarget,
@@ -53,6 +54,7 @@ export interface CreateRunInput {
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings?: RuntimeSettingsPatch
+  runtimeSettingsOverride?: RuntimeSettings
   continuationMode?: ChatSessionQueueMode
   queueItemId?: string
   internalContinuation?: 'runtimeGoal'
@@ -179,11 +181,13 @@ export async function createRun(
     const runtimeRequestMessages = requestMessages
 
     const sessionRuntimeSettings = readSessionRuntimeSettings(runtimeKind, context.session.configJson)
-    const runtimeSettings = resolveRunRuntimeSettings(
-      runtimeKind,
-      sessionRuntimeSettings,
-      input.runtimeSettings,
-    )
+    const runtimeSettings = input.runtimeSettingsOverride
+      ? { ...input.runtimeSettingsOverride }
+      : resolveRunRuntimeSettings(
+          runtimeKind,
+          sessionRuntimeSettings,
+          input.runtimeSettings,
+        )
     const requestedModelId
       = input.modelId !== undefined
         ? input.modelId

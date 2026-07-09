@@ -22,7 +22,7 @@ import type { ChatContextPart } from '../context/chat-context-parts'
 
 const SERVER_BASE = getServerUrl()
 
-export type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
+export type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export type ChatContinuationMode = 'queue' | 'steer'
 
 export interface ChatResponseRequestBody {
@@ -40,7 +40,9 @@ export type ChatQueueMode = 'queue'
 export type ChatQueueItemStatus = 'pending' | 'running' | 'cancelled' | 'completed' | 'failed'
 export type RuntimeSettingsValue = string | number | boolean
 export type RuntimeSettings = Record<string, RuntimeSettingsValue>
-export type RuntimeSettingsPatch = Partial<RuntimeSettings>
+export type RuntimeSettingsPatchValue = RuntimeSettingsValue | null
+export type RuntimeSettingsPatch = Record<string, RuntimeSettingsPatchValue | undefined>
+export type RuntimeSettingsPayload = Record<string, RuntimeSettingsPatchValue>
 
 /** @deprecated Use RuntimeSettings — provider-native session settings. */
 export type ChatRuntimeSettings = RuntimeSettings
@@ -65,6 +67,10 @@ export interface ChatQueueItem {
   errorText: string | null
   createdAt: number
   updatedAt: number
+}
+
+export type ChatResponseRequestPayload = Omit<ChatResponseRequestBody, 'runtimeSettings'> & {
+  runtimeSettings?: RuntimeSettingsPayload
 }
 
 export interface ChatQueueListResponse {
@@ -130,7 +136,7 @@ export interface ChatSteerBody {
   providerTargetId?: string
 }
 
-const ChatThinkingEffortSchema = z.enum(['low', 'medium', 'high', 'xhigh'])
+const ChatThinkingEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
 const ChatRuntimeSettingsSchema = z.record(
   z.string(),
   z.union([z.string(), z.number(), z.boolean()]),
@@ -256,7 +262,7 @@ export function readJsonErrorCodeFromText(text: string): string | null {
 
 export function buildChatResponseRequestBody(
   body: ChatResponseRequestBody,
-): ChatResponseRequestBody {
+): ChatResponseRequestPayload {
   return {
     text: body.text,
     files: body.files,
@@ -265,8 +271,23 @@ export function buildChatResponseRequestBody(
     providerTargetId: body.providerTargetId ?? undefined,
     modelId: body.modelId ?? undefined,
     thinkingEffort: body.thinkingEffort ?? undefined,
-    runtimeSettings: body.runtimeSettings ?? undefined,
+    runtimeSettings: compactRuntimeSettingsPatch(body.runtimeSettings),
   }
+}
+
+export function compactRuntimeSettingsPatch(
+  patch: RuntimeSettingsPatch | null | undefined,
+): RuntimeSettingsPayload | undefined {
+  if (!patch) {
+    return undefined
+  }
+  const compacted: RuntimeSettingsPayload = {}
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) {
+      compacted[key] = value
+    }
+  }
+  return Object.keys(compacted).length > 0 ? compacted : undefined
 }
 
 export async function startChatResponse(args: {

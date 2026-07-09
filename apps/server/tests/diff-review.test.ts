@@ -85,9 +85,13 @@ class TestDiffReviewRuntime implements ChatRuntime {
     yield { type: 'finish', finishReason: 'stop' }
   }
 
-  async cancelTurn(): Promise<void> {
+  releaseRun(): void {
     this.releaseBlockedRun?.()
     this.releaseBlockedRun = null
+  }
+
+  async cancelTurn(): Promise<void> {
+    this.releaseRun()
   }
 }
 
@@ -260,6 +264,7 @@ interface TestInfraEnv {
   dataDir?: string
   dbPath?: string
   migrationsDir?: string
+  runWaitTimeout?: string
 }
 
 function makeTempDir(prefix: string): string {
@@ -271,6 +276,7 @@ function useIsolatedTestInfra(dataDir: string): TestInfraEnv {
     dataDir: process.env.CRADLE_DATA_DIR,
     dbPath: process.env.CRADLE_DB_PATH,
     migrationsDir: process.env.CRADLE_MIGRATIONS_DIR,
+    runWaitTimeout: process.env.CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS,
   }
 
   shutdownInfra()
@@ -301,6 +307,13 @@ function restoreTestInfra(previous: TestInfraEnv): void {
   }
   else {
     process.env.CRADLE_MIGRATIONS_DIR = previous.migrationsDir
+  }
+
+  if (previous.runWaitTimeout === undefined) {
+    delete process.env.CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS
+  }
+  else {
+    process.env.CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS = previous.runWaitTimeout
   }
 }
 
@@ -892,6 +905,107 @@ describe('diff-review capability', () => {
     }
   })
 
+  it('lets change walkthrough generation outlive the global chat run wait timeout', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-diff-review-workspace-')
+    const previousEnv = useIsolatedTestInfra(dataDir)
+    const runtime = new TestDiffReviewGuideRuntime()
+
+    try {
+      process.env.CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS = '1'
+      registerRuntime(runtime, undefined, 'diff-review-test')
+      initGitRepository(workspaceRoot)
+      commitFile(workspaceRoot, 'README.md', '# Diff Review Fixture', 'repo: initial commit')
+      writeFileSync(join(workspaceRoot, 'README.md'), '# Diff Review Fixture\nneeds delayed review guide\n', 'utf8')
+
+      const app = await createServerApp()
+      db()
+        .insert(workspaces)
+        .values(localWorkspaceRow({
+          id: 'workspace-diff-review-guide-no-timeout',
+          name: 'Workspace Diff Review Guide No Timeout',
+          path: workspaceRoot,
+        }))
+        .run()
+      db().insert(providerTargets).values({
+        id: 'provider-target-diff-review-guide-no-timeout',
+        kind: 'manual',
+        providerKind: 'openai-compatible',
+        displayName: 'Diff Review Guide No Timeout Provider',
+        enabled: true,
+      }).run()
+
+      const review = await refreshLocalReview(app, 'workspace-diff-review-guide-no-timeout')
+      const readme = review.files.find(item => item.path === 'README.md')
+      expect(readme).toBeTruthy()
+      runtime.blockNextRun = true
+      runtime.responseText = [
+        '<cradle_guide>',
+        JSON.stringify({
+          title: 'Delayed guide',
+          steps: [
+            {
+              title: 'Review delayed README change',
+              rationale: 'Large diffs may need more time than the shared waiter timeout.',
+              ranges: [{ path: 'README.md', side: 'head', startLine: 2, endLine: 2 }],
+            },
+          ],
+        }),
+        '</cradle_guide>',
+      ].join('\n')
+
+      const generated = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-guide-no-timeout/diff-reviews/${review.id}/guide/generate`,
+        {
+          providerTargetId: 'provider-target-diff-review-guide-no-timeout',
+        },
+      )
+      expect(generated.guide.status).toBe('running')
+
+      await waitForCondition(
+        async () => runtime.streamInputs.length > 0 ? runtime.streamInputs.length : null,
+        'delayed change walkthrough run to start',
+      )
+      await new Promise(resolve => setTimeout(resolve, 30))
+      const stillRunning = await getJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-guide-no-timeout/diff-reviews/${review.id}`,
+      )
+      expect(stillRunning.guide).toMatchObject({
+        status: 'running',
+        errorMessage: null,
+      })
+
+      runtime.releaseRun()
+      const completed = await waitForCondition(async () => {
+        const reloaded = await getJson<DiffReviewResponse>(
+          app,
+          `/workspaces/workspace-diff-review-guide-no-timeout/diff-reviews/${review.id}`,
+        )
+        return reloaded.guide.status === 'ready' ? reloaded : null
+      }, 'delayed change walkthrough generation')
+
+      expect(completed.guide).toMatchObject({
+        status: 'ready',
+        errorMessage: null,
+        steps: [
+          expect.objectContaining({
+            title: 'Review delayed README change',
+            fileIds: [readme!.id],
+          }),
+        ],
+      })
+    }
+    finally {
+      runtime.releaseRun()
+      unregisterRuntime(DIFF_REVIEW_GUIDE_TEST_RUNTIME_KIND, 'diff-review-test')
+      restoreTestInfra(previousEnv)
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+    }
+  })
+
   it('keeps change walkthrough generation alive when the local worktree changes during the run', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-diff-review-workspace-')
@@ -1345,6 +1459,129 @@ describe('diff-review capability', () => {
       )
     }
     finally {
+      if (originalStandardRuntime) {
+        registerRuntime(originalStandardRuntime)
+      }
+      restoreTestInfra(previousEnv)
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('lets commit plan generation outlive the global chat run wait timeout', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-diff-review-workspace-')
+    const previousEnv = useIsolatedTestInfra(dataDir)
+    const runtime = new TestDiffReviewRuntime()
+    const originalStandardRuntime = getRuntimeRegistry().get('standard')
+
+    try {
+      process.env.CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS = '1'
+      registerRuntime(runtime)
+      initGitRepository(workspaceRoot)
+      commitFile(workspaceRoot, 'README.md', '# Diff Review Fixture', 'repo: initial commit')
+      writeFileSync(join(workspaceRoot, 'README.md'), '# Diff Review Fixture\ndelayed commit plan\n', 'utf8')
+
+      const app = await createServerApp()
+      db()
+        .insert(workspaces)
+        .values(localWorkspaceRow({
+          id: 'workspace-diff-review-commit-plan-no-timeout',
+          name: 'Workspace Diff Review Commit Plan No Timeout',
+          path: workspaceRoot,
+        }))
+        .run()
+      db().insert(providerTargets).values({
+        id: 'provider-target-diff-review-commit-plan-no-timeout',
+        kind: 'manual',
+        providerKind: 'openai-compatible',
+        displayName: 'Diff Review Commit Plan No Timeout Provider',
+        enabled: true,
+      }).run()
+
+      const review = await refreshLocalReview(app, 'workspace-diff-review-commit-plan-no-timeout')
+      const readme = review.files.find(file => file.path === 'README.md')
+      expect(readme).toBeTruthy()
+      runtime.blockNextRun = true
+      runtime.responseText = [
+        '<cradle_commit_plan>',
+        JSON.stringify({
+          rationale: 'Keep the delayed documentation change as one commit.',
+          groups: [
+            {
+              title: 'Documentation',
+              message: 'docs: describe delayed commit planning',
+              rationale: 'Covers the user-facing documentation change.',
+              fileIds: [readme!.id],
+            },
+          ],
+        }),
+        '</cradle_commit_plan>',
+      ].join('\n')
+
+      const created = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-commit-plan-no-timeout/diff-reviews/${review.id}/agent-fixes`,
+        {
+          instruction: 'Plan commits even if generation takes longer than the shared waiter timeout.',
+          expectedOutput: 'commit',
+        },
+      )
+      const agentFix = created.agentFixes[0]!
+      const started = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-commit-plan-no-timeout/diff-reviews/${review.id}/agent-fixes/${agentFix.id}/start`,
+        {
+          providerTargetId: 'provider-target-diff-review-commit-plan-no-timeout',
+          runtimeKind: 'standard',
+        },
+      )
+      expect(started.agentFixes.find(item => item.id === agentFix.id)).toMatchObject({
+        status: 'running',
+      })
+
+      await waitForCondition(
+        async () => runtime.streamInputs.length > 0 ? runtime.streamInputs.length : null,
+        'delayed commit plan run to start',
+      )
+      await new Promise(resolve => setTimeout(resolve, 30))
+      const stillRunning = await getJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-commit-plan-no-timeout/diff-reviews/${review.id}`,
+      )
+      expect(stillRunning.agentFixes.find(item => item.id === agentFix.id)).toMatchObject({
+        status: 'running',
+      })
+      expect(stillRunning.commitPlans).toHaveLength(0)
+
+      runtime.releaseRun()
+      const completed = await waitForCondition(async () => {
+        const reloaded = await getJson<DiffReviewResponse>(
+          app,
+          `/workspaces/workspace-diff-review-commit-plan-no-timeout/diff-reviews/${review.id}`,
+        )
+        const completedFix = reloaded.agentFixes.find(item => item.id === agentFix.id)
+        return completedFix?.status === 'completed' && reloaded.commitPlans.length === 1 ? reloaded : null
+      }, 'delayed diff review commit plan generation')
+
+      expect(completed.agentFixes.find(item => item.id === agentFix.id)).toMatchObject({
+        status: 'completed',
+        errorMessage: null,
+      })
+      expect(completed.commitPlans[0]).toMatchObject({
+        strategy: 'manual',
+        status: 'draft',
+        groups: [
+          expect.objectContaining({
+            title: 'Documentation',
+            fileIds: [readme!.id],
+            paths: ['README.md'],
+          }),
+        ],
+      })
+    }
+    finally {
+      runtime.releaseRun()
       if (originalStandardRuntime) {
         registerRuntime(originalStandardRuntime)
       }

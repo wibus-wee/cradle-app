@@ -18,6 +18,14 @@ import { createSubscriberRegistry } from './subscriber-registry'
 export const runSubscribers = createSubscriberRegistry()
 export const providerThreadStreamStore = createProviderThreadStreamStore()
 
+export interface WaitForRunCompletionOptions {
+  /**
+   * Positive timeout in milliseconds. Pass null for intentionally unbounded
+   * background work where the owning feature provides its own cancellation path.
+   */
+  timeoutMs?: number | null
+}
+
 /**
  * Chunk emitted in place of a real replay/terminal event when the DB row
  * still says `streaming` but no in-memory `ActiveRun` exists for it (the
@@ -77,7 +85,10 @@ export function openProviderThreadStream(
   })
 }
 
-export function waitForRunCompletion(runId: string): Promise<typeof backendRuns.$inferSelect> {
+export function waitForRunCompletion(
+  runId: string,
+  options?: WaitForRunCompletionOptions,
+): Promise<typeof backendRuns.$inferSelect> {
   const run = readRun(runId)
   if (!run) {
     throw new AppError({
@@ -91,39 +102,49 @@ export function waitForRunCompletion(runId: string): Promise<typeof backendRuns.
     return Promise.resolve(run)
   }
 
-  const timeoutMs = readPositiveIntegerEnv(
-    'CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS',
-    DEFAULT_RUN_WAIT_TIMEOUT_MS,
-  )
+  const timeoutMs = options?.timeoutMs === undefined
+    ? readPositiveIntegerEnv(
+        'CRADLE_CHAT_RUN_WAIT_TIMEOUT_MS',
+        DEFAULT_RUN_WAIT_TIMEOUT_MS,
+      )
+    : options.timeoutMs
 
   return new Promise((resolve, reject) => {
     let settled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
 
-    // Belt-and-suspenders against a terminal event that never arrives (e.g.
-    // shutdown clears the active-run registry without publishing a terminal
-    // chunk to subscribers, see `runRegistry.clearAll()`): without this,
-    // every caller awaiting this run — automations, issue-agent, diff
-    // review, conversation bridge — would hang indefinitely.
-    const timer = setTimeout(() => {
-      if (settled) {
-        return
+    const clearTimer = () => {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
       }
-      settled = true
-      unsubscribe()
-      reject(new AppError({
-        code: 'chat_run_wait_timeout',
-        status: 504,
-        message: `Timed out after ${timeoutMs}ms waiting for chat run ${runId} to complete.`,
-        details: { runId, timeoutMs },
-      }))
-    }, timeoutMs)
+    }
+
+    if (timeoutMs !== null) {
+      // Default waiters keep a guard against terminal events that never arrive
+      // (e.g. shutdown clears the active-run registry without publishing a
+      // terminal chunk to subscribers, see `runRegistry.clearAll()`).
+      timer = setTimeout(() => {
+        if (settled) {
+          return
+        }
+        settled = true
+        unsubscribe()
+        reject(new AppError({
+          code: 'chat_run_wait_timeout',
+          status: 504,
+          message: `Timed out after ${timeoutMs}ms waiting for chat run ${runId} to complete.`,
+          details: { runId, timeoutMs },
+        }))
+      }, timeoutMs)
+    }
 
     const unsubscribe = runSubscribers.subscribe(runId, (_event, terminal) => {
       if (!terminal || settled) {
         return
       }
       settled = true
-      clearTimeout(timer)
+      clearTimer()
       unsubscribe()
       resolve(readRun(runId) ?? run)
     })
@@ -131,7 +152,7 @@ export function waitForRunCompletion(runId: string): Promise<typeof backendRuns.
     const latest = readRun(runId)
     if (latest && latest.status !== 'streaming' && !settled) {
       settled = true
-      clearTimeout(timer)
+      clearTimer()
       unsubscribe()
       resolve(latest)
     }

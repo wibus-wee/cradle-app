@@ -3156,6 +3156,7 @@ describe('chat runtime capability', () => {
       expect(initialSettingsRes.status).toBe(200)
       expect(await initialSettingsRes.json()).toEqual({
         sessionId: 'session-runtime-settings-failure',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'full-access', interactionMode: 'default' },
         claudeAgent: null,
         applied: true,
@@ -3174,6 +3175,7 @@ describe('chat runtime capability', () => {
       expect(idlePatchRes.status).toBe(200)
       expect(await idlePatchRes.json()).toEqual({
         sessionId: 'session-runtime-settings-failure',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'full-access', interactionMode: 'default' },
         claudeAgent: null,
         applied: true,
@@ -3203,6 +3205,7 @@ describe('chat runtime capability', () => {
       expect(patchRes.status).toBe(200)
       expect(await patchRes.json()).toEqual({
         sessionId: 'session-runtime-settings-failure',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'approval-required', interactionMode: 'plan' },
         claudeAgent: null,
         applied: false,
@@ -3217,6 +3220,7 @@ describe('chat runtime capability', () => {
       expect(unappliedSettingsRes.status).toBe(200)
       expect(await unappliedSettingsRes.json()).toEqual({
         sessionId: 'session-runtime-settings-failure',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'approval-required', interactionMode: 'plan' },
         claudeAgent: null,
         applied: false,
@@ -3263,6 +3267,7 @@ describe('chat runtime capability', () => {
       expect(completedSettingsRes.status).toBe(200)
       expect(await completedSettingsRes.json()).toEqual({
         sessionId: 'session-runtime-settings-failure',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'approval-required', interactionMode: 'plan' },
         claudeAgent: null,
         applied: true,
@@ -3321,7 +3326,8 @@ describe('chat runtime capability', () => {
       expect(initialSettingsRes.status).toBe(200)
       expect(await initialSettingsRes.json()).toEqual({
         sessionId: 'session-claude-matrix-settings',
-        runtimeSettings: { accessMode: 'full-access', interactionMode: 'default' },
+        runtimeKind: 'claude-agent',
+        runtimeSettings: { permissionMode: 'bypassPermissions' },
         claudeAgent: null,
         applied: true,
       })
@@ -3347,7 +3353,8 @@ describe('chat runtime capability', () => {
       expect(patchRes.status).toBe(200)
       expect(await patchRes.json()).toEqual({
         sessionId: 'session-claude-matrix-settings',
-        runtimeSettings: { accessMode: 'full-access', interactionMode: 'default' },
+        runtimeKind: 'claude-agent',
+        runtimeSettings: { permissionMode: 'bypassPermissions' },
         claudeAgent: {
           modelAliases: {
             haiku: 'claude-haiku-session',
@@ -3374,8 +3381,7 @@ describe('chat runtime capability', () => {
         },
       })
       expect(persistedSettings.runtimeSettings).toEqual({
-        accessMode: 'full-access',
-        interactionMode: 'default',
+        permissionMode: 'bypassPermissions',
       })
 
       const clearRes = await app.handle(
@@ -3399,7 +3405,8 @@ describe('chat runtime capability', () => {
       expect(clearRes.status).toBe(200)
       expect(await clearRes.json()).toEqual({
         sessionId: 'session-claude-matrix-settings',
-        runtimeSettings: { accessMode: 'full-access', interactionMode: 'default' },
+        runtimeKind: 'claude-agent',
+        runtimeSettings: { permissionMode: 'bypassPermissions' },
         claudeAgent: null,
         applied: true,
       })
@@ -3476,6 +3483,7 @@ describe('chat runtime capability', () => {
       expect(patchRes.status).toBe(200)
       expect(await patchRes.json()).toEqual({
         sessionId: 'session-pending-runtime-settings',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'approval-required', interactionMode: 'plan' },
         claudeAgent: null,
         applied: false,
@@ -3489,6 +3497,7 @@ describe('chat runtime capability', () => {
       expect(settingsRes.status).toBe(200)
       expect(await settingsRes.json()).toEqual({
         sessionId: 'session-pending-runtime-settings',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'approval-required', interactionMode: 'plan' },
         claudeAgent: null,
         applied: false,
@@ -3514,6 +3523,7 @@ describe('chat runtime capability', () => {
       expect(completedSettingsRes.status).toBe(200)
       expect(await completedSettingsRes.json()).toEqual({
         sessionId: 'session-pending-runtime-settings',
+        runtimeKind: 'codex',
         runtimeSettings: { accessMode: 'approval-required', interactionMode: 'plan' },
         claudeAgent: null,
         applied: true,
@@ -5978,6 +5988,7 @@ describe('chat runtime capability', () => {
       await createProfileAndSession(app, 'workspace-queue-update', {
         providerTargetId: 'provider-target-queue-update',
         sessionId: 'session-queue-update',
+        runtimeKind: 'codex',
       })
 
       commitSessionEventsInTransaction('session-queue-update', [
@@ -6034,8 +6045,10 @@ describe('chat runtime capability', () => {
           text: 'edited text',
           status: 'pending',
           position: 1,
-          runtimeAccessMode: 'full-access',
-          runtimeInteractionMode: 'plan',
+          runtimeSettingsJson: JSON.stringify({
+            accessMode: 'full-access',
+            interactionMode: 'plan',
+          }),
         }),
       )
 

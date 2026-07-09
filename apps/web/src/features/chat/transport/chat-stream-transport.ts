@@ -12,7 +12,7 @@ import { readDesktopChatStreamBridge } from '~/lib/electron'
 import { isSyncSocketEnabled, subscribeSyncSessionRunChunks } from '~/lib/sync-socket'
 
 import type { ChatResponseRequestBody } from '../commands/chat-response-command'
-import { startChatResponse, subscribeChatSessionStream } from '../commands/chat-response-command'
+import { buildChatResponseRequestBody, startChatResponse, subscribeChatSessionStream } from '../commands/chat-response-command'
 import type { ChatStreamChunk } from './chat-stream-types'
 import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
 import {
@@ -137,7 +137,7 @@ async function startDesktopChatResponseStream(
   throwIfAborted(args.signal)
   const handle = await bridge.startResponse({
     sessionId: args.sessionId,
-    body: args.body,
+    body: buildChatResponseRequestBody(args.body),
   })
   return readDesktopTransportResult(bridge, handle, args.signal)
 }

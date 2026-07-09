@@ -29,18 +29,18 @@ import { openSettingsSection as openSettingsRouteSection } from '~/navigation/na
 import { useNewChatStore } from '~/store/new-chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
-import type { RuntimeSettings, RuntimeSettingsPatch } from '../commands/chat-response-command'
+import type { RuntimeSettingsPatch, RuntimeSettingsPatchValue } from '../commands/chat-response-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import type { MentionItem } from '../mentions/mention-panel'
 import { searchPluginMentions } from '../mentions/plugin-mentions'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { useDraftClaudeAgentModelAliases, useProviderTargetClaudeAgentModelAliases } from '../runtime/claude-session-model-matrix-control'
+import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
 import {
   mergeRuntimeSettings,
   readDefaultRuntimeSettings,
   resolveRuntimeCatalogItem,
 } from '../runtime/runtime-settings-presenter'
-import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   CRADLE_APPSHOT_SLASH_ACTION_ID,
@@ -55,13 +55,13 @@ import { modelSupportsAttachments } from './composer-attachment-state'
 import { ComposerSlotStates } from './composer-slot-states'
 import { useComposerAppshotCapture } from './use-composer-appshot-capture'
 
-type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
+type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 interface DraftClaudeAgentConfig {
   modelAliases: ClaudeAgentModelAliases
 }
 
-export type DraftChatRuntimeSettings = RuntimeSettings & {
+export type DraftChatRuntimeSettings = Record<string, RuntimeSettingsPatchValue | DraftClaudeAgentConfig | undefined> & {
   claudeAgent?: DraftClaudeAgentConfig | null
 }
 
