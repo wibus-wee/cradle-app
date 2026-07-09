@@ -8,8 +8,6 @@ import {
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
-import type { RuntimeSettingsFieldDescriptor } from '~/features/agent-management/runtime-settings-schema'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -21,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
+import type { RuntimeSettingsFieldDescriptor } from '~/features/agent-management/runtime-settings-schema'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 import { cn } from '~/lib/cn'
 
 import type { RuntimeSettings, RuntimeSettingsPatch } from '../commands/chat-response-command'
@@ -54,7 +54,7 @@ export function RuntimeSettingsControl({
   const fields = useMemo(() => readComposerRuntimeSettingsFields(runtime), [runtime])
   const summary = formatRuntimeSettingsSummary(t, fields, settings)
   const appliedSummary = applied ? summary : t('runtimeSettings.summary.pendingActiveRun', { summary })
-  const iconKey = readRuntimeSettingsIconKey(settings, fields)
+  const iconKey = readRuntimeSettingsIconKey(settings)
 
   if (!runtime?.settingsSchema || fields.length === 0) {
     return null

@@ -15,7 +15,10 @@ const spec = {
       "name": "platform",
       "required": true,
       "target": "body.platform",
-      "type": "string"
+      "type": "string",
+      "values": [
+        "slack"
+      ]
     },
     {
       "name": "label",
@@ -30,12 +33,14 @@ const spec = {
       "type": "boolean"
     },
     {
-      "description": "Defaults to CRADLE_WORKSPACE_ID.",
+      "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.",
       "name": "workspaceId",
       "required": false,
       "target": "body.workspaceId",
       "type": "string",
-      "envDefault": "CRADLE_WORKSPACE_ID"
+      "flagName": "workspace",
+      "resolver": "workspace",
+      "resolverAmbient": true
     },
     {
       "name": "teamId",

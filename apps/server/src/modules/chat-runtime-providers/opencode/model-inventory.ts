@@ -25,6 +25,35 @@ const OPENCODE_MODEL_CATALOG_SCOPE_ID = 'model-catalog'
 
 type OpenCodeProvider = ProviderListResponse['all'][number]
 type OpenCodeModel = OpenCodeProvider['models'][string]
+type OpenCodeReasoningEffort = NonNullable<RuntimeModelDescriptor['capabilities']['reasoningEfforts']>[number]
+
+interface OpenCodeVariantConfig {
+  reasoningEffort?: string
+  reasoning_effort?: string
+  effort?: string
+  thinking?: unknown
+  thinkingConfig?: {
+    thinkingLevel?: string
+    thinking_level?: string
+  }
+  thinking_config?: {
+    thinkingLevel?: string
+    thinking_level?: string
+  }
+  reasoning?: {
+    effort?: string
+  }
+  reasoningConfig?: {
+    maxReasoningEffort?: string
+    max_reasoning_effort?: string
+  }
+  reasoning_config?: {
+    maxReasoningEffort?: string
+    max_reasoning_effort?: string
+  }
+}
+
+const OPENCODE_REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const satisfies readonly OpenCodeReasoningEffort[]
 
 export interface OpencodeRuntimeProviderGroup {
   id: string
@@ -172,6 +201,7 @@ function projectOpenCodeModel(
   model: OpenCodeModel,
 ): RuntimeModelDescriptor {
   const id = toOpenCodeModelRef(provider.id, model.id)
+  const reasoningEfforts = readOpenCodeModelReasoningEfforts(model)
   return {
     id,
     label: model.name || id,
@@ -182,9 +212,7 @@ function projectOpenCodeModel(
       ...(model.modalities?.input ? { inputModalities: model.modalities.input } : {}),
       ...(model.modalities?.output ? { outputModalities: model.modalities.output } : {}),
       reasoning: model.reasoning,
-      ...(model.reasoning
-        ? { reasoningEfforts: ['low', 'medium', 'high', 'xhigh'] as const }
-        : {}),
+      ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
       toolCall: model.tool_call,
       temperature: model.temperature,
       ...(model.cost
@@ -203,6 +231,80 @@ function projectOpenCodeModel(
     source: 'opencode-sdk',
     nativeProviderId: provider.id,
   }
+}
+
+function readOpenCodeModelReasoningEfforts(model: OpenCodeModel): OpenCodeReasoningEffort[] {
+  const variants = readOpenCodeModelVariants(model)
+  return Array.from(new Set(
+    Object.entries(variants).flatMap(([variantKey, variant]) => {
+      const value = readOpenCodeVariantReasoningEffort(variantKey, variant)
+      return value ? [value] : []
+    }),
+  ))
+}
+
+function readOpenCodeModelVariants(model: OpenCodeModel): Record<string, OpenCodeVariantConfig> {
+  const variants = (model as OpenCodeModel & { variants?: unknown }).variants
+  if (!isRecord(variants)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(variants).flatMap(([key, value]) =>
+      isRecord(value)
+        ? [[key, value as OpenCodeVariantConfig]]
+        : []),
+  )
+}
+
+function readOpenCodeVariantReasoningEffort(
+  variantKey: string,
+  variant: OpenCodeVariantConfig,
+): OpenCodeReasoningEffort | null {
+  const value = trimToNull(variant.reasoningEffort)
+    ?? trimToNull(variant.reasoning_effort)
+    ?? trimToNull(variant.effort)
+    ?? trimToNull(variant.thinkingConfig?.thinkingLevel)
+    ?? trimToNull(variant.thinkingConfig?.thinking_level)
+    ?? trimToNull(variant.thinking_config?.thinkingLevel)
+    ?? trimToNull(variant.thinking_config?.thinking_level)
+    ?? trimToNull(variant.reasoning?.effort)
+    ?? trimToNull(variant.reasoningConfig?.maxReasoningEffort)
+    ?? trimToNull(variant.reasoningConfig?.max_reasoning_effort)
+    ?? trimToNull(variant.reasoning_config?.maxReasoningEffort)
+    ?? trimToNull(variant.reasoning_config?.max_reasoning_effort)
+
+  if (value) {
+    return toOpenCodeReasoningEffort(value)
+  }
+
+  if (
+    'thinking' in variant
+    || 'thinkingConfig' in variant
+    || 'thinking_config' in variant
+    || 'reasoning' in variant
+    || 'reasoningConfig' in variant
+    || 'reasoning_config' in variant
+    || Object.keys(variant).length === 0
+  ) {
+    return toOpenCodeReasoningEffort(variantKey)
+  }
+
+  return null
+}
+
+function toOpenCodeReasoningEffort(value: string): OpenCodeReasoningEffort | null {
+  const normalized = value.trim()
+  return OPENCODE_REASONING_EFFORTS.find(effort => effort === normalized) ?? null
+}
+
+function trimToNull(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed || null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function projectOpenCodeProviderKind(provider: OpenCodeProvider): ProviderKind {

@@ -80,9 +80,9 @@ import { executeRun as executeRunWithDeps } from './run/turn-executor'
 import type { ActiveRun } from './run-registry'
 import { runRegistry } from './run-registry'
 import type {
-  RuntimeSettingsPatch,
   ChatThinkingEffort,
   RuntimeGoalContinuationOptions,
+  RuntimeSettingsPatch,
 } from './runtime-provider-types'
 import {
   assertProviderBoundRunContext,
@@ -108,6 +108,7 @@ import {
   streamSideConversationResponse as streamSideConversationResponseFromSideChat,
 } from './side-chat/response'
 import { createActiveRunStreamController } from './stream/active-run-stream'
+import type { WaitForRunCompletionOptions } from './stream/live-run-streams'
 import {
   openProviderThreadStream as openProviderThreadStreamFromLiveStreams,
   openRunEventStream,
@@ -262,7 +263,7 @@ const queueDrainDeps: QueueDrainDeps = {
       providerTargetId: input.providerTargetId,
       modelId: input.modelId,
       thinkingEffort: input.thinkingEffort,
-      runtimeSettings: input.runtimeSettings,
+      runtimeSettingsOverride: input.runtimeSettings,
       continuationMode: 'queue',
       queueItemId: input.queueItemId,
     })
@@ -430,8 +431,11 @@ export function openProviderThreadStream(
   return openProviderThreadStreamFromLiveStreams(sessionId, threadId)
 }
 
-export function waitForRunCompletion(runId: string): Promise<BackendRun> {
-  return waitForRunCompletionFromLiveStreams(runId)
+export function waitForRunCompletion(
+  runId: string,
+  options?: WaitForRunCompletionOptions,
+): Promise<BackendRun> {
+  return waitForRunCompletionFromLiveStreams(runId, options)
 }
 
 export function listSessionQueueItems(sessionId: string): ChatSessionQueueItemDto[] {

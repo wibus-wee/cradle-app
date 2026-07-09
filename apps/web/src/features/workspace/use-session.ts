@@ -9,6 +9,8 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetSessionsByIdResponse, GetSessionsData, GetSessionsResponse } from '~/api-gen/types.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
+import type { SessionExecution } from '~/features/chat/session/session-execution'
+import { readSessionExecution } from '~/features/chat/session/session-execution'
 import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
 
 let unreadSessionIdsSnapshot: string[] = []
@@ -53,6 +55,8 @@ export interface WorkspaceSession {
   isIsolated: boolean
   worktreeId: string | null
   worktreeBranch: string | null
+  /** Local vs remote-host execution affinity from session projection. */
+  execution: SessionExecution
 }
 
 /**
@@ -298,6 +302,7 @@ function asWorkspaceSession(session: GetSessionsResponse[number]): WorkspaceSess
     isIsolated: session.isIsolated === true,
     worktreeId: nullableString(session.worktreeId),
     worktreeBranch: nullableString(session.worktreeBranch),
+    execution: readSessionExecution(session),
   }
 }
 

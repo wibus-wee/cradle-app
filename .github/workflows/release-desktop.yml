@@ -198,6 +198,7 @@ jobs:
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
           CRADLE_ELECTRON_REBUILD_ARCH: arm64
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          NODE_OPTIONS: --max-old-space-size=4096
         shell: bash
         run: |
           pnpm dist:mac --arm64

@@ -12,6 +12,7 @@ import {
 } from '~/api-gen/sdk.gen'
 import { toastManager } from '~/components/ui/toast'
 import type { AgentProfile, ApiProviderKind, ModelDescriptor, ProviderKind, ProviderTarget } from '~/features/agent-runtime/types'
+import { fetchRemoteUpstreamJson } from '~/features/remote-hosts/upstream-fetch'
 
 import { filterVisibleModels, ModelVisibilitySchema } from './model-visibility'
 import { ProfileConfigJsonSchema } from './profile-config-schema'
@@ -31,12 +32,23 @@ export function agentModelsQueryKey(profileId: string | null) {
   return [...AGENT_MODELS_QUERY_KEY, profileId ?? 'no-profile'] as const
 }
 
-export function providerTargetModelsQueryKey(target: ProviderTarget | null, workspaceId?: string | null) {
+export function providerTargetModelsQueryKey(
+  target: ProviderTarget | null,
+  workspaceId?: string | null,
+  hostId?: string | null,
+) {
   return [
     ...AGENT_MODELS_QUERY_KEY,
     target ? `provider-target:${target.id}` : 'no-provider-target',
     ...(workspaceId ? [`workspace:${workspaceId}`] : []),
+    ...(hostId ? [`host:${hostId}`] : []),
   ] as const
+}
+
+interface ProviderTargetModelFetchOptions {
+  workspaceId?: string | null
+  hostId?: string | null
+  refresh?: boolean
 }
 
 const EMPTY_INITIAL_PROFILE_IDS: ReadonlyArray<string | null> = []
@@ -146,10 +158,33 @@ async function fetchCachedVisibleModelsForProfile(
   return filterVisibleModels(models, visibility)
 }
 
-async function fetchCachedVisibleModelsForProviderTarget(
+async function readProviderTargetModelInventory(
   target: ProviderTarget,
-  options?: { workspaceId?: string | null },
-): Promise<ModelDescriptor[]> {
+  options?: ProviderTargetModelFetchOptions,
+): Promise<{
+  visibility: z.infer<typeof ModelVisibilitySchema>
+  cache: z.infer<typeof ProviderTargetModelsCacheSchema>
+}> {
+  const hostId = options?.hostId ?? null
+  if (hostId) {
+    const [settings, cache] = await Promise.all([
+      fetchRemoteUpstreamJson<{ configJson: string }>(
+        hostId,
+        `/provider-targets/${encodeURIComponent(target.id)}/model-settings`,
+      ),
+      fetchRemoteUpstreamJson<z.infer<typeof ProviderTargetModelsCacheSchema>>(
+        hostId,
+        `/providers/targets/${encodeURIComponent(target.id)}/models-cache`,
+      ),
+    ])
+    const parsedSettings = ProviderTargetModelSettingsSchema.parse(settings)
+    const config = ProfileConfigJsonSchema.parse(parsedSettings.configJson)
+    return {
+      visibility: ModelVisibilitySchema.parse(config.enabledModels),
+      cache: ProviderTargetModelsCacheSchema.parse(cache),
+    }
+  }
+
   const [settingsResult, cacheResult] = await Promise.all([
     getProviderTargetsByProviderTargetIdModelSettings({
       path: { providerTargetId: target.id },
@@ -160,29 +195,59 @@ async function fetchCachedVisibleModelsForProviderTarget(
       throwOnError: true,
     }),
   ])
-
   const settings = ProviderTargetModelSettingsSchema.parse(settingsResult.data)
   const config = ProfileConfigJsonSchema.parse(settings.configJson)
-  const visibility = ModelVisibilitySchema.parse(config.enabledModels)
-  const cache = ProviderTargetModelsCacheSchema.parse(cacheResult.data)
+  return {
+    visibility: ModelVisibilitySchema.parse(config.enabledModels),
+    cache: ProviderTargetModelsCacheSchema.parse(cacheResult.data),
+  }
+}
+
+async function refreshProviderTargetModels(
+  target: ProviderTargetModelRequestTarget,
+  options?: ProviderTargetModelFetchOptions,
+): Promise<ModelDescriptor[]> {
+  const body = {
+    providerKind: isApiProviderKind(target.providerKind) ? target.providerKind : 'universal',
+    label: target.name || target.id,
+    config: {},
+    secretRef: null,
+    profileId: null,
+    providerTargetKind: target.kind ?? null,
+    providerTargetId: target.id,
+    workspaceId: options?.workspaceId ?? null,
+  }
+  const hostId = options?.hostId ?? null
+  if (hostId) {
+    const data = await fetchRemoteUpstreamJson<unknown>(hostId, '/providers/models', {
+      method: 'POST',
+      body,
+    })
+    return ModelDescriptorListSchema.parse(data) satisfies ModelDescriptor[]
+  }
+
+  const { data } = await postProvidersModels({
+    body,
+    throwOnError: true,
+  })
+  return ModelDescriptorListSchema.parse(data) satisfies ModelDescriptor[]
+}
+
+async function fetchCachedVisibleModelsForProviderTarget(
+  target: ProviderTarget,
+  options?: ProviderTargetModelFetchOptions,
+): Promise<ModelDescriptor[]> {
+  const { visibility, cache } = await readProviderTargetModelInventory(target, options)
   if (!cache.cached || cache.models.length === 0) {
     if (!shouldRefreshProviderTargetModelsOnCacheMiss(target)) {
       return []
     }
-    const { data } = await postProvidersModels({
-      body: {
-        providerKind: 'universal',
-        label: target.id,
-        config: {},
-        secretRef: null,
-        profileId: null,
-        providerTargetKind: target.kind ?? null,
-        providerTargetId: target.id,
-        workspaceId: options?.workspaceId ?? null,
-      },
-      throwOnError: true,
-    })
-    const liveModels = ModelDescriptorListSchema.parse(data) satisfies ModelDescriptor[]
+    const liveModels = await refreshProviderTargetModels({
+      ...target,
+      enabled: true,
+      name: target.id,
+      providerKind: 'universal',
+    }, options)
     return filterVisibleModels(liveModels, visibility)
   }
 
@@ -192,23 +257,9 @@ async function fetchCachedVisibleModelsForProviderTarget(
 
 async function fetchVisibleModelsForProviderTarget(
   target: ProviderTargetModelRequestTarget,
-  options?: { refresh?: boolean, workspaceId?: string | null },
+  options?: ProviderTargetModelFetchOptions,
 ): Promise<ModelDescriptor[]> {
-  const [settingsResult, cacheResult] = await Promise.all([
-    getProviderTargetsByProviderTargetIdModelSettings({
-      path: { providerTargetId: target.id },
-      throwOnError: true,
-    }),
-    getProvidersTargetsByProviderTargetIdModelsCache({
-      path: { providerTargetId: target.id },
-      throwOnError: true,
-    }),
-  ])
-
-  const settings = ProviderTargetModelSettingsSchema.parse(settingsResult.data)
-  const config = ProfileConfigJsonSchema.parse(settings.configJson)
-  const visibility = ModelVisibilitySchema.parse(config.enabledModels)
-  const cache = ProviderTargetModelsCacheSchema.parse(cacheResult.data)
+  const { visibility, cache } = await readProviderTargetModelInventory(target, options)
   if (cache.cached) {
     const cachedModels = ModelDescriptorListSchema.parse(cache.models) satisfies ModelDescriptor[]
     return filterVisibleModels(cachedModels, visibility)
@@ -219,20 +270,7 @@ async function fetchVisibleModelsForProviderTarget(
     return []
   }
 
-  const { data } = await postProvidersModels({
-    body: {
-      providerKind: target.providerKind,
-      label: target.name,
-      config: {},
-      secretRef: null,
-      profileId: null,
-      providerTargetKind: target.kind ?? null,
-      providerTargetId: target.id,
-      workspaceId: options?.workspaceId ?? null,
-    },
-    throwOnError: true,
-  })
-  const liveModels = ModelDescriptorListSchema.parse(data) satisfies ModelDescriptor[]
+  const liveModels = await refreshProviderTargetModels(target, options)
   return filterVisibleModels(liveModels, visibility)
 }
 
@@ -256,10 +294,10 @@ export function useAgentModels(profileId: string | null) {
 
 export function useProviderTargetModels(
   target: ProviderTarget | null,
-  options: { workspaceId?: string | null } = {},
+  options: { workspaceId?: string | null, hostId?: string | null } = {},
 ) {
   const { data: models = [], isLoading } = useQuery({
-    queryKey: providerTargetModelsQueryKey(target, options.workspaceId),
+    queryKey: providerTargetModelsQueryKey(target, options.workspaceId, options.hostId),
     enabled: target !== null,
     queryFn: async (): Promise<ModelDescriptor[]> => {
       if (!target) {
@@ -348,7 +386,7 @@ export function useAgentModelMap(
 export function useProviderTargetModelMap(
   providerTargets: ProviderTargetModelRequestTarget[],
   initialProviderTargetIds: ReadonlyArray<string | null> = EMPTY_INITIAL_PROFILE_IDS,
-  hookOptions: { workspaceId?: string | null } = {},
+  hookOptions: { workspaceId?: string | null, hostId?: string | null } = {},
 ) {
   const { t } = useTranslation('common')
   const queryClient = useQueryClient()
@@ -379,8 +417,11 @@ export function useProviderTargetModelMap(
 
   const queries = useQueries({
     queries: requestedTargets.map(target => ({
-      queryKey: providerTargetModelsQueryKey(target, hookOptions.workspaceId),
-      queryFn: () => fetchVisibleModelsForProviderTarget(target, { workspaceId: hookOptions.workspaceId }),
+      queryKey: providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.hostId),
+      queryFn: () => fetchVisibleModelsForProviderTarget(target, {
+        workspaceId: hookOptions.workspaceId,
+        hostId: hookOptions.hostId,
+      }),
       enabled: target.enabled,
       ...MODEL_INVENTORY_QUERY_OPTIONS,
     })),
@@ -434,12 +475,16 @@ export function useProviderTargetModelMap(
       return
     }
 
-    const queryKey = providerTargetModelsQueryKey(target, hookOptions.workspaceId)
+    const queryKey = providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.hostId)
     const refresh = (async () => {
       await queryClient.cancelQueries({ queryKey })
       return queryClient.fetchQuery({
         queryKey,
-        queryFn: () => fetchVisibleModelsForProviderTarget(target, { refresh: true, workspaceId: hookOptions.workspaceId }),
+        queryFn: () => fetchVisibleModelsForProviderTarget(target, {
+          refresh: true,
+          workspaceId: hookOptions.workspaceId,
+          hostId: hookOptions.hostId,
+        }),
         staleTime: 0,
         gcTime: MODEL_INVENTORY_GC_TIME_MS,
         retry: false,
@@ -449,7 +494,7 @@ export function useProviderTargetModelMap(
     void refresh.catch(() => []).finally(() => {
       refreshesRef.current.delete(target.id)
     })
-  }, [hookOptions.workspaceId, providerTargets, queryClient])
+  }, [hookOptions.hostId, hookOptions.workspaceId, providerTargets, queryClient])
 
   const modelsByProviderTargetId: Record<string, ModelDescriptor[]> = {}
   const loadingProviderTargetIds = new Set<string>()

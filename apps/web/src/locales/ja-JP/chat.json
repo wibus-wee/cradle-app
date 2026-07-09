@@ -51,5 +51,8 @@
   "runtimeSettings.values.opencode.interactionMode.default": "ビルド",
   "runtimeSettings.values.opencode.interactionMode.plan": "計画",
   "status.thinking": "考えています...",
-  "subagent.output.readOnly": "Subagent とは操作できません"
+  "subagent.output.readOnly": "Subagent とは操作できません",
+  "execution.badge": "{{hostName}} 上",
+  "execution.disconnected.message": "{{hostName}} は切断されています。送信前に接続してください。",
+  "execution.disconnected.unknownHost": "リモートホスト {{hostName}} が見つかりません。設定で再接続してください。"
 }

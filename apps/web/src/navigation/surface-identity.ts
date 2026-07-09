@@ -9,6 +9,7 @@ export type SurfaceKind
     | 'workspace-diffs'
     | 'kanban'
     | 'plugin'
+    | 'plugin-center'
     | 'awaits'
     | 'automation'
     | 'usage'
@@ -25,6 +26,7 @@ export type SurfaceRoute
     | { to: '/workspaces/$workspaceId/diffs', params: { workspaceId: string }, search?: { repo?: string, path?: string, review?: string, view?: 'commit' | 'guide' } }
     | { to: '/kanban/$boardId', params: { boardId: string }, search?: { issue?: string, milestoneId?: string } }
     | { to: '/plugins/$routeSegment/$localId', params: { routeSegment: string, localId: string }, search?: undefined }
+    | { to: '/plugins', params?: undefined, search?: undefined }
     | { to: '/awaits', params?: undefined, search?: undefined }
     | { to: '/automation', params?: undefined, search?: undefined }
     | { to: '/usage', params?: undefined, search?: undefined }
@@ -202,6 +204,15 @@ export function surfaceDraftFromRoute(input: {
 
   const routeSegment = readString(params.routeSegment)
   const localId = readString(params.localId)
+  if (input.pathname === '/plugins' || input.pathname === '/plugins/') {
+    return {
+      id: 'plugin-center',
+      kind: 'plugin-center',
+      title: getI18n().t('settings:plugins.center.title'),
+      route: { to: '/plugins' },
+      closable: true,
+    }
+  }
   if (input.pathname.startsWith('/plugins/') && routeSegment && localId) {
     return {
       id: pluginSurfaceId(routeSegment, localId),

@@ -21,7 +21,155 @@ type OpencodeMessagePartDeltaEvent = {
   }
 }
 
-export type OpencodeStreamEvent = OpencodeLegacyEvent | OpencodeRootEvent | OpencodeMessagePartDeltaEvent
+type OpencodeSessionNextTextDeltaEvent = {
+  type: 'session.next.text.delta'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    delta: string
+  }
+}
+
+type OpencodeSessionNextTextEndedEvent = {
+  type: 'session.next.text.ended'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    text: string
+  }
+}
+
+type OpencodeSessionNextReasoningDeltaEvent = {
+  type: 'session.next.reasoning.delta'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    reasoningID: string
+    delta: string
+  }
+}
+
+type OpencodeSessionNextReasoningEndedEvent = {
+  type: 'session.next.reasoning.ended'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    reasoningID: string
+    text?: string
+  }
+}
+
+type OpencodeSessionNextToolCalledEvent = {
+  type: 'session.next.tool.called'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    callID: string
+    tool: string
+    input?: unknown
+    provider?: unknown
+  }
+}
+
+type OpencodeSessionNextToolProgressEvent = {
+  type: 'session.next.tool.progress'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    callID: string
+    content?: unknown
+    structured?: unknown
+    provider?: unknown
+  }
+}
+
+type OpencodeSessionNextToolSuccessEvent = {
+  type: 'session.next.tool.success'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    callID: string
+    content?: unknown
+    structured?: unknown
+    provider?: unknown
+  }
+}
+
+type OpencodeSessionNextToolFailedEvent = {
+  type: 'session.next.tool.failed'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    callID: string
+    provider?: unknown
+    error: {
+      message?: string
+      [key: string]: unknown
+    }
+  }
+}
+
+type OpencodeSessionNextStepEndedEvent = {
+  type: 'session.next.step.ended'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    finish?: string
+    cost?: number
+    tokens?: {
+      input?: number
+      output?: number
+      reasoning?: number
+      cache?: {
+        read?: number
+        write?: number
+      }
+    }
+  }
+}
+
+type OpencodeSessionNextStepFailedEvent = {
+  type: 'session.next.step.failed'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    error: {
+      message?: string
+      [key: string]: unknown
+    }
+  }
+}
+
+type OpencodeSessionNextRetriedEvent = {
+  type: 'session.next.retried'
+  properties: {
+    sessionID: string
+    timestamp?: number
+    error: {
+      message?: string
+      [key: string]: unknown
+    }
+  }
+}
+
+type OpencodeSessionNextEvent
+  = | OpencodeSessionNextTextDeltaEvent
+    | OpencodeSessionNextTextEndedEvent
+    | OpencodeSessionNextReasoningDeltaEvent
+    | OpencodeSessionNextReasoningEndedEvent
+    | OpencodeSessionNextToolCalledEvent
+    | OpencodeSessionNextToolProgressEvent
+    | OpencodeSessionNextToolSuccessEvent
+    | OpencodeSessionNextToolFailedEvent
+    | OpencodeSessionNextStepEndedEvent
+    | OpencodeSessionNextStepFailedEvent
+    | OpencodeSessionNextRetriedEvent
+
+export type OpencodeStreamEvent
+  = | OpencodeLegacyEvent
+    | OpencodeRootEvent
+    | OpencodeMessagePartDeltaEvent
+    | OpencodeSessionNextEvent
 
 interface TextPartProjection {
   kind: 'text' | 'reasoning'
@@ -34,7 +182,10 @@ interface ToolPartProjection {
   inputAvailable: boolean
   inputKey: string | null
   outputKey: string | null
+  toolName?: string
 }
+
+const OPENCODE_NEXT_TEXT_PART_ID = 'opencode-session-next-text'
 
 export class OpencodeEventStreamProjector {
   private ignoredMessageIds: ReadonlySet<string> = new Set()
@@ -134,6 +285,101 @@ export class OpencodeEventStreamProjector {
           },
         }]
 
+      case 'session.next.text.delta':
+        if (event.properties.sessionID !== this.sessionId || event.properties.delta.length === 0) {
+          return []
+        }
+        return this.projectTextDelta({
+          id: OPENCODE_NEXT_TEXT_PART_ID,
+          kind: 'text',
+          delta: event.properties.delta,
+        })
+
+      case 'session.next.text.ended':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return this.projectTextEnded({
+          id: OPENCODE_NEXT_TEXT_PART_ID,
+          kind: 'text',
+          text: event.properties.text,
+        })
+
+      case 'session.next.reasoning.delta':
+        if (event.properties.sessionID !== this.sessionId || event.properties.delta.length === 0) {
+          return []
+        }
+        return this.projectTextDelta({
+          id: event.properties.reasoningID,
+          kind: 'reasoning',
+          delta: event.properties.delta,
+        })
+
+      case 'session.next.reasoning.ended':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return this.projectTextEnded({
+          id: event.properties.reasoningID,
+          kind: 'reasoning',
+          text: event.properties.text ?? '',
+        })
+
+      case 'session.next.tool.called':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return this.projectNextToolCalled(event)
+
+      case 'session.next.tool.progress':
+      case 'session.next.tool.success':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return this.projectNextToolOutput(event)
+
+      case 'session.next.tool.failed':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return this.projectNextToolFailed(event)
+
+      case 'session.next.step.ended':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        this._usage = readStepTokenUsage(event.properties.tokens)
+        return isTerminalOpencodeStepFinish(event.properties.finish)
+          ? [providerChunk.finish(readFinishReason(event.properties.finish))]
+          : [{
+              type: 'data-runtime-event',
+              data: {
+                kind: `opencode.${event.type}`,
+                event,
+              },
+            }]
+
+      case 'session.next.step.failed':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return [{
+          type: 'error',
+          errorText: formatOpencodeStepFailedMessage(event),
+        }]
+
+      case 'session.next.retried':
+        if (event.properties.sessionID !== this.sessionId) {
+          return []
+        }
+        return [{
+          type: 'data-runtime-event',
+          data: {
+            kind: `opencode.${event.type}`,
+            event,
+          },
+        }]
+
       default:
         return []
     }
@@ -199,19 +445,18 @@ export class OpencodeEventStreamProjector {
   private projectPartDelta(partId: string, delta: string): UIMessageChunk[] {
     const part = this.partsById.get(partId)
     if (!part || (part.type !== 'text' && part.type !== 'reasoning')) {
-      this.pendingTextDeltas.set(partId, `${this.pendingTextDeltas.get(partId) ?? ''}${delta}`)
+      this.bufferPendingTextDelta(partId, delta)
       return []
     }
     if (this.messageRoles.get(part.messageID) !== 'assistant') {
-      this.pendingTextDeltas.set(partId, `${this.pendingTextDeltas.get(partId) ?? ''}${delta}`)
+      this.bufferPendingTextDelta(partId, delta)
       return []
     }
-    const projection = this.ensureTextProjection(part)
-    projection.emittedText += delta
-    return [
-      this.startTextChunk(part, projection),
-      this.deltaTextChunk(part, delta),
-    ].filter((chunk): chunk is UIMessageChunk => chunk !== null)
+    return this.projectTextDelta({
+      id: part.id,
+      kind: part.type,
+      delta,
+    })
   }
 
   private projectTextPart(part: Extract<OpencodePart, { type: 'text' | 'reasoning' }>): UIMessageChunk[] {
@@ -224,18 +469,20 @@ export class OpencodeEventStreamProjector {
 
     const pendingDelta = this.pendingTextDeltas.get(part.id) ?? ''
     this.pendingTextDeltas.delete(part.id)
-    const text = `${pendingDelta}${part.text}`
-    const projection = this.ensureTextProjection(part)
-    const delta = readTextDelta(projection.emittedText, text)
-    projection.emittedText = text
+    const text = pendingDelta.length > 0
+      ? appendOpencodeAssistantTextDelta(part.text, pendingDelta).nextText
+      : part.text
+    const projection = this.ensureTextProjection(part.id, part.type)
+    const { latestText, deltaToEmit } = mergeOpencodeAssistantText(projection.emittedText, text)
+    projection.emittedText = latestText
 
     const chunks: UIMessageChunk[] = []
-    const startChunk = this.startTextChunk(part, projection)
+    const startChunk = this.startTextChunk(part.id, part.type, projection)
     if (startChunk) {
       chunks.push(startChunk)
     }
-    if (delta.length > 0) {
-      chunks.push(this.deltaTextChunk(part, delta))
+    if (deltaToEmit.length > 0) {
+      chunks.push(this.deltaTextChunk(part.id, part.type, deltaToEmit))
     }
     if (part.time?.end !== undefined && !projection.ended) {
       projection.ended = true
@@ -246,12 +493,61 @@ export class OpencodeEventStreamProjector {
     return chunks
   }
 
+  private projectTextDelta(input: {
+    id: string
+    kind: TextPartProjection['kind']
+    delta: string
+  }): UIMessageChunk[] {
+    const projection = this.ensureTextProjection(input.id, input.kind)
+    const { nextText, deltaToEmit } = appendOpencodeAssistantTextDelta(projection.emittedText, input.delta)
+    if (deltaToEmit.length === 0) {
+      return []
+    }
+    projection.emittedText = nextText
+    return [
+      this.startTextChunk(input.id, input.kind, projection),
+      this.deltaTextChunk(input.id, input.kind, deltaToEmit),
+    ].filter((chunk): chunk is UIMessageChunk => chunk !== null)
+  }
+
+  private projectTextEnded(input: {
+    id: string
+    kind: TextPartProjection['kind']
+    text: string
+  }): UIMessageChunk[] {
+    const projection = this.ensureTextProjection(input.id, input.kind)
+    const { latestText, deltaToEmit } = mergeOpencodeAssistantText(projection.emittedText, input.text)
+    projection.emittedText = latestText
+    if (!projection.started && latestText.length === 0) {
+      projection.ended = true
+      return []
+    }
+
+    const chunks: UIMessageChunk[] = []
+    const startChunk = this.startTextChunk(input.id, input.kind, projection)
+    if (startChunk) {
+      chunks.push(startChunk)
+    }
+    if (deltaToEmit.length > 0) {
+      chunks.push(this.deltaTextChunk(input.id, input.kind, deltaToEmit))
+    }
+    if (!projection.ended) {
+      projection.ended = true
+      chunks.push(input.kind === 'text'
+        ? providerChunk.textEnd(input.id)
+        : providerChunk.reasoningEnd(input.id))
+    }
+    return chunks
+  }
+
   private projectToolPart(part: OpencodeToolPart): UIMessageChunk[] {
     const projection = this.toolParts.get(part.callID) ?? {
       inputAvailable: false,
       inputKey: null,
       outputKey: null,
+      toolName: part.tool,
     }
+    projection.toolName = part.tool
     this.toolParts.set(part.callID, projection)
 
     const chunks: UIMessageChunk[] = []
@@ -290,41 +586,131 @@ export class OpencodeEventStreamProjector {
     return chunks
   }
 
-  private ensureTextProjection(part: Extract<OpencodePart, { type: 'text' | 'reasoning' }>): TextPartProjection {
-    const existing = this.textParts.get(part.id)
+  private projectNextToolCalled(event: OpencodeSessionNextToolCalledEvent): UIMessageChunk[] {
+    const projection = this.toolParts.get(event.properties.callID) ?? {
+      inputAvailable: false,
+      inputKey: null,
+      outputKey: null,
+      toolName: event.properties.tool,
+    }
+    projection.toolName = event.properties.tool
+    this.toolParts.set(event.properties.callID, projection)
+
+    const chunks = this.ensureNextToolStarted(event.properties.callID, projection)
+    const input = {
+      args: event.properties.input ?? {},
+      ...(event.properties.provider === undefined ? {} : { provider: event.properties.provider }),
+    }
+    const inputKey = JSON.stringify(input)
+    if (inputKey !== projection.inputKey) {
+      projection.inputKey = inputKey
+      chunks.push(providerChunk.toolInputAvailable({
+        toolCallId: event.properties.callID,
+        toolName: event.properties.tool,
+        input,
+      }))
+    }
+    return chunks
+  }
+
+  private projectNextToolOutput(
+    event: OpencodeSessionNextToolProgressEvent | OpencodeSessionNextToolSuccessEvent,
+  ): UIMessageChunk[] {
+    const projection = this.toolParts.get(event.properties.callID) ?? {
+      inputAvailable: false,
+      inputKey: null,
+      outputKey: null,
+      toolName: 'opencode_tool',
+    }
+    this.toolParts.set(event.properties.callID, projection)
+    const chunks = this.ensureNextToolStarted(event.properties.callID, projection)
+    const output = {
+      content: event.properties.content ?? null,
+      structured: event.properties.structured ?? null,
+      ...(event.properties.provider === undefined ? {} : { provider: event.properties.provider }),
+    }
+    const outputKey = `${event.type}:${JSON.stringify(output)}`
+    if (outputKey !== projection.outputKey) {
+      projection.outputKey = outputKey
+      chunks.push(providerChunk.toolOutputAvailable({
+        toolCallId: event.properties.callID,
+        output,
+        preliminary: event.type === 'session.next.tool.progress',
+      }))
+    }
+    return chunks
+  }
+
+  private projectNextToolFailed(event: OpencodeSessionNextToolFailedEvent): UIMessageChunk[] {
+    const projection = this.toolParts.get(event.properties.callID) ?? {
+      inputAvailable: false,
+      inputKey: null,
+      outputKey: null,
+      toolName: 'opencode_tool',
+    }
+    this.toolParts.set(event.properties.callID, projection)
+    return [
+      ...this.ensureNextToolStarted(event.properties.callID, projection),
+      providerChunk.toolOutputError(event.properties.callID, event.properties.error.message ?? 'OpenCode tool failed.'),
+    ]
+  }
+
+  private ensureNextToolStarted(
+    toolCallId: string,
+    projection: ToolPartProjection,
+  ): UIMessageChunk[] {
+    if (projection.inputAvailable) {
+      return []
+    }
+    projection.inputAvailable = true
+    return [providerChunk.toolInputStart(toolCallId, projection.toolName ?? 'opencode_tool')]
+  }
+
+  private ensureTextProjection(
+    id: string,
+    kind: TextPartProjection['kind'],
+  ): TextPartProjection {
+    const existing = this.textParts.get(id)
     if (existing) {
       return existing
     }
     const next: TextPartProjection = {
-      kind: part.type,
+      kind,
       emittedText: '',
       started: false,
       ended: false,
     }
-    this.textParts.set(part.id, next)
+    this.textParts.set(id, next)
     return next
   }
 
   private startTextChunk(
-    part: Extract<OpencodePart, { type: 'text' | 'reasoning' }>,
+    id: string,
+    kind: TextPartProjection['kind'],
     projection: TextPartProjection,
   ): UIMessageChunk | null {
     if (projection.started) {
       return null
     }
     projection.started = true
-    return projection.kind === 'text'
-      ? providerChunk.textStart(part.id)
-      : providerChunk.reasoningStart(part.id)
+    return kind === 'text'
+      ? providerChunk.textStart(id)
+      : providerChunk.reasoningStart(id)
   }
 
   private deltaTextChunk(
-    part: Extract<OpencodePart, { type: 'text' | 'reasoning' }>,
+    id: string,
+    kind: TextPartProjection['kind'],
     delta: string,
   ): UIMessageChunk {
-    return part.type === 'text'
-      ? providerChunk.textDelta(part.id, delta)
-      : providerChunk.reasoningDelta(part.id, delta)
+    return kind === 'text'
+      ? providerChunk.textDelta(id, delta)
+      : providerChunk.reasoningDelta(id, delta)
+  }
+
+  private bufferPendingTextDelta(partId: string, delta: string): void {
+    const previous = this.pendingTextDeltas.get(partId) ?? ''
+    this.pendingTextDeltas.set(partId, appendOpencodeAssistantTextDelta(previous, delta).nextText)
   }
 }
 
@@ -363,11 +749,69 @@ export function readOpencodeTerminalAssistantForTurn(
   return isTerminalOpencodeAssistant(info) ? info : null
 }
 
-function readTextDelta(previousText: string, nextText: string): string {
-  if (nextText.startsWith(previousText)) {
-    return nextText.slice(previousText.length)
+export function isTerminalOpencodeStepEndedEvent(event: OpencodeStreamEvent, sessionId: string): boolean {
+  return event.type === 'session.next.step.ended'
+    && event.properties.sessionID === sessionId
+    && isTerminalOpencodeStepFinish(event.properties.finish)
+}
+
+export function isOpencodeToolCallStepEndedEvent(event: OpencodeStreamEvent, sessionId: string): boolean {
+  return event.type === 'session.next.step.ended'
+    && event.properties.sessionID === sessionId
+    && isOpenCodeToolCallFinish(event.properties.finish)
+}
+
+export function readOpencodeStepFailedMessage(event: OpencodeStreamEvent): string | null {
+  return event.type === 'session.next.step.failed'
+    ? formatOpencodeStepFailedMessage(event)
+    : null
+}
+
+function commonPrefixLength(left: string, right: string): number {
+  let index = 0
+  while (index < left.length && index < right.length && left[index] === right[index]) {
+    index += 1
+  }
+  return index
+}
+
+function suffixPrefixOverlap(text: string, delta: string): number {
+  const maxLength = Math.min(text.length, delta.length)
+  for (let length = maxLength; length > 0; length -= 1) {
+    if (text.endsWith(delta.slice(0, length))) {
+      return length
+    }
+  }
+  return 0
+}
+
+function appendOpencodeAssistantTextDelta(
+  previousText: string,
+  delta: string,
+): { nextText: string, deltaToEmit: string } {
+  const deltaToEmit = delta.slice(suffixPrefixOverlap(previousText, delta))
+  return {
+    nextText: previousText + deltaToEmit,
+    deltaToEmit,
+  }
+}
+
+function resolveLatestAssistantText(previousText: string, nextText: string): string {
+  if (previousText.length > nextText.length && previousText.startsWith(nextText)) {
+    return previousText
   }
   return nextText
+}
+
+function mergeOpencodeAssistantText(
+  previousText: string,
+  nextText: string,
+): { latestText: string, deltaToEmit: string } {
+  const latestText = resolveLatestAssistantText(previousText, nextText)
+  return {
+    latestText,
+    deltaToEmit: latestText.slice(commonPrefixLength(previousText, latestText)),
+  }
 }
 
 function readToolOutputKey(part: OpencodeToolPart): string {
@@ -391,6 +835,20 @@ function readTokenUsage(message: OpencodeAssistantMessage): TokenUsage {
   }
 }
 
+function readStepTokenUsage(tokens: OpencodeSessionNextStepEndedEvent['properties']['tokens']): TokenUsage | null {
+  if (!tokens) {
+    return null
+  }
+  const promptTokens = tokens.input ?? 0
+  const outputTokens = tokens.output ?? 0
+  const reasoningTokens = tokens.reasoning ?? 0
+  return {
+    promptTokens,
+    completionTokens: outputTokens + reasoningTokens,
+    totalTokens: promptTokens + outputTokens + reasoningTokens,
+  }
+}
+
 function readFinishReason(finish: string | undefined): Extract<UIMessageChunk, { type: 'finish' }>['finishReason'] {
   switch (finish) {
     case 'length':
@@ -403,6 +861,24 @@ function readFinishReason(finish: string | undefined): Extract<UIMessageChunk, {
     default:
       return 'stop'
   }
+}
+
+function isTerminalOpencodeStepFinish(finish: string | undefined): boolean {
+  if (!finish) {
+    return false
+  }
+  return !isOpenCodeToolCallFinish(finish)
+    && finish !== 'function-call'
+    && finish !== 'continue'
+    && finish !== 'unknown'
+}
+
+function isOpenCodeToolCallFinish(finish: string | undefined): boolean {
+  return finish === 'tool-call' || finish === 'tool-calls'
+}
+
+function formatOpencodeStepFailedMessage(event: OpencodeSessionNextStepFailedEvent): string {
+  return event.properties.error.message ?? 'OpenCode session failed.'
 }
 
 function formatOpencodeStreamError(error: OpencodeAssistantMessage['error'] | unknown): string {

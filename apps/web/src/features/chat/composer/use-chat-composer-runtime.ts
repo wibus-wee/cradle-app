@@ -73,6 +73,7 @@ interface UseChatComposerRuntimeOptions {
   isStreaming: boolean
   isReady: boolean
   workspaceId?: string | null
+  remoteHostId?: string | null
   composerModel?: ModelDescriptor | null
   sendOverridesRef?: React.MutableRefObject<ChatComposerSendOverrides>
   sendMessage: (
@@ -129,6 +130,7 @@ export function useChatComposerRuntime({
   isStreaming,
   isReady,
   workspaceId,
+  remoteHostId = null,
   composerModel,
   sendOverridesRef,
   sendMessage,
@@ -163,7 +165,10 @@ export function useChatComposerRuntime({
   const boundProviderTarget = useMemo(() => {
     return sessionBinding?.providerTargetId ? { id: sessionBinding.providerTargetId } : null
   }, [sessionBinding?.providerTargetId])
-  const { models: providerSessionModels } = useProviderTargetModels(boundProviderTarget, { workspaceId })
+  const { models: providerSessionModels } = useProviderTargetModels(boundProviderTarget, {
+    workspaceId,
+    hostId: remoteHostId,
+  })
   const sessionModels = providerSessionModels
   const hasRuntimeCodeReviewSlot = useMemo(() => {
     return Boolean(runtimeCapabilities?.uiSlots.some((slot) => {

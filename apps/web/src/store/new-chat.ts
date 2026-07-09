@@ -7,7 +7,7 @@ import type { RuntimeSettings, RuntimeSettingsPatch } from '~/features/chat/comm
 
 import { persistStorage } from './persist-storage'
 
-type PersistedThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh' | null
+type PersistedThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 export interface NewChatClaudeAgentConfig {
   modelAliases: ClaudeAgentModelAliases
 }
@@ -157,7 +157,17 @@ export const useNewChatStore = create<NewChatState>()(
       patchLastRuntimeSettings: (runtimeKind, patch) => {
         set((state) => {
           const current = state.lastRuntimeSettingsByKind[runtimeKind] ?? {}
-          const next = { ...current, ...patch }
+          const next: RuntimeSettings = { ...current }
+          for (const [key, value] of Object.entries(patch)) {
+            if (value === undefined) {
+              continue
+            }
+            if (value === null) {
+              delete next[key]
+              continue
+            }
+            next[key] = value
+          }
           if (areRuntimeSettingsEqual(current, next)) {
             return state
           }

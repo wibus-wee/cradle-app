@@ -26,7 +26,7 @@ const logger = createChildLogger({ module: 'relay-host-connector' })
  * stored pairing code; once paired it reconnects via the pinned controller
  * pubkey (no human intervention). Each `stream_open` from the controller is
  * bridged to a `net.connect` against this Cradle Server's own HTTP port, so
- * the controller's `RemoteCradleClient` reaches the host server end-to-end.
+ * the controller's remote-hosts upstream gateway reaches the host server end-to-end.
  */
 
 export interface HostConnectorConfig {

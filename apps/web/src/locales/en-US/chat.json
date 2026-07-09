@@ -34,8 +34,8 @@
   "runtimeSettings.interaction.default": "Build",
   "runtimeSettings.interaction.label": "Interaction",
   "runtimeSettings.interaction.plan": "Plan",
-  "runtimeSettings.summary.empty": "Default",
   "runtimeSettings.summary": "{{access}} / {{interaction}}",
+  "runtimeSettings.summary.empty": "Default",
   "runtimeSettings.summary.pendingActiveRun": "{{summary}} (saved for the next run)",
   "runtimeSettings.summary.short": "{{access}} / {{interaction}}",
   "runtimeSettings.values.claude-agent.permissionMode.acceptEdits": "Accept edits",
@@ -51,5 +51,8 @@
   "runtimeSettings.values.opencode.interactionMode.default": "Build",
   "runtimeSettings.values.opencode.interactionMode.plan": "Plan",
   "status.thinking": "Thinking...",
-  "subagent.output.readOnly": "Cannot interact with Subagent"
+  "subagent.output.readOnly": "Cannot interact with Subagent",
+  "execution.badge": "On {{hostName}}",
+  "execution.disconnected.message": "{{hostName}} is disconnected. Connect before sending.",
+  "execution.disconnected.unknownHost": "Remote host {{hostName}} was not found. Reconnect it in Settings."
 }

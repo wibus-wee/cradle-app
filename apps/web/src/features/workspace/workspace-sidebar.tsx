@@ -26,6 +26,7 @@ import {
   PlusLine as PlusIcon,
   Refresh1Line as RefreshCwIcon,
   SearchLine as SearchIcon,
+  ServerLine as ServerIcon,
   Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
   UpSmallLine as ChevronUpIcon,
@@ -55,8 +56,6 @@ import {
   postSessionsByIdUnread,
 } from '~/api-gen'
 import {
-  getRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesOptions,
-  getRemoteHostsByHostIdCradleServerWorkspacesOptions,
   getRemoteHostsOptions,
   getSessionsByIdQueryKey,
   patchWorkspacesByWorkspaceIdMutation,
@@ -65,8 +64,6 @@ import {
   postWorkspacesMultiFolderMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
-  GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponse,
-  GetRemoteHostsByHostIdCradleServerWorkspacesResponse,
   GetRemoteHostsResponse,
   PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
@@ -110,6 +107,10 @@ import { prefetchChatSession } from '~/features/chat/session/chat-session-prefet
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
+import {
+  fetchRemoteUpstreamJson,
+  remoteHostUpstreamQueryKey,
+} from '~/features/remote-hosts/upstream-fetch'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
@@ -1213,8 +1214,41 @@ function WorkspaceRecognitionDialog({
 }
 
 type RemoteHost = GetRemoteHostsResponse[number]
-type RemoteWorkspace = GetRemoteHostsByHostIdCradleServerWorkspacesResponse['workspaces'][number]
-type RemoteWorkspaceFileEntry = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponse['files'][number]
+
+interface RemoteWorkspace {
+  id: string
+  name: string
+  locator: {
+    hostId: string
+    path: string
+    kind?: 'project' | 'managed-worktree'
+    sourceWorkspaceId?: string | null
+  }
+  gitIdentity: {
+    originUrl?: string | null
+    repoRoot?: string | null
+    headSha?: string | null
+    branch?: string | null
+  }
+  identifier: string
+  pinned: number
+  createdAt: number
+  updatedAt: number
+}
+
+interface RemoteWorkspaceFileEntry {
+  type: 'file' | 'directory'
+  name: string
+  path: string
+}
+
+function remoteHostWorkspacesQueryKey(hostId: string) {
+  return remoteHostUpstreamQueryKey(hostId, 'workspaces')
+}
+
+function remoteHostFilesQueryKey(hostId: string, workspaceId: string) {
+  return remoteHostUpstreamQueryKey(hostId, workspaceId, 'files')
+}
 
 function RemoteWorkspaceFileRow({ entry }: { entry: RemoteWorkspaceFileEntry }) {
   return (
@@ -1270,10 +1304,11 @@ function RemoteWorkspaceBrowser({
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
 
   const workspacesQuery = useQuery({
-    ...getRemoteHostsByHostIdCradleServerWorkspacesOptions({ path: { hostId: host.id } }),
+    queryKey: remoteHostWorkspacesQueryKey(host.id),
+    queryFn: () => fetchRemoteUpstreamJson<RemoteWorkspace[]>(host.id, '/workspaces'),
     retry: false,
   })
-  const workspaces = workspacesQuery.data?.workspaces ?? []
+  const workspaces = workspacesQuery.data ?? []
   const selectedWorkspace = useMemo(() => {
     return workspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? workspaces[0] ?? null
   }, [selectedWorkspaceId, workspaces])
@@ -1289,12 +1324,11 @@ function RemoteWorkspaceBrowser({
   }, [selectedWorkspaceId, workspaces])
 
   const filesQuery = useQuery({
-    ...getRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesOptions({
-      path: {
-        hostId: host.id,
-        remoteWorkspaceId: selectedWorkspace?.id ?? '',
-      },
-    }),
+    queryKey: remoteHostFilesQueryKey(host.id, selectedWorkspace?.id ?? ''),
+    queryFn: () => fetchRemoteUpstreamJson<RemoteWorkspaceFileEntry[]>(
+      host.id,
+      `/workspaces/${encodeURIComponent(selectedWorkspace?.id ?? '')}/files`,
+    ),
     enabled: !!selectedWorkspace,
     retry: false,
   })
@@ -1391,10 +1425,10 @@ function RemoteWorkspaceBrowser({
                               {filesQuery.error instanceof Error ? filesQuery.error.message : String(filesQuery.error)}
                             </p>
                           )
-                        : filesQuery.data && filesQuery.data.files.length > 0
+                        : filesQuery.data && filesQuery.data.length > 0
                           ? (
                               <div className="max-h-56 overflow-y-auto rounded-md border border-border/60">
-                                {filesQuery.data.files.map(entry => (
+                                {filesQuery.data.map(entry => (
                                   <RemoteWorkspaceFileRow key={entry.path} entry={entry} />
                                 ))}
                               </div>
@@ -1915,7 +1949,19 @@ const SessionItem = memo(
                     <WorktreeIcon className="size-3.5" aria-hidden="true" />
                   </span>
                 )
-                : null}
+                : session.execution.kind === 'remote-host'
+                  ? (
+                    <span
+                      className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground/70 opacity-100 group-hover:opacity-0 group-focus-within/menu:opacity-0"
+                      title={t('session.aria.remote', { hostName: session.execution.hostId })}
+                      aria-label={t('session.aria.remote', { hostName: session.execution.hostId })}
+                      role="img"
+                      data-testid={`session-remote-indicator-${session.id}`}
+                    >
+                      <ServerIcon className="size-3.5" aria-hidden="true" />
+                    </span>
+                  )
+                  : null}
               <button
                 type="button"
                 className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"

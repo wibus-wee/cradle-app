@@ -1,7 +1,6 @@
 import type { FileUIPart } from 'ai'
 
 import { AppError } from '../../../errors/app-error'
-import { assertStoredSession } from '../runtime-session-context'
 import type { ChatContextPart } from '../context-parts'
 import {
   claimSessionQueueItem,
@@ -12,6 +11,7 @@ import {
 } from '../es/commands'
 import type { SerializedChatError } from '../run/errors'
 import type { RuntimeSettings } from '../runtime-provider-types'
+import { assertStoredSession } from '../runtime-session-context'
 import type { PersistedThinkingEffort } from './session-queue'
 import {
   compareQueueRows,

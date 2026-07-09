@@ -2,6 +2,7 @@ import type { FileUIPart } from 'ai'
 
 import { toastManager } from '~/components/ui/toast'
 
+import { describeChatExecutionError } from '../commands/chat-execution-errors'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import type { SendMessageResult } from '../session/use-chat-session'
 import type { ComposerAction } from './composer-state'
@@ -31,7 +32,8 @@ export function reportComposerSubmitError(error: unknown) {
   toastManager.add({
     type: 'error',
     title: 'Message submit failed',
-    description: error instanceof Error ? error.message : 'Unknown submit error.',
+    description: describeChatExecutionError(error)
+      ?? (error instanceof Error ? error.message : 'Unknown submit error.'),
   })
 }
 

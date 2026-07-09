@@ -11,6 +11,7 @@ import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
 import type {
   RuntimeSettings,
   RuntimeSettingsPatch,
+  RuntimeSettingsValue,
 } from './runtime-provider-types'
 import { assertStoredSession, getSessionRunContext } from './runtime-session-context'
 import type { SessionClaudeAgentConfig, SessionClaudeAgentConfigPatchInput } from './runtime-settings'
@@ -33,7 +34,7 @@ export interface ChatRuntimeSettingsDto {
   applied: boolean
 }
 
-export type ChatRuntimeSettingsUpdatePatch = RuntimeSettingsPatch & {
+export type ChatRuntimeSettingsUpdatePatch = Record<string, RuntimeSettingsValue | SessionClaudeAgentConfigPatchInput | null | undefined> & {
   claudeAgent?: SessionClaudeAgentConfigPatchInput | null
 }
 
@@ -58,12 +59,19 @@ export function getSessionRuntimeSettings(sessionId: string): ChatRuntimeSetting
   }
 }
 
-function stripRuntimeSettingsPatchNulls(
+function readRuntimeSettingsPatch(
   patch: ChatRuntimeSettingsUpdatePatch,
-): ChatRuntimeSettingsUpdatePatch {
-  const next: ChatRuntimeSettingsUpdatePatch = {}
+): RuntimeSettingsPatch {
+  const next: RuntimeSettingsPatch = {}
   for (const [key, value] of Object.entries(patch)) {
-    if (value !== null && value !== undefined) {
+    if (
+      key !== 'claudeAgent'
+      && (
+        typeof value === 'string'
+        || typeof value === 'number'
+        || typeof value === 'boolean'
+      )
+    ) {
       next[key] = value
     }
   }
@@ -74,7 +82,7 @@ export async function updateSessionRuntimeSettings(input: {
   sessionId: string
   patch: ChatRuntimeSettingsUpdatePatch
 }): Promise<ChatRuntimeSettingsDto> {
-  const patch = stripRuntimeSettingsPatchNulls(input.patch)
+  const patch = readRuntimeSettingsPatch(input.patch)
   const session = assertStoredSession(input.sessionId)
   const runtimeKind = readSessionRuntimeKind(session)
   const rawPatch = input.patch as Record<string, unknown>
@@ -85,7 +93,7 @@ export async function updateSessionRuntimeSettings(input: {
   const runtimeSettings = mergeRuntimeSettings(
     runtimeKind,
     readSessionRuntimeSettings(runtimeKind, session.configJson),
-    normalizeRuntimeSettingsPatch(runtimeKind, input.patch),
+    normalizeRuntimeSettingsPatch(runtimeKind, patch),
   )
   db()
     .update(sessions)
@@ -117,9 +125,6 @@ export async function updateSessionRuntimeSettings(input: {
     }
   }
   const activeRun = runRegistry.getActiveRun(runId)
-  if (activeRun && !activeRun.terminalStatus) {
-    activeRun.runtimeSettings = runtimeSettings
-  }
   let applied = readRuntimeSettingsApplied(input.sessionId, runtimeKind, runtimeSettings)
   if (
     !applied
@@ -135,6 +140,7 @@ export async function updateSessionRuntimeSettings(input: {
           profile: context.profile,
           settings: runtimeSettings,
         })
+        activeRun.runtimeSettings = runtimeSettings
         applied = true
       }
  catch (error) {

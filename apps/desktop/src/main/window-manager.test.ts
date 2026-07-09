@@ -106,6 +106,9 @@ const electronMocks = vi.hoisted(() => {
       },
     },
     BrowserWindow: FakeBrowserWindow,
+    nativeTheme: {
+      shouldUseDarkColors: false,
+    },
     screen: {
       getDisplayNearestPoint: vi.fn(() => ({
         workArea: { x: 0, y: 0, width: 1440, height: 900 },

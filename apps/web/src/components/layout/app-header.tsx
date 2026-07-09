@@ -13,6 +13,7 @@ import { CHROME_COLLAPSED_SIDEBAR_WIDTH } from '~/components/layout/layout-respo
 import { useChatSessionLayoutRecord } from '~/components/layout/use-layout-query-records'
 import { Button } from '~/components/ui/button'
 import { ResourcesPopover } from '~/features/devtool/resources/resources-popover'
+import { SessionExecutionChrome } from '~/features/remote-hosts/session-execution-chrome'
 import { SessionIsolationChrome } from '~/features/session/session-isolation-chrome'
 import { cn } from '~/lib/cn'
 import { isTearoffWindow, windowControlsSafeArea } from '~/lib/electron'
@@ -155,10 +156,13 @@ export function AppHeader({
                 {sessionScopedTitle}
               </div>
               {scopedSessionId && (
-                <SessionIsolationChrome
-                  sessionId={scopedSessionId}
-                  workspaceId={scopedSessionLayout?.workspaceId ?? null}
-                />
+                <>
+                  <SessionExecutionChrome sessionId={scopedSessionId} />
+                  <SessionIsolationChrome
+                    sessionId={scopedSessionId}
+                    workspaceId={scopedSessionLayout?.workspaceId ?? null}
+                  />
+                </>
               )}
             </div>
             )

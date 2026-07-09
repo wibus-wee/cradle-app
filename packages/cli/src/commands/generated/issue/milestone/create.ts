@@ -12,12 +12,14 @@ const spec = {
   "description": "Create issue milestone",
   "flags": [
     {
-      "description": "Defaults to CRADLE_WORKSPACE_ID.",
+      "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.",
       "name": "workspaceId",
       "required": true,
       "target": "body.workspaceId",
       "type": "string",
-      "envDefault": "CRADLE_WORKSPACE_ID"
+      "flagName": "workspace",
+      "resolver": "workspace",
+      "resolverAmbient": true
     },
     {
       "name": "title",

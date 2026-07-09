@@ -5,10 +5,14 @@ import type { Command } from 'commander'
 const spec = {
   "arguments": [
     {
+      "description": "Accepts a workspace name or id.",
       "name": "workspaceId",
       "required": true,
       "target": "path.workspaceId",
-      "type": "string"
+      "type": "string",
+      "flagName": "workspace",
+      "resolver": "workspace",
+      "resolverAmbient": false
     }
   ],
   "command": [

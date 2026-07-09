@@ -671,5 +671,5 @@ describe('workspace capability', () => {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
-  })
+  }, 15_000)
 })

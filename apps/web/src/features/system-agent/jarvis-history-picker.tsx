@@ -106,11 +106,19 @@ export function JarvisHistoryPicker({
           </button>
         )}
       />
-      <PopoverContent side="top" align="end" sideOffset={8} className="w-64 gap-0 p-1">
-        <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={8}
+        className="max-h-[var(--radix-popover-content-available-height)] w-64 gap-0 p-1"
+      >
+        <div className="shrink-0 px-2 py-1 text-[11px] font-medium text-muted-foreground">
           {t('history.title')}
         </div>
-        <ScrollArea className="max-h-64">
+        <ScrollArea
+          className="max-h-[min(16rem,calc(var(--radix-popover-content-available-height)-2rem))]"
+          viewportClassName="max-h-[min(16rem,calc(var(--radix-popover-content-available-height)-2rem))]"
+        >
           {isPending
             ? (
                 <div className="flex min-h-12 items-center gap-2 px-2 text-xs text-muted-foreground">

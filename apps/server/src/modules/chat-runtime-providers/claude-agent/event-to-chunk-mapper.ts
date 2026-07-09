@@ -21,7 +21,6 @@ import type { UIMessageChunk } from 'ai'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { providerChunk } from '../kit/chunk-mapper'
 import {
-  CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE,
   CLAUDE_PLAN_IMPLEMENTATION_TOOL_NAME,
   isClaudeAgentEnterPlanModeToolName,
   isClaudeAgentExitPlanModeToolName,

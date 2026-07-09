@@ -10,10 +10,10 @@ import {
 import { isTerminalUIMessageChunk } from '../run/stream-chunks'
 import type {
   ChatRuntime,
-  RuntimeSettings,
   ChatThinkingEffort,
   RuntimeProviderTargetProfile,
   RuntimeSession,
+  RuntimeSettings,
 } from '../runtime-provider-types'
 import { createAssistantMessage } from '../ui-message'
 

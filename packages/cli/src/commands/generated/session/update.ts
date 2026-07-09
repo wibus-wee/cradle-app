@@ -45,7 +45,16 @@ const spec = {
       "name": "thinkingEffort",
       "required": false,
       "target": "body.thinkingEffort",
-      "type": "string"
+      "type": "string",
+      "values": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
     },
     {
       "name": "sessionGroupId",

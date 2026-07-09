@@ -46,10 +46,13 @@ const recipeSchema = t.Object({
   runtimeKind: t.Optional(runtimeKindSchema),
   modelId: t.Optional(t.String({ minLength: 1 })),
   thinkingEffort: t.Optional(t.Union([
+    t.Literal('none'),
+    t.Literal('minimal'),
     t.Literal('low'),
     t.Literal('medium'),
     t.Literal('high'),
     t.Literal('xhigh'),
+    t.Literal('max'),
   ])),
 }, { additionalProperties: false })
 

@@ -152,6 +152,8 @@ I have been deeply inspired by the following projects and communities:
 - Thanks to [agentation](https://github.com/benjitaylor/agentation) & [Cursor](https://cursor.com/) for its visual feedback ideas
 - Thanks to [CC Switch](https://ccswitch.io) for our provider management plugin integration.
 - Thanks to [Nowledge Mem](https://mem.nowledge.co/) for our plugin integration.
+- Thanks to [Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) for our plugin integration.
+
 
 ## License
 

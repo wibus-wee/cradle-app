@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  getDefaultRuntimeSettings,
   migrateLegacyClaudeAgentRuntimeSettings,
   readRuntimeSettingsDefaults,
   readRuntimeSettingsSchema,
@@ -12,9 +11,13 @@ import {
 describe('runtime-settings-registry', () => {
   it('exposes claude-agent as a 1D permissionMode schema', () => {
     const schema = readRuntimeSettingsSchema('claude-agent')
-    expect(schema?.required).toEqual(['permissionMode'])
-    expect(schema?.properties?.permissionMode).toMatchObject({
-      enum: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
+    expect(schema).toMatchObject({
+      required: ['permissionMode'],
+      properties: {
+        permissionMode: {
+          enum: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
+        },
+      },
     })
   })
 

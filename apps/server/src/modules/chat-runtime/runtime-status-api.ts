@@ -18,7 +18,7 @@ import type { ChatMessageStatus } from './run/stream-chunks'
 import { readDeltaChunkTextLength } from './run/stream-chunks'
 import type { ActiveRun } from './run-registry'
 import { runRegistry } from './run-registry'
-import type { RuntimeSettings, RuntimeGoalContinuationOptions } from './runtime-provider-types'
+import type { RuntimeGoalContinuationOptions, RuntimeSettings } from './runtime-provider-types'
 import { isProviderTargetAvailable } from './runtime-session-context'
 import { getDefaultRuntimeSettings, readSessionRuntimeSettings } from './runtime-settings'
 

@@ -3,7 +3,8 @@ import { z } from 'zod'
 
 import { getCommandContext } from '../runtime/context'
 import { printResult } from '../runtime/output'
-import type { CliOutputFormat } from '../runtime/types'
+import type { CliOutputFormat, CommandContext } from '../runtime/types'
+import { resolveWorkspaceReference } from '../runtime/workspace-context'
 
 const OutputFormatSchema = z.enum(['agent', 'auto', 'json', 'pretty', 'table', 'ndjson'])
 
@@ -21,7 +22,7 @@ const IssueStatusCategorySchema = z.enum(['triage', 'backlog', 'unstarted', 'sta
 
 interface AwaitCommandOptions {
   chatSessionId?: string
-  workspaceId?: string
+  workspace?: string
   reason?: string
   expiresAt?: string
   format?: string
@@ -121,16 +122,20 @@ function countValues(values: unknown[]): number {
   return values.filter(value => value !== undefined && value !== null).length
 }
 
-function buildCommonCreateBody(options: AwaitCommandOptions): {
+async function buildCommonCreateBody(context: CommandContext, options: AwaitCommandOptions): Promise<{
   chatSessionId: string
   workspaceId: string
   reason?: string
   expiresAt?: number
-} {
+}> {
   const expiresAt = readOptionalNumber(options.expiresAt, '--expires-at')
+  const workspaceId = await resolveWorkspaceReference(context, options.workspace)
+  if (!workspaceId) {
+    throw new Error('Could not resolve a workspace for --workspace. Pass a workspace name or id explicitly, set CRADLE_WORKSPACE_ID, or run this from an imported workspace directory.')
+  }
   return {
     chatSessionId: readRequiredValue(options.chatSessionId, 'CRADLE_CHAT_SESSION_ID', '--chat-session-id'),
-    workspaceId: readRequiredValue(options.workspaceId, 'CRADLE_WORKSPACE_ID', '--workspace-id'),
+    workspaceId,
     ...(options.reason ? { reason: options.reason } : {}),
     ...(expiresAt === null ? {} : { expiresAt }),
   }
@@ -173,7 +178,7 @@ export function registerSessionAwaitCommand(root: Command): void {
     .option('--sha <sha>', 'Commit SHA or ref')
     .option('--run-id <id>', 'GitHub check run ID')
     .option('--chat-session-id <id>', 'Chat session ID. Defaults to CRADLE_CHAT_SESSION_ID')
-    .option('--workspace-id <id>', 'Workspace ID. Defaults to CRADLE_WORKSPACE_ID')
+    .option('--workspace <name-or-id>', 'Workspace name or id. Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.')
     .option('--reason <text>', 'Visible wait reason')
     .option('--expires-at <unixSeconds>', 'Unix timestamp when this await expires')
     .option('--format <format>', 'Output format: agent, auto, json, pretty, table, ndjson', 'auto')
@@ -194,7 +199,7 @@ export function registerSessionAwaitCommand(root: Command): void {
       }
 
       await createAwait(command, {
-        ...buildCommonCreateBody(options),
+        ...(await buildCommonCreateBody(getCommandContext(command), options)),
         source: 'github-ci',
         filterJson: JSON.stringify(filter),
       }, options)
@@ -207,7 +212,7 @@ export function registerSessionAwaitCommand(root: Command): void {
     .requiredOption('--pr <number>', 'Pull request number')
     .requiredOption('--mode <mode>', 'Review mode: approved, changes-requested, reviewed')
     .option('--chat-session-id <id>', 'Chat session ID. Defaults to CRADLE_CHAT_SESSION_ID')
-    .option('--workspace-id <id>', 'Workspace ID. Defaults to CRADLE_WORKSPACE_ID')
+    .option('--workspace <name-or-id>', 'Workspace name or id. Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.')
     .option('--reason <text>', 'Visible wait reason')
     .option('--expires-at <unixSeconds>', 'Unix timestamp when this await expires')
     .option('--format <format>', 'Output format: agent, auto, json, pretty, table, ndjson', 'auto')
@@ -220,7 +225,7 @@ export function registerSessionAwaitCommand(root: Command): void {
 
       const mode = GithubReviewModeSchema.parse(options.mode)
       await createAwait(command, {
-        ...buildCommonCreateBody(options),
+        ...(await buildCommonCreateBody(getCommandContext(command), options)),
         source: 'github-review',
         filterJson: JSON.stringify({ repo, pr, mode }),
       }, options)
@@ -231,14 +236,14 @@ export function registerSessionAwaitCommand(root: Command): void {
     .description('Wait for delegated Cradle issue-agent work to return')
     .option('--issue <id>', 'Issue ID to await. May be repeated.', collectOptionValue, [])
     .option('--chat-session-id <id>', 'Chat session ID. Defaults to CRADLE_CHAT_SESSION_ID')
-    .option('--workspace-id <id>', 'Workspace ID. Defaults to CRADLE_WORKSPACE_ID')
+    .option('--workspace <name-or-id>', 'Workspace name or id. Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.')
     .option('--reason <text>', 'Visible wait reason')
     .option('--expires-at <unixSeconds>', 'Unix timestamp when this await expires')
     .option('--format <format>', 'Output format: agent, auto, json, pretty, table, ndjson', 'auto')
     .option('--json [fields]', 'Print JSON, optionally selecting comma-separated fields')
     .action(async (options: IssueAgentAwaitOptions, command: Command) => {
       await createAwait(command, {
-        ...buildCommonCreateBody(options),
+        ...(await buildCommonCreateBody(getCommandContext(command), options)),
         source: 'cradle-issue-agent',
         filterJson: JSON.stringify({
           issueIds: readRequiredValues(options.issue, '--issue'),
@@ -256,7 +261,7 @@ export function registerSessionAwaitCommand(root: Command): void {
     .option('--status-id <id>', 'Target status ID. May be repeated.', collectOptionValue, [])
     .option('--status-name <name>', 'Target status name. May be repeated.', collectOptionValue, [])
     .option('--chat-session-id <id>', 'Chat session ID. Defaults to CRADLE_CHAT_SESSION_ID')
-    .option('--workspace-id <id>', 'Workspace ID. Defaults to CRADLE_WORKSPACE_ID')
+    .option('--workspace <name-or-id>', 'Workspace name or id. Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.')
     .option('--reason <text>', 'Visible wait reason')
     .option('--expires-at <unixSeconds>', 'Unix timestamp when this await expires')
     .option('--format <format>', 'Output format: agent, auto, json, pretty, table, ndjson', 'auto')
@@ -275,7 +280,7 @@ export function registerSessionAwaitCommand(root: Command): void {
       }
 
       await createAwait(command, {
-        ...buildCommonCreateBody(options),
+        ...(await buildCommonCreateBody(getCommandContext(command), options)),
         source: 'cradle-issue-status',
         filterJson: JSON.stringify({
           issueIds: readRequiredValues(options.issue, '--issue'),
@@ -292,13 +297,13 @@ export function registerSessionAwaitCommand(root: Command): void {
     .description('Register a manual trigger-only session await')
     .requiredOption('--reason <text>', 'Visible wait reason')
     .option('--chat-session-id <id>', 'Chat session ID. Defaults to CRADLE_CHAT_SESSION_ID')
-    .option('--workspace-id <id>', 'Workspace ID. Defaults to CRADLE_WORKSPACE_ID')
+    .option('--workspace <name-or-id>', 'Workspace name or id. Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.')
     .option('--expires-at <unixSeconds>', 'Unix timestamp when this await expires')
     .option('--format <format>', 'Output format: agent, auto, json, pretty, table, ndjson', 'auto')
     .option('--json [fields]', 'Print JSON, optionally selecting comma-separated fields')
     .action(async (options: ManualAwaitOptions, command: Command) => {
       await createAwait(command, {
-        ...buildCommonCreateBody(options),
+        ...(await buildCommonCreateBody(getCommandContext(command), options)),
         source: 'manual',
         filterJson: '{}',
       }, options)

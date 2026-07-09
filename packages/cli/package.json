@@ -17,6 +17,7 @@
   ],
   "dependencies": {
     "commander": "^14.0.3",
+    "string-width": "^8.2.1",
     "table": "^6.9.0",
     "zod": "^4.4.3"
   },

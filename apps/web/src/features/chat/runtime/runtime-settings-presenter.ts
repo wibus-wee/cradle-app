@@ -1,16 +1,15 @@
 // Provider-native runtime settings helpers for the chat composer.
 import type { TFunction } from 'i18next'
 
-import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
-import type { RuntimeKind } from '~/features/agent-runtime/types'
+import type { RuntimeSettingsFieldDescriptor, RuntimeSettingsFormValue } from '~/features/agent-management/runtime-settings-schema'
 import {
   listRuntimeSettingsFieldsForRuntime,
   readRuntimeSettingsFormValues,
-  type RuntimeSettingsFieldDescriptor,
-  type RuntimeSettingsFormValue,
 } from '~/features/agent-management/runtime-settings-schema'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
+import type { RuntimeKind } from '~/features/agent-runtime/types'
 
-import type { RuntimeSettings, RuntimeSettingsPatch } from '../commands/chat-response-command'
+import type { RuntimeSettings, RuntimeSettingsPatch, RuntimeSettingsPatchValue } from '../commands/chat-response-command'
 
 export function resolveRuntimeCatalogItem(
   runtimes: RuntimeCatalogItem[],
@@ -40,9 +39,20 @@ export function readDefaultRuntimeSettings(
 
 export function mergeRuntimeSettings(
   base: RuntimeSettings,
-  patch: Partial<RuntimeSettings>,
+  patch: RuntimeSettingsPatch,
 ): RuntimeSettings {
-  return { ...base, ...patch }
+  const next: RuntimeSettings = { ...base }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) {
+      continue
+    }
+    if (value === null) {
+      delete next[key]
+      continue
+    }
+    next[key] = value
+  }
+  return next
 }
 
 export function isPlanRuntimeSettings(settings: RuntimeSettings): boolean {
@@ -83,23 +93,39 @@ export function supportsPlanModeToggle(runtimeKind: RuntimeKind | null | undefin
 }
 
 export function splitRuntimeSettingsSubmitPayload(
-  settings: RuntimeSettings & { claudeAgent?: { modelAliases: Record<string, string> } | null },
+  settings: Record<string, RuntimeSettingsPatchValue | object | undefined> & {
+    claudeAgent?: { modelAliases: Record<string, string> } | null
+  },
 ): {
-  runtimeSettings: RuntimeSettings
+  runtimeSettings: Record<string, RuntimeSettingsPatchValue>
   claudeAgent?: { modelAliases: Record<string, string> } | null
 } {
   const { claudeAgent, ...runtimeSettings } = settings
-  if (claudeAgent === undefined) {
-    return { runtimeSettings }
+  const compactedRuntimeSettings: Record<string, RuntimeSettingsPatchValue> = {}
+  for (const [key, value] of Object.entries(runtimeSettings)) {
+    if (value === undefined || (value !== null && typeof value === 'object')) {
+      continue
+    }
+    compactedRuntimeSettings[key] = value
   }
-  return { runtimeSettings, claudeAgent }
+  if (claudeAgent === undefined) {
+    return { runtimeSettings: compactedRuntimeSettings }
+  }
+  return { runtimeSettings: compactedRuntimeSettings, claudeAgent }
 }
 
 export function readRunRuntimeSettingsPatch(
-  settings: RuntimeSettings & { claudeAgent?: unknown },
-): RuntimeSettings {
+  settings: Record<string, RuntimeSettingsPatchValue | object | undefined>,
+): RuntimeSettingsPatch {
   const { claudeAgent: _claudeAgent, ...runtimeSettings } = settings
-  return runtimeSettings
+  const compactedRuntimeSettings: RuntimeSettingsPatch = {}
+  for (const [key, value] of Object.entries(runtimeSettings)) {
+    if (value === undefined || (value !== null && typeof value === 'object')) {
+      continue
+    }
+    compactedRuntimeSettings[key] = value
+  }
+  return compactedRuntimeSettings
 }
 
 export function labelRuntimeSettingsValue(
@@ -134,10 +160,7 @@ export function formatRuntimeSettingsSummary(
   return parts.length > 0 ? parts.join(' / ') : t('runtimeSettings.summary.empty')
 }
 
-export function readRuntimeSettingsIconKey(
-  settings: RuntimeSettings,
-  fields: RuntimeSettingsFieldDescriptor[],
-): 'plan' | 'approval' | 'full-access' {
+export function readRuntimeSettingsIconKey(settings: RuntimeSettings): 'plan' | 'approval' | 'full-access' {
   const permissionMode = settings.permissionMode
   if (permissionMode === 'plan') {
     return 'plan'

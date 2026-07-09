@@ -21,6 +21,8 @@ export interface ChatSessionFrameDescriptor {
   runtimeKind: RuntimeKind | undefined
   workspaceId: string | null
   agentId: string | null
+  /** Remote host id when this session executes via Upstream Gateway. */
+  remoteHostId?: string | null
 }
 
 export function ChatSessionFrameHost({
@@ -111,6 +113,7 @@ const ChatSessionFrame = ({
           runtimeKind={descriptor.runtimeKind}
           workspaceId={descriptor.workspaceId}
           agentId={descriptor.agentId}
+          remoteHostId={descriptor.remoteHostId ?? null}
         />
       </SurfaceActivityProvider>
     </div>
@@ -178,5 +181,6 @@ function areFrameListsEqual(
       && frame.runtimeKind === nextFrame.runtimeKind
       && frame.workspaceId === nextFrame.workspaceId
       && frame.agentId === nextFrame.agentId
+      && (frame.remoteHostId ?? null) === (nextFrame.remoteHostId ?? null)
   })
 }

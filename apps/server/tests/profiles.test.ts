@@ -21,6 +21,7 @@ import { z } from 'zod'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import { setCodexChatgptModelListClientFactoryForTests } from '../src/modules/chat-runtime-providers/codex/app-server/model-list'
 
 const MODELS_DEV_URL = 'https://models.dev/api.json'
 const ProfileResponseSchema = z.object({
@@ -37,6 +38,7 @@ function getRequestUrl(input: Parameters<typeof fetch>[0]): string {
 
 describe('profiles capability', () => {
   afterEach(() => {
+    setCodexChatgptModelListClientFactoryForTests(null)
     vi.restoreAllMocks()
   })
 
@@ -47,7 +49,30 @@ describe('profiles capability', () => {
     process.env.CRADLE_DATA_DIR = dataDir
     process.env.CRADLE_CREDENTIAL_SECRET = 'test-secret-for-profiles'
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const codexClientOptions: unknown[] = []
+    setCodexChatgptModelListClientFactoryForTests((options) => {
+      codexClientOptions.push(options)
+      return {
+        async initialize() {},
+        async request(method) {
+          if (method === 'model/list') {
+            return {
+              data: [
+                { id: 'gpt-4o-mini', displayName: 'GPT-4o Mini', supportedReasoningEfforts: [] },
+                { id: 'gpt-4o', displayName: 'GPT-4o', supportedReasoningEfforts: [] },
+              ],
+            }
+          }
+          throw new Error(`Unexpected Codex app-server request: ${method}`)
+        },
+        async nextNotification() {
+          return null
+        },
+        close() {},
+      }
+    })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = getRequestUrl(input)
       if (url === MODELS_DEV_URL) {
         return new Response(JSON.stringify({}), {
@@ -56,12 +81,7 @@ describe('profiles capability', () => {
         })
       }
 
-      expect(url).toBe('https://example.com/v1/models')
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer sk-test-abcdef' })
-      return new Response(JSON.stringify({ data: [{ id: 'gpt-4o-mini' }, { id: 'gpt-4o' }] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
+      throw new Error(`Unexpected fetch request: ${url}`)
     })
 
     let app: Awaited<ReturnType<typeof createServerApp>> | undefined
@@ -136,7 +156,24 @@ describe('profiles capability', () => {
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://example.com/v1/models',
       ).length
-      expect(providerFetchCount).toBe(1)
+      expect(providerFetchCount).toBe(0)
+      expect(codexClientOptions).toEqual([
+        {
+          apiKey: 'sk-test-abcdef',
+          config: {
+            model_provider: 'cradle-openai-compatible',
+            model_providers: {
+              'cradle-openai-compatible': {
+                name: 'Cradle OpenAI Compatible',
+                base_url: 'https://example.com/v1',
+                env_key: 'CRADLE_CODEX_API_KEY',
+                wire_api: 'responses',
+                requires_openai_auth: true,
+              },
+            },
+          },
+        },
+      ])
 
       const listSecrets = await app.handle(new Request('http://localhost/secrets'))
       expect(listSecrets.status).toBe(200)
@@ -716,7 +753,23 @@ describe('profiles capability', () => {
     process.env.CRADLE_DATA_DIR = dataDir
     process.env.CRADLE_CREDENTIAL_SECRET = 'test-secret-for-model-mapping'
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    setCodexChatgptModelListClientFactoryForTests(() => ({
+      async initialize() {},
+      async request(method) {
+        if (method === 'model/list') {
+          return {
+            data: [{ id: 'vendor-gpt4o', displayName: 'Vendor GPT-4o', supportedReasoningEfforts: [] }],
+          }
+        }
+        throw new Error(`Unexpected Codex app-server request: ${method}`)
+      },
+      async nextNotification() {
+        return null
+      },
+      close() {},
+    }))
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = getRequestUrl(input)
       if (url === MODELS_DEV_URL) {
         return new Response(JSON.stringify({}), {
@@ -725,12 +778,7 @@ describe('profiles capability', () => {
         })
       }
 
-      expect(url).toBe('https://example.com/v1/models')
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer sk-map-test' })
-      return new Response(JSON.stringify({ data: [{ id: 'vendor-gpt4o' }] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
+      throw new Error(`Unexpected fetch request: ${url}`)
     })
 
     let app: Awaited<ReturnType<typeof createServerApp>> | undefined
@@ -848,7 +896,7 @@ describe('profiles capability', () => {
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://example.com/v1/models',
       ).length
-      expect(providerFetchCount).toBe(2)
+      expect(providerFetchCount).toBe(0)
     }
  finally {
       shutdownInfra()

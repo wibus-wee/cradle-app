@@ -15,8 +15,8 @@ if (!response.ok) {
 }
 
 const document = await response.json()
-normalizeNullableSchemas(document)
 normalizeConstUnionSchemas(document)
+normalizeNullableSchemas(document)
 await writeFile(outputPath, JSON.stringify(document, null, 2))
 
 function normalizeNullableSchemas(value: unknown): void {
@@ -52,6 +52,9 @@ function normalizeNullableSchemas(value: unknown): void {
 
   delete record.anyOf
   Object.assign(record, schema, { nullable: true })
+  if (Array.isArray(record.enum) && !record.enum.includes(null)) {
+    record.enum = [...record.enum, null]
+  }
 }
 
 function isNullSchema(value: unknown): boolean {
@@ -79,12 +82,13 @@ function normalizeConstUnionSchemas(value: unknown): void {
   if (!Array.isArray(anyOf) || anyOf.length === 0) {
     return
   }
-  if (record.nullable === true) {
-    return
-  }
-
   const enumValues: string[] = []
+  let nullable = record.nullable === true
   for (const schema of anyOf) {
+    if (isNullSchema(schema)) {
+      nullable = true
+      continue
+    }
     const enumValue = getStringConstSchemaValue(schema)
     if (enumValue === null) {
       return
@@ -92,9 +96,16 @@ function normalizeConstUnionSchemas(value: unknown): void {
     enumValues.push(enumValue)
   }
 
+  if (enumValues.length === 0) {
+    return
+  }
+
   delete record.anyOf
   record.type = 'string'
-  record.enum = [...new Set(enumValues)]
+  record.enum = nullable ? [...new Set(enumValues), null] : [...new Set(enumValues)]
+  if (nullable) {
+    record.nullable = true
+  }
 }
 
 function getStringConstSchemaValue(value: unknown): string | null {

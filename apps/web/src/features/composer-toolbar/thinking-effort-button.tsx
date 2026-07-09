@@ -45,7 +45,7 @@ export function ThinkingEffortButton({
   const active = tiers[activeIndex] ?? tiers[0]
   const activeLabel = active?.label ?? 'unknown'
   const isDisabled = tiers.length === 0
-  const activeDepthBarCount = isDisabled
+  const activeDepthBarCount = isDisabled || active?.value === 'none'
     ? 0
     : Math.max(1, Math.round(((activeIndex + 1) / tiers.length) * DEPTH_BAR_HEIGHTS.length))
   const surfaceProps = occludeNativeBrowserSurface ? BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS : {}

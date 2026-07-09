@@ -94,8 +94,8 @@ interface WindowTitleBarOverlayInput {
   symbolColor: string
 }
 
-type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
-type RuntimeSettingsValue = string | number | boolean
+type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+type RuntimeSettingsValue = string | number | boolean | null
 
 // ── Desktop Chat Stream Bridge ────────────────────────────────────────────────
 

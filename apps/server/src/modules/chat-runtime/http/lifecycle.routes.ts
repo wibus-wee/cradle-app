@@ -1,7 +1,8 @@
 import { Elysia } from 'elysia'
 
 import { ChatRuntimeModel } from '../model'
-import { readChatThinkingEffort, readOptionalModelId } from './request-normalizers'
+import { readPersistedThinkingEffort } from '../queue/session-queue'
+import { readOptionalModelId } from './request-normalizers'
 import { loadChatRuntime } from './runtime-loader'
 
 export const chatRuntimeLifecycleRoutes = new Elysia({
@@ -54,7 +55,7 @@ export const chatRuntimeLifecycleRoutes = new Elysia({
         contextParts: body.contextParts,
         providerTargetId: body.providerTargetId?.trim() || undefined,
         modelId: readOptionalModelId(body.modelId),
-        thinkingEffort: readChatThinkingEffort(body.thinkingEffort),
+        thinkingEffort: readPersistedThinkingEffort(body.thinkingEffort) ?? undefined,
         runtimeSettings: body.runtimeSettings,
       })
     },
@@ -148,7 +149,7 @@ export const chatRuntimeLifecycleRoutes = new Elysia({
         contextParts: body.contextParts,
         providerTargetId: body.providerTargetId?.trim() || undefined,
         modelId: readOptionalModelId(body.modelId),
-        thinkingEffort: readChatThinkingEffort(body.thinkingEffort),
+        thinkingEffort: readPersistedThinkingEffort(body.thinkingEffort) ?? undefined,
         runtimeSettings: body.runtimeSettings,
       })
     },

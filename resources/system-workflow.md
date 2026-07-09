@@ -13,7 +13,7 @@ When the user asks you to manage tasks, create issues, update statuses, or check
 Key operations:
 
 - List issues: `cradle issue list`
-- Create issues: `cradle issue create --workspace-id "$CRADLE_WORKSPACE_ID" --title "title"`
+- Create issues: `cradle issue create --title "title"` (workspace is resolved automatically from your current directory or `CRADLE_WORKSPACE_ID`)
 - Move issues between statuses: `cradle issue move <id> <status-name>` (for example, `in_progress`)
 - Delegate to other agents: `cradle issue delegate <issueId> --agent-profile-id <agentProfileId>`
 - Add comments: `cradle issue comment add <issueId> --content "message"`

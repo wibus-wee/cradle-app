@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_CLAUDE_AGENT_ALIASES } from '~/features/agent-runtime/claude-agent-config'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 
-import type { RuntimeSettings, RuntimeSettingsPatch } from '../commands/chat-response-command'
+import type { RuntimeSettings } from '../commands/chat-response-command'
 import type {
   ChatRuntimeSettingsResponse,
   SessionClaudeAgentConfig,
@@ -56,13 +56,21 @@ export function useRuntimeSettings(sessionId: string | null, active = true): Cha
             }
           : null
         : previous?.claudeAgent ?? null
+      const optimisticRuntimeSettings: RuntimeSettings = { ...(previous?.runtimeSettings ?? {}) }
+      for (const [key, value] of Object.entries(runtimeSettingsPatch)) {
+        if (value === undefined || (value !== null && typeof value === 'object')) {
+          continue
+        }
+        if (value === null) {
+          delete optimisticRuntimeSettings[key]
+          continue
+        }
+        optimisticRuntimeSettings[key] = value
+      }
       queryClient.setQueryData<ChatRuntimeSettingsResponse>(queryKey, {
         sessionId: currentSessionId,
         runtimeKind: previous?.runtimeKind ?? 'standard',
-        runtimeSettings: {
-          ...(previous?.runtimeSettings ?? {}),
-          ...runtimeSettingsPatch,
-        },
+        runtimeSettings: optimisticRuntimeSettings,
         claudeAgent: optimisticClaudeAgent,
         applied: false,
       })

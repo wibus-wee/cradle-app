@@ -4,12 +4,12 @@ import type {
   RuntimeSettings,
   StreamTurnInput,
 } from '../../../chat-runtime/runtime-provider-types'
-import { readCodexLikeRuntimeSettings } from '../../../chat-runtime/runtime-settings'
 import {
   ProviderErrors,
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../../chat-runtime/runtime-provider-types'
+import { readCodexLikeRuntimeSettings } from '../../../chat-runtime/runtime-settings'
 import type { CodexConfig } from '../../../provider-contracts/provider-base'
 import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
 import type { RuntimeKind } from '../../../provider-contracts/types'

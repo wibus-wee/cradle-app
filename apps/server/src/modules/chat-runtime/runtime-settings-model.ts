@@ -6,12 +6,16 @@ export const runtimeSettingsValueSchema = t.Union([
   t.Boolean(),
 ])
 
-export const runtimeSettingsSchema = t.Record(t.String(), runtimeSettingsValueSchema)
+export const runtimeSettingsSchema = t.Object({}, {
+  additionalProperties: runtimeSettingsValueSchema,
+})
 
-export const runtimeSettingsPatchSchema = t.Record(t.String(), t.Union([
-  runtimeSettingsValueSchema,
-  t.Null(),
-]))
+export const runtimeSettingsPatchSchema = t.Object({}, {
+  additionalProperties: t.Union([
+    runtimeSettingsValueSchema,
+    t.Null(),
+  ]),
+})
 
 export const claudeAgentConfigPatchSchema = t.Object({
   modelAliases: t.Optional(t.Object({
@@ -21,8 +25,31 @@ export const claudeAgentConfigPatchSchema = t.Object({
   }, { additionalProperties: false })),
 }, { additionalProperties: false })
 
+const claudeAgentPermissionModePatchSchema = t.Union([
+  t.Literal('default'),
+  t.Literal('acceptEdits'),
+  t.Literal('bypassPermissions'),
+  t.Literal('plan'),
+  t.Null(),
+])
+
+const accessModePatchSchema = t.Union([
+  t.Literal('approval-required'),
+  t.Literal('full-access'),
+  t.Null(),
+])
+
+const interactionModePatchSchema = t.Union([
+  t.Literal('default'),
+  t.Literal('plan'),
+  t.Null(),
+])
+
 /** Session/runtime patch that may include provider-native settings plus Claude alias config. */
 export const sessionRuntimeSettingsPatchSchema = t.Object({
+  permissionMode: t.Optional(claudeAgentPermissionModePatchSchema),
+  accessMode: t.Optional(accessModePatchSchema),
+  interactionMode: t.Optional(interactionModePatchSchema),
   claudeAgent: t.Optional(t.Union([
     claudeAgentConfigPatchSchema,
     t.Null(),

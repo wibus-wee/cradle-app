@@ -74,45 +74,9 @@ const cradleServerHealthPayload = t.Object({
   timestamp: t.Number(),
 }, { additionalProperties: false })
 
-const workspaceLocator = t.Object({
-  hostId: nonBlankString,
-  path: nonBlankString,
-  kind: t.Optional(t.Union([t.Literal('project'), t.Literal('managed-worktree')])),
-  sourceWorkspaceId: t.Optional(nullableString),
-}, { additionalProperties: false })
-
-const workspaceGitIdentity = t.Object({
-  originUrl: t.Optional(nullableString),
-  repoRoot: t.Optional(nullableString),
-  headSha: t.Optional(nullableString),
-  branch: t.Optional(nullableString),
-}, { additionalProperties: false })
-
-const workspaceRecord = t.Object({
-  id: t.String(),
-  name: t.String(),
-  locator: workspaceLocator,
-  gitIdentity: workspaceGitIdentity,
-  identifier: t.String(),
-  pinned: t.Number(),
-  createdAt: t.Number(),
-  updatedAt: t.Number(),
-}, { additionalProperties: false })
-
-const workspaceFileEntry = t.Object({
-  type: t.Union([t.Literal('file'), t.Literal('directory')]),
-  name: t.String(),
-  path: t.String(),
-}, { additionalProperties: false })
-
 export const RemoteHostsModel = {
   hostIdParams: t.Object({
     hostId: t.String({ minLength: 1 }),
-  }, { additionalProperties: false }),
-
-  remoteWorkspaceIdParams: t.Object({
-    hostId: t.String({ minLength: 1 }),
-    remoteWorkspaceId: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
   host: t.Object({
@@ -158,50 +122,6 @@ export const RemoteHostsModel = {
     status: t.Literal('ok'),
     health: cradleServerHealthPayload,
   }, { additionalProperties: false }),
-
-  remoteWorkspaceList: t.Object({
-    workspaces: t.Array(workspaceRecord),
-  }, { additionalProperties: false }),
-
-  fileChildrenQuery: t.Object({
-    path: t.Optional(t.String()),
-  }, { additionalProperties: false }),
-
-  fileContentQuery: t.Object({
-    path: nonBlankString,
-  }, { additionalProperties: false }),
-
-  fileInfoQuery: t.Object({
-    path: nonBlankString,
-  }, { additionalProperties: false }),
-
-  workspaceFileList: t.Object({
-    files: t.Array(workspaceFileEntry),
-  }, { additionalProperties: false }),
-
-  readFileResponse: t.Object({
-    content: nullableString,
-  }, { additionalProperties: false }),
-
-  fileInfoResponse: t.Union([
-    t.Object({
-      name: t.String(),
-      path: t.String(),
-      size: t.Number(),
-      modifiedAt: t.Number(),
-      mimeType: t.String(),
-      extension: t.String(),
-      previewKind: t.Union([
-        t.Literal('text'),
-        t.Literal('markdown'),
-        t.Literal('image'),
-        t.Literal('pdf'),
-        t.Literal('office'),
-        t.Literal('unsupported'),
-      ]),
-    }, { additionalProperties: false }),
-    t.Null(),
-  ]),
 
   ok: t.Object({
     ok: t.Literal(true),

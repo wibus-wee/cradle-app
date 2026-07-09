@@ -634,40 +634,44 @@ export const zPostRemoteHostsByHostIdRelayClaimPath = z.object({
     hostId: z.string().min(1)
 });
 
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesPath = z.object({
-    hostId: z.string().min(1)
-});
-
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesPath = z.object({
+export const zAllRemoteHostsByHostIdUpstreamPath = z.object({
     hostId: z.string().min(1),
-    remoteWorkspaceId: z.string().min(1)
+    '*': z.string()
 });
 
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenPath = z.object({
+export const zAllRemoteHostsByHostIdUpstream2Path = z.object({
     hostId: z.string().min(1),
-    remoteWorkspaceId: z.string().min(1)
+    '*': z.string()
 });
 
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenQuery = z.object({
-    path: z.string().optional()
-});
-
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentPath = z.object({
+export const zAllRemoteHostsByHostIdUpstream3Path = z.object({
     hostId: z.string().min(1),
-    remoteWorkspaceId: z.string().min(1)
+    '*': z.string()
 });
 
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentQuery = z.object({
-    path: z.string().min(1).regex(/.*\S.*/)
-});
-
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoPath = z.object({
+export const zAllRemoteHostsByHostIdUpstream4Path = z.object({
     hostId: z.string().min(1),
-    remoteWorkspaceId: z.string().min(1)
+    '*': z.string()
 });
 
-export const zGetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoQuery = z.object({
-    path: z.string().min(1).regex(/.*\S.*/)
+export const zAllRemoteHostsByHostIdUpstream5Path = z.object({
+    hostId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllRemoteHostsByHostIdUpstream6Path = z.object({
+    hostId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllRemoteHostsByHostIdUpstream7Path = z.object({
+    hostId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllRemoteHostsByHostIdUpstream8Path = z.object({
+    hostId: z.string().min(1),
+    '*': z.string()
 });
 
 export const zGetExternalIssueSourcesBindingsQuery = z.object({
@@ -895,10 +899,7 @@ export const zPostProvidersModelsBody = z.object({
     config: z.record(z.string(), z.unknown()),
     secretRef: z.string().min(1).nullish(),
     profileId: z.string().min(1).nullish(),
-    providerTargetKind: z.union([
-        z.string(),
-        z.unknown()
-    ]).optional(),
+    providerTargetKind: z.enum(['manual', 'external']).nullish(),
     providerTargetId: z.string().min(1).nullish(),
     workspaceId: z.string().min(1).nullish()
 });
@@ -1036,10 +1037,13 @@ export const zPostAutomationsBody = z.object({
         runtimeKind: z.string().min(1).optional(),
         modelId: z.string().min(1).optional(),
         thinkingEffort: z.enum([
+            'none',
+            'minimal',
             'low',
             'medium',
             'high',
-            'xhigh'
+            'xhigh',
+            'max'
         ]).optional()
     }),
     createdByKind: z.enum([
@@ -1105,10 +1109,13 @@ export const zPatchAutomationsByIdBody = z.object({
         runtimeKind: z.string().min(1).optional(),
         modelId: z.string().min(1).optional(),
         thinkingEffort: z.enum([
+            'none',
+            'minimal',
             'low',
             'medium',
             'high',
-            'xhigh'
+            'xhigh',
+            'max'
         ]).optional()
     }).optional(),
     createdByKind: z.enum([
@@ -1238,8 +1245,14 @@ export const zPostSessionsBody = z.object({
     agentId: z.string().min(1).optional(),
     runtimeKind: z.string().min(1).optional(),
     runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional(),
+        permissionMode: z.enum([
+            'default',
+            'acceptEdits',
+            'bypassPermissions',
+            'plan'
+        ]).nullish(),
+        accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+        interactionMode: z.enum(['default', 'plan']).nullish(),
         claudeAgent: z.object({
             modelAliases: z.object({
                 haiku: z.string().optional(),
@@ -1249,10 +1262,13 @@ export const zPostSessionsBody = z.object({
         }).nullish()
     }).optional(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max'
     ]).optional(),
     linkedIssueId: z.string().min(1).nullish(),
     sessionGroupId: z.string().min(1).nullish(),
@@ -1273,7 +1289,15 @@ export const zPatchSessionsByIdBody = z.object({
     pinned: z.boolean().optional(),
     providerTargetId: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
-    thinkingEffort: z.string().nullish(),
+    thinkingEffort: z.enum([
+        'none',
+        'minimal',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max'
+    ]).nullish(),
     sessionGroupId: z.string().min(1).nullish()
 });
 
@@ -1783,6 +1807,13 @@ export const zPostPluginsSourcesBody = z.object({
     addedReason: z.string().nullish()
 });
 
+export const zPostPluginsSourcesPreviewBody = z.object({
+    kind: z.enum(['git', 'npm']),
+    location: z.string().min(1),
+    ref: z.string().nullish(),
+    subPath: z.string().nullish()
+});
+
 export const zDeletePluginsSourcesByIdPath = z.object({
     id: z.string().min(1)
 });
@@ -2240,7 +2271,12 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateBody 
     runtimeKind: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
     force: z.boolean().optional(),
-    outputLocale: z.string().nullish()
+    outputLocale: z.enum([
+        'en-US',
+        'zh-CN',
+        'ja-JP',
+        'es-ES'
+    ]).nullish()
 });
 
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGeneratePath = z.object({
@@ -2282,7 +2318,12 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentF
     providerTargetId: z.string().min(1).nullish(),
     runtimeKind: z.string().min(1).nullish(),
     modelId: z.string().min(1).nullish(),
-    outputLocale: z.string().nullish()
+    outputLocale: z.enum([
+        'en-US',
+        'zh-CN',
+        'ja-JP',
+        'es-ES'
+    ]).nullish()
 });
 
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFixIdStartPath = z.object({
@@ -2310,7 +2351,12 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentF
     providerTargetId: z.string().min(1).nullish(),
     runtimeKind: z.string().min(1).nullish(),
     modelId: z.string().min(1).nullish(),
-    outputLocale: z.string().nullish()
+    outputLocale: z.enum([
+        'en-US',
+        'zh-CN',
+        'ja-JP',
+        'es-ES'
+    ]).nullish()
 });
 
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFixIdRerunPath = z.object({
@@ -2636,15 +2682,19 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
     providerTargetId: z.string().optional(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max'
     ]).optional(),
-    runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional()
-    }).optional()
+    runtimeSettings: z.record(z.string(), z.union([
+        z.string(),
+        z.number(),
+        z.boolean()
+    ]).nullable()).optional()
 });
 
 export const zPostChatSessionsBySessionIdQueuePath = z.object({
@@ -2770,15 +2820,19 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
     providerTargetId: z.string().optional(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max'
     ]).optional(),
-    runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional()
-    }).optional()
+    runtimeSettings: z.record(z.string(), z.union([
+        z.string(),
+        z.number(),
+        z.boolean()
+    ]).nullable()).optional()
 });
 
 export const zPatchChatSessionsBySessionIdQueueByQueueItemIdPath = z.object({
@@ -2799,8 +2853,14 @@ export const zGetChatSessionsBySessionIdRuntimeSettingsPath = z.object({
 });
 
 export const zPatchChatSessionsBySessionIdRuntimeSettingsBody = z.object({
-    accessMode: z.enum(['approval-required', 'full-access']).optional(),
-    interactionMode: z.enum(['default', 'plan']).optional(),
+    permissionMode: z.enum([
+        'default',
+        'acceptEdits',
+        'bypassPermissions',
+        'plan'
+    ]).nullish(),
+    accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+    interactionMode: z.enum(['default', 'plan']).nullish(),
     claudeAgent: z.object({
         modelAliases: z.object({
             haiku: z.string().optional(),
@@ -2877,15 +2937,19 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
     providerTargetId: z.string().optional(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max'
     ]).optional(),
-    runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional()
-    }).optional()
+    runtimeSettings: z.record(z.string(), z.union([
+        z.string(),
+        z.number(),
+        z.boolean()
+    ]).nullable()).optional()
 });
 
 export const zPostChatSessionsBySessionIdResponsePath = z.object({
@@ -2955,15 +3019,19 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
     providerTargetId: z.string().optional(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max'
     ]).optional(),
-    runtimeSettings: z.object({
-        accessMode: z.enum(['approval-required', 'full-access']).optional(),
-        interactionMode: z.enum(['default', 'plan']).optional()
-    }).optional()
+    runtimeSettings: z.record(z.string(), z.union([
+        z.string(),
+        z.number(),
+        z.boolean()
+    ]).nullable()).optional()
 });
 
 export const zPostChatSideConversationsBySideConversationIdResponsePath = z.object({

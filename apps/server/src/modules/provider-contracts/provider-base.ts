@@ -53,7 +53,7 @@ export const CodexConfigSchema = BaseProviderConfig.extend({
   authMode: CodexAuthModeSchema.optional(),
   approvalPolicy: z.enum(['never', 'on-request', 'on-failure', 'untrusted']).default(CODEX_DEFAULT_APPROVAL_POLICY),
   sandboxMode: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default(CODEX_DEFAULT_SANDBOX_MODE),
-  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).default('high'),
+  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).default('high'),
   bedrock: z.object({
     region: z.string().trim().min(1),
   }).optional(),

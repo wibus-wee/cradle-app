@@ -53,6 +53,8 @@ export interface ChatViewProps {
   placeholder?: string
   runtimeKind?: RuntimeKind
   workspaceId?: string | null
+  /** When set, composer catalogs and connection gating use the remote host. */
+  remoteHostId?: string | null
   messageTextTransform?: MessageTextTransform
   prepareSend?: (input: {
     text: Parameters<ChatComposerRuntime['send']>[0]

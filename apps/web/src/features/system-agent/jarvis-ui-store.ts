@@ -31,6 +31,7 @@ export interface JarvisUiState {
   activeSessionId: string | null
   setActiveSessionId: (id: string | null) => void
   addSession: (session: JarvisSession) => void
+  updateSessionTitle: (id: string, title: string) => void
   closeSessionTab: (id: string) => void
 }
 
@@ -162,6 +163,23 @@ export function createJarvisUiStore(options?: JarvisUiStoreOptions) {
             session,
           ],
         })),
+        updateSessionTitle: (id, title) => set((s) => {
+          const trimmedTitle = title.trim()
+          if (!trimmedTitle) {
+            return s
+          }
+
+          let changed = false
+          const sessions = s.sessions.map((session) => {
+            if (session.id !== id || session.title === trimmedTitle) {
+              return session
+            }
+            changed = true
+            return { ...session, title: trimmedTitle }
+          })
+
+          return changed ? { sessions } : s
+        }),
         closeSessionTab: id => set(s => ({
           sessions: s.sessions.filter(sess => sess.id !== id),
           activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,

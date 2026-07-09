@@ -42,8 +42,8 @@ import { db } from '../../infra'
 import { getRuntimeRegistry, listRuntimeCatalog } from '../chat-runtime/chat-runtime-provider-registry'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import type {
-  RuntimeSettings,
   RuntimeProviderTargetProfile,
+  RuntimeSettings,
 } from '../chat-runtime/runtime-provider-types'
 import * as Git from '../git/service'
 import * as ModelRegistry from '../model-registry/service'
@@ -116,6 +116,7 @@ const GUIDE_RUNTIME_SETTINGS: RuntimeSettings = {
   accessMode: 'full-access',
   interactionMode: 'default',
 }
+const UNBOUNDED_DIFF_REVIEW_RUN_WAIT = { timeoutMs: null }
 const DEFAULT_OUTPUT_LOCALE: ReviewOutputLocale = 'en-US'
 const OUTPUT_LOCALE_LABELS = {
   'en-US': 'English (US)',
@@ -2221,7 +2222,7 @@ async function runGuideGenerationTask(input: {
   runId: string
 }): Promise<void> {
   try {
-    const run = await ChatRuntime.waitForRunCompletion(input.runId)
+    const run = await ChatRuntime.waitForRunCompletion(input.runId, UNBOUNDED_DIFF_REVIEW_RUN_WAIT)
     if (run.status !== 'complete') {
       throw new Error(
         run.errorText
@@ -2364,7 +2365,7 @@ export async function generateGuide(input: {
     })
   }
 
-  const session = Session.create({
+  const session = await Session.create({
     workspaceId: review.workspaceId,
     title: `Diff guide: ${review.title}`,
     origin: 'cradle-review',
@@ -2377,7 +2378,7 @@ export async function generateGuide(input: {
     sessionId: session.id,
     text: instruction,
     modelId: input.modelId ?? undefined,
-    runtimeSettings: GUIDE_RUNTIME_SETTINGS,
+    runtimeSettingsOverride: GUIDE_RUNTIME_SETTINGS,
   })
 
   upsertGuide({
@@ -2934,7 +2935,7 @@ async function watchAgentFixRunCompletion(input: {
   sessionId: string
 }): Promise<void> {
   try {
-    const run = await ChatRuntime.waitForRunCompletion(input.runId)
+    const run = await ChatRuntime.waitForRunCompletion(input.runId, UNBOUNDED_DIFF_REVIEW_RUN_WAIT)
     const current = db()
       .select()
       .from(diffReviewAgentFixes)
@@ -3188,7 +3189,7 @@ async function startAgentFixRun(
           .where(eq(agents.id, agentId))
           .get()
       : null
-    const session = Session.create({
+    const session = await Session.create({
       workspaceId: review.workspaceId,
       title: `Diff fix: ${review.title}`,
       origin: 'cradle-review',
@@ -3203,6 +3204,7 @@ async function startAgentFixRun(
       text: buildAgentFixPrompt({ review, revision, agentFix, thread, comments, files, outputLocale }),
       modelId: input.modelId ?? agentRow?.modelId ?? undefined,
       thinkingEffort: agentRow?.thinkingEffort ?? undefined,
+      runtimeSettingsOverride: { accessMode: 'full-access' },
     })
     const now = currentUnixSeconds()
     db()

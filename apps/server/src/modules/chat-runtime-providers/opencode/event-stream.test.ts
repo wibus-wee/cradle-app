@@ -6,6 +6,7 @@ import type {
 import { describe, expect, it } from 'vitest'
 
 import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
+import type { OpencodeStreamEvent } from './event-stream'
 import { isTerminalOpencodeAssistant, OpencodeEventStreamProjector } from './event-stream'
 
 function assistantMessage(input: Partial<OpencodeAssistantMessage> = {}): OpencodeAssistantMessage {
@@ -195,6 +196,149 @@ describe('opencodeEventStreamProjector', () => {
     expect(chunks).toMatchObject([
       { type: 'text-start', id: 'part_text' },
       { type: 'text-delta', id: 'part_text', delta: 'Hel' },
+    ])
+  })
+
+  it('does not duplicate pending text deltas when the later part snapshot already includes them', () => {
+    const projector = new OpencodeEventStreamProjector('ses_1')
+
+    const chunks = [
+      ...projector.projectEvent({
+        type: 'message.updated',
+        properties: { info: assistantMessage({ time: { created: 1 }, finish: undefined }) },
+      }),
+      ...projector.projectEvent({
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'ses_1',
+          messageID: 'msg_assistant',
+          partID: 'part_text',
+          delta: 'Hel',
+        },
+      }),
+      ...projector.projectEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'part_text',
+            sessionID: 'ses_1',
+            messageID: 'msg_assistant',
+            type: 'text',
+            text: 'Hel',
+            time: { start: 1 },
+          } satisfies OpencodePart,
+        },
+      }),
+    ]
+
+    expect(chunks).toMatchObject([
+      { type: 'text-start', id: 'part_text' },
+      { type: 'text-delta', id: 'part_text', delta: 'Hel' },
+    ])
+    expect(chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.delta).join('')).toBe('Hel')
+  })
+
+  it('projects session.next text, reasoning, tool, and terminal step events', () => {
+    const projector = new OpencodeEventStreamProjector('ses_1')
+    const nextEvent = (event: OpencodeStreamEvent): OpencodeStreamEvent => event
+
+    const chunks = [
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.text.delta',
+        properties: { sessionID: 'ses_1', timestamp: 1, delta: 'Hel' },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.text.ended',
+        properties: { sessionID: 'ses_1', timestamp: 2, text: 'Hello' },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.reasoning.delta',
+        properties: { sessionID: 'ses_1', timestamp: 3, reasoningID: 'reasoning_1', delta: 'Thinking' },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.reasoning.ended',
+        properties: { sessionID: 'ses_1', timestamp: 4, reasoningID: 'reasoning_1', text: 'Thinking' },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.tool.called',
+        properties: {
+          sessionID: 'ses_1',
+          timestamp: 5,
+          callID: 'call_1',
+          tool: 'read',
+          input: { filePath: 'README.md' },
+        },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.tool.progress',
+        properties: {
+          sessionID: 'ses_1',
+          timestamp: 6,
+          callID: 'call_1',
+          content: 'Reading README.md',
+        },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.tool.success',
+        properties: {
+          sessionID: 'ses_1',
+          timestamp: 7,
+          callID: 'call_1',
+          content: 'Done',
+          structured: { bytes: 42 },
+        },
+      })),
+      ...projector.projectEvent(nextEvent({
+        type: 'session.next.step.ended',
+        properties: {
+          sessionID: 'ses_1',
+          timestamp: 8,
+          finish: 'stop',
+          tokens: {
+            input: 10,
+            output: 3,
+            reasoning: 2,
+            cache: { read: 0, write: 0 },
+          },
+        },
+      })),
+    ]
+
+    expect(chunks.map(chunk => chunk.type)).toEqual([
+      'text-start',
+      'text-delta',
+      'text-delta',
+      'text-end',
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'tool-input-start',
+      'tool-input-available',
+      'tool-output-available',
+      'tool-output-available',
+      'finish',
+    ])
+    expect(chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.delta).join('')).toBe('Hello')
+    expect(projector.usage).toEqual({
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+    })
+    assertValidProviderChunkSequence(chunks)
+  })
+
+  it('projects session.next step failures as provider errors', () => {
+    const projector = new OpencodeEventStreamProjector('ses_1')
+
+    expect(projector.projectEvent({
+      type: 'session.next.step.failed',
+      properties: {
+        sessionID: 'ses_1',
+        timestamp: 1,
+        error: { message: 'model overloaded' },
+      },
+    } satisfies OpencodeStreamEvent)).toEqual([
+      { type: 'error', errorText: 'model overloaded' },
     ])
   })
 

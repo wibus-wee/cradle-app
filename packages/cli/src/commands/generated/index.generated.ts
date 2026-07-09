@@ -186,7 +186,6 @@ import { register as registerRelayTransportHostEnrollmentPairingString } from '.
 import { register as registerRemoteHostCradleServerConnect } from './remote-host/cradle-server/connect'
 import { register as registerRemoteHostCradleServerDisconnect } from './remote-host/cradle-server/disconnect'
 import { register as registerRemoteHostCradleServerHealth } from './remote-host/cradle-server/health'
-import { register as registerRemoteHostCradleServerWorkspaceList } from './remote-host/cradle-server/workspace/list'
 import { register as registerRemoteHostCreate } from './remote-host/create'
 import { register as registerRemoteHostDelete } from './remote-host/delete'
 import { register as registerRemoteHostList } from './remote-host/list'
@@ -490,7 +489,6 @@ export function registerGeneratedCommands(program: Command): void {
   registerRemoteHostCradleServerConnect(program)
   registerRemoteHostCradleServerDisconnect(program)
   registerRemoteHostCradleServerHealth(program)
-  registerRemoteHostCradleServerWorkspaceList(program)
   registerRemoteHostCreate(program)
   registerRemoteHostDelete(program)
   registerRemoteHostList(program)

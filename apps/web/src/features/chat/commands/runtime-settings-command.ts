@@ -6,7 +6,7 @@ import {
 import type { ClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 
-import type { RuntimeSettings, RuntimeSettingsPatch } from './chat-response-command'
+import type { RuntimeSettings, RuntimeSettingsPatchValue } from './chat-response-command'
 
 export interface SessionClaudeAgentConfig {
   modelAliases: ClaudeAgentModelAliases
@@ -16,7 +16,9 @@ export interface SessionClaudeAgentConfigPatch {
   modelAliases?: Partial<ClaudeAgentModelAliases>
 }
 
-export type SessionRuntimeSettingsPatch = RuntimeSettingsPatch & {
+export type SessionRuntimeSettingsPatchValue = RuntimeSettingsPatchValue | SessionClaudeAgentConfigPatch
+
+export type SessionRuntimeSettingsPatch = Record<string, SessionRuntimeSettingsPatchValue | undefined> & {
   claudeAgent?: SessionClaudeAgentConfigPatch | null
 }
 

@@ -108,7 +108,7 @@ function projectOpenCodeFilePart(part: Extract<ReturnType<typeof projectProvider
  * body (message-scoped, one-shot). The `@opencode-ai/sdk` v1 types predate this
  * field, so we extend the generated body types with the optional `variant`.
  */
-export type OpencodeReasoningVariant = 'low' | 'medium' | 'high' | 'xhigh'
+export type OpencodeReasoningVariant = ChatThinkingEffort
 
 type OpencodePromptBodyBase = Omit<NonNullable<SessionPromptData['body']>, 'parts'> & {
   variant?: OpencodeReasoningVariant
@@ -122,7 +122,5 @@ export type OpencodePromptAsyncBody = OpencodePromptAsyncBodyBase & { parts: Ope
 export function projectOpencodeReasoningVariant(
   effort: ChatThinkingEffort | null | undefined,
 ): OpencodeReasoningVariant | undefined {
-  return effort === 'low' || effort === 'medium' || effort === 'high' || effort === 'xhigh'
-    ? effort
-    : undefined
+  return effort ?? undefined
 }

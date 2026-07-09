@@ -1,9 +1,7 @@
 import type {
   AssistantMessage as OpencodeAssistantMessage,
-  Event as OpencodeLegacyEvent,
   Part as OpencodePart,
 } from '@opencode-ai/sdk'
-import type { Event as OpencodeRootEvent } from '@opencode-ai/sdk/v2'
 import type { UIMessageChunk } from 'ai'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -14,11 +12,12 @@ import type {
   RuntimeUserInputRequest,
   RuntimeUserInputResolution,
 } from '../../chat-runtime/runtime-provider-types'
+import type { OpencodeStreamEvent } from './event-stream'
 import { formatOpencodeAssistantError, OpencodeProvider } from './provider'
 import type { OpencodeRuntimeResource } from './runtime-context'
 
 type OpencodeAssistantError = NonNullable<OpencodeAssistantMessage['error']>
-type OpencodeEvent = OpencodeLegacyEvent | OpencodeRootEvent
+type OpencodeEvent = OpencodeStreamEvent
 
 async function drainStream(stream: AsyncGenerator<UIMessageChunk>): Promise<UIMessageChunk[]> {
   const chunks: UIMessageChunk[] = []
@@ -970,6 +969,86 @@ describe('opencodeProvider streamTurn', () => {
     await expect(stream.next()).resolves.toEqual({ done: true, value: undefined })
   })
 
+  it('streams and closes turns from session.next events without legacy message events', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    const stream = provider.streamTurn({
+      runId: 'run-session-next',
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      message: {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Use the new event family' }],
+      },
+      workspacePath: '/tmp/workspace',
+    })
+
+    const chunksPromise = drainStream(stream)
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+    events.push({
+      type: 'session.next.text.delta',
+      properties: { sessionID: 'ses_1', timestamp: 1, delta: 'Hel' },
+    })
+    events.push({
+      type: 'session.next.text.ended',
+      properties: { sessionID: 'ses_1', timestamp: 2, text: 'Hello' },
+    })
+    events.push({
+      type: 'session.next.tool.called',
+      properties: {
+        sessionID: 'ses_1',
+        timestamp: 3,
+        callID: 'call_read',
+        tool: 'read',
+        input: { filePath: 'README.md' },
+      },
+    })
+    events.push({
+      type: 'session.next.tool.success',
+      properties: {
+        sessionID: 'ses_1',
+        timestamp: 4,
+        callID: 'call_read',
+        content: 'README contents',
+        structured: { bytes: 512 },
+      },
+    })
+    events.push({
+      type: 'session.next.step.ended',
+      properties: {
+        sessionID: 'ses_1',
+        timestamp: 5,
+        finish: 'stop',
+        tokens: {
+          input: 10,
+          output: 4,
+          reasoning: 1,
+          cache: { read: 0, write: 0 },
+        },
+      },
+    })
+
+    const chunks = await chunksPromise
+    expect(chunks.map(chunk => chunk.type)).toEqual([
+      'text-start',
+      'text-delta',
+      'text-delta',
+      'text-end',
+      'tool-input-start',
+      'tool-input-available',
+      'tool-output-available',
+      'finish',
+    ])
+    expect(chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.delta).join('')).toBe('Hello')
+    expect(provider.lastUsage).toEqual({
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+    })
+  })
+
   it('generates and reports an OpenCode session title after the first successful turn', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -1185,6 +1264,49 @@ describe('opencodeProvider streamTurn', () => {
     expect(chunks.at(-1)).toMatchObject({ type: 'finish' })
   })
 
+  it.each(['none', 'minimal', 'max'] as const)('forwards %s as an opencode prompt variant', async (thinkingEffort) => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    const stream = provider.streamTurn({
+      runId: `run-effort-${thinkingEffort}`,
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      message: {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Think with this variant' }],
+      },
+      workspacePath: '/tmp/workspace',
+      providerOptions: { thinkingEffort },
+    })
+
+    const chunksPromise = drainStream(stream)
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+    expect(fake.promptAsync.mock.calls[0]![0].body.variant).toBe(thinkingEffort)
+    events.push({
+      type: 'session.next.text.delta',
+      properties: { sessionID: 'ses_1', timestamp: 1, delta: 'Done.' },
+    })
+    events.push({
+      type: 'session.next.text.ended',
+      properties: { sessionID: 'ses_1', timestamp: 2, text: 'Done.' },
+    })
+    events.push({
+      type: 'session.next.step.ended',
+      properties: {
+        sessionID: 'ses_1',
+        timestamp: 3,
+        finish: 'stop',
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+      },
+    })
+
+    await expect(chunksPromise).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'finish' }),
+    ]))
+  })
+
   it('omits the variant field when thinkingEffort is not set', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
@@ -1380,6 +1502,101 @@ describe('opencodeProvider streamTurn', () => {
       path: { id: 'ses_1' },
       query: { directory: '/tmp/workspace', limit: 50 },
     }))
+  })
+
+  it('fails a promptAsync turn when acceptance is followed by no provider activity', async () => {
+    vi.useFakeTimers()
+    try {
+      const events = new AsyncEventStream<OpencodeEvent>()
+      const fake = createFakeResource(events)
+      const provider = new OpencodeProvider(
+        { readSecret: () => 'secret' },
+        {
+          promptAcceptedRecoveryDelaysMs: [5],
+          promptAcceptedActivityTimeoutMs: 10,
+          prematureIdleTimeoutMs: 10,
+        },
+      )
+      const stream = provider.streamTurn({
+        runId: 'run-no-activity',
+        runtimeSession: createRuntimeSession(fake.resource),
+        profile: null,
+        message: {
+          id: 'user-1',
+          role: 'user',
+          parts: [{ type: 'text', text: 'This should not hang' }],
+        },
+        workspacePath: '/tmp/workspace',
+      })
+
+      const firstChunk = stream.next()
+      await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+      const rejection = expect(firstChunk).rejects.toThrow('OpenCode did not produce any activity for this prompt')
+      await vi.advanceTimersByTimeAsync(15)
+      await rejection
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fails a turn that becomes idle after tool calls without a final assistant response', async () => {
+    vi.useFakeTimers()
+    try {
+      const events = new AsyncEventStream<OpencodeEvent>()
+      const fake = createFakeResource(events)
+      const provider = new OpencodeProvider(
+        { readSecret: () => 'secret' },
+        {
+          promptAcceptedRecoveryDelaysMs: [100],
+          promptAcceptedActivityTimeoutMs: 100,
+          prematureIdleTimeoutMs: 10,
+        },
+      )
+      const stream = provider.streamTurn({
+        runId: 'run-idle-after-tools',
+        runtimeSession: createRuntimeSession(fake.resource),
+        profile: null,
+        message: {
+          id: 'user-1',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Use a tool' }],
+        },
+        workspacePath: '/tmp/workspace',
+      })
+      const chunksPromise = drainStream(stream)
+
+      await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+      events.push({
+        type: 'session.next.tool.called',
+        properties: {
+          sessionID: 'ses_1',
+          timestamp: 1,
+          callID: 'call_1',
+          tool: 'bash',
+          input: { command: 'pnpm test' },
+        },
+      })
+      events.push({
+        type: 'session.next.step.ended',
+        properties: {
+          sessionID: 'ses_1',
+          timestamp: 2,
+          finish: 'tool-calls',
+          tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      })
+      events.push({
+        type: 'session.idle',
+        properties: { sessionID: 'ses_1' },
+      })
+      const rejection = expect(chunksPromise).rejects.toThrow('OpenCode became idle after tool calls without producing a final assistant response')
+      await vi.advanceTimersByTimeAsync(10)
+      await rejection
+    }
+    finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reuses the native session across consecutive promptAsync turns without custom message IDs', async () => {

@@ -171,7 +171,7 @@ export interface RuntimeOwnedProviderTargets {
   listModelsForProviderTarget?: (input: ListRuntimeOwnedProviderTargetModelsInput) => Promise<RuntimeModelDescriptor[]>
 }
 
-export type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
+export type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export interface RuntimeSlashCommand {
   name: string

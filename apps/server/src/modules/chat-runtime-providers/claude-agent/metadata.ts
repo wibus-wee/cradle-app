@@ -30,7 +30,7 @@ export const CLAUDE_AGENT_RUNTIME_METADATA = {
     inputMode: 'rich',
     modelSelection: 'alias-matrix',
     thinking: {
-      efforts: ['low', 'medium', 'high', 'xhigh'],
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
     },
   },
 } satisfies ChatRuntimeMetadata

@@ -8,6 +8,7 @@ import { useChatStore } from '~/store/chat'
 
 import type { ChatSessionFrameDescriptor } from './chat-session-frame-host'
 import { ChatSessionFrameHost } from './chat-session-frame-host'
+import { getRemoteHostId } from './session-execution'
 import { readSessionThinkingEffort } from './session-thinking-effort'
 import { readRetainableStreamingSessionIds } from './streaming-session-retention'
 
@@ -34,6 +35,7 @@ function RetainedStreamingChatSession({ sessionId }: { sessionId: string }) {
     runtimeKind: session?.runtimeKind,
     workspaceId: session?.workspaceId ?? null,
     agentId: session?.agentId ?? null,
+    remoteHostId: getRemoteHostId(session),
   }
 
   return <ChatSessionFrameHost activeSession={descriptor} active={false} />

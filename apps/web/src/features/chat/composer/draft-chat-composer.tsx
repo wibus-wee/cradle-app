@@ -21,6 +21,8 @@ import {
 import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
 import type { RuntimeProviderBinding } from '~/features/composer-toolbar/types'
 import type { ComposerStateResult } from '~/features/composer-toolbar/use-composer-state'
+import { RemoteHostConnectionNotice } from '~/features/remote-hosts/remote-host-connection-notice'
+import { useRemoteHostConnection } from '~/features/remote-hosts/use-remote-host-connection'
 import type { SkillInventoryEntry } from '~/features/skills/types'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { cn } from '~/lib/cn'
@@ -29,18 +31,18 @@ import { openSettingsSection as openSettingsRouteSection } from '~/navigation/na
 import { useNewChatStore } from '~/store/new-chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
-import type { RuntimeSettings, RuntimeSettingsPatch } from '../commands/chat-response-command'
+import type { RuntimeSettingsPatch, RuntimeSettingsPatchValue } from '../commands/chat-response-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import type { MentionItem } from '../mentions/mention-panel'
 import { searchPluginMentions } from '../mentions/plugin-mentions'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { useDraftClaudeAgentModelAliases, useProviderTargetClaudeAgentModelAliases } from '../runtime/claude-session-model-matrix-control'
+import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
 import {
   mergeRuntimeSettings,
   readDefaultRuntimeSettings,
   resolveRuntimeCatalogItem,
 } from '../runtime/runtime-settings-presenter'
-import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   CRADLE_APPSHOT_SLASH_ACTION_ID,
@@ -55,13 +57,13 @@ import { modelSupportsAttachments } from './composer-attachment-state'
 import { ComposerSlotStates } from './composer-slot-states'
 import { useComposerAppshotCapture } from './use-composer-appshot-capture'
 
-type ChatThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
+type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 interface DraftClaudeAgentConfig {
   modelAliases: ClaudeAgentModelAliases
 }
 
-export type DraftChatRuntimeSettings = RuntimeSettings & {
+export type DraftChatRuntimeSettings = Record<string, RuntimeSettingsPatchValue | DraftClaudeAgentConfig | undefined> & {
   claudeAgent?: DraftClaudeAgentConfig | null
 }
 
@@ -95,6 +97,11 @@ export type DraftChatComposerSendHandler = (
 
 interface DraftChatComposerProps {
   workspaceId: string | null
+  /**
+   * When the selected workspace is mounted from a remote host, load the remote
+   * provider catalog and gate send on host connection.
+   */
+  remoteHostId?: string | null
   active?: boolean
   contextBar?: ReactNode
   replaceText?: string
@@ -127,7 +134,13 @@ function useRotatingPlaceholder(hints: string[], active: boolean, interval = 400
 }
 
 export function DraftChatComposer(props: DraftChatComposerProps) {
-  const composerState = useComposerState({ context: 'new-chat', workspaceId: props.workspaceId, enableAgents: true })
+  const composerState = useComposerState({
+    context: 'new-chat',
+    workspaceId: props.workspaceId,
+    remoteHostId: props.remoteHostId,
+    // Remote catalogs own providers; local Agents are not executable there.
+    enableAgents: !props.remoteHostId,
+  })
   return <DraftChatComposerContent {...props} composerState={composerState} />
 }
 
@@ -137,6 +150,7 @@ export function DraftChatComposerWithState(props: DraftChatComposerContentProps)
 
 function DraftChatComposerContent({
   workspaceId,
+  remoteHostId = null,
   active = true,
   contextBar,
   replaceText,
@@ -165,7 +179,13 @@ function DraftChatComposerContent({
   const placeholderHints = PLACEHOLDER_HINT_KEYS.map(key => t(key))
   const placeholder = useRotatingPlaceholder(placeholderHints, active)
 
+  const remoteConnection = useRemoteHostConnection(remoteHostId)
+  const remoteConnectionBlocked = remoteConnection.isBlocking
+
   const readinessNotice = (() => {
+    if (remoteConnectionBlocked) {
+      return null
+    }
     if (
       composerState.isLoadingAgents
       || composerState.isLoadingProfiles
@@ -292,9 +312,9 @@ function DraftChatComposerContent({
     return [appshotCommand]
   })()
   const slashCommands = useRuntimeComposerSlashCommands(selection.runtimeKind, composerState.runtimeComposer, cradleSlashCommands)
-  const sendDisabled = selection.targetMode === 'agent'
+  const sendDisabled = remoteConnectionBlocked || (selection.targetMode === 'agent'
     ? !effectiveAgent || sending
-    : !effectiveProfile || sending
+    : !effectiveProfile || sending)
 
   const toolbar = (
     <div className="flex min-w-0 items-center gap-1">
@@ -333,9 +353,9 @@ function DraftChatComposerContent({
   ) => {
     const trimmedText = text.trim()
     const hasDraft = trimmedText.length > 0 || files.length > 0 || contextParts.length > 0
-    const canSubmit = selection.targetMode === 'agent'
+    const canSubmit = !remoteConnectionBlocked && (selection.targetMode === 'agent'
       ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
-      : !!effectiveProfile && hasDraft && !sending
+      : !!effectiveProfile && hasDraft && !sending)
 
     if (!canSubmit) {
       return false
@@ -555,11 +575,19 @@ function DraftChatComposerContent({
           sendButton: `${testIdPrefix}-send-btn`,
         }}
       />
-      <DraftChatReadinessNotice
-        notice={readinessNotice}
-        onAction={openSettingsSection}
-        testIdPrefix={testIdPrefix}
-      />
+      {remoteConnectionBlocked
+        ? (
+            <div className="mt-2">
+              <RemoteHostConnectionNotice gate={remoteConnection.gate} />
+            </div>
+          )
+        : (
+            <DraftChatReadinessNotice
+              notice={readinessNotice}
+              onAction={openSettingsSection}
+              testIdPrefix={testIdPrefix}
+            />
+          )}
     </>
   )
 }

@@ -863,7 +863,30 @@ describe('external provider sources capability', () => {
     process.env.CRADLE_PLUGINS_DIR = join(dataDir, 'plugins')
     process.env.CRADLE_EXTERNAL_PLUGINS_DIRS = ''
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const codexClientOptions: unknown[] = []
+    setCodexChatgptModelListClientFactoryForTests((options) => {
+      codexClientOptions.push(options)
+      return {
+        async initialize() {},
+        async request(method) {
+          if (method === 'model/list') {
+            return {
+              data: [
+                { id: 'gpt-4.1-mini', displayName: 'GPT 4.1 Mini', supportedReasoningEfforts: [] },
+                { id: 'gpt-4.1', displayName: 'GPT 4.1', supportedReasoningEfforts: [] },
+              ],
+            }
+          }
+          throw new Error(`Unexpected Codex app-server request: ${method}`)
+        },
+        async nextNotification() {
+          return null
+        },
+        close() {},
+      }
+    })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = getRequestUrl(input)
       if (url === MODELS_DEV_URL) {
         return new Response(JSON.stringify({}), {
@@ -872,12 +895,7 @@ describe('external provider sources capability', () => {
         })
       }
 
-      expect(url).toBe('https://target-openai.example.test/v1/models')
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer target-secret-value' })
-      return new Response(JSON.stringify({ data: [{ id: 'gpt-4.1-mini' }, { id: 'gpt-4.1' }] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
+      throw new Error(`Unexpected fetch request: ${url}`)
     })
 
     try {
@@ -1048,11 +1066,29 @@ describe('external provider sources capability', () => {
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://target-openai.example.test/v1/models',
       ).length
-      expect(providerFetchCount).toBe(1)
+      expect(providerFetchCount).toBe(0)
+      expect(codexClientOptions).toEqual([
+        {
+          apiKey: 'target-secret-value',
+          config: {
+            model_provider: 'cradle-openai-compatible',
+            model_providers: {
+              'cradle-openai-compatible': {
+                name: 'Cradle OpenAI Compatible',
+                base_url: 'https://target-openai.example.test/v1',
+                env_key: 'CRADLE_CODEX_API_KEY',
+                wire_api: 'responses',
+                requires_openai_auth: true,
+              },
+            },
+          },
+        },
+      ])
 
       registration.dispose()
     }
  finally {
+      setCodexChatgptModelListClientFactoryForTests(null)
       shutdownInfra()
       restoreEnv(previous)
       rmSync(dataDir, { recursive: true, force: true })

@@ -11,7 +11,7 @@ import {
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
 import { resolveSessionSystemPrompt } from '../context/turn-context'
 import type { ChatContextPart } from '../context-parts'
-import type { RuntimeSettingsPatch, ChatThinkingEffort } from '../runtime-provider-types'
+import type { ChatThinkingEffort, RuntimeSettingsPatch } from '../runtime-provider-types'
 import {
   assertProviderBoundRunContext,
   assertRunnableSession,

@@ -9,10 +9,12 @@ import { useTranslation } from 'react-i18next'
 
 import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { getWorkspacesByWorkspaceIdGitMergeBase } from '~/api-gen/sdk.gen'
-import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
+import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { RemoteHostConnectionNotice } from '~/features/remote-hosts/remote-host-connection-notice'
+import { useRemoteHostConnection } from '~/features/remote-hosts/use-remote-host-connection'
 import { IsolationBoundaryDialog } from '~/features/session/isolation-boundary-dialog'
 import { IsolationMissingDialog } from '~/features/session/isolation-missing-dialog'
 import { useSessionIsolationState, useStartSessionIsolation } from '~/features/session/use-session-isolation'
@@ -24,6 +26,7 @@ import type { ChatRuntimeGoalUiSlotState } from './capabilities/chat-capabilitie
 import { runtimeUiSlotStatesQueryKey } from './capabilities/chat-capabilities'
 import { useQuickQuestion } from './capabilities/use-quick-question'
 import type { ChatViewProps } from './chat-view-types'
+import { describeChatExecutionError } from './commands/chat-execution-errors'
 import { describeRollbackLastTurnError } from './commands/rollback-last-turn-command'
 import type {
   ComposerSlashCommandActionContext,
@@ -83,6 +86,7 @@ export function ChatView({
   placeholder,
   runtimeKind: _runtimeKind,
   workspaceId,
+  remoteHostId = null,
   messageTextTransform,
   prepareSend,
   compactInset = false,
@@ -92,6 +96,8 @@ export function ChatView({
   const { t: tIsolation } = useTranslation('session-isolation')
   const surfaceActive = useSurfaceActive()
   const chatActive = active && surfaceActive
+  const remoteConnection = useRemoteHostConnection(remoteHostId)
+  const remoteConnectionBlocked = remoteConnection.isBlocking
   const {
     messageIds,
     messageCount,
@@ -137,13 +143,18 @@ export function ChatView({
     active: chatActive,
     sessionId,
     isStreaming,
-    isReady,
+    isReady: isReady && !remoteConnectionBlocked,
     workspaceId,
+    remoteHostId,
     composerModel,
     sendOverridesRef,
     sendMessage,
     stop,
   })
+  const gatedComposerRuntime = useMemo(() => ({
+    ...composerRuntime,
+    disabled: composerRuntime.disabled || remoteConnectionBlocked,
+  }), [composerRuntime, remoteConnectionBlocked])
   const scrollRuntime = useChatScrollRuntime({ active: chatActive, sessionId, messageIds, status })
   const appshotRuntime = useComposerAppshotCapture({
     active: chatActive,
@@ -194,10 +205,8 @@ export function ChatView({
     ],
   )
   const navigableComposerRuntime = useMemo<ChatComposerRuntime>(
-    () => ({
-      ...composerRuntime,
-    }),
-    [composerRuntime],
+    () => gatedComposerRuntime,
+    [gatedComposerRuntime],
   )
   const preparedBaseComposerRuntime = useMemo<ChatComposerRuntime>(() => {
     return {
@@ -751,7 +760,7 @@ export function ChatView({
         messageIds={messageIds}
         messageCount={messageCount}
         status={status}
-        error={error}
+        error={describeChatExecutionError(error) ?? error}
         isReady={isReady}
         scrollContainerRef={scrollRuntime.scrollContainerRef}
         viewportRef={scrollRuntime.viewportRef}
@@ -770,43 +779,52 @@ export function ChatView({
         hideMinimap={hideRuntimeToolbar}
         compactInset={compactInset}
         composerStack={(
-          <ChatComposerSection
-            sessionId={sessionId}
-            runtimeKind={runtimeSettings.runtimeKind ?? _runtimeKind}
-            awaitSummary={awaitSummary}
-            queueItems={queueItems}
-            onCancelQueueItem={queueItemId => void cancelQueueItem(queueItemId)}
-            onReorderQueueItems={queueItemIds => void reorderQueueItems(queueItemIds)}
-            onUpdateQueueItem={(queueItemId, body) => updateQueueItem(queueItemId, body)}
-            onSlashCommandAction={handleSlashCommandAction}
-            composerRuntime={preparedComposerRuntime}
-            appshotRuntime={appshotRuntime}
-            placeholder={placeholder}
-            availableFiles={availableFiles}
-            searchFiles={searchFiles}
-            searchPlugins={searchPlugins}
-            searchSkills={searchSkills}
-            toolbar={runtimeSettingsToolbar}
-            runtimeSettings={{
+          <>
+            {remoteConnectionBlocked
+              ? (
+                  <div className="mb-2">
+                    <RemoteHostConnectionNotice gate={remoteConnection.gate} />
+                  </div>
+                )
+              : null}
+            <ChatComposerSection
+              sessionId={sessionId}
+              runtimeKind={runtimeSettings.runtimeKind ?? _runtimeKind}
+              awaitSummary={awaitSummary}
+              queueItems={queueItems}
+              onCancelQueueItem={queueItemId => void cancelQueueItem(queueItemId)}
+              onReorderQueueItems={queueItemIds => void reorderQueueItems(queueItemIds)}
+              onUpdateQueueItem={(queueItemId, body) => updateQueueItem(queueItemId, body)}
+              onSlashCommandAction={handleSlashCommandAction}
+              composerRuntime={preparedComposerRuntime}
+              appshotRuntime={appshotRuntime}
+              placeholder={placeholder}
+              availableFiles={availableFiles}
+              searchFiles={searchFiles}
+              searchPlugins={searchPlugins}
+              searchSkills={searchSkills}
+              toolbar={runtimeSettingsToolbar}
+              runtimeSettings={{
               runtimeKind: runtimeSettings.runtimeKind ?? _runtimeKind,
               settings: runtimeSettings.settings,
-              disabled: !isReady || !runtimeSettings.loaded || runtimeSettings.loading,
+              disabled: !isReady || !runtimeSettings.loaded || runtimeSettings.loading || remoteConnectionBlocked,
               onChange: updateRuntimeSettings,
             }}
-            contextBar={effectiveComposerContextBar}
-            droppedPath={droppedPath}
-            goalActions={goalActions}
-            quickQuestionSlot={quickQuestionSlot}
-            reviewSlot={reviewSlot}
-            usageSlot={usageSlot}
-            onQuickQuestion={
+              contextBar={effectiveComposerContextBar}
+              droppedPath={droppedPath}
+              goalActions={goalActions}
+              quickQuestionSlot={quickQuestionSlot}
+              reviewSlot={reviewSlot}
+              usageSlot={usageSlot}
+              onQuickQuestion={
               sessionId && hasQuickQuestionSlot ? quickQuestion.openQuickQuestion : undefined
             }
-            onComposerFocusChange={scrollRuntime.handleComposerFocusChange}
-            rollbackDraftSignal={rollbackDraftSignal}
-            clearDraftSignal={clearComposerDraftSignal}
-            suspendDraftPersistence={Boolean(pendingRollbackMessageId)}
-          />
+              onComposerFocusChange={scrollRuntime.handleComposerFocusChange}
+              rollbackDraftSignal={rollbackDraftSignal}
+              clearDraftSignal={clearComposerDraftSignal}
+              suspendDraftPersistence={Boolean(pendingRollbackMessageId)}
+            />
+          </>
         )}
       />
 

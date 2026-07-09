@@ -12,6 +12,7 @@ function createSessionRow(overrides: Partial<SessionRow> & Pick<SessionRow, 'id'
   const { id, ...rest } = overrides
   return {
     id,
+    execution: { kind: 'local' },
     parentSessionId: null,
     sideContextSource: null,
     workspaceId: 'workspace-1',

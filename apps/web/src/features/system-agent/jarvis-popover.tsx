@@ -51,6 +51,7 @@ const PANEL_MAX_WIDTH = 900
 const PANEL_MIN_HEIGHT = 300
 const PANEL_MAX_HEIGHT = 800
 const MAX_CONTEXT_LABEL_CHARS = 32
+const JARVIS_DEFAULT_SESSION_TITLE = 'Jarvis'
 
 function resolveExpandedCenterRect(rect: {
   top: number
@@ -314,6 +315,7 @@ function JarvisRuntimePanel({
     ...getSessionsByIdOptions({ path: { id: sessionId } }),
     enabled: !!sessionId,
   })
+  const updateSessionTitle = useJarvisUiStore(s => s.updateSessionTitle)
 
   const runtimeKind = readSessionRuntimeKind(session?.runtimeKind) ?? prefsRuntimeKind
   const workspaceId = session?.workspaceId ?? null
@@ -321,6 +323,14 @@ function JarvisRuntimePanel({
   const sessionModelId = session?.modelId ?? prefsModelId ?? null
   const sessionThinkingEffort = readSessionThinkingEffort(session?.thinkingEffort)
   const agentId = session?.agentId ?? null
+
+  React.useEffect(() => {
+    const title = session?.title?.trim()
+    if (!title || title === JARVIS_DEFAULT_SESSION_TITLE) {
+      return
+    }
+    updateSessionTitle(sessionId, title)
+  }, [session?.title, sessionId, updateSessionTitle])
 
   return (
     <div className="min-h-0 flex-1">
@@ -510,7 +520,11 @@ export function JarvisPopover({
         return false
       }
 
-      addSession({ id: session.id, title: trimmedText.slice(0, 40) || 'Jarvis', createdAt: Date.now() })
+      addSession({
+        id: session.id,
+        title: trimmedText.slice(0, 40) || JARVIS_DEFAULT_SESSION_TITLE,
+        createdAt: Date.now(),
+      })
       setActiveSessionId(session.id)
       clearExplicitContextAttachments()
       startOptimisticChatResponse({

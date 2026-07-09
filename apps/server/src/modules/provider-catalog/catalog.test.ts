@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { setCodexChatgptModelListClientFactoryForTests } from '../chat-runtime-providers/codex/app-server/model-list'
+import { setSsrAddressLookupForTests } from '../../lib/ssrf-guard'
 import type { ProviderRequest } from '../provider-contracts/types'
 import { ProviderCatalog } from './catalog'
 import {
@@ -12,43 +12,38 @@ function getRequestUrl(input: Parameters<typeof fetch>[0]): string {
   return new Request(input).url
 }
 
+function encodeBase64Url(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString('base64url')
+}
+
+function createUnexpiredJwt(): string {
+  return [
+    encodeBase64Url({ alg: 'none', typ: 'JWT' }),
+    encodeBase64Url({ exp: Math.floor(Date.now() / 1000) + 60 * 60 }),
+    'signature',
+  ].join('.')
+}
+
 describe('providerCatalog', () => {
   afterEach(() => {
-    setCodexChatgptModelListClientFactoryForTests(null)
+    setSsrAddressLookupForTests(null)
     vi.restoreAllMocks()
   })
 
-  it('lists Codex source API-key models through Codex app-server', async () => {
-    const clientOptions: unknown[] = []
-    const requests: Array<{ method: string, params?: unknown }> = []
-    const close = vi.fn()
-    setCodexChatgptModelListClientFactoryForTests((options) => {
-      clientOptions.push(options)
-      return {
-        async initialize() {},
-        async request(method, params) {
-          requests.push({ method, params })
-          if (method === 'model/list') {
-            return {
-              data: [
-                {
-                  id: 'gpt-5-codex',
-                  displayName: 'GPT-5 Codex',
-                  inputModalities: ['text'],
-                  supportedReasoningEfforts: [{ reasoningEffort: 'high' }],
-                },
-              ],
-            }
-          }
-          throw new Error(`Unexpected Codex app-server request: ${method}`)
-        },
-        async nextNotification() {
-          return null
-        },
-        close,
+  it('lists OpenAI-compatible API-key models from the OpenAI-compatible endpoint even for Codex sources', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = getRequestUrl(input)
+      if (url !== 'https://openai-compatible.example.test/v1/models') {
+        throw new Error(`Unexpected OpenAI-compatible model list request: ${url}`)
       }
+
+      expect(init?.headers).toMatchObject({ Authorization: 'Bearer sk-openai-compatible' })
+      return new Response(JSON.stringify({ data: [{ id: 'gpt-5-codex' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
     })
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
 
     const provider = new ProviderCatalog().get('openai-compatible')
     if (!provider) {
@@ -57,42 +52,100 @@ describe('providerCatalog', () => {
 
     const request: ProviderRequest = {
       providerKind: 'openai-compatible',
-      label: 'Codex Official',
-      configJson: JSON.stringify({ apiMode: 'chat-completions' }),
-      secretRef: 'secret-codex',
+      label: 'OpenAI-compatible',
+      configJson: JSON.stringify({
+        baseUrl: 'https://openai-compatible.example.test/v1',
+        apiMode: 'chat-completions',
+      }),
+      secretRef: 'secret-openai-compatible',
       profileId: null,
       providerTargetKind: 'external',
-      providerTargetId: 'external-provider-codex',
+      providerTargetId: 'external-provider-openai-compatible',
       sourceApp: 'codex',
     }
 
     await expect(provider.listModels(request, {
       readSecret: (secretRef) => {
-        expect(secretRef).toBe('secret-codex')
-        return 'sk-codex'
+        expect(secretRef).toBe('secret-openai-compatible')
+        return 'sk-openai-compatible'
       },
     })).resolves.toEqual([
       {
         id: 'gpt-5-codex',
-        label: 'GPT-5 Codex',
+        label: 'gpt-5-codex',
         providerKind: 'openai-compatible',
-        capabilities: {
-          inputModalities: ['text'],
-          reasoning: true,
-          reasoningEfforts: ['high'],
-        },
+        capabilities: {},
       },
     ])
 
-    expect(clientOptions).toEqual([{ apiKey: 'sk-codex' }])
-    expect(requests).toEqual([
-      { method: 'model/list', params: { includeHidden: true, limit: 100 } },
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('lists OpenAI-compatible ChatGPT-auth models from the OpenAI-compatible endpoint', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
+    const accessToken = createUnexpiredJwt()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = getRequestUrl(input)
+      if (url !== 'https://api.openai.com/v1/models') {
+        throw new Error(`Unexpected ChatGPT-auth model list request: ${url}`)
+      }
+
+      expect(init?.headers).toMatchObject({
+        'Authorization': `Bearer ${accessToken}`,
+        'ChatGPT-Account-ID': 'chatgpt-account-1',
+      })
+      return new Response(JSON.stringify({ data: [{ id: 'gpt-chatgpt-auth' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    const updateSecretValue = vi.fn()
+
+    const provider = new ProviderCatalog().get('openai-compatible')
+    if (!provider) {
+      throw new Error('OpenAI-compatible provider is not registered')
+    }
+
+    const request: ProviderRequest = {
+      providerKind: 'openai-compatible',
+      label: 'OpenAI',
+      configJson: JSON.stringify({
+        baseUrl: 'https://api.openai.com/v1',
+        apiMode: 'responses',
+      }),
+      secretRef: 'chatgpt-auth-secret',
+      profileId: null,
+      providerTargetKind: 'manual',
+      providerTargetId: 'openai-chatgpt-auth-target',
+      sourceApp: null,
+    }
+
+    await expect(provider.listModels(request, {
+      readSecret: (secretRef) => {
+        expect(secretRef).toBe('chatgpt-auth-secret')
+        return JSON.stringify({
+          accessToken,
+          refreshToken: 'refresh-token',
+          chatgptAccountId: 'chatgpt-account-1',
+          chatgptPlanType: 'plus',
+        })
+      },
+      updateSecretValue,
+    })).resolves.toEqual([
+      {
+        id: 'gpt-chatgpt-auth',
+        label: 'gpt-chatgpt-auth',
+        providerKind: 'openai-compatible',
+        capabilities: {},
+      },
     ])
-    expect(fetchSpy).not.toHaveBeenCalled()
-    expect(close).toHaveBeenCalledTimes(1)
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(updateSecretValue).not.toHaveBeenCalled()
   })
 
   it('lists Universal models from the OpenAI-compatible endpoint only', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = getRequestUrl(input)
       if (url !== 'https://openai.example.test/v1/models') {
@@ -156,6 +209,7 @@ describe('providerCatalog', () => {
   })
 
   it('lists Volcengine Ark coding models with bearer-token Anthropic wire auth', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = getRequestUrl(input)
       if (url !== 'https://ark.cn-beijing.volces.com/api/coding/v1/models') {

@@ -7,10 +7,10 @@ import { truncateSnapshotPayload } from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun } from '../run-registry'
 import type {
-  RuntimeSettings,
   ChatThinkingEffort,
   RuntimeGoalContinuationOptions,
   RuntimeProviderTargetProfile,
+  RuntimeSettings,
 } from '../runtime-provider-types'
 import { attachBinding, isProviderTargetAvailable } from '../runtime-session-context'
 import { providerThreadStreamStore } from '../stream/live-run-streams'

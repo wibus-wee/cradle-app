@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 
-import { filterThinkingOptionsForModel, getThinkingCapabilityTier, THINKING_EFFORTS } from './constants'
+import { filterThinkingOptionsForModel, getThinkingCapabilityTier, selectSupportedThinkingValue, THINKING_EFFORTS } from './constants'
 
 function model(overrides: Partial<ModelDescriptor> & { id: string }): ModelDescriptor {
   return {
@@ -36,19 +36,34 @@ describe('thinking capability filtering', () => {
         id: 'runtime-declared-reasoning-model',
         capabilities: {
           reasoning: true,
-          reasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
+          reasoningEfforts: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
         },
       }),
       THINKING_EFFORTS,
     )
 
-    expect(options.map(option => option.value)).toEqual(['low', 'medium', 'high', 'xhigh'])
+    expect(options.map(option => option.value)).toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(getThinkingCapabilityTier(model({
       id: 'runtime-declared-reasoning-model',
       capabilities: {
         reasoning: true,
-        reasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
+        reasoningEfforts: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
       },
     }))).toBe('extended')
+  })
+
+  it('uses the requested fallback before the first supported effort', () => {
+    expect(selectSupportedThinkingValue(
+      model({
+        id: 'runtime-declared-reasoning-model',
+        capabilities: {
+          reasoning: true,
+          reasoningEfforts: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+        },
+      }),
+      THINKING_EFFORTS,
+      null,
+      'high',
+    )).toBe('high')
   })
 })

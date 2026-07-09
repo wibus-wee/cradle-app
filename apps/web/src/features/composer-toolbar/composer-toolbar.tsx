@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { RuntimeKind } from '~/features/agent-runtime/types'
+import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
 import {
   runtimeComposerSupportsThinking,
   runtimeComposerUsesAliasMatrixModelSelection,
@@ -33,6 +34,17 @@ function includeSelectedThinkingOption(
   const optionValues = new Set(options.map(option => option.value))
   optionValues.add(selected)
   return allOptions.filter(option => optionValues.has(option.value))
+}
+
+function filterThinkingOptionsForRuntimeComposer(
+  composer: RuntimeCatalogComposer,
+  options: Array<ThinkingOption<ThinkingEffort>>,
+): Array<ThinkingOption<ThinkingEffort>> {
+  if (typeof composer.thinking !== 'object') {
+    return options
+  }
+  const efforts = new Set(composer.thinking.efforts)
+  return options.filter(option => option.value !== null && efforts.has(option.value))
 }
 
 interface ComposerToolbarProps {
@@ -91,7 +103,7 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
   const thinkingOptions = useProviderThinkingOptions()
   const usesAliasMatrixModelSelection = runtimeComposerUsesAliasMatrixModelSelection(state.runtimeComposer)
   const supportedThinkingControlOptions = usesAliasMatrixModelSelection
-    ? thinkingOptions
+    ? filterThinkingOptionsForRuntimeComposer(state.runtimeComposer, thinkingOptions)
     : filterThinkingOptionsForModel(state.effectiveModel, thinkingOptions)
   const thinkingControlOptions = includeSelectedThinkingOption(
     supportedThinkingControlOptions,

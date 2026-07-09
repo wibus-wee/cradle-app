@@ -19,6 +19,7 @@ import { useSurfaceStore } from '~/navigation/surface-store'
 
 import { ChatSessionFrameHost } from './chat-session-frame-host'
 import { CHAT_SESSION_FALLBACK_LABEL } from './chat-session-label'
+import { getRemoteHostId } from './session-execution'
 import { readSessionThinkingEffort } from './session-thinking-effort'
 
 function loadTerminalPanelView() {
@@ -126,6 +127,7 @@ export function ChatSessionRouteContent({
 
   const workspaceId = session?.workspaceId ?? null
   const agentId = session?.agentId ?? null
+  const remoteHostId = getRemoteHostId(session)
   const activeSession = useMemo(() => ({
     sessionId,
     sessionProviderTargetId,
@@ -134,7 +136,8 @@ export function ChatSessionRouteContent({
     runtimeKind: session?.runtimeKind,
     workspaceId,
     agentId,
-  }), [agentId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId])
+    remoteHostId,
+  }), [agentId, remoteHostId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId])
 
   const { data: workspace } = useQuery({
     ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId: workspaceId! } }),

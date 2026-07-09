@@ -26,7 +26,7 @@
     "tab-working-set:collect": "python3 scripts/tab_working_set_collector.py",
     "leak:harness": "tsx scripts/leak-harness.ts",
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit",
-    "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter @cradle/cc-switch build && vitest run",
+    "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter \"../../plugins/*\" build && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -95,6 +95,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "4.0.4",
+    "@sinclair/typebox": "0.34.49",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.1",
     "nodemon": "^3.1.9",

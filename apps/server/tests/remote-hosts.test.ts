@@ -17,6 +17,7 @@ type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 interface FakeRemoteCradleServer {
   baseUrl: string
   close: () => Promise<void>
+  seenHosts: string[]
 }
 
 function makeTempDir(prefix: string): string {
@@ -37,6 +38,7 @@ async function createAppWithDataDir(dataDir: string): Promise<ElysiaApp> {
 }
 
 async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
+  const seenHosts: string[] = []
   const workspace = {
     id: 'remote-workspace-1',
     name: 'Remote Project',
@@ -63,6 +65,7 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   ]
 
   const server = createServer((request, response) => {
+    seenHosts.push(request.headers.host ?? '')
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     if (url.pathname === '/health') {
       writeJson(response, {
@@ -119,6 +122,7 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   const address = server.address() as AddressInfo
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
+    seenHosts,
     close: () => closeServer(server),
   }
 }
@@ -138,6 +142,22 @@ function closeServer(server: Server): Promise<void> {
       resolve()
     })
   })
+}
+
+async function createDirectUrlHost(app: ElysiaApp, hostId: string, baseUrl: string): Promise<void> {
+  const createRes = await app.handle(new Request('http://localhost/remote-hosts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      id: hostId,
+      displayName: hostId,
+      connectionConfig: {
+        transport: 'direct-url',
+        baseUrl,
+      },
+    }),
+  }))
+  expect(createRes.status).toBe(200)
 }
 
 describe('remote Cradle Server hosts', () => {
@@ -183,28 +203,8 @@ describe('remote Cradle Server hosts', () => {
       app = await createAppWithDataDir(dataDir)
       expect(db().select().from(providerTargets).all()).toHaveLength(0)
 
-      const createRes = await app.handle(new Request('http://localhost/remote-hosts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          id: 'remote-host-a',
-          displayName: 'Remote Host A',
-          connectionConfig: {
-            transport: 'direct-url',
-            baseUrl: fakeRemote.baseUrl,
-          },
-        }),
-      }))
-      expect(createRes.status).toBe(200)
-      expect(await createRes.json()).toEqual(expect.objectContaining({
-        id: 'remote-host-a',
-        displayName: 'Remote Host A',
-        connectionState: 'idle',
-      }))
-
-      const listRes = await app.handle(new Request('http://localhost/remote-hosts'))
-      expect(listRes.status).toBe(200)
-      expect(await listRes.json()).toEqual([
+      await createDirectUrlHost(app, 'remote-host-a', fakeRemote.baseUrl)
+      expect(await (await app.handle(new Request('http://localhost/remote-hosts'))).json()).toEqual([
         expect.objectContaining({ id: 'remote-host-a' }),
       ])
       expect(db().select().from(providerTargets).all()).toHaveLength(0)
@@ -215,7 +215,7 @@ describe('remote Cradle Server hosts', () => {
     }
   })
 
-  it('connects to a remote Cradle Server and proxies workspace file APIs', async () => {
+  it('connects to a remote Cradle Server and forwards upstream workspace file APIs', async () => {
     const dataDir = makeTempDir('cradle-remote-cradle-server-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
     let app: ElysiaApp | undefined
@@ -223,20 +223,7 @@ describe('remote Cradle Server hosts', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-
-      const createRes = await app.handle(new Request('http://localhost/remote-hosts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          id: 'remote-host-live',
-          displayName: 'Remote Host Live',
-          connectionConfig: {
-            transport: 'direct-url',
-            baseUrl: fakeRemote.baseUrl,
-          },
-        }),
-      }))
-      expect(createRes.status).toBe(200)
+      await createDirectUrlHost(app, 'remote-host-live', fakeRemote.baseUrl)
 
       const connectRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/connect', {
         method: 'POST',
@@ -256,37 +243,118 @@ describe('remote Cradle Server hosts', () => {
         health: expect.objectContaining({ uptime: 42 }),
       }))
 
-      const workspacesRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/workspaces'))
+      const upstreamHealthRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/upstream/health'))
+      expect(upstreamHealthRes.status).toBe(200)
+      expect(await upstreamHealthRes.json()).toEqual(expect.objectContaining({ uptime: 42 }))
+
+      const workspacesRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/upstream/workspaces'))
       expect(workspacesRes.status).toBe(200)
-      expect(await workspacesRes.json()).toEqual({
-        workspaces: [expect.objectContaining({ id: 'remote-workspace-1', name: 'Remote Project' })],
-      })
+      expect(await workspacesRes.json()).toEqual([
+        expect.objectContaining({ id: 'remote-workspace-1', name: 'Remote Project' }),
+      ])
 
-      const filesRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/workspaces/remote-workspace-1/files'))
+      const filesRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/upstream/workspaces/remote-workspace-1/files'))
       expect(filesRes.status).toBe(200)
-      expect(await filesRes.json()).toEqual({
-        files: [
-          { type: 'directory', name: 'src', path: 'src' },
-          { type: 'file', name: 'README.md', path: 'README.md' },
-        ],
-      })
+      expect(await filesRes.json()).toEqual([
+        { type: 'directory', name: 'src', path: 'src' },
+        { type: 'file', name: 'README.md', path: 'README.md' },
+      ])
 
-      const childrenRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/workspaces/remote-workspace-1/files/children?path=src'))
+      const childrenRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/upstream/workspaces/remote-workspace-1/files/children?path=src'))
       expect(childrenRes.status).toBe(200)
-      expect(await childrenRes.json()).toEqual({
-        files: [{ type: 'file', name: 'index.ts', path: 'src/index.ts' }],
-      })
+      expect(await childrenRes.json()).toEqual([
+        { type: 'file', name: 'index.ts', path: 'src/index.ts' },
+      ])
 
-      const contentRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/workspaces/remote-workspace-1/files/content?path=README.md'))
+      const contentRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/upstream/workspaces/remote-workspace-1/files/content?path=README.md'))
       expect(contentRes.status).toBe(200)
       expect(await contentRes.json()).toEqual({ content: '# Remote Project\n' })
 
-      const infoRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/workspaces/remote-workspace-1/files/info?path=README.md'))
+      const infoRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/upstream/workspaces/remote-workspace-1/files/info?path=README.md'))
       expect(infoRes.status).toBe(200)
       expect(await infoRes.json()).toEqual(expect.objectContaining({
         name: 'README.md',
         previewKind: 'markdown',
       }))
+
+      expect(fakeRemote.seenHosts.some(host => host.includes('127.0.0.1') && !host.startsWith('localhost'))).toBe(true)
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('returns 409 when upstream is called for a disabled host', async () => {
+    const dataDir = makeTempDir('cradle-remote-upstream-disabled-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      fakeRemote = await startFakeRemoteCradleServer()
+      app = await createAppWithDataDir(dataDir)
+
+      const createRes = await app.handle(new Request('http://localhost/remote-hosts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: 'remote-host-disabled',
+          displayName: 'Disabled Host',
+          enabled: false,
+          connectionConfig: {
+            transport: 'direct-url',
+            baseUrl: fakeRemote.baseUrl,
+          },
+        }),
+      }))
+      expect(createRes.status).toBe(200)
+
+      const upstreamRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-disabled/upstream/health'))
+      expect(upstreamRes.status).toBe(409)
+      const body = await upstreamRes.json() as { code?: string }
+      expect(body.code).toBe('remote_host_disabled')
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('still serves remote workspace files through local workspace routes', async () => {
+    const dataDir = makeTempDir('cradle-remote-workspace-proxy-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      fakeRemote = await startFakeRemoteCradleServer()
+      app = await createAppWithDataDir(dataDir)
+      await createDirectUrlHost(app, 'remote-host-live', fakeRemote.baseUrl)
+
+      const connectRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/connect', {
+        method: 'POST',
+      }))
+      expect(connectRes.status).toBe(200)
+
+      const createWorkspaceRes = await app.handle(new Request('http://localhost/workspaces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Remote Project',
+          locator: {
+            hostId: 'remote-host-live',
+            path: '/remote/project',
+          },
+        }),
+      }))
+      expect(createWorkspaceRes.status).toBe(200)
+      const workspace = await createWorkspaceRes.json() as { id: string }
+
+      const filesRes = await app.handle(new Request(`http://localhost/workspaces/${workspace.id}/files`))
+      expect(filesRes.status).toBe(200)
+      expect(await filesRes.json()).toEqual([
+        { type: 'directory', name: 'src', path: 'src' },
+        { type: 'file', name: 'README.md', path: 'README.md' },
+      ])
     }
     finally {
       rmSync(dataDir, { recursive: true, force: true })

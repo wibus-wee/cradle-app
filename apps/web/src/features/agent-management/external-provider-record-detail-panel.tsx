@@ -15,6 +15,7 @@ import {
   patchExternalProviderSourcesBySourceKeyRecordsByExternalRecordIdRuntimeTargetMutation,
   postProvidersModelsMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
+import type { PostProvidersModelsData } from '~/api-gen/types.gen'
 import { ProviderIcon } from '~/components/common/provider-icons'
 import { Badge } from '~/components/ui/badge'
 import { Separator } from '~/components/ui/separator'
@@ -108,7 +109,7 @@ function toRuntimeTargetView(target: {
 function createProviderTargetRequestBody(
   record: ExternalProviderRecordView,
   providerKind: ApiProviderKind,
-) {
+): PostProvidersModelsData['body'] {
   return {
     providerKind,
     label: record.name,

@@ -13,17 +13,23 @@ type CommonKey = keyof typeof import('~/locales/default').default.common
 type ThinkingOptionKey = NonNullable<ThinkingEffort>
 
 const thinkingLabelKeys = {
+  none: 'thinking.none.label',
+  minimal: 'thinking.minimal.label',
   low: 'thinking.low.label',
   medium: 'thinking.medium.label',
   high: 'thinking.high.label',
   xhigh: 'thinking.xhigh.label',
+  max: 'thinking.max.label',
 } satisfies Record<ThinkingOptionKey, CommonKey>
 
 const thinkingDescriptionKeys = {
+  none: 'thinking.none.description',
+  minimal: 'thinking.minimal.description',
   low: 'thinking.low.description',
   medium: 'thinking.medium.description',
   high: 'thinking.high.description',
   xhigh: 'thinking.xhigh.description',
+  max: 'thinking.max.description',
 } satisfies Record<ThinkingOptionKey, CommonKey>
 
 interface ProviderModelSelectorProps {

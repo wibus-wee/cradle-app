@@ -112,58 +112,17 @@ export const remoteHosts = new Elysia({
     body: RemoteHostsModel.relayClaimBody,
     response: { 200: RemoteHostsModel.cradleServerConnection },
   })
-  .get('/:hostId/cradle-server/workspaces', async ({ params }) => ({
-    workspaces: await RemoteHosts.listRemoteCradleWorkspaces(params.hostId),
-  }), {
-    detail: {
-      'summary': 'List workspaces from a remote Cradle Server',
-      'x-cradle-cli': {
-        command: ['remote-host', 'cradle-server', 'workspace', 'list'],
-      },
-    },
-    params: RemoteHostsModel.hostIdParams,
-    response: { 200: RemoteHostsModel.remoteWorkspaceList },
-  })
-  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files', async ({ params }) => ({
-    files: await RemoteHosts.listRemoteCradleWorkspaceFiles(params.hostId, params.remoteWorkspaceId),
-  }), {
-    detail: {
-      summary: 'List root files from a remote Cradle Server workspace',
-    },
-    params: RemoteHostsModel.remoteWorkspaceIdParams,
-    response: { 200: RemoteHostsModel.workspaceFileList },
-  })
-  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files/children', async ({ params, query }) => ({
-    files: await RemoteHosts.listRemoteCradleWorkspaceFileChildren(
-      params.hostId,
-      params.remoteWorkspaceId,
-      query.path ?? '',
-    ),
-  }), {
-    detail: {
-      summary: 'List child files from a remote Cradle Server workspace',
-    },
-    params: RemoteHostsModel.remoteWorkspaceIdParams,
-    query: RemoteHostsModel.fileChildrenQuery,
-    response: { 200: RemoteHostsModel.workspaceFileList },
-  })
-  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files/content', ({ params, query }) => {
-    return RemoteHosts.readRemoteCradleWorkspaceFileContent(params.hostId, params.remoteWorkspaceId, query.path)
+  .all('/:hostId/upstream/*', async ({ params, request }) => {
+    const upstreamPath = `/${params['*'] ?? ''}`
+    const requestUrl = new URL(request.url)
+    const pathWithQuery = `${upstreamPath}${requestUrl.search}`
+    return await RemoteHosts.proxyRemoteHostUpstreamRequest(params.hostId, request, pathWithQuery)
   }, {
     detail: {
-      summary: 'Read file content from a remote Cradle Server workspace',
+      summary: 'Transparent upstream proxy to the connected remote Cradle Server',
     },
-    params: RemoteHostsModel.remoteWorkspaceIdParams,
-    query: RemoteHostsModel.fileContentQuery,
-    response: { 200: RemoteHostsModel.readFileResponse },
-  })
-  .get('/:hostId/cradle-server/workspaces/:remoteWorkspaceId/files/info', ({ params, query }) => {
-    return RemoteHosts.readRemoteCradleWorkspaceFileInfo(params.hostId, params.remoteWorkspaceId, query.path)
-  }, {
-    detail: {
-      summary: 'Read file metadata from a remote Cradle Server workspace',
-    },
-    params: RemoteHostsModel.remoteWorkspaceIdParams,
-    query: RemoteHostsModel.fileInfoQuery,
-    response: { 200: RemoteHostsModel.fileInfoResponse },
+    params: t.Object({
+      'hostId': t.String({ minLength: 1 }),
+      '*': t.Optional(t.String()),
+    }, { additionalProperties: false }),
   })

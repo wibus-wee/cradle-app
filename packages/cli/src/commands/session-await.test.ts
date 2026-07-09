@@ -40,16 +40,18 @@ describe('registerSessionAwaitCommand', () => {
     vi.restoreAllMocks()
   })
 
+  const WORKSPACE_ID = '11111111-1111-1111-1111-111111111111'
+
   it('registers a GitHub CI pull request await with session context from environment variables', async () => {
     const request = await runCommand(['session', 'await', 'github-ci', 'acme/app', '--pr', '42'], {
       CRADLE_CHAT_SESSION_ID: 'session-1',
-      CRADLE_WORKSPACE_ID: 'workspace-1',
+      CRADLE_WORKSPACE_ID: WORKSPACE_ID,
     })
 
     expect(request).toHaveBeenCalledWith({
       body: {
         chatSessionId: 'session-1',
-        workspaceId: 'workspace-1',
+        workspaceId: WORKSPACE_ID,
         source: 'github-ci',
         filterJson: JSON.stringify({ repo: 'acme/app', pr: 42 }),
       },
@@ -63,7 +65,7 @@ describe('registerSessionAwaitCommand', () => {
   it('requires exactly one GitHub CI target', async () => {
     await expect(runCommand(['session', 'await', 'github-ci', 'acme/app', '--pr', '42', '--sha', 'abc'], {
       CRADLE_CHAT_SESSION_ID: 'session-1',
-      CRADLE_WORKSPACE_ID: 'workspace-1',
+      CRADLE_WORKSPACE_ID: WORKSPACE_ID,
     })).rejects.toThrow('Pass exactly one GitHub CI target')
   })
 
@@ -79,8 +81,8 @@ describe('registerSessionAwaitCommand', () => {
       'approved',
       '--chat-session-id',
       'session-1',
-      '--workspace-id',
-      'workspace-1',
+      '--workspace',
+      WORKSPACE_ID,
     ])
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
@@ -100,8 +102,8 @@ describe('registerSessionAwaitCommand', () => {
       'Waiting for deploy approval',
       '--chat-session-id',
       'session-1',
-      '--workspace-id',
-      'workspace-1',
+      '--workspace',
+      WORKSPACE_ID,
     ])
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
@@ -110,6 +112,34 @@ describe('registerSessionAwaitCommand', () => {
         filterJson: '{}',
         reason: 'Waiting for deploy approval',
       }),
+    }))
+  })
+
+  it('resolves an explicit --workspace name by listing workspaces', async () => {
+    const request = vi.fn().mockImplementation(async (input: { template: string }) => {
+      if (input.template === '/workspaces') {
+        return [{ id: WORKSPACE_ID, locator: { path: '/repo/app' }, name: 'app' }]
+      }
+      return { id: 'await-1', status: 'pending' }
+    })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+    registerSessionAwaitCommand(program)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await program.parseAsync([
+      'session',
+      'await',
+      'manual',
+      '--reason',
+      'Waiting for deploy approval',
+      '--chat-session-id',
+      'session-1',
+      '--workspace',
+      'app',
+    ], { from: 'user' })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.objectContaining({ workspaceId: WORKSPACE_ID }),
     }))
   })
 

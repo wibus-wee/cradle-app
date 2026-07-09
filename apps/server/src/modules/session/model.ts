@@ -8,17 +8,32 @@ const runtimeKindSchema = t.String({ minLength: 1 })
 const nullableString = t.Nullable(t.String())
 const nullableRequiredString = t.Nullable(t.String({ minLength: 1 }))
 const thinkingEffortSchema = t.Union([
+  t.Literal('none'),
+  t.Literal('minimal'),
   t.Literal('low'),
   t.Literal('medium'),
   t.Literal('high'),
   t.Literal('xhigh'),
+  t.Literal('max'),
 ])
 const sessionStatusSchema = t.Union([t.Literal('idle'), t.Literal('streaming'), t.Literal('error')])
 const sideContextSourceSchema = t.Union([t.Literal('provider-native'), t.Literal('cradle-context')])
 
+const sessionExecutionSchema = t.Union([
+  t.Object({
+    kind: t.Literal('local'),
+  }),
+  t.Object({
+    kind: t.Literal('remote-host'),
+    hostId: t.String(),
+    remoteSessionId: t.String(),
+  }),
+])
+
 export const SessionModel = {
   session: t.Object({
     id: t.String(),
+    execution: sessionExecutionSchema,
     parentSessionId: nullableString,
     sideContextSource: t.Nullable(sideContextSourceSchema),
     workspaceId: nullableString,

@@ -8,10 +8,13 @@ import type { ThinkingEffort } from './types'
 type ConcreteThinkingEffort = NonNullable<ThinkingEffort>
 
 export const THINKING_EFFORTS: { value: ConcreteThinkingEffort, label: string, description: string }[] = [
+  { value: 'none', label: '', description: '' },
+  { value: 'minimal', label: '', description: '' },
   { value: 'low', label: '', description: '' },
   { value: 'medium', label: '', description: '' },
   { value: 'high', label: '', description: '' },
   { value: 'xhigh', label: '', description: '' },
+  { value: 'max', label: '', description: '' },
 ]
 
 export interface RuntimeKindOption {
@@ -70,7 +73,7 @@ export function filterThinkingOptionsForModel<TThinking extends string | null>(
     if (tier === 'none') {
       return false
     }
-    if (option.value === 'minimal' || option.value === 'xhigh' || option.value === 'max') {
+    if (option.value === 'none' || option.value === 'minimal' || option.value === 'xhigh' || option.value === 'max') {
       return tier === 'extended'
     }
     return true
@@ -86,6 +89,9 @@ export function selectSupportedThinkingValue<TThinking extends string | null>(
   const supportedOptions = filterThinkingOptionsForModel(model, options)
   if (supportedOptions.some(option => option.value === current)) {
     return current
+  }
+  if (supportedOptions.some(option => option.value === fallback)) {
+    return fallback
   }
   return supportedOptions[0]?.value ?? fallback
 }

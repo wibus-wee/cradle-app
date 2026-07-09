@@ -19,8 +19,10 @@ import { Button } from '~/components/ui/button'
 import { DitheredGradientDecoration } from '~/components/ui/canvas-art'
 import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from '~/components/ui/menu'
 import { runtimeComposerUsesCollapsedInput, useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { describeChatExecutionError } from '~/features/chat/commands/chat-execution-errors'
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
 import { DraftChatComposerWithState } from '~/features/chat/composer/draft-chat-composer'
+import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import {
   isPlanRuntimeSettings,
   mergeRuntimeSettings,
@@ -28,7 +30,6 @@ import {
   readRunRuntimeSettingsPatch,
   resolveRuntimeCatalogItem,
 } from '~/features/chat/runtime/runtime-settings-presenter'
-import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
 import type { IssueIsolationStartChoice } from '~/features/new-chat/issue-isolation-start-dialog'
@@ -36,7 +37,7 @@ import { IssueIsolationStartDialog } from '~/features/new-chat/issue-isolation-s
 import {
   useIssueIsolationContext,
 } from '~/features/session/use-session-isolation'
-import { getLocalWorkspacePath } from '~/features/workspace/types'
+import { getLocalWorkspacePath, isLocalWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey, updateSessionInSessionLists, useWorkspaceSessions } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { useNow } from '~/hooks/use-now'
@@ -105,7 +106,6 @@ function useNewChatPageOwner(
   const { workspaces, loading: workspacesLoading } = useWorkspaces()
   const { addFromPicker, adding: addingWorkspace } = useAddWorkspace()
   const queryClient = useQueryClient()
-  const composerState = useComposerState({ context: 'new-chat', enableAgents: true })
 
   const [draft, setDraft] = useState('')
   const [quickActionText, setQuickActionText] = useState<string | undefined>(undefined)
@@ -143,6 +143,16 @@ function useNewChatPageOwner(
 
   const selectedWorkspace = workspaces.find(w => w.id === selectedProjectWorkspaceId) ?? null
   const selectedWorkspaceLocalPath = getLocalWorkspacePath(selectedWorkspace)
+  const remoteHostId = selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
+    ? selectedWorkspace.locator.hostId
+    : null
+  const composerState = useComposerState({
+    context: 'new-chat',
+    workspaceId: selectedProjectWorkspaceId,
+    remoteHostId,
+    // Remote hosts own their provider catalog; local Agents are not executable there.
+    enableAgents: !remoteHostId,
+  })
   const { sessions, loading: sessionsLoading } = useWorkspaceSessions(selectedProjectWorkspaceId)
   const now = useNow(60_000, active)
   const sessionsReady = selectedProjectWorkspaceId === null || !sessionsLoading
@@ -224,7 +234,13 @@ function useNewChatPageOwner(
         return true
       }
 
-      if (!options.providerTargetId && !options.agentId && options.providerBinding !== 'runtime-owned') {
+      const isRemoteWorkspace = !!selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
+      if (
+        !isRemoteWorkspace
+        && !options.providerTargetId
+        && !options.agentId
+        && options.providerBinding !== 'runtime-owned'
+      ) {
         return false
       }
       const sessionTitle = trimmedText.slice(0, 80)
@@ -233,27 +249,39 @@ function useNewChatPageOwner(
         || options.agentId
         || options.providerTargetId
         || 'Untitled'
-      const body: CreateSessionBody = options.agentId
+      // Remote projections are created by workspaceId alone on the server; omit local
+      // providerTargetId / agentId so we never bind a local catalog to a remote session.
+      const body: CreateSessionBody = isRemoteWorkspace
         ? {
             ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
             title: sessionTitle,
-            agentId: options.agentId,
-            runtimeSettings: options.runtimeSettings,
-            ...linkedIssueFields,
-            ...sessionGroupFields,
-            ...worktreeFields,
-          }
-        : {
-            ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
-            title: sessionTitle,
-            providerTargetId: options.providerTargetId,
-            modelId: options.modelId ?? null,
             runtimeKind: options.runtimeKind,
             runtimeSettings: options.runtimeSettings,
             ...linkedIssueFields,
             ...sessionGroupFields,
             ...worktreeFields,
           }
+        : options.agentId
+          ? {
+              ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
+              title: sessionTitle,
+              agentId: options.agentId,
+              runtimeSettings: options.runtimeSettings,
+              ...linkedIssueFields,
+              ...sessionGroupFields,
+              ...worktreeFields,
+            }
+          : {
+              ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
+              title: sessionTitle,
+              providerTargetId: options.providerTargetId,
+              modelId: options.modelId ?? null,
+              runtimeKind: options.runtimeKind,
+              runtimeSettings: options.runtimeSettings,
+              ...linkedIssueFields,
+              ...sessionGroupFields,
+              ...worktreeFields,
+            }
       const { data: sessionData } = await postSessions({
         body,
       })
@@ -295,7 +323,7 @@ function useNewChatPageOwner(
           ])
         },
         onError: (err) => {
-          console.error('[NewChatPage] start response failed:', err)
+          console.error('[NewChatPage] start response failed:', describeChatExecutionError(err) ?? err)
         },
       })
       void Promise.all([
@@ -307,10 +335,10 @@ function useNewChatPageOwner(
       return true
     }
     catch (err) {
-      console.error('[NewChatPage] send failed:', err)
+      console.error('[NewChatPage] send failed:', describeChatExecutionError(err) ?? err)
       return false
     }
-  }, [issueId, openCreatedChatSession, queryClient, selectedProjectWorkspaceId, sessionGroupId])
+  }, [issueId, openCreatedChatSession, queryClient, selectedProjectWorkspaceId, selectedWorkspace, sessionGroupId])
 
   const handleSendToTarget = useCallback(async (
     text: string,
@@ -393,6 +421,7 @@ function useNewChatPageOwner(
     selectedWorkspace,
     selectedProjectWorkspaceId,
     selectedWorkspaceLocalPath,
+    remoteHostId,
     setDraft,
     promptInputCollapsed,
     addFromPicker,
@@ -478,6 +507,7 @@ function NewChatComposerCard({
     <DraftChatComposerWithState
       composerState={owner.composerState}
       workspaceId={selectedWorkspace?.id ?? null}
+      remoteHostId={owner.remoteHostId}
       active={active}
       contextBar={workspaceSelector}
       onSendIsolated={handleSendIsolated}
@@ -634,13 +664,8 @@ export function NewChatEntryPoint({
   )
   const hasWorkspace = !!owner.selectedWorkspace
   const hasLocalWorkspace = !!owner.selectedWorkspaceLocalPath
-  const composerState = useComposerState({
-    context: 'new-chat',
-    workspaceId: owner.selectedWorkspace?.id ?? null,
-    enableAgents: true,
-  })
   const { runtimes } = useRuntimeCatalog()
-  const runtimeKind = composerState.selection.runtimeKind
+  const runtimeKind = owner.composerState.selection.runtimeKind
   const storedRuntimeSettings = useNewChatStore(s => s.lastRuntimeSettingsByKind[runtimeKind])
   const isPlanMode = useMemo(() => {
     const runtime = resolveRuntimeCatalogItem(runtimes, runtimeKind)

@@ -1,3 +1,4 @@
+import stringWidth from 'string-width'
 import type { TableUserConfig } from 'table'
 import { getBorderCharacters, table } from 'table'
 import { z } from 'zod'
@@ -104,7 +105,11 @@ interface AgentSearchResult {
 }
 
 function getDisplayWidth(value: string): number {
-  return value.length
+  // The `table` package renders using terminal display width (CJK/emoji are
+  // 2 columns wide), so our column-width budgeting must match — otherwise a
+  // wide-character column is under-sized here, and `table` force-wraps the
+  // row (even with wrapWord: false), breaking the grid.
+  return stringWidth(value)
 }
 
 function getTableWidthLimit(): number {

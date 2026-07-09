@@ -59,10 +59,11 @@ describe('jarvis UI cross-window sync', () => {
     firstStore.getState().setIncludeContext(false)
     firstStore.getState().addSession({ id: 'session-1', title: 'First request', createdAt: 1 })
     firstStore.getState().setActiveSessionId('session-1')
+    firstStore.getState().updateSessionTitle('session-1', 'Resolved title')
 
     expect(secondStore.getState().includeContext).toBe(false)
     expect(secondStore.getState().sessions).toEqual([
-      { id: 'session-1', title: 'First request', createdAt: 1 },
+      { id: 'session-1', title: 'Resolved title', createdAt: 1 },
     ])
     expect(secondStore.getState().activeSessionId).toBe('session-1')
 

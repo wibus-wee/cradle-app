@@ -15,7 +15,7 @@
     "typecheck:apps-web": "pnpm --filter @cradle/web typecheck",
     "typecheck:desktop": "pnpm --filter @cradle/desktop typecheck",
     "typecheck": "npm run typecheck:node && npm run typecheck:server && npm run typecheck:apps-web && npm run typecheck:desktop",
-    "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter @cradle/cc-switch build && vitest run",
+    "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter \"./plugins/*\" build && vitest run",
     "test:watch": "vitest",
     "dev:web": "pnpm --filter @cradle/web dev",
     "dev:server": "pnpm --filter @cradle/server dev",

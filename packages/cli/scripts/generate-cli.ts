@@ -13,9 +13,11 @@ const PIPE_RE = /\|/g
 
 interface OpenApiSchema {
   anyOf?: OpenApiSchema[]
+  const?: string
   description?: string
   enum?: string[]
   items?: OpenApiSchema
+  oneOf?: OpenApiSchema[]
   properties?: Record<string, OpenApiSchema>
   required?: string[]
   type?: string
@@ -55,7 +57,6 @@ const generatedRoot = path.join(packageRoot, 'src', 'commands', 'generated')
 const cradleCliSkillPath = path.join(repoRoot, 'resources', 'skills', 'cradle-cli', 'SKILL.md')
 const generatedSkillStart = '<!-- CRADLE_CLI_MODULES_START -->'
 const generatedSkillEnd = '<!-- CRADLE_CLI_MODULES_END -->'
-const workspaceIdEnvDefault = 'CRADLE_WORKSPACE_ID'
 
 const moduleDescriptions: Record<string, string> = {
   'acp': 'Manage ACP agent installation and registry state.',
@@ -128,30 +129,61 @@ function inferValueType(schema: OpenApiSchema | undefined): CliValueType {
 }
 
 function getSchemaValues(schema: OpenApiSchema | undefined): string[] | undefined {
-  const values = unwrapSchema(schema)?.enum
-  return values && values.length > 0 ? values : undefined
+  const values = new Set<string>()
+
+  function visit(candidate: OpenApiSchema | undefined): void {
+    if (!candidate || candidate.type === 'null') {
+      return
+    }
+    if (candidate.const) {
+      values.add(candidate.const)
+    }
+    for (const value of candidate.enum ?? []) {
+      values.add(value)
+    }
+    for (const variant of candidate.anyOf ?? []) {
+      visit(variant)
+    }
+    for (const variant of candidate.oneOf ?? []) {
+      visit(variant)
+    }
+  }
+
+  visit(schema)
+  return values.size > 0 ? Array.from(values) : undefined
 }
 
 function getJsonBodySchema(operation: OpenApiOperation): OpenApiSchema | undefined {
   return unwrapSchema(operation.requestBody?.content?.['application/json']?.schema)
 }
 
-function withWorkspaceEnvDefault<T extends CliArgumentSpec | CliFlagSpec>(spec: T, options: { defaultPathWorkspaceId?: boolean } = {}): T {
+/**
+ * Turns a `workspaceId` path/query/body parameter into a human-resolvable
+ * `--workspace <name-or-id>` flag (or `[workspace]`/`<workspace>` argument)
+ * instead of a raw `--workspace-id <uuid>`. See
+ * `packages/cli/src/runtime/workspace-context.ts` for the resolution chain.
+ *
+ * `ambient: false` is used for destructive/administrative path parameters
+ * (e.g. `workspace delete`) that must never silently fall back to "whatever
+ * the current workspace is" — those still accept a name instead of a raw id,
+ * they just require it to be typed.
+ */
+function withWorkspaceResolver<T extends CliArgumentSpec | CliFlagSpec>(spec: T, options: { ambient?: boolean } = {}): T {
   if (spec.name !== 'workspaceId' || spec.type !== 'string') {
     return spec
   }
-  if (spec.target === 'path.workspaceId' && options.defaultPathWorkspaceId !== true) {
-    return spec
-  }
 
-  const description = spec.description
-    ? `${spec.description} Defaults to ${workspaceIdEnvDefault}.`
-    : `Defaults to ${workspaceIdEnvDefault}.`
+  const ambient = options.ambient !== false
+  const hint = ambient
+    ? 'Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.'
+    : 'Accepts a workspace name or id.'
 
   return {
     ...spec,
-    description,
-    envDefault: workspaceIdEnvDefault,
+    description: spec.description ? `${spec.description} ${hint}` : hint,
+    flagName: 'workspace',
+    resolver: 'workspace',
+    resolverAmbient: ambient,
   }
 }
 
@@ -162,22 +194,22 @@ function withWorkspaceQueryScopeFlag(flag: CliFlagSpec): CliFlagSpec {
 
   return {
     ...flag,
-    description: `${flag.description ?? `Defaults to ${workspaceIdEnvDefault}.`} Pass --all-workspaces to query every workspace.`,
-    disableEnvDefaultFlag: 'allWorkspaces',
+    description: `${flag.description ?? ''} Pass --all-workspaces to query every workspace.`.trim(),
+    disableResolverFlag: 'allWorkspaces',
   }
 }
 
 function collectArguments(operation: OpenApiOperation): CliArgumentSpec[] {
-  const defaultPathWorkspaceId = operation['x-cradle-cli']?.defaultWorkspaceId === true
+  const ambientPathWorkspaceId = operation['x-cradle-cli']?.defaultWorkspaceId === true
   return (operation.parameters ?? [])
     .filter(parameter => parameter.in === 'path')
-    .map(parameter => withWorkspaceEnvDefault({
+    .map(parameter => withWorkspaceResolver({
       description: parameter.description ?? parameter.schema?.description,
       name: parameter.name,
       required: parameter.required !== false,
       target: `path.${parameter.name}`,
       type: inferValueType(parameter.schema),
-    }, { defaultPathWorkspaceId }))
+    }, { ambient: ambientPathWorkspaceId }))
 }
 
 function collectFlags(operation: OpenApiOperation): CliFlagSpec[] {
@@ -187,7 +219,7 @@ function collectFlags(operation: OpenApiOperation): CliFlagSpec[] {
     if (parameter.in !== 'query') {
       continue
     }
-    flags.push(withWorkspaceQueryScopeFlag(withWorkspaceEnvDefault({
+    flags.push(withWorkspaceQueryScopeFlag(withWorkspaceResolver({
       description: parameter.description ?? parameter.schema?.description,
       name: parameter.name,
       required: parameter.required === true,
@@ -201,7 +233,7 @@ function collectFlags(operation: OpenApiOperation): CliFlagSpec[] {
   if (bodySchema?.properties) {
     const required = new Set(bodySchema.required ?? [])
     for (const [name, schema] of Object.entries(bodySchema.properties)) {
-      flags.push(withWorkspaceEnvDefault({
+      flags.push(withWorkspaceResolver({
         description: schema.description,
         name,
         required: required.has(name),

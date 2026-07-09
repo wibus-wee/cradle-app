@@ -396,6 +396,8 @@ const KanbanIssueRelationSchema = z.object({
   createdAt: z.number(),
 })
 const KanbanIssueRelationListSchema = z.array(KanbanIssueRelationSchema).default([])
+const SessionThinkingEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+const SessionWorktreeHealthSchema = z.enum(['ok', 'missing', 'stale'])
 
 const AgentSessionSchema = z
   .object({
@@ -413,6 +415,14 @@ const AgentSessionSchema = z
 const IssueLinkedSessionSchema = z
   .object({
     id: z.string(),
+    execution: z.union([
+      z.object({ kind: z.string() }),
+      z.object({
+        kind: z.string(),
+        hostId: z.string(),
+        remoteSessionId: z.string(),
+      }),
+    ]),
     parentSessionId: z.string().nullable(),
     sideContextSource: z.enum(['provider-native', 'cradle-context']).nullable(),
     workspaceId: z.string().nullable(),
@@ -421,7 +431,7 @@ const IssueLinkedSessionSchema = z
     providerTargetId: z.string().nullable(),
     agentId: z.string().nullable(),
     modelId: z.string().nullable(),
-    thinkingEffort: z.string().nullable(),
+    thinkingEffort: SessionThinkingEffortSchema.nullable(),
     linkedIssueId: z.string().nullable(),
     sessionGroupId: z.string().nullable(),
     runtimeKind: z.string(),
@@ -438,7 +448,7 @@ const IssueLinkedSessionSchema = z
     worktreeId: z.string().nullable(),
     worktreeBranch: z.string().nullable(),
     worktreePath: z.string().nullable(),
-    worktreeHealth: z.string().nullable(),
+    worktreeHealth: SessionWorktreeHealthSchema.nullable(),
     pendingWorktreeId: z.string().nullable(),
     isolationBoundaryRequired: z.boolean(),
   })

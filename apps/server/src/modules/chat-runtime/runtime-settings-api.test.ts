@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { db } from '../../infra'
 import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
-import type { RuntimeSettings, RuntimeSession } from './runtime-provider-types'
+import type { RuntimeSession, RuntimeSettings } from './runtime-provider-types'
 import { updateSessionRuntimeSettings } from './runtime-settings-api'
 
 const runtimeKind = 'codex'

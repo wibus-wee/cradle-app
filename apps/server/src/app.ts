@@ -15,6 +15,7 @@ import {
   chatRuntimeEventRoutes,
   chatRuntimeGlobalEventRoutes,
 } from './modules/chat-runtime/http/events.routes'
+import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked-session-proxy'
 import { chronicle } from './modules/chronicle'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
@@ -163,6 +164,9 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(worktree)
   app.use(diffReview)
   app.use(acp)
+  // Projected remote sessions: transparent upstream for all /chat/sessions/:id/* paths
+  // (including event routes mounted separately below).
+  app.use(linkedChatSessionProxyPlugin)
   app.use(chatRuntimeGlobalEventRoutes)
   app.use(chatRuntimeEventRoutes)
   app.use(chatRuntime)

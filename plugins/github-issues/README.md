@@ -22,7 +22,7 @@ Repository selection is not configured here. Users bind `owner/repo` to a Cradle
 The same flow is available from the generated CLI:
 
     cradle external-issue-source list
-    cradle external-issue-source bind <sourceKey> --workspace-id <workspaceId> --repository-owner owner --repository-name repo --refresh-now
+    cradle external-issue-source bind <sourceKey> --workspace <name-or-id> --repository-owner owner --repository-name repo --refresh-now
     cradle external-issue-source refresh --binding-id <bindingId>
 
 GitHub labels, assignees, milestone, state, number, URL, and timestamps stay source-owned. Cradle stores only the binding, sync metadata, durable external item projection, and local Kanban status.

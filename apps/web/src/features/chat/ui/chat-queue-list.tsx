@@ -10,9 +10,9 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
-import { cn } from '~/lib/cn'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { cn } from '~/lib/cn'
 
 import type { ChatQueueItem } from '../commands/chat-response-command'
 import {

@@ -17,13 +17,15 @@ const spec = {
       "type": "string"
     },
     {
-      "description": "Defaults to CRADLE_WORKSPACE_ID. Pass --all-workspaces to query every workspace.",
+      "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID. Pass --all-workspaces to query every workspace.",
       "name": "workspaceId",
       "required": false,
       "target": "query.workspaceId",
       "type": "string",
-      "envDefault": "CRADLE_WORKSPACE_ID",
-      "disableEnvDefaultFlag": "allWorkspaces"
+      "flagName": "workspace",
+      "resolver": "workspace",
+      "resolverAmbient": true,
+      "disableResolverFlag": "allWorkspaces"
     },
     {
       "name": "limit",

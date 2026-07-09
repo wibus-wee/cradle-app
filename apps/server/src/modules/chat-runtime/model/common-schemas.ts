@@ -311,10 +311,13 @@ export const tracePhaseSchema = t.Union([
 ])
 
 export const thinkingEffortSchema = t.Union([
+  t.Literal('none'),
+  t.Literal('minimal'),
   t.Literal('low'),
   t.Literal('medium'),
   t.Literal('high'),
   t.Literal('xhigh'),
+  t.Literal('max'),
 ])
 export const nullableModelIdSchema = t.Union([t.String(), t.Null()])
 

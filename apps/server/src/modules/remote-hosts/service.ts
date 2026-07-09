@@ -24,10 +24,23 @@ import {
   buildRemoteCradleSshLaunchConfig,
   startRemoteCradleServerTunnel,
 } from './cradle-server-tunnel'
-import type { RemoteCradleClient, RemoteCradleServerHealthPayload, RemoteWorkspaceFileContent, RemoteWorkspaceFileEntry, RemoteWorkspaceFileInfo, RemoteWorkspaceView } from './remote-cradle-client'
-import {
-  createRemoteCradleClient,
-} from './remote-cradle-client'
+import type {
+  RemoteCradleServerHealthPayload,
+  RemoteWorkspaceFileContent,
+  RemoteWorkspaceFileEntry,
+  RemoteWorkspaceFileInfo,
+  RemoteWorkspaceView,
+} from './upstream'
+import { proxyUpstreamRequestByBaseUrl, upstreamJsonByBaseUrl } from './upstream'
+
+export type {
+  RemoteCradleServerHealthPayload,
+  RemoteWorkspaceFileContent,
+  RemoteWorkspaceFileEntry,
+  RemoteWorkspaceFileInfo,
+  RemoteWorkspaceLocator,
+  RemoteWorkspaceView,
+} from './upstream'
 
 export interface CreateRemoteHostInput {
   id?: string
@@ -363,14 +376,19 @@ export async function testRemoteHostCradleServer(hostId: string): Promise<Remote
 }
 
 export async function listRemoteCradleWorkspaces(hostId: string): Promise<RemoteWorkspaceView[]> {
-  return await (await remoteCradleClient(hostId, 'list remote workspaces')).listWorkspaces()
+  const { baseUrl } = await ensureRemoteHostConnected(hostId)
+  return await upstreamJsonByBaseUrl<RemoteWorkspaceView[]>(baseUrl, '/workspaces')
 }
 
 export async function listRemoteCradleWorkspaceFiles(
   hostId: string,
   remoteWorkspaceId: string,
 ): Promise<RemoteWorkspaceFileEntry[]> {
-  return await (await remoteCradleClient(hostId, 'list remote workspace files')).listWorkspaceFiles(remoteWorkspaceId)
+  const { baseUrl } = await ensureRemoteHostConnected(hostId)
+  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileEntry[]>(
+    baseUrl,
+    `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files`,
+  )
 }
 
 export async function listRemoteCradleWorkspaceFileChildren(
@@ -378,8 +396,11 @@ export async function listRemoteCradleWorkspaceFileChildren(
   remoteWorkspaceId: string,
   relativePath: string,
 ): Promise<RemoteWorkspaceFileEntry[]> {
-  return await (await remoteCradleClient(hostId, 'list remote workspace children'))
-    .listWorkspaceFileChildren(remoteWorkspaceId, relativePath)
+  const { baseUrl } = await ensureRemoteHostConnected(hostId)
+  const path = `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files/children`
+  const url = new URL(path, 'http://127.0.0.1')
+  url.searchParams.set('path', relativePath)
+  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileEntry[]>(baseUrl, `${url.pathname}${url.search}`)
 }
 
 export async function readRemoteCradleWorkspaceFileContent(
@@ -387,8 +408,11 @@ export async function readRemoteCradleWorkspaceFileContent(
   remoteWorkspaceId: string,
   relativePath: string,
 ): Promise<RemoteWorkspaceFileContent> {
-  return await (await remoteCradleClient(hostId, 'read remote workspace file'))
-    .readWorkspaceFileContent(remoteWorkspaceId, relativePath)
+  const { baseUrl } = await ensureRemoteHostConnected(hostId)
+  const path = `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files/content`
+  const url = new URL(path, 'http://127.0.0.1')
+  url.searchParams.set('path', relativePath)
+  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileContent>(baseUrl, `${url.pathname}${url.search}`)
 }
 
 export async function readRemoteCradleWorkspaceFileInfo(
@@ -396,8 +420,20 @@ export async function readRemoteCradleWorkspaceFileInfo(
   remoteWorkspaceId: string,
   relativePath: string,
 ): Promise<RemoteWorkspaceFileInfo | null> {
-  return await (await remoteCradleClient(hostId, 'read remote workspace file info'))
-    .readWorkspaceFileInfo(remoteWorkspaceId, relativePath)
+  const { baseUrl } = await ensureRemoteHostConnected(hostId)
+  const path = `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files/info`
+  const url = new URL(path, 'http://127.0.0.1')
+  url.searchParams.set('path', relativePath)
+  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileInfo | null>(baseUrl, `${url.pathname}${url.search}`)
+}
+
+export async function proxyRemoteHostUpstreamRequest(
+  hostId: string,
+  request: Request,
+  upstreamPathWithQuery: string,
+): Promise<Response> {
+  const { baseUrl } = await ensureRemoteHostConnected(hostId)
+  return await proxyUpstreamRequestByBaseUrl(baseUrl, request, upstreamPathWithQuery)
 }
 
 export async function resolveRemoteWorkspaceByPath(hostId: string, remotePath: string): Promise<RemoteWorkspaceView | null> {
@@ -405,9 +441,9 @@ export async function resolveRemoteWorkspaceByPath(hostId: string, remotePath: s
   return workspaces.find(workspace => workspace.locator.path === remotePath) ?? null
 }
 
-async function remoteCradleClient(hostId: string, _operation: string): Promise<RemoteCradleClient> {
+export async function ensureRemoteHostConnected(hostId: string): Promise<{ baseUrl: string }> {
   const record = await connectedRecord(hostId)
-  return createRemoteCradleClient(record.baseUrl)
+  return { baseUrl: record.baseUrl }
 }
 
 async function connectedRecord(hostId: string): Promise<RemoteHostConnectionRecord> {
@@ -825,7 +861,16 @@ async function fetchRemoteCradleServerHealth(record: RemoteHostConnectionRecord)
     })
   }
   try {
-    return await createRemoteCradleClient(record.baseUrl).readHealth()
+    const response = await fetch(new URL('/health', `${record.baseUrl}/`))
+    if (!response.ok) {
+      throw new AppError({
+        code: 'remote_cradle_http_error',
+        status: response.status === 404 ? 404 : 502,
+        message: `Remote Cradle Server returned HTTP ${response.status} for /health.`,
+        details: { hostId: record.host.id, status: response.status },
+      })
+    }
+    return await response.json() as RemoteCradleServerHealthPayload
   }
   catch (error) {
     record.lastError = error instanceof Error ? error.message : String(error)

@@ -42,7 +42,17 @@ Cradle automatically injects these environment variables into your shell — no 
 
 Use them directly in commands (e.g. `$CRADLE_CHAT_SESSION_ID`). They are available in both GUI (Claude Agent) and TUI (terminal) modes.
 
-Generated CLI commands that expose a `workspaceId` argument or flag default to `CRADLE_WORKSPACE_ID` when it is available. Optional workspace-scoped list/search commands therefore operate on the current workspace by default; pass `--all-workspaces` only when you intentionally want a global query.
+### Workspace resolution
+
+Commands that need a workspace expose a `--workspace <name-or-id>` flag (or a `[workspace]`/`<workspace>` positional argument), resolved in this order — no raw UUID required:
+
+1. The value you pass explicitly (`--workspace my-app` or `cradle workspace get my-app`) — accepts a workspace **name** (case-insensitive, unambiguous prefix also works) or its id.
+2. `CRADLE_WORKSPACE_ID`, when set (this is how Cradle-managed agent shells scope commands automatically).
+3. The workspace whose registered path is an ancestor of your current directory — run `cradle` from inside an imported workspace and it just works, no flag or env var needed.
+
+Destructive/administrative commands (`workspace delete`, `workspace update`, `workspace migrate`, `workflow-rule delete`, ...) still accept a name or id but never fall back through env/cwd — you must always name the target explicitly, so a stale ambient workspace can't be silently affected.
+
+Optional workspace-scoped list/search commands (e.g. `issue list`) resolve ambiently by default; pass `--all-workspaces` when you intentionally want a global query instead.
 
 ## Discovery
 
@@ -66,7 +76,7 @@ cradle agent list --json id,name,agentProfileId,enabled
 ```bash
 cradle issue list --json id,title,statusId,priority,assigneeKind,assigneeId
 cradle issue create --title "Fix login redirect" --description "Describe the failure mode"
-cradle issue create --workspace-id "$CRADLE_WORKSPACE_ID" --title "Triage build failure" --status-name triage
+cradle issue create --workspace my-app --title "Triage build failure" --status-name triage
 cradle issue move <issueId> in_progress
 cradle issue update <issueId> --priority high --labels bug,agent
 cradle issue get <issueId> --json id,title,description,statusId,priority
@@ -88,11 +98,11 @@ cradle issue undelegate <issueId>
 
 ```bash
 cradle workspace list --json id,name,path
-cradle workspace resolve --path "$PWD" --json id,name,path
-cradle workspace files <workspaceId> --json type,name,path
-cradle workspace file read <workspaceId> --path AGENTS.md
-cradle workspace git status <workspaceId> --json branch,tracking,ahead,behind,isDetached
-cradle workspace git diff <workspaceId> --paths src/index.ts --format json
+cradle workspace get                                   # ambient: resolved from $PWD or CRADLE_WORKSPACE_ID
+cradle workspace files --json type,name,path            # same — workspace argument is optional
+cradle workspace file read --path AGENTS.md
+cradle workspace git status --json branch,tracking,ahead,behind,isDetached
+cradle workspace git diff my-app --paths src/index.ts --format json  # explicit name, another workspace
 ```
 
 ## Output Patterns
@@ -100,7 +110,7 @@ cradle workspace git diff <workspaceId> --paths src/index.ts --format json
 ```bash
 cradle issue list
 cradle issue list --all-workspaces
-cradle issue list --workspace-id <workspaceId> --json id,title,statusId
+cradle issue list --workspace my-app --json id,title,statusId
 cradle issue list --format json
 cradle issue list --format ndjson
 ```
@@ -154,7 +164,6 @@ cradle session await manual \
 fire_at=$(($(date +%s) + 1800))
 cradle session await-create \
   --chat-session-id "$CRADLE_CHAT_SESSION_ID" \
-  --workspace-id "$CRADLE_WORKSPACE_ID" \
   --source timer \
   --filter-json '{}' \
   --fire-at "$fire_at" \
@@ -201,7 +210,7 @@ cradle chronicle privacy redact --text "Sensitive text to preview"
 ## Automation, Usage, And Diagnostics
 
 ```bash
-cradle automation list --workspace-id "$CRADLE_WORKSPACE_ID" --format json
+cradle automation list --format json
 cradle automation run <automationId> --format json
 cradle automation runs <automationId> --format json
 cradle usage summary --format json
@@ -236,7 +245,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |
 | `relay-server` | 4 | Generated Cradle CLI module. | `cradle man relay-server` |
 | `relay-transport` | 5 | Generated Cradle CLI module. | `cradle man relay-transport` |
-| `remote-host` | 9 | Generated Cradle CLI module. | `cradle man remote-host` |
+| `remote-host` | 8 | Generated Cradle CLI module. | `cradle man remote-host` |
 | `search` | 2 | Search Cradle data. | `cradle man search` |
 | `secret` | 2 | Manage secret metadata. | `cradle man secret` |
 | `session` | 22 | Manage chat sessions and session links. | `cradle man session` |

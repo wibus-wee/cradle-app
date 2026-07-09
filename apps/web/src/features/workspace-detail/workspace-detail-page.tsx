@@ -20,12 +20,13 @@ import { MarkdownEditor } from '~/components/editor/markdown-editor'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { runtimeComposerUsesCollapsedInput } from '~/features/agent-runtime/use-runtime-catalog'
+import { describeChatExecutionError } from '~/features/chat/commands/chat-execution-errors'
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
 import { DraftChatComposer } from '~/features/chat/composer/draft-chat-composer'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { readRunRuntimeSettingsPatch } from '~/features/chat/runtime/runtime-settings-presenter'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
-import { getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey, updateSessionInSessionLists } from '~/features/workspace/use-session'
 import { WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
@@ -500,18 +501,26 @@ function useWorkspaceDetailOwner(workspaceId: string) {
     if (!workspace) {
       return false
     }
+    const isRemoteWorkspace = !isLocalWorkspace(workspace)
     if (runtimeComposerUsesCollapsedInput(opts.runtimeComposer)) {
-      if (!opts.agentId) {
+      if (!isRemoteWorkspace && !opts.agentId) {
         return false
       }
-      const sessionTitle = text.slice(0, 80) || opts.agentName || opts.agentId
+      const sessionTitle = text.slice(0, 80) || opts.agentName || opts.agentId || 'Untitled'
       const session = await createSessionMutation.mutateAsync({
-        body: {
-          workspaceId,
-          agentId: opts.agentId,
-          title: sessionTitle,
-          runtimeSettings: opts.runtimeSettings,
-        },
+        body: isRemoteWorkspace
+          ? {
+              workspaceId,
+              title: sessionTitle,
+              runtimeKind: opts.runtimeKind,
+              runtimeSettings: opts.runtimeSettings,
+            }
+          : {
+              workspaceId,
+              agentId: opts.agentId,
+              title: sessionTitle,
+              runtimeSettings: opts.runtimeSettings,
+            },
       })
       if (!session?.id) {
         return false
@@ -520,25 +529,35 @@ function useWorkspaceDetailOwner(workspaceId: string) {
         id: session.id,
         title: sessionTitle,
         workspaceId,
-        agentId: opts.agentId,
+        agentId: isRemoteWorkspace ? null : opts.agentId,
         runtimeKind: opts.runtimeKind,
       }, { promote: true })
       await openCreatedWorkspaceSession(session.id, target)
       return true
     }
-    if (!opts.providerTargetId) {
+    if (!isRemoteWorkspace && !opts.providerTargetId) {
       return false
     }
-    const sessionTitle = text.slice(0, 80) || opts.providerTargetName || opts.providerTargetId
+    const sessionTitle = text.slice(0, 80)
+      || opts.providerTargetName
+      || opts.providerTargetId
+      || 'Untitled'
     const session = await createSessionMutation.mutateAsync({
-      body: {
-        workspaceId,
-        providerTargetId: opts.providerTargetId,
-        modelId: opts.modelId ?? null,
-        runtimeKind: opts.runtimeKind,
-        title: sessionTitle,
-        runtimeSettings: opts.runtimeSettings,
-      },
+      body: isRemoteWorkspace
+        ? {
+            workspaceId,
+            runtimeKind: opts.runtimeKind,
+            title: sessionTitle,
+            runtimeSettings: opts.runtimeSettings,
+          }
+        : {
+            workspaceId,
+            providerTargetId: opts.providerTargetId,
+            modelId: opts.modelId ?? null,
+            runtimeKind: opts.runtimeKind,
+            title: sessionTitle,
+            runtimeSettings: opts.runtimeSettings,
+          },
     })
     if (!session?.id) {
       return false
@@ -547,8 +566,8 @@ function useWorkspaceDetailOwner(workspaceId: string) {
       id: session.id,
       title: sessionTitle,
       workspaceId,
-      providerTargetId: opts.providerTargetId ?? null,
-      modelId: opts.modelId ?? null,
+      providerTargetId: isRemoteWorkspace ? null : (opts.providerTargetId ?? null),
+      modelId: isRemoteWorkspace ? null : (opts.modelId ?? null),
       runtimeKind: opts.runtimeKind,
     }, { promote: true })
     await openCreatedWorkspaceSession(session.id, target)
@@ -560,7 +579,7 @@ function useWorkspaceDetailOwner(workspaceId: string) {
         text,
         files,
         contextParts,
-        modelId: opts.modelId,
+        modelId: isRemoteWorkspace ? undefined : opts.modelId,
         thinkingEffort: opts.thinkingEffort,
         runtimeSettings: readRunRuntimeSettingsPatch(opts.runtimeSettings),
       },
@@ -574,7 +593,8 @@ function useWorkspaceDetailOwner(workspaceId: string) {
         toastManager.add({
           type: 'error',
           title: t('detail.toast.startChatFailed'),
-          description: error instanceof Error ? error.message : String(error),
+          description: describeChatExecutionError(error)
+            ?? (error instanceof Error ? error.message : String(error)),
         })
       },
       onSettled: () => {
@@ -789,6 +809,7 @@ function WorkspaceDetailMainColumn({ active, owner }: { active: boolean, owner: 
         <div className="pointer-events-auto mx-auto max-w-160">
           <DraftChatComposer
             workspaceId={workspaceId}
+            remoteHostId={workspace && !isLocalWorkspace(workspace) ? workspace.locator.hostId : null}
             active={active}
             onSend={handleDraftComposerSend}
             onSendInNewWindow={handleDraftComposerSendInNewWindow}

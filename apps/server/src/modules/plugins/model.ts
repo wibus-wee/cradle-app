@@ -167,6 +167,39 @@ const addPluginSourceResult = t.Object({
   discoveredPlugins: t.Array(pluginDescriptor),
 }, { additionalProperties: false })
 
+const pluginPreviewItem = t.Object({
+  name: t.String({ minLength: 1 }),
+  version: t.String(),
+  displayName: t.String({ minLength: 1 }),
+  description: t.Union([t.String(), t.Null()]),
+  iconAvailable: t.Boolean(),
+  trusted: t.Boolean(),
+  trustReason: t.Union([t.String(), t.Null()]),
+  declaredPermissions: t.Array(pluginDeclaredPermission),
+  warnings: t.Array(t.String()),
+  hasWeb: t.Boolean(),
+  hasServer: t.Boolean(),
+  hasDesktop: t.Boolean(),
+}, { additionalProperties: false })
+
+const previewPluginSourceBody = t.Object({
+  kind: t.Union([t.Literal('git'), t.Literal('npm')]),
+  location: t.String({ minLength: 1 }),
+  ref: t.Optional(t.Union([t.String(), t.Null()])),
+  subPath: t.Optional(t.Union([t.String(), t.Null()])),
+}, { additionalProperties: false })
+
+const pluginSourcePreview = t.Object({
+  source: t.Object({
+    kind: t.Union([t.Literal('git'), t.Literal('npm')]),
+    location: t.String({ minLength: 1 }),
+    ref: t.Union([t.String(), t.Null()]),
+    subPath: t.Union([t.String(), t.Null()]),
+  }, { additionalProperties: false }),
+  plugins: t.Array(pluginPreviewItem),
+  warnings: t.Array(t.String()),
+}, { additionalProperties: false })
+
 export const PluginsModel = {
   addPluginSourceBody,
   addPluginSourceResult,
@@ -175,5 +208,8 @@ export const PluginsModel = {
   pluginMentionCapability,
   pluginMentionCandidate,
   pluginSourceRegistryEntry,
+  pluginPreviewItem,
+  previewPluginSourceBody,
+  pluginSourcePreview,
   updatePluginActivationBody,
 } as const

@@ -19,12 +19,12 @@ import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../menti
 import { MentionPanel } from '../mentions/mention-panel'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { SkillMentionPanel } from '../mentions/skill-mention-panel'
-import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   buildPlanModeTogglePatch,
   isPlanRuntimeSettings,
   supportsPlanModeToggle,
 } from '../runtime/runtime-settings-presenter'
+import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   CHAT_SLASH_COMMAND_LISTBOX_ID,
   getActiveSlashCommand,

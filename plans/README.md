@@ -42,6 +42,13 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 026  | Publish plugin SDK + open marketplace to any repo        | P2       | M      | —          | DONE                                                                                   |
 | 027  | Persisted, live-reloadable external plugin sources        | P1       | L      | 026        | DONE                                                                                   |
 | 028  | Mirror dynamic plugin sources into the desktop layer      | P2       | M      | 027        | DONE                                                                                   |
+| 029  | Redesign Plugins Settings for C-end                      | P1       | M      | 027        | TODO (see plan file; duplicate number with review-guide plan)                          |
+| 029b | Review Guide UX overhaul (`029-review-guide-ux-overhaul`) | P2       | M      | —          | TODO (filename collision with plugin 029 — execute by path)                            |
+| 030  | Plugin install foundation: preview endpoint + shared wizard + trust consent | P1 | L | 027, 029 | TODO                                                                                   |
+| 031  | Plugin Center: marketplace + installed + import surfaces (consumes 030) | P1 | XL | 027, 030 | TODO                                                                                   |
+| 032  | Transparent remote-host Upstream Gateway; delete RemoteCradleClient | P1 | L | —     | DONE                                                                                   |
+| 033  | Remote session projection + link; block local runtime    | P1       | L      | 032        | DONE                                                                                   |
+| 034  | Web remote-execution UX for projected sessions           | P1       | M      | 032, 033   | DONE                                                                                   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
@@ -66,6 +73,30 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
 - 2026-07-06, Plan 024 complete: final verification passed `pnpm --filter @cradle/server typecheck`, `pnpm --filter @cradle/web typecheck`, full `pnpm --filter @cradle/server exec vitest run --maxWorkers=1 --reporter=dot` (139 files / 832 tests), root `pnpm test` (249 files / 1369 tests), `git diff --check`, and the direct-write grep excluding projectors/parity/rebuild with no output.
 - 2026-07-06, Plans 026-028: `@cradle/plugin-sdk` is now publishable from `dist` with public npm publish config; marketplace install links accept any valid GitHub `owner/repo`, repo-root or normalized relative plugin paths, and scoped/unscoped npm package names while preserving checksum and install-confirmation gates. Added persisted `plugin_sources` storage, source installer support for local path / GitHub tarball / `npm pack`, live server discovery/removal APIs and generated CLI commands, Settings source add/remove UI, and desktop source mirroring through server HTTP plus preload IPC. New persisted-source plugins are registered as `externalLocal` and disabled until operator enable records the existing checksum trust grant. Verification passed `pnpm --filter @cradle/plugin-sdk build`, `pnpm --filter @cradle/plugin-sdk typecheck`, `pnpm --filter @cradle/server typecheck`, `pnpm --filter @cradle/web typecheck`, `pnpm --filter @cradle/desktop typecheck`, `pnpm --filter @cradle/cli typecheck`, `pnpm --filter @cradle/cli cradle --help`, focused Vitest for desktop plugin install/loader, focused server loader Vitest, and full web Vitest (`71 files / 303 tests`). `pnpm --filter @cradle/server test -- src/plugins src/modules/plugins` was attempted but the repo's broad Vitest matching ran unrelated relay/WebSocket/preferences suites and failed on sandboxed `127.0.0.1` listeners plus pre-existing 500 assertions outside the plugin-source path; it is not counted as a pass. npm publish itself was not executed; manual publish from `packages/plugin-sdk` remains the release step.
 
+- 2026-07-09, Plans 030/031 redesign: split the plugin-install work into a reusable **foundation** (030) and a **surface** (031) to eliminate throwaway work. The original 030 specified a full `plugins-add-dialog.tsx` rewrite that 031 then deleted and re-implemented as a tab. Redesigned 030 now ships surface-agnostic primitives - `InstallWizard`, `PluginSourcePasteInput`, `TrustConsentDialog` - plus the stateless `POST /plugins/sources/preview` endpoint and the `loader.ts` `refresh->resolve` cache-reuse switch, and guts the existing dialog to host them (independently demoable). 031 consumes those primitives verbatim for its Marketplace-install and Import tabs and deletes only the thin dialog shell. Also corrected two factual errors: `evaluatePluginSourceTrust` takes `PluginTrustEvaluationInput` (`{ source: { kind, packageDir, provenance? }, pluginName, relayHostExposed? }`), not the shape the original 030 assumed; and `sourceCacheKey`/`cacheDirForSource` are module-private, so the preview's throwaway `PluginSource` needs no special id (cache reuse works off `{kind,location,ref,subPath}` alone). The marketplace module is described as a simple `guardedFetch` + zod + TTL singleton, not a `provider-catalog` mirror (provider-catalog is a multi-provider dispatcher).
+
+- 2026-07-09, Plan 032: Transparent `ALL /remote-hosts/:hostId/upstream/*` gateway landed on
+  branch `advisor/032-remote-host-upstream-gateway` (`57f6b58`, follow-up `c49de41`).
+  `RemoteCradleClient` and hand-written cradle-server workspace/file routes deleted; settings/
+  sidebar use upstream fetches; CLI workspace-list command removed via regen. Reviewer
+  re-ran `pnpm --filter @cradle/server typecheck` and focused remote-hosts/upstream tests
+  (2 files / 6 tests). Full server suite had 5 pre-existing failures outside remote-hosts
+  scope (relay e2e / external-provider-sources / preferences / profiles). Note: executor
+  committed in the main working tree on the advisor branch rather than a disposable
+  worktree clone — scope and criteria still verified clean. Merge is the operator's call.
+
+- 2026-07-09, Plan 033: Remote session projection landed on `main` (`42c6d6b`, `5f8a690`).
+  Added `remote_session_links`, create/delete projection via upstream, local runtime
+  hard-reject `chat_session_executes_on_remote_host` (409), and minimum chat proxy for
+  `POST /chat/sessions/:id/response`, `GET .../stream`, `GET .../messages`. Reviewer
+  re-ran typecheck + focused tests (2 files / 11 tests). Remaining chat routes
+  (cancel/queue/events/runtime-settings/…) deferred to plan 034 wiring notes.
+  Operator asked to stay on `main` (no advisor branch).
+- 2026-07-09, Plan 034: Web remote-execution UX on `advisor/034-remote-session-web`.
+  Session `execution` helpers, remote catalog via Upstream Gateway, connect gate +
+  Connect CTA, header/sidebar remote badges, and error mapping for remote codes.
+  Also completed the deferred linked-session catch-all proxy from 033.
+
 ## Recommended sequencing
 
 1. **Security first** (002 → 003, 004, 006; 005 in parallel): the relay feature makes
@@ -77,6 +108,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
 4. **Perf + hardening + hygiene** (007, 008, 009, 015, 016, 017, 018, 019).
 5. **Structural refactors last** (020, 021, 023): high value, but must follow the test
    net and the security/correctness fixes.
+6. **Remote Control product** (032 → 033 → 034): after transport/auth (002/003) are DONE,
+   this track makes remote workspaces actually runnable. Do not start 033/034 before 032.
 
 ## Dependency notes
 
@@ -88,6 +121,27 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
 - 023 (data-fetching) should follow 022 (chronicle test net) and ideally 020's chronicle split.
 - 027 depends on 026 (naming/repo openness) but is independently useful even if 026 hasn't landed.
 - 028 depends on 027 (needs the persisted source registry + its HTTP routes to exist before desktop can mirror it).
+- 031 consumes 030 (the shared `InstallWizard` / `PluginSourcePasteInput` / `TrustConsentDialog` / `POST /plugins/sources/preview` must ship first); 030 is independently shippable. Execute 030 before 031 - the redesigned split removed the throwaway dialog the original 031 would have deleted.
+- 032 is independent of the plugin track; it is the Remote Control product-layer keystone.
+- 033 requires 032 (session projection forwards through the upstream gateway; RemoteCradleClient must be gone).
+- 034 requires 032 and 033 (web consumes `execution` metadata and connection gates; server must proxy linked chat).
+
+## Remote Control product track (032-034)
+
+Planned 2026-07-09 against commit `0ff0271` via `/improve plan` (design already decided;
+not an audit finding). Goal: Relay/SSH/direct already yield `localBaseUrl`; make the remote
+Cradle Server fully reusable without a second agent protocol.
+
+1. **032** — Transparent `ALL /remote-hosts/:hostId/upstream/*` gateway; delete
+   `RemoteCradleClient` and hand-written cradle-server workspace/file routes.
+2. **033** — `remote_session_links` + local session projection; create/delete/chat for
+   remote workspaces go upstream; local chat-runtime hard-rejects linked sessions (409).
+3. **034** — Web: connect gate, remote catalog for remote execution, badges; keep calling
+   local session ids (server proxies).
+
+Explicitly deferred: session handoff / code migration / take-back. Explicitly rejected:
+expanding typed `RemoteCradleClient`; teaching local chat-runtime remote cwd; browser
+global `baseUrl` pointed at tunnel; reviving agentd session links.
 
 ## Plugin external-loading track (026-028)
 
@@ -120,6 +174,11 @@ orchestration layer) would be reasonable; a whole-codebase migration is negative
 
 ## Findings considered and rejected (so they aren't re-audited)
 
+- **Expand RemoteCradleClient method-per-API for full remote chat** — rejected 2026-07-09; use transparent upstream gateway (plan 032) instead. Typed client is debt.
+- **UI/browser P2P direct to tunnel `localBaseUrl` as primary architecture** — rejected as default; keys/pairing/lifecycle stay on local server. Optional desktop optimization only, not required for 032–034.
+- **Teach chat-runtime `hostId` / remote cwd** — rejected; remote sessions must not enter local TurnExecutor. Projection + upstream (033).
+- **Revive agentd / `remote_host_agentd_session_links`** — rejected; table dropped in migration 0017; Cradle-Server-to-Cradle-Server HTTP is the path.
+- **Handoff in the same track as first remote chat** — deferred (not rejected forever); 032–034 ship without handoff.
 - **Git subprocess command injection** — `git-command.ts` uses `spawn` with arg arrays; injection-resistant. Not a finding.
 - **Workspace file path traversal** — `workspace/files.ts` already uses `resolveWorkspaceFilePath` + `isWithinRoot`. Correct.
 - **External provider list leaking secrets** — returns `credentialRef`, not raw values. Correct.

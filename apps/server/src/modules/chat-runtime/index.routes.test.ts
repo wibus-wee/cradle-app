@@ -64,7 +64,7 @@ describe('chat runtime route composition', () => {
       composer: expect.objectContaining({
         inputMode: 'rich',
         modelSelection: 'alias-matrix',
-        thinking: { efforts: ['low', 'medium', 'high', 'xhigh'] },
+        thinking: { efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       }),
     }))
     expect(body.items.find(item => item.runtimeKind === 'cli-tui')).toEqual(expect.objectContaining({

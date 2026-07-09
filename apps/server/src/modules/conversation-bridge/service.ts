@@ -1461,7 +1461,7 @@ export async function handleInboundMessage(
         markInboundEvent(event, 'ignored', 'external channel has no default Cradle runtime target')
         return
       }
-      const session = Session.create({
+      const session = await Session.create({
         workspaceId: channelBinding.cradleWorkspaceId,
         title: titleFromText(event.text),
         origin: 'conversation-bridge',

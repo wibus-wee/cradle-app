@@ -18,9 +18,9 @@ import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
 import { getTerminalFontFamily } from './terminal-font'
-import { useTerminalPreferencesStore } from './terminal-preferences'
 import type { TerminalMetadata } from './terminal-metadata'
 import { mergeTerminalMetadata, readTerminalMetadata } from './terminal-metadata'
+import { useTerminalPreferencesStore } from './terminal-preferences'
 
 const EXIT_BANNER = '\r\n\x1B[2m[Process exited]\x1B[0m\r\n'
 const MAX_TRANSCRIPT_CHARS = 8_000

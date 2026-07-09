@@ -17,7 +17,7 @@ import {
   normalizeRuntimeSettingsPatch,
 } from '../runtime-settings'
 
-export type PersistedThinkingEffort = Extract<ChatThinkingEffort, 'low' | 'medium' | 'high' | 'xhigh'>
+export type PersistedThinkingEffort = ChatThinkingEffort
 export type ChatSessionContinuationMode = 'queue' | 'steer'
 export type ChatSessionQueueMode = 'queue'
 export type ChatSessionQueueStatus = 'pending' | 'running' | 'cancelled' | 'completed' | 'failed'
@@ -203,7 +203,13 @@ export function readQueueItemRuntimeSettings(
 }
 
 export function readPersistedThinkingEffort(effort: unknown): PersistedThinkingEffort | null {
-  return effort === 'low' || effort === 'medium' || effort === 'high' || effort === 'xhigh'
+  return effort === 'none'
+    || effort === 'minimal'
+    || effort === 'low'
+    || effort === 'medium'
+    || effort === 'high'
+    || effort === 'xhigh'
+    || effort === 'max'
     ? effort
     : null
 }

@@ -44,12 +44,12 @@ import { SubagentIdenticon } from '../rendering/subagent-identicon'
 import type { RenderableToolPart, ToolState } from '../rendering/tool-ui-classifier'
 import { describeToolCall, formatToolName } from '../rendering/tool-ui-classifier'
 import { useSessionTodos } from '../session/use-session-todos'
-import { useRuntimeSessionStatus } from './use-runtime-session-status'
 import {
   formatRuntimeSettingsSummary,
   readComposerRuntimeSettingsFields,
   resolveRuntimeCatalogItem,
 } from './runtime-settings-presenter'
+import { useRuntimeSessionStatus } from './use-runtime-session-status'
 
 interface RuntimeSessionPanelProps {
   sessionId: string | null

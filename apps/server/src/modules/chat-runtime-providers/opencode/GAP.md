@@ -10,7 +10,7 @@
 | Slash Commands | `command` config、`client.command.list()`、`session.command()` | ✅ 已实现列表投影与 `/command` 路由 | 高 |
 | Shell 执行 | `session.shell()` | ✅ `supportsShellExecution: true` | 高 |
 | 呈现能力 (Presentation) | command/slot 系统 | ✅ 已实现 `getPresentation`/`getDraftPresentation` | 高 |
-| Event-first Turn | `event.subscribe()` + `session.promptAsync()` | ✅ 普通 prompt 已改为 SSE-first；订阅失败才 fallback 到 `session.prompt()` | 高 |
+| Event-first Turn | `event.subscribe()` + `session.promptAsync()` | ✅ session-scoped 持续 event pump；同时投影 `message.*` 与 `session.next.*`；prompt/idle recovery 有上限 | 高 |
 | Permission Approval | `permission.updated` + `postSessionIdPermissionsPermissionId()` | ✅ 已接入 Chat Runtime pending tool approval | 高 |
 | File/Image 输入 | `FilePartInput` | ✅ AI SDK file part 会投影为 opencode file part | 高 |
 | Plugin MCP 配置 | `Config.mcp` local/remote servers | ✅ Cradle plugin registry 会投影为 OpenCode `config.mcp[...]` | 高 |
@@ -78,7 +78,7 @@
 **当前实现**: 
 1. 通过 live SDK server 的 `client.command.list()` 读取命令列表
 2. 映射为 `RuntimeSlashCommand[]` 通过 `getPresentation` 暴露
-3. `streamTurn` 识别已注册 `/command` 文本并路由到 `session.command()`；未匹配的普通 prompt 在 SSE 可用时走 `session.promptAsync()`，SSE 订阅失败时 fallback 到 `session.prompt()`
+3. `streamTurn` 识别已注册 `/command` 文本并路由到 `session.command()`；未匹配的普通 prompt 走持续 event pump + `session.promptAsync()`。
 
 ### 3. btw / Quick Question
 
@@ -133,8 +133,12 @@
 - `FilePartInput` — prompt body 中的文件/图片输入
 
 **当前状态**:
-- 普通 prompt 先订阅 `event.subscribe()`，再读取当前 session 已有 message id 作为 baseline，然后调用不带自定义 `messageID` 的 `session.promptAsync()`。
-- adapter 用“不在 baseline 中的新 assistant message”识别当前 turn 的终态 message；终态时再读 `session.message()` 补偿 missed parts，然后发 AI SDK `finish`。projector 也会忽略 baseline 内的旧 message，避免第二轮复用 session 时重放上一轮文本。
+- OpenCode provider 现在按 Cradle runtime session 维护持续 `event.subscribe()` pump；turn 只挂 active subscriber，不再为每个 turn 创建并关闭临时 SSE 订阅。订阅失败会在 prompt dispatch 前作为 provider error 暴露，避免 prompt 已接受但 Cradle 无法观察结果。
+- 普通 prompt 读取当前 session 已有 message id 作为 recovery baseline，然后调用不带自定义 `messageID` 的 `session.promptAsync()`。
+- projector 同时支持旧 root `message.*` 事件族与新 v2 `session.next.*` 事件族。`session.next.text.*`/`reasoning.*`/`tool.*`/`step.*` 会投影为 AI SDK text/reasoning/tool/finish chunks；`session.next.step.failed` 会让 active turn 以 provider error 结束。
+- 文本 projector 使用 overlap-aware merge，`message.part.delta` 先于完整 part snapshot 到达时不会把已有文本重复成 `HelHel`。
+- adapter 用“不在 baseline 中的新 terminal assistant message”识别旧事件族的终态 message；终态时再读 `session.message()` 补偿 missed parts，然后发 AI SDK `finish`。projector 也会忽略 baseline 内的旧 message，避免第二轮复用 session 时重放上一轮文本。
+- `promptAsync` accepted 后会启动 bounded recovery：按短延迟尝试从 `session.messages()` 读取终态 assistant；若没有任何 provider activity，会以明确 stuck provider error 结束。session idle 早于 assistant activity，或 tool-call finish 后没有 final assistant，也会由 idle watchdog 在有界时间内失败，而不是无限等待。
 - `permission.updated` 被投影为 AI SDK `tool-input-*` + `tool-approval-request` chunks，approval id 形如 `server-request-${permission.id}`，builtin apiName 为 `approval.permissions`；用户审批后回复 OpenCode `once` 或 `reject`。
 - `projectOpencodePromptParts()` 支持 text 与 file parts，AI SDK `file.mediaType/filename/url` 会映射到 OpenCode `mime/filename/url`。
 
@@ -224,7 +228,7 @@
 | `/api/agent` | supported OpenCode agents，可作为 composer `@agent` 提及/选择 catalog | runtime agent catalog/selector | 不应进入 crew slot；若要展示/选择，需要新增 agent catalog/agent picker kit |
 | `/api/integration/*`、`/api/credential/*` | OpenCode integrations and credentials | runtime integration/auth flow + credential ownership | 需要先定 Cradle 是否拥有 OpenCode isolated credential lifecycle；不要直接把 OpenCode credential mutation 塞进 generic provider target |
 | `/experimental/project/{projectID}/copy*` | OpenCode project copy | workspace/project-copy ownership | 和 Cradle workspace/worktree 语义重叠，需产品决策；不应默认接到 ChatRuntime |
-| `/api/event` v2 | v2 event stream with `session.next.*`, question/permission v2 events | adapter-internal projector, no new generic kit | 可迁移 provider projector 以减少 root `message.part.updated` 补偿逻辑；需要完整回归测试 |
+| `/api/event` v2 | v2 event stream with `session.next.*`, question/permission v2 events | adapter-internal projector, no new generic kit | ✅ active turn 已通过持续 event pump 消费 v2 event stream；`session.next.*` 与 root `message.*` 双事件族并存，question/permission v2 bridge 继续复用现有 Chat Runtime kit |
 
 ### 当前不建议接入 ChatRuntime 的 v2 能力
 

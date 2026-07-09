@@ -1,9 +1,13 @@
 import type { ChatThinkingEffort } from '../runtime-provider-types'
 
-type QueueThinkingEffort = Extract<ChatThinkingEffort, 'low' | 'medium' | 'high' | 'xhigh'>
-
-export function readChatThinkingEffort(value: unknown): QueueThinkingEffort | undefined {
-  return value === 'low' || value === 'medium' || value === 'high' || value === 'xhigh'
+export function readChatThinkingEffort(value: unknown): ChatThinkingEffort | undefined {
+  return value === 'none'
+    || value === 'minimal'
+    || value === 'low'
+    || value === 'medium'
+    || value === 'high'
+    || value === 'xhigh'
+    || value === 'max'
     ? value
     : undefined
 }

@@ -4,7 +4,7 @@ export type ComposerContext = 'new-chat' | 'chat'
 export type ComposerTargetMode = 'provider' | 'agent'
 export type RuntimeProviderBinding = 'required' | 'runtime-owned'
 
-export type ThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh' | null
+export type ThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 
 export interface ComposerSelection {
   agentId: string | null

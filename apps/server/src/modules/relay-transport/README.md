@@ -84,10 +84,10 @@ credential even if the managed secret remains on disk.
 ## Runtime Tunnel
 
 The controller side opens a local listener on `127.0.0.1:<port>` and returns
-`localBaseUrl` to `remote-hosts`. Existing `RemoteCradleClient` calls then work
-unchanged: HTTP bytes enter the local socket, become encrypted `stream_data`
-frames over relayd, and exit on the host side as a TCP connection to the host
-Cradle Server's own local HTTP port.
+`localBaseUrl` to `remote-hosts`. The upstream gateway at
+`/remote-hosts/:hostId/upstream/*` then forwards HTTP bytes into that local
+socket; they become encrypted `stream_data` frames over relayd and exit on the
+host side as a TCP connection to the host Cradle Server's own local HTTP port.
 
 The stream protocol uses 256 KiB chunks and a 512 KiB unacknowledged credit
 window. The receiver sends cumulative `stream_ack` frames every 64 KiB so the

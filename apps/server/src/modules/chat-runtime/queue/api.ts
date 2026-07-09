@@ -6,8 +6,8 @@ import { and, eq } from 'drizzle-orm'
 import { AppError } from '../../../errors/app-error'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
-import type { RuntimeKind } from '../../provider-contracts/types'
 import { runtimeOwnsProviderTarget } from '../../provider-contracts/runtime-compatibility'
+import type { RuntimeKind } from '../../provider-contracts/types'
 import {
   cancelQueuedSessionItem,
   commitSessionEvents,

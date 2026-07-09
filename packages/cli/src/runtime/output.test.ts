@@ -261,4 +261,24 @@ describe('printResult', () => {
 
     expect(readPrintedJson(logSpy)).toEqual([{ ok: true, nested: { value: 1 } }])
   })
+
+  it('does not force-wrap rows containing wide (CJK) characters', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    printResult(
+      [
+        { id: 'ws-1', name: '这是一个很长的中文工作区名称测试用例', status: 'active' },
+        { id: 'ws-2', name: 'ws2', status: 'archived' }
+      ],
+      { format: 'table' }
+    )
+
+    const printedTable = String(logSpy.mock.calls[0]?.[0])
+    const lines = printedTable.split('\n')
+
+    // A broken/wrapped row would split "这是一个很长的中文工作区名称测试用例"
+    // across two physical lines even though the terminal is wide enough.
+    expect(lines.some(line => line.includes('这是一个很长的中文工作区名称测试用例'))).toBe(true)
+    expect(lines).toHaveLength(6)
+  })
 })

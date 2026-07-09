@@ -32,7 +32,7 @@ export interface AutomationRecipe {
   providerTargetId?: string | null
   runtimeKind?: RuntimeKind | null
   modelId?: string | null
-  thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh' | null
+  thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 }
 
 export interface AutomationDefinition {
@@ -102,7 +102,7 @@ export interface CreateAutomationInput {
     providerTargetId?: string
     runtimeKind?: RuntimeKind
     modelId?: string
-    thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh'
+    thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   }
   createdByKind?: 'agent' | 'user' | 'system'
   createdById?: string | null

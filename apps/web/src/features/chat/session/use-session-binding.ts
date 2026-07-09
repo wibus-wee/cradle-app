@@ -6,6 +6,8 @@ import { patchSessionsById } from '~/api-gen/sdk.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { updateSessionInSessionLists } from '~/features/workspace/use-session'
 
+import type { SessionExecution } from './session-execution'
+import { readSessionExecution } from './session-execution'
 import { readSessionThinkingEffort } from './session-thinking-effort'
 import type { SendMessageOptions } from './use-chat-session-types'
 
@@ -18,6 +20,7 @@ export interface ChatSessionBinding {
   modelId: string | null
   thinkingEffort: SendMessageOptions['thinkingEffort'] | null
   runtimeKind: RuntimeKind | null
+  execution: SessionExecution
 }
 
 export type SessionProviderModelPatch = {
@@ -50,6 +53,7 @@ export function useSessionBinding(
           modelId: data.modelId ?? null,
           thinkingEffort: readSessionThinkingEffort(data.thinkingEffort),
           runtimeKind: data.runtimeKind ?? null,
+          execution: readSessionExecution(data),
         } satisfies ChatSessionBinding
       : null,
   })

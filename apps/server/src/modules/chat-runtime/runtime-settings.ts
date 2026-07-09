@@ -7,15 +7,11 @@ import {
 import type { RuntimeKind } from '../provider-contracts/types'
 import type {
   RuntimeSettings,
-  RuntimeSettingsPatch,
 } from './runtime-provider-types'
 import {
-  areRuntimeSettingsEqual,
   getDefaultRuntimeSettings,
   mergeRuntimeSettings,
-  normalizeRuntimeSettingsPatch,
   readSessionRuntimeSettingsFromConfig,
-  resolveRunRuntimeSettings,
 } from './runtime-settings-registry'
 
 export {
@@ -25,10 +21,10 @@ export {
   migrateLegacyClaudeAgentRuntimeSettings,
   normalizeRuntimeSettingsPatch,
   readCodexLikeRuntimeSettings,
-  readRuntimeSettingsSchema,
   readRuntimeSettingsDefaults,
-  resolveRuntimeSettingsEntry,
+  readRuntimeSettingsSchema,
   resolveRunRuntimeSettings,
+  resolveRuntimeSettingsEntry,
   runtimeSupportsSessionSettings,
 } from './runtime-settings-registry'
 

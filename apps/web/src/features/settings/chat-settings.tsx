@@ -24,6 +24,7 @@ import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { readSessionExecution } from '~/features/chat/session/session-execution'
 import { listSelectableComposerProfilesForRuntimes } from '~/features/composer-toolbar/composer-profile-selection'
 import { filterThinkingOptionsForModel, selectSupportedThinkingValue } from '~/features/composer-toolbar/constants'
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
@@ -94,6 +95,7 @@ function normalizeArchivedSession(session: {
   isIsolated?: boolean | unknown
   worktreeId?: string | unknown | null
   worktreeBranch?: string | unknown | null
+  execution?: unknown
 }): WorkspaceSession {
   const latestUserMessageAt = typeof session.latestUserMessageAt === 'number' ? session.latestUserMessageAt : null
   const latestAssistantMessageAt = typeof session.latestAssistantMessageAt === 'number' ? session.latestAssistantMessageAt : null
@@ -121,6 +123,7 @@ function normalizeArchivedSession(session: {
     isIsolated: session.isIsolated === true,
     worktreeId: typeof session.worktreeId === 'string' ? session.worktreeId : null,
     worktreeBranch: typeof session.worktreeBranch === 'string' ? session.worktreeBranch : null,
+    execution: readSessionExecution(session),
   }
 }
 

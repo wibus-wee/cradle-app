@@ -32,10 +32,6 @@ import type { ProviderInputPart } from '../kit/input-projector'
 import { projectProviderInputParts } from '../kit/input-projector'
 import { readWorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import { CLAUDE_AGENT_RUNTIME_KIND } from './metadata'
-import {
-  readClaudeAgentAllowDangerouslySkipPermissions,
-  readClaudeAgentPermissionMode,
-} from './runtime-settings'
 import type { ClaudeAgentPermissionBridgeState, ClaudeAgentToolApprovalRequest } from './permission-bridge'
 import {
   createClaudeAgentCanUseTool,
@@ -47,6 +43,10 @@ import {
   removeCradleOwnedClaudeConfigDirFromEnv,
   resolveClaudeAgentRuntimeContext,
 } from './runtime-context'
+import {
+  readClaudeAgentAllowDangerouslySkipPermissions,
+  readClaudeAgentPermissionMode,
+} from './runtime-settings'
 import type {
   AnthropicImageMediaType,
   ClaudeAgentContentBlock,
@@ -410,6 +410,7 @@ function readClaudeAgentEffort(
     case 'medium':
     case 'high':
     case 'xhigh':
+    case 'max':
       return override
     default:
       return configured

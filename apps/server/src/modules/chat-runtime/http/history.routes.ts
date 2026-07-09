@@ -12,8 +12,8 @@ export const chatRuntimeHistoryRoutes = new Elysia({
   // GET /chat/sessions/:sessionId/messages -> historical message snapshot rows
   .get(
     '/sessions/:sessionId/messages',
-    async ({ params }) => {
-      return await getMessageGroups(params.sessionId)
+    async ({ params }): Promise<Response> => {
+      return Response.json(await getMessageGroups(params.sessionId))
     },
     {
       detail: {

@@ -16,6 +16,7 @@ import { Route as DevtoolRouteImport } from './routes/devtool'
 import { Route as AwaitsRouteImport } from './routes/awaits'
 import { Route as AutomationRouteImport } from './routes/automation'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as WorkspacesWorkspaceIdRouteImport } from './routes/workspaces/$workspaceId'
 import { Route as SettingsSectionRouteImport } from './routes/settings/$section'
 import { Route as KanbanBoardIdRouteImport } from './routes/kanban/$boardId'
@@ -58,6 +59,11 @@ const AutomationRoute = AutomationRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PluginsIndexRoute = PluginsIndexRouteImport.update({
+  id: '/plugins/',
+  path: '/plugins/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkspacesWorkspaceIdRoute = WorkspacesWorkspaceIdRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/kanban/$boardId': typeof KanbanBoardIdRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/workspaces/$workspaceId': typeof WorkspacesWorkspaceIdRouteWithChildren
+  '/plugins/': typeof PluginsIndexRoute
   '/plugins/$routeSegment/$localId': typeof PluginsRouteSegmentLocalIdRoute
   '/workspaces/$workspaceId/diffs': typeof WorkspacesWorkspaceIdDiffsRoute
   '/workspaces/$workspaceId/': typeof WorkspacesWorkspaceIdIndexRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/chat/new': typeof ChatNewRoute
   '/kanban/$boardId': typeof KanbanBoardIdRoute
   '/settings/$section': typeof SettingsSectionRoute
+  '/plugins': typeof PluginsIndexRoute
   '/plugins/$routeSegment/$localId': typeof PluginsRouteSegmentLocalIdRoute
   '/workspaces/$workspaceId/diffs': typeof WorkspacesWorkspaceIdDiffsRoute
   '/workspaces/$workspaceId': typeof WorkspacesWorkspaceIdIndexRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/kanban/$boardId': typeof KanbanBoardIdRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/workspaces/$workspaceId': typeof WorkspacesWorkspaceIdRouteWithChildren
+  '/plugins/': typeof PluginsIndexRoute
   '/plugins/$routeSegment/$localId': typeof PluginsRouteSegmentLocalIdRoute
   '/workspaces/$workspaceId/diffs': typeof WorkspacesWorkspaceIdDiffsRoute
   '/workspaces/$workspaceId/': typeof WorkspacesWorkspaceIdIndexRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/kanban/$boardId'
     | '/settings/$section'
     | '/workspaces/$workspaceId'
+    | '/plugins/'
     | '/plugins/$routeSegment/$localId'
     | '/workspaces/$workspaceId/diffs'
     | '/workspaces/$workspaceId/'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/chat/new'
     | '/kanban/$boardId'
     | '/settings/$section'
+    | '/plugins'
     | '/plugins/$routeSegment/$localId'
     | '/workspaces/$workspaceId/diffs'
     | '/workspaces/$workspaceId'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/kanban/$boardId'
     | '/settings/$section'
     | '/workspaces/$workspaceId'
+    | '/plugins/'
     | '/plugins/$routeSegment/$localId'
     | '/workspaces/$workspaceId/diffs'
     | '/workspaces/$workspaceId/'
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   KanbanBoardIdRoute: typeof KanbanBoardIdRoute
   SettingsSectionRoute: typeof SettingsSectionRoute
   WorkspacesWorkspaceIdRoute: typeof WorkspacesWorkspaceIdRouteWithChildren
+  PluginsIndexRoute: typeof PluginsIndexRoute
   PluginsRouteSegmentLocalIdRoute: typeof PluginsRouteSegmentLocalIdRoute
 }
 
@@ -273,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plugins/': {
+      id: '/plugins/'
+      path: '/plugins'
+      fullPath: '/plugins/'
+      preLoaderRoute: typeof PluginsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workspaces/$workspaceId': {
@@ -362,6 +382,7 @@ const rootRouteChildren: RootRouteChildren = {
   KanbanBoardIdRoute: KanbanBoardIdRoute,
   SettingsSectionRoute: SettingsSectionRoute,
   WorkspacesWorkspaceIdRoute: WorkspacesWorkspaceIdRouteWithChildren,
+  PluginsIndexRoute: PluginsIndexRoute,
   PluginsRouteSegmentLocalIdRoute: PluginsRouteSegmentLocalIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -45,11 +45,11 @@ import {
   ProviderRuntimeError,
   requireRuntimeProviderTargetProfile,
 } from '../../chat-runtime/runtime-provider-types'
-import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../../chat-runtime/stream-trace'
 import {
   getDefaultRuntimeSettings,
   mergeRuntimeSettings,
 } from '../../chat-runtime/runtime-settings'
+import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../../chat-runtime/stream-trace'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { readTrustedClaudeAgentConfig } from '../../provider-contracts/provider-base'
 import { AsyncEventQueue } from '../async-event-queue'
@@ -72,9 +72,6 @@ import {
   shouldPersistClaudeAgentSdkSession,
 } from './input-projector'
 import {
-  readClaudeAgentPermissionMode,
-} from './runtime-settings'
-import {
   CLAUDE_AGENT_RUNTIME_CAPABILITIES,
   CLAUDE_AGENT_RUNTIME_KIND,
   CLAUDE_AGENT_RUNTIME_METADATA,
@@ -87,6 +84,9 @@ import {
 } from './permission-bridge'
 import { generateClaudeSessionTitle, shouldGenerateClaudeSessionTitle } from './provider-title-generation'
 import { activateClaudeAgentSdkConfigDir, resolveClaudeAgentRuntimeContext } from './runtime-context'
+import {
+  readClaudeAgentPermissionMode,
+} from './runtime-settings'
 import {
   CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID,
   clearClaudeAgentCapturedPlan,

@@ -71,16 +71,17 @@ describe('registerOperationCommand', () => {
   })
 
   it('defaults generated workspace query flags from CRADLE_WORKSPACE_ID', async () => {
-    process.env.CRADLE_WORKSPACE_ID = 'workspace-1'
+    process.env.CRADLE_WORKSPACE_ID = '11111111-1111-1111-1111-111111111111'
     const request = vi.fn().mockResolvedValue({ ok: true })
     const program = createProgram({ serverUrl: 'http://localhost:21423', request })
 
     registerOperationCommand(program, {
       command: ['session', 'list'],
       flags: [{
-        disableEnvDefaultFlag: 'allWorkspaces',
-        envDefault: 'CRADLE_WORKSPACE_ID',
+        disableResolverFlag: 'allWorkspaces',
+        flagName: 'workspace',
         name: 'workspaceId',
+        resolver: 'workspace',
         target: 'query.workspaceId',
         type: 'string',
       }],
@@ -91,21 +92,22 @@ describe('registerOperationCommand', () => {
     await program.parseAsync(['session', 'list'], { from: 'user' })
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
-      query: { workspaceId: 'workspace-1' },
+      query: { workspaceId: '11111111-1111-1111-1111-111111111111' },
     }))
   })
 
   it('allows generated workspace query defaults to be disabled explicitly', async () => {
-    process.env.CRADLE_WORKSPACE_ID = 'workspace-1'
+    process.env.CRADLE_WORKSPACE_ID = '11111111-1111-1111-1111-111111111111'
     const request = vi.fn().mockResolvedValue({ ok: true })
     const program = createProgram({ serverUrl: 'http://localhost:21423', request })
 
     registerOperationCommand(program, {
       command: ['session', 'list'],
       flags: [{
-        disableEnvDefaultFlag: 'allWorkspaces',
-        envDefault: 'CRADLE_WORKSPACE_ID',
+        disableResolverFlag: 'allWorkspaces',
+        flagName: 'workspace',
         name: 'workspaceId',
+        resolver: 'workspace',
         target: 'query.workspaceId',
         type: 'string',
       }],
@@ -118,19 +120,20 @@ describe('registerOperationCommand', () => {
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       query: { workspaceId: undefined },
     }))
-    await expect(program.parseAsync(['session', 'list', '--workspace-id', 'workspace-2', '--all-workspaces'], { from: 'user' }))
-      .rejects.toThrow('--workspace-id cannot be used with --all-workspaces')
+    await expect(program.parseAsync(['session', 'list', '--workspace', '22222222-2222-2222-2222-222222222222', '--all-workspaces'], { from: 'user' }))
+      .rejects.toThrow('--workspace cannot be used with --all-workspaces')
   })
 
   it('omits optional workspace query flags when no workspace context is available', async () => {
-    const request = vi.fn().mockResolvedValue({ ok: true })
+    const request = vi.fn().mockResolvedValue([])
     const program = createProgram({ serverUrl: 'http://localhost:21423', request })
 
     registerOperationCommand(program, {
       command: ['issue', 'list'],
       flags: [{
-        envDefault: 'CRADLE_WORKSPACE_ID',
+        flagName: 'workspace',
         name: 'workspaceId',
+        resolver: 'workspace',
         target: 'query.workspaceId',
         type: 'string',
       }],
@@ -146,16 +149,17 @@ describe('registerOperationCommand', () => {
   })
 
   it('allows required workspace flags to be satisfied by CRADLE_WORKSPACE_ID', async () => {
-    process.env.CRADLE_WORKSPACE_ID = 'workspace-1'
+    process.env.CRADLE_WORKSPACE_ID = '11111111-1111-1111-1111-111111111111'
     const request = vi.fn().mockResolvedValue({ ok: true })
     const program = createProgram({ serverUrl: 'http://localhost:21423', request })
 
     registerOperationCommand(program, {
       command: ['issue', 'create'],
       flags: [{
-        envDefault: 'CRADLE_WORKSPACE_ID',
+        flagName: 'workspace',
         name: 'workspaceId',
         required: true,
+        resolver: 'workspace',
         target: 'body.workspaceId',
         type: 'string',
       }],
@@ -166,7 +170,68 @@ describe('registerOperationCommand', () => {
     await program.parseAsync(['issue', 'create'], { from: 'user' })
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
-      body: { workspaceId: 'workspace-1' },
+      body: { workspaceId: '11111111-1111-1111-1111-111111111111' },
+    }))
+  })
+
+  it('resolves an explicit workspace name via --workspace by listing workspaces', async () => {
+    const request = vi.fn().mockImplementation(async (input: { template: string }) => {
+      if (input.template === '/workspaces') {
+        return [{ id: '11111111-1111-1111-1111-111111111111', locator: { path: '/repo/app' }, name: 'app' }]
+      }
+      return { ok: true }
+    })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+
+    registerOperationCommand(program, {
+      command: ['issue', 'list'],
+      flags: [{
+        flagName: 'workspace',
+        name: 'workspaceId',
+        resolver: 'workspace',
+        target: 'query.workspaceId',
+        type: 'string',
+      }],
+      method: 'get',
+      path: '/issues/',
+    })
+
+    await program.parseAsync(['issue', 'list', '--workspace', 'app'], { from: 'user' })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      query: { workspaceId: '11111111-1111-1111-1111-111111111111' },
+    }))
+  })
+
+  it('resolves a non-ambient workspace argument by name without cwd/env fallback', async () => {
+    process.env.CRADLE_WORKSPACE_ID = '99999999-9999-9999-9999-999999999999'
+    const request = vi.fn().mockImplementation(async (input: { template: string }) => {
+      if (input.template === '/workspaces') {
+        return [{ id: '11111111-1111-1111-1111-111111111111', locator: { path: '/repo/app' }, name: 'app' }]
+      }
+      return { ok: true }
+    })
+    const program = createProgram({ serverUrl: 'http://localhost:21423', request })
+
+    registerOperationCommand(program, {
+      arguments: [{
+        flagName: 'workspace',
+        name: 'workspaceId',
+        required: true,
+        resolver: 'workspace',
+        resolverAmbient: false,
+        target: 'path.workspaceId',
+        type: 'string',
+      }],
+      command: ['workspace', 'delete'],
+      method: 'delete',
+      path: '/workspaces/{workspaceId}',
+    })
+
+    await program.parseAsync(['workspace', 'delete', 'app'], { from: 'user' })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      path: { workspaceId: '11111111-1111-1111-1111-111111111111' },
     }))
   })
 })

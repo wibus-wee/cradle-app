@@ -19,6 +19,18 @@ const spec = {
   "description": "Update runtime settings for a chat session",
   "flags": [
     {
+      "name": "permissionMode",
+      "required": false,
+      "target": "body.permissionMode",
+      "type": "string",
+      "values": [
+        "default",
+        "acceptEdits",
+        "bypassPermissions",
+        "plan"
+      ]
+    },
+    {
       "name": "accessMode",
       "required": false,
       "target": "body.accessMode",

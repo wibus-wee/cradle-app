@@ -49,7 +49,11 @@ const spec = {
       "name": "providerTargetKind",
       "required": false,
       "target": "body.providerTargetKind",
-      "type": "string"
+      "type": "string",
+      "values": [
+        "manual",
+        "external"
+      ]
     },
     {
       "name": "providerTargetId",
@@ -58,12 +62,14 @@ const spec = {
       "type": "string"
     },
     {
-      "description": "Defaults to CRADLE_WORKSPACE_ID.",
+      "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.",
       "name": "workspaceId",
       "required": false,
       "target": "body.workspaceId",
       "type": "string",
-      "envDefault": "CRADLE_WORKSPACE_ID"
+      "flagName": "workspace",
+      "resolver": "workspace",
+      "resolverAmbient": true
     }
   ],
   "method": "post",

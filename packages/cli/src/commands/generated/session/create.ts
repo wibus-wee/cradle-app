@@ -11,12 +11,14 @@ const spec = {
   "description": "Create session",
   "flags": [
     {
-      "description": "Defaults to CRADLE_WORKSPACE_ID.",
+      "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.",
       "name": "workspaceId",
       "required": false,
       "target": "body.workspaceId",
       "type": "string",
-      "envDefault": "CRADLE_WORKSPACE_ID"
+      "flagName": "workspace",
+      "resolver": "workspace",
+      "resolverAmbient": true
     },
     {
       "name": "title",
@@ -66,10 +68,13 @@ const spec = {
       "target": "body.thinkingEffort",
       "type": "string",
       "values": [
+        "none",
+        "minimal",
         "low",
         "medium",
         "high",
-        "xhigh"
+        "xhigh",
+        "max"
       ]
     },
     {

@@ -392,7 +392,7 @@ async function runSession(
       return
     }
 
-    const chatSession = Session.create({
+    const chatSession = await Session.create({
       workspaceId: issue.workspaceId,
       title: `Issue: ${issue.title}`,
       origin: 'cradle-issue',

@@ -5,6 +5,7 @@ import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-mo
 import type { Agent } from '~/features/agent-runtime/use-agents'
 import { useAgents } from '~/features/agent-runtime/use-agents'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
+import { useRemoteProviderTargets } from '~/features/agent-runtime/use-remote-provider-targets'
 import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
 import {
   DEFAULT_RUNTIME_CATALOG_COMPOSER,
@@ -21,6 +22,7 @@ import type { RuntimeKindOption } from './constants'
 import { selectChatThinkingEffort } from './resolution/chat-selection'
 import {
   readComposerThinkingEffort,
+  resolveComposerCatalogSource,
   resolveComposerModelId,
   resolveComposerProfileId,
   resolvePreferredThinkingEffort,
@@ -31,6 +33,11 @@ import type { ComposerContext, ComposerSelection, ComposerTargetMode, ModelsByPr
 interface ComposerStateConfig {
   context: ComposerContext
   workspaceId?: string | null
+  /**
+   * When set, provider/model catalogs are loaded from the remote host via the
+   * Upstream Gateway instead of local `/provider-targets`.
+   */
+  remoteHostId?: string | null
   /** Enables Agent as a mutually exclusive new-chat target. Provider-only surfaces leave this off. */
   enableAgents?: boolean
   /** For 'chat' context — the session's bound agent identity */
@@ -78,7 +85,19 @@ export interface ComposerStateResult {
 const EMPTY_MODELS: ModelDescriptor[] = []
 
 export function useComposerState(config: ComposerStateConfig): ComposerStateResult {
-  const { context, workspaceId, enableAgents = false, boundAgentId, boundProviderTargetId, boundModelId, boundThinkingEffort, boundRuntimeKind, resetKey } = config
+  const {
+    context,
+    workspaceId,
+    remoteHostId = null,
+    enableAgents = false,
+    boundAgentId,
+    boundProviderTargetId,
+    boundModelId,
+    boundThinkingEffort,
+    boundRuntimeKind,
+    resetKey,
+  } = config
+  const usesRemoteCatalog = resolveComposerCatalogSource(remoteHostId) === 'remote-host'
 
   // Persisted state
   const lastRuntimeKind = useNewChatStore(s => s.lastRuntimeKind)
@@ -92,9 +111,23 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
   const lastThinkingEffort = useNewChatStore(s => s.lastThinkingEffort)
   const setLastThinkingEffort = useNewChatStore(s => s.setLastThinkingEffort)
 
-  // Data
+  // Data — remote execution uses the remote host catalog; local stays on /provider-targets.
   const { agents, isLoading: isLoadingAgents } = useAgents()
-  const { providerOptions: baseProviderOptions, isLoading: isLoadingBaseProviders } = useProviderTargets()
+  const {
+    providerOptions: localBaseProviderOptions,
+    isLoading: isLoadingLocalBaseProviders,
+  } = useProviderTargets()
+  const {
+    providerOptions: remoteBaseProviderOptions,
+    isLoading: isLoadingRemoteBaseProviders,
+  } = useRemoteProviderTargets({
+    hostId: remoteHostId,
+    enabled: usesRemoteCatalog,
+  })
+  const baseProviderOptions = usesRemoteCatalog ? remoteBaseProviderOptions : localBaseProviderOptions
+  const isLoadingBaseProviders = usesRemoteCatalog
+    ? isLoadingRemoteBaseProviders
+    : isLoadingLocalBaseProviders
   const { runtimes } = useRuntimeCatalog()
 
   // Local non-persisted state
@@ -255,10 +288,28 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
   const runtimeComposer = readRuntimeComposer(runtimeKind)
   const composerUsesModelSelection = runtimeComposerUsesModelSelection(runtimeComposer)
   const usesRuntimeOwnedProviderTargets = providerBinding === 'runtime-owned' && composerUsesModelSelection
+  const scopedProviderQuery = usesRuntimeOwnedProviderTargets
+    ? { runtimeKind, workspaceId }
+    : undefined
   const {
-    providerOptions,
-    isLoading: isLoadingScopedProviders,
-  } = useProviderTargets(usesRuntimeOwnedProviderTargets ? { runtimeKind, workspaceId } : undefined)
+    providerOptions: localScopedProviderOptions,
+    isLoading: isLoadingLocalScopedProviders,
+  } = useProviderTargets(usesRemoteCatalog ? undefined : scopedProviderQuery)
+  const {
+    providerOptions: remoteScopedProviderOptions,
+    isLoading: isLoadingRemoteScopedProviders,
+  } = useRemoteProviderTargets({
+    hostId: remoteHostId,
+    enabled: usesRemoteCatalog && usesRuntimeOwnedProviderTargets,
+    runtimeKind,
+    workspaceId,
+  })
+  const providerOptions = usesRuntimeOwnedProviderTargets
+    ? (usesRemoteCatalog ? remoteScopedProviderOptions : localScopedProviderOptions)
+    : baseProviderOptions
+  const isLoadingScopedProviders = usesRuntimeOwnedProviderTargets
+    ? (usesRemoteCatalog ? isLoadingRemoteScopedProviders : isLoadingLocalScopedProviders)
+    : isLoadingBaseProviders
   const selectableProfiles = useMemo(
     () => listSelectableComposerProfiles({ profiles: providerOptions, runtimeKind, runtimes }),
     [providerOptions, runtimeKind, runtimes],
@@ -318,7 +369,10 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     loadingProviderTargetIds,
     successfulProviderTargetIds,
     requestProviderTargetModels,
-  } = useProviderTargetModelMap(selectableProfiles, initialModelProfileIds, { workspaceId })
+  } = useProviderTargetModelMap(selectableProfiles, initialModelProfileIds, {
+    workspaceId,
+    hostId: remoteHostId,
+  })
   const modelsByProfileId = modelsByProviderTargetId
   const loadingProfileIds = loadingProviderTargetIds
   const successfulProfileIds = successfulProviderTargetIds

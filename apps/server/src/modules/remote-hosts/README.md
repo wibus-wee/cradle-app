@@ -2,14 +2,14 @@
 
 Owns Cradle's registry of remote Cradle Server instances. A remote host row stores how the local Cradle Server reaches another Cradle Server through a direct HTTP(S) base URL, an SSH local port tunnel, or a relay transport tunnel through relayd for machines without inbound network reachability.
 
-Rows live in `remote_hosts`. The remote host module owns connection lifecycle, health probing, and proxying selected remote Cradle Server APIs. It must not write remote server identity into provider target namespaces.
+Rows live in `remote_hosts`. The remote host module owns connection lifecycle, health probing, and transparent upstream proxying to the connected remote Cradle Server. It must not write remote server identity into provider target namespaces.
 
 ## Files
 
-- `index.ts`: Elysia route surface under `/remote-hosts`, including host CRUD, `/cradle-server/connect`, `/cradle-server/disconnect`, `/cradle-server/health`, `/relay/claim`, and remote workspace file proxy routes.
-- `model.ts`: TypeBox request and response schemas for remote host config, relay claim input, remote Cradle Server health, workspace list, and file proxy responses.
-- `service.ts`: Drizzle-backed host registry, SSH/direct URL/relay connection lifecycle, relay pairing claim, health checks, and remote workspace proxy functions.
-- `remote-cradle-client.ts`: Small HTTP client for calling the target Cradle Server's existing `/health` and `/workspaces` APIs.
+- `index.ts`: Elysia route surface under `/remote-hosts`, including host CRUD, `/cradle-server/connect`, `/cradle-server/disconnect`, `/cradle-server/health`, `/relay/claim`, and the transparent upstream gateway at `/:hostId/upstream/*`.
+- `model.ts`: TypeBox request and response schemas for remote host config, relay claim input, and remote Cradle Server health.
+- `service.ts`: Drizzle-backed host registry, SSH/direct URL/relay connection lifecycle, relay pairing claim, health checks, and upstream-backed workspace/file helpers used by the workspace module.
+- `upstream.ts`: Transparent HTTP/SSE upstream fetch and proxy helpers that forward to the connected tunnel `localBaseUrl`.
 - `cradle-server-tunnel.ts`: OpenSSH local TCP port-forwarding helper for reaching a target Cradle Server through an SSH profile.
 
 ## Connection Config
@@ -72,9 +72,32 @@ The Cradle Server capability controls where the SSH tunnel connects after reachi
 
 For relay transport, the host-side connector always bridges to the host server's
 own configured local HTTP port. The controller still receives a local
-`localBaseUrl`, so `RemoteCradleClient` and workspace proxy routes do not need a
+`localBaseUrl`, so upstream forwarding and workspace helpers do not need a
 separate relay code path.
+
+## Upstream Gateway
+
+After connect, callers reach the remote Cradle Server through:
+
+    ALL /remote-hosts/:hostId/upstream/*
+
+This forwards method, query string, headers (minus hop-by-hop), and body to the
+connected `localBaseUrl`. Examples:
+
+- `GET /remote-hosts/:hostId/upstream/health`
+- `GET /remote-hosts/:hostId/upstream/workspaces`
+- `GET /remote-hosts/:hostId/upstream/workspaces/:id/files`
+
+The workspace module still exposes local `/workspaces/:id/files...` routes for
+registered remote locators; those call the upstream-backed helpers in
+`service.ts` rather than duplicating proxy routes here.
+
+Linked chat sessions (plan 033+) forward **all** `/chat/sessions/:localSessionId/*`
+requests through this gateway after rewriting to `remoteSessionId`, via the global
+`linkedChatSessionProxyPlugin` in `app.ts`. Session delete cascades through
+`DELETE /sessions/:id` upstream. See `session/remote-projection.ts` and
+`session/README.md`.
 
 ## Ownership Boundary
 
-This module deliberately does not define a second remote agent protocol. The target Cradle Server already owns workspace, session, runtime, provider, and file semantics. Local Cradle connects to that server and calls its HTTP APIs. If a new remote capability is needed, add it to the owning target Cradle Server module first, then proxy it here only when the local product needs that projection.
+This module deliberately does not define a second remote agent protocol. The target Cradle Server already owns workspace, session, runtime, provider, and file semantics. Local Cradle connects to that server and calls its HTTP APIs through the upstream gateway. If a new remote capability is needed, add it to the owning target Cradle Server module first; it becomes reachable automatically once exposed on the remote server.

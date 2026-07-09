@@ -15,6 +15,7 @@ import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import * as ChatRuntime from '../chat-runtime/runtime'
+import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../provider-contracts/types'
 import * as Session from '../session/service'
 import type { AutomationTrigger, DueOccurrence } from './scheduler'
@@ -41,7 +42,7 @@ export interface AutomationRecipe {
   providerTargetId?: string
   runtimeKind?: RuntimeKind
   modelId?: string
-  thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh'
+  thinkingEffort?: ChatThinkingEffort
 }
 
 export interface AutomationDefinitionView {
@@ -562,7 +563,7 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
     if (recipe.kind !== 'agent_task') {
       throw new Error(`Unsupported automation recipe kind: ${(recipe as { kind?: string }).kind}`)
     }
-    const session = Session.create({
+    const session = await Session.create({
       workspaceId: run.workspaceId,
       title: `Automation: ${getDefinitionRow(run.automationDefinitionId).title}`,
       origin: 'automation',

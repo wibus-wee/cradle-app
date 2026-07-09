@@ -20,6 +20,7 @@ import {
   resolveProviderRuntimeSession,
 } from '../provider-runtime/service'
 import { getProviderTarget, resolveProviderTargetForRuntime } from '../provider-targets/service'
+import { getRemoteSessionLink } from '../session/remote-projection'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { assertIsolationExecutionReady, resolveSessionExecutionRoot } from '../worktree/service'
@@ -72,6 +73,10 @@ export function getSessionRunContext(
 ): SessionRunContext | null {
   const session = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) {
+    return null
+  }
+  const remoteLink = getRemoteSessionLink(sessionId)
+  if (remoteLink) {
     return null
   }
   assertIsolationExecutionReady(session)
@@ -353,6 +358,19 @@ export function readSessionRequestedThinkingEffort(input: {
 }
 
 export function assertRunnableSession(sessionId: string): SessionRunContext {
+  const remoteLink = getRemoteSessionLink(sessionId)
+  if (remoteLink) {
+    throw new AppError({
+      code: 'chat_session_executes_on_remote_host',
+      status: 409,
+      message: 'This session executes on a remote Cradle Server; use the remote-host upstream APIs.',
+      details: {
+        sessionId,
+        hostId: remoteLink.hostId,
+        remoteSessionId: remoteLink.remoteSessionId,
+      },
+    })
+  }
   const context = getSessionRunContext(sessionId)
   if (!context) {
     throw new AppError({

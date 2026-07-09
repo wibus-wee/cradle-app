@@ -1988,7 +1988,7 @@ export type GetProviderTargetsByProviderTargetIdAuthDiagnosticsResponses = {
         status: 'ready' | 'warning' | 'error' | 'unknown';
         available: boolean;
         authStatus: 'authenticated' | 'unauthenticated' | 'unknown';
-        authMode: string | null;
+        authMode: 'apiKey' | 'claudeAi' | null;
         authType: string | null;
         authLabel: string | null;
         version: string | null;
@@ -2026,7 +2026,7 @@ export type GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponses
         refreshedAt: number | null;
         account: {
             authMode: string;
-            accountType: string | null;
+            accountType: 'apiKey' | 'chatgpt' | 'amazonBedrock' | null;
             email: string | null;
             planType: string | null;
             requiresOpenaiAuth: boolean | null;
@@ -2842,148 +2842,85 @@ export type PostRemoteHostsByHostIdRelayClaimResponses = {
 
 export type PostRemoteHostsByHostIdRelayClaimResponse = PostRemoteHostsByHostIdRelayClaimResponses[keyof PostRemoteHostsByHostIdRelayClaimResponses];
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesData = {
+export type AllRemoteHostsByHostIdUpstreamData = {
     body?: never;
     path: {
         hostId: string;
+        '*': string;
     };
     query?: never;
-    url: '/remote-hosts/{hostId}/cradle-server/workspaces';
+    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        workspaces: Array<{
-            id: string;
-            name: string;
-            locator: {
-                hostId: string;
-                path: string;
-                kind?: 'project' | 'managed-worktree';
-                sourceWorkspaceId?: string | null;
-            };
-            gitIdentity: {
-                originUrl?: string | null;
-                repoRoot?: string | null;
-                headSha?: string | null;
-                branch?: string | null;
-            };
-            identifier: string;
-            pinned: number;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-    };
-};
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesResponse = GetRemoteHostsByHostIdCradleServerWorkspacesResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesResponses];
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesData = {
+export type AllRemoteHostsByHostIdUpstream2Data = {
     body?: never;
     path: {
         hostId: string;
-        remoteWorkspaceId: string;
+        '*': string;
     };
     query?: never;
-    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files';
+    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        files: Array<{
-            type: 'file' | 'directory';
-            name: string;
-            path: string;
-        }>;
-    };
-};
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesResponses];
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenData = {
+export type AllRemoteHostsByHostIdUpstream3Data = {
     body?: never;
     path: {
         hostId: string;
-        remoteWorkspaceId: string;
+        '*': string;
     };
-    query?: {
-        path?: string;
-    };
-    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files/children';
+    query?: never;
+    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        files: Array<{
-            type: 'file' | 'directory';
-            name: string;
-            path: string;
-        }>;
-    };
-};
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesChildrenResponses];
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentData = {
+export type AllRemoteHostsByHostIdUpstream4Data = {
     body?: never;
     path: {
         hostId: string;
-        remoteWorkspaceId: string;
+        '*': string;
     };
-    query: {
-        path: string;
-    };
-    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files/content';
+    query?: never;
+    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        content: string | null;
-    };
-};
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesContentResponses];
-
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoData = {
+export type AllRemoteHostsByHostIdUpstream5Data = {
     body?: never;
     path: {
         hostId: string;
-        remoteWorkspaceId: string;
+        '*': string;
     };
-    query: {
-        path: string;
-    };
-    url: '/remote-hosts/{hostId}/cradle-server/workspaces/{remoteWorkspaceId}/files/info';
+    query?: never;
+    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        name: string;
-        path: string;
-        size: number;
-        modifiedAt: number;
-        mimeType: string;
-        extension: string;
-        previewKind: 'text' | 'markdown' | 'image' | 'pdf' | 'office' | 'unsupported';
-    } | null;
+export type AllRemoteHostsByHostIdUpstream6Data = {
+    body?: never;
+    path: {
+        hostId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponse = GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponses[keyof GetRemoteHostsByHostIdCradleServerWorkspacesByRemoteWorkspaceIdFilesInfoResponses];
+export type AllRemoteHostsByHostIdUpstream7Data = {
+    body?: never;
+    path: {
+        hostId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/remote-hosts/{hostId}/upstream/*';
+};
+
+export type AllRemoteHostsByHostIdUpstream8Data = {
+    body?: never;
+    path: {
+        hostId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/remote-hosts/{hostId}/upstream/*';
+};
 
 export type GetExternalIssueSourcesData = {
     body?: never;
@@ -3980,7 +3917,7 @@ export type PostProvidersModelsData = {
         };
         secretRef?: string | null;
         profileId?: string | null;
-        providerTargetKind?: string | unknown;
+        providerTargetKind?: 'manual' | 'external' | null;
         providerTargetId?: string | null;
         workspaceId?: string | null;
     };
@@ -4600,7 +4537,7 @@ export type GetAutomationsResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4653,7 +4590,7 @@ export type PostAutomationsData = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind?: 'agent' | 'user' | 'system';
         createdById?: string | null;
@@ -4706,7 +4643,7 @@ export type PostAutomationsResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4791,7 +4728,7 @@ export type GetAutomationsByIdResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4841,7 +4778,7 @@ export type PatchAutomationsByIdData = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind?: 'agent' | 'user' | 'system';
         createdById?: string | null;
@@ -4896,7 +4833,7 @@ export type PatchAutomationsByIdResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4961,7 +4898,7 @@ export type PostAutomationsByIdEnableResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -5026,7 +4963,7 @@ export type PostAutomationsByIdDisableResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -5095,7 +5032,7 @@ export type PostAutomationsByIdRunResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         chatSessionId: string | null;
         backendRunId: string | null;
@@ -5165,7 +5102,7 @@ export type GetAutomationsByIdRunsResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         chatSessionId: string | null;
         backendRunId: string | null;
@@ -5236,7 +5173,7 @@ export type GetAutomationsByIdRunsByRunIdResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         chatSessionId: string | null;
         backendRunId: string | null;
@@ -5478,7 +5415,7 @@ export type GetCronRunsResponses = {
             providerTargetId?: string;
             runtimeKind?: string;
             modelId?: string;
-            thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         };
         chatSessionId: string | null;
         backendRunId: string | null;
@@ -5602,15 +5539,22 @@ export type GetSessionsResponses = {
      */
     200: Array<{
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5627,7 +5571,7 @@ export type GetSessionsResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     }>;
@@ -5645,8 +5589,9 @@ export type PostSessionsData = {
         agentId?: string;
         runtimeKind?: string;
         runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
+            permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
+            accessMode?: 'approval-required' | 'full-access' | null;
+            interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
                     haiku?: string;
@@ -5654,8 +5599,15 @@ export type PostSessionsData = {
                     opus?: string;
                 };
             } | null;
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+                modelAliases?: {
+                    haiku?: string;
+                    sonnet?: string;
+                    opus?: string;
+                };
+            } | null | undefined;
         };
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         linkedIssueId?: string | null;
         sessionGroupId?: string | null;
         worktreeId?: string;
@@ -5672,15 +5624,22 @@ export type PostSessionsResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5697,7 +5656,7 @@ export type PostSessionsResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -5740,15 +5699,22 @@ export type GetSessionsByIdResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5765,7 +5731,7 @@ export type GetSessionsByIdResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -5779,7 +5745,7 @@ export type PatchSessionsByIdData = {
         pinned?: boolean;
         providerTargetId?: string;
         modelId?: string | null;
-        thinkingEffort?: string | null;
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         sessionGroupId?: string | null;
     };
     path: {
@@ -5795,15 +5761,22 @@ export type PatchSessionsByIdResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5820,7 +5793,7 @@ export type PatchSessionsByIdResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -5845,15 +5818,22 @@ export type PostSessionsByIdArchiveResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5870,7 +5850,7 @@ export type PostSessionsByIdArchiveResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -5893,15 +5873,22 @@ export type PostSessionsByIdReadResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5918,7 +5905,7 @@ export type PostSessionsByIdReadResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -5941,15 +5928,22 @@ export type PostSessionsByIdUnreadResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -5966,7 +5960,7 @@ export type PostSessionsByIdUnreadResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -6223,7 +6217,7 @@ export type GetSessionsByIdIsolationResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -6510,7 +6504,7 @@ export type GetSessionAwaitsResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -6552,7 +6546,7 @@ export type PostSessionAwaitsResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -6588,7 +6582,7 @@ export type GetSessionAwaitsByIdResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -6624,7 +6618,7 @@ export type PostSessionAwaitsByIdCancelResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -6663,7 +6657,7 @@ export type PostSessionAwaitsByIdTriggerResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -6702,7 +6696,7 @@ export type PostSessionAwaitsByIdRetryDeliveryResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -6810,7 +6804,7 @@ export type PostSessionAwaitsByIdBypassCheckResponses = {
         reason: string | null;
         resumeText: string | null;
         resumePayloadJson: string | null;
-        failureKind: string | null;
+        failureKind: 'source' | 'delivery' | null;
         bypassedChecksJson: string | null;
         createdAt: number;
         triggeredAt: number | null;
@@ -7432,15 +7426,22 @@ export type GetIssuesByIdSessionsResponses = {
      */
     200: Array<{
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -7457,7 +7458,7 @@ export type GetIssuesByIdSessionsResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     }>;
@@ -7623,11 +7624,11 @@ export type GetIssuesByIdActivityResponses = {
         };
         comment: {
             content: string;
-            systemKind: string | null;
+            systemKind: 'delegated' | 'system' | 'undelegated' | null;
         } | null;
         fieldChange: {
             action: 'added-description' | 'changed-field' | 'cleared-description' | 'renamed-issue' | 'updated-description';
-            field: string | null;
+            field: 'assignee' | 'description' | 'due-date' | 'labels' | 'metadata' | 'milestone' | 'parent' | 'priority' | 'status' | 'title' | 'workspace' | null;
             fromValue: {
                 kind: string;
                 timestamp: number;
@@ -8147,6 +8148,88 @@ export type GetSearchChronicleResponses = {
 
 export type GetSearchChronicleResponse = GetSearchChronicleResponses[keyof GetSearchChronicleResponses];
 
+export type GetPluginsMarketplaceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/plugins/marketplace';
+};
+
+export type GetPluginsMarketplaceResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        plugins: Array<{
+            id: string;
+            displayName: string;
+            description: string;
+            icon: string | null;
+            category: 'automation' | 'mcp' | 'integration' | 'skill' | 'dev';
+            tags: Array<string>;
+            author: {
+                name: string;
+                url: string | null;
+            };
+            homepage: string | null;
+            bundled: boolean;
+            source: {
+                kind: 'git' | 'npm';
+                location: string;
+                ref: string | null;
+                subPath: string | null;
+            } | null;
+            featured: boolean;
+            version: string | null;
+        }>;
+        stale: boolean;
+        fetchedAt: number | null;
+    };
+};
+
+export type GetPluginsMarketplaceResponse = GetPluginsMarketplaceResponses[keyof GetPluginsMarketplaceResponses];
+
+export type PostPluginsMarketplaceRefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/plugins/marketplace/refresh';
+};
+
+export type PostPluginsMarketplaceRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        plugins: Array<{
+            id: string;
+            displayName: string;
+            description: string;
+            icon: string | null;
+            category: 'automation' | 'mcp' | 'integration' | 'skill' | 'dev';
+            tags: Array<string>;
+            author: {
+                name: string;
+                url: string | null;
+            };
+            homepage: string | null;
+            bundled: boolean;
+            source: {
+                kind: 'git' | 'npm';
+                location: string;
+                ref: string | null;
+                subPath: string | null;
+            } | null;
+            featured: boolean;
+            version: string | null;
+        }>;
+        stale: boolean;
+        fetchedAt: number | null;
+    };
+};
+
+export type PostPluginsMarketplaceRefreshResponse = PostPluginsMarketplaceRefreshResponses[keyof PostPluginsMarketplaceRefreshResponses];
+
 export type GetPluginsData = {
     body?: never;
     path?: never;
@@ -8207,7 +8290,7 @@ export type GetPluginsResponses = {
             owner: string;
             localId: string;
             type: string;
-            layer: string | null;
+            layer: 'server' | 'web' | 'desktop' | null;
             label: string | null;
             description: string | null;
             permissions: Array<string>;
@@ -8349,7 +8432,7 @@ export type GetPluginsSourcesResponses = {
                 owner: string;
                 localId: string;
                 type: string;
-                layer: string | null;
+                layer: 'server' | 'web' | 'desktop' | null;
                 label: string | null;
                 description: string | null;
                 permissions: Array<string>;
@@ -8470,7 +8553,7 @@ export type PostPluginsSourcesResponses = {
                     owner: string;
                     localId: string;
                     type: string;
-                    layer: string | null;
+                    layer: 'server' | 'web' | 'desktop' | null;
                     label: string | null;
                     description: string | null;
                     permissions: Array<string>;
@@ -8556,7 +8639,7 @@ export type PostPluginsSourcesResponses = {
                 owner: string;
                 localId: string;
                 type: string;
-                layer: string | null;
+                layer: 'server' | 'web' | 'desktop' | null;
                 label: string | null;
                 description: string | null;
                 permissions: Array<string>;
@@ -8596,6 +8679,56 @@ export type PostPluginsSourcesResponses = {
 };
 
 export type PostPluginsSourcesResponse = PostPluginsSourcesResponses[keyof PostPluginsSourcesResponses];
+
+export type PostPluginsSourcesPreviewData = {
+    body: {
+        kind: 'git' | 'npm';
+        location: string;
+        ref?: string | null;
+        subPath?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/plugins/sources/preview';
+};
+
+export type PostPluginsSourcesPreviewResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            kind: 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+        };
+        plugins: Array<{
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconAvailable: boolean;
+            trusted: boolean;
+            trustReason: string | null;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            warnings: Array<string>;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+        }>;
+        warnings: Array<string>;
+    };
+};
+
+export type PostPluginsSourcesPreviewResponse = PostPluginsSourcesPreviewResponses[keyof PostPluginsSourcesPreviewResponses];
 
 export type DeletePluginsSourcesByIdData = {
     body?: never;
@@ -8691,7 +8824,7 @@ export type GetPluginsSourcesByIdResponses = {
                 owner: string;
                 localId: string;
                 type: string;
-                layer: string | null;
+                layer: 'server' | 'web' | 'desktop' | null;
                 label: string | null;
                 description: string | null;
                 permissions: Array<string>;
@@ -8803,7 +8936,7 @@ export type GetPluginsByRouteSegmentResponses = {
             owner: string;
             localId: string;
             type: string;
-            layer: string | null;
+            layer: 'server' | 'web' | 'desktop' | null;
             label: string | null;
             description: string | null;
             permissions: Array<string>;
@@ -8908,7 +9041,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
             owner: string;
             localId: string;
             type: string;
-            layer: string | null;
+            layer: 'server' | 'web' | 'desktop' | null;
             label: string | null;
             description: string | null;
             permissions: Array<string>;
@@ -8970,7 +9103,7 @@ export type GetSkillsResponses = {
         rootDir: string;
         skillDir: string;
         active: boolean;
-        shadowedBy: string | null;
+        shadowedBy: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent' | null;
     }>;
 };
 
@@ -9943,7 +10076,7 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -10194,7 +10327,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalWorkingTreeResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -10420,7 +10553,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompareResponses = 
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -10645,7 +10778,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -10868,7 +11001,7 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -11091,7 +11224,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdRefreshResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -11314,7 +11447,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCloseResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -11540,7 +11673,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdFilesByFileIdViewedR
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -11774,7 +11907,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -12000,7 +12133,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCom
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -12226,7 +12359,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdRea
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -12450,7 +12583,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdRes
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -12676,7 +12809,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses = {
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -12817,7 +12950,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateData = 
         runtimeKind?: string;
         modelId?: string | null;
         force?: boolean;
-        outputLocale?: string | null;
+        outputLocale?: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES' | null;
     };
     path: {
         workspaceId: string;
@@ -12946,7 +13079,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateRespons
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -13169,7 +13302,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancelResponses
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -13405,7 +13538,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesResponses 
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -13505,7 +13638,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         providerTargetId?: string | null;
         runtimeKind?: string | null;
         modelId?: string | null;
-        outputLocale?: string | null;
+        outputLocale?: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES' | null;
     };
     path: {
         workspaceId: string;
@@ -13635,7 +13768,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -13892,7 +14025,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -13992,7 +14125,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         providerTargetId?: string | null;
         runtimeKind?: string | null;
         modelId?: string | null;
-        outputLocale?: string | null;
+        outputLocale?: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES' | null;
     };
     path: {
         workspaceId: string;
@@ -14122,7 +14255,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -14346,7 +14479,7 @@ export type DeleteWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentF
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -14582,7 +14715,7 @@ export type PutWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPl
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -14808,7 +14941,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitP
         };
         guide: {
             revisionId: string | null;
-            status: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
             providerTargetId: string | null;
             runtimeKind: string | null;
             modelId: string | null;
@@ -16306,8 +16439,7 @@ export type GetChatSessionsBySessionIdRuntimeStatusResponses = {
         providerSessionId: string | null;
         modelId: string | null;
         runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
+            [key: string]: string | number | boolean;
         };
         pendingQueueItemId: string | null;
         hasActiveGoal: boolean;
@@ -16322,8 +16454,7 @@ export type GetChatSessionsBySessionIdRuntimeStatusResponses = {
             providerSessionId: string | null;
             queueItemId: string | null;
             runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
+                [key: string]: string | number | boolean;
             };
         } | null;
         latestRun: {
@@ -16336,8 +16467,7 @@ export type GetChatSessionsBySessionIdRuntimeStatusResponses = {
             providerSessionId: string | null;
             queueItemId: string | null;
             runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
+                [key: string]: string | number | boolean;
             };
         } | null;
         queue: {
@@ -16529,10 +16659,9 @@ export type GetChatSessionsBySessionIdQueueResponses = {
             }>;
             providerTargetId: string | null;
             modelId: string | null;
-            thinkingEffort: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
             runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
+                [key: string]: string | number | boolean;
             };
             position: number;
             sourceRunId: string | null;
@@ -16587,10 +16716,9 @@ export type PostChatSessionsBySessionIdQueueData = {
         }>;
         providerTargetId?: string;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
+            [key: string]: string | number | boolean | null;
         };
     };
     path: {
@@ -16648,10 +16776,9 @@ export type PostChatSessionsBySessionIdQueueResponses = {
         }>;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
+            [key: string]: string | number | boolean;
         };
         position: number;
         sourceRunId: string | null;
@@ -16780,10 +16907,9 @@ export type PostChatSessionsBySessionIdSteerResponses = {
             }>;
             providerTargetId: string | null;
             modelId: string | null;
-            thinkingEffort: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
             runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
+                [key: string]: string | number | boolean;
             };
             position: number;
             sourceRunId: string | null;
@@ -16857,10 +16983,9 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
             }>;
             providerTargetId: string | null;
             modelId: string | null;
-            thinkingEffort: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
             runtimeSettings: {
-                accessMode: 'approval-required' | 'full-access';
-                interactionMode: 'default' | 'plan';
+                [key: string]: string | number | boolean;
             };
             position: number;
             sourceRunId: string | null;
@@ -16932,10 +17057,9 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
         }>;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
+            [key: string]: string | number | boolean;
         };
         position: number;
         sourceRunId: string | null;
@@ -16989,10 +17113,9 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
         }>;
         providerTargetId?: string;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
+            [key: string]: string | number | boolean | null;
         };
     };
     path: {
@@ -17051,10 +17174,9 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
         }>;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
+            [key: string]: string | number | boolean;
         };
         position: number;
         sourceRunId: string | null;
@@ -17102,15 +17224,22 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
      */
     200: {
         id: string;
+        execution: {
+            kind: string;
+        } | {
+            kind: string;
+            hostId: string;
+            remoteSessionId: string;
+        };
         parentSessionId: string | null;
-        sideContextSource: string | null;
+        sideContextSource: 'provider-native' | 'cradle-context' | null;
         workspaceId: string | null;
         title: string | null;
         origin: string;
         providerTargetId: string | null;
         agentId: string | null;
         modelId: string | null;
-        thinkingEffort: string | null;
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
         linkedIssueId: string | null;
         sessionGroupId: string | null;
         runtimeKind: string;
@@ -17127,7 +17256,7 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         worktreeId: string | null;
         worktreeBranch: string | null;
         worktreePath: string | null;
-        worktreeHealth: string | null;
+        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
         pendingWorktreeId: string | null;
         isolationBoundaryRequired: boolean;
     };
@@ -17150,9 +17279,9 @@ export type GetChatSessionsBySessionIdRuntimeSettingsResponses = {
      */
     200: {
         sessionId: string;
+        runtimeKind: string;
         runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
+            [key: string]: string | number | boolean;
         };
         claudeAgent: {
             modelAliases: {
@@ -17169,8 +17298,9 @@ export type GetChatSessionsBySessionIdRuntimeSettingsResponse = GetChatSessionsB
 
 export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
     body: {
-        accessMode?: 'approval-required' | 'full-access';
-        interactionMode?: 'default' | 'plan';
+        permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
+        accessMode?: 'approval-required' | 'full-access' | null;
+        interactionMode?: 'default' | 'plan' | null;
         claudeAgent?: {
             modelAliases?: {
                 haiku?: string;
@@ -17178,6 +17308,13 @@ export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
                 opus?: string;
             };
         } | null;
+        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            modelAliases?: {
+                haiku?: string;
+                sonnet?: string;
+                opus?: string;
+            };
+        } | null | undefined;
     };
     path: {
         sessionId: string;
@@ -17192,9 +17329,9 @@ export type PatchChatSessionsBySessionIdRuntimeSettingsResponses = {
      */
     200: {
         sessionId: string;
+        runtimeKind: string;
         runtimeSettings: {
-            accessMode: 'approval-required' | 'full-access';
-            interactionMode: 'default' | 'plan';
+            [key: string]: string | number | boolean;
         };
         claudeAgent: {
             modelAliases: {
@@ -17260,10 +17397,9 @@ export type PostChatSessionsBySessionIdResponseData = {
         }>;
         providerTargetId?: string;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
+            [key: string]: string | number | boolean | null;
         };
     };
     path: {
@@ -17333,10 +17469,9 @@ export type PostChatSideConversationsBySideConversationIdResponseData = {
         }>;
         providerTargetId?: string;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
         runtimeSettings?: {
-            accessMode?: 'approval-required' | 'full-access';
-            interactionMode?: 'default' | 'plan';
+            [key: string]: string | number | boolean | null;
         };
     };
     path: {
@@ -18554,7 +18689,7 @@ export type GetChronicleMemoriesResponses = {
         createdAtUnix: number;
         content: string;
         modelId: string | null;
-        matchKind: string | null;
+        matchKind: 'keyword' | 'semantic' | 'hybrid' | null;
         keywordScore: number | null;
         semanticScore: number | null;
     }>;
@@ -20832,7 +20967,7 @@ export type GetChronicleMemoriesSearchResponses = {
         createdAtUnix: number;
         content: string;
         modelId: string | null;
-        matchKind: string | null;
+        matchKind: 'keyword' | 'semantic' | 'hybrid' | null;
         keywordScore: number | null;
         semanticScore: number | null;
     }>;
@@ -20881,7 +21016,7 @@ export type GetChronicleMemoriesByMemoryIdResponses = {
         createdAtUnix: number;
         content: string;
         modelId: string | null;
-        matchKind: string | null;
+        matchKind: 'keyword' | 'semantic' | 'hybrid' | null;
         keywordScore: number | null;
         semanticScore: number | null;
     };
@@ -20917,7 +21052,7 @@ export type PatchChronicleMemoriesByMemoryIdResponses = {
         createdAtUnix: number;
         content: string;
         modelId: string | null;
-        matchKind: string | null;
+        matchKind: 'keyword' | 'semantic' | 'hybrid' | null;
         keywordScore: number | null;
         semanticScore: number | null;
     };
