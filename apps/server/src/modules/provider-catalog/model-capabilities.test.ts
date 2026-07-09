@@ -44,12 +44,24 @@ describe('projectProviderModelCapabilities', () => {
     }).capabilities).toEqual({})
   })
 
-  it('projects Codex app-server reasoning efforts for OpenAI reasoning models', () => {
+  it('does not infer OpenAI-compatible reasoning efforts from model names', () => {
     expect(projectProviderModelCapabilities({
       id: 'gpt-5-codex',
       label: 'GPT-5 Codex',
       providerKind: 'openai-compatible',
       capabilities: {},
+    }).capabilities).toEqual({})
+  })
+
+  it('keeps explicit OpenAI-compatible reasoning efforts from the model list protocol', () => {
+    expect(projectProviderModelCapabilities({
+      id: 'gpt-5-codex',
+      label: 'GPT-5 Codex',
+      providerKind: 'openai-compatible',
+      capabilities: {
+        reasoning: true,
+        reasoningEfforts: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+      },
     }).capabilities).toEqual({
       reasoning: true,
       reasoningEfforts: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],

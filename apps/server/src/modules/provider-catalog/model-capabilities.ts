@@ -2,10 +2,7 @@ import type { ModelCapabilities, ModelDescriptor, ProviderKind } from '../provid
 
 const ANTHROPIC_INPUT_MODALITIES = ['text', 'image'] as const
 const ANTHROPIC_OUTPUT_MODALITIES = ['text'] as const
-const OPENAI_STANDARD_REASONING_EFFORTS = ['low', 'medium', 'high'] as const
-const CODEX_APP_SERVER_REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
 const CLAUDE_AGENT_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
-const OPENAI_EXTENDED_REASONING_MODEL_RE = /(?:^|[\s/:_-])(?:gpt-5(?:\.\d+)?|o1|o3|o4|gpt-oss|codex|deepseek-r1)(?:$|[\s:._-])/
 const CLAUDE_AGENT_REASONING_MODEL_RE = /(?:^|[\s/:_-])claude-(?:3[.-]7|opus-4|sonnet-4)(?:$|[\s:._-])/
 
 export function readProviderDefaultModelCapabilities(providerKind: ProviderKind): ModelCapabilities {
@@ -32,15 +29,6 @@ function readProviderReasoningEfforts(model: ModelDescriptor): ModelCapabilities
     return CLAUDE_AGENT_REASONING_MODEL_RE.test(searchable)
       ? [...CLAUDE_AGENT_REASONING_EFFORTS]
       : undefined
-  }
-
-  if (model.providerKind === 'openai-compatible') {
-    if (OPENAI_EXTENDED_REASONING_MODEL_RE.test(searchable)) {
-      return [...CODEX_APP_SERVER_REASONING_EFFORTS]
-    }
-    if (model.capabilities.reasoning === true) {
-      return [...OPENAI_STANDARD_REASONING_EFFORTS]
-    }
   }
 
   return undefined
