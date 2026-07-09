@@ -51,5 +51,8 @@
   "runtimeSettings.values.opencode.interactionMode.default": "构建",
   "runtimeSettings.values.opencode.interactionMode.plan": "计划",
   "status.thinking": "正在思考...",
-  "subagent.output.readOnly": "无法与 Subagent 交互"
+  "subagent.output.readOnly": "无法与 Subagent 交互",
+  "execution.badge": "在 {{hostName}} 上",
+  "execution.disconnected.message": "{{hostName}} 未连接。发送前请先连接。",
+  "execution.disconnected.unknownHost": "未找到远程主机 {{hostName}}。请在设置中重新连接。"
 }

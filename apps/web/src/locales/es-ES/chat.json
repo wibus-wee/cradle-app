@@ -51,5 +51,8 @@
   "runtimeSettings.values.opencode.interactionMode.default": "Construir",
   "runtimeSettings.values.opencode.interactionMode.plan": "Plan",
   "status.thinking": "Pensando...",
-  "subagent.output.readOnly": "No se puede interactuar con Subagent"
+  "subagent.output.readOnly": "No se puede interactuar con Subagent",
+  "execution.badge": "En {{hostName}}",
+  "execution.disconnected.message": "{{hostName}} está desconectado. Conéctalo antes de enviar.",
+  "execution.disconnected.unknownHost": "No se encontró el host remoto {{hostName}}. Vuelve a conectarlo en Ajustes."
 }

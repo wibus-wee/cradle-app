@@ -235,5 +235,6 @@
   "workspace.toast.openInFinderFailed": "No se pudo abrir el espacio de trabajo en Finder",
   "workspace.toast.recognitionOpenFailed": "Error al abrir el proyecto detectado.",
   "workspace.toast.recognitionSingleFailed": "Error al agregar el proyecto.",
-  "workspace.toast.renameFailed": "No se pudo renombrar el espacio de trabajo"
+  "workspace.toast.renameFailed": "No se pudo renombrar el espacio de trabajo",
+  "session.aria.remote": "Se ejecuta en el host remoto {{hostName}}"
 }

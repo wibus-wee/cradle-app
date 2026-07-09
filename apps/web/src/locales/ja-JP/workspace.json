@@ -235,5 +235,6 @@
   "workspace.toast.openInFinderFailed": "ワークスペースを Finder で開けませんでした",
   "workspace.toast.recognitionOpenFailed": "検出されたプロジェクトを開けませんでした。",
   "workspace.toast.recognitionSingleFailed": "プロジェクトの追加に失敗しました。",
-  "workspace.toast.renameFailed": "ワークスペース名を変更できませんでした"
+  "workspace.toast.renameFailed": "ワークスペース名を変更できませんでした",
+  "session.aria.remote": "リモートホスト {{hostName}} で実行"
 }

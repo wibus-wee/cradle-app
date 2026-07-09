@@ -235,5 +235,6 @@
   "workspace.toast.openInFinderFailed": "无法在 Finder 中打开工作区",
   "workspace.toast.recognitionOpenFailed": "打开检测到的项目失败。",
   "workspace.toast.recognitionSingleFailed": "添加项目失败。",
-  "workspace.toast.renameFailed": "无法重命名工作区"
+  "workspace.toast.renameFailed": "无法重命名工作区",
+  "session.aria.remote": "在远程主机 {{hostName}} 上运行"
 }
