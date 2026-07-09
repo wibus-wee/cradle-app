@@ -174,36 +174,6 @@ function assistantCompletedEvent(
   }
 }
 
-function assistantSnapshottedEvent(
-  sessionId: string,
-  runId: string,
-  messageId: string,
-  content: string,
-  updatedAt: number,
-): ChatSessionEvent {
-  const messageJson = JSON.stringify({
-    id: messageId,
-    role: 'assistant',
-    parts: [{ type: 'text', text: content }],
-  })
-  return {
-    type: 'AssistantMessageSnapshotted',
-    payload: {
-      runId,
-      message: {
-        id: messageId,
-        sessionId,
-        content,
-        messageJson,
-        status: 'streaming',
-        errorText: null,
-        updatedAt,
-      },
-      messageJsonBytes: Buffer.byteLength(messageJson),
-    },
-  }
-}
-
 function runCompletedEvent(input: {
   sessionId: string
   runId: string
@@ -342,9 +312,10 @@ describe('checkChatSessionProjectionParity', () => {
               providerTargetId: null,
               modelId: null,
               thinkingEffort: null,
-              permissionMode: null,
-              runtimeAccessMode: 'approval-required',
-              runtimeInteractionMode: 'default',
+              runtimeSettingsJson: JSON.stringify({
+                accessMode: 'approval-required',
+                interactionMode: 'default',
+              }),
               position: 1,
               sourceRunId: null,
               startedRunId: null,
@@ -617,7 +588,7 @@ describe('checkChatSessionProjectionParity', () => {
     })
   })
 
-  it('replays streaming assistant message snapshots without projection drift', async () => {
+  it('replays streaming runs without checkpoint projection drift', async () => {
     await withTempDataDir(() => {
       const sessionId = 'session-parity-streaming-snapshot'
       seedSession(sessionId)
@@ -628,13 +599,6 @@ describe('checkChatSessionProjectionParity', () => {
           messageId: 'assistant-streaming-snapshot',
           startedAt: 101,
         }),
-        assistantSnapshottedEvent(
-          sessionId,
-          'run-streaming-snapshot',
-          'assistant-streaming-snapshot',
-          'partial',
-          105,
-        ),
       ])
 
       expect(
@@ -645,8 +609,7 @@ describe('checkChatSessionProjectionParity', () => {
           .get(),
       ).toMatchObject({
         status: 'streaming',
-        content: 'partial',
-        updatedAt: 105,
+        content: '',
       })
 
       const report = checkChatSessionProjectionParity(sessionId)

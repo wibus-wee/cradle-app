@@ -179,6 +179,10 @@ export const composerDrafts = sqliteTable('composer_drafts', {
 // are same-transaction projections. Session metadata creation, archive, and deletion remain
 // owned by the session module. Payload JSON is versioned by chat-runtime-owned domain facts
 // and hydrated through upcasters before projection.
+//
+// Version contract: `version` is monotonically increasing per aggregate but NOT contiguous.
+// Consumers must use `version > lastSeen` (never assert `version === prev + 1`). Holes appear
+// when legacy checkpoint rows are purged or filtered at the read boundary.
 export const sessionEvents = sqliteTable('session_events', {
   sequenceId: int('sequence_id').primaryKey({ autoIncrement: true }),
   aggregateId: text('aggregate_id').notNull(),
@@ -207,6 +211,20 @@ export const sessionEvents = sqliteTable('session_events', {
     .where(sql`${table.eventType} in ('RunCompleted', 'RunFailed', 'RunAborted') and ${table.subjectRunId} is not null`),
 }))
 
+// Ephemeral streaming checkpoint state (not a domain fact). Overwritten while a run streams;
+// promoted into AssistantMessageCompleted on crash recovery; deleted on terminal commit.
+// FK-free like session_events — cleaned up explicitly on session delete / run terminal.
+export const runStreamCheckpoints = sqliteTable('run_stream_checkpoints', {
+  runId: text('run_id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  messageId: text('message_id').notNull(),
+  messageJson: text('message_json').notNull(),
+  chunkSeq: int('chunk_seq').notNull().default(0),
+  updatedAt: int('updated_at').notNull(),
+}, table => ({
+  bySession: index('run_stream_checkpoints_session_idx').on(table.sessionId),
+}))
+
 export type SessionGroup = typeof sessionGroups.$inferSelect
 export type NewSessionGroup = typeof sessionGroups.$inferInsert
 export type Session = typeof sessions.$inferSelect
@@ -223,3 +241,5 @@ export type ComposerDraftRow = typeof composerDrafts.$inferSelect
 export type NewComposerDraftRow = typeof composerDrafts.$inferInsert
 export type SessionEvent = typeof sessionEvents.$inferSelect
 export type NewSessionEvent = typeof sessionEvents.$inferInsert
+export type RunStreamCheckpoint = typeof runStreamCheckpoints.$inferSelect
+export type NewRunStreamCheckpoint = typeof runStreamCheckpoints.$inferInsert

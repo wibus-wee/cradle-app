@@ -3,8 +3,13 @@ import type { ChatMessageStatus } from '../run/stream-chunks'
 import type { RuntimeSettings } from '../runtime-provider-types'
 
 export const CHAT_SESSION_AGGREGATE_TYPE = 'ChatSession'
-export const CHAT_SESSION_EVENT_SCHEMA_VERSION = 2
+export const CHAT_SESSION_EVENT_SCHEMA_VERSION = 3
 
+/**
+ * Aggregate event versions are monotonically increasing but NOT contiguous.
+ * Legacy checkpoint facts (`AssistantMessageSnapshotted`) may leave holes after
+ * purge/filter. Consumers must use `version > lastSeen`, never `version === prev + 1`.
+ */
 export type ChatSessionEventSchemaVersion = typeof CHAT_SESSION_EVENT_SCHEMA_VERSION
 
 export type TerminalRunEventType = 'RunCompleted' | 'RunFailed' | 'RunAborted'
@@ -13,7 +18,6 @@ export type ChatSessionEventType
   = | 'UserMessageAppended'
     | 'MessageImported'
     | 'RunStarted'
-    | 'AssistantMessageSnapshotted'
     | 'AssistantMessageCompleted'
     | TerminalRunEventType
     | 'InteractionRequested'
@@ -30,6 +34,9 @@ export type ChatSessionEventType
     | 'SteerApplied'
     | 'LastTurnRolledBack'
     | 'TitleChanged'
+
+/** Legacy event type filtered at the read boundary; never re-emitted as a domain fact. */
+export const LEGACY_ASSISTANT_MESSAGE_SNAPSHOTTED_EVENT_TYPE = 'AssistantMessageSnapshotted'
 
 export type QueueProjectionStatus = 'pending' | 'running' | 'cancelled' | 'completed' | 'failed'
 
@@ -122,20 +129,6 @@ export interface AssistantMessageCompletedPayload extends VersionedChatSessionPa
     errorText: string | null
     updatedAt: number
   }
-}
-
-export interface AssistantMessageSnapshottedPayload extends VersionedChatSessionPayload {
-  runId: string
-  message: {
-    id: string
-    sessionId: string
-    content: string
-    messageJson: string
-    status: 'streaming'
-    errorText: null
-    updatedAt: number
-  }
-  messageJsonBytes: number
 }
 
 export interface RunTerminalPayload extends VersionedChatSessionPayload {
@@ -263,7 +256,6 @@ export type ChatSessionEvent
   = | { type: 'UserMessageAppended', payload: UserMessageAppendedPayload }
     | { type: 'MessageImported', payload: MessageImportedPayload }
     | { type: 'RunStarted', payload: RunStartedPayload }
-    | { type: 'AssistantMessageSnapshotted', payload: AssistantMessageSnapshottedPayload }
     | { type: 'AssistantMessageCompleted', payload: AssistantMessageCompletedPayload }
     | { type: 'RunCompleted', payload: RunTerminalPayload }
     | { type: 'RunFailed', payload: RunTerminalPayload }
@@ -291,6 +283,10 @@ type V1RunStartedPayload = Omit<RunStartedPayload, 'v'> & {
   assistantMessageProjection?: 'insert' | 'update' | null
 }
 
+export function isLegacyAssistantMessageSnapshottedRow(row: ChatSessionEventRow): boolean {
+  return row.eventType === LEGACY_ASSISTANT_MESSAGE_SNAPSHOTTED_EVENT_TYPE
+}
+
 export function serializeChatSessionEventPayload(event: ChatSessionEvent): string {
   return JSON.stringify(addCurrentPayloadVersion(event.payload))
 }
@@ -304,12 +300,21 @@ export function parseStoredChatSessionEvent(row: ChatSessionEventRow): StoredCha
   } as StoredChatSessionEvent
 }
 
+/**
+ * Upcast stored payload JSON to the current schema version.
+ * Legacy `AssistantMessageSnapshotted` rows are filtered before this is called
+ * (`readSessionEvents` / event-tail read paths); do not reintroduce that type here.
+ */
 export function upcastChatSessionEventPayload(
   eventType: ChatSessionEventType,
   rawPayload: ChatSessionEvent['payload'],
 ): ChatSessionEvent['payload'] {
   if (rawPayload.v === CHAT_SESSION_EVENT_SCHEMA_VERSION) {
     return rawPayload
+  }
+  // v2 payloads are structurally compatible with v3 (snapshot event removed from the union).
+  if (rawPayload.v === 2) {
+    return addCurrentPayloadVersion(rawPayload)
   }
   if (rawPayload.v !== undefined) {
     throw new Error(`Unsupported chat session event payload version: ${rawPayload.v}`)

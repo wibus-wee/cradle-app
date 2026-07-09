@@ -2,12 +2,17 @@ import type { UIMessageChunk } from 'ai'
 
 import { currentUnixSeconds } from '../../../helpers/time'
 import { evaluateIsolationBoundary } from '../../worktree/service'
-import { commitSessionEvents, readRunStopReason, readRunTerminalEventType } from '../es/commands'
+import {
+  commitSessionEventsWithProjection,
+  readRunStopReason,
+  readRunTerminalEventType,
+} from '../es/commands'
 import {
   compactStoredMessageSnapshot,
 } from '../message-snapshot-compaction'
 import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
 import { attachBinding } from '../runtime-session-context'
+import { deleteRunStreamCheckpoint } from '../stream/checkpoint-store'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
 import {
   extractMessageText,
@@ -152,35 +157,41 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
       const now = currentUnixSeconds()
       const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage))
       const messageJson = JSON.stringify(message)
-      await commitSessionEvents(activeRun.sessionId, [
-        {
-          type: 'AssistantMessageCompleted',
-          payload: {
-            message: {
-              id: activeRun.messageId,
-              sessionId: activeRun.sessionId,
-              content: extractMessageText(message),
-              messageJson,
-              status,
-              errorText,
-              updatedAt: now,
+      await commitSessionEventsWithProjection(
+        activeRun.sessionId,
+        [
+          {
+            type: 'AssistantMessageCompleted',
+            payload: {
+              message: {
+                id: activeRun.messageId,
+                sessionId: activeRun.sessionId,
+                content: extractMessageText(message),
+                messageJson,
+                status,
+                errorText,
+                updatedAt: now,
+              },
             },
           },
-        },
-        {
-          type: readRunTerminalEventType(status),
-          payload: {
-            runId: activeRun.runId,
-            sessionId: activeRun.sessionId,
-            queueItemId: activeRun.queueItemId ?? null,
-            ...(bindingId !== undefined ? { bindingId } : {}),
-            status,
-            stopReason: readRunStopReason(status),
-            errorText,
-            finishedAt: now,
+          {
+            type: readRunTerminalEventType(status),
+            payload: {
+              runId: activeRun.runId,
+              sessionId: activeRun.sessionId,
+              queueItemId: activeRun.queueItemId ?? null,
+              ...(bindingId !== undefined ? { bindingId } : {}),
+              status,
+              stopReason: readRunStopReason(status),
+              errorText,
+              finishedAt: now,
+            },
           },
+        ],
+        (tx) => {
+          deleteRunStreamCheckpoint(activeRun.runId, tx)
         },
-      ])
+      )
       return { messageJsonBytes: Buffer.byteLength(messageJson) }
     }
  catch (error) {

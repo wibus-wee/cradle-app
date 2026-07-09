@@ -430,7 +430,6 @@ export const sessionTailEventTypeSchema = t.Union([
   t.Literal('UserMessageAppended'),
   t.Literal('MessageImported'),
   t.Literal('RunStarted'),
-  t.Literal('AssistantMessageSnapshotted'),
   t.Literal('AssistantMessageCompleted'),
   t.Literal('RunCompleted'),
   t.Literal('RunFailed'),

@@ -234,34 +234,32 @@ describe('chat session event tail', () => {
     expect(JSON.stringify(tailEvent.payload)).not.toContain('messageJson')
   })
 
-  it('projects assistant message snapshots to slim message refresh DTOs', () => {
+  it('projects assistant message completed events to slim message refresh DTOs', () => {
     const event = storedEvent({
-      type: 'AssistantMessageSnapshotted',
+      type: 'AssistantMessageCompleted',
       payload: {
-        runId: 'run-1',
         message: {
           id: 'assistant-1',
           sessionId: 'session-1',
-          content: 'partial secret transcript content',
+          content: 'final secret transcript content',
           messageJson: '{"id":"assistant-1","role":"assistant","parts":[]}',
-          status: 'streaming',
+          status: 'complete',
           errorText: null,
           updatedAt: 150,
         },
-        messageJsonBytes: 52,
       },
     })
 
     const tailEvent = toChatSessionTailEvent(event)
 
     expect(tailEvent).toMatchObject({
-      type: 'AssistantMessageSnapshotted',
+      type: 'AssistantMessageCompleted',
       payload: {
         messageId: 'assistant-1',
-        status: 'streaming',
+        status: 'complete',
       },
     })
-    expect(JSON.stringify(tailEvent.payload)).not.toContain('partial secret transcript content')
+    expect(JSON.stringify(tailEvent.payload)).not.toContain('final secret transcript content')
     expect(JSON.stringify(tailEvent.payload)).not.toContain('messageJson')
   })
 

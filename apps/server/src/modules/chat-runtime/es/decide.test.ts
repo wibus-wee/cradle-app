@@ -113,33 +113,6 @@ function runCompleted(runId: string): Extract<ChatSessionEvent, { type: 'RunComp
   }
 }
 
-function assistantSnapshotted(
-  runId: string,
-  messageId: string,
-): Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }> {
-  const messageJson = JSON.stringify({
-    id: messageId,
-    role: 'assistant',
-    parts: [{ type: 'text', text: 'partial' }],
-  })
-  return {
-    type: 'AssistantMessageSnapshotted',
-    payload: {
-      runId,
-      message: {
-        id: messageId,
-        sessionId: 'session-1',
-        content: 'partial',
-        messageJson,
-        status: 'streaming',
-        errorText: null,
-        updatedAt: 110,
-      },
-      messageJsonBytes: Buffer.byteLength(messageJson),
-    },
-  }
-}
-
 describe('decide', () => {
   it('rejects starting a second active top-level run', () => {
     const state = createInitialChatSessionState('session-1')
@@ -173,58 +146,6 @@ describe('decide', () => {
       error: {
         code: 'run_not_active',
         details: { activeRunId: 'run-1', runId: 'run-2' },
-      },
-    })
-  })
-
-  it('accepts assistant message snapshots for a streaming run', () => {
-    const state = createInitialChatSessionState('session-1')
-    evolveChatSessionState(state, stored(1, runStarted('run-1', 'assistant-1')))
-    const event = assistantSnapshotted('run-1', 'assistant-1')
-
-    expect(decide(state, { type: 'snapshotAssistantMessage', event })).toEqual({
-      ok: true,
-      events: [event],
-    })
-  })
-
-  it('rejects assistant message snapshots after the run is terminal', () => {
-    const state = createInitialChatSessionState('session-1')
-    evolveChatSessionState(state, stored(1, runStarted('run-1', 'assistant-1')))
-    evolveChatSessionState(state, stored(2, runCompleted('run-1')))
-
-    const result = decide(state, {
-      type: 'snapshotAssistantMessage',
-      event: assistantSnapshotted('run-1', 'assistant-1'),
-    })
-
-    expect(result).toMatchObject({
-      ok: false,
-      error: {
-        code: 'run_not_active',
-        details: { activeRunId: null, runId: 'run-1' },
-      },
-    })
-  })
-
-  it('rejects assistant message snapshots for a different run message', () => {
-    const state = createInitialChatSessionState('session-1')
-    evolveChatSessionState(state, stored(1, runStarted('run-1', 'assistant-1')))
-
-    const result = decide(state, {
-      type: 'snapshotAssistantMessage',
-      event: assistantSnapshotted('run-1', 'assistant-2'),
-    })
-
-    expect(result).toMatchObject({
-      ok: false,
-      error: {
-        code: 'run_message_mismatch',
-        details: {
-          runId: 'run-1',
-          messageId: 'assistant-2',
-          expectedMessageId: 'assistant-1',
-        },
       },
     })
   })
@@ -266,7 +187,6 @@ describe('decide', () => {
     const state = createInitialChatSessionState('session-1')
     const events = [
       runStarted('run-1', 'assistant-1'),
-      assistantSnapshotted('run-1', 'assistant-1'),
       runCompleted('run-1'),
     ]
 

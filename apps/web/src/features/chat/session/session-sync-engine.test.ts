@@ -222,12 +222,9 @@ describe('sessionSyncEngine', () => {
     expect(callbacks.onSessionSummaryChanged).toHaveBeenCalledTimes(1)
   })
 
-  it('does not request a snapshot for snapshotted messages with an active stream lease', () => {
+  it('requests a snapshot refresh for completed assistant messages', () => {
     const source = new FakeEventSource()
-    const callbacks = {
-      ...createCallbacks(),
-      hasStreamLease: vi.fn((messageId: string) => messageId === 'assistant-1'),
-    }
+    const callbacks = createCallbacks()
     const engine = new SessionSyncEngine({
       sessionId: 'session-1',
       serverBaseUrl: 'http://127.0.0.1:21423',
@@ -241,16 +238,15 @@ describe('sessionSyncEngine', () => {
       sessionId: 'session-1',
       sequenceId: 1,
       version: 1,
-      type: 'AssistantMessageSnapshotted',
+      type: 'AssistantMessageCompleted',
       occurredAt: 100,
       payload: {
-        runId: 'run-1',
-        message: { id: 'assistant-1' },
+        messageId: 'assistant-1',
+        status: 'complete',
       },
     })
 
-    expect(callbacks.hasStreamLease).toHaveBeenCalledWith('assistant-1')
-    expect(callbacks.onMessagesChanged).not.toHaveBeenCalled()
+    expect(callbacks.onMessagesChanged).toHaveBeenCalledTimes(1)
     expect(callbacks.onRuntimeUiSlotStatesChanged).toHaveBeenCalledTimes(1)
   })
 

@@ -26,10 +26,6 @@ export type ChatSessionDecisionResult
 
 export type ChatSessionCommand
   = | { type: 'startRun', event: Extract<ChatSessionEvent, { type: 'RunStarted' }> }
-    | {
-      type: 'snapshotAssistantMessage'
-      event: Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }>
-    }
     | { type: 'completeRun', event: Extract<ChatSessionEvent, { type: 'RunCompleted' }> }
     | { type: 'failRun', event: Extract<ChatSessionEvent, { type: 'RunFailed' }> }
     | { type: 'abortRun', event: Extract<ChatSessionEvent, { type: 'RunAborted' }> }
@@ -44,8 +40,6 @@ export function decide(
   switch (command.type) {
     case 'startRun':
       return decideStartRun(state, command.event)
-    case 'snapshotAssistantMessage':
-      return decideAssistantMessageSnapshot(state, command.event)
     case 'completeRun':
     case 'failRun':
     case 'abortRun':
@@ -127,30 +121,6 @@ function decideTerminalRun(
   return { ok: true, events: [event] }
 }
 
-function decideAssistantMessageSnapshot(
-  state: ChatSessionState,
-  event: Extract<ChatSessionEvent, { type: 'AssistantMessageSnapshotted' }>,
-): ChatSessionDecisionResult {
-  if (state.runStatusById.get(event.payload.runId) !== 'streaming') {
-    return domainError('run_not_active', 'Snapshot event does not match an active run', {
-      activeRunId: state.activeRun?.runId ?? null,
-      runId: event.payload.runId,
-      eventType: event.type,
-    })
-  }
-
-  const messageId = state.runMessageIdById.get(event.payload.runId)
-  if (messageId !== event.payload.message.id) {
-    return domainError('run_message_mismatch', 'Snapshot event does not match the run message', {
-      runId: event.payload.runId,
-      messageId: event.payload.message.id,
-      expectedMessageId: messageId ?? null,
-    })
-  }
-
-  return { ok: true, events: [event] }
-}
-
 function decideClaimQueueItem(
   state: ChatSessionState,
   event: Extract<ChatSessionEvent, { type: 'QueueItemClaimed' }>,
@@ -184,8 +154,6 @@ function commandForEvent(event: ChatSessionEvent): ChatSessionCommand {
   switch (event.type) {
     case 'RunStarted':
       return { type: 'startRun', event }
-    case 'AssistantMessageSnapshotted':
-      return { type: 'snapshotAssistantMessage', event }
     case 'RunCompleted':
       return { type: 'completeRun', event }
     case 'RunFailed':
@@ -221,8 +189,6 @@ function readSyntheticSubjectRunId(event: ChatSessionEvent): string | null {
   switch (event.type) {
     case 'RunStarted':
       return event.payload.run.id
-    case 'AssistantMessageSnapshotted':
-      return event.payload.runId
     case 'RunCompleted':
     case 'RunFailed':
     case 'RunAborted':

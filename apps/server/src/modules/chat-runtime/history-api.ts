@@ -7,6 +7,7 @@ import { db } from '../../infra'
 import { compactStoredMessageSnapshotForRead } from './message-snapshot-compaction'
 import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
+import { readRunStreamCheckpointsBySession } from './stream/checkpoint-store'
 import {
   extractMessageText,
   parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot,
@@ -98,11 +99,27 @@ export async function getMessageGroups(sessionId: string): Promise<ChatMessageSn
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()
 
+  // Overlay ephemeral streaming checkpoints onto projection rows. Checkpoints are
+  // not projected into `messages` during streaming; this preserves ~10s partial
+  // text freshness for passive window refresh without polluting the fact log.
+  const checkpointByMessageId = new Map(
+    readRunStreamCheckpointsBySession(sessionId).map(checkpoint => [
+      checkpoint.messageId,
+      checkpoint,
+    ]),
+  )
+
   return rows.map((row) => {
     const role = row.role as 'user' | 'assistant'
-    const parsedMessage = parseStoredMessageSnapshot(row, role)
+    const checkpoint
+      = row.status === 'streaming' ? checkpointByMessageId.get(row.id) : undefined
+    const messageJson = checkpoint?.messageJson ?? row.messageJson
+    const parsedMessage = parseStoredMessageSnapshot(
+      { ...row, messageJson },
+      role,
+    )
     const message = compactStoredMessageSnapshotForRead({
-      rawJson: row.messageJson,
+      rawJson: messageJson,
       message: parsedMessage,
     })
     if (message.id !== row.id || message.role !== role) {

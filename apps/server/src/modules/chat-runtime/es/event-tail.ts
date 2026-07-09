@@ -4,7 +4,10 @@ import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm'
 
 import { db } from '../../../infra'
 import type { StoredChatSessionEvent } from './events'
-import { parseStoredChatSessionEvent } from './events'
+import {
+  isLegacyAssistantMessageSnapshottedRow,
+  parseStoredChatSessionEvent,
+} from './events'
 
 const encoder = new TextEncoder()
 const DEFAULT_TAIL_LIMIT = 500
@@ -90,7 +93,9 @@ function readSessionTailReplay(input: ChatSessionTailQuery): ChatTailReplay<Chat
     }
   }
 
-  const events = rows.map(row => toChatSessionTailEvent(parseStoredChatSessionEvent(row)))
+  const events = rows
+    .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
+    .map(row => toChatSessionTailEvent(parseStoredChatSessionEvent(row)))
   return {
     events,
     cursor: events.at(-1)?.version ?? input.afterVersion,
@@ -151,10 +156,12 @@ function readGlobalSessionTailReplay(
     }
   }
 
-  const events: ChatGlobalSessionTailEvent[] = rows.map((row) => {
-    const event = toChatSessionTailEvent(parseStoredChatSessionEvent(row))
-    return { ...event, scope: 'sessions' as const }
-  })
+  const events: ChatGlobalSessionTailEvent[] = rows
+    .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
+    .map((row) => {
+      const event = toChatSessionTailEvent(parseStoredChatSessionEvent(row))
+      return { ...event, scope: 'sessions' as const }
+    })
   return {
     events,
     cursor: events.at(-1)?.sequenceId ?? input.afterSequenceId,
@@ -431,7 +438,6 @@ function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['p
         queueItemId: event.payload.queueItemId ?? null,
         ...(event.payload.runtimeSettings ? { runtimeSettings: event.payload.runtimeSettings } : {}),
       }
-    case 'AssistantMessageSnapshotted':
     case 'AssistantMessageCompleted':
       return {
         messageId: event.payload.message.id,

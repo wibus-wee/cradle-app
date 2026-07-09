@@ -9,6 +9,7 @@ import {
   chatSessionQueueItems,
   messages,
   providerTargets,
+  runStreamCheckpoints,
   sessionEvents,
   sessions,
   workspaces,
@@ -5187,7 +5188,7 @@ describe('chat runtime capability', () => {
     }
   })
 
-  it('persists active streaming snapshots in message rows', async () => {
+  it('persists active streaming snapshots in run_stream_checkpoints', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -5245,9 +5246,21 @@ describe('chat runtime capability', () => {
       expect(assistantRow).toEqual(
         expect.objectContaining({
           status: 'streaming',
-          content: 'Side response',
+          content: '',
         }),
       )
+      const checkpoint = db()
+        .select()
+        .from(runStreamCheckpoints)
+        .where(eq(runStreamCheckpoints.runId, run.id))
+        .get()
+      expect(checkpoint).toEqual(
+        expect.objectContaining({
+          sessionId: 'session-chat-active-snapshot',
+          messageId: run.messageId,
+        }),
+      )
+      expect(checkpoint?.messageJson).toContain('Side response')
 
       db()
         .update(backendRuns)
@@ -5277,6 +5290,14 @@ describe('chat runtime capability', () => {
           status: 'failed',
           content: 'terminal response',
           errorText: 'persisted terminal failure',
+        }),
+      )
+      // Stale active-run flush must not keep writing after the run is terminal.
+      expect(
+        db().select().from(runStreamCheckpoints).where(eq(runStreamCheckpoints.runId, run.id)).get(),
+      ).toEqual(
+        expect.objectContaining({
+          messageId: run.messageId,
         }),
       )
     }

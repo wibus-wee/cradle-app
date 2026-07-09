@@ -800,7 +800,6 @@ export type ChatSessionTailEventType
   = | 'UserMessageAppended'
     | 'MessageImported'
     | 'RunStarted'
-    | 'AssistantMessageSnapshotted'
     | 'AssistantMessageCompleted'
     | 'RunCompleted'
     | 'RunFailed'

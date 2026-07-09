@@ -8,14 +8,13 @@ import {
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
 import { applyPlanImplementationApprovalResponse } from '../interaction/plan-implementation-message'
-import { normalizeQueueItemRuntimeSettingsJson } from '../queue/session-queue'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
+import { normalizeQueueItemRuntimeSettingsJson } from '../queue/session-queue'
 import type { ChatMessageStatus } from '../run/stream-chunks'
 import { parseStoredMessageSnapshot } from '../stream/projection'
 import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
 import type { ChatRuntimeWriteDb } from './event-store'
 import type {
-  AssistantMessageSnapshottedPayload,
   ChatSessionEvent,
   PlanImplementationRespondedPayload,
   QueueItemCancelledPayload,
@@ -87,9 +86,6 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
         })
       }
       touchSession(d, event.payload.run.chatSessionId, event.payload.run.startedAt)
-      break
-    case 'AssistantMessageSnapshotted':
-      projectAssistantMessageSnapshotted(d, event.payload)
       break
     case 'AssistantMessageCompleted':
       d.update(messages)
@@ -178,29 +174,6 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
         .run()
       break
   }
-}
-
-function projectAssistantMessageSnapshotted(
-  d: ProjectorDb,
-  payload: AssistantMessageSnapshottedPayload,
-): void {
-  d.update(messages)
-    .set({
-      content: payload.message.content,
-      messageJson: payload.message.messageJson,
-      status: payload.message.status,
-      errorText: payload.message.errorText,
-      updatedAt: payload.message.updatedAt,
-    })
-    .where(
-      and(
-        eq(messages.id, payload.message.id),
-        eq(messages.sessionId, payload.message.sessionId),
-        eq(messages.role, 'assistant'),
-      ),
-    )
-    .run()
-  touchSession(d, payload.message.sessionId, payload.message.updatedAt)
 }
 
 function hasProjectedMessage(

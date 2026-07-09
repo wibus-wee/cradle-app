@@ -1,7 +1,16 @@
 import { randomUUID } from 'node:crypto'
 
 import type { Message, Session } from '@cradle/db'
-import { agents, backendRuns, backendSessionBindings, messages, sessionGroups, sessions } from '@cradle/db'
+import {
+  agents,
+  backendRuns,
+  backendSessionBindings,
+  messages,
+  runStreamCheckpoints,
+  sessionEvents,
+  sessionGroups,
+  sessions,
+} from '@cradle/db'
 import { and, desc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -14,8 +23,8 @@ import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
 import { commitSessionEventsWithProjection } from '../chat-runtime/es/commands'
 import type {
-  RuntimeSettingsPatch,
   ChatThinkingEffort,
+  RuntimeSettingsPatch,
 } from '../chat-runtime/runtime-provider-types'
 import type { SessionClaudeAgentConfigPatchInput } from '../chat-runtime/runtime-settings'
 import {
@@ -1005,7 +1014,11 @@ function cleanupSessionResources(id: string): void {
 
 export function remove(id: string): void {
   cleanupSessionResources(id)
-  db().delete(sessions).where(eq(sessions.id, id)).run()
+  db().transaction((tx) => {
+    tx.delete(runStreamCheckpoints).where(eq(runStreamCheckpoints.sessionId, id)).run()
+    tx.delete(sessionEvents).where(eq(sessionEvents.aggregateId, id)).run()
+    tx.delete(sessions).where(eq(sessions.id, id)).run()
+  })
 }
 
 type SessionDeleteDb = Pick<ReturnType<typeof db>, 'select' | 'delete'>
@@ -1016,6 +1029,10 @@ function deleteSessionIdsInDb(ids: string[], d: SessionDeleteDb): void {
   }
 
   if (ids.length > 0) {
+    // Explicitly clean ephemeral checkpoints and the append-only fact log.
+    // Projection tables cascade from sessions FK; session_events / checkpoints do not.
+    d.delete(runStreamCheckpoints).where(inArray(runStreamCheckpoints.sessionId, ids)).run()
+    d.delete(sessionEvents).where(inArray(sessionEvents.aggregateId, ids)).run()
     d.delete(sessions).where(inArray(sessions.id, ids)).run()
   }
 }

@@ -2,7 +2,6 @@ import type { UIMessageChunk } from 'ai'
 
 import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { currentUnixSeconds } from '../../../helpers/time'
-import { recordAssistantMessageSnapshot } from '../es/commands'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import {
   flushFinalMessageProjection,
@@ -21,7 +20,8 @@ import {
 import type { ActiveRun } from '../run-registry'
 import { runRegistry } from '../run-registry'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
-import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
+import { normalizeMessageSnapshot } from '../ui-message'
+import { upsertRunStreamCheckpoint } from './checkpoint-store'
 import {
   DEFAULT_RUN_DELTA_FLUSH_CHARS,
   DEFAULT_RUN_DELTA_FLUSH_MS,
@@ -68,9 +68,11 @@ export function createActiveRunStreamController(
     }
   }
 
-  // Fenced streaming snapshot fact writer. The persisted run row is checked
-  // before appending so a stale active run cannot enqueue a snapshot after a
-  // terminal projection has already won.
+  // Fenced streaming checkpoint writer. Upserts ephemeral run_stream_checkpoints
+  // state (not a domain fact). The persisted run row is checked before writing
+  // so a stale active run cannot overwrite after a terminal projection has won.
+  // `messages` is NOT touched here — projections are written only by projectors
+  // reacting to facts; partial content is overlaid at the history read path.
   async function persistStreamingMessageSnapshot(activeRun: ActiveRun): Promise<void> {
     const fence = readRunWriteFence(activeRun.runId)
     if (fence.status === 'streaming') {
@@ -85,16 +87,13 @@ export function createActiveRunStreamController(
 
       activeRun.pendingStreamingSnapshotMessageJson = messageJson
       try {
-        await recordAssistantMessageSnapshot({
-          sessionId: activeRun.sessionId,
+        upsertRunStreamCheckpoint({
           runId: activeRun.runId,
-          message: {
-            id: activeRun.messageId,
-            content: extractMessageText(message),
-            messageJson,
-            updatedAt: currentUnixSeconds(),
-          },
-          messageJsonBytes: Buffer.byteLength(messageJson),
+          sessionId: activeRun.sessionId,
+          messageId: activeRun.messageId,
+          messageJson,
+          chunkSeq: 0,
+          updatedAt: currentUnixSeconds(),
         })
         activeRun.lastStreamingSnapshotMessageJson = messageJson
       }
@@ -104,7 +103,7 @@ export function createActiveRunStreamController(
           deps.releaseStaleActiveRun(activeRun, latestFence)
           return
         }
-        deps.error('failed to persist streaming message snapshot fact', {
+        deps.error('failed to persist streaming message checkpoint', {
           error,
           sessionId: activeRun.sessionId,
           runId: activeRun.runId,

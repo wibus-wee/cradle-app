@@ -20,7 +20,6 @@ export interface SessionSyncEngineCallbacks {
   onRuntimeUiSlotStatesChanged: () => void
   onQueueChanged: () => void
   onSessionSummaryChanged: () => void
-  hasStreamLease?: (messageId: string) => boolean
   onSnapshotRequired?: () => void
   onError?: (error: unknown) => void
 }
@@ -80,7 +79,6 @@ export interface SessionSyncEngineOptions {
 const MESSAGE_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'UserMessageAppended',
   'MessageImported',
-  'AssistantMessageSnapshotted',
   'AssistantMessageCompleted',
   'PlanImplementationResponded',
   'SteerApplied',
@@ -286,9 +284,7 @@ export class SessionSyncEngine {
       this.stopPassiveStream()
     }
     if (MESSAGE_EVENT_TYPES.has(event.type)) {
-      if (!this.shouldSkipMessageSnapshotRefresh(event)) {
-        this.callbacks.onMessagesChanged()
-      }
+      this.callbacks.onMessagesChanged()
       this.callbacks.onRuntimeUiSlotStatesChanged()
     }
     if (RUN_EVENT_TYPES.has(event.type)) {
@@ -314,14 +310,6 @@ export class SessionSyncEngine {
     this.callbacks.onRuntimeUiSlotStatesChanged()
     this.callbacks.onQueueChanged()
     this.callbacks.onSessionSummaryChanged()
-  }
-
-  private shouldSkipMessageSnapshotRefresh(event: ChatSessionTailEvent): boolean {
-    if (event.type !== 'AssistantMessageSnapshotted') {
-      return false
-    }
-    const messageId = readTailMessageId(event)
-    return Boolean(messageId && this.callbacks.hasStreamLease?.(messageId))
   }
 }
 
@@ -360,18 +348,4 @@ function readChatSessionTailEvent(value: string, sessionId: string): ChatSession
  catch {
     return null
   }
-}
-
-function readTailMessageId(event: ChatSessionTailEvent): string | null {
-  const payload = event.payload as {
-    messageId?: unknown
-    message?: { id?: unknown }
-  }
-  if (typeof payload.messageId === 'string') {
-    return payload.messageId
-  }
-  if (typeof payload.message?.id === 'string') {
-    return payload.message.id
-  }
-  return null
 }

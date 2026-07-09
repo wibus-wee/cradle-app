@@ -27,7 +27,6 @@ export interface GlobalSessionSyncEngineOptions {
 const SESSION_SUMMARY_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'UserMessageAppended',
   'MessageImported',
-  'AssistantMessageSnapshotted',
   'RunStarted',
   'InteractionRequested',
   'InteractionResolved',

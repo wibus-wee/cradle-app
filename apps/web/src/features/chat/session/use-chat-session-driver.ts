@@ -124,9 +124,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
           controlsRef.current.refreshSessionLists()
           controlsRef.current.scheduleSnapshotRefresh(0)
         },
-        hasStreamLease: (messageId) => {
-          return useChatStore.getState().streamLeaseMap.has(messageId)
-        },
         onSnapshotRequired: () => {
           controlsRef.current.refreshSessionLists()
         },

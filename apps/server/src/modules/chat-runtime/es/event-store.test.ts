@@ -51,7 +51,7 @@ describe('appendSessionEvent', () => {
           },
         })
         expect(stored.version).toBe(1)
-        expect(stored.payload.v).toBe(2)
+        expect(stored.payload.v).toBe(3)
 
         expect(() =>
           appendSessionEvent(tx, {

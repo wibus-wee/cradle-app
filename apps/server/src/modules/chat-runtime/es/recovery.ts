@@ -1,20 +1,23 @@
-import type { BackendRun, ChatSessionQueueItem, Message } from '@cradle/db'
+import type { BackendRun, ChatSessionQueueItem, Message, RunStreamCheckpoint } from '@cradle/db'
 import {
   backendRuns,
   backendRunSnapshots,
   chatSessionQueueItems,
   messages,
+  runStreamCheckpoints,
   sessionEvents,
 } from '@cradle/db'
 import { and, desc, eq, or, sql } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
-import { getDefaultRuntimeSettings } from '../runtime-settings'
-import { parseStoredMessageSnapshot } from '../ui-message'
+import {
+  deleteRunStreamCheckpoint,
+  readRunStreamCheckpoint,
+} from '../stream/checkpoint-store'
+import { extractMessageText, parseStoredMessageSnapshot } from '../ui-message'
 import {
   appendDecidedSessionEvents,
-  commitSessionEventsInTransaction,
   readRunStopReason,
   readRunTerminalEventType,
 } from './commands'
@@ -36,6 +39,7 @@ export interface ChatRuntimeRecoveryResult {
 }
 
 export async function recoverChatRuntimeProjections(): Promise<ChatRuntimeRecoveryResult> {
+  deleteStaleTerminalRunCheckpoints()
   return {
     interruptedRunsFinalized: await finalizeInterruptedSessionEventStreams(),
     terminalFactsProjected: await projectTerminalRunFacts(),
@@ -46,6 +50,7 @@ export async function recoverChatRuntimeProjections(): Promise<ChatRuntimeRecove
 export async function recoverChatRuntimeSession(
   sessionId: string,
 ): Promise<ChatRuntimeRecoveryResult> {
+  deleteStaleTerminalRunCheckpoints(sessionId)
   return {
     interruptedRunsFinalized: await finalizeInterruptedRunsForSession(sessionId),
     terminalFactsProjected: await projectTerminalRunFactsForSession(sessionId),
@@ -155,6 +160,9 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
   return commitRecoverySessionEventsInTransaction(run.chatSessionId, {
     events,
     alreadyProjectedCount: bootstrapEvents.length,
+    afterAppend: (tx) => {
+      deleteRunStreamCheckpoint(run.id, tx)
+    },
   })
 }
 
@@ -276,24 +284,24 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
     return []
   }
 
+  const checkpoint = readRunStreamCheckpoint(runId)
   const message = run.messageId ? readMessage(sessionId, run.messageId) : null
   const finishedAt = currentUnixSeconds()
   const queueItemId = readRunQueueItemId(sessionId, runId)
   const bootstrapEvents = readMissingRunBootstrapEvents({ run, message, queueItemId })
   const events: ChatSessionEvent[] = [...bootstrapEvents]
-  if (message) {
+  const completedMessage = readInterruptedAssistantMessage({
+    sessionId,
+    run,
+    message,
+    checkpoint,
+    finishedAt,
+  })
+  if (completedMessage) {
     events.push({
       type: 'AssistantMessageCompleted',
       payload: {
-        message: {
-          id: message.id,
-          sessionId,
-          content: message.content,
-          messageJson: normalizeTerminalMessageJson(message),
-          status: 'failed',
-          errorText: INTERRUPTED_RUN_ERROR_TEXT,
-          updatedAt: finishedAt,
-        },
+        message: completedMessage,
       },
     })
   }
@@ -313,7 +321,54 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
   return commitRecoverySessionEventsInTransaction(sessionId, {
     events,
     alreadyProjectedCount: bootstrapEvents.length,
+    afterAppend: (tx) => {
+      deleteRunStreamCheckpoint(runId, tx)
+    },
   })
+}
+
+function readInterruptedAssistantMessage(input: {
+  sessionId: string
+  run: BackendRun
+  message: Message | null | undefined
+  checkpoint: RunStreamCheckpoint | undefined
+  finishedAt: number
+}): {
+  id: string
+  sessionId: string
+  content: string
+  messageJson: string
+  status: 'failed'
+  errorText: string
+  updatedAt: number
+} | null {
+  const messageId = input.checkpoint?.messageId ?? input.run.messageId ?? input.message?.id
+  if (!messageId) {
+    return null
+  }
+
+  const messageJson = input.checkpoint
+    ? input.checkpoint.messageJson
+    : input.message
+      ? normalizeTerminalMessageJson(input.message)
+      : JSON.stringify({ id: messageId, role: 'assistant', parts: [] })
+  let content = input.message?.content ?? ''
+  try {
+    content = extractMessageText(parseStoredMessageSnapshot(messageJson))
+  }
+ catch {
+    // Keep projection content when checkpoint JSON is malformed.
+  }
+
+  return {
+    id: messageId,
+    sessionId: input.sessionId,
+    content,
+    messageJson,
+    status: 'failed',
+    errorText: INTERRUPTED_RUN_ERROR_TEXT,
+    updatedAt: input.finishedAt,
+  }
 }
 
 function commitRecoverySessionEventsInTransaction(
@@ -321,6 +376,7 @@ function commitRecoverySessionEventsInTransaction(
   input: {
     events: ChatSessionEvent[]
     alreadyProjectedCount: number
+    afterAppend?: (tx: Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0]) => void
   },
 ): StoredChatSessionEvent[] {
   if (input.events.length === 0) {
@@ -338,8 +394,32 @@ function commitRecoverySessionEventsInTransaction(
         },
       }),
     )
+    input.afterAppend?.(tx)
   })
   return storedEvents
+}
+
+function deleteStaleTerminalRunCheckpoints(sessionId?: string): void {
+  const predicate = sessionId
+    ? and(
+        eq(runStreamCheckpoints.sessionId, sessionId),
+        sql`exists (
+          select 1
+          from ${sessionEvents}
+          where ${sessionEvents.aggregateId} = ${runStreamCheckpoints.sessionId}
+            and ${sessionEvents.subjectRunId} = ${runStreamCheckpoints.runId}
+            and ${sessionEvents.eventType} in ('RunCompleted', 'RunFailed', 'RunAborted')
+        )`,
+      )
+    : sql`exists (
+        select 1
+        from ${sessionEvents}
+        where ${sessionEvents.aggregateId} = ${runStreamCheckpoints.sessionId}
+          and ${sessionEvents.subjectRunId} = ${runStreamCheckpoints.runId}
+          and ${sessionEvents.eventType} in ('RunCompleted', 'RunFailed', 'RunAborted')
+      )`
+
+  db().delete(runStreamCheckpoints).where(predicate).run()
 }
 
 function readMissingRunBootstrapEvents(input: {
@@ -437,20 +517,24 @@ function abortProjectedStreamingRunInActor(
     return []
   }
   const finishedAt = currentUnixSeconds()
+  const checkpoint = readRunStreamCheckpoint(runId)
   const message = run.messageId ? readMessage(run.chatSessionId, run.messageId) : null
   const events: ChatSessionEvent[] = []
-  if (message) {
+  const completedMessage = readInterruptedAssistantMessage({
+    sessionId: run.chatSessionId,
+    run,
+    message,
+    checkpoint,
+    finishedAt,
+  })
+  if (completedMessage) {
     events.push({
       type: 'AssistantMessageCompleted',
       payload: {
         message: {
-          id: message.id,
-          sessionId: run.chatSessionId,
-          content: message.content,
-          messageJson: normalizeTerminalMessageJson(message),
+          ...completedMessage,
           status: 'aborted',
           errorText: null,
-          updatedAt: finishedAt,
         },
       },
     })
@@ -468,7 +552,12 @@ function abortProjectedStreamingRunInActor(
       finishedAt,
     },
   })
-  return commitSessionEventsInTransaction(run.chatSessionId, events)
+  const storedEvents: StoredChatSessionEvent[] = []
+  db().transaction((tx) => {
+    storedEvents.push(...appendDecidedSessionEvents(tx, run.chatSessionId, events))
+    deleteRunStreamCheckpoint(runId, tx)
+  })
+  return storedEvents
 }
 
 function readRun(sessionId: string, runId: string): BackendRun | undefined {

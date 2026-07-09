@@ -214,37 +214,6 @@ export async function recordImportedSessionMessages(input: {
   )
 }
 
-export async function recordAssistantMessageSnapshot(input: {
-  sessionId: string
-  runId: string
-  message: {
-    id: string
-    content: string
-    messageJson: string
-    updatedAt: number
-  }
-  messageJsonBytes: number
-}): Promise<void> {
-  await commitSessionEvents(input.sessionId, [
-    {
-      type: 'AssistantMessageSnapshotted',
-      payload: {
-        runId: input.runId,
-        message: {
-          id: input.message.id,
-          sessionId: input.sessionId,
-          content: input.message.content,
-          messageJson: input.message.messageJson,
-          status: 'streaming',
-          errorText: null,
-          updatedAt: input.message.updatedAt,
-        },
-        messageJsonBytes: input.messageJsonBytes,
-      },
-    },
-  ])
-}
-
 export function clearProviderTargetFromSessionQueuesInTransaction(
   tx: ChatRuntimeTx,
   input: {

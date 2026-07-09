@@ -88,20 +88,6 @@ export function evolveChatSessionState(
         })
       }
       break
-    case 'AssistantMessageSnapshotted':
-      state.messageStatusById.set(event.payload.message.id, 'streaming')
-      state.runStatusById.set(event.payload.runId, 'streaming')
-      try {
-        state.assistantMessageById.set(
-          event.payload.message.id,
-          JSON.parse(event.payload.message.messageJson) as UIMessage,
-        )
-      }
- catch {
-        // Decision-making only needs the run/message status; malformed snapshots
-        // should not prevent terminal recovery from applying later facts.
-      }
-      break
     case 'AssistantMessageCompleted':
       state.messageStatusById.set(event.payload.message.id, event.payload.message.status)
       try {

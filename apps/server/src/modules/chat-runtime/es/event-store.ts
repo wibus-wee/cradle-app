@@ -7,9 +7,10 @@ import { db } from '../../../infra'
 import type { ChatSessionEvent, StoredChatSessionEvent } from './events'
 import {
   CHAT_SESSION_AGGREGATE_TYPE,
+  isLegacyAssistantMessageSnapshottedRow,
   parseStoredChatSessionEvent,
   serializeChatSessionEventPayload,
-  } from './events'
+} from './events'
 
 type ChatRuntimeDb = ReturnType<typeof db>
 export type ChatRuntimeTx = Parameters<Parameters<ChatRuntimeDb['transaction']>[0]>[0]
@@ -78,12 +79,16 @@ export function readSessionEvents(
   aggregateId: string,
   d: Pick<ChatRuntimeWriteDb, 'select'> = db(),
 ): StoredChatSessionEvent[] {
+  // Filter legacy AssistantMessageSnapshotted rows at the read boundary so
+  // reducers/projectors/tail never see checkpoint-masquerading-as-fact events.
+  // Aggregate versions remain monotonic but may have holes after purge/filter.
   return d
     .select()
     .from(sessionEvents)
     .where(eq(sessionEvents.aggregateId, aggregateId))
     .orderBy(sessionEvents.version)
     .all()
+    .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
     .map(parseStoredChatSessionEvent)
 }
 

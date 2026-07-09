@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto'
 import type { UIMessageChunk } from 'ai'
 
 import { currentUnixSeconds } from '../../../helpers/time'
-import { commitSessionEvents, readRunStopReason, readRunTerminalEventType } from '../es/commands'
+import { commitSessionEventsWithProjection, readRunStopReason, readRunTerminalEventType } from '../es/commands'
 import type { BackendRunStartedFact } from '../es/events'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
 import type { ProviderSyntheticTurnEvent, RuntimeSession } from '../runtime-provider-types'
 import { attachBinding } from '../runtime-session-context'
+import { deleteRunStreamCheckpoint } from '../stream/checkpoint-store'
 import { providerThreadStreamStore } from '../stream/live-run-streams'
 import {
   createAssistantMessage,
@@ -165,57 +166,63 @@ async function finalizeProviderSyntheticTurn(
     finishedAt: null,
   } satisfies BackendRunStartedFact
   syntheticTurn.runId = run.id
-  await commitSessionEvents(syntheticTurn.sessionId, [
-    {
-      type: 'RunStarted',
-      payload: {
-        run,
-        assistantMessage: {
-          id: syntheticTurn.messageId,
-          sessionId: syntheticTurn.sessionId,
-          parentMessageId: null,
-          parentToolCallId: null,
-          taskId: null,
-          depth: 0,
-          role: 'assistant',
-          status: 'streaming',
-          content: extractMessageText(message),
-          messageJson,
-          errorText: null,
-          createdAt: now,
-          updatedAt: now,
+  await commitSessionEventsWithProjection(
+    syntheticTurn.sessionId,
+    [
+      {
+        type: 'RunStarted',
+        payload: {
+          run,
+          assistantMessage: {
+            id: syntheticTurn.messageId,
+            sessionId: syntheticTurn.sessionId,
+            parentMessageId: null,
+            parentToolCallId: null,
+            taskId: null,
+            depth: 0,
+            role: 'assistant',
+            status: 'streaming',
+            content: extractMessageText(message),
+            messageJson,
+            errorText: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          queueItemId: null,
         },
-        queueItemId: null,
       },
-    },
-    {
-      type: 'AssistantMessageCompleted',
-      payload: {
-        message: {
-          id: syntheticTurn.messageId,
+      {
+        type: 'AssistantMessageCompleted',
+        payload: {
+          message: {
+            id: syntheticTurn.messageId,
+            sessionId: syntheticTurn.sessionId,
+            content: extractMessageText(message),
+            messageJson,
+            status,
+            errorText,
+            updatedAt: now,
+          },
+        },
+      },
+      {
+        type: readRunTerminalEventType(status),
+        payload: {
+          runId: run.id,
           sessionId: syntheticTurn.sessionId,
-          content: extractMessageText(message),
-          messageJson,
+          queueItemId: null,
+          ...(bindingId !== undefined ? { bindingId } : {}),
           status,
+          stopReason: readRunStopReason(status),
           errorText,
-          updatedAt: now,
+          finishedAt: now,
         },
       },
+    ],
+    (tx) => {
+      deleteRunStreamCheckpoint(run.id, tx)
     },
-    {
-      type: readRunTerminalEventType(status),
-      payload: {
-        runId: run.id,
-        sessionId: syntheticTurn.sessionId,
-        queueItemId: null,
-        ...(bindingId !== undefined ? { bindingId } : {}),
-        status,
-        stopReason: readRunStopReason(status),
-        errorText,
-        finishedAt: now,
-      },
-    },
-  ])
+  )
 }
 
 function recordProviderSyntheticTurnBindingId(
