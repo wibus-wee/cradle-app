@@ -196,6 +196,16 @@ export function openAwaits(options: { replace?: boolean } = {}): void {
   }, options)
 }
 
+export function openPluginCenter(options: { replace?: boolean } = {}): void {
+  openSurface({
+    id: 'plugin-center',
+    kind: 'plugin-center',
+    title: getI18n().t('settings:plugins.center.title'),
+    route: { to: '/plugins' },
+    closable: true,
+  }, options)
+}
+
 export function openAutomation(options: { replace?: boolean } = {}): void {
   openSurface({
     id: 'automation',

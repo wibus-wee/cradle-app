@@ -26,6 +26,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
+import { openPluginCenter } from '~/navigation/navigation-commands'
 import { cn } from '~/lib/cn'
 
 type SettingsKey = keyof typeof import('~/locales/default').default.settings
@@ -36,6 +37,9 @@ interface SettingsNavItem {
   icon: typeof PaletteIcon
   /** i18n keys for internal options that should be searchable */
   searchKeys?: SettingsKey[]
+  /** Optional override: if set, clicking this item opens a different surface
+   * (e.g. the Plugin Center) instead of switching the settings overlay section. */
+  onActivate?: () => void
 }
 
 interface SettingsSection {
@@ -149,7 +153,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     labelKey: 'sidebar.section.extensions',
     items: [
-      { id: 'plugins', labelKey: 'nav.plugins', icon: PlugIcon },
+      { id: 'plugins', labelKey: 'nav.plugins', icon: PlugIcon, onActivate: openPluginCenter },
       {
         id: 'integrations',
         labelKey: 'nav.integrations',
@@ -328,11 +332,11 @@ export function SettingsSidebar({ activeSection, onSetSection, onClose }: Settin
             <span className="px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground select-none">
               {t(labelKey)}
             </span>
-            {items.map(({ id, labelKey: itemLabelKey, icon: Icon }) => (
+            {items.map(({ id, labelKey: itemLabelKey, icon: Icon, onActivate }) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => onSetSection(id)}
+                onClick={() => (onActivate ? onActivate() : onSetSection(id))}
                 data-testid={`settings-nav-${id}`}
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',

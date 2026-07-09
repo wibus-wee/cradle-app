@@ -14,7 +14,6 @@ import { FeatureSettings } from './feature-settings'
 import { IntegrationsSettings } from './integrations-settings'
 import { JarvisSettings } from './jarvis-settings'
 import { ModelRegistrySettings } from './model-registry-settings'
-import { PluginsSettings } from './plugins-settings'
 import { RemoteHostsSettings } from './remote-hosts-settings'
 import { ServerEndpointSettings } from './server-endpoint-settings'
 import { ShortcutSettings } from './shortcut-settings'
@@ -30,7 +29,6 @@ const SECTION_MAP: Record<string, React.ComponentType> = {
   await: AwaitSettings,
   worktrees: WorktreeSettings,
   jarvis: JarvisSettings,
-  plugins: PluginsSettings,
   chronicle: ChronicleSettings,
   remoteHosts: RemoteHostsSettings,
   integrations: IntegrationsSettings,

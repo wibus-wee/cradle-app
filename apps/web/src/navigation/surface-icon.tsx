@@ -39,6 +39,8 @@ export function SurfaceIcon({ surface, className }: { surface: Pick<AppSurface, 
       return <KanbanSquareIcon className={cls} />
     case 'plugin':
       return <Plugin2Line className={cls} />
+    case 'plugin-center':
+      return <Plugin2Line className={cls} />
     case 'awaits':
       return <CircleDotIcon className={cls} />
     case 'automation':
