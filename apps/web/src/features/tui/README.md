@@ -8,7 +8,8 @@ Uses HTTP only for PTY resource lifecycle (`start-or-attach`, `delete`) and a sh
 
 ## Files
 
-- **app-theme.ts**: `getAppTerminalTheme()` — reads CSS variables from the app theme at runtime to produce an xterm ITheme.
+- **app-theme.ts**: `getAppTerminalTheme()` — reads explicit theme color overrides when present and otherwise preserves the terminal-native Light/Dark palette; its watcher also notifies terminals when the active theme profile changes.
+- **terminal-font.ts**: Resolves the active theme Code font first, then falls back to the legacy PR #11 terminal preference and finally the product default stack.
 - **keyboard-handler.ts**: `attachMacKeyboardHandler()` — maps macOS shortcuts (Cmd/Option+arrows, Cmd+Delete) to ANSI sequences.
 - **pty-protocol.ts**: Shared PTY WebSocket message types and JSON parser for `snapshot` / `output` / `exit` / `pong` / `error`.
 - **pty-protocol.test.ts**: Unit coverage for PTY WebSocket server event parsing, invalid payload rejection, and nullable exit fields.

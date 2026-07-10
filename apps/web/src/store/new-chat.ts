@@ -22,7 +22,10 @@ interface NewChatState {
   lastModelByRuntime: Record<string, string>
   /** map of profileId → draft Claude Agent model alias overrides */
   lastClaudeAgentByProfile: Record<string, NewChatClaudeAgentConfig>
+  /** Global fallback when no provider-specific thinking is stored */
   lastThinkingEffort: PersistedThinkingEffort
+  /** map of profileId → last selected thinking effort for that provider */
+  lastThinkingByProfile: Record<string, PersistedThinkingEffort>
   lastRuntimeSettingsByKind: Partial<Record<RuntimeKind, RuntimeSettings>>
   setLastRuntimeKind: (kind: RuntimeKind | null) => void
   setLastAgentId: (id: string | null) => void
@@ -31,6 +34,7 @@ interface NewChatState {
   setLastModelForRuntime: (runtimeKind: RuntimeKind, modelId: string | null) => void
   setLastClaudeAgentForProfile: (profileId: string, config: NewChatClaudeAgentConfig | null) => void
   setLastThinkingEffort: (effort: PersistedThinkingEffort) => void
+  setLastThinkingForProfile: (profileId: string, effort: PersistedThinkingEffort) => void
   patchLastRuntimeSettings: (runtimeKind: RuntimeKind, patch: RuntimeSettingsPatch) => void
   getLastModelForProfile: (profileId: string) => string | undefined
   reconcileProfiles: (profileIds: string[]) => void
@@ -70,6 +74,7 @@ export const useNewChatStore = create<NewChatState>()(
       lastModelByRuntime: {},
       lastClaudeAgentByProfile: {},
       lastThinkingEffort: 'high',
+      lastThinkingByProfile: {},
       lastRuntimeSettingsByKind: {},
       setLastRuntimeKind: (kind) => {
         set((state) => {
@@ -154,6 +159,24 @@ export const useNewChatStore = create<NewChatState>()(
           return { lastThinkingEffort: effort }
         })
       },
+      setLastThinkingForProfile: (profileId, effort) => {
+        set((state) => {
+          if (effort === null) {
+            if (!(profileId in state.lastThinkingByProfile)) {
+              return state
+            }
+            const next = { ...state.lastThinkingByProfile }
+            delete next[profileId]
+            return { lastThinkingByProfile: next }
+          }
+          if (state.lastThinkingByProfile[profileId] === effort) {
+            return state
+          }
+          return {
+            lastThinkingByProfile: { ...state.lastThinkingByProfile, [profileId]: effort },
+          }
+        })
+      },
       patchLastRuntimeSettings: (runtimeKind, patch) => {
         set((state) => {
           const current = state.lastRuntimeSettingsByKind[runtimeKind] ?? {}
@@ -193,14 +216,24 @@ export const useNewChatStore = create<NewChatState>()(
           const lastClaudeAgentByProfile = Object.fromEntries(
             Object.entries(state.lastClaudeAgentByProfile).filter(([profileId]) => allowed.has(profileId)),
           )
+          const lastThinkingByProfile = Object.fromEntries(
+            Object.entries(state.lastThinkingByProfile).filter(([profileId]) => allowed.has(profileId)),
+          )
 
           const modelsUnchanged = Object.keys(state.lastModelByProfile).length === Object.keys(lastModelByProfile).length
             && Object.entries(lastModelByProfile).every(([profileId, modelId]) => state.lastModelByProfile[profileId] === modelId)
           const claudeAgentsUnchanged = Object.keys(state.lastClaudeAgentByProfile).length === Object.keys(lastClaudeAgentByProfile).length
             && Object.entries(lastClaudeAgentByProfile).every(([profileId, config]) =>
               areClaudeAgentConfigsEqual(state.lastClaudeAgentByProfile[profileId] ?? null, config))
+          const thinkingUnchanged = Object.keys(state.lastThinkingByProfile).length === Object.keys(lastThinkingByProfile).length
+            && Object.entries(lastThinkingByProfile).every(([profileId, effort]) => state.lastThinkingByProfile[profileId] === effort)
 
-          if (state.lastAgentProfileId === lastAgentProfileId && modelsUnchanged && claudeAgentsUnchanged) {
+          if (
+            state.lastAgentProfileId === lastAgentProfileId
+            && modelsUnchanged
+            && claudeAgentsUnchanged
+            && thinkingUnchanged
+          ) {
             return state
           }
 
@@ -208,6 +241,7 @@ export const useNewChatStore = create<NewChatState>()(
             lastAgentProfileId,
             lastModelByProfile,
             lastClaudeAgentByProfile,
+            lastThinkingByProfile,
           }
         })
       },
@@ -215,7 +249,7 @@ export const useNewChatStore = create<NewChatState>()(
     {
       name: 'cradle:new-chat:v1',
       storage: persistStorage,
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
         if (version < 2) {
@@ -227,11 +261,19 @@ export const useNewChatStore = create<NewChatState>()(
                 codex: legacy,
                 opencode: legacy,
               },
+              lastThinkingByProfile: {},
             }
           }
           return {
             ...state,
             lastRuntimeSettingsByKind: {},
+            lastThinkingByProfile: {},
+          }
+        }
+        if (version < 3) {
+          return {
+            ...state,
+            lastThinkingByProfile: {},
           }
         }
         return persisted as NewChatState

@@ -55,10 +55,13 @@ import {
   postSessionsByIdArchive,
   postSessionsByIdRead,
   postSessionsByIdUnread,
+  postWorksByIdArchive,
 } from '~/api-gen'
 import {
   getRemoteHostsOptions,
   getSessionsByIdQueryKey,
+  getWorksByIdQueryKey,
+  getWorksQueryKey,
   patchWorkspacesByWorkspaceIdMutation,
   postWorkspacesByWorkspaceIdFilesFileMutation,
   postWorkspacesByWorkspaceIdFilesFolderMutation,
@@ -116,6 +119,7 @@ import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
+import type { WorkSummary } from '~/features/work/use-work'
 import { useWorkspaceWorks } from '~/features/work/use-work'
 import { WorkSidebarSection } from '~/features/work/work-sidebar-section'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
@@ -135,17 +139,19 @@ import {
   openNewWork,
   openSettingsSection,
   openUsage,
+  openWork,
   openWorkspaceDetail,
 } from '~/navigation/navigation-commands'
 import type { ScreenCoordinates } from '~/navigation/screen-coordinates'
 import { getEventScreenCoordinates, isPointerOutsideWindow } from '~/navigation/screen-coordinates'
-import { chatSurfaceId } from '~/navigation/surface-identity'
-import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
+import { chatSurfaceId, workSurfaceId } from '~/navigation/surface-identity'
+import { openTearoffChatSessionWindow, openTearoffSurfaceWindow } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
 import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
+import { SessionRenameInput } from './session-rename-input'
 import type { WorkspaceSession } from './use-session'
 import { isManualSession, sessionsQueryKey, updateSessionReadState, useAllSessions } from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
@@ -299,75 +305,6 @@ function isSessionRecent(session: WorkspaceSession, currentUnixTimestamp: number
   return session.listActivityAt >= currentUnixTimestamp - RECENT_SESSION_WINDOW_SECONDS
 }
 
-function SessionRenameInput({
-  initialTitle,
-  sessionId,
-  pinned,
-  listActivityAt,
-  onCommit,
-  onCancel,
-}: {
-  initialTitle: string
-  sessionId: string
-  pinned: boolean
-  listActivityAt: number
-  onCommit: (nextTitle: string) => Promise<void>
-  onCancel: () => void
-}) {
-  const { t } = useTranslation('workspace')
-  const renameInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      renameInputRef.current?.focus()
-      renameInputRef.current?.select()
-    })
-
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
-
-  return (
-    <fieldset
-      className="m-0 flex min-w-0 flex-1 items-center gap-2 border-0 p-0 px-2.5 py-1.5 text-sidebar-foreground/80"
-      onClick={e => e.stopPropagation()}
-      onKeyDown={e => e.stopPropagation()}
-    >
-      {pinned
-? (
-        <PinIcon
-          className="size-3 shrink-0 !text-primary/60"
-          aria-label={t('session.aria.pinned')}
-          data-testid={`session-pin-indicator-${sessionId}`}
-        />
-      )
-: null}
-      <input
-        ref={renameInputRef}
-        aria-label="Rename session"
-        defaultValue={initialTitle}
-        onBlur={(e) => {
-          void onCommit(e.currentTarget.value)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            void onCommit(e.currentTarget.value)
-          }
- else if (e.key === 'Escape') {
-            e.preventDefault()
-            onCancel()
-          }
-        }}
-        data-testid={`session-rename-input-${sessionId}`}
-        className="min-w-0 flex-1 bg-transparent text-left text-xs text-sidebar-foreground/90 outline-none placeholder:text-muted-foreground/40"
-      />
-      <span className="shrink-0 text-[11px] text-muted-foreground">
-        {formatRelativeTime(listActivityAt, t)}
-      </span>
-    </fieldset>
-  )
-}
-
 function formatRelativeTime(unixTimestamp: number, t: WorkspaceTranslation): string {
   const now = Math.floor(Date.now() / 1000)
   const diff = now - unixTimestamp
@@ -421,6 +358,7 @@ type RuntimeIconByKind = ReadonlyMap<RuntimeKind, RuntimeIconDescriptor>
 
 type SessionMenuRequest = {
   sessionId: string
+  workId: string | null
   anchor: SessionMenuAnchor
   surface: SessionMenuSurface
 }
@@ -428,6 +366,7 @@ type SessionMenuRequest = {
 type SessionMenuState = {
   open: boolean
   sessionId: string | null
+  workId: string | null
   anchor: SessionMenuAnchor | null
   surface: SessionMenuSurface
 }
@@ -435,6 +374,7 @@ type SessionMenuState = {
 const CLOSED_SESSION_MENU_STATE: SessionMenuState = {
   open: false,
   sessionId: null,
+  workId: null,
   anchor: null,
   surface: 'button',
 }
@@ -477,6 +417,7 @@ function SessionMenuActionItems({
 function SessionActionsMenu({
   state,
   session,
+  work,
   workspaceId,
   sessionGroups,
   onOpenChange,
@@ -488,6 +429,7 @@ function SessionActionsMenu({
 }: {
   state: SessionMenuState
   session: WorkspaceSession | null
+  work: WorkSummary | null
   workspaceId: string
   sessionGroups: WorkspaceSessionGroup[]
   onOpenChange: (open: boolean) => void
@@ -512,16 +454,26 @@ function SessionActionsMenu({
       queryClient.invalidateQueries({
         queryKey: getSessionsByIdQueryKey({ path: { id: session.id } }),
       }),
+      queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
+      ...(work
+        ? [queryClient.invalidateQueries({
+            queryKey: getWorksByIdQueryKey({ path: { id: work.id } }),
+          })]
+        : []),
     ])
-  }, [queryClient, session, workspaceId])
+  }, [queryClient, session, work, workspaceId])
 
   const handleOpenInNewTab = useCallback(() => {
     if (!session) {
       return
     }
 
+    if (work) {
+      openWork(work.id)
+      return
+    }
     openChatSession(session.id)
-  }, [session])
+  }, [session, work])
 
   const handleOpenInNewWindow = useCallback(() => {
     if (!session) {
@@ -531,8 +483,19 @@ function SessionActionsMenu({
     onPrepareSessionOpen(session)
     const screenX = window.screenX + Math.round(window.outerWidth / 2)
     const screenY = window.screenY + Math.round(window.outerHeight / 2)
+    if (work) {
+      void openTearoffSurfaceWindow({
+        id: workSurfaceId(work.id),
+        kind: 'work',
+        title: work.title,
+        route: { to: '/work/$workId', params: { workId: work.id } },
+        order: 0,
+        closable: true,
+      }, { screenX, screenY, detachSurface: true })
+      return
+    }
     void openTearoffChatSessionWindow(session.id, { screenX, screenY, detachSurface: true })
-  }, [onPrepareSessionOpen, session])
+  }, [onPrepareSessionOpen, session, work])
 
   const handleStartRename = useCallback(() => {
     if (!session) {
@@ -613,16 +576,22 @@ function SessionActionsMenu({
       return
     }
 
-    await postSessionsByIdArchive({ path: { id: session.id }, body: { archived: true } })
+    if (work) {
+      await postWorksByIdArchive({ path: { id: work.id }, body: { archived: true } })
+    }
+    else {
+      await postSessionsByIdArchive({ path: { id: session.id }, body: { archived: true } })
+    }
 
-    closeSurfaceById(chatSurfaceId(session.id))
+    const surfaceId = work ? workSurfaceId(work.id) : chatSurfaceId(session.id)
+    closeSurfaceById(surfaceId)
 
     if (isElectron) {
-      void nativeIpc?.window.closeSurface(chatSurfaceId(session.id)).catch(() => {})
+      void nativeIpc?.window.closeSurface(surfaceId).catch(() => {})
     }
 
     await invalidateSessionQueries()
-  }, [invalidateSessionQueries, session])
+  }, [invalidateSessionQueries, session, work])
 
   const actionGroups = useMemo<SessionMenuActionGroup[]>(() => {
     if (!session) {
@@ -748,7 +717,7 @@ function SessionActionsMenu({
           sideOffset={state.surface === 'context' ? 0 : 4}
         >
           <SessionMenuActionItems groups={actionGroups} testIdSurface={state.surface} />
-          {session
+          {session && !work
             ? (
                 <SessionGroupMenuItems
                   session={session}
@@ -1871,6 +1840,7 @@ const SessionItem = memo(
     const openSessionMenu = (anchor: SessionMenuAnchor, surface: SessionMenuSurface) => {
       onOpenSessionMenu({
         sessionId: session.id,
+        workId: null,
         anchor,
         surface,
       })
@@ -1922,7 +1892,7 @@ const SessionItem = memo(
             initialTitle={sessionTitle}
             sessionId={session.id}
             pinned={Boolean(session.pinned)}
-            listActivityAt={session.listActivityAt}
+            trailingLabel={formatRelativeTime(session.listActivityAt, t)}
             onCommit={nextTitle => onRenameCommit(session, nextTitle)}
             onCancel={onRenameCancel}
           />
@@ -2483,6 +2453,9 @@ const WorkspaceGroup = memo(
       })
     }, [filteredSessions, locallyStreamingSessionIds])
     const { data: workspaceWorks = [] } = useWorkspaceWorks(workspace.id)
+    const activeMenuWork = sessionMenuState.workId
+      ? (workspaceWorks.find(work => work.id === sessionMenuState.workId) ?? null)
+      : null
     const primaryWorkSessionIds = useMemo(
       () => new Set(workspaceWorks.map(work => work.primarySessionId)),
       [workspaceWorks],
@@ -3024,6 +2997,7 @@ const WorkspaceGroup = memo(
             <SessionActionsMenu
               state={sessionMenuState}
               session={activeMenuSession}
+              work={activeMenuWork}
               workspaceId={workspace.id}
               sessionGroups={sessionGroups}
               onOpenChange={handleSessionMenuOpenChange}
@@ -3037,7 +3011,14 @@ const WorkspaceGroup = memo(
         )}
       >
         <div className="flex min-w-0 flex-col">
-          <WorkSidebarSection works={workspaceWorks} />
+          <WorkSidebarSection
+            works={workspaceWorks}
+            sessionsById={sessionsById}
+            renamingSessionId={renamingSessionId}
+            onRenameCommit={handleRenameSession}
+            onRenameCancel={handleRenameCancel}
+            onOpenMenu={handleOpenSessionMenu}
+          />
           {groupedSessions.map(({ group, sessions: groupSessions }) => (
             <WorkspaceSessionGroupSection
               key={group.id}

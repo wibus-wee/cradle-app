@@ -42,6 +42,11 @@ function isDarkTheme(): boolean {
   return document.documentElement.classList.contains('dark')
 }
 
+function readThemeOverride(property: string): string | null {
+  const value = document.documentElement.style.getPropertyValue(property).trim()
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : null
+}
+
 /**
  * Build an xterm ITheme from the app's current surface tokens plus a terminal-native ANSI palette.
  * Call this at mount-time and on dark/light changes to keep the terminal
@@ -49,20 +54,26 @@ function isDarkTheme(): boolean {
  */
 export function getAppTerminalTheme(): ITheme {
   const dark = isDarkTheme()
+  const background = readThemeOverride('--background') ?? (dark ? '#0c0c0c' : '#ffffff')
+  const foreground = readThemeOverride('--foreground') ?? (dark ? '#cccccc' : '#333333')
+  const accent = readThemeOverride('--primary')
 
   return {
-    background: dark ? '#0c0c0c' : '#ffffff',
-    foreground: dark ? '#cccccc' : '#333333',
-    cursor: dark ? '#ffffff' : '#000000',
-    cursorAccent: dark ? '#0c0c0c' : '#ffffff',
-    selectionBackground: dark ? '#264f78' : '#add6ff',
-    selectionForeground: dark ? '#ffffff' : '#000000',
+    background,
+    foreground,
+    cursor: foreground,
+    cursorAccent: background,
+    selectionBackground: accent ? `${accent}66` : dark ? '#264f78' : '#add6ff',
+    selectionForeground: accent ? foreground : dark ? '#ffffff' : '#000000',
     ...(dark ? DARK_ANSI_THEME : LIGHT_ANSI_THEME),
   }
 }
 
 export function watchTerminalTheme(onChange: () => void): () => void {
   const observer = new MutationObserver(onChange)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'data-theme-profile', 'data-theme-code-font', 'style'],
+  })
   return () => observer.disconnect()
 }

@@ -388,6 +388,18 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
 
     const stopWatchingTheme = watchTerminalTheme(() => {
       terminal.options.theme = getAppTerminalTheme()
+      const nextFontFamily = getTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily)
+      if (nextFontFamily === terminal.options.fontFamily) {
+        return
+      }
+      terminal.options.fontFamily = nextFontFamily
+      if (fontFrame !== null) {
+        cancelAnimationFrame(fontFrame)
+      }
+      fontFrame = requestAnimationFrame(() => {
+        fontFrame = null
+        fitAndNotify()
+      })
     })
 
     const stopWatchingTerminalPreferences = useTerminalPreferencesStore.subscribe((state, previousState) => {

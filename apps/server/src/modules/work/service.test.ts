@@ -120,6 +120,19 @@ describe('deriveActivity', () => {
 })
 
 describe('work delivery control', () => {
+  it('projects the primary Session title instead of the stale creation title', async () => {
+    seedWork()
+    mockHealthyDetailReads()
+
+    const [summary] = Work.list({ workspaceId: WORKSPACE_ID })
+    const detail = await Work.get(WORK_ID)
+
+    expect(summary?.title).toBe('Primary Work Session')
+    expect(detail?.work.title).toBe('Primary Work Session')
+    expect(db().select({ title: works.title }).from(works).where(eq(works.id, WORK_ID)).get()?.title)
+      .toBe('Implement Work')
+  })
+
   it('creates a primary Session in a healthy managed Worktree from a clean repository', async () => {
     const repositoryPath = mkdtempSync(join(tmpdir(), 'cradle-work-service-'))
     try {

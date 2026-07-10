@@ -1,12 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkAsidePanel } from './work-aside-panel'
 
 const mocks = vi.hoisted(() => ({
-  submit: vi.fn(),
-  markReady: vi.fn(),
   reviewChanges: vi.fn(),
   repair: vi.fn(),
   getWorkDetail: vi.fn(),
@@ -33,24 +31,11 @@ vi.mock('./use-work', () => ({
     data: mocks.getWorkDetail(),
     refetch: vi.fn(),
   }),
-  useSubmitWork: () => ({
-    mutateAsync: mocks.submit,
-    isPending: false,
-    error: null,
-  }),
 }))
 
 vi.mock('~/features/session/use-session-isolation', () => ({
   useRepairSessionIsolation: () => ({
     mutateAsync: mocks.repair,
-    isPending: false,
-    error: null,
-  }),
-}))
-
-vi.mock('~/features/session/use-session-pull-request', () => ({
-  useMarkSessionPullRequestReady: () => ({
-    mutateAsync: mocks.markReady,
     isPending: false,
     error: null,
   }),
@@ -64,8 +49,7 @@ vi.mock('~/components/ui/toast', () => ({
   toastManager: { add: mocks.toast },
 }))
 
-function createWorkDetail(options: { submitted?: boolean } = {}) {
-  const submitted = options.submitted ?? false
+function createWorkDetail() {
   return {
     work: {
       id: 'work-1',
@@ -76,7 +60,7 @@ function createWorkDetail(options: { submitted?: boolean } = {}) {
       handoffSummary: 'Implemented deterministic retries.',
       handoffTestPlan: 'Run focused tests.',
       preparedAt: 20,
-      lastSubmittedAt: submitted ? 20 : 10,
+      lastSubmittedAt: 10,
       closedAt: null,
       archivedAt: null,
       createdAt: 1,
@@ -99,36 +83,13 @@ function createWorkDetail(options: { submitted?: boolean } = {}) {
       commitsAhead: 1,
       changedFiles: 0,
     },
-    pullRequest: submitted
-      ? {
-          owner: 'cradle',
-          repo: 'app',
-          number: 14,
-          url: 'https://github.com/cradle/app/pull/14',
-          title: 'Fix retries',
-          isDraft: true,
-          state: 'open',
-          merged: false,
-          headRef: 'cradle/wt/work-1',
-          baseRef: 'main',
-          headSha: 'head',
-          createdAt: 1,
-          updatedAt: 2,
-        }
-      : null,
+    pullRequest: null,
     activity: 'idle',
   }
 }
 
-describe('work aside panel delivery control', () => {
+describe('work aside panel reference view', () => {
   beforeEach(() => {
-    mocks.submit.mockReset().mockResolvedValue(undefined)
-    mocks.markReady.mockReset().mockResolvedValue({
-      pullRequest: {
-        ...createWorkDetail({ submitted: true }).pullRequest,
-        isDraft: false,
-      },
-    })
     mocks.reviewChanges.mockReset().mockResolvedValue({ id: 'review-1' })
     mocks.repair.mockReset().mockResolvedValue(undefined)
     mocks.getWorkDetail.mockReset().mockReturnValue(createWorkDetail())
@@ -138,23 +99,7 @@ describe('work aside panel delivery control', () => {
 
   afterEach(cleanup)
 
-  it('submits only after the user clicks Create Draft PR', () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <WorkAsidePanel workId="work-1" />
-      </QueryClientProvider>,
-    )
-
-    expect(mocks.submit).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByTestId('work-submit'))
-    expect(mocks.submit).toHaveBeenCalledTimes(1)
-    expect(mocks.submit).toHaveBeenCalledWith({
-      path: { id: 'work-1' },
-      body: {},
-    })
-  })
-
-  it('opens a committed branch comparison instead of the working-tree Changes tab', async () => {
+  it('opens a committed branch comparison from the execution section', async () => {
     const view = render(
       <QueryClientProvider client={new QueryClient()}>
         <WorkAsidePanel workId="work-1" />
@@ -174,24 +119,5 @@ describe('work aside panel delivery control', () => {
       workspaceId: 'workspace-1',
       reviewId: 'review-1',
     })
-  })
-
-  it('marks the submitted draft ready and reports success', async () => {
-    mocks.getWorkDetail.mockReturnValue(createWorkDetail({ submitted: true }))
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <WorkAsidePanel workId="work-1" />
-      </QueryClientProvider>,
-    )
-
-    fireEvent.click(screen.getByTestId('work-mark-ready'))
-
-    await waitFor(() => expect(mocks.markReady).toHaveBeenCalledWith({
-      path: { id: 'session-1' },
-    }))
-    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'success',
-      title: 'aside.markReadySuccessTitle',
-    }))
   })
 })

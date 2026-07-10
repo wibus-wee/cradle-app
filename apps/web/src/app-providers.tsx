@@ -12,6 +12,8 @@ import { createSystemAgentContextProvider } from '~/features/system-agent/system
 import { subscribeDesktopQuitGuardArmed, syncDesktopWindowControlsOverlay } from '~/lib/electron'
 import { ShortcutProvider } from '~/lib/shortcut-provider'
 import { useResolvedThemeMode } from '~/store/theme'
+import { selectActiveThemeProfile, useThemeCustomizationStore } from '~/store/theme-customization'
+import { applyThemeProfile } from '~/store/theme-customization-runtime'
 
 export function AppEnvironmentProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -58,11 +60,16 @@ function DesktopQuitGuardToastBridge() {
 
 export function useThemeClass(): void {
   const resolvedMode = useResolvedThemeMode()
+  const profile = useThemeCustomizationStore(state => selectActiveThemeProfile(state, resolvedMode))
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', resolvedMode === 'dark')
+    const removeThemeProfile = applyThemeProfile(profile, resolvedMode)
     syncDesktopWindowControlsOverlay()
     const timeout = window.setTimeout(syncDesktopWindowControlsOverlay, 100)
-    return () => window.clearTimeout(timeout)
-  }, [resolvedMode])
+    return () => {
+      window.clearTimeout(timeout)
+      removeThemeProfile()
+    }
+  }, [profile, resolvedMode])
 }

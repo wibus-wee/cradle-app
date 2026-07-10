@@ -152,6 +152,18 @@ export function TuiView({ sessionId }: TuiViewProps) {
 
     const stopWatchingTheme = watchTerminalTheme(() => {
       terminal.options.theme = getAppTerminalTheme()
+      const nextFontFamily = getTerminalFontFamily(useTerminalPreferencesStore.getState().fontFamily)
+      if (nextFontFamily === terminal.options.fontFamily) {
+        return
+      }
+      terminal.options.fontFamily = nextFontFamily
+      if (fontFrame !== null) {
+        cancelAnimationFrame(fontFrame)
+      }
+      fontFrame = requestAnimationFrame(() => {
+        fontFrame = null
+        refitAndNotify()
+      })
     })
 
     const stopWatchingTerminalPreferences = useTerminalPreferencesStore.subscribe((state, previousState) => {

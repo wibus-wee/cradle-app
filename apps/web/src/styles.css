@@ -25,6 +25,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-theme-translucent-sidebar="true"] [data-testid="app-sidebar"],
+[data-theme-translucent-sidebar="true"] [data-testid="app-layout-right-aside"],
+[data-theme-translucent-sidebar="true"] [data-slot="sidebar-inner"] {
+  backdrop-filter: blur(24px) saturate(1.15);
+}
+
 .tiptap-editor [data-resize-container] {
   align-items: flex-start;
   margin: 0.75rem 0;

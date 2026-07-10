@@ -134,7 +134,8 @@ export function resolveComposerModelId(input: {
   if (input.context !== 'chat' && input.targetMode === 'agent' && !input.selectedAgentId) {
     return null
   }
-  if (input.manualModelId && input.models.some(model => model.id === input.manualModelId)) {
+  // Explicit manual selection wins even when temporarily outside visible inventory.
+  if (input.manualModelId) {
     return input.manualModelId
   }
   if (
@@ -159,9 +160,10 @@ export function resolveComposerModelId(input: {
     })
   }
   const persisted = input.profileId ? input.lastModelByProfile[input.profileId] : undefined
-  if (persisted && input.models.some(model => model.id === persisted)) {
+  // Persisted provider model is restored as an orphan when not in the current visible list
+  // (loading / visibility), matching session bound behavior — never invent models[0].
+  if (persisted) {
     return persisted
   }
-  // Prefer empty over silent models[0] when nothing valid is selected.
   return null
 }

@@ -8,7 +8,9 @@
 
 ## Files
 
-- **appearance-settings.tsx**: 外观设置页，负责主题切换；Settings Appearance 首屏在 theme options ready 后记录 performance gate；主题选项暴露稳定 E2E selection anchors。AI 回复流式动画不再暴露设置项，由 Streamdown store 固定为逐字、balanced、关闭 cursor。
+- **appearance-settings.tsx**: 外观设置页，负责 System / Light / Dark 模式和通用显示偏好；Settings Appearance 首屏在 theme options ready 后记录 performance gate；主题选项暴露稳定 E2E selection anchors。AI 回复流式动画不再暴露设置项，由 Streamdown store 固定为逐字、balanced、关闭 cursor。
+- **theme-customization-settings.tsx**: Light / Dark 独立主题配置 UI，拥有 profile 选择、复制、JSON 导入、颜色、字体、侧栏透明度和对比度编辑；内置 profile 不设置 override，继续使用现有 CSS color system。
+- **theme-preview.tsx**: 主题卡和 live preview 的纯展示组件，不修改 app runtime theme。
 - **about-settings.tsx**: 关于设置页，使用紧凑 Settings row 布局说明 Cradle-owned Application Support 数据目录，并明确列出用户确认或显式操作后可能写入 Application Support 外的 workspace、skills、provider-native skill roots 与 CLI command 路径。
 - **chat-settings.tsx**: 对话设置页，负责默认 continuation behavior、Codex app-server Cradle User-Agent 开关的切换，并在 Chat section header 下方展示 session-owned archived sessions 列表、归档搜索与 restore 操作；restore response 会保留 session 列表使用的 latest-user-message activity timestamp。
 - **chronicle-settings.tsx**: 由 `features/chronicle` 拥有的 Settings > 记录页面；Settings Chronicle 首屏在 Chronicle config、status、resources、message sources、evidence、activity、knowledge、timeline、memories 和当前 profile 的 Agent Runtime model cache 首轮数据 ready 后记录 performance gate。

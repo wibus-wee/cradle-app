@@ -83,6 +83,11 @@ function requirePrimaryThread(workId: string): Session.SessionView {
   return session
 }
 
+function projectConversationTitle(work: Work, primaryThread: Session.SessionView): Work {
+  const title = primaryThread.title?.trim()
+  return title && title !== work.title ? { ...work, title } : work
+}
+
 export function deriveActivity(input: {
   sessionStatus: Session.SessionStatus
   worktreeHealth: Worktree.WorktreeHealth | null
@@ -123,7 +128,7 @@ function toSummary(work: Work, primaryThread: Session.SessionView): WorkSummary 
     })
   }
   return {
-    ...work,
+    ...projectConversationTitle(work, primaryThread),
     workspaceId: primaryThread.workspaceId,
     primarySessionId: primaryThread.id,
     activity: readActivity(primaryThread),
@@ -165,7 +170,7 @@ export async function get(id: string): Promise<WorkDetail | null> {
     PullRequest.getPullRequest(primaryThread.id),
   ])
   return {
-    work,
+    work: projectConversationTitle(work, primaryThread),
     primaryThread,
     execution,
     readiness,

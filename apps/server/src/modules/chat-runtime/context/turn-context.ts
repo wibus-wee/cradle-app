@@ -68,7 +68,6 @@ function resolvePrimaryWorkPrompt(session: Session): string | undefined {
   const work = db()
     .select({
       id: works.id,
-      title: works.title,
       objective: works.objective,
     })
     .from(workThreads)
@@ -82,7 +81,7 @@ function resolvePrimaryWorkPrompt(session: Session): string | undefined {
   return [
     '## Cradle Work',
     `Work ID: ${work.id}`,
-    `Title: ${work.title}`,
+    `Title: ${session.title || work.id}`,
     `Objective data: ${JSON.stringify(work.objective)}`,
     '',
     'This is an active Cradle Work session. Implement and verify the objective in the current managed Worktree.',

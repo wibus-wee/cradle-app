@@ -335,7 +335,7 @@ function DraftChatComposerContent({
           settings={runtimeSettings}
           applied
           disabled={sending}
-          showLabels={false}
+          showLabels={true}
           onChange={updateRuntimeSettings}
         />
       </div>

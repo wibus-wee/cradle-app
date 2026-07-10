@@ -177,6 +177,44 @@ describe('resolveComposerModelId', () => {
     })).toBe('persisted-model')
   })
 
+  it('restores a persisted provider model as an orphan when it is outside the visible inventory', () => {
+    expect(resolveComposerModelId({
+      composerUsesModelSelection: true,
+      context: 'new-chat',
+      targetMode: 'provider',
+      selectedAgentId: null,
+      selectedAgentModelId: null,
+      manualModelId: null,
+      models: [model({ id: 'first-model' })],
+      boundAgentModelId: null,
+      boundAgentProviderTargetId: null,
+      boundModelId: null,
+      boundProviderTargetId: null,
+      manualProfileId: null,
+      profileId: 'provider-1',
+      lastModelByProfile: { 'provider-1': 'persisted-model' },
+    })).toBe('persisted-model')
+  })
+
+  it('keeps an explicit manual model even when it is temporarily outside the inventory', () => {
+    expect(resolveComposerModelId({
+      composerUsesModelSelection: true,
+      context: 'new-chat',
+      targetMode: 'provider',
+      selectedAgentId: null,
+      selectedAgentModelId: null,
+      manualModelId: 'manual-orphan',
+      models: [model({ id: 'first-model' })],
+      boundAgentModelId: null,
+      boundAgentProviderTargetId: null,
+      boundModelId: null,
+      boundProviderTargetId: null,
+      manualProfileId: 'provider-1',
+      profileId: 'provider-1',
+      lastModelByProfile: {},
+    })).toBe('manual-orphan')
+  })
+
   it('returns null instead of silently picking models[0] when nothing is selected', () => {
     expect(resolveComposerModelId({
       composerUsesModelSelection: true,

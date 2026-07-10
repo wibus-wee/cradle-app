@@ -22,6 +22,8 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 ## Ownership boundaries
 
 - Session owns conversation metadata and archive behavior.
+- Work API read models project the primary Session title; the persisted creation title
+  is only the initial worktree slug seed and is never a second mutable title.
 - Worktree owns Git checkout creation, binding, health, and cleanup.
 - Pull Request owns Git comparison, push, GitHub API calls, and PR persistence.
 - Chat Runtime owns runs and pending interaction state.

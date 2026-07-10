@@ -81,7 +81,7 @@ export function RuntimeSettingsControl({
             >
               <RuntimeSettingsIcon iconKey={iconKey} />
               {showLabels && (
-                <span className="hidden max-w-40 truncate sm:inline">
+                <span className="max-w-40 truncate">
                   {summary}
                 </span>
               )}

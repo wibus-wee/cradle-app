@@ -176,4 +176,12 @@ describe('selectChatThinkingEffort', () => {
       preservePreferredThinkingEffort: true,
     })).toBe('xhigh')
   })
+
+  it('keeps the preferred effort while the model descriptor is unresolved', () => {
+    expect(selectChatThinkingEffort({
+      effectiveModel: null,
+      preferredThinkingEffort: 'medium',
+      preservePreferredThinkingEffort: true,
+    })).toBe('medium')
+  })
 })

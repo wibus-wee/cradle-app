@@ -1,35 +1,167 @@
-import { GitBranchLine as BranchIcon, GitPullRequestLine as PullRequestIcon } from '@mingcute/react'
+import {
+  ExternalLinkLine as ExternalLinkIcon,
+  GitPullRequestLine as PullRequestIcon,
+} from '@mingcute/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
-import { Badge } from '~/components/ui/badge'
+import { getWorksByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
+import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
+import { toastManager } from '~/components/ui/toast'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
+import { useMarkSessionPullRequestReady } from '~/features/session/use-session-pull-request'
+import { apiErrorMessage } from '~/lib/api-error'
 
-import { useWorkDetail } from './use-work'
+import type { WorkDetail } from './use-work'
+import { useSubmitWork, useWorkDetail } from './use-work'
 
+// Work's delivery chrome lives in the always-visible app header, reusing the
+// same PR-pill + Mark Ready pattern as a normal session's pull request chrome.
+// The only Work-specific addition is the "publish" step (Create/Update Draft
+// PR) that precedes the PR. When there's nothing to deliver yet (agent still
+// working, no PR) this renders nothing - just like a normal session with no PR
+// chrome - so Work doesn't carry a divergent mental model.
 export function WorkHeaderChrome({ workId }: { workId: string }) {
   const { t } = useTranslation('work')
-  const { data } = useWorkDetail(workId)
-  if (!data) {
+  const { t: tPr } = useTranslation('session-pull-request')
+  const queryClient = useQueryClient()
+  const { data: detail } = useWorkDetail(workId)
+  const submitWork = useSubmitWork()
+  const markReady = useMarkSessionPullRequestReady()
+
+  if (!detail) {
     return null
   }
+
+  const { readiness, pullRequest: pr } = detail
+  const preparedForDelivery = detail.work.preparedAt !== null
+    && (detail.work.lastSubmittedAt === null || detail.work.preparedAt > detail.work.lastSubmittedAt)
+  const canSubmit = preparedForDelivery
+    && readiness.isolated
+    && readiness.clean
+    && readiness.commitsAhead > 0
+
+  const blockedReason = preparedForDelivery && !canSubmit
+    ? (!readiness.isolated
+        ? t('aside.blocked.notIsolated')
+        : !readiness.clean
+          ? t('aside.blocked.dirty')
+          : readiness.commitsAhead === 0
+            ? t('aside.blocked.noCommits')
+            : null)
+    : null
+
+  const showPublish = preparedForDelivery
+  const showMarkReady = !!pr && pr.isDraft && pr.state === 'open' && !pr.merged
+
+  if (!showPublish && !pr) {
+    return null
+  }
+
+  const handleSubmit = async () => {
+    try {
+      await submitWork.mutateAsync({ path: { id: workId }, body: {} })
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: t('aside.submitFailed'),
+        description: apiErrorMessage(error),
+      })
+    }
+  }
+
+  const handleMarkReady = async () => {
+    if (!pr) {
+      return
+    }
+    try {
+      const result = await markReady.mutateAsync({ path: { id: detail.primaryThread.id } })
+      queryClient.setQueryData<WorkDetail>(
+        getWorksByIdQueryKey({ path: { id: workId } }),
+        current => current ? { ...current, pullRequest: result.pullRequest } : current,
+      )
+      toastManager.add({
+        type: 'success',
+        title: t('aside.markReadySuccessTitle'),
+        description: t('aside.markReadySuccessDescription', { number: result.pullRequest.number }),
+      })
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: t('aside.markReadyFailed'),
+        description: apiErrorMessage(error),
+      })
+    }
+  }
+
+  const prStatusLabel = pr
+    ? pr.merged
+      ? tPr('chrome.merged')
+      : pr.state === 'closed'
+        ? tPr('chrome.closed')
+        : pr.isDraft
+          ? tPr('chrome.draft')
+          : tPr('chrome.ready')
+    : null
+
+  const submitButton = (
+    <Button
+      type="button"
+      size="sm"
+      className="h-6 gap-1 px-2 text-[11px]"
+      disabled={!canSubmit || submitWork.isPending}
+      onClick={() => void handleSubmit()}
+      data-testid="work-submit"
+    >
+      {submitWork.isPending
+        ? <Spinner className="size-3" />
+        : pr
+          ? t('aside.updateDraft')
+          : t('aside.createDraft')}
+    </Button>
+  )
+
   return (
     <div className="flex min-w-0 items-center gap-1.5" data-testid="work-header-chrome">
-      <Badge variant="outline">{t(`aside.activity.${data.activity}`)}</Badge>
-      {data.readiness.branch && (
-        <span className="hidden max-w-36 items-center gap-1 truncate text-[11px] text-muted-foreground xl:inline-flex">
-          <BranchIcon className="size-3 shrink-0" aria-hidden="true" />
-          <span className="truncate">{data.readiness.branch}</span>
-        </span>
+      {showPublish && (
+        blockedReason
+          ? (
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex">{submitButton}</span>} />
+              <TooltipContent side="bottom">{blockedReason}</TooltipContent>
+            </Tooltip>
+          )
+          : submitButton
       )}
-      {data.pullRequest && (
+      {pr && (
         <a
-          href={data.pullRequest.url}
+          href={pr.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="inline-flex max-w-[220px] items-center gap-1 rounded-md border border-border/60 bg-fill/40 px-1.5 py-0.5 text-[11px] text-foreground/90 transition-colors duration-150 hover:bg-fill active:scale-[0.98]"
+          title={pr.title}
         >
-          <PullRequestIcon className="size-3" aria-hidden="true" />
-          {`#${data.pullRequest.number}`}
+          <PullRequestIcon className="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
+          <span className="truncate font-medium">{`#${pr.number}`}</span>
+          <span className="shrink-0 text-muted-foreground">{prStatusLabel}</span>
+          <ExternalLinkIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
         </a>
+      )}
+      {showMarkReady && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 text-[11px]"
+          disabled={markReady.isPending}
+          onClick={() => void handleMarkReady()}
+          data-testid="work-mark-ready"
+        >
+          {markReady.isPending ? t('aside.markingReady') : t('aside.markReady')}
+        </Button>
       )}
     </div>
   )
