@@ -93,7 +93,10 @@ export function RuntimeUserInputForm({
   }
 
   const readPreviewAnswer = (question: RuntimeUserInputQuestion): string => {
-    if (question.isSecret && isAnswered(question)) {
+    if (!isAnswered(question)) {
+      return 'Skipped'
+    }
+    if (question.isSecret) {
       return '********'
     }
     return readAnswers(question).join(', ')
@@ -121,6 +124,30 @@ export function RuntimeUserInputForm({
 
   const goNext = () => {
     setActiveStep(current => Math.min(previewStep, current + 1))
+  }
+
+  const skip = () => {
+    if (!question) {
+      return
+    }
+    // Skip means "no answer for this question": drop any draft so the
+    // submitted answer is empty, then advance to the next step.
+    setDrafts((current) => {
+      const next = { ...current }
+      delete next[question.id]
+      return next
+    })
+    setMultiDrafts((current) => {
+      const next = { ...current }
+      delete next[question.id]
+      return next
+    })
+    setOtherDrafts((current) => {
+      const next = { ...current }
+      delete next[question.id]
+      return next
+    })
+    goNext()
   }
 
   return (
@@ -328,27 +355,40 @@ export function RuntimeUserInputForm({
         <Button type="button" variant="ghost" size="xs" disabled={!canGoBack} onClick={goBack}>
           Back
         </Button>
-        {isPreview
+        <div className="flex items-center gap-1">
+          {isPreview
 ? (
-          <Button
-            type="button"
-            size="xs"
-            disabled={disabled || submitting || questions.some(question => !isAnswered(question))}
-            onClick={() => void submit()}
-          >
-            Submit
-          </Button>
-        )
+            <Button
+              type="button"
+              size="xs"
+              disabled={disabled || submitting}
+              onClick={() => void submit()}
+            >
+              Submit
+            </Button>
+          )
 : (
-          <Button
-            type="button"
-            size="xs"
-            disabled={disabled || submitting || !question || !isAnswered(question)}
-            onClick={goNext}
-          >
-            {step === questions.length - 1 ? 'Preview' : 'Next'}
-          </Button>
-        )}
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={disabled || submitting || !question}
+                onClick={skip}
+              >
+                Skip
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                disabled={disabled || submitting || !question || !isAnswered(question)}
+                onClick={goNext}
+              >
+                {step === questions.length - 1 ? 'Preview' : 'Next'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
