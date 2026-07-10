@@ -7,14 +7,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import type { ModelRegistryMappingEntry, ModelsDevModel } from '../src/modules/model-registry/model-info-registry'
 import {
   enrichModelsWithRegistryData,
   getCachedModelsDevCost,
   resolveModelEnrichment,
 } from '../src/modules/model-registry/model-info-registry'
-import type { ModelRegistryMappingEntry, ModelsDevModel } from '../src/modules/model-registry/model-info-registry'
-import type { ModelDescriptor } from '../src/modules/provider-contracts/types'
 import { getCachedModelsForTarget, setCachedModelsForTarget } from '../src/modules/provider-catalog/model-cache'
+import type { ModelDescriptor } from '../src/modules/provider-contracts/types'
 
 const MODELS_DEV_URL = 'https://models.dev/api.json'
 
@@ -131,18 +131,18 @@ describe('enrichModelsWithRegistryData', () => {
       providerKind: 'openai-compatible',
       capabilities: {
         contextWindow: 8192,
-        cost: { input: 0, output: 0 },      // stale cost from old enrichment
-        family: 'stale-family',             // stale family
-        registryMatch: 'unmatched',         // stale registry fields
+        cost: { input: 0, output: 0 }, // stale cost from old enrichment
+        family: 'stale-family', // stale family
+        registryMatch: 'unmatched', // stale registry fields
         registryModelId: 'old-id',
         registryModelLabel: 'Old Label',
       },
     }]
     const result = enrichModelsWithRegistryData(inventory, data, [])
     const model = result[0]
-    expect(model.label).toBe('GPT-4o')                     // updated from registry
-    expect(model.capabilities.family).toBe('gpt-4')        // registry wins
-    expect(model.capabilities.cost?.input).toBe(2.5)       // registry wins
+    expect(model.label).toBe('GPT-4o') // updated from registry
+    expect(model.capabilities.family).toBe('gpt-4') // registry wins
+    expect(model.capabilities.cost?.input).toBe(2.5) // registry wins
     expect(model.capabilities.registryMatch).toBe('exact')
     expect(model.capabilities.registryModelId).toBe('gpt-4o')
   })
@@ -165,8 +165,8 @@ describe('enrichModelsWithRegistryData', () => {
     const result = enrichModelsWithRegistryData(inventory, data, [])
     const caps = result[0].capabilities
     expect(caps.registryModelId).toBe('gpt-4o')
-    expect(caps.knowledgeCutoff).toBe('2024-04')          // from fresh registry
-    expect(caps.cost?.input).toBe(2.5)                    // from fresh registry, not old value
+    expect(caps.knowledgeCutoff).toBe('2024-04') // from fresh registry
+    expect(caps.cost?.input).toBe(2.5) // from fresh registry, not old value
   })
 
   it('marks unmatched models with registryMatch: unmatched and strips stale registry fields', () => {

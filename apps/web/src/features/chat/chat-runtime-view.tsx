@@ -138,7 +138,6 @@ export function ChatRuntimeView({
   const {
     modelsByProfileId,
     selection,
-    setModelId,
     successfulProfileIds,
   } = composerState
   const selectedProfileId = selection.profileId

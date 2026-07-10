@@ -16,6 +16,7 @@ allowBuilds:
   node-pty: true
   protobufjs: true
   sharp: true
+  simple-git-hooks: false
 minimumReleaseAgeExclude:
   - '@hijarvis/core@0.1.0'
   - '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.205'

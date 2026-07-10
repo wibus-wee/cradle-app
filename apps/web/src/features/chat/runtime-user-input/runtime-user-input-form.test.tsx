@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { RuntimeUserInputForm, type RuntimeUserInputQuestion } from './runtime-user-input-form'
+import type { RuntimeUserInputQuestion } from './runtime-user-input-form'
+import { RuntimeUserInputForm } from './runtime-user-input-form'
 
 afterEach(() => {
   cleanup()
@@ -38,7 +39,7 @@ function isDisabled(el: HTMLElement): boolean {
   return (el as HTMLButtonElement).disabled === true
 }
 
-describe('RuntimeUserInputForm - skip', () => {
+describe('runtimeUserInputForm - skip', () => {
   it('enables Skip and disables Next/Preview when a question is unanswered', () => {
     render(<RuntimeUserInputForm questions={[optionsQuestion('question-1')]} onSubmit={vi.fn()} />)
 

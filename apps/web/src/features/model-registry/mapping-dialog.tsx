@@ -16,7 +16,6 @@ import { z } from 'zod'
 
 import { getModelRegistryMappingsQueryKey } from '~/api-gen/@tanstack/react-query.gen'
 import { putModelRegistryMappingsByModelId } from '~/api-gen/sdk.gen'
-import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import {
@@ -32,6 +31,7 @@ import { Label } from '~/components/ui/label'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import type { ModelCapabilities } from '~/features/agent-runtime/types'
+import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { cn } from '~/lib/cn'
 
 import type { ModelsDevModel, SearchResult } from './schemas'

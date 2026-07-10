@@ -71,7 +71,7 @@ export function SessionPullRequestChrome({ sessionId }: SessionPullRequestChrome
       >
         <GitPullRequestIcon className="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
         <span className="truncate font-medium">
-          #{pullRequest.number}
+          {`#${pullRequest.number}`}
         </span>
         <span className="shrink-0 text-muted-foreground">{statusLabel}</span>
         <ExternalLinkIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />

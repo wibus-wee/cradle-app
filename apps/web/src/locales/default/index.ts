@@ -20,8 +20,8 @@ import settings from './settings'
 import skills from './skills'
 import systemAgent from './system-agent'
 import usage from './usage'
-import workspace from './workspace'
 import work from './work'
+import workspace from './workspace'
 
 const resources = {
   agentManagement,
