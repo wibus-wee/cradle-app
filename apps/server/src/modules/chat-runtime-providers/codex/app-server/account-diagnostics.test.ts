@@ -52,7 +52,7 @@ class FakeCodexAccountClient implements CodexAppServerClientLike {
               rateLimitReachedType: null,
             },
           },
-          rateLimitResetCredits: { availableCount: 2n },
+          rateLimitResetCredits: { availableCount: 2n, credits: null },
         }
       case 'account/usage/read':
         return {

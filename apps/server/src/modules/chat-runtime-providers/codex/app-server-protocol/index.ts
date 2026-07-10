@@ -61,6 +61,7 @@ export type { MultiAgentMode } from "./MultiAgentMode";
 export type { NetworkPolicyAmendment } from "./NetworkPolicyAmendment";
 export type { NetworkPolicyRuleAction } from "./NetworkPolicyRuleAction";
 export type { ParsedCommand } from "./ParsedCommand";
+export type { PathUri } from "./PathUri";
 export type { Personality } from "./Personality";
 export type { PlanType } from "./PlanType";
 export type { RealtimeConversationArchitecture } from "./RealtimeConversationArchitecture";

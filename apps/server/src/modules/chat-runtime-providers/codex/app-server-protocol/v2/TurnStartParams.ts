@@ -99,8 +99,6 @@ outputSchema?: JsonValue | null,
  */
 collaborationMode?: CollaborationMode | null,
 /**
- * Controls multi-agent v2 delegation instructions. `none` leaves the
- * multi-agent tools available without injecting mode instructions. Omitted
- * keeps the loaded session's current mode.
+ * @deprecated Ignored. Use `effort: "ultra"` for proactive multi-agent behavior.
  */
 multiAgentMode?: MultiAgentMode | null, };

@@ -16,6 +16,11 @@ export type ThreadRealtimeStartParams = { threadId: string,
  */
 clientManagedHandoffs?: boolean | null,
 /**
+ * Routes any transcript tail remaining at session end through Codex. Defaults to false.
+ * TODO: Remove this rollout knob once transcript-tail flushing is always enabled.
+ */
+flushTranscriptTailOnSessionEnd?: boolean | null,
+/**
  * Sends automatic Codex responses as realtime conversation items instead of handoff appends.
  */
 codexResponsesAsItems?: boolean | null,

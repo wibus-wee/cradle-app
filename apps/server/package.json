@@ -33,7 +33,7 @@
     "@ai-sdk/anthropic": "^3.0.76",
     "@ai-sdk/google": "^3.0.72",
     "@ai-sdk/openai": "^3.0.53",
-    "@anthropic-ai/claude-agent-sdk": "^0.3.186",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.205",
     "@cradle/chat-runtime-contracts": "workspace:*",
     "@cradle/db": "workspace:*",
     "@cradle/plugin-sdk": "workspace:*",

@@ -20,6 +20,13 @@ import type { ThreadSource } from "./ThreadSource";
  */
 export type ThreadForkParams = { threadId: string,
 /**
+ * Optional last turn id to fork through, inclusive.
+ *
+ * When specified, turns after `last_turn_id` are omitted from the fork.
+ * The referenced turn cannot be in progress.
+ */
+lastTurnId?: string | null,
+/**
  * [UNSTABLE] Specify the rollout path to fork from.
  * If specified, the thread_id param will be ignored.
  */

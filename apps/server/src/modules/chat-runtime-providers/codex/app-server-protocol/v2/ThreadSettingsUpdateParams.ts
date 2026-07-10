@@ -57,7 +57,7 @@ summary?: ReasoningSummary | null,
  */
 collaborationMode?: CollaborationMode | null,
 /**
- * Select the multi-agent mode for subsequent turns.
+ * @deprecated Ignored. Use `effort: "ultra"` for proactive multi-agent behavior.
  */
 multiAgentMode?: MultiAgentMode | null,
 /**

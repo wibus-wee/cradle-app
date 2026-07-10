@@ -37,7 +37,7 @@ sandbox: SandboxPolicy,
  */
 activePermissionProfile: ActivePermissionProfile | null, reasoningEffort: ReasoningEffort | null,
 /**
- * Current multi-agent mode for this thread.
+ * @deprecated Always `explicitRequestOnly`. Use `reasoningEffort` for Ultra behavior.
  */
 multiAgentMode: MultiAgentMode,
 /**

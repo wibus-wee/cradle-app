@@ -53,6 +53,11 @@ useStateDbOnly?: boolean,
  */
 searchTerm?: string | null,
 /**
- * Optional direct parent thread filter.
+ * Optional direct parent thread filter. Mutually exclusive with `ancestorThreadId`.
  */
-parentThreadId?: string | null, };
+parentThreadId?: string | null,
+/**
+ * Optional ancestor thread filter. Returns spawned descendants at any depth, excluding the
+ * ancestor itself. Mutually exclusive with `parentThreadId`.
+ */
+ancestorThreadId?: string | null, };

@@ -25,8 +25,8 @@ export interface CodexAppServerCapabilityManifest {
 }
 
 const CODEX_APP_SERVER_PROTOCOL = 'codex-app-server'
-const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.142.0'
-const CODEX_APP_SERVER_GENERATED_DATE = '2026-06-24'
+const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.143.0'
+const CODEX_APP_SERVER_GENERATED_DATE = '2026-07-09'
 
 export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'initialize', paramsType: 'InitializeParams', category: 'initialize', operation: 'initialize', interaction: 'request' },
@@ -59,7 +59,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'thread/loaded/list', paramsType: 'ThreadLoadedListParams', category: 'thread', operation: 'loaded/list', interaction: 'request' },
   { method: 'thread/read', paramsType: 'ThreadReadParams', category: 'thread', operation: 'read', interaction: 'request' },
   { method: 'thread/turns/list', paramsType: 'ThreadTurnsListParams', category: 'thread', operation: 'turns/list', interaction: 'request' },
-  { method: 'thread/turns/items/list', paramsType: 'ThreadTurnsItemsListParams', category: 'thread', operation: 'turns/items/list', interaction: 'request' },
+  { method: 'thread/items/list', paramsType: 'ThreadItemsListParams', category: 'thread', operation: 'items/list', interaction: 'request' },
   { method: 'thread/inject_items', paramsType: 'ThreadInjectItemsParams', category: 'thread', operation: 'inject_items', interaction: 'request' },
   { method: 'skills/list', paramsType: 'SkillsListParams', category: 'skills', operation: 'list', interaction: 'request' },
   { method: 'skills/extraRoots/set', paramsType: 'SkillsExtraRootsSetParams', category: 'skills', operation: 'extraRoots/set', interaction: 'request' },
@@ -114,6 +114,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'collaborationMode/list', paramsType: 'CollaborationModeListParams', category: 'collaboration-mode', operation: 'list', interaction: 'request' },
   { method: 'mock/experimentalMethod', paramsType: 'MockExperimentalMethodParams', category: 'mock', operation: 'experimentalMethod', interaction: 'request' },
   { method: 'environment/add', paramsType: 'EnvironmentAddParams', category: 'environment', operation: 'add', interaction: 'request' },
+  { method: 'environment/info', paramsType: 'EnvironmentInfoParams', category: 'environment', operation: 'info', interaction: 'request' },
   { method: 'mcpServer/oauth/login', paramsType: 'McpServerOauthLoginParams', category: 'mcp-server', operation: 'oauth/login', interaction: 'request' },
   { method: 'config/mcpServer/reload', paramsType: null, category: 'config', operation: 'mcpServer/reload', interaction: 'request' },
   { method: 'mcpServerStatus/list', paramsType: 'ListMcpServerStatusParams', category: 'mcp-server-status', operation: 'list', interaction: 'request' },

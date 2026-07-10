@@ -3,10 +3,10 @@
   "protocol": "codex-app-server",
   "bindings": "typescript",
   "generator": "codex app-server generate-ts",
-  "generatorVersion": "codex-cli 0.142.0",
+  "generatorVersion": "codex-cli 0.143.0",
   "experimental": true,
   "command": "pnpm --filter @cradle/server generate:codex-app-server-protocol",
-  "generatedDate": "2026-06-24",
+  "generatedDate": "2026-07-09",
   "notes": [
     "Codex app-server does not expose a separate schema version in generated files; generatorVersion is the schema source version.",
     "Regenerate with pnpm --filter @cradle/server generate:codex-app-server-protocol so Cradle uses the vendored Codex runtime, not a global codex command."
