@@ -89,7 +89,7 @@ const KimiSettingsSchema = z.object({
 }).catchall(z.unknown())
 
 const ReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high', 'xhigh'])
-const ApprovalPolicySchema = z.enum(['never', 'on-request', 'on-failure', 'untrusted'])
+const ApprovalPolicySchema = z.enum(['never', 'on-request', 'untrusted'])
 const SandboxModeSchema = z.enum(['read-only', 'workspace-write', 'danger-full-access'])
 
 interface ClaudeConfigReadResult {

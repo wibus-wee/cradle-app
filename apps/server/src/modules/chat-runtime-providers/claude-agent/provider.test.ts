@@ -291,6 +291,19 @@ function requireCanUseTool(value: CanUseTool | null): CanUseTool {
   return value
 }
 
+function canUseToolOptions(
+  options: Omit<Parameters<CanUseTool>[2], 'requestId' | 'signal'> & {
+    signal?: AbortSignal
+    requestId?: string
+  },
+): Parameters<CanUseTool>[2] {
+  return {
+    ...options,
+    signal: options.signal ?? new AbortController().signal,
+    requestId: options.requestId ?? `req_${options.toolUseID}`,
+  }
+}
+
 async function readPromptText(callIndex: number): Promise<string> {
   const content = await readPromptContent(callIndex)
   return String(content)
@@ -1035,10 +1048,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await expect((options.canUseTool as CanUseTool)(
       'ExitPlanMode',
       { plan: '1. Inspect\n2. Patch' },
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_plan_1',
-      },
+      }),
     )).resolves.toEqual({
       behavior: 'deny',
       message: 'Cradle captured the proposed plan. Stop here and wait for the user to refine or implement it in a later turn.',
@@ -1047,10 +1059,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await expect((options.canUseTool as CanUseTool)(
       'Bash',
       { command: 'echo hi' },
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_bash_1',
-      },
+      }),
     )).resolves.toEqual({
       behavior: 'deny',
       message: 'Cradle is in plan mode. Submit or revise the plan before running implementation tools.',
@@ -1137,10 +1148,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           },
         ],
       },
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_question_plan_1',
-      },
+      }),
     )).resolves.toEqual({
       behavior: 'allow',
       updatedInput: expect.any(Object),
@@ -1180,10 +1190,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await expect((options.canUseTool as CanUseTool)(
       'Bash',
       toolInput,
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_bash_1',
-      },
+      }),
     )).resolves.toEqual({
       behavior: 'allow',
       updatedInput: toolInput,
@@ -1222,13 +1231,12 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await expect((options.canUseTool as CanUseTool)(
       'Bash',
       toolInput,
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_bash_approval',
         title: 'Claude wants to run rm -rf build',
         displayName: 'Run command',
         description: 'Claude will run a shell command in the workspace.',
-      },
+      }),
     )).resolves.toEqual({
       behavior: 'allow',
       updatedInput: toolInput,
@@ -1285,10 +1293,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await expect((options.canUseTool as CanUseTool)(
       'Bash',
       { command: 'echo should wait' },
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_bridge_plan_1',
-      },
+      }),
     )).resolves.toEqual({
       behavior: 'deny',
       message: 'Cradle is in plan mode. Submit or revise the plan before running implementation tools.',
@@ -1409,10 +1416,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       await expect(originalCanUseTool(
         'Bash',
         { command: 'echo now allowed' },
-        {
-          signal: new AbortController().signal,
+        canUseToolOptions({
           toolUseID: 'toolu_reused_now_allowed',
-        },
+        }),
       )).resolves.toEqual({
         behavior: 'allow',
         updatedInput: { command: 'echo now allowed' },
@@ -1499,10 +1505,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       await expect(originalCanUseTool(
         'Bash',
         { command: 'pwd' },
-        {
-          signal: new AbortController().signal,
+        canUseToolOptions({
           toolUseID: 'toolu_reused_requires_approval',
-        },
+        }),
       )).resolves.toEqual({
         behavior: 'allow',
         updatedInput: { command: 'pwd' },
@@ -2375,7 +2380,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     const result = await (options.canUseTool as CanUseTool)(
       'AskUserQuestion',
       questionInput,
-      { signal: new AbortController().signal, toolUseID: 'toolu_question_1' },
+      canUseToolOptions({ toolUseID: 'toolu_question_1' }),
     )
 
     expect(requestUserInput).toHaveBeenCalledWith(expect.objectContaining({
@@ -2922,11 +2927,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     const permissionResult = capturedCanUseTool(
       'Bash',
       toolInput,
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_child_bash_approval',
         agentID: 'agent-child-approval',
-      },
+      }),
     )
 
     await expect(permissionResult).resolves.toEqual({
@@ -3001,11 +3005,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     const permissionResult = capturedCanUseTool(
       'Bash',
       { command: 'pwd' },
-      {
-        signal: new AbortController().signal,
+      canUseToolOptions({
         toolUseID: 'toolu_unresolved_bash_approval',
         agentID: 'agent-not-in-crew-state',
-      },
+      }),
     )
 
     expect(providerThreadEvents.flatMap(event => event.chunks)).not.toEqual(expect.arrayContaining([
