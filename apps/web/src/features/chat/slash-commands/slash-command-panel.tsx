@@ -371,7 +371,7 @@ export function SlashCommandPanel({
                 disabled={!isAvailable}
                 variant="ghost"
                 className={cn(
-                  'h-auto w-full items-start justify-start gap-2.5 rounded-lg px-2.5 py-1 text-left whitespace-normal',
+                  'h-auto w-full items-start justify-start gap-2.5 rounded-lg px-2.5 py-1 text-left whitespace-normal transition-none',
                   isAvailable
                     ? idx === effectiveActiveIndex
                       ? 'bg-accent text-accent-foreground'
