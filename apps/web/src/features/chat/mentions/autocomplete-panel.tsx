@@ -233,7 +233,7 @@ export function AutocompletePanel<TItem extends AutocompletePanelItem>({
                 data-active={idx === effectiveActiveIndex}
                 variant="ghost"
                 className={cn(
-                  'h-auto w-full justify-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs whitespace-normal',
+                  'h-auto w-full justify-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs whitespace-normal transition-none',
                   idx === effectiveActiveIndex
                     ? 'bg-accent text-accent-foreground'
                     : 'text-foreground/80 hover:bg-accent/40',
