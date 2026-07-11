@@ -6,6 +6,7 @@ export interface ChatRuntimeProfile {
   enabled: boolean
   startedAtMs: number
   streamStartedAtMs: number
+  firstTokenAtMs: number | null
   streamFinishedAtMs: number | null
   finalizeStartedAtMs: number | null
   finalizeFinishedAtMs: number | null
@@ -37,6 +38,7 @@ export function startChatRuntimeProfile(): ChatRuntimeProfile {
     enabled,
     startedAtMs: now,
     streamStartedAtMs: now,
+    firstTokenAtMs: null,
     streamFinishedAtMs: null,
     finalizeStartedAtMs: null,
     finalizeFinishedAtMs: null,

@@ -14,6 +14,10 @@ export interface TelemetryConfig {
   prometheusEndpoint: string
   runtimeMetricsSampleIntervalMs: number
   langfuseEnabled: boolean
+  posthogAiEnabled: boolean
+  posthogAiCaptureMode: 'metadata' | 'full'
+  posthogAiHost: string
+  posthogAiProjectToken: string | null
   profilingEnabled: boolean
   diagnosticsEnabled: boolean
 }
@@ -64,6 +68,7 @@ export function getTelemetryConfig(): TelemetryConfig {
   const enabled = readFlag('CRADLE_OTEL_ENABLED', false) && !testEnv
   const otlpEndpoint = readString('CRADLE_OTEL_EXPORTER_OTLP_ENDPOINT')
     ?? readString('OTEL_EXPORTER_OTLP_ENDPOINT')
+  const posthogAiProjectToken = readString('CRADLE_POSTHOG_PROJECT_TOKEN')
 
   cachedConfig = {
     enabled,
@@ -90,6 +95,14 @@ export function getTelemetryConfig(): TelemetryConfig {
       && readFlag('CRADLE_LANGFUSE_ENABLED', !!(process.env.LANGFUSE_PUBLIC_KEY && process.env.LANGFUSE_SECRET_KEY))
       && !!process.env.LANGFUSE_PUBLIC_KEY
       && !!process.env.LANGFUSE_SECRET_KEY,
+    posthogAiEnabled: enabled
+      && readFlag('CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED', false)
+      && !!posthogAiProjectToken,
+    posthogAiCaptureMode: readString('CRADLE_POSTHOG_AI_CAPTURE_MODE') === 'full'
+      ? 'full'
+      : 'metadata',
+    posthogAiHost: readString('CRADLE_POSTHOG_HOST') ?? 'https://us.i.posthog.com',
+    posthogAiProjectToken,
     profilingEnabled: enabled && readFlag('CRADLE_PROFILING_ENABLED', false),
     diagnosticsEnabled: readFlag('CRADLE_DIAGNOSTICS_ENABLED', false),
   }

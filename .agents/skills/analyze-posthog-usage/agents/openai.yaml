@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze PostHog Usage"
+  short_description: "Explore product usage and turn evidence into hypotheses"
+  default_prompt: "Use $analyze-posthog-usage to explore recent Cradle usage and recommend the next product questions."

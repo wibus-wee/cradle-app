@@ -8,6 +8,11 @@ import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
 
 import type { TelemetryConfig } from './config'
 import { createLangfuseSpanProcessor } from './langfuse'
+import {
+  ExcludePostHogAiSpanProcessor,
+  PostHogAiFilteringSpanProcessor,
+  posthogAiOtlpUrl,
+} from './posthog-ai'
 
 function joinOtlpEndpoint(base: string, suffix: 'v1/traces' | 'v1/metrics'): string {
   return `${base.replace(/\/+$/, '')}/${suffix}`
@@ -23,12 +28,24 @@ export function createTraceSpanProcessors(config: TelemetryConfig): SpanProcesso
     ?? (config.otlpEndpoint ? joinOtlpEndpoint(config.otlpEndpoint, 'v1/traces') : null)
 
   if (traceUrl) {
-    processors.push(new BatchSpanProcessor(new OTLPTraceExporter({ url: traceUrl })))
+    processors.push(new ExcludePostHogAiSpanProcessor(
+      new BatchSpanProcessor(new OTLPTraceExporter({ url: traceUrl })),
+    ))
+  }
+
+  if (config.posthogAiEnabled && config.posthogAiProjectToken) {
+    const exporter = new OTLPTraceExporter({
+      url: posthogAiOtlpUrl(config.posthogAiHost),
+      headers: {
+        Authorization: `Bearer ${config.posthogAiProjectToken}`,
+      },
+    })
+    processors.push(new PostHogAiFilteringSpanProcessor(new BatchSpanProcessor(exporter)))
   }
 
   const langfuseProcessor = createLangfuseSpanProcessor()
   if (langfuseProcessor) {
-    processors.push(langfuseProcessor)
+    processors.push(new ExcludePostHogAiSpanProcessor(langfuseProcessor))
   }
 
   return processors

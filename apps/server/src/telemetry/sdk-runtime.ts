@@ -45,6 +45,9 @@ export function startTelemetrySdk(config: TelemetryConfig): void {
 
   logTelemetry(`OpenTelemetry enabled service=${config.serviceName} traces=${config.tracesEnabled} metrics=${config.metricsEnabled}`)
   logTelemetry(config.langfuseEnabled ? 'Langfuse exporter enabled' : 'Langfuse exporter disabled')
+  logTelemetry(config.posthogAiEnabled
+    ? `PostHog AI Observability exporter enabled captureMode=${config.posthogAiCaptureMode}`
+    : 'PostHog AI Observability exporter disabled')
   if (config.prometheusEnabled) {
     logTelemetry(`Prometheus metrics enabled http://${config.prometheusHost ?? '0.0.0.0'}:${config.prometheusPort}${config.prometheusEndpoint}`)
   }

@@ -1,9 +1,13 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 
+import { observeAiGeneration } from '../../../telemetry/ai-observability'
 import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contract'
 import * as Observability from '../../observability/service'
 import { readDurableProviderRuntimeBinding } from '../../provider-runtime/service'
-import { truncateSnapshotPayload } from '../message-snapshot-compaction'
+import {
+  compactStoredMessageSnapshot,
+  truncateSnapshotPayload,
+} from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun } from '../run-registry'
 import type {
@@ -38,7 +42,7 @@ import {
   shouldRecordHarnessSnapshotChunk,
   summarizeSnapshotChunk,
 } from './snapshot-events'
-import { isTerminalUIMessageChunk } from './stream-chunks'
+import { isTerminalUIMessageChunk, readTerminalStatus } from './stream-chunks'
 import { terminalChunkForStatus } from './terminal-finalizer'
 import {
   estimateRunUsageCost,
@@ -122,48 +126,74 @@ export async function executeRun(
   input: ExecuteRunInput,
   deps: TurnExecutorDeps,
 ): Promise<void> {
-  const diagnostics = createTurnOutputDiagnostics()
-  const profile = startChatRuntimeProfile()
-  let released = false
+  await observeAiGeneration({
+    runtimeKind: activeRun.runtimeSession.runtimeKind,
+    providerKind: input.profile?.providerKind ?? activeRun.runtimeSession.runtimeKind,
+    requestedModelId: activeRun.modelId,
+    internalContinuation: activeRun.internalContinuation === 'runtimeGoal',
+    inputMessages: () => projectAiObservationInputMessages(input),
+  }, async (captureMode) => {
+    const diagnostics = createTurnOutputDiagnostics()
+    const profile = startChatRuntimeProfile()
+    let released = false
 
-  const releaseAndDrain = (): void => {
-    if (released) {
-      return
+    const releaseAndDrain = (): void => {
+      if (released) {
+        return
+      }
+      released = true
+      deps.releaseActiveRun(activeRun)
+      deps.scheduleQueueDrain(activeRun.sessionId)
     }
-    released = true
-    deps.releaseActiveRun(activeRun)
-    deps.scheduleQueueDrain(activeRun.sessionId)
-  }
 
-  try {
-    const { finalChunk, failurePayload } = await pumpRuntimeStream(
-      activeRun,
-      input,
-      diagnostics,
-      profile,
-      deps,
-    )
-    const { actualModelId, shouldFinalizeDiagnostics } = await persistRunTerminalAndUsage(
-      activeRun,
-      finalChunk,
-      failurePayload,
-      diagnostics,
-      profile,
-      deps,
-    )
-    completeRun(
-      activeRun,
-      finalChunk,
-      diagnostics,
-      profile,
-      actualModelId,
-      shouldFinalizeDiagnostics,
-      deps,
-    )
-  }
-  finally {
-    releaseAndDrain()
-  }
+    try {
+      const { finalChunk, failurePayload } = await pumpRuntimeStream(
+        activeRun,
+        input,
+        diagnostics,
+        profile,
+        deps,
+      )
+      const { actualModelId, shouldFinalizeDiagnostics } = await persistRunTerminalAndUsage(
+        activeRun,
+        finalChunk,
+        failurePayload,
+        diagnostics,
+        profile,
+        deps,
+      )
+      completeRun(
+        activeRun,
+        finalChunk,
+        diagnostics,
+        profile,
+        actualModelId,
+        shouldFinalizeDiagnostics,
+        deps,
+      )
+      const usage = activeRun.runtime.totalUsage ?? activeRun.runtime.lastUsage ?? null
+      return {
+        modelId: actualModelId,
+        usage,
+        estimatedCostUsd: usage ? estimateRunUsageCost(actualModelId, usage) : null,
+        timeToFirstTokenMs: profile.firstTokenAtMs === null
+          ? null
+          : Math.max(0, profile.firstTokenAtMs - profile.startedAtMs),
+        outcome: toAiGenerationOutcome(finalChunk),
+        stopReason: readAiGenerationStopReason(finalChunk),
+        outputChoices: captureMode === 'full'
+          ? [{
+              role: 'assistant',
+              content: compactStoredMessageSnapshot(activeRun.finalMessage).parts,
+            }]
+          : [],
+        tools: captureMode === 'full' ? readAiObservationToolNames(activeRun.finalMessage) : [],
+      }
+    }
+    finally {
+      releaseAndDrain()
+    }
+  })
 }
 
 async function pumpRuntimeStream(
@@ -234,6 +264,7 @@ async function pumpRuntimeStream(
       accumulateDiagnostics(diagnostics, chunk)
       if (isTokenDeltaChunk(chunk) && !activeRun.firstTokenDeltaSnapshotRecorded) {
         activeRun.firstTokenDeltaSnapshotRecorded = true
+        profile.firstTokenAtMs = performance.now()
         deps.recordSnapshotEvent(activeRun, {
           phase: 'model_first_token_delta',
           chunk,
@@ -497,6 +528,60 @@ function isTokenDeltaChunk(chunk: UIMessageChunk): boolean {
   return chunk.type === 'text-delta'
     || chunk.type === 'reasoning-delta'
     || chunk.type === 'tool-input-delta'
+}
+
+function toAiGenerationOutcome(chunk: UIMessageChunk): 'success' | 'failed' | 'cancelled' {
+  const status = readTerminalStatus(chunk)
+  return status === 'complete' ? 'success' : status === 'aborted' ? 'cancelled' : 'failed'
+}
+
+function readAiGenerationStopReason(chunk: UIMessageChunk): string {
+  if (chunk.type === 'finish') {
+    return chunk.finishReason ?? 'stop'
+  }
+  if (chunk.type === 'abort') {
+    return 'cancelled'
+  }
+  return 'error'
+}
+
+function projectAiObservationInputMessages(input: ExecuteRunInput): unknown[] {
+  return [
+    ...(input.systemPrompt
+      ? [{
+          role: 'system',
+          content: truncateSnapshotPayload(input.systemPrompt),
+        }]
+      : []),
+    ...(input.history ?? []).map(message => projectAiObservationMessage(message)),
+    projectAiObservationMessage(input.message),
+  ]
+}
+
+function projectAiObservationMessage(message: UIMessage): Record<string, unknown> {
+  const compacted = compactStoredMessageSnapshot(message)
+  return {
+    role: compacted.role,
+    content: compacted.parts,
+  }
+}
+
+function readAiObservationToolNames(message: UIMessage): string[] {
+  const names = new Set<string>()
+  for (const part of message.parts) {
+    if (!('type' in part) || (part.type !== 'dynamic-tool' && !part.type.startsWith('tool-'))) {
+      continue
+    }
+    const toolName = 'toolName' in part && typeof part.toolName === 'string'
+      ? part.toolName
+      : part.type === 'dynamic-tool'
+        ? null
+        : part.type.slice('tool-'.length)
+    if (toolName) {
+      names.add(toolName)
+    }
+  }
+  return [...names]
 }
 
 /**

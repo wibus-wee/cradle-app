@@ -29,6 +29,10 @@ describe('desktop server process observability env', () => {
       CRADLE_LANGFUSE_ENABLED: '1',
       LANGFUSE_PUBLIC_KEY: 'pk-test',
       LANGFUSE_SECRET_KEY: 'sk-test',
+      CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED: '1',
+      CRADLE_POSTHOG_AI_CAPTURE_MODE: 'full',
+      CRADLE_POSTHOG_PROJECT_TOKEN: 'phc-test',
+      CRADLE_POSTHOG_HOST: 'https://us.i.posthog.com',
       CRADLE_DIAGNOSTICS_TOKEN: 'local-token',
       CRADLE_HOST: '0.0.0.0',
       CRADLE_DATA_DIR: '/tmp/other-data',
@@ -42,6 +46,10 @@ describe('desktop server process observability env', () => {
       CRADLE_LANGFUSE_ENABLED: '1',
       LANGFUSE_PUBLIC_KEY: 'pk-test',
       LANGFUSE_SECRET_KEY: 'sk-test',
+      CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED: '1',
+      CRADLE_POSTHOG_AI_CAPTURE_MODE: 'full',
+      CRADLE_POSTHOG_PROJECT_TOKEN: 'phc-test',
+      CRADLE_POSTHOG_HOST: 'https://us.i.posthog.com',
       CRADLE_DIAGNOSTICS_TOKEN: 'local-token',
     })
   })
