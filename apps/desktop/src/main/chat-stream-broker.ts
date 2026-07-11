@@ -1,5 +1,7 @@
 import type { WebContents } from 'electron'
 
+import { getDesktopServerAuthHeaders } from './server-process'
+
 export const DESKTOP_CHAT_STREAM_CHUNK_CHANNEL = 'chat-stream:chunk'
 export const DESKTOP_CHAT_STREAM_CLOSED_CHANNEL = 'chat-stream:closed'
 export const DESKTOP_CHAT_STREAM_ERROR_CHANNEL = 'chat-stream:error'
@@ -382,6 +384,7 @@ export class ChatStreamBroker {
 
     try {
       const headers = new Headers(request.request.headers)
+      new Headers(getDesktopServerAuthHeaders()).forEach((value, key) => headers.set(key, value))
       headers.set(HEADER_DESKTOP_UPSTREAM_REQUEST_ID, entry.upstreamRequestId)
       headers.set(HEADER_DESKTOP_UPSTREAM_MODE, request.mode)
       const response = await this.fetchFn(new URL(request.path, this.serverUrl), {

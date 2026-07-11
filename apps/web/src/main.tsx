@@ -12,10 +12,12 @@ import * as ReactDOMClient from 'react-dom/client'
 import { AppErrorBoundary } from './components/common/app-error-boundary'
 import { resolveInitialLocale } from './i18n/browser-locale'
 import { I18nProvider } from './i18n/client'
+import { getServerUrl } from './lib/electron'
 import { initPerfMonitor } from './lib/perf-monitor'
 import { loadWebPlugins } from './lib/plugin-host'
 import { initializeReactDiagnostics } from './lib/react-diagnostics'
 import { installRendererDiagnostics } from './lib/renderer-diagnostics'
+import { bootstrapBrowserAuthSession } from './lib/server-credential'
 
 type SharedModuleRegistry = Window & {
   [key: symbol]: Record<string, unknown>
@@ -69,7 +71,8 @@ function RootApplication() {
   )
 }
 
-function startApp(): void {
+async function startApp(): Promise<void> {
+  await bootstrapBrowserAuthSession(getServerUrl())
   ReactDOMClient.createRoot(document.getElementById('app')!).render(
     <React.StrictMode>
       <AppErrorBoundary>
@@ -87,7 +90,7 @@ function startApp(): void {
   })
 }
 
-startApp()
+void startApp()
 
 queueMicrotask(() => {
   initializeReactDiagnostics()

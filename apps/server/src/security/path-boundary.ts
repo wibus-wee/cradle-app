@@ -2,7 +2,7 @@ import { realpathSync, statSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 
-import { AppError } from '../../errors/app-error'
+import { AppError } from '../errors/app-error'
 
 export interface ResolvedRootBoundary {
   requestedPath: string
@@ -64,9 +64,6 @@ export function assertWithinAllowedRoots(input: {
     code: input.code,
     status: 403,
     message: input.message,
-    details: {
-      ...input.details,
-      path: input.target.requestedPath,
-    },
+    details: { ...input.details, path: input.target.requestedPath },
   })
 }

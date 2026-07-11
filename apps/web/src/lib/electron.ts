@@ -2,6 +2,7 @@ import { createIpcProxy } from '@cradle/ipc/client'
 
 import type { SurfaceRoute } from '~/navigation/surface-identity'
 
+import { cradleFetch } from './server-credential'
 import { getDefaultServerUrl, readCustomServerUrl } from './server-endpoint-preferences'
 
 /**
@@ -50,6 +51,38 @@ export function getServerWebSocketUrl(
   }
 
   return url.toString()
+}
+
+export async function getAuthenticatedServerWebSocketUrl(
+  path: string,
+  query?: Record<string, string | number | boolean | null | undefined>,
+): Promise<string> {
+  const response = await cradleFetch(new URL('/auth/websocket-ticket', getServerUrl()), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ audience: path }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to issue WebSocket ticket: HTTP ${response.status}`)
+  }
+  const payload = await response.json() as { ticket: string }
+  return getServerWebSocketUrl(path, { ...query, ticket: payload.ticket })
+}
+
+export async function getAuthenticatedEventSourceUrl(url: string): Promise<string> {
+  const target = new URL(url, getServerUrl())
+  const audience = `sse:${target.pathname}`
+  const response = await cradleFetch(new URL('/auth/websocket-ticket', getServerUrl()), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ audience }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to issue event stream ticket: HTTP ${response.status}`)
+  }
+  const payload = await response.json() as { ticket: string }
+  target.searchParams.set('eventTicket', payload.ticket)
+  return target.toString()
 }
 
 /**

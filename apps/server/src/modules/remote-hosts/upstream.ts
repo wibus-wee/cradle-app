@@ -77,6 +77,25 @@ const HOP_BY_HOP_HEADERS = new Set([
   'host',
 ])
 
+const UPSTREAM_REQUEST_HEADERS = new Set([
+  'accept',
+  'accept-encoding',
+  'accept-language',
+  'cache-control',
+  'content-encoding',
+  'content-language',
+  'content-length',
+  'content-type',
+  'if-match',
+  'if-modified-since',
+  'if-none-match',
+  'if-range',
+  'if-unmodified-since',
+  'pragma',
+  'range',
+  'user-agent',
+])
+
 export function buildUpstreamUrl(baseUrl: string, pathWithQuery: string): URL {
   return new URL(pathWithQuery.replace(/^\//, ''), `${baseUrl.replace(/\/+$/, '')}/`)
 }
@@ -118,10 +137,10 @@ export async function upstreamJsonByBaseUrl<T>(
   return await response.json() as T
 }
 
-export function filterHopByHopRequestHeaders(headers: Headers, upstreamHost: string): Headers {
+export function buildUpstreamRequestHeaders(headers: Headers, upstreamHost: string): Headers {
   const filtered = new Headers()
   for (const [key, value] of headers.entries()) {
-    if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+    if (UPSTREAM_REQUEST_HEADERS.has(key.toLowerCase())) {
       filtered.set(key, value)
     }
   }
@@ -148,7 +167,7 @@ export async function proxyUpstreamRequestByBaseUrl(
   const upstreamHost = upstreamUrl.host
 
   const method = request.method.toUpperCase()
-  const headers = filterHopByHopRequestHeaders(request.headers, upstreamHost)
+  const headers = buildUpstreamRequestHeaders(request.headers, upstreamHost)
   const hasBody = method !== 'GET' && method !== 'HEAD'
 
   let upstreamResponse: Response

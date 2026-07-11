@@ -25,7 +25,7 @@ export function registerSyncGatewayRoutes(app: Elysia): Elysia {
     detail: { summary: 'Multiplexed realtime sync channel', tags: ['sync'] },
     body: t.Any(),
     beforeHandle({ request }) {
-      if (!verifyWebSocketRequestToken(request)) {
+      if (!verifyWebSocketRequestToken(request, { audience: '/sync' })) {
         throw createUnauthorizedError()
       }
     },

@@ -29,7 +29,8 @@ relay server registry rows. The controller-side remote host row remains owned by
 - `session.ts`: shared controller/host handshake state machine, encrypted frame
   handling, stream multiplexing, and credit-based flow control.
 - `controller-transport.ts`: controller-side WebSocket connection and local TCP
-  listener. It returns a `RemoteCradleServerTunnelHandle`-compatible handle.
+  listener. It returns the shared `LocalTunnelHandle` contract owned by
+  `src/runtime/local-tunnel.ts`.
 - `host-connector.ts`: host-side background service. It recreates relay rooms,
   connects to `/ws/host`, reconnects with backoff, and bridges streams to this
   server's local HTTP port.

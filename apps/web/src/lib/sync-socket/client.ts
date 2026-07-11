@@ -127,8 +127,8 @@ async function ensureConnected(): Promise<void> {
 }
 
 async function openSocket(): Promise<void> {
-  const { getServerWebSocketUrl } = await import('~/lib/electron')
-  const url = getServerWebSocketUrl('/sync')
+  const { getAuthenticatedServerWebSocketUrl } = await import('~/lib/electron')
+  const url = await getAuthenticatedServerWebSocketUrl('/sync')
   intentionalClose = false
   socket = new WebSocket(url)
 

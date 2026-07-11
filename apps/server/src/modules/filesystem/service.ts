@@ -3,13 +3,13 @@ import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 
-import * as Workspace from '../workspace/service'
-import type { ResolvedRootBoundary } from './path-boundary'
+import type { ResolvedRootBoundary } from '../../security/path-boundary'
 import {
   assertWithinAllowedRoots,
   isPathWithinRoot,
   resolveDirectoryBoundary,
-} from './path-boundary'
+} from '../../security/path-boundary'
+import * as Workspace from '../workspace/service'
 
 export interface DirectoryEntry {
   name: string

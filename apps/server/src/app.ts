@@ -2,6 +2,7 @@ import { cors } from '@elysiajs/cors'
 import { node } from '@elysiajs/node'
 import { Elysia } from 'elysia'
 
+import { loadServerAuthConfig } from './config/server-config'
 import { createAuthPlugin } from './http/auth'
 import { createOpenApiPlugin, registerOpenApiAlias } from './http/openapi'
 import { createRequestIdPlugin } from './http/request-id'
@@ -45,6 +46,7 @@ import { registerPtyRoutes } from './modules/pty'
 import { pullRequest } from './modules/pull-request'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
+import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
 import { remoteHosts } from './modules/remote-hosts'
 import { search } from './modules/search'
 import { secrets } from './modules/secrets'
@@ -59,6 +61,7 @@ import { sessionWork, work } from './modules/work'
 import { workflowRules } from './modules/workflow-rules'
 import { workspace } from './modules/workspace'
 import { worktree } from './modules/worktree'
+import { RuntimeResourceRegistry } from './runtime-resource-registry'
 
 interface CreateServerAppOptions {
   startBackgroundTasks?: boolean
@@ -117,6 +120,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   })
   app.use(
     cors({
+      credentials: true,
       origin: isAllowedCorsOrigin,
       exposeHeaders: [
         'x-cradle-run-id',
@@ -126,7 +130,10 @@ export async function createServerContractApp(options: CreateServerContractAppOp
     }),
   )
   app.use(createRequestIdPlugin())
-  app.use(createAuthPlugin())
+  app.use(createAuthPlugin({
+    ...loadServerAuthConfig(),
+    listRelayAuthTokens: listActiveRelayAuthTokens,
+  }))
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
       import('./http/request-logger'),
@@ -204,7 +211,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   } = options
   const [
     { shutdownInfra, getServerConfig },
-    { flushAllActiveRunSnapshots, recoverPersistedRunProjections },
+    { abortAllRuns, flushAllActiveRunSnapshots, recoverPersistedRunProjections },
     { shutdownTraceStreams },
     { cleanup: chronicleCleanup },
     chronicleService,
@@ -218,6 +225,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     localRelaydSupervisor,
     { startOpencodeServer, stopOpencodeServer },
     { initHostConnectorService, getHostConnectorService },
+    { shutdownRemoteHostConnections },
   ] = await Promise.all([
     import('./infra'),
     import('./modules/chat-runtime/runtime'),
@@ -234,6 +242,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/relay-servers/local-relayd-supervisor'),
     import('./modules/chat-runtime-providers/opencode/runtime-context'),
     import('./modules/relay-transport/host-connector'),
+    import('./modules/remote-hosts/service'),
   ])
   if (recoverPersistedRunsOnCreate) {
     recoverPersistedRunProjections()
@@ -255,23 +264,25 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   await activateServerPlugins(app)
   reconcileExternalIssueSourceRegistrations()
 
-  app.onStop([
-    () => flushAllActiveRunSnapshots(),
-    () => clearSideConversations(),
-    () => conversationBridgeSupervisor.stopAllConversationBridgeConnections(),
-    () => deactivateAllPlugins(),
-    () => providerRuntimeHostManager.shutdown(),
-    () => stopOpencodeServer(),
-    () => localRelaydSupervisor.stopManagedLocalRelayd(),
-    () => BackgroundJobPoller.stop(),
-    () => getHostConnectorService()?.stopAll(),
-    () => chronicleService.stopActivityPipelineScheduler(),
-    () => chronicleService.stopSlackBackgroundSync(),
-    () => chronicleCleanup(),
-    () => shutdownTraceStreams(),
-    () => destroyWorkspaceFileIndexes(),
-    () => shutdownInfra(),
-  ])
+const runtimeResources = new RuntimeResourceRegistry()
+  runtimeResources.register({ name: 'active-run-snapshots', phase: 'drain', stop: flushAllActiveRunSnapshots })
+  runtimeResources.register({ name: 'active-chat-runs', phase: 'drain', stop: abortAllRuns })
+  runtimeResources.register({ name: 'side-conversations', phase: 'stop', stop: clearSideConversations })
+  runtimeResources.register({ name: 'conversation-bridge', phase: 'stop', stop: () => conversationBridgeSupervisor.stopAllConversationBridgeConnections() })
+  runtimeResources.register({ name: 'plugins', phase: 'stop', stop: deactivateAllPlugins })
+  runtimeResources.register({ name: 'provider-runtime', phase: 'stop', stop: () => providerRuntimeHostManager.shutdown() })
+  runtimeResources.register({ name: 'opencode-server', phase: 'stop', stop: stopOpencodeServer })
+  runtimeResources.register({ name: 'local-relayd', phase: 'stop', stop: () => localRelaydSupervisor.stopManagedLocalRelayd() })
+  runtimeResources.register({ name: 'background-job-poller', phase: 'cancel', stop: () => BackgroundJobPoller.stop() })
+  runtimeResources.register({ name: 'relay-host-connector', phase: 'cancel', stop: () => getHostConnectorService()?.stopAll() })
+  runtimeResources.register({ name: 'remote-host-connections', phase: 'cancel', stop: shutdownRemoteHostConnections })
+  runtimeResources.register({ name: 'chronicle-scheduler', phase: 'stop', stop: () => chronicleService.stopActivityPipelineScheduler() })
+  runtimeResources.register({ name: 'chronicle-slack-sync', phase: 'stop', stop: () => chronicleService.stopSlackBackgroundSync() })
+  runtimeResources.register({ name: 'chronicle-daemon', phase: 'stop', stop: chronicleCleanup })
+  runtimeResources.register({ name: 'trace-streams', phase: 'stop', stop: shutdownTraceStreams })
+  runtimeResources.register({ name: 'workspace-indexes', phase: 'stop', stop: destroyWorkspaceFileIndexes })
+  runtimeResources.register({ name: 'infrastructure', phase: 'close', stop: shutdownInfra })
+  app.onStop(() => runtimeResources.shutdown())
 
   // Start chronicle daemon if enabled
   if (startBackgroundTasks) {

@@ -170,31 +170,31 @@ export async function createRemoteProjectedSession(input: {
   }
 
   try {
-    db()
-      .insert(sessions)
-      .values({
-        id: localSessionId,
-        workspaceId: input.workspaceId,
-        title: input.title,
-        origin: input.origin ?? 'manual',
-        providerTargetId: null,
-        runtimeKind: input.runtimeKind ?? 'standard',
-        agentId: null,
-        configJson: '{}',
-        linkedIssueId: input.linkedIssueId ?? null,
-        sessionGroupId: input.sessionGroupId ?? null,
-      })
-      .run()
+    db().transaction((tx) => {
+      tx.insert(sessions)
+        .values({
+          id: localSessionId,
+          workspaceId: input.workspaceId,
+          title: input.title,
+          origin: input.origin ?? 'manual',
+          providerTargetId: null,
+          runtimeKind: input.runtimeKind ?? 'standard',
+          agentId: null,
+          configJson: '{}',
+          linkedIssueId: input.linkedIssueId ?? null,
+          sessionGroupId: input.sessionGroupId ?? null,
+        })
+        .run()
 
-    db()
-      .insert(remoteSessionLinks)
-      .values({
-        localSessionId,
-        hostId: locator.hostId,
-        remoteSessionId: remoteSession.id,
-        remoteWorkspaceId,
-      })
-      .run()
+      tx.insert(remoteSessionLinks)
+        .values({
+          localSessionId,
+          hostId: locator.hostId,
+          remoteSessionId: remoteSession.id,
+          remoteWorkspaceId,
+        })
+        .run()
+    })
   }
   catch (error) {
     try {

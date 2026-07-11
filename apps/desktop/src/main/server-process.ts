@@ -27,6 +27,7 @@ const LOGIN_SHELL_PATH_TIMEOUT_MS = 1500
 const SHELL_PATH_MARKER_START = '__CRADLE_SHELL_PATH_START__'
 const SHELL_PATH_MARKER_END = '__CRADLE_SHELL_PATH_END__'
 const CREDENTIAL_SECRET_FILE = 'credential-secret'
+const SERVER_AUTH_TOKEN_FILE = 'server-auth-token'
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
 const SAFE_STORAGE_PREFIX = 'v1-safe:'
 const PLAIN_STORAGE_PREFIX = 'v1-plain:'
@@ -84,6 +85,7 @@ const DesktopServerAccessModeSchema = z.object({
   }).default({ serverAccessMode: 'local' }),
 }).passthrough()
 let currentServerUrl = ''
+let currentServerAuthToken = ''
 const recentServerOutputLines: string[] = []
 
 interface DesktopServerExitExpectation {
@@ -143,6 +145,7 @@ export async function startServer(): Promise<string> {
 
   const dataDir = join(app.getPath('userData'), 'data')
   const credentialSecret = resolveDesktopCredentialSecret(dataDir)
+  currentServerAuthToken = resolveDesktopServerAuthToken(dataDir)
   const existingServer = await readHealthyLocatedServerUrl(app.getPath('userData'))
   if (existingServer) {
     currentServerUrl = existingServer.serverUrl
@@ -155,7 +158,7 @@ export async function startServer(): Promise<string> {
   const host = desktopServerBindHostForAccessMode(readDesktopServerAccessMode(dataDir))
   currentServerUrl = `http://127.0.0.1:${port}`
 
-  await spawnServer({ host, port, dataDir, credentialSecret })
+  await spawnServer({ host, port, dataDir, credentialSecret, serverAuthToken: currentServerAuthToken })
 
   // Wait for server to be ready
   await waitForServer(currentServerUrl, SERVER_STARTUP_TIMEOUT_MS)
@@ -213,8 +216,14 @@ function removeCliServerLocator(): void {
   }
 }
 
-async function spawnServer(opts: { host: string, port: number, dataDir: string, credentialSecret: string }): Promise<void> {
-  const { host, port, dataDir, credentialSecret } = opts
+async function spawnServer(opts: {
+  host: string
+  port: number
+  dataDir: string
+  credentialSecret: string
+  serverAuthToken: string
+}): Promise<void> {
+  const { host, port, dataDir, credentialSecret, serverAuthToken } = opts
 
   // In dev, use tsx to run the TS source directly
   // In production, run the compiled server entry
@@ -246,6 +255,7 @@ async function spawnServer(opts: { host: string, port: number, dataDir: string, 
     CRADLE_DATA_DIR: dataDir,
     CRADLE_VERSION: app.getVersion(),
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
+    CRADLE_AUTH_TOKEN: serverAuthToken,
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,
@@ -624,6 +634,30 @@ function resolveDesktopCredentialSecret(dataDir: string): string {
   return secret
 }
 
+function resolveDesktopServerAuthToken(dataDir: string): string {
+  mkdirSync(dataDir, { recursive: true })
+  const tokenPath = join(dataDir, SERVER_AUTH_TOKEN_FILE)
+  if (existsSync(tokenPath)) {
+    const token = readFileSync(tokenPath, 'utf8').trim()
+    if (token) {
+      return token
+    }
+  }
+  const token = randomBytes(32).toString('base64url')
+  writeFileSync(tokenPath, `${token}\n`, { encoding: 'utf8', mode: 0o600 })
+  return token
+}
+
+export function getDesktopServerAuthToken(): string {
+  return currentServerAuthToken
+}
+
+export function getDesktopServerAuthHeaders(): HeadersInit {
+  return currentServerAuthToken
+    ? { authorization: `Bearer ${currentServerAuthToken}` }
+    : {}
+}
+
 function readDesktopCredentialSecret(secretPath: string): string {
   const serializedSecret = readFileSync(secretPath, 'utf8').trim()
   if (serializedSecret.startsWith(SAFE_STORAGE_PREFIX)) {
@@ -799,7 +833,7 @@ async function waitForServer(url: string, timeoutMs: number): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(`${url}/health`)
+      const res = await fetch(`${url}/health`, { headers: getDesktopServerAuthHeaders() })
       if (res.ok) {
         return
       }

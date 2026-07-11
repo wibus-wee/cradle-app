@@ -1,5 +1,7 @@
 import type { WebContents } from 'electron'
 
+import { getDesktopServerAuthHeaders } from './server-process'
+
 export const DESKTOP_CHAT_EVENT_TAIL_EVENT_CHANNEL = 'chat-event-tail:event'
 export const DESKTOP_CHAT_EVENT_TAIL_CLOSED_CHANNEL = 'chat-event-tail:closed'
 export const DESKTOP_CHAT_EVENT_TAIL_ERROR_CHANNEL = 'chat-event-tail:error'
@@ -273,6 +275,7 @@ export class ChatEventTailBroker {
 
     try {
       const response = await this.fetchFn(url, {
+        headers: getDesktopServerAuthHeaders(),
         method: 'GET',
         signal: entry.controller.signal,
       })

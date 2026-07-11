@@ -1,6 +1,8 @@
 import type { BrowserWindow } from 'electron'
 import { app, ipcMain, Menu, nativeImage, Tray } from 'electron'
 
+import { getDesktopServerAuthHeaders } from './server-process'
+
 export type TrayActionId
   = | 'open-app'
     | 'open-chat'
@@ -294,7 +296,7 @@ export class TrayManager {
   }
 
   private async readDesktopJson<T>(path: string): Promise<T> {
-    const response = await fetch(new URL(path, this.options.serverUrl))
+    const response = await fetch(new URL(path, this.options.serverUrl), { headers: getDesktopServerAuthHeaders() })
     if (!response.ok) {
       throw new Error(`Desktop projection request failed: ${response.status}`)
     }

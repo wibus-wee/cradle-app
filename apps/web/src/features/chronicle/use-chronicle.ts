@@ -13,7 +13,7 @@ import {
   getChronicleTimelineQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { postSecrets, putChronicleConfig } from '~/api-gen/sdk.gen'
-import { getServerUrl } from '~/lib/electron'
+import { getAuthenticatedEventSourceUrl, getServerUrl } from '~/lib/electron'
 
 export interface ChronicleConfig {
   profileId: string
@@ -1129,9 +1129,15 @@ export function useChronicleDownloadProgress(active: boolean): Map<string, Downl
       return
     }
     const url = `${getServerUrl()}/chronicle/model-resources/download-progress`
-    const eventSource = new EventSource(url)
+    let eventSource: EventSource | null = null
+    let cancelled = false
     let malformedFrameReported = false
-    eventSource.onmessage = (event) => {
+    void getAuthenticatedEventSourceUrl(url).then((authenticatedUrl) => {
+      if (cancelled) {
+        return
+      }
+      eventSource = new EventSource(authenticatedUrl)
+      eventSource.onmessage = (event) => {
       let entries: DownloadProgressEntry[]
       try {
         entries = ChronicleDownloadProgressMessageSchema.parse(event.data)
@@ -1150,12 +1156,14 @@ export function useChronicleDownloadProgress(active: boolean): Map<string, Downl
         }
         return next
       })
-    }
-    eventSource.onerror = () => {
-      // Reconnect is automatic with EventSource
-    }
+      }
+      eventSource.onerror = () => {
+        // Reconnect is automatic with EventSource while the ticket remains attached.
+      }
+    }).catch(error => console.warn('[chronicle] failed to open download progress stream', error))
     return () => {
-      eventSource.close()
+      cancelled = true
+      eventSource?.close()
     }
   }, [active])
 

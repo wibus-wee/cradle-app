@@ -6,6 +6,17 @@ import { z } from 'zod'
 
 const logLevels = ['debug', 'info', 'warn', 'error'] as const
 
+export function isLoopbackBindHost(host: string): boolean {
+  const normalizedHost = host.trim().toLowerCase().replace(/^\[|\]$/g, '')
+  if (normalizedHost === 'localhost' || normalizedHost === '::1') {
+    return true
+  }
+  const octets = normalizedHost.split('.')
+  return octets.length === 4
+    && octets.every(octet => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
+    && Number(octets[0]) === 127
+}
+
 const OptionalEnvStringSchema = z.string()
   .trim()
   .transform(value => value.length > 0 ? value : undefined)
@@ -28,6 +39,12 @@ const serverEnvSchema = z.object({
     throw new Error('CRADLE_DATA_DIR or CRADLE_DB_PATH is required')
   }
 
+  const authToken = env.CRADLE_AUTH_TOKEN ?? null
+  const authRequired = env.CRADLE_AUTH_TOKEN !== undefined || env.CRADLE_AUTH_REQUIRED === 'true'
+  if (!isLoopbackBindHost(env.CRADLE_HOST) && (!authRequired || !authToken)) {
+    throw new Error('CRADLE_AUTH_TOKEN is required when CRADLE_HOST is not loopback')
+  }
+
   return {
     host: env.CRADLE_HOST,
     port: env.CRADLE_PORT,
@@ -36,8 +53,8 @@ const serverEnvSchema = z.object({
     dbPath,
     migrationsDir: env.CRADLE_MIGRATIONS_DIR || getMigrationsPath(),
     logFile: env.CRADLE_LOG_FILE || (env.CRADLE_DATA_DIR ? join(env.CRADLE_DATA_DIR, 'server.log') : undefined),
-    authToken: env.CRADLE_AUTH_TOKEN ?? null,
-    authRequired: env.CRADLE_AUTH_TOKEN !== undefined || env.CRADLE_AUTH_REQUIRED === 'true',
+    authToken,
+    authRequired,
   }
 })
 

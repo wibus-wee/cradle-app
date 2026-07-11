@@ -1,11 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 
 import { loadServerAuthConfig } from '../config/server-config'
 import { AppError } from '../errors/app-error'
-import { listActiveRelayAuthTokens } from '../modules/relay-transport/relay-auth-token-service'
+import { issueBrowserAuthSession, verifyBrowserAuthSession } from './browser-auth-session'
 import { OPENAPI_DOCS_PATH, OPENAPI_JSON_ALIAS_PATH, OPENAPI_JSON_PATH } from './openapi'
+import { consumeWebSocketTicket, issueWebSocketTicket } from './websocket-ticket'
 
 export const CRADLE_TOKEN_HEADER = 'x-cradle-token'
 export const CRADLE_RELAY_TOKEN_HEADER = 'x-cradle-relay-token'
@@ -13,6 +14,7 @@ export const CRADLE_RELAY_TOKEN_HEADER = 'x-cradle-relay-token'
 interface AuthConfig {
   authRequired: boolean
   authToken: string | null
+  listRelayAuthTokens?: () => string[]
 }
 
 interface VerifyRequestTokenOptions {
@@ -84,32 +86,45 @@ export function verifyRequestToken(
 
   const presentedToken = readPresentedToken(headers, options)
   if (!presentedToken) {
-    return false
+    return verifyBrowserAuthSession(headers)
   }
 
   if (config.authToken && tokenMatches(presentedToken, config.authToken)) {
     return true
   }
 
-  return listRelayAuthTokens().some(token => tokenMatches(presentedToken, token))
+  return readRelayAuthTokens(config).some(token => tokenMatches(presentedToken, token))
+    || verifyBrowserAuthSession(headers)
 }
 
 export function verifyWebSocketRequestToken(
   request: Request,
-  options: Pick<VerifyRequestTokenOptions, 'config'> = {},
+  options: Pick<VerifyRequestTokenOptions, 'config'> & { audience?: string } = {},
 ): boolean {
   const url = new URL(request.url)
-  return verifyRequestToken(request.headers, {
-    ...options,
-    token: url.searchParams.get('token'),
-  })
+  const config = options.config ?? readAuthConfig()
+  if (!config.authRequired) {
+    return true
+  }
+  const ticket = url.searchParams.get('ticket')
+  return Boolean(ticket && consumeWebSocketTicket(ticket, options.audience ?? url.pathname))
 }
 
 export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
   return new Elysia({ name: 'cradle.http.auth' })
     .onBeforeHandle({ as: 'global' }, ({ request }) => {
-      const { pathname } = new URL(request.url)
+      const url = new URL(request.url)
+      const { pathname } = url
       if (isPublicAuthPath(request.method, pathname)) {
+        return undefined
+      }
+
+      const eventTicket = url.searchParams.get('eventTicket')
+      if (
+        request.method === 'GET'
+        && eventTicket
+        && consumeWebSocketTicket(eventTicket, `sse:${pathname}`)
+      ) {
         return undefined
       }
 
@@ -119,11 +134,28 @@ export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
 
       return undefined
     })
+    .post('/auth/websocket-ticket', ({ body }) => issueWebSocketTicket(body.audience), {
+      detail: { summary: 'Issue a single-use WebSocket authentication ticket', tags: ['auth'] },
+      body: t.Object({ audience: t.String({ minLength: 1, maxLength: 256 }) }),
+      response: {
+        200: t.Object({
+          ticket: t.String(),
+          expiresAt: t.Number(),
+        }),
+      },
+    })
+    .post('/auth/browser-session', ({ request, set }) => {
+      set.headers['set-cookie'] = issueBrowserAuthSession(new URL(request.url).protocol === 'https:')
+      return { ok: true as const }
+    }, {
+      detail: { summary: 'Bootstrap a browser authentication session', tags: ['auth'] },
+      response: { 200: t.Object({ ok: t.Literal(true) }) },
+    })
 }
 
-function listRelayAuthTokens(): string[] {
+function readRelayAuthTokens(config: AuthConfig): string[] {
   try {
-    return listActiveRelayAuthTokens()
+    return config.listRelayAuthTokens?.() ?? []
   }
   catch {
     return []

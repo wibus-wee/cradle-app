@@ -22,6 +22,7 @@ function parseSurfaceRoute(raw: string | null): unknown | null {
 }
 
 const serverUrl = getArg('server-url') ?? 'http://127.0.0.1:21423'
+const serverAuthToken = getArg('server-auth-token')
 const sessionId = getArg('session-id')
 const isTearoff = getArg('tearoff') === 'true'
 const surface = getArg('surface')
@@ -65,6 +66,7 @@ const cradleElectron = {
   /** Environment info */
   env: {
     serverUrl,
+    serverAuthToken,
     sessionId,
     isTearoff,
     surface,

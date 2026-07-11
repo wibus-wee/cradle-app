@@ -3,10 +3,10 @@ import net from 'node:net'
 import WebSocket from 'ws'
 
 import { AppError } from '../../errors/app-error'
+import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
+import { allocateLocalPort } from '../../runtime/local-tunnel'
 import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import { relayAssertionHeaders } from '../relay-servers/relay-signature-service'
-import type { RemoteCradleServerTunnelHandle } from '../remote-hosts/cradle-server-tunnel'
-import { allocateLocalPort } from '../remote-hosts/cradle-server-tunnel'
 import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
 import type { RelayEnvelope } from './protocol'
 import { relayEnvelopeSchema } from './protocol'
@@ -45,7 +45,7 @@ export interface RelayControllerTransportOptions {
   readyTimeoutMs?: number
 }
 
-export interface RelayControllerTransportHandle extends RemoteCradleServerTunnelHandle {
+export interface RelayControllerTransportHandle extends LocalTunnelHandle {
   /** The controller keypair actually used. Persist the private key for reconnect. */
   readonly controllerPrivateKeyBase64: string
   readonly controllerPublicKeyBase64: string

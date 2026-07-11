@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { loadServerConfig } from '../src/config/server-config'
+import { isLoopbackBindHost, loadServerConfig } from '../src/config/server-config'
 
 describe('server config', () => {
   it('parses defaults and derives dbPath from data dir', () => {
@@ -59,4 +59,28 @@ describe('server config', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it.each(['localhost', '127.0.0.1', '127.42.0.8', '::1', '[::1]'])(
+    'allows the loopback bind host %s without authentication',
+    (host) => {
+      expect(isLoopbackBindHost(host)).toBe(true)
+      expect(loadServerConfig({ CRADLE_DATA_DIR: '/tmp/cradle-data', CRADLE_HOST: host }).authRequired).toBe(false)
+    },
+  )
+
+  it.each(['0.0.0.0', '::', '192.168.1.20', 'cradle.internal'])(
+    'requires a configured token for the non-loopback bind host %s',
+    (host) => {
+      expect(isLoopbackBindHost(host)).toBe(false)
+      expect(() => loadServerConfig({
+        CRADLE_DATA_DIR: '/tmp/cradle-data',
+        CRADLE_HOST: host,
+      })).toThrow(/CRADLE_AUTH_TOKEN is required/)
+      expect(loadServerConfig({
+        CRADLE_AUTH_TOKEN: 'network-token',
+        CRADLE_DATA_DIR: '/tmp/cradle-data',
+        CRADLE_HOST: host,
+      }).authRequired).toBe(true)
+    },
+  )
 })

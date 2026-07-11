@@ -51,7 +51,7 @@ import {
   syncAllDesktopLayerSources,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
-import { startServer, stopServer } from './server-process'
+import { getDesktopServerAuthHeaders, getDesktopServerAuthToken, startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
@@ -180,7 +180,10 @@ async function createMainWindow(serverUrl: string): Promise<BrowserWindow> {
       nodeIntegration: false,
       sandbox: true,
       webviewTag: false,
-      additionalArguments: [`--server-url=${serverUrl}`],
+      additionalArguments: [
+        `--server-url=${serverUrl}`,
+        `--server-auth-token=${getDesktopServerAuthToken()}`,
+      ],
     },
     show: false,
   })
@@ -478,7 +481,7 @@ async function applyAppshotHotkeyPreference(enabled: boolean, trigger: MacInputB
 
 async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void> {
   try {
-    const response = await fetch(new URL('/preferences/desktop', serverUrl))
+    const response = await fetch(new URL('/preferences/desktop', serverUrl), { headers: getDesktopServerAuthHeaders() })
     if (!response.ok) {
       await applyAppshotHotkeyPreference(true)
       updateManager?.configurePreferences({

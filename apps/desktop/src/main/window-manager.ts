@@ -10,6 +10,7 @@ import {
 import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath, resolveDesktopRendererTearoffPath } from './desktop-assets'
 import { installExternalLinkPolicy } from './external-link-policy'
 import { subscribeAcpDevtool, subscribeIpcDevtool } from './ipc-devtool'
+import { getDesktopServerAuthToken } from './server-process'
 import { readStoredWindowSize, resolveWindowBoundsNearPoint, resolveWindowSize, writeStoredWindowSize } from './window-state'
 
 const TEAROFF_WINDOW_DEFAULT_WIDTH = 720
@@ -107,6 +108,7 @@ export class WindowManager {
         webviewTag: true,
         additionalArguments: [
           `--server-url=${this.serverUrl}`,
+          `--server-auth-token=${getDesktopServerAuthToken()}`,
           `--surface=${surfaceId}`,
           `--surface-route=${JSON.stringify(route)}`,
           '--tearoff=true',
@@ -247,6 +249,7 @@ export class WindowManager {
         webviewTag: true,
         additionalArguments: [
           `--server-url=${this.serverUrl}`,
+          `--server-auth-token=${getDesktopServerAuthToken()}`,
           '--devtool=true',
         ],
       },

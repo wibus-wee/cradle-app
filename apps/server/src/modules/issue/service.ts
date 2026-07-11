@@ -1500,7 +1500,9 @@ export function migrateIssues(sourceId: string, targetId: string, options: Migra
   }
   requireWorkspace(sourceId)
   requireWorkspace(targetId)
-  seedDefaultStatuses(targetId)
+  if (!options.dryRun) {
+    seedDefaultStatuses(targetId)
+  }
 
   // Phase 1: Build status mapping (source status name → target status ID)
   const sourceStatuses = readWorkspaceStatuses(sourceId)

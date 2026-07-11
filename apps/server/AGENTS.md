@@ -83,7 +83,7 @@ export const workspace = new Elysia({
 - 模块之间应优先通过明确 service API 或 shared contract 交互，避免隐式循环依赖。
 - 持久化 schema 变更必须谨慎处理，优先用 Drizzle schema/migration 路径，不要绕过现有 database provider。
 
-已知状态：当前代码里 `http/` 和 `lib/` 仍有少量 feature imports，计划 021 会处理这些依赖方向漂移。不要扩大这类反向依赖。
+依赖方向由 `pnpm --filter @cradle/server check:boundaries` 检查。它忽略测试与纯 type imports，拒绝跨 domain `internal/` imports，锁定已移除的反向 runtime edges，并以最大 runtime domain SCC 为非递增基线。SCC（strongly connected component）是互相可达、因此无法独立初始化的一组 domain。当前遗留 SCC 由计划 041 逐个 vertical slice 降低；不要扩大基线。
 
 ## 错误处理
 
@@ -108,7 +108,8 @@ export const workspace = new Elysia({
 ## Background tasks 和 lifecycle
 
 - `createServerApp()` 启动 runtime concerns，例如 plugin activation、external provider refresh、Chronicle background sync、relay connector、provider runtime cleanup。
-- 长生命周期资源必须注册到 `app.onStop()`，并保证 shutdown path 不依赖请求上下文。
+- 长生命周期资源必须注册到 composition-root-owned `RuntimeResourceRegistry`，不要各自追加分散的 `app.onStop()` callbacks。
+- shutdown 顺序是：立即停止接受新命令并触发 abort signal；取消 pending connectors/background work；drain chat runs/finalization；停止 providers/watchers/plugins；最后关闭 database/infra。资源 stop 必须可重复调用。
 - Boot-time background work 必须显式处理 rejection；不要留下 floating promise 造成 unhandled rejection。
 
 ## Testing and verification
@@ -117,6 +118,7 @@ Server package scripts 是真实验证入口：
 
 ```bash
 pnpm --filter @cradle/server typecheck
+pnpm --filter @cradle/server check:boundaries
 pnpm --filter @cradle/server test
 pnpm --filter @cradle/server build
 ```

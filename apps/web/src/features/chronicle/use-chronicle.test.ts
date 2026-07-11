@@ -7,6 +7,7 @@ import {
 } from './use-chronicle'
 
 vi.mock('~/lib/electron', () => ({
+  getAuthenticatedEventSourceUrl: async (url: string) => url,
   getServerUrl: () => 'http://127.0.0.1:4100',
 }))
 
@@ -70,12 +71,13 @@ describe('chronicle download progress', () => {
     expect(batch[0]?.status).toBe('done')
   })
 
-  it('updates progress from EventSource frames and closes on cleanup', () => {
+  it('updates progress from EventSource frames and closes on cleanup', async () => {
     globalThis.EventSource = FakeEventSource as unknown as typeof EventSource
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { result, unmount } = renderHook(() => useChronicleDownloadProgress(true))
 
-    const eventSource = FakeEventSource.instances[0]
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+    const eventSource = FakeEventSource.instances[0]!
     expect(eventSource?.url).toBe('http://127.0.0.1:4100/chronicle/model-resources/download-progress')
 
     act(() => {
@@ -100,13 +102,14 @@ describe('chronicle download progress', () => {
     expect(eventSource.closed).toBe(true)
   })
 
-  it('clears progress and avoids EventSource when inactive', () => {
+  it('clears progress and avoids EventSource when inactive', async () => {
     globalThis.EventSource = FakeEventSource as unknown as typeof EventSource
     const { result, rerender } = renderHook(
       ({ active }) => useChronicleDownloadProgress(active),
       { initialProps: { active: true } },
     )
 
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
     act(() => {
       FakeEventSource.instances[0]?.emit(JSON.stringify({
         category: 'audio-asr',

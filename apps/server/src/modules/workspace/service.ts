@@ -321,6 +321,13 @@ export interface MigrateWorkspaceResult {
 }
 
 export function migrateWorkspace(sourceId: string, targetId: string, options: MigrateWorkspaceOptions = {}): MigrateWorkspaceResult {
+  if (options.dryRun) {
+    return migrateWorkspaceWithinBoundary(sourceId, targetId, options)
+  }
+  return db().transaction(() => migrateWorkspaceWithinBoundary(sourceId, targetId, options))
+}
+
+function migrateWorkspaceWithinBoundary(sourceId: string, targetId: string, options: MigrateWorkspaceOptions): MigrateWorkspaceResult {
   if (sourceId === targetId) {
     throw new AppError({ code: 'workspace_migrate_same', status: 400, message: 'Source and target workspace must be different' })
   }

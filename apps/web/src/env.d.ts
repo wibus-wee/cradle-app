@@ -24,6 +24,7 @@ interface Window {
     }
     env: {
       serverUrl: string
+      serverAuthToken: string | null
       sessionId: string | null
       isTearoff: boolean
       surface: string | null

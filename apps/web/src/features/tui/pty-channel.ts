@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { getI18n } from '~/i18n/instance'
-import { getServerWebSocketUrl } from '~/lib/electron'
+import { getAuthenticatedServerWebSocketUrl } from '~/lib/electron'
 
 import type { PtyClientEvent, PtyErrorEvent, PtyExitEvent, PtyOutputEvent, PtySnapshotEvent } from './pty-protocol'
 import { PtyServerEventJsonSchema } from './pty-protocol'
@@ -117,7 +117,10 @@ export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
-      connect()
+      void connect().catch(() => {
+        emitError('SOCKET_AUTH_ERROR', getI18n().t('common:pty.socketConnectionError'))
+        scheduleReconnect()
+      })
     }, options.reconnectDelayMs)
   }
 
@@ -156,7 +159,7 @@ export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
     }
   }
 
-  function connect() {
+  async function connect(): Promise<void> {
     if (closedManually) {
       return
     }
@@ -165,7 +168,10 @@ export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
       return
     }
 
-    const url = getServerWebSocketUrl(options.socketPath, lastSeq === null ? undefined : { fromSeq: lastSeq })
+    const url = await getAuthenticatedServerWebSocketUrl(
+      options.socketPath,
+      lastSeq === null ? undefined : { fromSeq: lastSeq },
+    )
     socket = new WebSocket(url)
 
     socket.addEventListener('open', () => {

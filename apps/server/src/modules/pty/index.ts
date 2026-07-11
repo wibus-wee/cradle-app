@@ -6,7 +6,8 @@ import { PtyModel } from './model'
 import * as Pty from './service'
 
 function rejectUnauthorizedSocketRequest(request: Request): void {
-  if (!verifyWebSocketRequestToken(request)) {
+  const audience = new URL(request.url).pathname
+  if (!verifyWebSocketRequestToken(request, { audience })) {
     throw createUnauthorizedError()
   }
 }

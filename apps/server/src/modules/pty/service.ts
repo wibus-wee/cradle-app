@@ -9,12 +9,12 @@ import {
 } from '../../helpers/agent-runtime-config'
 import { getSystemWorkflow } from '../../helpers/system-workflow'
 import { db } from '../../infra'
-import { reportRuntimeSessionTitle } from '../chat-runtime/title-service'
-import type { ResolvedRootBoundary } from '../filesystem/path-boundary'
+import type { ResolvedRootBoundary } from '../../security/path-boundary'
 import {
   assertWithinAllowedRoots,
   resolveDirectoryBoundarySync,
-} from '../filesystem/path-boundary'
+} from '../../security/path-boundary'
+import { reportRuntimeSessionTitle } from '../chat-runtime/title-service'
 import { runtimeUsesAgentTerminalLaunch } from '../provider-contracts/runtime-compatibility'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'

@@ -8,6 +8,7 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import {
   generateRelaySigningKeyPair,
@@ -19,7 +20,6 @@ import {
 } from '../relay-transport/controller-transport'
 import { generateRelayKeyPair, publicKeyFromPrivate, relayPublicKeyFingerprint } from '../relay-transport/crypto'
 import { readSecret, upsertSecret } from '../secrets/service'
-import type { RemoteCradleServerTunnelHandle } from './cradle-server-tunnel'
 import {
   buildRemoteCradleSshLaunchConfig,
   startRemoteCradleServerTunnel,
@@ -137,7 +137,7 @@ export interface RemoteCradleServerHealthView extends RemoteCradleServerConnecti
 
 interface RemoteHostConnectionRecord {
   host: RemoteHost
-  tunnel: RemoteCradleServerTunnelHandle | null
+  tunnel: LocalTunnelHandle | null
   baseUrl: string
   lastError: string | null
   tunnelExited: boolean
@@ -270,6 +270,7 @@ const capabilitiesSchema = z.object({
 
 const connections = new Map<string, RemoteHostConnectionRecord>()
 const connectPromises = new Map<string, Promise<RemoteCradleServerConnectionView>>()
+const connectionGenerations = new Map<string, number>()
 
 export const connectRemoteHost = connectRemoteHostCradleServer
 export const disconnectRemoteHost = disconnectRemoteHostCradleServer
@@ -346,7 +347,8 @@ export async function connectRemoteHostCradleServer(hostId: string): Promise<Rem
   if (existingPromise) {
     return existingPromise
   }
-  const promise = connectRemoteHostCradleServerInner(hostId).finally(() => {
+  const generation = connectionGenerations.get(hostId) ?? 0
+  const promise = connectRemoteHostCradleServerInner(hostId, generation).finally(() => {
     connectPromises.delete(hostId)
   })
   connectPromises.set(hostId, promise)
@@ -354,9 +356,20 @@ export async function connectRemoteHostCradleServer(hostId: string): Promise<Rem
 }
 
 export async function disconnectRemoteHostCradleServer(hostId: string): Promise<void> {
+  connectionGenerations.set(hostId, (connectionGenerations.get(hostId) ?? 0) + 1)
+  await closeRemoteHostConnection(hostId)
+}
+
+async function closeRemoteHostConnection(hostId: string): Promise<void> {
   const record = connections.get(hostId)
   connections.delete(hostId)
   await record?.tunnel?.close()
+}
+
+export async function shutdownRemoteHostConnections(): Promise<void> {
+  const hostIds = new Set([...connections.keys(), ...connectPromises.keys()])
+  await Promise.all(Array.from(hostIds, hostId => disconnectRemoteHostCradleServer(hostId)))
+  await Promise.allSettled([...connectPromises.values()])
 }
 
 export async function readRemoteHostCradleServerHealth(hostId: string): Promise<RemoteCradleServerHealthView> {
@@ -464,7 +477,7 @@ async function connectedRecord(hostId: string): Promise<RemoteHostConnectionReco
   return next
 }
 
-async function connectRemoteHostCradleServerInner(hostId: string): Promise<RemoteCradleServerConnectionView> {
+async function connectRemoteHostCradleServerInner(hostId: string, generation: number): Promise<RemoteCradleServerConnectionView> {
   const host = requireRemoteHost(hostId)
   if (!host.enabled) {
     throw new AppError({
@@ -475,7 +488,7 @@ async function connectRemoteHostCradleServerInner(hostId: string): Promise<Remot
     })
   }
 
-  await disconnectRemoteHostCradleServer(hostId)
+  await closeRemoteHostConnection(hostId)
 
   const connectionConfig = parseConnectionConfig(host.connectionConfigJson)
   const capabilities = parseCapabilities(host.capabilitiesJson)
@@ -488,7 +501,7 @@ async function connectRemoteHostCradleServerInner(hostId: string): Promise<Remot
     })
   }
 
-  let tunnel: RemoteCradleServerTunnelHandle | null = null
+  let tunnel: LocalTunnelHandle | null = null
   let record: RemoteHostConnectionRecord | null = null
   try {
     let baseUrl: string
@@ -518,6 +531,16 @@ async function connectRemoteHostCradleServerInner(hostId: string): Promise<Remot
       record.tunnelExited = true
       record.lastError = `tunnel exited with code ${exit.code ?? 'null'} signal ${exit.signal ?? 'null'}`
     })
+    if ((connectionGenerations.get(hostId) ?? 0) !== generation) {
+      await tunnel?.close()
+      throw new AppError({
+        code: 'remote_host_connection_cancelled',
+        status: 409,
+        message: 'Remote host connection was cancelled.',
+        details: { hostId },
+      })
+    }
+    requireRemoteHost(hostId)
     connections.set(hostId, record)
     await fetchRemoteCradleServerHealth(record)
     return toConnectionView(record)
@@ -525,13 +548,15 @@ async function connectRemoteHostCradleServerInner(hostId: string): Promise<Remot
   catch (error) {
     await tunnel?.close()
     const appError = toAppError(error, 'remote_cradle_server_connect_failed')
-    connections.set(hostId, {
-      host,
-      tunnel: null,
-      baseUrl: connectionConfig.transport === 'direct-url' ? connectionConfig.baseUrl ?? '' : '',
-      lastError: appError.message,
-      tunnelExited: true,
-    })
+    if ((connectionGenerations.get(hostId) ?? 0) === generation) {
+      connections.set(hostId, {
+        host,
+        tunnel: null,
+        baseUrl: connectionConfig.transport === 'direct-url' ? connectionConfig.baseUrl ?? '' : '',
+        lastError: appError.message,
+        tunnelExited: true,
+      })
+    }
     throw appError
   }
 }
@@ -540,7 +565,7 @@ async function startSshCradleTunnel(
   host: RemoteHost,
   connectionConfig: RemoteHostConnectionConfig,
   capabilities: RemoteHostCapabilities,
-): Promise<RemoteCradleServerTunnelHandle> {
+): Promise<LocalTunnelHandle> {
   if (!connectionConfig.ssh) {
     throw new AppError({
       code: 'remote_cradle_server_ssh_required',
@@ -694,7 +719,7 @@ export async function claimRemoteHostRelay(
 async function startRelayControllerTunnel(
   host: RemoteHost,
   connectionConfig: RemoteHostConnectionConfig,
-): Promise<RemoteCradleServerTunnelHandle> {
+): Promise<LocalTunnelHandle> {
   const relay = connectionConfig.relay
   if (!relay) {
     throw new AppError({
@@ -731,7 +756,7 @@ async function startRelayControllerTunnel(
     pinnedHostPubkey: relay.pinnedHostPubkey,
     controllerName: hostname(),
     readyTimeoutMs: connectionConfig.connectTimeoutMs ?? 15_000,
-  }) as RemoteCradleServerTunnelHandle
+  }) as LocalTunnelHandle
 }
 
 function resolveRelayUrl(relay: RemoteHostRelayConfig): string {

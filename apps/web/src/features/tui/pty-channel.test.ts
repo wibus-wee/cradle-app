@@ -4,7 +4,7 @@ import { createPtyChannel } from './pty-channel'
 import type { PtyErrorEvent, PtySnapshotEvent } from './pty-protocol'
 
 vi.mock('~/lib/electron', () => ({
-  getServerWebSocketUrl: (_socketPath: string, query?: { fromSeq?: number }) => {
+  getAuthenticatedServerWebSocketUrl: async (_socketPath: string, query?: { fromSeq?: number }) => {
     const url = new URL('ws://127.0.0.1/pty')
     if (typeof query?.fromSeq === 'number') {
       url.searchParams.set('fromSeq', String(query.fromSeq))
@@ -75,7 +75,7 @@ describe('createPtyChannel', () => {
     vi.useRealTimers()
   })
 
-  it('drops malformed server frames without breaking later valid frames', () => {
+  it('drops malformed server frames without breaking later valid frames', async () => {
     globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const snapshots: PtySnapshotEvent[] = []
     const errors: PtyErrorEvent[] = []
@@ -87,7 +87,7 @@ describe('createPtyChannel', () => {
       onError: event => errors.push(event),
     })
 
-    channel.connect()
+    await channel.connect()
     const socket = FakeWebSocket.instances[0]
     expect(socket?.url).toBe('ws://127.0.0.1/pty')
 
@@ -115,7 +115,7 @@ describe('createPtyChannel', () => {
     channel.close()
   })
 
-  it('flushes queued client messages when the socket opens', () => {
+  it('flushes queued client messages when the socket opens', async () => {
     globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const channel = createPtyChannel({
       socketPath: '/pty/session-1',
@@ -124,7 +124,7 @@ describe('createPtyChannel', () => {
       onExit: vi.fn(),
     })
 
-    channel.connect()
+    await channel.connect()
     const socket = FakeWebSocket.instances[0]
     channel.sendInput('hello')
     channel.sendResize(120, 40)
@@ -141,7 +141,7 @@ describe('createPtyChannel', () => {
     channel.close()
   })
 
-  it('reconnects from the latest server sequence', () => {
+  it('reconnects from the latest server sequence', async () => {
     vi.useFakeTimers()
     globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const channel = createPtyChannel({
@@ -152,7 +152,7 @@ describe('createPtyChannel', () => {
       onExit: vi.fn(),
     })
 
-    channel.connect()
+    await channel.connect()
     const firstSocket = FakeWebSocket.instances[0]
     firstSocket.open()
     firstSocket.emitMessage(JSON.stringify({
@@ -163,6 +163,7 @@ describe('createPtyChannel', () => {
     firstSocket.close()
 
     vi.advanceTimersByTime(250)
+    await Promise.resolve()
 
     expect(FakeWebSocket.instances[1]?.url).toBe('ws://127.0.0.1/pty?fromSeq=5')
 

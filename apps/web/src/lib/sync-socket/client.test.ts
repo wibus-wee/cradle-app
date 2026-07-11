@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('~/lib/electron', () => ({
-  getServerWebSocketUrl: () => 'ws://127.0.0.1:4100/sync',
+  getAuthenticatedServerWebSocketUrl: async () => 'ws://127.0.0.1:4100/sync?ticket=test-ticket',
 }))
 
 type WebSocketListener = (event: Event | MessageEvent<string>) => void
@@ -100,7 +100,7 @@ describe('sync socket client', () => {
     }, handler)
 
     const socket = await waitForSocket()
-    expect(socket?.url).toBe('ws://127.0.0.1:4100/sync')
+    expect(socket?.url).toBe('ws://127.0.0.1:4100/sync?ticket=test-ticket')
     expect(socket.sent).toEqual([])
 
     socket.open()

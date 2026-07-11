@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { loadServerAuthConfig } from '../config/server-config'
 import { createAuthPlugin, verifyRequestToken, verifyWebSocketRequestToken } from './auth'
+import { issueWebSocketTicket, resetWebSocketTicketsForTests } from './websocket-ticket'
 
 function createTestApp(config: { authRequired: boolean, authToken: string | null }) {
   return new Elysia()
@@ -50,6 +51,22 @@ describe('hTTP auth plugin', () => {
     await expect(response.json()).resolves.toEqual({ ok: true })
   })
 
+  it('bootstraps an HttpOnly browser session for headerless browser transports', async () => {
+    const app = createTestApp({ authRequired: true, authToken: 'secret-token' })
+    const bootstrap = await app.handle(new Request('http://localhost/auth/browser-session', {
+      method: 'POST',
+      headers: { authorization: 'Bearer secret-token' },
+    }))
+    const cookie = bootstrap.headers.get('set-cookie')
+
+    expect(bootstrap.status).toBe(200)
+    expect(cookie).toContain('HttpOnly')
+    const response = await app.handle(new Request('http://localhost/protected', {
+      headers: { cookie: cookie!.split(';')[0]! },
+    }))
+    expect(response.status).toBe(200)
+  })
+
   it('always allows the health endpoint', async () => {
     const app = createTestApp({ authRequired: true, authToken: 'secret-token' })
 
@@ -77,12 +94,30 @@ describe('hTTP auth plugin', () => {
     })).toBe(true)
   })
 
-  it('accepts a token query parameter for browser WebSocket clients', () => {
-    const request = new Request('http://localhost/sync?token=secret-token')
+  it('accepts a single-use audience-bound ticket for browser WebSocket clients', () => {
+    resetWebSocketTicketsForTests()
+    const { ticket } = issueWebSocketTicket('/sync')
+    const request = new Request(`http://localhost/sync?ticket=${ticket}`)
 
     expect(verifyWebSocketRequestToken(request, {
       config: { authRequired: true, authToken: 'secret-token' },
+      audience: '/sync',
     })).toBe(true)
+    expect(verifyWebSocketRequestToken(request, {
+      config: { authRequired: true, authToken: 'secret-token' },
+      audience: '/sync',
+    })).toBe(false)
+  })
+
+  it('rejects a WebSocket ticket issued for a different audience', () => {
+    resetWebSocketTicketsForTests()
+    const { ticket } = issueWebSocketTicket('/sync')
+    const request = new Request(`http://localhost/terminal-sessions/one/socket?ticket=${ticket}`)
+
+    expect(verifyWebSocketRequestToken(request, {
+      config: { authRequired: true, authToken: 'secret-token' },
+      audience: '/terminal-sessions/one/socket',
+    })).toBe(false)
   })
 
   it('derives authRequired from token or explicit required env', () => {
