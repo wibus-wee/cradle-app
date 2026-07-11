@@ -11,6 +11,8 @@ import { agentInteractionRuntime } from './modules/agent-interaction-runtime'
 import { registerAgentToolsMcpServer } from './modules/agent-tools/runtime-registration'
 import { assets } from './modules/assets'
 import { automation } from './modules/automation'
+import { backgroundJob } from './modules/background-job'
+import * as BackgroundJobPoller from './modules/background-job/poller'
 import { chatRuntime } from './modules/chat-runtime'
 import {
   chatRuntimeEventRoutes,
@@ -153,6 +155,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(agentIdentity)
   app.use(automation)
   app.use(assets)
+  app.use(backgroundJob)
   app.use(session)
   app.use(work)
   app.use(sessionWork)
@@ -260,6 +263,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     () => providerRuntimeHostManager.shutdown(),
     () => stopOpencodeServer(),
     () => localRelaydSupervisor.stopManagedLocalRelayd(),
+    () => BackgroundJobPoller.stop(),
     () => getHostConnectorService()?.stopAll(),
     () => chronicleService.stopActivityPipelineScheduler(),
     () => chronicleService.stopSlackBackgroundSync(),
@@ -271,6 +275,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
 
   // Start chronicle daemon if enabled
   if (startBackgroundTasks) {
+    BackgroundJobPoller.start()
     const chronicleRuntimeAllowed = chronicleService.isChronicleRuntimeAllowed()
     void refreshAllExternalProviderSources()
       .then((results) => {
