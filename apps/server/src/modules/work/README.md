@@ -8,8 +8,13 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 
 - A Session belongs to at most one Work.
 - A Work has exactly one primary Session in the local v1 flow.
-- Work creation requires a clean local Git workspace and an immediately active
+- Work creation requires a local Git workspace and an immediately active
   managed Worktree.
+- Default creation bases the managed Worktree on a clean local `HEAD`
+  (`baseStrategy: source-head`). When the source checkout is dirty, clients may
+  explicitly opt into `baseStrategy: remote-default` to start from the remote
+  tracking default branch tip (for example `origin/main`) without touching local
+  WIP.
 - Work stores facts only. Activity labels are derived and no Work status machine
   exists.
 - Preparing a handoff never pushes or calls GitHub.

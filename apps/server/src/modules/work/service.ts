@@ -30,6 +30,7 @@ export interface WorkDetail {
 }
 
 type SessionCreateInput = Parameters<typeof Session.create>[0]
+export type WorkBaseStrategy = Worktree.WorkBaseStrategy
 export type CreateWorkInput = Omit<
   SessionCreateInput,
   'id' | 'workspaceId' | 'title' | 'origin' | 'linkedIssueId' | 'sessionGroupId' | 'worktreeId'
@@ -38,6 +39,12 @@ export type CreateWorkInput = Omit<
   title: string
   objective: string
   linkedIssueId?: string | null
+  /**
+   * Isolation base selection. Defaults to `source-head` (clean local HEAD).
+   * Pass `remote-default` to start from origin's default branch tip even when
+   * the source checkout has uncommitted changes.
+   */
+  baseStrategy?: WorkBaseStrategy
 }
 
 function now(): number {
@@ -203,7 +210,13 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
     })
   }
 
-  await Worktree.assertWorkspaceCleanForManagedIsolation(input.workspaceId)
+  const baseStrategy: WorkBaseStrategy = input.baseStrategy ?? 'source-head'
+  // Remote-default isolation never copies uncommitted local files into the
+  // managed worktree, so a dirty source checkout is safe. Source-head still
+  // requires a clean tree so Work does not silently drop or mix WIP.
+  if (baseStrategy === 'source-head') {
+    await Worktree.assertWorkspaceCleanForManagedIsolation(input.workspaceId)
+  }
 
   const workId = randomUUID()
   let sessionId: string | null = null
@@ -211,8 +224,16 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
   let workPersisted = false
 
   try {
+    const {
+      baseStrategy: _baseStrategy,
+      title: _title,
+      objective: _objective,
+      linkedIssueId: _linkedIssueId,
+      workspaceId: _workspaceId,
+      ...sessionInput
+    } = input
     const primaryThread = await Session.create({
-      ...input,
+      ...sessionInput,
       workspaceId: input.workspaceId,
       title,
       origin: 'work',
@@ -224,6 +245,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       sourceWorkspaceId: input.workspaceId,
       sessionId,
       slug: title,
+      baseStrategy,
     })
     worktreeId = worktree.id
     await Worktree.bindSessionWorktree({ sessionId, worktreeId, pending: false })

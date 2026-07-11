@@ -87,6 +87,16 @@ export const WorkModel = {
     title: t.String({ minLength: 1 }),
     objective: t.String({ minLength: 1 }),
     linkedIssueId: t.Optional(t.String({ minLength: 1 })),
+    /**
+     * How to choose the isolation base commit.
+     * - `source-head` (default): local HEAD; requires a clean source checkout.
+     * - `remote-default`: remote-tracking default branch tip (e.g. origin/main);
+     *   allowed even when the source checkout is dirty.
+     */
+    baseStrategy: t.Optional(t.Union([
+      t.Literal('source-head'),
+      t.Literal('remote-default'),
+    ])),
     providerTargetId: t.Optional(t.String({ minLength: 1 })),
     modelId: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
     thinkingEffort: t.Optional(thinkingEffort),

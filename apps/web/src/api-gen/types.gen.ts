@@ -6299,6 +6299,7 @@ export type PostWorksData = {
         title: string;
         objective: string;
         linkedIssueId?: string;
+        baseStrategy?: 'source-head' | 'remote-default';
         providerTargetId?: string;
         modelId?: string | null;
         thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';

@@ -20,6 +20,7 @@ import type { ChatContextPart } from '~/features/chat/context/chat-context-parts
 import { readRunRuntimeSettingsPatch } from '~/features/chat/runtime/runtime-settings-presenter'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
+import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
 import { isLocalWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
@@ -27,11 +28,20 @@ import { apiErrorMessage } from '~/lib/api-error'
 import { openWork, openWorkspaceDiffs } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 
+type WorkBaseStrategy = NonNullable<PostWorksData['body']['baseStrategy']>
+
 function isDirtySourceError(error: unknown): boolean {
   return !!error
     && typeof error === 'object'
     && 'code' in error
     && (error as { code?: unknown }).code === 'work_source_dirty'
+}
+
+function isRemoteBaseUnavailableError(error: unknown): boolean {
+  return !!error
+    && typeof error === 'object'
+    && 'code' in error
+    && (error as { code?: unknown }).code === 'work_remote_base_unavailable'
 }
 
 export function NewWorkPage() {
@@ -57,6 +67,12 @@ export function NewWorkPage() {
     }
   })
   const [error, setError] = useState<unknown>(null)
+  const [pendingObjective, setPendingObjective] = useState<{
+    text: string
+    files: FileUIPart[]
+    contextParts: ChatContextPart[]
+    options: DraftChatComposerSubmitOptions
+  } | null>(null)
   const selectedWorkspace = localWorkspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? null
   const composerState = useComposerState({
     context: 'new-chat',
@@ -85,11 +101,12 @@ export function NewWorkPage() {
     hasBrowserPanel: !!selectedWorkspace,
   }), [selectedWorkspace]))
 
-  const handleSend = async (
+  const createWork = async (
     text: string,
     files: FileUIPart[],
     contextParts: ChatContextPart[],
     options: DraftChatComposerSubmitOptions,
+    baseStrategy?: WorkBaseStrategy,
   ) => {
     if (!selectedWorkspace) {
       setError(new Error(t('new.workspaceRequired')))
@@ -116,6 +133,7 @@ export function NewWorkPage() {
       runtimeKind: options.runtimeKind,
       runtimeSettings: options.runtimeSettings,
       thinkingEffort: options.thinkingEffort,
+      ...(baseStrategy ? { baseStrategy } : {}),
       ...(options.agentId
         ? { agentId: options.agentId }
         : {
@@ -125,13 +143,31 @@ export function NewWorkPage() {
     }
 
     setError(null)
-    const result = await postWorks({ body })
+    const analyticsTask = trackProductTaskStarted({
+      feature_domain: 'work',
+      task_kind: 'work_create',
+      task_variant: search.issueId ? 'issue' : 'new_work',
+    })
+    let result: Awaited<ReturnType<typeof postWorks>>
+    try {
+      result = await postWorks({ body })
+    }
+    catch (requestError) {
+      trackProductTaskFinished(analyticsTask, 'failed')
+      throw requestError
+    }
     if (result.error || !result.data) {
+      trackProductTaskFinished(analyticsTask, 'failed')
       setError(result.error ?? new Error(t('new.createFailed')))
+      if (isDirtySourceError(result.error) || isRemoteBaseUnavailableError(result.error)) {
+        setPendingObjective({ text, files, contextParts, options })
+      }
       return false
     }
 
     const detail = result.data
+    trackProductTaskFinished(analyticsTask, 'success')
+    setPendingObjective(null)
     startOptimisticChatResponse({
       sessionId: detail.primaryThread.id,
       queryClient,
@@ -158,6 +194,45 @@ export function NewWorkPage() {
     ])
     openWork(detail.work.id, { replace: true })
     return true
+  }
+
+  const handleSend = async (
+    text: string,
+    files: FileUIPart[],
+    contextParts: ChatContextPart[],
+    options: DraftChatComposerSubmitOptions,
+  ) => {
+    try {
+      return await createWork(text, files, contextParts, options)
+    }
+    catch (requestError) {
+      setError(requestError)
+      if (isDirtySourceError(requestError) || isRemoteBaseUnavailableError(requestError)) {
+        setPendingObjective({ text, files, contextParts, options })
+      }
+      return false
+    }
+  }
+
+  const handleStartFromRemoteDefault = async () => {
+    if (!pendingObjective) {
+      return
+    }
+    try {
+      await createWork(
+        pendingObjective.text,
+        pendingObjective.files,
+        pendingObjective.contextParts,
+        pendingObjective.options,
+        'remote-default',
+      )
+    }
+    catch (requestError) {
+      setError(requestError)
+      if (isDirtySourceError(requestError) || isRemoteBaseUnavailableError(requestError)) {
+        setPendingObjective(pendingObjective)
+      }
+    }
   }
 
   const workspaceSelector = (
@@ -197,6 +272,7 @@ export function NewWorkPage() {
   )
 
   const dirty = isDirtySourceError(error)
+  const remoteBaseUnavailable = isRemoteBaseUnavailableError(error)
   return (
     <div className="flex h-full flex-col bg-background" data-testid="new-work-page">
       <div className="flex flex-1 items-center justify-center px-6 pb-8">
@@ -224,12 +300,20 @@ export function NewWorkPage() {
           {error !== null && (
             <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3" data-testid="new-work-error">
               <div className="text-sm font-medium text-foreground">
-                {dirty ? t('new.dirtyTitle') : t('new.createFailed')}
+                {dirty
+                  ? t('new.dirtyTitle')
+                  : remoteBaseUnavailable
+                    ? t('new.remoteBaseUnavailableTitle')
+                    : t('new.createFailed')}
               </div>
               <div className="mt-1 text-xs leading-5 text-muted-foreground">
-                {dirty ? t('new.dirtyDescription') : apiErrorMessage(error)}
+                {dirty
+                  ? t('new.dirtyDescription')
+                  : remoteBaseUnavailable
+                    ? t('new.remoteBaseUnavailableDescription')
+                    : apiErrorMessage(error)}
               </div>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {dirty && selectedWorkspace && (
                   <Button
                     type="button"
@@ -240,7 +324,25 @@ export function NewWorkPage() {
                     {t('new.openChanges')}
                   </Button>
                 )}
-                <Button type="button" size="sm" onClick={() => setError(null)}>
+                {dirty && pendingObjective && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleStartFromRemoteDefault()}
+                    data-testid="new-work-start-from-remote-default"
+                  >
+                    {t('new.startFromRemoteDefault')}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={dirty && pendingObjective ? 'outline' : 'default'}
+                  onClick={() => {
+                    setError(null)
+                    setPendingObjective(null)
+                  }}
+                >
                   {t('new.tryAgain')}
                 </Button>
               </div>

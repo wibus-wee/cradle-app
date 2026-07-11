@@ -22,6 +22,48 @@ export async function isWorkingTreeDirty(repoPath: string): Promise<boolean> {
   return status.files.length > 0
 }
 
+/**
+ * Resolve a local base commit for managed isolation from the remote-tracking
+ * default branch (typically `origin/main` / `origin/master`).
+ *
+ * Preference order:
+ * 1. `refs/remotes/<remote>/HEAD` (what `origin/HEAD` points at)
+ * 2. `refs/remotes/<remote>/main`
+ * 3. `refs/remotes/<remote>/master`
+ *
+ * Does not network-fetch. Returns a resolved commit SHA so later readiness
+ * comparisons (`baseRef..HEAD`) stay stable even if the remote branch moves.
+ */
+export async function resolveRemoteDefaultBaseRef(
+  repoPath: string,
+  remoteName = 'origin',
+): Promise<string> {
+  const candidates = [
+    `refs/remotes/${remoteName}/HEAD`,
+    `refs/remotes/${remoteName}/main`,
+    `refs/remotes/${remoteName}/master`,
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      const sha = (await runGitCommand(repoPath, ['rev-parse', '--verify', `${candidate}^{commit}`])).trim()
+      if (sha) {
+        return sha
+      }
+    }
+    catch {
+      // try next candidate
+    }
+  }
+
+  throw new AppError({
+    code: 'work_remote_base_unavailable',
+    status: 409,
+    message: `Could not resolve a remote default base from ${remoteName}. Fetch the remote default branch (for example origin/main) and try again.`,
+    details: { repoPath, remoteName, candidates },
+  })
+}
+
 export async function listGitWorktrees(repoPath: string): Promise<GitWorktreeEntryView[]> {
   const output = await runGitCommand(repoPath, ['worktree', 'list', '--porcelain'])
   const entries: GitWorktreeEntryView[] = []

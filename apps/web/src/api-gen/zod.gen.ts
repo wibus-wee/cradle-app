@@ -1395,6 +1395,7 @@ export const zPostWorksBody = z.object({
     title: z.string().min(1),
     objective: z.string().min(1),
     linkedIssueId: z.string().min(1).optional(),
+    baseStrategy: z.enum(['source-head', 'remote-default']).optional(),
     providerTargetId: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
     thinkingEffort: z.enum([

@@ -84,6 +84,7 @@ function resolvePrimaryWorkPrompt(session: Session): string | undefined {
     `Title: ${session.title || work.id}`,
     `Objective data: ${JSON.stringify(work.objective)}`,
     '',
+    'CRITICAL: Do not attempt to complete this Work without following the instructions below.',
     'This is an active Cradle Work session. Implement and verify the objective in the current managed Worktree.',
     'You are explicitly authorized to create coherent local commits for this Work. Keep the checkout clean.',
     'Every commit must include: Co-authored-by: Cradle Agent <cradleagent@wibus.ren>',

@@ -394,6 +394,63 @@ describe('work delivery control', () => {
     expect(db().select().from(sessions).all()).toHaveLength(0)
   })
 
+  it('skips the clean-source preflight when creating Work from the remote default base', async () => {
+    db().insert(workspaces).values({
+      id: WORKSPACE_ID,
+      name: 'Work Service Workspace',
+      locatorJson: localWorkspaceLocatorJson('/tmp/work-service'),
+      identifier: 'WSW',
+    }).run()
+    const assertClean = vi.spyOn(Worktree, 'assertWorkspaceCleanForManagedIsolation')
+    const createSession = vi.spyOn(Session, 'create').mockImplementation(async () => {
+      db().insert(sessions).values({
+        id: SESSION_ID,
+        workspaceId: WORKSPACE_ID,
+        title: 'Remote-default Work',
+        origin: 'work',
+        runtimeKind: 'opencode',
+      }).run()
+      return Session.get(SESSION_ID)!
+    })
+    const createWorktree = vi.spyOn(Worktree, 'createWorktree').mockResolvedValue({
+      id: 'worktree-remote-default',
+      sourceWorkspaceId: WORKSPACE_ID,
+      name: 'remote-default',
+      path: '/tmp/worktree-remote-default',
+      branch: 'cradle/wt/remote-default',
+      baseRef: 'origin-main-sha',
+      status: 'active',
+      createdBySessionId: SESSION_ID,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const bind = vi.spyOn(Worktree, 'bindSessionWorktree').mockResolvedValue()
+    mockHealthyDetailReads()
+
+    const detail = await Work.create({
+      workspaceId: WORKSPACE_ID,
+      title: 'Remote-default Work',
+      objective: 'Start from origin/main despite local WIP.',
+      runtimeKind: 'opencode',
+      baseStrategy: 'remote-default',
+    })
+
+    expect(assertClean).not.toHaveBeenCalled()
+    expect(createSession).toHaveBeenCalledTimes(1)
+    expect(createWorktree).toHaveBeenCalledWith(expect.objectContaining({
+      sourceWorkspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ID,
+      baseStrategy: 'remote-default',
+    }))
+    expect(bind).toHaveBeenCalledWith({
+      sessionId: SESSION_ID,
+      worktreeId: 'worktree-remote-default',
+      pending: false,
+    })
+    expect(detail.primaryThread.id).toBe(SESSION_ID)
+    expect(db().select().from(works).all()).toHaveLength(1)
+  })
+
   it('removes the primary Session when managed Worktree creation fails', async () => {
     db().insert(workspaces).values({
       id: WORKSPACE_ID,
