@@ -27,6 +27,9 @@ import { register as registerAutomationRun } from './automation/run'
 import { register as registerAutomationRunGet } from './automation/run/get'
 import { register as registerAutomationRuns } from './automation/runs'
 import { register as registerAutomationUpdate } from './automation/update'
+import { register as registerBackgroundJobCancel } from './background-job/cancel'
+import { register as registerBackgroundJobGet } from './background-job/get'
+import { register as registerBackgroundJobList } from './background-job/list'
 import { register as registerBoardCreate } from './board/create'
 import { register as registerBoardDelete } from './board/delete'
 import { register as registerBoardList } from './board/list'
@@ -341,6 +344,9 @@ export function registerGeneratedCommands(program: Command): void {
   registerAutomationRunGet(program)
   registerAutomationRuns(program)
   registerAutomationUpdate(program)
+  registerBackgroundJobCancel(program)
+  registerBackgroundJobGet(program)
+  registerBackgroundJobList(program)
   registerBoardCreate(program)
   registerBoardDelete(program)
   registerBoardList(program)

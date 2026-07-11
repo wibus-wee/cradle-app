@@ -4,7 +4,15 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { agents, diffReviewCommitPlans, diffReviewGuides, providerTargets, sessions, workspaces } from '@cradle/db'
+import {
+  agents,
+  backgroundJobs,
+  diffReviewCommitPlans,
+  diffReviewGuides,
+  providerTargets,
+  sessions,
+  workspaces,
+} from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
@@ -820,6 +828,19 @@ describe('diff-review capability', () => {
         errorMessage: null,
         steps: [],
       })
+      expect(
+        db()
+          .select()
+          .from(backgroundJobs)
+          .where(eq(backgroundJobs.sourceRunId, generated.guide.runId!))
+          .get(),
+      ).toMatchObject({
+        ownerNamespace: 'diff-review',
+        ownerResourceId: review.id,
+        ownerResourceKey: review.currentRevisionId,
+        kind: 'guide-generation',
+        status: 'running',
+      })
       const guideSession = db().select().from(sessions).where(eq(sessions.id, generated.guide.sessionId!)).get()
       expect(guideSession?.origin).toBe('cradle-review')
 
@@ -1399,6 +1420,20 @@ describe('diff-review capability', () => {
         },
       )
       expect(started.agentFixes.find(item => item.id === agentFix.id)).toMatchObject({
+        status: 'running',
+      })
+      const startedFix = started.agentFixes.find(item => item.id === agentFix.id)!
+      expect(
+        db()
+          .select()
+          .from(backgroundJobs)
+          .where(eq(backgroundJobs.sourceRunId, startedFix.runId!))
+          .get(),
+      ).toMatchObject({
+        ownerNamespace: 'diff-review',
+        ownerResourceId: review.id,
+        ownerResourceKey: agentFix.id,
+        kind: 'commit-plan-generation',
         status: 'running',
       })
       expect(runtime.streamInputs[0]?.message.parts).toEqual(

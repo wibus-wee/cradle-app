@@ -39,6 +39,10 @@ import { and, asc, desc, eq, ne } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
+import * as BackgroundJobPoller from '../background-job/poller'
+import { registerOwnerProjector } from '../background-job/registry'
+import * as BackgroundJob from '../background-job/service'
+import type { BackgroundJobProjectionResult, BackgroundJobView } from '../background-job/types'
 import { getRuntimeRegistry, listRuntimeCatalog } from '../chat-runtime/chat-runtime-provider-registry'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import type {
@@ -117,6 +121,9 @@ const GUIDE_RUNTIME_SETTINGS: RuntimeSettings = {
   interactionMode: 'default',
 }
 const UNBOUNDED_DIFF_REVIEW_RUN_WAIT = { timeoutMs: null }
+const DIFF_REVIEW_JOB_OWNER = 'diff-review'
+const GUIDE_GENERATION_JOB_KIND = 'guide-generation'
+const COMMIT_PLAN_GENERATION_JOB_KIND = 'commit-plan-generation'
 const DEFAULT_OUTPUT_LOCALE: ReviewOutputLocale = 'en-US'
 const OUTPUT_LOCALE_LABELS = {
   'en-US': 'English (US)',
@@ -1154,11 +1161,20 @@ const reviewSourceAdapters: Partial<Record<ReviewSourceKind, ReviewSourceAdapter
   },
 }
 
-export function get(workspaceId: string, reviewId: string): DiffReviewView {
+export async function get(workspaceId: string, reviewId: string): Promise<DiffReviewView> {
+  await BackgroundJob.reconcile({
+    workspaceId,
+    ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+    ownerResourceId: reviewId,
+  })
   return loadReviewView(getReviewRow(workspaceId, reviewId))
 }
 
-export function list(workspaceId: string): DiffReviewView[] {
+export async function list(workspaceId: string): Promise<DiffReviewView[]> {
+  await BackgroundJob.reconcile({
+    workspaceId,
+    ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+  })
   return db()
     .select()
     .from(diffReviews)
@@ -2119,7 +2135,7 @@ function normalizeGuideSteps(input: {
 function upsertGuide(input: {
   reviewId: string
   revisionId: string
-  providerTargetId: string
+  providerTargetId: string | null
   runtimeKind: RuntimeKind
   modelId?: string | null
   sessionId?: string | null
@@ -2208,89 +2224,133 @@ function isCurrentGuideGeneration(input: {
   return current?.inputHash === input.inputHash && isGuideGenerationActive(current.status)
 }
 
-async function runGuideGenerationTask(input: {
-  workspaceId: string
-  review: DiffReview
-  revision: DiffReviewRevision
-  files: DiffReviewFile[]
-  threads: ReviewThreadView[]
-  providerTargetId: string
-  runtimeKind: RuntimeKind
-  modelId?: string | null
-  inputHash: string
-  sessionId: string
-  runId: string
-}): Promise<void> {
-  try {
-    const run = await ChatRuntime.waitForRunCompletion(input.runId, UNBOUNDED_DIFF_REVIEW_RUN_WAIT)
-    if (run.status !== 'complete') {
-      throw new Error(
-        run.errorText
-        ?? (run.status === 'aborted'
-            ? 'Guide generation run was aborted'
-            : 'Guide generation run failed'),
-      )
+async function projectGuideGeneration(
+  job: BackgroundJobView,
+): Promise<BackgroundJobProjectionResult> {
+  const guide = job.sourceRunId
+    ? db().select().from(diffReviewGuides).where(eq(diffReviewGuides.runId, job.sourceRunId)).get()
+    : null
+  if (guide?.runId === job.sourceRunId && guide.status === 'ready') {
+    const steps = normalizeStoredGuideSteps(safeJsonParse(guide.stepsJson))
+    return { result: { title: guide.title, stepCount: steps.length } }
+  }
+  if (guide?.runId === job.sourceRunId && guide.status === 'failed') {
+    return {
+      status: 'failed',
+      errorCode: 'diff_review_guide_projection_failed',
+      errorMessage: guide.errorMessage,
     }
-    const rawOutput = Session.getRunMessageContents([input.runId])[0]?.content?.trim()
+  }
+  if (guide?.runId === job.sourceRunId && guide.status === 'cancelled') {
+    return { status: 'cancelled' }
+  }
+  if (
+    !guide
+    || !isGuideGenerationActive(guide.status)
+    || guide.runId !== job.sourceRunId
+    || !isCurrentGuideGeneration({
+      reviewId: guide.reviewId,
+      revisionId: guide.revisionId,
+      inputHash: guide.inputHash,
+    })
+  ) {
+    return { result: { ignored: true, reason: 'stale-domain-state' } }
+  }
+
+  if (job.status === 'cancelled' || job.status === 'failed') {
+    upsertGuide({
+      reviewId: guide.reviewId,
+      revisionId: guide.revisionId,
+      providerTargetId: guide.providerTargetId,
+      runtimeKind: guide.runtimeKind,
+      modelId: guide.modelId,
+      sessionId: guide.sessionId,
+      runId: guide.runId,
+      inputHash: guide.inputHash,
+      status: job.status,
+      steps: [],
+      errorMessage: job.status === 'failed' ? job.errorMessage : null,
+    })
+    return {}
+  }
+
+  try {
+    const review = db().select().from(diffReviews).where(eq(diffReviews.id, guide.reviewId)).get()
+    const revision = db()
+      .select()
+      .from(diffReviewRevisions)
+      .where(eq(diffReviewRevisions.id, guide.revisionId))
+      .get()
+    if (!review || !revision) {
+      throw new Error('Guide generation owner review or revision no longer exists')
+    }
+    const files = db()
+      .select()
+      .from(diffReviewFiles)
+      .where(eq(diffReviewFiles.revisionId, revision.id))
+      .orderBy(asc(diffReviewFiles.path))
+      .all()
+    const rawOutput = Session.getRunMessageContents([job.sourceRunId!])[0]?.content?.trim()
     if (!rawOutput) {
       throw new Error('Guide generation completed without assistant output')
     }
     const parsedArtifact = parseGuideJson(rawOutput)
     const steps = normalizeGuideSteps({
       parsed: parsedArtifact,
-      revision: input.revision,
-      files: input.files,
-      threads: input.threads,
+      revision,
+      files,
+      threads: loadThreads(review.id),
     })
     const title = readGuideTitle(parsedArtifact)
-    if (
-      !isCurrentGuideGeneration({
-        reviewId: input.review.id,
-        revisionId: input.revision.id,
-        inputHash: input.inputHash,
-      })
-    ) {
-      return
+    if (!isCurrentGuideGeneration({
+      reviewId: guide.reviewId,
+      revisionId: guide.revisionId,
+      inputHash: guide.inputHash,
+    })) {
+      return { result: { ignored: true, reason: 'stale-domain-state' } }
     }
     upsertGuide({
-      reviewId: input.review.id,
-      revisionId: input.revision.id,
-      providerTargetId: input.providerTargetId,
-      runtimeKind: input.runtimeKind,
-      modelId: input.modelId,
-      sessionId: input.sessionId,
-      runId: input.runId,
-      inputHash: input.inputHash,
+      reviewId: guide.reviewId,
+      revisionId: guide.revisionId,
+      providerTargetId: guide.providerTargetId,
+      runtimeKind: guide.runtimeKind,
+      modelId: guide.modelId,
+      sessionId: guide.sessionId,
+      runId: guide.runId,
+      inputHash: guide.inputHash,
       status: 'ready',
       title,
       steps,
       errorMessage: null,
     })
+    return { result: { title, stepCount: steps.length } }
   }
- catch (error) {
+  catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (
-      !isCurrentGuideGeneration({
-        reviewId: input.review.id,
-        revisionId: input.revision.id,
-        inputHash: input.inputHash,
+    if (isCurrentGuideGeneration({
+      reviewId: guide.reviewId,
+      revisionId: guide.revisionId,
+      inputHash: guide.inputHash,
+    })) {
+      upsertGuide({
+        reviewId: guide.reviewId,
+        revisionId: guide.revisionId,
+        providerTargetId: guide.providerTargetId,
+        runtimeKind: guide.runtimeKind,
+        modelId: guide.modelId,
+        sessionId: guide.sessionId,
+        runId: guide.runId,
+        inputHash: guide.inputHash,
+        status: 'failed',
+        steps: [],
+        errorMessage: message,
       })
-    ) {
-      return
     }
-    upsertGuide({
-      reviewId: input.review.id,
-      revisionId: input.revision.id,
-      providerTargetId: input.providerTargetId,
-      runtimeKind: input.runtimeKind,
-      modelId: input.modelId,
-      sessionId: input.sessionId,
-      runId: input.runId,
-      inputHash: input.inputHash,
+    return {
       status: 'failed',
-      steps: [],
+      errorCode: 'diff_review_guide_projection_failed',
       errorMessage: message,
-    })
+    }
   }
 }
 
@@ -2394,21 +2454,23 @@ export async function generateGuide(input: {
     steps: [],
     errorMessage: null,
   })
-  void runGuideGenerationTask({
-    workspaceId: input.workspaceId,
-    review,
-    revision,
-    files,
-    threads,
-    providerTargetId: input.providerTargetId,
-    runtimeKind,
-    modelId: input.modelId,
-    inputHash,
-    sessionId: session.id,
-    runId: run.runId,
-  }).catch((error) => {
-    console.error('Diff review guide generation background task failed', error)
+  BackgroundJob.enqueue({
+    workspaceId: review.workspaceId,
+    ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+    ownerResourceType: 'review',
+    ownerResourceId: review.id,
+    ownerResourceKey: revision.id,
+    kind: GUIDE_GENERATION_JOB_KIND,
+    sourceKind: 'chat-runtime-run',
+    sourceSessionId: session.id,
+    sourceRunId: run.runId,
+    status: 'running',
+    context: {
+      revisionId: revision.id,
+      inputHash,
+    },
   })
+  BackgroundJobPoller.requestRun()
 
   return loadReviewView(review, { userId: input.userId })
 }
@@ -2439,8 +2501,14 @@ export async function cancelGuide(input: {
       details: { reviewId: review.id, revisionId: revision.id },
     })
   }
-  if (isGuideGenerationActive(guide.status) && guide.sessionId) {
-    await ChatRuntime.cancelSession(guide.sessionId)
+  const job = BackgroundJob.findActive({
+    ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+    kind: GUIDE_GENERATION_JOB_KIND,
+    ownerResourceId: review.id,
+    ownerResourceKey: revision.id,
+  })
+  if (job) {
+    await BackgroundJob.cancel(job.id)
   }
 
   const now = currentUnixSeconds()
@@ -2869,12 +2937,13 @@ async function createCommitPlanFromAgentOutput(input: {
     files: input.files,
   })
   const now = currentUnixSeconds()
-  const row = db()
+  const inserted = db()
     .insert(diffReviewCommitPlans)
     .values({
       id: randomUUID(),
       reviewId: input.review.id,
       revisionId: input.revision.id,
+      agentFixId: input.agentFix.id,
       actorId: input.agentFix.profileId ?? LOCAL_USER_ID,
       strategy: 'manual',
       status: 'draft',
@@ -2883,20 +2952,31 @@ async function createCommitPlanFromAgentOutput(input: {
       createdAt: now,
       updatedAt: now,
     })
+    .onConflictDoNothing({ target: diffReviewCommitPlans.agentFixId })
     .returning()
     .get()
-  recordEvent({
-    reviewId: input.review.id,
-    eventKind: 'commit_plan_created',
-    actorKind: 'agent',
-    actorId: input.agentFix.profileId,
-    payload: {
-      commitPlanId: row.id,
-      agentFixId: input.agentFix.id,
-      groupCount: plan.groups.length,
-    },
-    createdAt: now,
-  })
+  const row = inserted ?? db()
+    .select()
+    .from(diffReviewCommitPlans)
+    .where(eq(diffReviewCommitPlans.agentFixId, input.agentFix.id))
+    .get()
+  if (!row) {
+    throw new Error(`Commit plan projection failed for agent fix ${input.agentFix.id}`)
+  }
+  if (inserted) {
+    recordEvent({
+      reviewId: input.review.id,
+      eventKind: 'commit_plan_created',
+      actorKind: 'agent',
+      actorId: input.agentFix.profileId,
+      payload: {
+        commitPlanId: row.id,
+        agentFixId: input.agentFix.id,
+        groupCount: plan.groups.length,
+      },
+      createdAt: now,
+    })
+  }
   return row
 }
 
@@ -2925,6 +3005,172 @@ function markAgentFixFailed(input: {
     payload: { agentFixId: input.agentFixId, errorMessage: input.errorMessage },
     createdAt: now,
   })
+}
+
+async function projectCommitPlanGeneration(
+  job: BackgroundJobView,
+): Promise<BackgroundJobProjectionResult> {
+  const agentFix = job.sourceRunId
+    ? db().select().from(diffReviewAgentFixes).where(eq(diffReviewAgentFixes.runId, job.sourceRunId)).get()
+    : null
+  if (!agentFix || agentFix.expectedOutput !== 'commit' || agentFix.runId !== job.sourceRunId) {
+    return { result: { ignored: true, reason: 'stale-domain-state' } }
+  }
+  if (agentFix.status === 'completed') {
+    const existingPlan = db()
+      .select()
+      .from(diffReviewCommitPlans)
+      .where(eq(diffReviewCommitPlans.agentFixId, agentFix.id))
+      .get()
+    return {
+      result: existingPlan
+        ? { agentFixId: agentFix.id, commitPlanId: existingPlan.id }
+        : { agentFixId: agentFix.id },
+    }
+  }
+  if (agentFix.status === 'failed') {
+    return {
+      status: 'failed',
+      errorCode: 'diff_review_commit_plan_projection_failed',
+      errorMessage: agentFix.errorMessage,
+    }
+  }
+  if (agentFix.status === 'cancelled') {
+    return { status: 'cancelled' }
+  }
+  if (agentFix.status !== 'running') {
+    return { result: { ignored: true, reason: 'inactive-domain-state' } }
+  }
+
+  if (job.status === 'cancelled' || job.status === 'failed') {
+    const now = currentUnixSeconds()
+    db()
+      .update(diffReviewAgentFixes)
+      .set({
+        status: job.status,
+        errorMessage: job.status === 'failed' ? job.errorMessage : null,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(diffReviewAgentFixes.id, agentFix.id),
+        eq(diffReviewAgentFixes.runId, job.sourceRunId!),
+        eq(diffReviewAgentFixes.status, 'running'),
+      ))
+      .run()
+    if (job.status === 'failed') {
+      recordEvent({
+        reviewId: agentFix.reviewId,
+        eventKind: 'agent_fix_failed',
+        actorKind: 'system',
+        actorId: null,
+        payload: {
+          agentFixId: agentFix.id,
+          sessionId: job.sourceSessionId,
+          runId: job.sourceRunId,
+          runStatus: job.status,
+        },
+        createdAt: now,
+      })
+    }
+    return {}
+  }
+
+  try {
+    const review = db().select().from(diffReviews).where(eq(diffReviews.id, agentFix.reviewId)).get()
+    if (!review || !agentFix.targetRevisionId) {
+      throw new Error('Commit plan owner review or target revision no longer exists')
+    }
+    if (review.currentRevisionId !== agentFix.targetRevisionId) {
+      throw new Error('Diff review revision changed while commit plan generation was running')
+    }
+    const revision = db()
+      .select()
+      .from(diffReviewRevisions)
+      .where(eq(diffReviewRevisions.id, agentFix.targetRevisionId))
+      .get()
+    if (!revision) {
+      throw new Error('Commit plan target revision no longer exists')
+    }
+    const files = db()
+      .select()
+      .from(diffReviewFiles)
+      .where(eq(diffReviewFiles.revisionId, revision.id))
+      .orderBy(asc(diffReviewFiles.path))
+      .all()
+    const rawOutput = Session.getRunMessageContents([job.sourceRunId!])[0]?.content?.trim()
+    if (!rawOutput) {
+      throw new Error('Commit plan generation completed without assistant output')
+    }
+    const now = currentUnixSeconds()
+    const artifact = readAgentFixArtifact({
+      reviewId: review.id,
+      agentFix: {
+        ...agentFix,
+        sessionId: job.sourceSessionId,
+        runId: job.sourceRunId,
+        updatedAt: now,
+      },
+    })
+    const commitPlan = await createCommitPlanFromAgentOutput({
+      review,
+      revision,
+      files,
+      agentFix,
+      rawOutput,
+    })
+    db()
+      .update(diffReviewAgentFixes)
+      .set({
+        status: 'completed',
+        artifactId: artifact?.id ?? null,
+        resultRevisionId: revision.id,
+        errorMessage: null,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(diffReviewAgentFixes.id, agentFix.id),
+        eq(diffReviewAgentFixes.runId, job.sourceRunId!),
+        eq(diffReviewAgentFixes.status, 'running'),
+      ))
+      .run()
+    recordEvent({
+      reviewId: review.id,
+      eventKind: 'agent_fix_completed',
+      actorKind: 'agent',
+      actorId: agentFix.profileId,
+      payload: {
+        agentFixId: agentFix.id,
+        sessionId: job.sourceSessionId,
+        runId: job.sourceRunId,
+        artifactId: artifact?.id ?? null,
+        artifactKind: artifact?.kind ?? null,
+        artifactContentHash: artifact?.contentHash ?? null,
+        resultRevisionId: revision.id,
+        commitPlanId: commitPlan.id,
+      },
+      createdAt: now,
+    })
+    return {
+      result: {
+        agentFixId: agentFix.id,
+        commitPlanId: commitPlan.id,
+        revisionId: revision.id,
+      },
+    }
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    markAgentFixFailed({
+      reviewId: agentFix.reviewId,
+      agentFixId: agentFix.id,
+      errorMessage: message,
+    })
+    return {
+      status: 'failed',
+      errorCode: 'diff_review_commit_plan_projection_failed',
+      errorMessage: message,
+    }
+  }
 }
 
 async function watchAgentFixRunCompletion(input: {
@@ -2968,67 +3214,6 @@ async function watchAgentFixRunCompletion(input: {
           sessionId: input.sessionId,
           runId: input.runId,
           runStatus: run.status,
-        },
-        createdAt: now,
-      })
-      return
-    }
-
-    if (current.expectedOutput === 'commit') {
-      const now = currentUnixSeconds()
-      const rawOutput = Session.getRunMessageContents([input.runId])[0]?.content?.trim()
-      if (!rawOutput) {
-        throw new Error('Commit plan generation completed without assistant output')
-      }
-      const review = getReviewRow(input.workspaceId, input.reviewId)
-      const revision = getCurrentRevision(review)
-      const files = db()
-        .select()
-        .from(diffReviewFiles)
-        .where(eq(diffReviewFiles.revisionId, revision.id))
-        .orderBy(asc(diffReviewFiles.path))
-        .all()
-      const artifact = readAgentFixArtifact({
-        reviewId: input.reviewId,
-        agentFix: {
-          ...current,
-          sessionId: input.sessionId,
-          runId: input.runId,
-          updatedAt: now,
-        },
-      })
-      const commitPlan = await createCommitPlanFromAgentOutput({
-        review,
-        revision,
-        files,
-        agentFix: current,
-        rawOutput,
-      })
-      db()
-        .update(diffReviewAgentFixes)
-        .set({
-          status: 'completed',
-          artifactId: artifact?.id ?? null,
-          resultRevisionId: revision.id,
-          errorMessage: null,
-          updatedAt: now,
-        })
-        .where(eq(diffReviewAgentFixes.id, input.agentFixId))
-        .run()
-      recordEvent({
-        reviewId: input.reviewId,
-        eventKind: 'agent_fix_completed',
-        actorKind: 'agent',
-        actorId: current.profileId,
-        payload: {
-          agentFixId: input.agentFixId,
-          sessionId: input.sessionId,
-          runId: input.runId,
-          artifactId: artifact?.id ?? null,
-          artifactKind: artifact?.kind ?? null,
-          artifactContentHash: artifact?.contentHash ?? null,
-          resultRevisionId: revision.id,
-          commitPlanId: commitPlan.id,
         },
         createdAt: now,
       })
@@ -3236,13 +3421,34 @@ async function startAgentFixRun(
       },
       createdAt: now,
     })
-    void watchAgentFixRunCompletion({
-      workspaceId: review.workspaceId,
-      reviewId: review.id,
-      agentFixId: agentFix.id,
-      sessionId: session.id,
-      runId: run.runId,
-    })
+    if (agentFix.expectedOutput === 'commit') {
+      BackgroundJob.enqueue({
+        workspaceId: review.workspaceId,
+        ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+        ownerResourceType: 'review',
+        ownerResourceId: review.id,
+        ownerResourceKey: agentFix.id,
+        kind: COMMIT_PLAN_GENERATION_JOB_KIND,
+        sourceKind: 'chat-runtime-run',
+        sourceSessionId: session.id,
+        sourceRunId: run.runId,
+        status: 'running',
+        context: {
+          agentFixId: agentFix.id,
+          targetRevisionId: agentFix.targetRevisionId,
+        },
+      })
+      BackgroundJobPoller.requestRun()
+    }
+    else {
+      void watchAgentFixRunCompletion({
+        workspaceId: review.workspaceId,
+        reviewId: review.id,
+        agentFixId: agentFix.id,
+        sessionId: session.id,
+        runId: run.runId,
+      })
+    }
     return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId: input.userId })
   }
  catch (error) {
@@ -3312,7 +3518,18 @@ export async function cancelAgentFix(input: {
   if (agentFix.status === 'cancelled') {
     return loadReviewView(review, { userId: input.userId })
   }
-  if (agentFix.status === 'running' && agentFix.sessionId) {
+  if (agentFix.status === 'running' && agentFix.expectedOutput === 'commit') {
+    const job = BackgroundJob.findActive({
+      ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+      kind: COMMIT_PLAN_GENERATION_JOB_KIND,
+      ownerResourceId: review.id,
+      ownerResourceKey: agentFix.id,
+    })
+    if (job) {
+      await BackgroundJob.cancel(job.id)
+    }
+  }
+  else if (agentFix.status === 'running' && agentFix.sessionId) {
     await ChatRuntime.cancelSession(agentFix.sessionId)
   }
 
@@ -3587,3 +3804,15 @@ export async function applyCommitPlan(input: {
     throw error
   }
 }
+
+registerOwnerProjector({
+  ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+  kind: GUIDE_GENERATION_JOB_KIND,
+  project: projectGuideGeneration,
+})
+
+registerOwnerProjector({
+  ownerNamespace: DIFF_REVIEW_JOB_OWNER,
+  kind: COMMIT_PLAN_GENERATION_JOB_KIND,
+  project: projectCommitPlanGeneration,
+})

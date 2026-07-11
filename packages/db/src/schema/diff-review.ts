@@ -373,6 +373,8 @@ export const diffReviewCommitPlans = sqliteTable('diff_review_commit_plans', {
   revisionId: text('revision_id')
     .notNull()
     .references(() => diffReviewRevisions.id, { onDelete: 'cascade' }),
+  agentFixId: text('agent_fix_id')
+    .references(() => diffReviewAgentFixes.id, { onDelete: 'set null' }),
   actorId: text('actor_id').notNull(),
   strategy: text('strategy', {
     enum: ['manual'],
@@ -387,6 +389,7 @@ export const diffReviewCommitPlans = sqliteTable('diff_review_commit_plans', {
 }, table => ({
   byReview: index('diff_review_commit_plans_review_id_idx').on(table.reviewId),
   byRevision: index('diff_review_commit_plans_revision_id_idx').on(table.revisionId),
+  byAgentFix: uniqueIndex('diff_review_commit_plans_agent_fix_id_unique').on(table.agentFixId),
   byCreatedAt: index('diff_review_commit_plans_created_at_idx').on(table.createdAt),
 }))
 
