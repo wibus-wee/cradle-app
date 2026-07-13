@@ -48,6 +48,7 @@
   "nav.diffs": "Diffs",
   "nav.newChat": "新建聊天",
   "nav.newWork": "新建 Work",
+  "nav.pullRequests": "Pull requests",
   "nav.profile": "Profile",
   "nav.search": "搜索",
   "nav.settings": "设置",
@@ -255,5 +256,8 @@
   "workspace.toast.remoteWorkspaceCreated": "已添加远程工作区",
   "workspace.toast.remoteWorkspaceCreateFailed": "无法添加远程工作区",
   "workspace.toast.renameFailed": "无法重命名工作区",
-  "session.aria.remote": "在远程主机 {{hostName}} 上运行"
+  "session.aria.remote": "在远程主机 {{hostName}} 上运行",
+  "session.action.exportZip": "导出为 ZIP",
+  "session.toast.exportZipBusy": "会话仍在流式输出，请等待完成。",
+  "session.toast.exportZipFailed": "无法将该会话导出为 ZIP 归档。"
 }

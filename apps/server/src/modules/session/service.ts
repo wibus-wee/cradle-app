@@ -10,6 +10,7 @@ import {
   sessionEvents,
   sessionGroups,
   sessions,
+  usageLogs,
 } from '@cradle/db'
 import { and, desc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -55,6 +56,8 @@ import {
   readSessionExecutionTarget,
   removeRemoteProjectedSession,
 } from './remote-projection'
+import type { SessionArchive } from './export-archive'
+import { sessionArchiveFileName, threadExportBlockedReason } from './export-archive'
 
 export type { SessionExecutionTarget }
 
@@ -1206,4 +1209,89 @@ export function exportMarkdown(sessionId: string): string {
   }
 
   return lines.join('\n')
+}
+
+// Builds the structured archive the ZIP writer consumes. Throws 404 if the
+// session does not exist and 409 if it is still streaming (so the route maps
+// those directly). Usage is aggregated from usage_logs; the model is resolved
+// from the session config preference, falling back to the runtime binding.
+export function exportArchive(sessionId: string): { archive: SessionArchive, filename: string } {
+  const d = db()
+  const session = d.select().from(sessions).where(eq(sessions.id, sessionId)).get()
+  if (!session) {
+    throw new AppError({ code: 'session_not_found', status: 404, message: 'Session not found' })
+  }
+
+  const msgs = d
+    .select({
+      id: messages.id,
+      role: messages.role,
+      status: messages.status,
+      content: messages.content,
+      createdAt: messages.createdAt,
+      updatedAt: messages.updatedAt,
+    })
+    .from(messages)
+    .where(eq(messages.sessionId, sessionId))
+    .orderBy(messages.createdAt)
+    .all()
+
+  const blocked = threadExportBlockedReason(msgs)
+  if (blocked) {
+    throw new AppError({ code: 'session_export_busy', status: 409, message: blocked })
+  }
+
+  const binding = d
+    .select()
+    .from(backendSessionBindings)
+    .where(
+      and(
+        eq(backendSessionBindings.chatSessionId, sessionId),
+        isNotNull(backendSessionBindings.backendSessionId),
+      ),
+    )
+    .get()
+
+  const usageRow = d.get<{ total: number, prompt: number, completion: number, count: number }>(sql`
+    SELECT
+      COALESCE(SUM(${usageLogs.totalTokens}), 0) AS total,
+      COALESCE(SUM(${usageLogs.promptTokens}), 0) AS prompt,
+      COALESCE(SUM(${usageLogs.completionTokens}), 0) AS completion,
+      COUNT(*) AS count
+    FROM ${usageLogs}
+    WHERE ${usageLogs.sessionId} = ${sessionId}
+  `)
+
+  const modelId = readSessionModelPreference(session.configJson) ?? binding?.requestedModelId ?? null
+
+  const archive: SessionArchive = {
+    sessionId: session.id,
+    title: session.title,
+    modelId,
+    providerTargetId: session.providerTargetId,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    usage: {
+      totalTokens: usageRow?.total ?? 0,
+      promptTokens: usageRow?.prompt ?? 0,
+      completionTokens: usageRow?.completion ?? 0,
+      turnCount: usageRow?.count ?? 0,
+    },
+    messages: msgs.map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      status: msg.status,
+      content: msg.content,
+      createdAt: msg.createdAt,
+      updatedAt: msg.updatedAt,
+    })),
+  }
+
+  return {
+    archive,
+    filename: sessionArchiveFileName({
+      title: session.title,
+      createdAtEpochSeconds: session.createdAt,
+    }),
+  }
 }

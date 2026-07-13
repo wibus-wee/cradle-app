@@ -20,6 +20,7 @@ import type { DesktopCliStatus, DesktopUpdateStatus } from '~/lib/electron'
 import { isElectron, nativeIpc, subscribeDesktopUpdateStatus } from '~/lib/electron'
 import { formatCompactBytes } from '~/lib/number-format'
 
+import { PreferredEditorSetting } from './preferred-editor-setting'
 import { SettingsGroup, SettingsPage } from './settings-container'
 import { SettingsDivider, SettingsRow } from './settings-row'
 import type { DesktopPreferences } from './use-desktop-preferences'
@@ -266,6 +267,8 @@ export function DesktopUpdateSettings() {
             data-testid="desktop-external-terminal"
           />
         </SettingsRow>
+
+        {isElectron && <PreferredEditorSetting />}
 
       </SettingsGroup>
 

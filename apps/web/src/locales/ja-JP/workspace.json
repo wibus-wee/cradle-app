@@ -48,6 +48,7 @@
   "nav.diffs": "Diffs",
   "nav.newChat": "新規チャット",
   "nav.newWork": "新しい Work",
+  "nav.pullRequests": "Pull requests",
   "nav.profile": "Profile",
   "nav.search": "検索",
   "nav.settings": "設定",
@@ -255,5 +256,8 @@
   "workspace.toast.remoteWorkspaceCreated": "Remote workspace added",
   "workspace.toast.remoteWorkspaceCreateFailed": "Remote workspace could not be added",
   "workspace.toast.renameFailed": "ワークスペース名を変更できませんでした",
-  "session.aria.remote": "リモートホスト {{hostName}} で実行"
+  "session.aria.remote": "リモートホスト {{hostName}} で実行",
+  "session.action.exportZip": "ZIP としてエクスポート",
+  "session.toast.exportZipBusy": "セッションがまだストリーミング中です。完了までお待ちください。",
+  "session.toast.exportZipFailed": "セッションを ZIP アーカイブとしてエクスポートできませんでした。"
 }
