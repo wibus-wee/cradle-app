@@ -65,9 +65,9 @@ import type { ThinkingEffort } from '~/features/composer-toolbar/types'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 
-import { listAutomationArtifacts, listAutomationRuns } from './api-client'
+import { listAutomationArtifacts, listAutomationRuns, listAutomationTriage } from './api-client'
 import type { AutomationArtifact, AutomationDefinition, AutomationRecipe, AutomationRun, AutomationRunStatus, AutomationTrigger, CreateAutomationInput } from './types'
-import { automationQueryKeys, useAutomationDefinitions, useCreateAutomation, useRunAutomationNow, useUpdateAutomation } from './use-automations'
+import { automationQueryKeys, useAutomationDefinitions, useCreateAutomation, useRunAutomationNow, useStopAutomationRun, useUpdateAutomation, useUpdateAutomationRunTriage } from './use-automations'
 
 // ── Types & Constants ────────────────────────────────────────────────────────
 
@@ -155,6 +155,9 @@ interface CreateAutomationDraft {
   runtimeKind: AutomationRuntimeKind
   modelId: string | null
   thinkingEffort: ThinkingEffort
+  sessionPolicy: 'new' | 'heartbeat'
+  isolationPolicy: 'workspace' | 'worktree_per_run'
+  noFindingsBehavior: 'archive' | 'triage'
   prompt: string
   artifactName: string
 }
@@ -176,6 +179,9 @@ function createDefaultDraft(
     runtimeKind,
     modelId: null,
     thinkingEffort: null,
+    sessionPolicy: 'new',
+    isolationPolicy: 'workspace',
+    noFindingsBehavior: 'archive',
     prompt: '',
     artifactName: 'automation-run.md',
   }
@@ -232,6 +238,12 @@ function toCreateAutomationInput(draft: CreateAutomationDraft, t: TFunction<'aut
       runtimeKind: draft.runtimeKind,
       modelId: draft.modelId,
       thinkingEffort: draft.thinkingEffort ?? undefined,
+      sessionPolicy: draft.sessionPolicy,
+      isolationPolicy: draft.isolationPolicy,
+      completionPolicy: {
+        stopWhen: 'agent_complete',
+        noFindingsBehavior: draft.noFindingsBehavior,
+      },
     },
     createdByKind: 'user',
   }
@@ -462,6 +474,8 @@ function DetailView({
   locale,
   onEdit,
   onRunNow,
+  onStopRun,
+  onTriageRun,
   runNowPending,
 }: {
   definition: AutomationDefinition
@@ -472,6 +486,8 @@ function DetailView({
   locale: string
   onEdit: () => void
   onRunNow: () => void
+  onStopRun: (runId: string) => void
+  onTriageRun: (runId: string, status: 'resolved' | 'archived') => void
   runNowPending: boolean
 }) {
   const { t } = useTranslation('automation')
@@ -580,6 +596,27 @@ function DetailView({
 
             <Card size="sm">
               <CardHeader>
+                <CardTitle className="text-[13px]">{t('execution.section')}</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                <KVRow
+                  label={t('execution.sessionPolicy.label')}
+                  value={recipe?.sessionPolicy === 'heartbeat' ? t('execution.sessionPolicy.heartbeat') : t('execution.sessionPolicy.new')}
+                />
+                <KVRow
+                  label={t('execution.isolationPolicy.label')}
+                  value={recipe?.isolationPolicy === 'worktree_per_run' ? t('execution.isolationPolicy.worktreePerRun') : t('execution.isolationPolicy.workspace')}
+                />
+                <KVRow label={t('execution.completionPolicy.label')} value={t('execution.completionPolicy.agentComplete')} />
+                <KVRow
+                  label={t('execution.noFindings.label')}
+                  value={recipe?.completionPolicy?.noFindingsBehavior === 'triage' ? t('execution.noFindings.triage') : t('execution.noFindings.archive')}
+                />
+              </CardContent>
+            </Card>
+
+            <Card size="sm">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-[13px]">{t('recipe.section')}</CardTitle>
                   <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{recipe?.kind ?? t('common.unknown')}</Badge>
@@ -616,7 +653,13 @@ function DetailView({
                 <div className="absolute left-[5px] top-3 bottom-3 w-px bg-border/40" />
               )}
               {sortedRuns.map(run => (
-                <TimelineRunRow key={run.id} run={run} locale={locale} />
+                <TimelineRunRow
+                  key={run.id}
+                  run={run}
+                  locale={locale}
+                  onStop={() => onStopRun(run.id)}
+                  onTriage={status => onTriageRun(run.id, status)}
+                />
               ))}
             </div>
           </m.div>
@@ -675,7 +718,17 @@ function DetailView({
 
 // ── Timeline run row with dot connector ──────────────────────────────────────
 
-function TimelineRunRow({ run, locale }: { run: AutomationRun, locale: string }) {
+function TimelineRunRow({
+  run,
+  locale,
+  onStop,
+  onTriage,
+}: {
+  run: AutomationRun
+  locale: string
+  onStop: () => void
+  onTriage: (status: 'resolved' | 'archived') => void
+}) {
   const { t } = useTranslation('automation')
   const normalized = (run.status ?? 'queued') as AutomationRunStatus
   const dotColor = STATUS_DOT_COLORS[normalized] ?? STATUS_DOT_COLORS.queued
@@ -694,6 +747,21 @@ function TimelineRunRow({ run, locale }: { run: AutomationRun, locale: string })
         <div className="flex items-center gap-2">
           <StatusText status={run.status} />
           <span className="truncate font-mono text-[11px] text-foreground">{run.id}</span>
+          <span className="ml-auto flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            {run.status === 'queued' || run.status === 'running'
+? (
+              <Button type="button" variant="ghost" size="xs" onClick={onStop}>{t('runs.stop')}</Button>
+            )
+: null}
+            {run.triageStatus === 'unread' || run.triageStatus === 'read'
+? (
+              <>
+                <Button type="button" variant="ghost" size="xs" onClick={() => onTriage('resolved')}>{t('triage.resolve')}</Button>
+                <Button type="button" variant="ghost" size="xs" onClick={() => onTriage('archived')}>{t('triage.archive')}</Button>
+              </>
+            )
+: null}
+          </span>
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
           <ClockIcon className="size-3 shrink-0" />
@@ -704,6 +772,11 @@ function TimelineRunRow({ run, locale }: { run: AutomationRun, locale: string })
         {run.errorText && (
           <div className="mt-1 truncate text-[11px] text-red-500">{run.errorText}</div>
         )}
+        {run.resultSummary
+? (
+          <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{run.resultSummary}</div>
+        )
+: null}
       </div>
     </div>
   )
@@ -1171,7 +1244,11 @@ function CreateAutomationPanel({
             <FormField label={t('definition.workspaceLabel')} description={t('definition.workspaceDescription')}>
               <Select
                 value={draft.workspaceId ?? ''}
-                onValueChange={value => onChange({ ...draft, workspaceId: value || null })}
+                onValueChange={value => onChange({
+                  ...draft,
+                  workspaceId: value || null,
+                  isolationPolicy: value ? draft.isolationPolicy : 'workspace',
+                })}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={t('definition.workspacePlaceholder')} />
@@ -1184,6 +1261,63 @@ function CreateAutomationPanel({
                 </SelectContent>
               </Select>
             </FormField>
+          </section>
+
+          <div className="border-t border-foreground/5" />
+
+          <section className="grid gap-4">
+            <div>
+              <h3 className="text-[13px] font-medium text-foreground">{t('execution.section')}</h3>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">{t('execution.description')}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t('execution.sessionPolicy.label')} description={t('execution.sessionPolicy.description')}>
+                <Select
+                  value={draft.sessionPolicy}
+                  onValueChange={value => onChange({
+                    ...draft,
+                    sessionPolicy: value as CreateAutomationDraft['sessionPolicy'],
+                    isolationPolicy: value === 'heartbeat' ? 'workspace' : draft.isolationPolicy,
+                  })}
+                >
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">{t('execution.sessionPolicy.new')}</SelectItem>
+                    <SelectItem value="heartbeat">{t('execution.sessionPolicy.heartbeat')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label={t('execution.isolationPolicy.label')} description={t('execution.isolationPolicy.description')}>
+                <Select
+                  value={draft.isolationPolicy}
+                  onValueChange={value => onChange({ ...draft, isolationPolicy: value as CreateAutomationDraft['isolationPolicy'] })}
+                  disabled={!draft.workspaceId}
+                >
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="workspace">{t('execution.isolationPolicy.workspace')}</SelectItem>
+                    <SelectItem value="worktree_per_run" disabled={draft.sessionPolicy === 'heartbeat'}>{t('execution.isolationPolicy.worktreePerRun')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label={t('execution.completionPolicy.label')} description={t('execution.completionPolicy.description')}>
+                <div className="flex h-8 items-center rounded-lg border border-input px-2.5 text-sm text-foreground">
+                  {t('execution.completionPolicy.agentComplete')}
+                </div>
+              </FormField>
+              <FormField label={t('execution.noFindings.label')} description={t('execution.noFindings.description')}>
+                <Select
+                  value={draft.noFindingsBehavior}
+                  onValueChange={value => onChange({ ...draft, noFindingsBehavior: value as CreateAutomationDraft['noFindingsBehavior'] })}
+                >
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="archive">{t('execution.noFindings.archive')}</SelectItem>
+                    <SelectItem value="triage">{t('execution.noFindings.triage')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
           </section>
 
           <div className="border-t border-foreground/5" />
@@ -1300,6 +1434,13 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   const [workspaceFilter, setWorkspaceFilter] = useState<string | null>(null)
   const definitionsQuery = useAutomationDefinitions(workspaceFilter)
   const definitions = definitionsQuery.data ?? []
+  const triageQuery = useQuery({
+    queryKey: ['automations', 'triage', { workspaceId: workspaceFilter }],
+    queryFn: () => listAutomationTriage(workspaceFilter),
+    staleTime: 10_000,
+    retry: 1,
+  })
+  const triageRuns = triageQuery.data ?? []
   const { runtimes } = useRuntimeCatalog()
   const defaultRuntimeKind = useMemo(
     () => listRuntimeCatalogForSurface(runtimes, 'chat')
@@ -1335,6 +1476,8 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   const createAutomationMutation = useCreateAutomation()
   const updateAutomationMutation = useUpdateAutomation()
   const runNowMutation = useRunAutomationNow()
+  const stopRunMutation = useStopAutomationRun()
+  const triageMutation = useUpdateAutomationRunTriage()
 
   const latestRun = selectedDefinition ? getLatestRun(selectedDefinition, runsQuery.data) : null
   const automationReady = definitionsQuery.isSuccess
@@ -1362,6 +1505,9 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
       runtimeKind: (recipe?.runtimeKind as AutomationRuntimeKind | undefined) ?? defaultRuntimeKind,
       modelId: recipe?.modelId ?? null,
       thinkingEffort: recipe?.thinkingEffort ?? null,
+      sessionPolicy: recipe?.sessionPolicy ?? 'new',
+      isolationPolicy: recipe?.isolationPolicy ?? 'workspace',
+      noFindingsBehavior: recipe?.completionPolicy?.noFindingsBehavior ?? 'archive',
       prompt: recipe?.prompt ?? '',
       artifactName: recipe?.artifactRequests?.[0]?.name ?? 'automation-run.md',
     })
@@ -1481,6 +1627,34 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
       <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] divide-x divide-border/40 overflow-hidden">
         {/* Left sidebar — definition list */}
         <aside className="flex min-h-0 flex-col overflow-hidden">
+          <div className="border-b border-border/40 px-3 py-2.5">
+            <SectionLabel label={t('triage.title', { defaultValue: 'Triage' })} count={triageRuns.length} />
+            <div className="mt-2 grid gap-1">
+              {triageRuns.slice(0, 5).map(run => (
+                <button
+                  key={run.id}
+                  type="button"
+                  onClick={() => setSelectedId(run.automationDefinitionId)}
+                  className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50"
+                >
+                  <StatusDot status={run.status} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-foreground">
+                      {definitions.find(item => item.id === run.automationDefinitionId)?.title ?? run.automationDefinitionId}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {run.resultSummary ?? run.errorText ?? t('triage.needsReview', { defaultValue: 'Needs review' })}
+                    </span>
+                  </span>
+                </button>
+              ))}
+              {!triageQuery.isLoading && triageRuns.length === 0
+? (
+                <p className="px-2 py-1 text-[11px] text-muted-foreground">{t('triage.empty', { defaultValue: 'No unread runs' })}</p>
+              )
+: null}
+            </div>
+          </div>
           <div className="flex items-center justify-between gap-2 px-3 py-2.5">
             <SectionLabel label={t('definitions.title')} count={definitions.length} />
             <Select
@@ -1569,6 +1743,8 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
                 locale={locale}
                 onEdit={() => startEdit(selectedDefinition)}
                 onRunNow={() => selectedAutomationId && runNowMutation.mutate(selectedAutomationId)}
+                onStopRun={runId => selectedAutomationId && stopRunMutation.mutate({ automationId: selectedAutomationId, runId })}
+                onTriageRun={(runId, status) => selectedAutomationId && triageMutation.mutate({ automationId: selectedAutomationId, runId, status })}
                 runNowPending={runNowMutation.isPending}
               />
             </m.div>

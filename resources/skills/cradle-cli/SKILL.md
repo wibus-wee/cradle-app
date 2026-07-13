@@ -279,7 +279,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | --- | ---: | --- | --- |
 | `acp` | 9 | Manage ACP agent installation and registry state. | `cradle man acp` |
 | `agent` | 5 | Manage Cradle agent identities. | `cradle man agent` |
-| `automation` | 13 | Manage scheduled automations, runs, and artifacts. | `cradle man automation` |
+| `automation` | 16 | Manage scheduled automations, runs, and artifacts. | `cradle man automation` |
 | `background-job` | 3 | Generated Cradle CLI module. | `cradle man background-job` |
 | `board` | 4 | Manage Kanban boards. | `cradle man board` |
 | `chat` | 14 | Control chat runtime commands. | `cradle man chat` |
