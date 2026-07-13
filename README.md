@@ -101,7 +101,7 @@ Cradle is a desktop-first platform for managing AI agents and their workflows. I
   <tr>
     <td>
       <h3>Your Data, Your Control</h3>
-      <p>Your data stays on your machine. Cradle is built with a privacy-first approach — no telemetry, no cloud dependency, full local control over your agents and conversations.</p>
+      <p>Your data stays on your machine. Cradle is built with a privacy-first approach — no cloud dependency, full local control over your agents and conversations.</p>
     </td>
     <td>
       <img src=".github/readme/about-data-care.png" alt="About Data Care" />

@@ -12,7 +12,7 @@ import { buildUIMessageChunkStreamFromResponse, disposeChatRunBroadcast, onChatR
 
 const productAnalyticsMocks = vi.hoisted(() => ({
   trackProductTaskFinished: vi.fn(),
-  trackProductTaskStarted: vi.fn((task: ProductAnalyticsTask) => ({ task, startedAtMs: 0 })),
+  trackProductTaskStarted: vi.fn((task: ProductAnalyticsTask) => ({ task, startedAtMs: 0, settled: false })),
 }))
 
 vi.mock('~/features/product-analytics/client', () => productAnalyticsMocks)
@@ -127,6 +127,7 @@ describe('chat streaming handler store boundary', () => {
         },
       }),
       'success',
+      null,
     )
   })
 
