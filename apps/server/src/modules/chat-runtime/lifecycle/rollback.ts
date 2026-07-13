@@ -189,7 +189,7 @@ async function rollbackProviderTurns(
   const rollback = readProviderRollback(sessionId, resolved)
 
   try {
-    const result = await rollback({
+    const result = await rollback.call(resolved.runtime, {
       ...buildRuntimeProviderInput(resolved),
       numTurns,
     })

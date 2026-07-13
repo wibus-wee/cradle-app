@@ -689,7 +689,7 @@ class TestCodexRollbackRuntime implements ChatRuntime {
     return {
       runtimeKind: 'codex',
       providerSessionId: input.runtimeSession.providerSessionId,
-      rolledBackTurns: 1,
+      rolledBackTurns: input.numTurns,
       fileChangesReverted: false,
     }
   }
