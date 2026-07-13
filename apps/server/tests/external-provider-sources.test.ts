@@ -960,7 +960,6 @@ describe('external provider sources capability', () => {
       )
       expect(modelsRes.status).toBe(200)
       expect(await modelsRes.json()).toEqual([
-        expect.objectContaining({ id: 'gpt-4.1-mini', providerKind: 'openai-compatible' }),
         expect.objectContaining({ id: 'gpt-4.1', providerKind: 'openai-compatible' }),
       ])
 

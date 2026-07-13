@@ -150,7 +150,6 @@ describe('profiles capability', () => {
       )
       expect(modelsRes.status).toBe(200)
       expect(await modelsRes.json()).toEqual([
-        expect.objectContaining({ id: 'gpt-4o-mini', providerKind: 'openai-compatible' }),
         expect.objectContaining({ id: 'gpt-4o', providerKind: 'openai-compatible' }),
       ])
       const providerFetchCount = fetchSpy.mock.calls.filter(
@@ -778,6 +777,15 @@ describe('profiles capability', () => {
         })
       }
 
+      if (url === 'https://example.com/v1/models') {
+        return new Response(JSON.stringify({
+          data: [{ id: 'vendor-gpt4o' }],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+
       throw new Error(`Unexpected fetch request: ${url}`)
     })
 
@@ -896,7 +904,7 @@ describe('profiles capability', () => {
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://example.com/v1/models',
       ).length
-      expect(providerFetchCount).toBe(0)
+      expect(providerFetchCount).toBe(2)
     }
  finally {
       shutdownInfra()

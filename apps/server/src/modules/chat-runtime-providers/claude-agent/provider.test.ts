@@ -4064,6 +4064,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       totalTokens: 185,
       cachedInputTokens: 0,
       cacheWriteInputTokens: 0,
+      reasoningOutputTokens: 0,
     })
   })
 })
