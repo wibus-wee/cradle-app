@@ -3286,6 +3286,9 @@ interface WorkspaceSidebarBodyProps {
   multiWorkspaceEnabled: boolean
   onAddFromPicker: () => void
   onOpenMultiWorkspaceDialog: () => void
+  hasUnreadWorkspaceSessions: boolean
+  markingAllSessionsRead: boolean
+  onMarkAllAsRead: () => void
   onDelete: (id: string) => void
   onTogglePin: (id: string, pinned: boolean) => void
 }
@@ -3300,6 +3303,9 @@ const WorkspaceSidebarBody = memo(
     multiWorkspaceEnabled,
     onAddFromPicker,
     onOpenMultiWorkspaceDialog,
+    hasUnreadWorkspaceSessions,
+    markingAllSessionsRead,
+    onMarkAllAsRead,
     onDelete,
     onTogglePin,
   }: WorkspaceSidebarBodyProps) => {
@@ -3399,6 +3405,22 @@ const WorkspaceSidebarBody = memo(
               {t('sidebar.projects.title')}
             </span>
             <div className="flex items-center gap-0.5">
+              {hasUnreadWorkspaceSessions && (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-6 text-muted-foreground/60 hover:bg-fill/70 hover:text-foreground"
+                  onClick={onMarkAllAsRead}
+                  disabled={markingAllSessionsRead}
+                  title={t('sidebar.action.markAllRead')}
+                  aria-label={t('sidebar.action.markAllRead')}
+                  data-testid="workspace-mark-all-read-btn"
+                >
+                  {markingAllSessionsRead
+                    ? <LoadingLine className="size-3 animate-spin" />
+                    : <MailOpenIcon className="size-3" />}
+                </Button>
+              )}
               <Menu>
                 <MenuTrigger
                   render={(
@@ -3684,6 +3706,42 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
     }
     return grouped
   }, [sessions])
+  const unreadWorkspaceSessions = useMemo(
+    () => sessions.filter(session => session.workspaceId !== null && session.unread),
+    [sessions],
+  )
+  const { mutate: markAllSessionsRead, isPending: markingAllSessionsRead } = useMutation({
+    mutationFn: async (sessionsToMarkRead: WorkspaceSession[]) => {
+      return Promise.allSettled(
+        sessionsToMarkRead.map(async (session) => {
+          const { data, error } = await postSessionsByIdRead({ path: { id: session.id } })
+          if (error) {
+            throw error
+          }
+          if (!data) {
+            throw new Error(`Marking session ${session.id} as read returned no data`)
+          }
+          updateSessionReadState(queryClient, data)
+        }),
+      )
+    },
+    onSuccess: (results) => {
+      const failedCount = results.filter(result => result.status === 'rejected').length
+      if (failedCount === 0) {
+        toastManager.add({ type: 'success', title: t('sidebar.toast.markAllReadSuccess') })
+        return
+      }
+
+      toastManager.add({
+        type: failedCount === results.length ? 'error' : 'warning',
+        title: t(
+          failedCount === results.length
+            ? 'sidebar.toast.markAllReadFailed'
+            : 'sidebar.toast.markAllReadPartial',
+        ),
+      })
+    },
+  })
   const runtimeIconByKind = useMemo<RuntimeIconByKind>(() => {
     return new Map(runtimes.map(runtime => [runtime.runtimeKind, runtime.icon]))
   }, [runtimes])
@@ -3716,6 +3774,12 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
     },
     [togglePin],
   )
+
+  const handleMarkAllAsRead = useCallback(() => {
+    if (unreadWorkspaceSessions.length > 0) {
+      markAllSessionsRead(unreadWorkspaceSessions)
+    }
+  }, [markAllSessionsRead, unreadWorkspaceSessions])
 
   const handleCreateMultiFolderWorkspace = useCallback(
     async (input: { name: string, folders: Array<{ name: string, path: string }> }) => {
@@ -3868,6 +3932,9 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
             multiWorkspaceEnabled={multiWorkspaceEnabled}
             onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
             onOpenMultiWorkspaceDialog={() => setMultiFolderDialogOpen(true)}
+            hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
+            markingAllSessionsRead={markingAllSessionsRead}
+            onMarkAllAsRead={handleMarkAllAsRead}
             onDelete={handleDelete}
             onTogglePin={handleToggleWorkspacePin}
           />
