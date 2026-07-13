@@ -121,6 +121,9 @@ describe('executeAiSdkTurn', () => {
       promptTokens: 10,
       completionTokens: 3,
       totalTokens: 13,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
+      reasoningOutputTokens: 0,
     })
   })
 })

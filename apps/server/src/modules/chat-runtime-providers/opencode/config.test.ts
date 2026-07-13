@@ -129,7 +129,7 @@ describe('resolveOpencodeConfig', () => {
       models: {
         'gpt-5.5': {
           id: 'gpt-5.5',
-          name: 'gpt-5.5',
+          name: 'GPT-5.5',
         },
       },
     })
