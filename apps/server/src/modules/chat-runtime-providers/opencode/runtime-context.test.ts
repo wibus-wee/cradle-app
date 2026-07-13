@@ -1,108 +1,155 @@
-import type { Config } from '@opencode-ai/sdk'
-import { afterEach, describe, expect, it } from 'vitest'
+import { EventEmitter } from 'node:events'
 
+import type { OpencodeClient } from '@opencode-ai/sdk'
+import type { OpencodeClient as OpencodeV2Client } from '@opencode-ai/sdk/v2'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { ManagedChildProcess } from '../../../infra/managed-process'
+import type { OpencodeManagedHost } from './runtime-context'
 import {
-  mergeOpencodeRuntimeConfig,
-  resolveOpencodeConfigDirectory,
-  resolveOpencodeDatabasePath,
-  resolveOpencodeRuntimeDirectory,
+  createOpencodeServerProcessOptions,
+  OpencodeRuntimePool,
+  resolveOpencodeBinaryPath,
+  resolveOpencodeRuntimeHostOptions,
+  stopOpencodeServer,
 } from './runtime-context'
 
-describe('mergeOpencodeRuntimeConfig', () => {
-  it('merges provider and MCP entries without replacing unrelated runtime config', () => {
-    const base: Config = {
-      model: 'existing-provider/gpt',
-      provider: {
-        'existing-provider': {
-          id: 'existing-provider',
-          name: 'Existing Provider',
-          api: 'openai-compatible',
-          npm: '@ai-sdk/openai-compatible',
-          options: {},
-          models: {
-            gpt: {
-              id: 'gpt',
-              name: 'GPT',
-            },
-          },
-        },
-      },
-      mcp: {
-        'existing-mcp': {
-          type: 'local',
-          command: ['node', '/existing/mcp.mjs'],
-        },
-      },
-      small_model: 'existing-provider/gpt-mini',
-    }
-    const incoming: Config = {
-      model: 'cradle-manual-target-1/gpt-5',
-      provider: {
-        'cradle-manual-target-1': {
-          id: 'cradle-manual-target-1',
-          name: 'Cradle Target',
-          api: 'openai',
-          npm: '@ai-sdk/openai',
-          options: {
-            apiKey: 'secret-value',
-            timeout: false,
-          },
-          models: {
-            'gpt-5': {
-              id: 'gpt-5',
-              name: 'GPT-5',
-            },
-          },
-        },
-      },
-      mcp: {
-        'browser-use': {
-          type: 'local',
-          command: ['node', '/plugins/browser-use/dist/mcp-server.mjs'],
-          environment: { BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock' },
-          enabled: true,
-        },
-        'nowledge-mem': {
-          type: 'remote',
-          url: 'https://nowledge.example.test/mcp',
-          headers: { Authorization: 'Bearer nowledge-secret' },
-          enabled: true,
-        },
-      },
-    }
+afterEach(async () => {
+  vi.useRealTimers()
+  vi.clearAllMocks()
+  await stopOpencodeServer()
+})
 
-    expect(mergeOpencodeRuntimeConfig(base, incoming)).toEqual({
-      model: 'existing-provider/gpt',
-      provider: {
-        ...base.provider,
-        ...incoming.provider,
-      },
-      mcp: {
-        ...base.mcp,
-        ...incoming.mcp,
-      },
-      small_model: 'existing-provider/gpt-mini',
+describe('openCode runtime host options', () => {
+  it('uses the configured binary and workspace cwd without injecting isolated OpenCode config', () => {
+    const previousBinaryPath = process.env.CRADLE_OPENCODE_PATH
+    process.env.CRADLE_OPENCODE_PATH = ' /opt/opencode-native '
+
+    try {
+      const hostOptions = resolveOpencodeRuntimeHostOptions({ directory: '/workspace/alpha' })
+      const launchOptions = createOpencodeServerProcessOptions({
+        ...hostOptions,
+        port: 45123,
+      })
+
+      expect(launchOptions).toEqual(expect.objectContaining({
+        command: '/opt/opencode-native',
+        cwd: '/workspace/alpha',
+      }))
+      expect(launchOptions).not.toHaveProperty('env')
+      expect(launchOptions).not.toHaveProperty('OPENCODE_CONFIG_CONTENT')
+      expect(launchOptions).not.toHaveProperty('OPENCODE_CONFIG_DIR')
+      expect(launchOptions).not.toHaveProperty('OPENCODE_DB')
+      expect(launchOptions).not.toHaveProperty('OPENCODE_DISABLE_PROJECT_CONFIG')
+    }
+    finally {
+      if (previousBinaryPath === undefined) {
+        delete process.env.CRADLE_OPENCODE_PATH
+      }
+      else {
+        process.env.CRADLE_OPENCODE_PATH = previousBinaryPath
+      }
+    }
+  })
+
+  it('falls back to the native binary and server cwd', () => {
+    expect(resolveOpencodeBinaryPath({})).toBe('opencode')
+    expect(resolveOpencodeRuntimeHostOptions()).toEqual({
+      binaryPath: resolveOpencodeBinaryPath(),
+      cwd: process.cwd(),
     })
   })
 })
 
-describe('resolveOpencodeRuntimeDirectory', () => {
-  const previousDataDir = process.env.CRADLE_DATA_DIR
+describe('opencodeRuntimePool', () => {
+  it('pools by binary path and cwd, ref-counts leases, and closes after the idle TTL', async () => {
+    vi.useFakeTimers()
+    const hosts: OpencodeManagedHost[] = []
+    const startHost = vi.fn(async (input) => {
+      const host = createManagedHost(`${input.binaryPath}:${input.cwd}:${hosts.length}`)
+      hosts.push(host)
+      return host
+    })
+    const pool = new OpencodeRuntimePool({ idleTtlMs: 50, startHost })
 
-  afterEach(() => {
-    if (previousDataDir === undefined) {
-      delete process.env.CRADLE_DATA_DIR
-    }
-    else {
-      process.env.CRADLE_DATA_DIR = previousDataDir
-    }
+    const first = await pool.acquire({ binaryPath: 'opencode-a', directory: '/workspace/a' })
+    const second = await pool.acquire({ binaryPath: 'opencode-a', directory: '/workspace/a' })
+    const otherCwd = await pool.acquire({ binaryPath: 'opencode-a', directory: '/workspace/b' })
+    const otherBinary = await pool.acquire({ binaryPath: 'opencode-b', directory: '/workspace/a' })
+
+    expect(startHost).toHaveBeenCalledTimes(3)
+    expect(first.resource).toBe(second.resource)
+    first.release()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(hosts[0]?.close).not.toHaveBeenCalled()
+
+    second.release()
+    await vi.advanceTimersByTimeAsync(49)
+    expect(hosts[0]?.close).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(hosts[0]?.close).toHaveBeenCalledOnce()
+
+    otherCwd.release()
+    otherBinary.release()
+    await pool.shutdown()
   })
 
-  it('keeps opencode runtime files under the Cradle data directory', () => {
-    process.env.CRADLE_DATA_DIR = '/tmp/cradle-data'
+  it('cancels an idle close on reacquire and removes a host when its child exits', async () => {
+    vi.useFakeTimers()
+    const exitCallbacks: Array<(code: number | null, signal: NodeJS.Signals | null) => void> = []
+    const hosts: OpencodeManagedHost[] = []
+    const startHost = vi.fn(async (input) => {
+      exitCallbacks.push(input.onExit)
+      const host = createManagedHost(`host-${hosts.length}`)
+      hosts.push(host)
+      return host
+    })
+    const pool = new OpencodeRuntimePool({ idleTtlMs: 50, startHost })
 
-    expect(resolveOpencodeRuntimeDirectory()).toBe('/tmp/cradle-data/runtime/opencode')
-    expect(resolveOpencodeConfigDirectory()).toBe('/tmp/cradle-data/runtime/opencode/config')
-    expect(resolveOpencodeDatabasePath()).toBe('/tmp/cradle-data/runtime/opencode/opencode.db')
+    const first = await pool.acquire({ directory: '/workspace/a' })
+    first.release()
+    await vi.advanceTimersByTimeAsync(25)
+    const reacquired = await pool.acquire({ directory: '/workspace/a' })
+    await vi.advanceTimersByTimeAsync(100)
+    expect(hosts[0]?.close).not.toHaveBeenCalled()
+
+    exitCallbacks[0]?.(1, null)
+    const restarted = await pool.acquire({ directory: '/workspace/a' })
+    expect(startHost).toHaveBeenCalledTimes(2)
+    expect(restarted.resource).not.toBe(reacquired.resource)
+
+    reacquired.release()
+    restarted.release()
+    await pool.shutdown()
   })
 })
+
+function createManagedProcess(): ManagedChildProcess {
+  const proc = Object.assign(new EventEmitter(), {
+    stdout: null,
+    stderr: null,
+    targetPid: 1234,
+    pid: 1234,
+    exitCode: null,
+    signalCode: null,
+    stop: vi.fn(async () => undefined),
+  })
+  return proc as unknown as ManagedChildProcess
+}
+
+function createManagedHost(id: string): OpencodeManagedHost {
+  const close = vi.fn(async () => undefined)
+  return {
+    resource: {
+      client: {} as OpencodeClient,
+      v2Client: {} as OpencodeV2Client,
+      server: { url: `http://${id}`, close },
+    },
+    process: createManagedProcess(),
+    url: `http://${id}`,
+    binaryPath: 'opencode',
+    cwd: '/workspace',
+    startedAt: Date.now(),
+    close,
+  }
+}
