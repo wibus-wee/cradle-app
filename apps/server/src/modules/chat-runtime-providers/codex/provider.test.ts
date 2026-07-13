@@ -2234,6 +2234,8 @@ describe('codexProvider app-server integration', () => {
       promptTokens: 3_000,
       completionTokens: 1_000,
       totalTokens: 4_000,
+      cachedInputTokens: 1_000,
+      reasoningOutputTokens: 250,
     })
     expect(provider.lastModelId).toBe('gpt-5-codex')
 
