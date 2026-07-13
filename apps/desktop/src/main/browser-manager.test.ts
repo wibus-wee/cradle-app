@@ -4,8 +4,11 @@ const electronMocks = vi.hoisted(() => {
   type Listener = (...args: unknown[]) => void
 
   let processCounter = 1
+  let webContentsCounter = 1
+  const webContentsById = new Map<number, FakeWebContents>()
 
   class FakeWebContents {
+    readonly id = webContentsCounter++
     readonly processId = processCounter++
     readonly listeners = new Map<string, Listener[]>()
     readonly session = {
@@ -31,6 +34,10 @@ const electronMocks = vi.hoisted(() => {
     loading = false
     url = ''
     title = ''
+
+    constructor() {
+      webContentsById.set(this.id, this)
+    }
 
     loadURL = vi.fn(async (url: string) => {
       this.loading = true
@@ -141,9 +148,15 @@ const electronMocks = vi.hoisted(() => {
     shell: {
       openExternal: vi.fn(),
     },
+    webContents: {
+      fromId: vi.fn((id: number) => webContentsById.get(id) ?? null),
+    },
+    createWebContents: () => new FakeWebContents(),
     __reset: () => {
       FakeWebContentsView.instances.length = 0
       processCounter = 1
+      webContentsCounter = 1
+      webContentsById.clear()
     },
   }
 })
@@ -187,6 +200,38 @@ afterEach(() => {
 })
 
 describe('desktop browser manager tab runtime retention', () => {
+  it('adopts a renderer webview without creating or owning a native view', async () => {
+    const manager = await createManager()
+    const threadId = 'thread-1'
+    const createdWebContents: unknown[] = []
+    manager.subscribeToWebContentsCreated(webContents => createdWebContents.push(webContents))
+
+    const initialState = manager.open({ threadId, initialUrl: 'https://one.test/' })
+    const tabId = initialState.activeTabId!
+    manager.setPanelBounds({ threadId, bounds, surface: 'renderer' })
+
+    expect(electronMocks.WebContentsView.instances).toHaveLength(0)
+
+    const rendererWebContents = electronMocks.createWebContents()
+    rendererWebContents.url = 'https://one.test/'
+    const attachedState = manager.attachWebview({
+      threadId,
+      tabId,
+      webContentsId: rendererWebContents.id,
+    })
+
+    expect(attachedState.tabs[0]?.status).toBe('live')
+    expect(createdWebContents).toEqual([rendererWebContents])
+    expect(electronMocks.WebContentsView.instances).toHaveLength(0)
+
+    manager.detachWebview({ threadId, tabId, webContentsId: rendererWebContents.id })
+
+    expect(rendererWebContents.close).not.toHaveBeenCalled()
+    expect(manager.getState({ threadId }).tabs[0]?.status).toBe('suspended')
+
+    manager.dispose()
+  })
+
   it('only returns ready local servers from discovery', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const port = Number(new URL(url).port)
@@ -226,7 +271,7 @@ describe('desktop browser manager tab runtime retention', () => {
     manager.dispose()
   })
 
-  it('keeps inactive browser tab runtimes across ordinary tab switches', async () => {
+  it('suspends inactive browser tab runtimes and restores them on selection', async () => {
     vi.useFakeTimers()
     const manager = await createManager()
     const threadId = 'thread-1'
@@ -249,12 +294,16 @@ describe('desktop browser manager tab runtime retention', () => {
 
     await vi.advanceTimersByTimeAsync(2_000)
 
+    expect(firstView.webContents.close).toHaveBeenCalledTimes(1)
+    expect(manager.getState({ threadId }).tabs.find(tab => tab.id === firstTabId)?.status)
+      .toBe('suspended')
+
     manager.selectTab({ threadId, tabId: firstTabId })
     await flushBrowserWork()
 
-    expect(electronMocks.WebContentsView.instances).toHaveLength(2)
-    expect(firstView.webContents.close).not.toHaveBeenCalled()
-    expect(firstView.webContents.loadURL).toHaveBeenCalledTimes(1)
+    expect(electronMocks.WebContentsView.instances).toHaveLength(3)
+    const restoredFirstView = electronMocks.WebContentsView.instances[2]!
+    expect(restoredFirstView.webContents.loadURL).toHaveBeenCalledTimes(1)
     expect(manager.getState({ threadId }).activeTabId).toBe(firstTabId)
 
     manager.selectTab({ threadId, tabId: secondTabId })
@@ -287,9 +336,27 @@ describe('desktop browser manager tab runtime retention', () => {
     manager.dispose()
   })
 
-  it('keeps browser runtimes when the panel is hidden and shown again', async () => {
-    vi.useFakeTimers()
+  it('replaces the final closed browser tab with a fresh blank tab', async () => {
     const manager = await createManager()
+    const threadId = 'thread-1'
+
+    const initialState = manager.open({ threadId, initialUrl: 'https://one.test/' })
+    const closedState = manager.closeTab({ threadId, tabId: initialState.activeTabId! })
+
+    expect(closedState.open).toBe(true)
+    expect(closedState.tabs).toHaveLength(1)
+    expect(closedState.tabs[0]).toMatchObject({
+      id: closedState.activeTabId,
+      url: 'about:blank',
+      status: 'suspended',
+    })
+
+    manager.dispose()
+  })
+
+  it('suspends browser runtimes after the hidden-panel grace period', async () => {
+    vi.useFakeTimers()
+    const { manager, window } = await createManagerWithWindow()
     const threadId = 'thread-1'
 
     const initialState = manager.open({ threadId, initialUrl: 'https://one.test/' })
@@ -301,20 +368,24 @@ describe('desktop browser manager tab runtime retention', () => {
     expect(view.webContents.loadURL).toHaveBeenCalledTimes(1)
 
     manager.hide({ threadId })
+    expect(window.contentView.removeChildView).toHaveBeenCalledWith(view)
     await vi.advanceTimersByTimeAsync(31_000)
 
-    expect(view.webContents.close).not.toHaveBeenCalled()
+    expect(view.webContents.close).toHaveBeenCalledTimes(1)
     expect(view.setBounds).toHaveBeenLastCalledWith(bounds)
     expect(view.setVisible).toHaveBeenLastCalledWith(false)
+    expect(manager.getState({ threadId }).tabs[0]?.status).toBe('suspended')
 
     manager.setPanelBounds({ threadId, bounds, surface: 'native' })
     manager.selectTab({ threadId, tabId })
     await flushBrowserWork()
 
-    expect(electronMocks.WebContentsView.instances).toHaveLength(1)
-    expect(view.webContents.loadURL).toHaveBeenCalledTimes(1)
-    expect(view.setBounds).toHaveBeenLastCalledWith(bounds)
-    expect(view.setVisible).toHaveBeenLastCalledWith(true)
+    expect(electronMocks.WebContentsView.instances).toHaveLength(2)
+    const restoredView = electronMocks.WebContentsView.instances[1]!
+    expect(restoredView.webContents.loadURL).toHaveBeenCalledTimes(1)
+    expect(restoredView.setBounds).toHaveBeenLastCalledWith(bounds)
+    expect(restoredView.setVisible).toHaveBeenLastCalledWith(true)
+    expect(window.contentView.addChildView).toHaveBeenCalledTimes(2)
     expect(manager.getState({ threadId }).activeTabId).toBe(tabId)
 
     manager.dispose()

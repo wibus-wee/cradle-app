@@ -6,8 +6,15 @@
 import * as Crypto from 'node:crypto'
 
 import type { BrowserWindow, WebContents } from 'electron'
-import { clipboard, nativeImage, shell, WebContentsView } from 'electron'
+import {
+  clipboard,
+  nativeImage,
+  shell,
+  webContents as electronWebContents,
+  WebContentsView,
+} from 'electron'
 
+import { browserSessionPartition } from '../shared/browser-session'
 import { resolveDesktopBrowserPanelPreloadPath } from './desktop-assets'
 
 export type ThreadId = string
@@ -53,12 +60,22 @@ export interface BrowserThreadInput {
 export interface BrowserSetPanelBoundsInput {
   threadId: ThreadId
   bounds: BrowserPanelBounds | null
-  surface?: 'native'
+  surface?: 'native' | 'renderer'
 }
 
 export interface BrowserTabInput {
   threadId: ThreadId
   tabId?: string
+}
+
+export interface BrowserAttachWebviewInput extends BrowserTabInput {
+  tabId: string
+  webContentsId: number
+}
+
+export interface BrowserDetachWebviewInput extends BrowserTabInput {
+  tabId: string
+  webContentsId: number
 }
 
 export interface BrowserNavigateInput extends BrowserTabInput {
@@ -282,7 +299,10 @@ export interface BrowserLocalServer {
 }
 
 const ABOUT_BLANK_URL = 'about:blank'
-const BROWSER_SESSION_PARTITION = 'persist:cradle-browser'
+const BROWSER_INACTIVE_TAB_SUSPEND_DELAY_MS = 1_500
+const BROWSER_INACTIVE_TAB_SUSPEND_DELAY_PRESSURED_MS = 400
+const BROWSER_MAX_WARM_INACTIVE_RUNTIMES_PER_THREAD = 1
+const BROWSER_THREAD_SUSPEND_DELAY_MS = 30_000
 const BROWSER_ERROR_ABORTED = -3
 const SEARCH_URL_PREFIX = 'https://www.google.com/search?q='
 const HIDDEN_BROWSER_BOUNDS: BrowserPanelBounds = { x: -10000, y: -10000, width: 1, height: 1 }
@@ -654,7 +674,8 @@ interface LiveTabRuntime {
   threadId: ThreadId
   tabId: string
   webContents: WebContents
-  view: WebContentsView
+  view: WebContentsView | null
+  ownsWebContents: boolean
   listenerDisposers: Array<() => void>
 }
 
@@ -736,6 +757,10 @@ interface BrowserPerformanceSnapshot {
     capturedScreenshotBytes: number
     lastScreenshotBytes: number
     lastScreenshotAt: number | null
+    inactiveTabSuspendScheduled: number
+    inactiveTabSuspendCancelled: number
+    inactiveTabBudgetEvictions: number
+    warmInactiveRuntimeCount: number
   }
   trackedProcessIds: number[]
   trackedOSProcessIds: number[]
@@ -943,10 +968,6 @@ function buildRuntimeKey(threadId: ThreadId, tabId: string): string {
   return `${threadId}:${tabId}`
 }
 
-function browserSessionPartition(threadId: ThreadId): string {
-  return `${BROWSER_SESSION_PARTITION}-${Buffer.from(threadId).toString('base64url')}`
-}
-
 function normalizeBrowserPromptPayload(
   payload: unknown,
 ): Pick<BrowserPromptRequest, 'text' | 'attachments'> | null {
@@ -1099,6 +1120,18 @@ function browserBoundsSignature(bounds: BrowserPanelBounds | null): string {
   return `${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}`
 }
 
+function isBlankBrowserTab(tab: BrowserTabState | null | undefined): boolean {
+  if (!tab) {
+    return true
+  }
+  const currentUrl = tab.url.trim()
+  const committedUrl = tab.lastCommittedUrl?.trim() ?? ''
+  return (
+    (currentUrl.length === 0 || currentUrl === ABOUT_BLANK_URL)
+    && (committedUrl.length === 0 || committedUrl === ABOUT_BLANK_URL)
+  )
+}
+
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
@@ -1185,11 +1218,14 @@ export class DesktopBrowserManager {
 
   private readonly lastEmittedVersionByThreadId = new Map<ThreadId, number>()
   private readonly runtimes = new Map<string, LiveTabRuntime>()
+  private readonly runtimeLastActiveAtByKey = new Map<string, number>()
   private readonly pendingRuntimeSyncs = new Map<string, PendingRuntimeSync>()
   private readonly listeners = new Set<BrowserStateListener>()
   private readonly webContentsListeners = new Set<BrowserWebContentsListener>()
   private readonly promptRequestListeners = new Set<BrowserPromptRequestListener>()
   private readonly annotationRuntimeEventListeners = new Set<BrowserAnnotationRuntimeEventListener>()
+  private readonly tabSuspendTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly suspendTimers = new Map<ThreadId, ReturnType<typeof setTimeout>>()
   private runtimeSyncFlushScheduled = false
   private readonly perfCounters = {
     setPanelBoundsCalls: 0,
@@ -1206,6 +1242,10 @@ export class DesktopBrowserManager {
     capturedScreenshotBytes: 0,
     lastScreenshotBytes: 0,
     lastScreenshotAt: null as number | null,
+    inactiveTabSuspendScheduled: 0,
+    inactiveTabSuspendCancelled: 0,
+    inactiveTabBudgetEvictions: 0,
+    warmInactiveRuntimeCount: 0,
   }
 
   setWindow(window: BrowserWindow | null): void {
@@ -1253,9 +1293,18 @@ export class DesktopBrowserManager {
   }
 
   dispose(): void {
+    for (const timer of this.suspendTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.suspendTimers.clear()
+    for (const timer of this.tabSuspendTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.tabSuspendTimers.clear()
     this.detachAttachedRuntime()
     this.destroyAllRuntimes()
     this.pendingRuntimeSyncs.clear()
+    this.runtimeLastActiveAtByKey.clear()
     this.listeners.clear()
     this.webContentsListeners.clear()
     this.promptRequestListeners.clear()
@@ -1273,6 +1322,7 @@ export class DesktopBrowserManager {
   }
 
   getPerformanceSnapshot(): BrowserPerformanceSnapshot {
+    this.perfCounters.warmInactiveRuntimeCount = this.countWarmInactiveRuntimes()
     const stateEntries = [...this.states.entries()]
     const runtimeEntries = [...this.runtimes.values()]
     const runtimeCountByThreadId = new Map<ThreadId, number>()
@@ -1453,19 +1503,27 @@ export class DesktopBrowserManager {
     const state = this.ensureWorkspace(input.threadId, input.initialUrl)
     const didChange = !state.open
     state.open = true
-    const nextDidChange = syncThreadLastError(state) || didChange
-    const activeTab = this.getActiveTab(state)
-    if (activeTab) {
-      const runtime = this.ensureLiveRuntime(input.threadId, activeTab.id)
-      void this.loadTab(input.threadId, activeTab.id, { runtime })
+    const nextInitialUrl = input.initialUrl ? normalizeUrlInput(input.initialUrl) : null
+    const activeTab = nextInitialUrl ? this.getActiveTab(state) : null
+    if (nextInitialUrl && activeTab && activeTab.url !== nextInitialUrl) {
+      return this.navigate({
+        threadId: input.threadId,
+        tabId: activeTab.id,
+        url: nextInitialUrl,
+      })
     }
+
+    const nextDidChange = syncThreadLastError(state) || didChange
 
     if (
       this.activeBounds
       && this.activeBoundsThreadId === input.threadId
       && (this.activeThreadId === null || this.activeThreadId === input.threadId)
     ) {
-      this.activateThread(input.threadId, this.activeBounds)
+      const visibleTab = this.getActiveTab(state)
+      if (!isBlankBrowserTab(visibleTab)) {
+        this.activateThread(input.threadId, this.activeBounds)
+      }
     }
 
     if (nextDidChange) {
@@ -1476,6 +1534,8 @@ export class DesktopBrowserManager {
   }
 
   close(input: BrowserThreadInput): ThreadBrowserState {
+    this.clearSuspendTimer(input.threadId)
+
     if (this.activeThreadId === input.threadId) {
       this.detachAttachedRuntime()
       this.activeThreadId = null
@@ -1496,11 +1556,17 @@ export class DesktopBrowserManager {
   }
 
   hide(input: BrowserThreadInput): void {
+    const state = this.states.get(input.threadId)
     if (this.activeThreadId === input.threadId) {
       this.detachAttachedRuntime()
       this.activeThreadId = null
     }
-    this.clearActiveBoundsForThread(input.threadId)
+
+    if (!state?.open) {
+      return
+    }
+
+    this.scheduleThreadSuspend(input.threadId)
   }
 
   getState(input: BrowserThreadInput): ThreadBrowserState {
@@ -1514,13 +1580,36 @@ export class DesktopBrowserManager {
     const nextBoundsSignature = browserBoundsSignature(nextBounds)
     const activeTabId = this.getActiveTab(state)?.id ?? null
     const activeRuntimeKey = activeTabId ? buildRuntimeKey(input.threadId, activeTabId) : null
+    const activeRuntime = activeRuntimeKey ? this.runtimes.get(activeRuntimeKey) : null
     this.setActiveBounds(input.threadId, nextBounds)
 
     if (!state.open || nextBounds === null) {
       if (this.activeThreadId === input.threadId) {
         this.detachAttachedRuntime()
         this.activeThreadId = null
+        this.scheduleThreadSuspend(input.threadId)
       }
+      return
+    }
+
+    if (
+      input.surface === 'native'
+      && activeTabId
+      && activeRuntime
+      && !activeRuntime.ownsWebContents
+    ) {
+      this.destroyRuntime(input.threadId, activeTabId)
+      const activeTab = this.getTab(state, activeTabId)
+      if (activeTab) {
+        suspendTabState(activeTab)
+        this.markThreadStateChanged(input.threadId)
+      }
+      this.attachedRuntimeKey = null
+      this.attachedBoundsSignature = null
+    }
+
+    if (input.surface === 'renderer' && activeTabId && !activeRuntime) {
+      this.activateThreadForPendingRenderer(input.threadId, nextBounds)
       return
     }
 
@@ -1549,6 +1638,79 @@ export class DesktopBrowserManager {
     }
 
     this.activateThread(input.threadId, nextBounds)
+  }
+
+  attachWebview(input: BrowserAttachWebviewInput): ThreadBrowserState {
+    const state = this.ensureWorkspace(input.threadId)
+    const tab = this.resolveTab(state, input.tabId)
+    const webContents = electronWebContents.fromId(input.webContentsId)
+    if (!webContents || webContents.isDestroyed()) {
+      throw new Error('The visible browser webview is not available.')
+    }
+
+    const key = buildRuntimeKey(input.threadId, tab.id)
+    const existingRendererRuntime = this.findRendererRuntimeByWebContentsId(webContents.id)
+    if (existingRendererRuntime && existingRendererRuntime.key !== key) {
+      this.destroyRuntime(existingRendererRuntime.threadId, existingRendererRuntime.tabId)
+    }
+
+    const existing = this.runtimes.get(key)
+    if (existing?.webContents.id !== webContents.id) {
+      if (existing) {
+        this.destroyRuntime(input.threadId, tab.id)
+      }
+      const runtime: LiveTabRuntime = {
+        key,
+        threadId: input.threadId,
+        tabId: tab.id,
+        webContents,
+        view: null,
+        ownsWebContents: false,
+        listenerDisposers: [],
+      }
+      this.configureRuntimeWebContents(runtime)
+      this.runtimes.set(key, runtime)
+      for (const listener of this.webContentsListeners) {
+        listener(runtime.webContents, tab.id)
+      }
+    }
+
+    const bounds = this.getVisibleBoundsForThread(input.threadId)
+    const runtime = this.runtimes.get(key)
+    if (runtime && bounds) {
+      this.attachRuntime(runtime, bounds)
+    }
+
+    const didChange = tab.status !== LIVE_TAB_STATUS || tab.lastError !== null
+    tab.status = LIVE_TAB_STATUS
+    tab.lastError = null
+    syncThreadLastError(state)
+    if (didChange) {
+      this.markThreadStateChanged(input.threadId)
+    }
+    this.queueRuntimeStateSync(input.threadId, tab.id)
+    this.emitState(input.threadId)
+    return this.snapshotThreadState(input.threadId, state)
+  }
+
+  detachWebview(input: BrowserDetachWebviewInput): void {
+    const state = this.states.get(input.threadId)
+    const tab = state ? this.getTab(state, input.tabId) : null
+    if (!state || !tab) {
+      return
+    }
+
+    const runtime = this.runtimes.get(buildRuntimeKey(input.threadId, input.tabId))
+    if (!runtime || runtime.ownsWebContents || runtime.webContents.id !== input.webContentsId) {
+      return
+    }
+
+    this.destroyRuntime(input.threadId, input.tabId)
+    const didChange = suspendTabState(tab) || syncThreadLastError(state)
+    if (didChange) {
+      this.markThreadStateChanged(input.threadId)
+      this.emitState(input.threadId)
+    }
   }
 
   navigate(input: BrowserNavigateInput): ThreadBrowserState {
@@ -1629,19 +1791,15 @@ export class DesktopBrowserManager {
 
     if (this.activeThreadId === input.threadId) {
       const bounds = this.getVisibleBoundsForThread(input.threadId)
-      if (state.activeTabId === tab.id) {
-        const runtime = this.ensureLiveRuntime(input.threadId, tab.id)
-        if (bounds) {
-          this.attachRuntime(runtime, bounds)
-        }
-        void this.loadTab(input.threadId, tab.id, { force: true, runtime })
+      if (state.activeTabId === tab.id && bounds) {
+        this.clearSuspendTimer(input.threadId)
+        this.attachActiveTab(input.threadId, bounds, { forceLoad: true })
+      }
+      else {
+        tab.status = 'suspended'
       }
     }
- else if (state.activeTabId === tab.id) {
-      const runtime = this.ensureLiveRuntime(input.threadId, tab.id)
-      void this.loadTab(input.threadId, tab.id, { force: true, runtime })
-    }
- else {
+    else {
       tab.status = 'suspended'
     }
 
@@ -1664,14 +1822,10 @@ export class DesktopBrowserManager {
     state.tabs = nextTabs
 
     if (nextTabs.length === 0) {
-      state.open = false
-      state.activeTabId = null
+      const replacementTab = createBrowserTab()
+      state.tabs = [replacementTab]
+      state.activeTabId = replacementTab.id
       state.lastError = null
-      if (this.activeThreadId === input.threadId) {
-        this.detachAttachedRuntime()
-        this.activeThreadId = null
-      }
-      this.clearActiveBoundsForThread(input.threadId)
       this.markThreadStateChanged(input.threadId)
       this.emitState(input.threadId)
       return this.snapshotThreadState(input.threadId, state)
@@ -2010,11 +2164,25 @@ export class DesktopBrowserManager {
   }
 
   private activateThread(threadId: ThreadId, bounds: BrowserPanelBounds): void {
+    if (this.activeThreadId && this.activeThreadId !== threadId) {
+      this.scheduleThreadSuspend(this.activeThreadId)
+    }
+
     this.activeThreadId = threadId
     this.activeBounds = bounds
     this.activeBoundsThreadId = threadId
     this.resumeThread(threadId)
     this.attachActiveTab(threadId, bounds)
+  }
+
+  private activateThreadForPendingRenderer(threadId: ThreadId, bounds: BrowserPanelBounds): void {
+    if (this.activeThreadId && this.activeThreadId !== threadId) {
+      this.scheduleThreadSuspend(this.activeThreadId)
+    }
+    this.activeThreadId = threadId
+    this.activeBounds = bounds
+    this.activeBoundsThreadId = threadId
+    this.clearSuspendTimer(threadId)
   }
 
   private async resolveLiveRuntimeForCommand(input: BrowserTabInput): Promise<LiveTabRuntime> {
@@ -2072,8 +2240,9 @@ export class DesktopBrowserManager {
       return
     }
 
+    this.clearSuspendTimer(threadId)
     const activeTab = this.getActiveTab(state)
-    let didChange = false
+    let didChange = this.suspendInactiveTabs(threadId, activeTab?.id ?? null)
 
     // Only resume the visible tab. Waking every tab can fan out into several
     // Chromium renderer processes and background page activity at once.
@@ -2098,18 +2267,157 @@ export class DesktopBrowserManager {
     }
   }
 
-  private attachActiveTab(threadId: ThreadId, bounds: BrowserPanelBounds): void {
+  private suspendInactiveTabs(threadId: ThreadId, activeTabId: string | null): boolean {
+    const state = this.states.get(threadId)
+    if (!state) {
+      return false
+    }
+
+    let didChange = false
+    const inactiveRuntimeTabIds = state.tabs
+      .filter(tab => tab.id !== activeTabId)
+      .filter(tab => this.runtimes.has(buildRuntimeKey(threadId, tab.id)))
+      .sort((left, right) => {
+        const leftKey = buildRuntimeKey(threadId, left.id)
+        const rightKey = buildRuntimeKey(threadId, right.id)
+        return (
+          (this.runtimeLastActiveAtByKey.get(rightKey) ?? 0)
+          - (this.runtimeLastActiveAtByKey.get(leftKey) ?? 0)
+        )
+      })
+    const warmRuntimeTabIds = new Set(
+      inactiveRuntimeTabIds
+        .slice(0, BROWSER_MAX_WARM_INACTIVE_RUNTIMES_PER_THREAD)
+        .map(tab => tab.id),
+    )
+
+    for (const tab of state.tabs) {
+      if (tab.id === activeTabId) {
+        this.clearTabSuspendTimer(threadId, tab.id)
+        continue
+      }
+
+      const runtime = this.runtimes.get(buildRuntimeKey(threadId, tab.id))
+      if (runtime) {
+        if (warmRuntimeTabIds.has(tab.id)) {
+          this.scheduleInactiveTabSuspend(threadId, tab.id)
+          continue
+        }
+
+        this.perfCounters.inactiveTabBudgetEvictions += 1
+        this.destroyRuntime(threadId, tab.id)
+        didChange = suspendTabState(tab) || didChange
+        continue
+      }
+
+      didChange = suspendTabState(tab) || didChange
+    }
+
+    return didChange
+  }
+
+  private scheduleThreadSuspend(threadId: ThreadId): void {
+    const state = this.states.get(threadId)
+    if (!state?.open || this.activeThreadId === threadId) {
+      return
+    }
+
+    this.clearSuspendTimer(threadId)
+    const timer = setTimeout(() => {
+      this.suspendThread(threadId)
+      this.suspendTimers.delete(threadId)
+    }, BROWSER_THREAD_SUSPEND_DELAY_MS)
+    timer.unref()
+    this.suspendTimers.set(threadId, timer)
+  }
+
+  private suspendThread(threadId: ThreadId): void {
+    const state = this.states.get(threadId)
+    if (!state || this.activeThreadId === threadId) {
+      return
+    }
+
+    let didChange = false
+    for (const tab of state.tabs) {
+      this.destroyRuntime(threadId, tab.id)
+      didChange = suspendTabState(tab) || didChange
+    }
+
+    didChange = syncThreadLastError(state) || didChange
+    if (didChange) {
+      this.markThreadStateChanged(threadId)
+      this.emitState(threadId)
+    }
+  }
+
+  private clearSuspendTimer(threadId: ThreadId): void {
+    const existing = this.suspendTimers.get(threadId)
+    if (!existing) {
+      return
+    }
+    clearTimeout(existing)
+    this.suspendTimers.delete(threadId)
+  }
+
+  private scheduleInactiveTabSuspend(threadId: ThreadId, tabId: string): void {
+    const key = buildRuntimeKey(threadId, tabId)
+    if (this.tabSuspendTimers.has(key)) {
+      return
+    }
+
+    this.perfCounters.inactiveTabSuspendScheduled += 1
+    const delayMs = this.resolveInactiveTabSuspendDelay(threadId)
+    const timer = setTimeout(() => {
+      this.tabSuspendTimers.delete(key)
+      const state = this.states.get(threadId)
+      const tab = state ? this.getTab(state, tabId) : null
+      if (!state || !tab) {
+        return
+      }
+
+      this.destroyRuntime(threadId, tabId)
+      const didChange = suspendTabState(tab) || syncThreadLastError(state)
+      if (didChange) {
+        this.markThreadStateChanged(threadId)
+        this.emitState(threadId)
+      }
+    }, delayMs)
+    timer.unref()
+    this.tabSuspendTimers.set(key, timer)
+  }
+
+  private clearTabSuspendTimer(threadId: ThreadId, tabId: string): void {
+    const key = buildRuntimeKey(threadId, tabId)
+    const existing = this.tabSuspendTimers.get(key)
+    if (!existing) {
+      return
+    }
+
+    clearTimeout(existing)
+    this.tabSuspendTimers.delete(key)
+    this.perfCounters.inactiveTabSuspendCancelled += 1
+  }
+
+  private attachActiveTab(
+    threadId: ThreadId,
+    bounds: BrowserPanelBounds,
+    options: { forceLoad?: boolean } = {},
+  ): void {
     const state = this.ensureWorkspace(threadId)
     const activeTab = this.getActiveTab(state)
     if (!activeTab) {
       return
     }
 
+    this.suspendInactiveTabs(threadId, activeTab.id)
     const wasSuspended = activeTab.status === SUSPENDED_TAB_STATUS
     const runtime = this.ensureLiveRuntime(threadId, activeTab.id)
     this.attachRuntime(runtime, bounds)
-    if (wasSuspended) {
-      void this.loadTab(threadId, activeTab.id, { force: true, runtime })
+    if (options.forceLoad || wasSuspended) {
+      void this.loadTab(threadId, activeTab.id, {
+        force: options.forceLoad || wasSuspended,
+        runtime,
+      })
     }
  else {
       this.syncRuntimeState(threadId, activeTab.id)
@@ -2123,8 +2431,21 @@ export class DesktopBrowserManager {
     }
 
     const nextBoundsSignature = browserBoundsSignature(bounds)
+    this.runtimeLastActiveAtByKey.set(runtime.key, Date.now())
+    if (!runtime.ownsWebContents) {
+      if (this.attachedRuntimeKey && this.attachedRuntimeKey !== runtime.key) {
+        this.detachAttachedRuntime()
+      }
+      this.attachedRuntimeKey = runtime.key
+      this.attachedBoundsSignature = nextBoundsSignature
+      return
+    }
+    if (!runtime.view) {
+      return
+    }
     if (this.attachedRuntimeKey === runtime.key) {
       this.setRuntimeViewHidden(runtime, false)
+      this.bringRuntimeViewToFront(runtime)
       if (this.attachedBoundsSignature === nextBoundsSignature) {
         return
       }
@@ -2143,7 +2464,7 @@ export class DesktopBrowserManager {
 
   private bringRuntimeViewToFront(runtime: LiveTabRuntime): void {
     const window = this.window
-    if (!window) {
+    if (!window || !runtime.view) {
       return
     }
 
@@ -2173,14 +2494,18 @@ export class DesktopBrowserManager {
     }
 
     const runtime = this.runtimes.get(this.attachedRuntimeKey)
-    if (runtime) {
+    if (runtime?.view) {
       this.setRuntimeViewHidden(runtime, true)
+      this.removeRuntimeView(runtime)
     }
     this.attachedRuntimeKey = null
     this.attachedBoundsSignature = null
   }
 
   private setRuntimeViewHidden(runtime: LiveTabRuntime, hidden: boolean): void {
+    if (!runtime.view) {
+      return
+    }
     const nativeView = runtime.view as typeof runtime.view & NativeBrowserViewVisibility
     if (!nativeView.setVisible) {
       if (hidden) {
@@ -2197,7 +2522,7 @@ export class DesktopBrowserManager {
 
   private removeRuntimeView(runtime: LiveTabRuntime): void {
     const window = this.window
-    if (!window || !window.contentView.children.includes(runtime.view)) {
+    if (!window || !runtime.view || !window.contentView.children.includes(runtime.view)) {
       return
     }
     window.contentView.removeChildView(runtime.view)
@@ -2205,6 +2530,7 @@ export class DesktopBrowserManager {
 
   private ensureLiveRuntime(threadId: ThreadId, tabId: string): LiveTabRuntime {
     const key = buildRuntimeKey(threadId, tabId)
+    this.clearTabSuspendTimer(threadId, tabId)
     const existing = this.runtimes.get(key)
     if (existing) {
       if (existing.webContents.isDestroyed()) {
@@ -2251,6 +2577,7 @@ export class DesktopBrowserManager {
       tabId,
       webContents: view.webContents,
       view,
+      ownsWebContents: true,
       listenerDisposers: [],
     }
     this.configureRuntimeWebContents(runtime)
@@ -2263,6 +2590,15 @@ export class DesktopBrowserManager {
   private findRuntimeByWebContents(webContents: WebContents): LiveTabRuntime | null {
     for (const runtime of this.runtimes.values()) {
       if (runtime.webContents === webContents) {
+        return runtime
+      }
+    }
+    return null
+  }
+
+  private findRendererRuntimeByWebContentsId(webContentsId: number): LiveTabRuntime | null {
+    for (const runtime of this.runtimes.values()) {
+      if (!runtime.ownsWebContents && runtime.webContents.id === webContentsId) {
         return runtime
       }
     }
@@ -2511,7 +2847,9 @@ export class DesktopBrowserManager {
 
   private destroyRuntime(threadId: ThreadId, tabId: string): void {
     const key = buildRuntimeKey(threadId, tabId)
+    this.clearTabSuspendTimer(threadId, tabId)
     this.pendingRuntimeSyncs.delete(key)
+    this.runtimeLastActiveAtByKey.delete(key)
     const runtime = this.runtimes.get(key)
     if (!runtime) {
       return
@@ -2536,7 +2874,9 @@ export class DesktopBrowserManager {
           // The runtime is being torn down anyway; ignore stale-debugger cleanup noise.
         }
       }
-      webContents.close({ waitForBeforeUnload: false })
+      if (runtime.ownsWebContents) {
+        webContents.close({ waitForBeforeUnload: false })
+      }
     }
   }
 
@@ -2610,6 +2950,30 @@ export class DesktopBrowserManager {
     return [...processIds]
   }
 
+  private countWarmInactiveRuntimes(): number {
+    let count = 0
+    for (const [key] of this.tabSuspendTimers) {
+      if (this.runtimes.has(key)) {
+        count += 1
+      }
+    }
+    return count
+  }
+
+  private resolveInactiveTabSuspendDelay(threadId: ThreadId): number {
+    const threadRuntimeCount = [...this.runtimes.values()].filter(
+      runtime => runtime.threadId === threadId,
+    ).length
+    if (
+      threadRuntimeCount > BROWSER_MAX_WARM_INACTIVE_RUNTIMES_PER_THREAD + 1
+      || this.runtimes.size > 4
+    ) {
+      return BROWSER_INACTIVE_TAB_SUSPEND_DELAY_PRESSURED_MS
+    }
+
+    return BROWSER_INACTIVE_TAB_SUSPEND_DELAY_MS
+  }
+
   private ensureWorkspace(threadId: ThreadId, initialUrl?: string): ThreadBrowserState {
     const state = this.getOrCreateState(threadId)
     if (state.tabs.length === 0) {
@@ -2673,6 +3037,27 @@ function setIfChanged<T>(current: T, next: T, apply: (value: T) => void): boolea
   }
   apply(next)
   return true
+}
+
+function suspendTabState(tab: BrowserTabState): boolean {
+  let didChange = false
+  didChange
+    = setIfChanged(tab.status, SUSPENDED_TAB_STATUS, (value) => {
+      tab.status = value
+    }) || didChange
+  didChange
+    = setIfChanged(tab.isLoading, false, (value) => {
+      tab.isLoading = value
+    }) || didChange
+  didChange
+    = setIfChanged(tab.canGoBack, false, (value) => {
+      tab.canGoBack = value
+    }) || didChange
+  didChange
+    = setIfChanged(tab.canGoForward, false, (value) => {
+      tab.canGoForward = value
+    }) || didChange
+  return didChange
 }
 
 function syncTabStateFromRuntime(

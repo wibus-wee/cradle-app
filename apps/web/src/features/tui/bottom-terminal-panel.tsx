@@ -1,19 +1,15 @@
-import {
-  CloseLine as XIcon,
-  PlusLine as PlusIcon,
-  TerminalBoxLine as SquareTerminalIcon,
-} from '@mingcute/react'
 import { useEffect, useState } from 'react'
 
 import { deleteTerminalSessionsShellByPtyId } from '~/api-gen/sdk.gen'
-import { Button } from '~/components/ui/button'
-import { cn } from '~/lib/cn'
+import { useBottomPanelVisibility } from '~/components/layout/bottom-panel-visibility'
 import { useLayoutStore } from '~/store/layout'
 
-import { ShellView } from './shell-view'
 import type { TerminalMetadata } from './terminal-metadata'
-import { getTerminalPathLabel } from './terminal-metadata'
-import { useTerminalPanelStore } from './terminal-panel-store'
+import { TerminalPaneView } from './terminal-pane-view'
+import type { TerminalPanelSession } from './terminal-panel-store'
+import { MAX_TERMINAL_PANES, useTerminalPanelStore } from './terminal-panel-store'
+
+const EMPTY_SESSIONS: TerminalPanelSession[] = []
 
 interface BottomTerminalPanelProps {
   ownerId: string
@@ -24,32 +20,29 @@ export function BottomTerminalPanel({ ownerId, cwd }: BottomTerminalPanelProps) 
   const owner = useTerminalPanelStore(state => state.owners[ownerId])
   const registerOwner = useTerminalPanelStore(state => state.registerOwner)
   const addSession = useTerminalPanelStore(state => state.addSession)
+  const splitSession = useTerminalPanelStore(state => state.splitSession)
   const activateSession = useTerminalPanelStore(state => state.activateSession)
   const removeSession = useTerminalPanelStore(state => state.removeSession)
+  const resizeSplit = useTerminalPanelStore(state => state.resizeSplit)
   const updateSessionTitle = useTerminalPanelStore(state => state.updateSessionTitle)
   const bottomPanelOpen = useLayoutStore(state => state.bottomPanelOpen)
+  const panelVisible = useBottomPanelVisibility()
   const setBottomPanelOpen = useLayoutStore(state => state.setBottomPanelOpen)
   const [cwdBySessionId, setCwdBySessionId] = useState<Record<string, string | null>>({})
 
   useEffect(() => {
-    if (!bottomPanelOpen) {
-      return
+    if (bottomPanelOpen) {
+      registerOwner(ownerId, cwd)
     }
-
-    registerOwner(ownerId, cwd)
   }, [bottomPanelOpen, cwd, ownerId, registerOwner])
 
-  const sessions = owner?.sessions ?? []
-  const activeSessionId = owner?.activeSessionId ?? sessions[0]?.id ?? null
+  const sessions = owner?.sessions ?? EMPTY_SESSIONS
+  const sessionsById = new Map(sessions.map(session => [session.id, session]))
 
-  function handleAddSession() {
-    addSession(ownerId, cwd)
-  }
-
-  function handleRemoveSession(sessionId: string) {
-    void deleteTerminalSessionsShellByPtyId({
-      path: { ptyId: sessionId },
-    }).catch(() => {})
+  function handleRemoveSession(sessionId: string, stopProcess: boolean) {
+    if (stopProcess) {
+      void deleteTerminalSessionsShellByPtyId({ path: { ptyId: sessionId } }).catch(() => {})
+    }
     const remainingCount = removeSession(ownerId, sessionId)
     if (remainingCount === 0) {
       setBottomPanelOpen(false)
@@ -61,13 +54,15 @@ export function BottomTerminalPanel({ ownerId, cwd }: BottomTerminalPanelProps) 
       updateSessionTitle(ownerId, sessionId, metadata.title)
     }
     if (metadata.cwd) {
-      setCwdBySessionId(prev => ({ ...prev, [sessionId]: metadata.cwd }))
+      setCwdBySessionId(current => (
+        current[sessionId] === metadata.cwd
+          ? current
+          : { ...current, [sessionId]: metadata.cwd }
+      ))
     }
   }
 
-  const activeSession = sessions.find(session => session.id === activeSessionId) ?? sessions[0] ?? null
-
-  if (!activeSession) {
+  if (!owner?.layout || sessions.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-background text-xs text-muted-foreground">
         Preparing terminal
@@ -76,81 +71,23 @@ export function BottomTerminalPanel({ ownerId, cwd }: BottomTerminalPanelProps) 
   }
 
   return (
-    <div className="flex h-full min-h-0 bg-background" data-testid="bottom-terminal-panel">
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <ShellView
-          key={activeSession.id}
-          ptyId={activeSession.id}
-          cwd={activeSession.cwd}
-          visible={bottomPanelOpen}
-          stopOnUnmount={false}
-          onMetadata={metadata => handleMetadata(activeSession.id, metadata)}
-          onExited={() => {
-            const remainingCount = removeSession(ownerId, activeSession.id)
-            if (remainingCount === 0) {
-              setBottomPanelOpen(false)
-            }
-          }}
-        />
-      </div>
-      <div className="flex w-56 shrink-0 flex-col border-l border-border/70 bg-background" data-testid="bottom-terminal-session-tabs">
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/70 px-2">
-          <span className="truncate text-[11px] font-medium text-muted-foreground">Terminals</span>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={handleAddSession}
-            aria-label="New terminal session"
-            title="New terminal session"
-            data-testid="bottom-terminal-new-session"
-          >
-            <PlusIcon className="size-3" />
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-1">
-          {sessions.map((session) => {
-            const selected = session.id === activeSession.id
-            const pathLabel = getTerminalPathLabel(cwd, cwdBySessionId[session.id] ?? session.cwd)
-
-            return (
-              <div
-                key={session.id}
-                className={cn(
-                  'group flex min-h-7 w-full items-center rounded-md transition-colors',
-                  selected
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-                )}
-                data-testid="bottom-terminal-tab"
-                data-active={selected ? 'true' : 'false'}
-              >
-                <button
-                  type="button"
-                  onClick={() => activateSession(ownerId, session.id)}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1 text-left text-[11px]"
-                >
-                  <SquareTerminalIcon className="size-3 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{session.title}</span>
-                  {pathLabel && (
-                    <span className="max-w-18 shrink-0 truncate rounded bg-foreground/7 px-1 font-mono text-[10px] text-muted-foreground">
-                      {pathLabel}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Close ${session.title}`}
-                  data-testid={`bottom-terminal-close-${session.id}`}
-                  className="mr-1 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-foreground/10 focus:opacity-100"
-                  onClick={() => handleRemoveSession(session.id)}
-                >
-                  <XIcon className="size-2.5" />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+    <div className="h-full min-h-0 overflow-hidden bg-background" data-testid="bottom-terminal-panel">
+      <TerminalPaneView
+        layout={owner.layout}
+        sessionsById={sessionsById}
+        cwdBySessionId={cwdBySessionId}
+        workspaceCwd={cwd}
+        activeSessionId={owner.activeSessionId}
+        panelVisible={panelVisible}
+        canSplit={sessions.length < MAX_TERMINAL_PANES}
+        onActivate={sessionId => activateSession(ownerId, sessionId)}
+        onAddTab={() => addSession(ownerId, cwd)}
+        onSplit={direction => splitSession(ownerId, cwd, direction)}
+        onClose={sessionId => handleRemoveSession(sessionId, true)}
+        onExited={sessionId => handleRemoveSession(sessionId, false)}
+        onMetadata={handleMetadata}
+        onResizeSplit={(splitId, weights) => resizeSplit(ownerId, splitId, weights)}
+      />
     </div>
   )
 }

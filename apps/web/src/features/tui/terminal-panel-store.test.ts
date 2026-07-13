@@ -68,4 +68,30 @@ describe('terminal panel store', () => {
       nextIndex: 3,
     })
   })
+
+  it('adds tabs to the focused pane and can split that pane for simultaneous terminals', () => {
+    const store = useTerminalPanelStore.getState()
+    store.registerOwner('chat:session-1', '/tmp/workspace')
+    store.addSession('chat:session-1', '/tmp/workspace')
+    store.splitSession('chat:session-1', '/tmp/workspace', 'horizontal')
+
+    expect(useTerminalPanelStore.getState().owners['chat:session-1']).toMatchObject({
+      activeSessionId: 'terminal:chat:session-1:3',
+      layout: {
+        type: 'split',
+        direction: 'horizontal',
+        children: [
+          {
+            type: 'terminal',
+            sessionIds: ['terminal:chat:session-1:1', 'terminal:chat:session-1:2'],
+            activeSessionId: 'terminal:chat:session-1:2',
+          },
+          {
+            type: 'terminal',
+            sessionIds: ['terminal:chat:session-1:3'],
+          },
+        ],
+      },
+    })
+  })
 })
