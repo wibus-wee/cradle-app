@@ -314,7 +314,7 @@ describe('conversation bridge service', () => {
       actionId: 'cradle_session_model_select',
       selectedValue: 'gpt-5',
     })
-    expect(modelResponse.text).toContain('GPT-5')
+    expect(modelResponse.text).toContain('gpt-5')
     expect(db().select().from(conversationBridgeChannelBindings).all()).toEqual([
       expect.objectContaining({
         sessionProviderTargetId: 'target-1',

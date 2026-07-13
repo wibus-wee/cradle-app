@@ -30,6 +30,8 @@ describe('mapClaudeAgentMessageToChunks', () => {
       promptTokens: 100,
       completionTokens: 50,
       totalTokens: 150,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
     })
   })
 
@@ -74,6 +76,8 @@ describe('mapClaudeAgentMessageToChunks', () => {
       promptTokens: 300,
       completionTokens: 100,
       totalTokens: 400,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
     })
     expect(result.chunks).toEqual([
       { type: 'finish', finishReason: 'stop' },

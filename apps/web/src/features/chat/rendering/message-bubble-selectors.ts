@@ -20,6 +20,8 @@ import {
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
+import type { RuntimeWarningMessagePart } from '../runtime-warning'
+import { isRuntimeWarningMessagePart } from '../runtime-warning'
 import type {
   ChatRenderItem,
   ChatRenderSegment,
@@ -250,11 +252,13 @@ function areRenderSegmentEqual(left: ChatRenderSegment, right: ChatRenderSegment
     case 'file-attachment':
     case 'skill-context':
     case 'plugin-context':
+    case 'runtime-warning':
       return (
         (right.kind === 'reasoning'
           || right.kind === 'file-attachment'
           || right.kind === 'skill-context'
-          || right.kind === 'plugin-context')
+          || right.kind === 'plugin-context'
+          || right.kind === 'runtime-warning')
         && left.kind === right.kind
         && left.messageId === right.messageId
         && left.partIndex === right.partIndex
@@ -359,6 +363,16 @@ export function readPluginContextPartFromState(
 ): ChatPluginContextMessagePart | null {
   const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
   return isChatPluginContextPart(part) ? part : null
+}
+
+export function readRuntimeWarningPartFromState(
+  state: ChatStoreSnapshot,
+  sessionId: string,
+  messageId: string,
+  partIndex: number,
+): RuntimeWarningMessagePart | null {
+  const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
+  return isRuntimeWarningMessagePart(part) ? part : null
 }
 
 export function readRenderableToolPartFromState(

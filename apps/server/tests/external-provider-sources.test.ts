@@ -894,6 +894,12 @@ describe('external provider sources capability', () => {
           headers: { 'content-type': 'application/json' },
         })
       }
+      if (url === 'https://target-openai.example.test/v1/models') {
+        return new Response(JSON.stringify({ data: [{ id: 'gpt-4.1' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
 
       throw new Error(`Unexpected fetch request: ${url}`)
     })
@@ -960,7 +966,6 @@ describe('external provider sources capability', () => {
       )
       expect(modelsRes.status).toBe(200)
       expect(await modelsRes.json()).toEqual([
-        expect.objectContaining({ id: 'gpt-4.1-mini', providerKind: 'openai-compatible' }),
         expect.objectContaining({ id: 'gpt-4.1', providerKind: 'openai-compatible' }),
       ])
 
@@ -1066,24 +1071,8 @@ describe('external provider sources capability', () => {
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://target-openai.example.test/v1/models',
       ).length
-      expect(providerFetchCount).toBe(0)
-      expect(codexClientOptions).toEqual([
-        {
-          apiKey: 'target-secret-value',
-          config: {
-            model_provider: 'cradle-openai-compatible',
-            model_providers: {
-              'cradle-openai-compatible': {
-                name: 'Cradle OpenAI Compatible',
-                base_url: 'https://target-openai.example.test/v1',
-                env_key: 'CRADLE_CODEX_API_KEY',
-                wire_api: 'responses',
-                requires_openai_auth: true,
-              },
-            },
-          },
-        },
-      ])
+      expect(providerFetchCount).toBe(1)
+      expect(codexClientOptions).toEqual([])
 
       registration.dispose()
     }

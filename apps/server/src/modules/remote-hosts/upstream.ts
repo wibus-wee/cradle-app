@@ -139,22 +139,22 @@ export async function upstreamJsonByBaseUrl<T>(
 
 export function buildUpstreamRequestHeaders(headers: Headers, upstreamHost: string): Headers {
   const filtered = new Headers()
-  for (const [key, value] of headers.entries()) {
+  headers.forEach((value, key) => {
     if (UPSTREAM_REQUEST_HEADERS.has(key.toLowerCase())) {
       filtered.set(key, value)
     }
-  }
+  })
   filtered.set('host', upstreamHost)
   return filtered
 }
 
 export function filterHopByHopResponseHeaders(headers: Headers): Headers {
   const filtered = new Headers()
-  for (const [key, value] of headers.entries()) {
+  headers.forEach((value, key) => {
     if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
       filtered.set(key, value)
     }
-  }
+  })
   return filtered
 }
 
