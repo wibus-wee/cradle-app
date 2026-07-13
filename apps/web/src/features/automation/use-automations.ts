@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { createAutomation, listAutomationDefinitions, runAutomationNow, updateAutomation } from './api-client'
+import { createAutomation, listAutomationDefinitions, runAutomationNow, stopAutomationRun, updateAutomation, updateAutomationRunTriage } from './api-client'
 
 export const automationQueryKeys = {
   definitions: (workspaceId?: string | null) => workspaceId ? ['automations', 'definitions', { workspaceId }] as const : ['automations', 'definitions'] as const,
@@ -49,6 +49,32 @@ export function useRunAutomationNow() {
         queryClient.invalidateQueries({ queryKey: ['automations', 'definitions'] }),
         queryClient.invalidateQueries({ queryKey: automationQueryKeys.runs(automationId) }),
         queryClient.invalidateQueries({ queryKey: automationQueryKeys.artifacts(automationId) }),
+      ])
+    },
+  })
+}
+
+export function useStopAutomationRun() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: stopAutomationRun,
+    onSuccess: async (_run, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: automationQueryKeys.runs(input.automationId) }),
+        queryClient.invalidateQueries({ queryKey: ['automations', 'triage'] }),
+      ])
+    },
+  })
+}
+
+export function useUpdateAutomationRunTriage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateAutomationRunTriage,
+    onSuccess: async (_run, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: automationQueryKeys.runs(input.automationId) }),
+        queryClient.invalidateQueries({ queryKey: ['automations', 'triage'] }),
       ])
     },
   })

@@ -186,6 +186,23 @@ const automationRoutes = new Elysia({
     params: AutomationModel.runIdParams,
     response: { 200: AutomationModel.run },
   })
+  .post('/:id/runs/:runId/stop', ({ params }) => Automation.stopRun(params.id, params.runId), {
+    detail: {
+      'summary': 'Stop automation run',
+      'x-cradle-cli': { command: ['automation', 'run', 'stop'] },
+    },
+    params: AutomationModel.runIdParams,
+    response: { 200: AutomationModel.run },
+  })
+  .patch('/:id/runs/:runId/triage', ({ params, body }) => Automation.setTriageStatus(params.id, params.runId, body.status), {
+    detail: {
+      'summary': 'Update automation run triage state',
+      'x-cradle-cli': { command: ['automation', 'run', 'triage'] },
+    },
+    params: AutomationModel.runIdParams,
+    body: AutomationModel.triageBody,
+    response: { 200: AutomationModel.run },
+  })
   .get('/:id/runs/:runId/artifacts', ({ params }) => Automation.listArtifacts(params.id, params.runId), {
     detail: {
       'summary': 'List automation run artifacts',
@@ -210,6 +227,18 @@ const automationRoutes = new Elysia({
     params: AutomationModel.artifactIdParams,
     response: { 200: AutomationModel.artifact },
   })
+
+const automationTriageRoutes = new Elysia({
+  prefix: '/automation-triage',
+  detail: { tags: ['automation'] },
+}).get('/', ({ query }) => Automation.listTriage(query), {
+  detail: {
+    'summary': 'List automation triage inbox',
+    'x-cradle-cli': { command: ['automation', 'triage', 'list'] },
+  },
+  query: AutomationModel.triageQuery,
+  response: { 200: t.Array(AutomationModel.run) },
+})
 
 const cronRoutes = new Elysia({
   prefix: '/cron',
@@ -250,4 +279,5 @@ export const automation = new Elysia()
   .onStart(() => { AutomationPoller.start() })
   .onStop(() => { AutomationPoller.stop() })
   .use(automationRoutes)
+  .use(automationTriageRoutes)
   .use(cronRoutes)
