@@ -4554,6 +4554,12 @@ export type GetAutomationsResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4607,6 +4613,12 @@ export type PostAutomationsData = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind?: 'agent' | 'user' | 'system';
         createdById?: string | null;
@@ -4660,6 +4672,12 @@ export type PostAutomationsResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4745,6 +4763,12 @@ export type GetAutomationsByIdResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4795,6 +4819,12 @@ export type PatchAutomationsByIdData = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind?: 'agent' | 'user' | 'system';
         createdById?: string | null;
@@ -4850,6 +4880,12 @@ export type PatchAutomationsByIdResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4915,6 +4951,12 @@ export type PostAutomationsByIdEnableResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -4980,6 +5022,12 @@ export type PostAutomationsByIdDisableResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         createdByKind: 'agent' | 'user' | 'system';
         createdById: string | null;
@@ -5049,11 +5097,21 @@ export type PostAutomationsByIdRunResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         chatSessionId: string | null;
         backendRunId: string | null;
         artifactCount: number;
         errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
         scheduledFor: number | null;
         claimedAt: number | null;
         startedAt: number | null;
@@ -5119,11 +5177,21 @@ export type GetAutomationsByIdRunsResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         chatSessionId: string | null;
         backendRunId: string | null;
         artifactCount: number;
         errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
         scheduledFor: number | null;
         claimedAt: number | null;
         startedAt: number | null;
@@ -5190,11 +5258,21 @@ export type GetAutomationsByIdRunsByRunIdResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         chatSessionId: string | null;
         backendRunId: string | null;
         artifactCount: number;
         errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
         scheduledFor: number | null;
         claimedAt: number | null;
         startedAt: number | null;
@@ -5205,6 +5283,170 @@ export type GetAutomationsByIdRunsByRunIdResponses = {
 };
 
 export type GetAutomationsByIdRunsByRunIdResponse = GetAutomationsByIdRunsByRunIdResponses[keyof GetAutomationsByIdRunsByRunIdResponses];
+
+export type PostAutomationsByIdRunsByRunIdStopData = {
+    body?: never;
+    path: {
+        id: string;
+        runId: string;
+    };
+    query?: never;
+    url: '/automations/{id}/runs/{runId}/stop';
+};
+
+export type PostAutomationsByIdRunsByRunIdStopResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        automationDefinitionId: string;
+        workspaceId: string | null;
+        triggerType: 'manual' | 'scheduled';
+        occurrenceKey: string | null;
+        status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
+        triggerSnapshot: {
+            type: string;
+            rrule: string;
+            timezone: string;
+            misfirePolicy?: 'skip' | 'run_latest';
+        };
+        recipeSnapshot: {
+            kind: string;
+            prompt: string;
+            inputs: Array<{
+                type: string;
+                path: string;
+            } | {
+                type: string;
+                name: string;
+                content: string;
+            } | {
+                type: string;
+                name: string;
+                content: string;
+            } | {
+                type: string;
+                url: string;
+            }>;
+            artifactRequests: Array<{
+                kind: 'markdown' | 'text' | 'json' | 'file_ref';
+                name: string;
+                description?: string;
+            }>;
+            agentId?: string;
+            providerTargetId?: string;
+            runtimeKind?: string;
+            modelId?: string;
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
+        };
+        chatSessionId: string | null;
+        backendRunId: string | null;
+        artifactCount: number;
+        errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
+        scheduledFor: number | null;
+        claimedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostAutomationsByIdRunsByRunIdStopResponse = PostAutomationsByIdRunsByRunIdStopResponses[keyof PostAutomationsByIdRunsByRunIdStopResponses];
+
+export type PatchAutomationsByIdRunsByRunIdTriageData = {
+    body: {
+        status: 'unread' | 'read' | 'resolved' | 'archived';
+    };
+    path: {
+        id: string;
+        runId: string;
+    };
+    query?: never;
+    url: '/automations/{id}/runs/{runId}/triage';
+};
+
+export type PatchAutomationsByIdRunsByRunIdTriageResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        automationDefinitionId: string;
+        workspaceId: string | null;
+        triggerType: 'manual' | 'scheduled';
+        occurrenceKey: string | null;
+        status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
+        triggerSnapshot: {
+            type: string;
+            rrule: string;
+            timezone: string;
+            misfirePolicy?: 'skip' | 'run_latest';
+        };
+        recipeSnapshot: {
+            kind: string;
+            prompt: string;
+            inputs: Array<{
+                type: string;
+                path: string;
+            } | {
+                type: string;
+                name: string;
+                content: string;
+            } | {
+                type: string;
+                name: string;
+                content: string;
+            } | {
+                type: string;
+                url: string;
+            }>;
+            artifactRequests: Array<{
+                kind: 'markdown' | 'text' | 'json' | 'file_ref';
+                name: string;
+                description?: string;
+            }>;
+            agentId?: string;
+            providerTargetId?: string;
+            runtimeKind?: string;
+            modelId?: string;
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
+        };
+        chatSessionId: string | null;
+        backendRunId: string | null;
+        artifactCount: number;
+        errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
+        scheduledFor: number | null;
+        claimedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchAutomationsByIdRunsByRunIdTriageResponse = PatchAutomationsByIdRunsByRunIdTriageResponses[keyof PatchAutomationsByIdRunsByRunIdTriageResponses];
 
 export type GetAutomationsByIdRunsByRunIdArtifactsData = {
     body?: never;
@@ -5300,6 +5542,87 @@ export type GetAutomationsByIdArtifactsByArtifactIdResponses = {
 };
 
 export type GetAutomationsByIdArtifactsByArtifactIdResponse = GetAutomationsByIdArtifactsByArtifactIdResponses[keyof GetAutomationsByIdArtifactsByArtifactIdResponses];
+
+export type GetAutomationTriageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        status?: 'unread' | 'read' | 'resolved' | 'archived' | 'all';
+    };
+    url: '/automation-triage/';
+};
+
+export type GetAutomationTriageResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        automationDefinitionId: string;
+        workspaceId: string | null;
+        triggerType: 'manual' | 'scheduled';
+        occurrenceKey: string | null;
+        status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
+        triggerSnapshot: {
+            type: string;
+            rrule: string;
+            timezone: string;
+            misfirePolicy?: 'skip' | 'run_latest';
+        };
+        recipeSnapshot: {
+            kind: string;
+            prompt: string;
+            inputs: Array<{
+                type: string;
+                path: string;
+            } | {
+                type: string;
+                name: string;
+                content: string;
+            } | {
+                type: string;
+                name: string;
+                content: string;
+            } | {
+                type: string;
+                url: string;
+            }>;
+            artifactRequests: Array<{
+                kind: 'markdown' | 'text' | 'json' | 'file_ref';
+                name: string;
+                description?: string;
+            }>;
+            agentId?: string;
+            providerTargetId?: string;
+            runtimeKind?: string;
+            modelId?: string;
+            thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
+        };
+        chatSessionId: string | null;
+        backendRunId: string | null;
+        artifactCount: number;
+        errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
+        scheduledFor: number | null;
+        claimedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetAutomationTriageResponse = GetAutomationTriageResponses[keyof GetAutomationTriageResponses];
 
 export type GetCronJobsData = {
     body?: never;
@@ -5432,11 +5755,21 @@ export type GetCronRunsResponses = {
             runtimeKind?: string;
             modelId?: string;
             thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            sessionPolicy?: 'new' | 'heartbeat';
+            isolationPolicy?: 'workspace' | 'worktree_per_run';
+            completionPolicy?: {
+                stopWhen?: string;
+                noFindingsBehavior?: 'archive' | 'triage';
+            };
         };
         chatSessionId: string | null;
         backendRunId: string | null;
         artifactCount: number;
         errorText: string | null;
+        resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+        resultSummary: string | null;
+        triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+        triagedAt: number | null;
         scheduledFor: number | null;
         claimedAt: number | null;
         startedAt: number | null;
@@ -5536,6 +5869,151 @@ export type GetAssetsByIdContentData = {
     query?: never;
     url: '/assets/{id}/content';
 };
+
+export type GetBackgroundJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        ownerNamespace?: string;
+        ownerResourceType?: string;
+        ownerResourceId?: string;
+        ownerResourceKey?: string;
+        kind?: string;
+        status?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        limit?: number;
+    };
+    url: '/background-jobs/';
+};
+
+export type GetBackgroundJobsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetBackgroundJobsResponse = GetBackgroundJobsResponses[keyof GetBackgroundJobsResponses];
+
+export type GetBackgroundJobsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/background-jobs/{id}';
+};
+
+export type GetBackgroundJobsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type GetBackgroundJobsByIdResponse = GetBackgroundJobsByIdResponses[keyof GetBackgroundJobsByIdResponses];
+
+export type PostBackgroundJobsByIdCancelData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/background-jobs/{id}/cancel';
+};
+
+export type PostBackgroundJobsByIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostBackgroundJobsByIdCancelResponse = PostBackgroundJobsByIdCancelResponses[keyof PostBackgroundJobsByIdCancelResponses];
 
 export type GetSessionsData = {
     body?: never;

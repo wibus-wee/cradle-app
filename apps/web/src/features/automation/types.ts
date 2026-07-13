@@ -33,6 +33,12 @@ export interface AutomationRecipe {
   runtimeKind?: RuntimeKind | null
   modelId?: string | null
   thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
+  sessionPolicy?: 'new' | 'heartbeat'
+  isolationPolicy?: 'workspace' | 'worktree_per_run'
+  completionPolicy?: {
+    stopWhen?: 'agent_complete'
+    noFindingsBehavior?: 'archive' | 'triage'
+  }
 }
 
 export interface AutomationDefinition {
@@ -54,6 +60,7 @@ export interface AutomationDefinition {
 
 export interface AutomationRun {
   id: string
+  automationDefinitionId: string
   automationId?: string
   definitionId?: string
   workspaceId?: string | null
@@ -67,6 +74,10 @@ export interface AutomationRun {
   createdAt?: number | string | null
   chatSessionId?: string | null
   backendRunId?: string | null
+  resultKind?: 'findings' | 'no_findings' | 'stopped' | 'error' | null
+  resultSummary?: string | null
+  triageStatus?: 'unread' | 'read' | 'resolved' | 'archived' | null
+  triagedAt?: number | string | null
 }
 
 export interface AutomationArtifact {
@@ -103,6 +114,9 @@ export interface CreateAutomationInput {
     runtimeKind?: RuntimeKind
     modelId?: string
     thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+    sessionPolicy?: 'new' | 'heartbeat'
+    isolationPolicy?: 'workspace' | 'worktree_per_run'
+    completionPolicy?: AutomationRecipe['completionPolicy']
   }
   createdByKind?: 'agent' | 'user' | 'system'
   createdById?: string | null
