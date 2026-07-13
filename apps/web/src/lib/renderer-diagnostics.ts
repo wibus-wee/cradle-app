@@ -47,7 +47,7 @@ function readDocumentMetrics(): Record<string, number> {
 function readBrowserPanelDiagnostics(): Record<string, unknown> {
   const layoutState = useLayoutStore.getState()
   const browserPanelState = useBrowserPanelStore.getState()
-  const activeOwnerId = layoutState.activeBrowserPanelOwnerId
+  const activeOwnerId = browserPanelState.activeOwnerId
   const ownerState = browserPanelState.owners[activeOwnerId] ?? null
 
   const browserPanelTabs = Array.from(
@@ -72,17 +72,16 @@ function readBrowserPanelDiagnostics(): Record<string, unknown> {
     layout: {
       asideOpen: layoutState.asideOpen,
       asideActiveTab: layoutState.asideActiveTab,
-      activeBrowserPanelOwnerId: layoutState.activeBrowserPanelOwnerId,
-      browserPanelOpen: layoutState.browserPanelOpen,
-      browserPanelOpenByOwnerId: layoutState.browserPanelOpenByOwnerId,
     },
     browserPanelStore: {
       activeOwnerId: browserPanelState.activeOwnerId,
+      open: browserPanelState.open,
       topLevelActiveTabId: browserPanelState.activeTabId,
       topLevelTabs: browserPanelState.tabs.map(tab => ({ id: tab.id, kind: tab.kind })),
       owner: ownerState
         ? {
             activeTabId: ownerState.activeTabId,
+            open: ownerState.open,
             tabs: ownerState.tabs.map(tab => ({ id: tab.id, kind: tab.kind, title: tab.title })),
             requestedTab: ownerState.requestedTab,
             annotationCount: ownerState.annotations.length,

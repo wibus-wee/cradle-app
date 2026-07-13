@@ -38,7 +38,6 @@ import { cn } from '~/lib/cn'
 import { isElectron, nativeIpc, platform } from '~/lib/electron'
 import { openWorkspaceDiffs } from '~/navigation/navigation-commands'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import type { ChangeSection } from './changes-grouping'
 import { groupGitFileStatuses } from './changes-grouping'
@@ -64,7 +63,6 @@ export function ChangesPanel({ workspaceId, workspacePath, sessionId }: ChangesP
   const changedFileCount = gitRepositories.reduce((total, repository) => total + repository.files.length, 0)
   const openWorkspaceDiffTab = useBrowserPanelStore(state => state.openWorkspaceDiffTab)
   const requestScrollToFilePath = useBrowserPanelStore(state => state.requestScrollToFilePath)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
   const handleReviewRepository = (repository: GitRepository) => {
     if (!workspaceId) {
       return
@@ -81,7 +79,6 @@ export function ChangesPanel({ workspaceId, workspacePath, sessionId }: ChangesP
       repositoryPath: getWorkspaceDiffRepositoryPath(repository.path, gitRepositories.length),
       title: 'All Changes',
     })
-    setBrowserPanelOpen(true)
     requestScrollToFilePath({ path, tabId })
   }
 
@@ -389,7 +386,6 @@ function ChangesTreeView({
   } | null>(null)
   const copyPathChordActiveRef = useRef(false)
   const openWorkspaceFileTab = useBrowserPanelStore(state => state.openWorkspaceFileTab)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
   const paths = files.map(file => file.path)
   const workspacePathByRepoPath = new Map(files.map(file => [file.path, file.workspacePath]))
   const filePathSet = new Set(paths)
@@ -500,7 +496,6 @@ function ChangesTreeView({
     }
     const relativePath = resolveWorkspaceRelativePath(path)
     openWorkspaceFileTab({ workspaceId, path: relativePath, view: getWorkspaceFileDefaultView(relativePath) })
-    setBrowserPanelOpen(true)
   }
   const openInDefaultApplication = async (path: string) => {
     if (!workspacePath || !isElectron || !nativeIpc) {

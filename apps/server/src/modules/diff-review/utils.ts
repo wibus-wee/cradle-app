@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 
+import { jsonrepair } from 'jsonrepair'
+
 export function safeJsonParse(value: string | null | undefined): unknown | null {
   if (!value) {
     return null
@@ -8,7 +10,14 @@ export function safeJsonParse(value: string | null | undefined): unknown | null 
     return JSON.parse(value) as unknown
   }
   catch {
-    return null
+    // LLM artifacts (commit plans, guides) often ship trailing commas / soft quotes.
+    // Prefer strict parse first so trusted stored JSON never goes through repair.
+    try {
+      return JSON.parse(jsonrepair(value)) as unknown
+    }
+    catch {
+      return null
+    }
   }
 }
 

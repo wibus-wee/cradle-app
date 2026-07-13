@@ -6,7 +6,7 @@
 
 - `index.ts`：main process 入口；负责安装 main-process error capture，再加载实际 Desktop app bootstrap。
 - `main-app.ts`：负责激活 desktop plugins、启动 server、创建主窗口、接入 update manager、创建 desktop-owned chat stream broker、注册 desktop app badge IPC、注册 `cradle://` protocol，并把 native BrowserPanel `WebContentsView` runtime 事件投影给 plugin loader。
-- `browser-manager.ts`：拥有 native BrowserPanel runtime；按 BrowserPanel owner 管理 retained `WebContentsView` tab、owner-scoped Electron session partition、显式 close/crash/dispose 销毁、截图、CDP 执行、popup 新 tab 路由和 panel bounds attachment。
+- `browser-manager.ts`：拥有 BrowserPanel 双运行时；默认接管 renderer `<webview>` 的 guest `WebContents`，并保留 native `WebContentsView` fallback，按 BrowserPanel owner 管理短期 warm inactive tab、隐藏面板 grace-period suspend/restore、owner-scoped Electron session partition、显式 close/crash/dispose 销毁、截图、CDP 执行、popup 新 tab 路由和 panel bounds attachment。
 - `browser-ipc.ts`：注册 native BrowserPanel IPC contract；renderer 通过 preload 调用 open/close/hide/bounds/navigation/tab/screenshot/CDP 方法，main process 推送 browser state snapshots。
 - `chat-stream-broker.ts`：拥有 Electron main process 的 long-lived chat stream transport；main process 对 server SSE 保持每个 chat session 一个上游 stream，并通过 renderer IPC events fan out 已接受的 AI SDK chunk frames；response start request 透传 Cradle-owned `runtimeSettings`，late subscriber 只接收有界 replay tail，避免 Desktop bridge 为长流缓存完整 chunk 历史。
 - `chat-stream-broker.test.ts`：覆盖 desktop chat stream broker 的单上游 fanout、有界 replay tail、delta replay coalescing、per-WebContents subscriber lifecycle cleanup、passive stream final unsubscribe abort，以及 response stream sender unsubscribe retention。

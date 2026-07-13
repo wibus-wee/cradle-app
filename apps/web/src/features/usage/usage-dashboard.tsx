@@ -35,7 +35,7 @@ export function UsageDashboard() {
       data-usage-ready={usageReady ? 'true' : 'false'}
     >
       <div className="relative mx-auto max-w-5xl px-8 py-10">
-        {/* Soft ambient glow behind the header/hero region — the one deliberate
+        {/* Soft ambient glow behind the header/hero region - the one deliberate
             spot of "texture" on an otherwise flat, functional page. */}
         <div
           aria-hidden="true"
@@ -68,13 +68,13 @@ export function UsageDashboard() {
           )}
         </div>
 
-        {/* Loading skeleton — first paint only, before any cached data exists */}
+        {/* Loading skeleton - first paint only, before any cached data exists */}
         {!usageReady && !hasData && <UsageDashboardSkeleton />}
 
         {/* Main dashboard body. Deliberately mixed: the opening KPI/trend zone
             stays card-less (big numbers and a floating chart carry it), then
             a hairline marks the switch into the denser, boxed "widgets" below
-            — one visual language for the whole page would read as flat. */}
+            - one visual language for the whole page would read as flat. */}
         {usageReady && hasData && summary && stats && (
           <div className="mt-10">
             <UsageHeroCards
@@ -179,11 +179,11 @@ function UsageDashboardSkeleton() {
   )
 }
 
-// Secondary detail row — a quiet "meta stats" strip beneath the flashier
+// Secondary detail row - a quiet "meta stats" strip beneath the flashier
 // headline numbers above. Card-less like the rest of the hero zone, just
 // hairline-topped to read as "supporting detail" for what's above rather
 // than a new section. Deliberately neutral/monochrome (color already lives
-// in the hero numbers and charts — Von Restorff: if everything is colorful,
+// in the hero numbers and charts - Von Restorff: if everything is colorful,
 // nothing stands out).
 function SecondaryStats({ summary, stats }: { summary: UsageSummary, stats: UsageStats }) {
   const { t } = useTranslation('usage')

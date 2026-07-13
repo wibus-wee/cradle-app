@@ -1,9 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
 import type { UIMessageChunk } from 'ai'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 
-import { getChatSessionsBySessionIdMessagesQueryKey, getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
+import {
+  getChatSessionsBySessionIdMessagesQueryKey,
+  getSessionsByIdQueryKey,
+} from '~/api-gen/@tanstack/react-query.gen'
 import { postSessionsByIdRead } from '~/api-gen/sdk.gen'
 import { runtimeUiSlotStatesQueryKey } from '~/features/chat/capabilities/chat-capabilities'
 import { runtimeSettingsQueryKey } from '~/features/chat/commands/runtime-settings-command'
@@ -11,14 +14,20 @@ import { runtimeSessionStatusQueryKey } from '~/features/chat/runtime/use-runtim
 import { onAnyChatRunEvent, onChatRunSettled } from '~/features/chat/transport/sse-chat-transport'
 import { useGlobalSessionEventSync } from '~/features/workspace/use-global-session-event-sync'
 import { isSessionsQueryKey, updateSessionReadState } from '~/features/workspace/use-session'
+import { useShortcut } from '~/hooks/use-shortcut'
 import { isElectron, isTearoffWindow, nativeIpc, platform } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
-import { activateAdjacentSurface, closeActiveSurface, openNewChat } from '~/navigation/navigation-commands'
+import {
+  activateAdjacentSurface,
+  closeActiveSurface,
+  openNewChat,
+} from '~/navigation/navigation-commands'
 import { chatSessionIdForSurface } from '~/navigation/surface-identity'
 import {
   BROWSER_PANEL_WEBVIEW_TAB_SHORTCUT_CHANNEL,
   handleBrowserPanelTabShortcut,
   handleBrowserPanelTabShortcutPayload,
+  useBrowserPanelStore,
 } from '~/store/browser-panel'
 import { useLayoutStore } from '~/store/layout'
 import { useSessionActivityStore } from '~/store/session-activity'
@@ -41,20 +50,11 @@ function isClaudeEnterPlanModeChunk(chunk: UIMessageChunk): boolean {
   return chunk.type === 'tool-input-start' && chunk.toolName === 'EnterPlanMode'
 }
 
-function isOpenExternalTerminalShortcut(event: KeyboardEvent): boolean {
-  const isKeyC = event.key === 'c' || event.key === 'C' || event.code === 'KeyC'
-  if (!isKeyC || !event.shiftKey || event.altKey) {
-    return false
-  }
-  if (platform === 'darwin') {
-    return event.metaKey && !event.ctrlKey
-  }
-  return event.ctrlKey && !event.metaKey
-}
-
-export function useGlobalEventListeners(options: {
-  workspacePath?: string | null
-} = {}) {
+export function useGlobalEventListeners(
+  options: {
+    workspacePath?: string | null
+  } = {},
+) {
   const queryClient = useQueryClient()
   useGlobalSessionEventSync(queryClient)
   const toggleBottomPanel = useLayoutStore(s => s.toggleBottomPanel)
@@ -62,84 +62,76 @@ export function useGlobalEventListeners(options: {
   const visibleSessionId = chatSessionIdForSurface(useActiveSurface())
   const workspacePath = options.workspacePath
 
+  useShortcut('layout.toggle-bottom-panel', { ctrl: true, key: '`' }, toggleBottomPanel)
+  useShortcut('layout.toggle-aside', { meta: true, alt: true, key: 'b' }, toggleAside)
+  useShortcut(
+    'terminal.open-external',
+    {
+      ...(platform === 'darwin' ? { meta: true } : { ctrl: true }),
+      shift: true,
+      key: 'c',
+    },
+    useCallback(() => {
+      if (!isElectron || !nativeIpc || !workspacePath) {
+        return
+      }
+      void nativeIpc.native.openPathInTerminal(workspacePath).catch((error) => {
+        console.error('Failed to open external terminal', error)
+      })
+    }, [workspacePath]),
+    Boolean(workspacePath),
+  )
+  useShortcut(
+    'surface.close',
+    { meta: true, key: 'w' },
+    useCallback(() => {
+      if (isTearoffWindow) {
+        void nativeIpc?.window.close().catch(() => {})
+        return
+      }
+      closeActiveSurface()
+    }, []),
+  )
+  useShortcut('chat.new', { meta: true, key: 't' }, openNewChat, !isTearoffWindow)
+  useShortcut(
+    'surface.next',
+    { ctrl: true, key: 'Tab' },
+    () => activateAdjacentSurface(1),
+    !isTearoffWindow,
+  )
+  useShortcut(
+    'surface.previous',
+    { ctrl: true, shift: true, key: 'Tab' },
+    () => activateAdjacentSurface(-1),
+    !isTearoffWindow,
+  )
+
   // Panel + tab keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const isBackquote = e.key === '`' || e.code === 'Backquote'
-      const isKeyB = e.key === 'b' || e.key === 'B' || e.key === '∫' || e.code === 'KeyB'
-
-      // Ctrl+` → toggle bottom panel
-      if (e.ctrlKey && !e.metaKey && !e.altKey && isBackquote) {
-        e.preventDefault()
-        toggleBottomPanel()
-        return
-      }
-      // Cmd+Option+B → toggle right aside (e.key is '∫' on macOS when Option is held)
-      if (e.metaKey && e.altKey && !e.ctrlKey && isKeyB) {
-        e.preventDefault()
-        toggleAside()
-        return
-      }
-      // Cmd+Shift+C on macOS, Ctrl+Shift+C elsewhere -> open external terminal.
-      if (isElectron && nativeIpc && workspacePath && isOpenExternalTerminalShortcut(e)) {
-        e.preventDefault()
-        void nativeIpc.native.openPathInTerminal(workspacePath).catch((error) => {
-          console.error('Failed to open external terminal', error)
-        })
-        return
-      }
-
       // ── Tab shortcuts ──────────────────────────────────────────────
-      const layoutState = useLayoutStore.getState()
-      if (handleBrowserPanelTabShortcut(e, {
-        panelOpen: layoutState.browserPanelOpen,
-        ownerId: layoutState.activeBrowserPanelOwnerId,
-        onCloseLastTab: ownerId => useLayoutStore.getState().setBrowserPanelOpen(false, ownerId),
-      })) {
-        return
-      }
-
-      // Cmd+W -> close active surface
-      if (e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey && e.key === 'w') {
-        e.preventDefault()
-        if (isTearoffWindow) {
-          void nativeIpc?.window.close().catch(() => {})
-          return
-        }
-        closeActiveSurface()
-        return
-      }
-
-      if (isTearoffWindow) {
-        return
-      }
-
-      // Cmd+T -> new chat surface
-      if (e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey && e.key === 't') {
-        e.preventDefault()
-        openNewChat()
-        return
-      }
-
-      // Ctrl+Tab / Ctrl+Shift+Tab -> cycle surfaces
-      if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Tab') {
-        e.preventDefault()
-        activateAdjacentSurface(e.shiftKey ? -1 : 1)
-      }
+      const browserPanelState = useBrowserPanelStore.getState()
+      handleBrowserPanelTabShortcut(e, {
+        panelOpen: browserPanelState.open,
+        ownerId: browserPanelState.activeOwnerId,
+        onCloseLastTab: ownerId => useBrowserPanelStore.getState().setDockOpen(false, ownerId),
+      })
     }
     window.addEventListener('keydown', handleKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
-  }, [toggleBottomPanel, toggleAside, workspacePath])
+  }, [])
 
   useEffect(() => {
-    return window.cradle?.ipc.on(BROWSER_PANEL_WEBVIEW_TAB_SHORTCUT_CHANNEL, (payload) => {
-      const layoutState = useLayoutStore.getState()
-      handleBrowserPanelTabShortcutPayload(payload, {
-        panelOpen: layoutState.browserPanelOpen,
-        ownerId: layoutState.activeBrowserPanelOwnerId,
-        onCloseLastTab: ownerId => useLayoutStore.getState().setBrowserPanelOpen(false, ownerId),
-      })
-    }) ?? (() => {})
+    return (
+      window.cradle?.ipc.on(BROWSER_PANEL_WEBVIEW_TAB_SHORTCUT_CHANNEL, (payload) => {
+        const browserPanelState = useBrowserPanelStore.getState()
+        handleBrowserPanelTabShortcutPayload(payload, {
+          panelOpen: browserPanelState.open,
+          ownerId: browserPanelState.activeOwnerId,
+          onCloseLastTab: ownerId => useBrowserPanelStore.getState().setDockOpen(false, ownerId),
+        })
+      }) ?? (() => {})
+    )
   }, [])
 
   useEffect(() => {
@@ -180,7 +172,9 @@ export function useGlobalEventListeners(options: {
       }
       if (isClaudeEnterPlanModeChunk(chunk)) {
         void queryClient.invalidateQueries({ queryKey: runtimeSettingsQueryKey(chatSessionId) })
-        void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(chatSessionId) })
+        void queryClient.invalidateQueries({
+          queryKey: runtimeSessionStatusQueryKey(chatSessionId),
+        })
       }
     })
   }, [queryClient])

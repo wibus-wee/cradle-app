@@ -17,7 +17,6 @@ import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { openChatSession, openKanbanBoard, openSettingsSection, openWorkspaceDetail } from '~/navigation/navigation-commands'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { formatIssueId } from '../shared/format-issue-id'
@@ -171,7 +170,6 @@ function getFirstBoardForWorkspace(
 
 export function IssueDescription({ issue, onUpdate, readOnly = false }: IssueDescriptionProps) {
   const openWorkspaceFileTab = useBrowserPanelStore(state => state.openWorkspaceFileTab)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
   const { workspaces } = useWorkspaces()
   const { agents } = useAgents()
   const { sessions } = useWorkspaceSessions(issue.workspaceId)
@@ -384,7 +382,6 @@ export function IssueDescription({ issue, onUpdate, readOnly = false }: IssueDes
         path: attrs.id,
         view: 'preview',
       })
-      setBrowserPanelOpen(true)
       return
     }
 

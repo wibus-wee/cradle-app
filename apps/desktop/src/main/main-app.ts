@@ -179,7 +179,7 @@ async function createMainWindow(serverUrl: string): Promise<BrowserWindow> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webviewTag: false,
+      webviewTag: true,
       additionalArguments: [
         `--server-url=${serverUrl}`,
         `--server-auth-token=${getDesktopServerAuthToken()}`,

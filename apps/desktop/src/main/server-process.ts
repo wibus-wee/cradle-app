@@ -259,7 +259,7 @@ async function spawnServer(opts: {
     CRADLE_DATA_DIR: dataDir,
     CRADLE_VERSION: app.getVersion(),
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
-    CRADLE_AUTH_TOKEN: serverAuthToken,
+    // CRADLE_AUTH_TOKEN: serverAuthToken,
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,

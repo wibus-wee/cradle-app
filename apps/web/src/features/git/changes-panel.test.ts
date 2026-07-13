@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GitFileStatus } from '~/features/git/types'
 import { DEFAULT_BROWSER_PANEL_OWNER_ID, useBrowserPanelStore } from '~/store/browser-panel'
-import { DEFAULT_LAYOUT_BROWSER_PANEL_OWNER_ID, useLayoutStore } from '~/store/layout'
 
 import { groupGitFileStatuses } from './changes-grouping'
 import { ChangesPanel } from './changes-panel'
@@ -67,15 +66,11 @@ beforeEach(() => {
   useBrowserPanelStore.setState({
     activeOwnerId: DEFAULT_BROWSER_PANEL_OWNER_ID,
     owners: {},
+    open: false,
     tabs: [],
     activeTabId: null,
     requestedTab: null,
     scrollToFilePath: null,
-  })
-  useLayoutStore.setState({
-    activeBrowserPanelOwnerId: DEFAULT_LAYOUT_BROWSER_PANEL_OWNER_ID,
-    browserPanelOpen: false,
-    browserPanelOpenByOwnerId: {},
   })
   gitQueryMocks.useGitRepositories.mockReturnValue({
     data: [createGitRepository([{ path: 'src/app.tsx', workspacePath: 'src/app.tsx', status: 'modified' }])],
@@ -180,8 +175,7 @@ describe('changesPanel type interactions', () => {
       path: 'src/feature.ts',
       tabId: state.tabs[0]?.id,
     })
-    expect(useLayoutStore.getState().browserPanelOpen).toBe(true)
-    expect(useLayoutStore.getState().browserPanelOpenByOwnerId[DEFAULT_LAYOUT_BROWSER_PANEL_OWNER_ID]).toBe(true)
+    expect(state.open).toBe(true)
   })
 })
 

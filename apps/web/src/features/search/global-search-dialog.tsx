@@ -12,7 +12,6 @@ import {
 import { DelayedSpinner } from '~/components/ui/spinner'
 import { openChatSession, openKanbanBoard, openWorkspaceDetail } from '~/navigation/navigation-commands'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import { selectFileSearchResult } from './global-search-actions'
 import { PALETTE_MODES, parseInitialQuery, PLACEHOLDER_KEY, PREFIX_TO_MODE } from './palette/modes'
@@ -58,7 +57,6 @@ const GlobalSearchDialogContent = ({
   const { t } = useTranslation('search')
   const close = useCallback(() => onOpenChange(false), [onOpenChange])
   const openWorkspaceFile = useBrowserPanelStore(s => s.openWorkspaceFileTab)
-  const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
   const [{ mode: initialMode, query: initialQueryText }] = useState(() => parseInitialQuery(initialQuery))
   const [query, setQuery] = useState(initialQueryText)
   const [mode, setMode] = useState<PaletteModeId>(initialMode)
@@ -102,9 +100,8 @@ const GlobalSearchDialogContent = ({
       filePath,
       close,
       openWorkspaceFile,
-      setBrowserPanelOpen,
     })
-  }, [data.fileWorkspaceId, close, openWorkspaceFile, setBrowserPanelOpen])
+  }, [data.fileWorkspaceId, close, openWorkspaceFile])
 
   const handleSelectThread = useCallback((sessionId: string) => {
     close()

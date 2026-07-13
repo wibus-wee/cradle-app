@@ -64,6 +64,10 @@ interface Window {
       unsyncSource: (pluginName: string) => Promise<unknown>
     }
     browser?: {
+      getWebviewConfig: (input: { threadId: string }) => {
+        partition: string
+        preloadUrl: string
+      }
       open: (input: {
         threadId: string
         initialUrl?: string
@@ -77,9 +81,19 @@ interface Window {
       }) => Promise<import('~/store/browser-panel').ThreadBrowserState>
       setBounds: (input: {
         threadId: string
-        surface?: 'native'
+        surface?: 'native' | 'renderer'
         bounds: { x: number, y: number, width: number, height: number } | null
       }) => void
+      attachWebview: (input: {
+        threadId: string
+        tabId: string
+        webContentsId: number
+      }) => Promise<import('~/store/browser-panel').ThreadBrowserState>
+      detachWebview: (input: {
+        threadId: string
+        tabId: string
+        webContentsId: number
+      }) => Promise<void>
       captureScreenshot: (input: { threadId: string, tabId?: string }) => Promise<{
         name: string
         mimeType: 'image/png'
