@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process'
-import { createInterface } from 'node:readline'
-import type { Readable, Writable } from 'node:stream'
+import type { Writable } from 'node:stream'
 
 import { jsonrepair } from 'jsonrepair'
 
@@ -8,6 +7,7 @@ import type { ManagedChildProcess } from '../../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../../infra/managed-process'
 import type { ClientInfo } from '../app-server-protocol/ClientInfo'
 import { syncCodexAppServerLogInsertBlockerFromFeatureFlag } from './log-insert-blocker'
+import { looksLikeJsonNdjsonLine, NdjsonLineSplitter } from './ndjson-lines'
 import { prepareCodexAppServerHome } from './runtime-home'
 import { isCodexAppServerInteractiveServerRequest } from './server-request-methods'
 
@@ -127,8 +127,11 @@ export class CodexAppServerClient {
     this.child.once('exit', (code, signal) => this.terminate(this.createExitError(code, signal)))
     this.child.once('close', (code, signal) => this.terminate(this.createExitError(code, signal)))
 
-    const lines = createInterface({ input: childStdout as Readable, crlfDelay: Infinity })
-    lines.on('line', line => this.handleLine(line))
+    // Frame on LF only — Node readline also splits on U+2028/U+2029 and will
+    // shred valid NDJSON that embeds those characters inside JSON strings.
+    const lines = new NdjsonLineSplitter(line => this.handleLine(line))
+    childStdout.on('data', (chunk: Buffer) => lines.push(chunk))
+    childStdout.on('end', () => lines.flush())
   }
 
   async initialize(): Promise<void> {
@@ -226,6 +229,11 @@ export class CodexAppServerClient {
 
   private handleLine(line: string): void {
     if (this.closed || !line.trim()) {
+      return
+    }
+    // Plaintext on the NDJSON pipe (logs, catalog fragments, etc.) must not
+    // go through jsonrepair — repair can invent plausible but wrong messages.
+    if (!looksLikeJsonNdjsonLine(line)) {
       return
     }
     let message: CodexAppServerMessage

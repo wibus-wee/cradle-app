@@ -1,5 +1,7 @@
 import type { UIMessageChunk } from 'ai'
 
+import type { RuntimeWarningPartData } from '../../chat-runtime/runtime-provider-types'
+
 type TextStartChunk = Extract<UIMessageChunk, { type: 'text-start' }>
 type TextDeltaChunk = Extract<UIMessageChunk, { type: 'text-delta' }>
 type TextEndChunk = Extract<UIMessageChunk, { type: 'text-end' }>
@@ -109,6 +111,10 @@ function file({
   return { type: 'file', mediaType, url }
 }
 
+function runtimeWarning(data: RuntimeWarningPartData): UIMessageChunk {
+  return { type: 'data-runtime-warning', data }
+}
+
 export const providerChunk = {
   file,
   finish,
@@ -116,6 +122,7 @@ export const providerChunk = {
   reasoningDelta,
   reasoningEnd,
   reasoningStart,
+  runtimeWarning,
   textBlock,
   textDelta,
   textEnd,
