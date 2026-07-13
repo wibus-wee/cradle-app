@@ -77,7 +77,10 @@ describe('notificationCenterManager', () => {
 
     await manager.poll()
 
-    expect(fetchFn).toHaveBeenCalledWith(new URL('http://127.0.0.1:21423/chat/runs/completed?since=0&limit=50'))
+    expect(fetchFn).toHaveBeenCalledWith(
+      new URL('http://127.0.0.1:21423/chat/runs/completed?since=0&limit=50'),
+      { headers: {} },
+    )
     expect(notifications).toHaveLength(1)
     expect(notifications[0]?.options).toMatchObject({
       title: 'Fix the build',
@@ -189,7 +192,10 @@ describe('notificationCenterManager', () => {
 
     await manager.poll()
 
-    expect(fetchFn).toHaveBeenCalledWith(new URL('http://127.0.0.1:21423/desktop/user-input-requests'))
+    expect(fetchFn).toHaveBeenCalledWith(
+      new URL('http://127.0.0.1:21423/desktop/user-input-requests'),
+      { headers: {} },
+    )
     expect(notifications).toHaveLength(1)
     expect(notifications[0]?.options).toMatchObject({
       title: 'Choose scope',

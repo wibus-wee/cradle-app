@@ -2235,6 +2235,8 @@ describe('codexProvider app-server integration', () => {
       promptTokens: 3_000,
       completionTokens: 1_000,
       totalTokens: 4_000,
+      cachedInputTokens: 1_000,
+      reasoningOutputTokens: 250,
     })
     expect(provider.lastModelId).toBe('gpt-5-codex')
 
@@ -3504,7 +3506,13 @@ describe('codexProvider app-server integration', () => {
 
       await expect(firstChunkPromise).resolves.toEqual({
         done: false,
-        value: { type: 'text-start', id: 'quick-answer' },
+        value: {
+          type: 'data-runtime-warning',
+          data: {
+            message: 'Reconnecting... 1/5',
+            additionalDetails: 'stream disconnected before completion: stream closed before response.completed',
+          },
+        },
       })
 
       client.pushNotification({
@@ -3521,6 +3529,7 @@ describe('codexProvider app-server integration', () => {
       }
 
       expect(chunks).toEqual([
+        { type: 'text-start', id: 'quick-answer' },
         { type: 'text-delta', id: 'quick-answer', delta: 'Recovered' },
         { type: 'text-end', id: 'quick-answer' },
       ])
@@ -5564,7 +5573,13 @@ describe('codexProvider app-server integration', () => {
 
     await expect(firstChunkPromise).resolves.toEqual({
       done: false,
-      value: { type: 'text-start', id: 'assistant-message-1' },
+      value: {
+        type: 'data-runtime-warning',
+        data: {
+          message: 'Reconnecting... 1/5',
+          additionalDetails: 'stream disconnected before completion',
+        },
+      },
     })
 
     client.pushNotification({
@@ -5581,6 +5596,7 @@ describe('codexProvider app-server integration', () => {
     }
 
     expect(chunks).toEqual([
+      { type: 'text-start', id: 'assistant-message-1' },
       { type: 'text-delta', id: 'assistant-message-1', delta: 'Recovered' },
       { type: 'text-end', id: 'assistant-message-1' },
     ])
@@ -5663,10 +5679,10 @@ describe('codexProvider app-server integration', () => {
       code: 'TURN_STREAM_FAILED',
       message: 'Codex app-server retry limit exceeded',
       data: {
-        details: 'status: 429 Too Many Requests; request id: fe7e7cae-a49f-4bd9-b493-6bf74c121526; retryable errors observed before failure: 2; events: 3 total, 0 mapped; event types: error:3',
+        details: 'status: 429 Too Many Requests; request id: fe7e7cae-a49f-4bd9-b493-6bf74c121526; retryable errors observed before failure: 2; events: 3 total, 2 mapped; event types: error:3',
         diagnostics: {
           totalEvents: 3,
-          mappedEvents: 0,
+          mappedEvents: 2,
           retryableErrorEvents: 2,
           eventTypeCounts: { error: 3 },
         },

@@ -10,6 +10,47 @@ import {
 } from './event-to-chunk-mapper'
 
 describe('mapCodexAppServerNotificationToChunks', () => {
+  it('inserts retryable errors between streamed text segments as warnings', () => {
+    const state = createCodexAppServerMapperState('text-1')
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method: 'item/agentMessage/delta',
+      params: { itemId: 'text-1', delta: 'Before' },
+    }, state)).toEqual([
+      { type: 'text-start', id: 'text-1' },
+      { type: 'text-delta', id: 'text-1', delta: 'Before' },
+    ])
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method: 'error',
+      params: {
+        error: {
+          message: 'Reconnecting... 2/5',
+          additionalDetails: 'request timed out',
+          codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: null } },
+        },
+        willRetry: true,
+      },
+    }, state)).toEqual([
+      { type: 'text-end', id: 'text-1' },
+      {
+        type: 'data-runtime-warning',
+        data: {
+          message: 'Reconnecting... 2/5',
+          additionalDetails: 'request timed out',
+        },
+      },
+    ])
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method: 'item/agentMessage/delta',
+      params: { itemId: 'text-1', delta: 'After' },
+    }, state)).toEqual([
+      { type: 'text-start', id: 'text-1' },
+      { type: 'text-delta', id: 'text-1', delta: 'After' },
+    ])
+  })
+
   it('projects Codex moderation metadata as AI SDK message metadata', () => {
     const state = createCodexAppServerMapperState('text-1')
 

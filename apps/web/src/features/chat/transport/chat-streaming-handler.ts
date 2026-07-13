@@ -359,6 +359,9 @@ function hasVisibleContent(message: UIMessage): boolean {
     if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
       return true
     }
+    if (part.type === 'data-runtime-warning') {
+      return true
+    }
     return false
   })
 }

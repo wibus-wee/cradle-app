@@ -22,6 +22,7 @@ import {
   readCodexToolError,
   readCodexToolName,
 } from '../tools/mapper'
+import { readRetryableCodexAppServerWarning } from './stream-diagnostics'
 
 export interface CodexAppServerMapperState {
   openReasoningItemIds: Set<string>
@@ -156,9 +157,26 @@ export function mapCodexAppServerNotificationToChunks(
       return mapPendingServerRequest(notification.params, state)
     case 'serverRequest/handled':
       return mapHandledServerRequest(notification.params, state)
+    case 'error':
+      return mapRetryableError(notification, state)
     default:
       return []
   }
+}
+
+function mapRetryableError(
+  notification: CodexAppServerNotification,
+  state: CodexAppServerMapperState,
+): UIMessageChunk[] {
+  const warning = readRetryableCodexAppServerWarning(notification)
+  if (!warning) {
+    return []
+  }
+  return [
+    ...closeOpenCodexAppServerReasoning(state),
+    ...closeOpenAgentMessageSegments(state),
+    providerChunk.runtimeWarning(warning),
+  ]
 }
 
 export function closeOpenCodexAppServerReasoning(state: CodexAppServerMapperState): UIMessageChunk[] {
