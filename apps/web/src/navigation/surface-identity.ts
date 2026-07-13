@@ -4,6 +4,7 @@ export type SurfaceKind
   = | 'home'
     | 'new-work'
     | 'work'
+    | 'pull-requests'
     | 'new-chat'
     | 'chat'
     | 'diff'
@@ -23,6 +24,7 @@ export type SurfaceRoute
   = | { to: '/', params?: undefined, search?: undefined }
     | { to: '/work/new', params?: undefined, search?: { workspaceId?: string, issueId?: string } }
     | { to: '/work/$workId', params: { workId: string }, search?: undefined }
+    | { to: '/pull-requests', params?: undefined, search?: { workId?: string } }
     | { to: '/chat/new', params?: undefined, search?: { issueId?: string } }
     | { to: '/chat/$sessionId', params: { sessionId: string }, search?: undefined }
     | { to: '/diff', params?: undefined, search?: { workspace?: string, repo?: string, path?: string, review?: string, view?: 'commit' | 'guide' } }
@@ -84,6 +86,10 @@ export function workSurfaceId(workId: string): string {
   return `work:${workId}`
 }
 
+export function pullRequestsSurfaceId(): string {
+  return 'pull-requests'
+}
+
 export function workspaceSurfaceId(workspaceId: string): string {
   return `workspace:${workspaceId}`
 }
@@ -141,6 +147,19 @@ export function surfaceDraftFromRoute(input: {
           workspaceId: readString(search.workspaceId),
           issueId: readString(search.issueId),
         },
+      },
+      closable: true,
+    }
+  }
+
+  if (input.pathname === '/pull-requests') {
+    return {
+      id: pullRequestsSurfaceId(),
+      kind: 'pull-requests',
+      title: getI18n().t('pull-requests:surface.title'),
+      route: {
+        to: '/pull-requests',
+        search: { workId: readString(search.workId) },
       },
       closable: true,
     }
@@ -333,6 +352,10 @@ export function layoutSlotIdForRoute(route: SurfaceRoute | null | undefined): st
 
   if (route.to === '/work/$workId') {
     return workSurfaceId(route.params.workId)
+  }
+
+  if (route.to === '/pull-requests') {
+    return pullRequestsSurfaceId()
   }
 
   if (route.to === '/workspaces/$workspaceId') {

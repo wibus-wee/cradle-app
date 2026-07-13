@@ -240,6 +240,12 @@ async function githubGetPaged<T>(path: string, schema: JsonSchema<T[]>, maxPages
   return items
 }
 
+export interface GitHubPullRequestAuthor {
+  login: string
+  avatar_url: string
+  html_url: string
+}
+
 export interface GitHubPullRequest {
   number: number
   title: string
@@ -249,8 +255,14 @@ export interface GitHubPullRequest {
   mergeable: boolean | null
   mergeable_state?: string
   html_url?: string
+  user?: GitHubPullRequestAuthor | null
   head: { sha: string, ref: string }
   base: { ref: string }
+  // Only present on the single-PR resource (not the list-pulls endpoint).
+  // `fetchPullRequest` always hits the single-PR endpoint, so these are
+  // populated in practice, but kept optional for older cached shapes.
+  additions?: number
+  deletions?: number
 }
 
 export interface CreatePullRequestInput {
@@ -277,8 +289,11 @@ export interface CreatedGitHubPullRequest {
   draft: boolean
   html_url: string
   state: 'open' | 'closed'
+  user?: GitHubPullRequestAuthor | null
   head: { sha: string, ref: string }
   base: { ref: string }
+  additions?: number
+  deletions?: number
 }
 
 export interface GitHubCheckRun {
@@ -309,17 +324,80 @@ export interface GitHubCombinedStatus {
   statuses: GitHubCommitStatus[]
 }
 
-export interface GitHubReviewUser {
-  login: string
-}
-
 export interface GitHubPullRequestReview {
   id: number
-  user: GitHubReviewUser | null
+  user: GitHubPullRequestAuthor | null
   state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | 'PENDING'
   commit_id: string
   submitted_at: string | null
   body: string | null
+  html_url: string | null
+}
+
+export interface GitHubPullRequestDetail {
+  number: number
+  title: string
+  body: string | null
+  state: 'open' | 'closed'
+  draft: boolean
+  merged: boolean
+  mergeable: boolean | null
+  mergeable_state: string
+  html_url: string
+  user: {
+    login: string
+    avatar_url: string
+    html_url: string
+  } | null
+  head: { sha: string, ref: string }
+  base: { ref: string }
+  additions: number
+  deletions: number
+  changed_files: number
+  commits: number
+  comments: number
+  review_comments: number
+  created_at: string
+  updated_at: string
+  closed_at: string | null
+  merged_at: string | null
+  requested_reviewers: GitHubPullRequestAuthor[]
+  assignees: Array<{
+    login: string
+    avatar_url: string
+    html_url: string
+  }>
+  labels: Array<{
+    name: string
+    color: string
+  }>
+}
+
+export interface GitHubPullRequestComment {
+  id: number
+  body: string
+  html_url: string
+  created_at: string
+  updated_at: string
+  user: {
+    login: string
+    avatar_url: string
+    html_url: string
+  } | null
+}
+
+export interface GitHubPullRequestFile {
+  sha: string
+  filename: string
+  status: string
+  additions: number
+  deletions: number
+  changes: number
+  blob_url: string
+  raw_url: string
+  contents_url: string
+  patch: string | null
+  previous_filename: string | null
 }
 
 export interface GitHubWorkflowRun {
@@ -373,6 +451,12 @@ interface GitHubWorkflowJobsResponse {
   jobs: GitHubWorkflowJob[]
 }
 
+const GitHubUserSchema = z.object({
+  login: z.string(),
+  avatar_url: z.string(),
+  html_url: z.string(),
+}).passthrough()
+
 const GitHubPullRequestSchema = z.object({
   number: z.number().finite(),
   title: z.string(),
@@ -382,9 +466,70 @@ const GitHubPullRequestSchema = z.object({
   mergeable: z.boolean().nullable(),
   mergeable_state: z.string().optional(),
   html_url: z.string().optional(),
+  user: GitHubUserSchema.nullable().optional(),
   head: z.object({ sha: z.string(), ref: z.string() }),
   base: z.object({ ref: z.string() }),
+  additions: z.number().finite().optional(),
+  deletions: z.number().finite().optional(),
 }).passthrough()
+
+const GitHubPullRequestDetailSchema = z.object({
+  number: z.number().finite(),
+  title: z.string(),
+  body: z.string().nullable(),
+  state: z.enum(['open', 'closed']),
+  draft: z.boolean(),
+  merged: z.boolean(),
+  mergeable: z.boolean().nullable(),
+  mergeable_state: z.string(),
+  html_url: z.string(),
+  user: GitHubUserSchema.nullable(),
+  head: z.object({ sha: z.string(), ref: z.string() }),
+  base: z.object({ ref: z.string() }),
+  additions: z.number().finite(),
+  deletions: z.number().finite(),
+  changed_files: z.number().finite(),
+  commits: z.number().finite(),
+  comments: z.number().finite(),
+  review_comments: z.number().finite(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  closed_at: z.string().nullable(),
+  merged_at: z.string().nullable(),
+  requested_reviewers: z.array(GitHubUserSchema),
+  assignees: z.array(GitHubUserSchema),
+  labels: z.array(z.object({
+    name: z.string(),
+    color: z.string(),
+  }).passthrough()),
+}).passthrough()
+
+const GitHubPullRequestCommentSchema = z.object({
+  id: z.number().finite(),
+  body: z.string(),
+  html_url: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  user: GitHubUserSchema.nullable(),
+}).passthrough()
+
+const GitHubPullRequestFileSchema = z.object({
+  sha: z.string(),
+  filename: z.string(),
+  status: z.string(),
+  additions: z.number().finite(),
+  deletions: z.number().finite(),
+  changes: z.number().finite(),
+  blob_url: z.string(),
+  raw_url: z.string(),
+  contents_url: z.string(),
+  patch: z.string().nullable().optional(),
+  previous_filename: z.string().nullable().optional(),
+}).passthrough().transform(file => ({
+  ...file,
+  patch: file.patch ?? null,
+  previous_filename: file.previous_filename ?? null,
+}))
 
 const GitHubPullRequestNodeSchema = z.object({
   node_id: z.string(),
@@ -396,8 +541,11 @@ const CreatedGitHubPullRequestSchema = z.object({
   draft: z.boolean(),
   html_url: z.string(),
   state: z.enum(['open', 'closed']),
+  user: GitHubUserSchema.nullable().optional(),
   head: z.object({ sha: z.string(), ref: z.string() }),
   base: z.object({ ref: z.string() }),
+  additions: z.number().finite().optional(),
+  deletions: z.number().finite().optional(),
 }).passthrough()
 
 const MarkPullRequestReadyDataSchema = z.object({
@@ -445,11 +593,12 @@ const GitHubCombinedStatusSchema = z.object({
 
 const GitHubPullRequestReviewSchema = z.object({
   id: z.number().finite(),
-  user: z.object({ login: z.string() }).nullable(),
+  user: GitHubUserSchema.nullable(),
   state: z.enum(['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING']),
   commit_id: z.string(),
   submitted_at: z.string().nullable(),
   body: z.string().nullable(),
+  html_url: z.string().nullable().optional().transform(value => value ?? null),
 }).passthrough()
 
 const GitHubWorkflowRunSchema = z.object({
@@ -507,8 +656,237 @@ export function hasGitHubToken(): boolean {
   return resolveGitHubToken() !== null
 }
 
+export interface GitHubViewer {
+  login: string
+  avatarUrl: string
+  url: string
+}
+
+const GitHubViewerDataSchema = z.object({
+  viewer: z.object({
+    login: z.string(),
+    avatarUrl: z.string(),
+    url: z.string(),
+  }).passthrough(),
+})
+
+export function fetchAuthenticatedUser(): Promise<GitHubViewer> {
+  return githubGraphQL(
+    `query ViewerIdentity {
+      viewer {
+        login
+        avatarUrl
+        url
+      }
+    }`,
+    {},
+    GitHubViewerDataSchema,
+  ).then(data => data.viewer)
+}
+
+export type GitHubPullRequestChecksState = 'success' | 'failure' | 'pending' | 'neutral'
+
+export interface GitHubActor {
+  login: string
+  avatarUrl: string
+  url: string
+}
+
+export interface GitHubSearchPullRequest {
+  owner: string
+  repo: string
+  number: number
+  title: string
+  url: string
+  isDraft: boolean
+  state: 'open' | 'closed'
+  merged: boolean
+  headRef: string
+  baseRef: string
+  headSha: string | null
+  createdAt: string
+  updatedAt: string
+  author: GitHubActor | null
+  additions: number
+  deletions: number
+  checksState: GitHubPullRequestChecksState
+}
+
+// GitHub's search only exposes a coarse commit status rollup, not individual
+// check runs - good enough for a list-level signal, detail views still fetch
+// the full check-run breakdown via fetchCheckRuns/fetchCombinedStatus.
+const GitHubStatusCheckRollupStateSchema = z.enum(['EXPECTED', 'ERROR', 'FAILURE', 'PENDING', 'SUCCESS'])
+
+function mapStatusCheckRollupState(
+  state: z.infer<typeof GitHubStatusCheckRollupStateSchema> | undefined,
+): GitHubPullRequestChecksState {
+  switch (state) {
+    case 'SUCCESS':
+      return 'success'
+    case 'ERROR':
+    case 'FAILURE':
+      return 'failure'
+    case 'EXPECTED':
+    case 'PENDING':
+      return 'pending'
+    default:
+      return 'neutral'
+  }
+}
+
+const GitHubSearchPullRequestNodeSchema = z.object({
+  number: z.number().finite(),
+  title: z.string(),
+  url: z.string(),
+  isDraft: z.boolean(),
+  state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+  headRefName: z.string(),
+  baseRefName: z.string(),
+  additions: z.number().finite(),
+  deletions: z.number().finite(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  repository: z.object({
+    name: z.string(),
+    owner: z.object({ login: z.string() }).passthrough(),
+  }).passthrough(),
+  author: z.object({
+    login: z.string(),
+    avatarUrl: z.string(),
+    url: z.string(),
+  }).nullable(),
+  commits: z.object({
+    nodes: z.array(z.object({
+      commit: z.object({
+        oid: z.string(),
+        statusCheckRollup: z.object({
+          state: GitHubStatusCheckRollupStateSchema,
+        }).nullable(),
+      }).passthrough(),
+    })),
+  }).passthrough(),
+}).passthrough()
+
+const GitHubSearchPullRequestsDataSchema = z.object({
+  search: z.object({
+    pageInfo: z.object({
+      hasNextPage: z.boolean(),
+      endCursor: z.string().nullable(),
+    }).passthrough(),
+    nodes: z.array(GitHubSearchPullRequestNodeSchema),
+  }).passthrough(),
+})
+
+const SEARCH_PULL_REQUESTS_QUERY = `
+  query SearchPullRequests($searchQuery: String!, $first: Int!, $after: String) {
+    search(query: $searchQuery, type: ISSUE, first: $first, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        ... on PullRequest {
+          number
+          title
+          url
+          isDraft
+          state
+          headRefName
+          baseRefName
+          additions
+          deletions
+          createdAt
+          updatedAt
+          repository { name owner { login } }
+          author { login avatarUrl url }
+          commits(last: 1) {
+            nodes {
+              commit {
+                oid
+                statusCheckRollup { state }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+function mapSearchPullRequestNode(
+  node: z.infer<typeof GitHubSearchPullRequestNodeSchema>,
+): GitHubSearchPullRequest {
+  const headCommit = node.commits.nodes[0]?.commit
+  return {
+    owner: node.repository.owner.login,
+    repo: node.repository.name,
+    number: node.number,
+    title: node.title,
+    url: node.url,
+    isDraft: node.isDraft,
+    state: node.state === 'OPEN' ? 'open' : 'closed',
+    merged: node.state === 'MERGED',
+    headRef: node.headRefName,
+    baseRef: node.baseRefName,
+    headSha: headCommit?.oid ?? null,
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    author: node.author,
+    additions: node.additions,
+    deletions: node.deletions,
+    checksState: mapStatusCheckRollupState(headCommit?.statusCheckRollup?.state),
+  }
+}
+
+export interface GitHubSearchPullRequestPage {
+  items: GitHubSearchPullRequest[]
+  hasNextPage: boolean
+  endCursor: string | null
+}
+
+const SEARCH_PULL_REQUESTS_PAGE_SIZE = 25
+
+/**
+ * Fetches a single page of the given search query, most-recently-updated
+ * first. Callers drive pagination explicitly via `after` - there is no
+ * internal multi-page loop or item cap here, because GitHub search results
+ * are NOT capped in this codebase: a viewer who has authored hundreds of PRs
+ * must be able to page through all of them, not have the tail silently
+ * dropped. `sort:updated-desc` is appended so that cursor pages remain a
+ * stable, recency-ordered sequence.
+ */
+async function searchPullRequestsPage(searchQuery: string, after: string | null): Promise<GitHubSearchPullRequestPage> {
+  const data = await githubGraphQL(
+    SEARCH_PULL_REQUESTS_QUERY,
+    { searchQuery: `${searchQuery} sort:updated-desc`, first: SEARCH_PULL_REQUESTS_PAGE_SIZE, after },
+    GitHubSearchPullRequestsDataSchema,
+  )
+  return {
+    items: data.search.nodes.map(mapSearchPullRequestNode),
+    hasNextPage: data.search.pageInfo.hasNextPage,
+    endCursor: data.search.pageInfo.endCursor,
+  }
+}
+
+export function searchAuthoredPullRequests(login: string, after: string | null = null): Promise<GitHubSearchPullRequestPage> {
+  return searchPullRequestsPage(`is:pr author:${login}`, after)
+}
+
+export function searchReviewRequestedPullRequests(login: string, after: string | null = null): Promise<GitHubSearchPullRequestPage> {
+  return searchPullRequestsPage(`is:pr review-requested:${login}`, after)
+}
+
 export function fetchPullRequest(owner: string, repo: string, pr: number): Promise<GitHubPullRequest | null> {
   return githubGet(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestSchema)
+}
+
+export function fetchPullRequestDetail(owner: string, repo: string, pr: number): Promise<GitHubPullRequestDetail | null> {
+  return githubGet(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestDetailSchema)
+}
+
+export function fetchPullRequestComments(owner: string, repo: string, pr: number): Promise<GitHubPullRequestComment[] | null> {
+  return githubGetPaged(`/repos/${owner}/${repo}/issues/${pr}/comments`, z.array(GitHubPullRequestCommentSchema))
+}
+
+export function fetchPullRequestFiles(owner: string, repo: string, pr: number): Promise<GitHubPullRequestFile[] | null> {
+  return githubGetPaged(`/repos/${owner}/${repo}/pulls/${pr}/files`, z.array(GitHubPullRequestFileSchema))
 }
 
 function fetchPullRequestNode(owner: string, repo: string, pr: number): Promise<{ node_id: string } | null> {

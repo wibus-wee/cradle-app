@@ -5537,6 +5537,151 @@ export type GetAssetsByIdContentData = {
     url: '/assets/{id}/content';
 };
 
+export type GetBackgroundJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        ownerNamespace?: string;
+        ownerResourceType?: string;
+        ownerResourceId?: string;
+        ownerResourceKey?: string;
+        kind?: string;
+        status?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        limit?: number;
+    };
+    url: '/background-jobs/';
+};
+
+export type GetBackgroundJobsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetBackgroundJobsResponse = GetBackgroundJobsResponses[keyof GetBackgroundJobsResponses];
+
+export type GetBackgroundJobsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/background-jobs/{id}';
+};
+
+export type GetBackgroundJobsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type GetBackgroundJobsByIdResponse = GetBackgroundJobsByIdResponses[keyof GetBackgroundJobsByIdResponses];
+
+export type PostBackgroundJobsByIdCancelData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/background-jobs/{id}/cancel';
+};
+
+export type PostBackgroundJobsByIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostBackgroundJobsByIdCancelResponse = PostBackgroundJobsByIdCancelResponses[keyof PostBackgroundJobsByIdCancelResponses];
+
 export type GetSessionsData = {
     body?: never;
     path?: never;
@@ -6287,6 +6432,13 @@ export type GetWorksResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
     }>;
 };
@@ -6419,6 +6571,13 @@ export type PostWorksResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -6524,6 +6683,13 @@ export type GetWorksByIdResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -6631,6 +6797,13 @@ export type PostWorksByIdArchiveResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -6740,6 +6913,13 @@ export type PostWorksByIdPrepareResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -6850,6 +7030,13 @@ export type PostWorksByIdSubmitResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -6902,6 +7089,13 @@ export type GetSessionsByIdWorkResponses = {
                 headSha: string | null;
                 createdAt: number;
                 updatedAt: number;
+                author?: {
+                    login: string;
+                    avatarUrl: string;
+                    url: string;
+                } | null;
+                additions?: number;
+                deletions?: number;
             } | null;
         } | null;
     };
@@ -6937,6 +7131,13 @@ export type GetSessionsByIdPullRequestResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
     };
 };
@@ -6975,11 +7176,117 @@ export type PostSessionsByIdPullRequestResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         };
     };
 };
 
 export type PostSessionsByIdPullRequestResponse = PostSessionsByIdPullRequestResponses[keyof PostSessionsByIdPullRequestResponses];
+
+export type GetSessionsByIdPullRequestDetailData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/pull-request/detail';
+};
+
+export type GetSessionsByIdPullRequestDetailResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions: number;
+            deletions: number;
+            body: string | null;
+            changedFiles: number;
+            commits: number;
+            comments: number;
+            reviewComments: number;
+            mergeable: boolean | null;
+            mergeableState: string;
+            createdAtIso: string;
+            updatedAtIso: string;
+            closedAtIso: string | null;
+            mergedAtIso: string | null;
+            reviewers: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            assignees: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            labels: Array<{
+                name: string;
+                color: string;
+            }>;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+            checks: Array<{
+                id: string;
+                name: string;
+                status: 'queued' | 'in_progress' | 'completed';
+                conclusion: string | null;
+                url: string | null;
+            }>;
+        };
+        timeline: Array<{
+            id: string;
+            kind: 'comment' | 'review';
+            author: {
+                login: string;
+                avatarUrl: string | null;
+                url: string | null;
+            } | null;
+            body: string | null;
+            state: string | null;
+            createdAt: string;
+            url: string | null;
+        }>;
+        files: Array<{
+            sha: string;
+            filename: string;
+            previousFilename: string | null;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch: string | null;
+            blobUrl: string;
+            rawUrl: string;
+        }>;
+    };
+};
+
+export type GetSessionsByIdPullRequestDetailResponse = GetSessionsByIdPullRequestDetailResponses[keyof GetSessionsByIdPullRequestDetailResponses];
 
 export type PostSessionsByIdPullRequestReadyData = {
     body?: never;
@@ -7009,11 +7316,231 @@ export type PostSessionsByIdPullRequestReadyResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         };
     };
 };
 
 export type PostSessionsByIdPullRequestReadyResponse = PostSessionsByIdPullRequestReadyResponses[keyof PostSessionsByIdPullRequestReadyResponses];
+
+export type GetPullRequestsViewerData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/pull-requests/viewer';
+};
+
+export type GetPullRequestsViewerResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        viewer: {
+            login: string;
+            avatarUrl: string;
+            url: string;
+        };
+    };
+};
+
+export type GetPullRequestsViewerResponse = GetPullRequestsViewerResponses[keyof GetPullRequestsViewerResponses];
+
+export type GetPullRequestsAuthoredData = {
+    body?: never;
+    path?: never;
+    query: {
+        login: string;
+        after?: string;
+    };
+    url: '/pull-requests/authored';
+};
+
+export type GetPullRequestsAuthoredResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        items: Array<{
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+        }>;
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+};
+
+export type GetPullRequestsAuthoredResponse = GetPullRequestsAuthoredResponses[keyof GetPullRequestsAuthoredResponses];
+
+export type GetPullRequestsReviewingData = {
+    body?: never;
+    path?: never;
+    query: {
+        login: string;
+        after?: string;
+    };
+    url: '/pull-requests/reviewing';
+};
+
+export type GetPullRequestsReviewingResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        items: Array<{
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+        }>;
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+};
+
+export type GetPullRequestsReviewingResponse = GetPullRequestsReviewingResponses[keyof GetPullRequestsReviewingResponses];
+
+export type GetPullRequestsByOwnerByRepoByNumberDetailData = {
+    body?: never;
+    path: {
+        owner: string;
+        repo: string;
+        number: string;
+    };
+    query?: never;
+    url: '/pull-requests/{owner}/{repo}/{number}/detail';
+};
+
+export type GetPullRequestsByOwnerByRepoByNumberDetailResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions: number;
+            deletions: number;
+            body: string | null;
+            changedFiles: number;
+            commits: number;
+            comments: number;
+            reviewComments: number;
+            mergeable: boolean | null;
+            mergeableState: string;
+            createdAtIso: string;
+            updatedAtIso: string;
+            closedAtIso: string | null;
+            mergedAtIso: string | null;
+            reviewers: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            assignees: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            labels: Array<{
+                name: string;
+                color: string;
+            }>;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+            checks: Array<{
+                id: string;
+                name: string;
+                status: 'queued' | 'in_progress' | 'completed';
+                conclusion: string | null;
+                url: string | null;
+            }>;
+        };
+        timeline: Array<{
+            id: string;
+            kind: 'comment' | 'review';
+            author: {
+                login: string;
+                avatarUrl: string | null;
+                url: string | null;
+            } | null;
+            body: string | null;
+            state: string | null;
+            createdAt: string;
+            url: string | null;
+        }>;
+        files: Array<{
+            sha: string;
+            filename: string;
+            previousFilename: string | null;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch: string | null;
+            blobUrl: string;
+            rawUrl: string;
+        }>;
+    };
+};
+
+export type GetPullRequestsByOwnerByRepoByNumberDetailResponse = GetPullRequestsByOwnerByRepoByNumberDetailResponses[keyof GetPullRequestsByOwnerByRepoByNumberDetailResponses];
 
 export type GetSessionGroupsData = {
     body?: never;
