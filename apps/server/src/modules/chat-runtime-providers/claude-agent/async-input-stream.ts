@@ -29,10 +29,9 @@ export class ClaudeAgentInputStream implements AsyncIterable<SDKUserMessage> {
       toolUseResult?: unknown
       /** Defaults to `next` so mid-turn follow-ups queue instead of competing with interrupt semantics. */
       priority?: ClaudeAgentInputPriority
-      uuid?: string
     } = {},
   ): string {
-    const uuid = options.uuid?.trim() || randomUUID()
+    const uuid = randomUUID()
     const accepted = this.queue.push({
       type: 'user',
       message: { role: 'user', content },
