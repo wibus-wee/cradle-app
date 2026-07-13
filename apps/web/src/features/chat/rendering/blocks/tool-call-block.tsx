@@ -10,15 +10,26 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import { readBuiltinToolCallInputPayload } from '../chat-tool-entities'
 import { readTerminalOutputSections } from '../terminal-tool-details'
 import { STATUS_LABELS, TOOL_ICON_MAP } from '../tool-block-constants'
-import type { RenderableToolPart, ToolPayload, ToolState, ToolUiDescriptor } from '../tool-ui-classifier'
+import type {
+  RenderableToolPart,
+  ToolPayload,
+  ToolState,
+  ToolUiDescriptor,
+} from '../tool-ui-classifier'
 import { describeToolCall, readToolInputPayload, readToolPayload } from '../tool-ui-classifier'
 import { EditFileBlock } from './edit-file-block'
 import type { ToolCallBlockProps } from './tool-call-block-types'
@@ -71,26 +82,31 @@ function hasRenderableChildren(children: ReactNode): boolean {
   return true
 }
 
-function hasWorkflowDetails(input: ToolPayload, output: ToolPayload, descriptor: ToolUiDescriptor): boolean {
-  return descriptor.kind === 'subagent' && (
-    descriptor.toolName === 'Workflow'
-    || descriptor.toolName === 'claude-code/Workflow'
-    || input.taskType === 'local_workflow'
-    || output.taskType === 'local_workflow'
-    || input.taskType === 'remote_agent'
-    || output.taskType === 'remote_agent'
-    || input.workflowName !== null
-    || output.workflowName !== null
-    || input.workflowDescription !== null
-    || output.workflowDescription !== null
-    || input.workflowPhases.length > 0
-    || output.workflowPhases.length > 0
-    || input.workflowRunId !== null
-    || output.workflowRunId !== null
-    || input.workflowScriptPath !== null
-    || output.workflowScriptPath !== null
-    || input.workflowSessionUrl !== null
-    || output.workflowSessionUrl !== null
+function hasWorkflowDetails(
+  input: ToolPayload,
+  output: ToolPayload,
+  descriptor: ToolUiDescriptor,
+): boolean {
+  return (
+    descriptor.kind === 'subagent'
+    && (descriptor.toolName === 'Workflow'
+      || descriptor.toolName === 'claude-code/Workflow'
+      || input.taskType === 'local_workflow'
+      || output.taskType === 'local_workflow'
+      || input.taskType === 'remote_agent'
+      || output.taskType === 'remote_agent'
+      || input.workflowName !== null
+      || output.workflowName !== null
+      || input.workflowDescription !== null
+      || output.workflowDescription !== null
+      || input.workflowPhases.length > 0
+      || output.workflowPhases.length > 0
+      || input.workflowRunId !== null
+      || output.workflowRunId !== null
+      || input.workflowScriptPath !== null
+      || output.workflowScriptPath !== null
+      || input.workflowSessionUrl !== null
+      || output.workflowSessionUrl !== null)
   )
 }
 
@@ -99,13 +115,15 @@ function readSubagentPanelName(
   output: ToolPayload,
   descriptor: ToolUiDescriptor,
 ): string {
-  return output.workflowName
+  return (
+    output.workflowName
     ?? input.workflowName
     ?? output.subagentName
     ?? input.subagentName
     ?? descriptor.target
     ?? descriptor.title
     ?? 'Subagent'
+  )
 }
 
 function readSubagentPanelRole(
@@ -113,11 +131,13 @@ function readSubagentPanelRole(
   output: ToolPayload,
   descriptor: ToolUiDescriptor,
 ): string | null {
-  return output.agentType
+  return (
+    output.agentType
     ?? input.agentType
     ?? output.taskType
     ?? input.taskType
     ?? (descriptor.toolName.includes('Workflow') ? 'Workflow' : null)
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +357,12 @@ export function ToolCallBlock({
       && (!!errorText || hasFileDiffInlineContent(inputPayload, outputPayload))
   const hasWorkflowPanel = hasWorkflowDetails(inputPayload, outputPayload, descriptor)
   const hasStructuredPanel = hasTerminalPanel || hasDiffPanel || hasWorkflowPanel
+  const hasDetailPayload
+    = hasStructuredPanel
+      || input !== undefined
+      || output !== undefined
+      || Boolean(argumentsText)
+      || Boolean(errorText)
   const workspaceDiffPath
     = descriptor.kind === 'file-diff' || descriptor.kind === 'notebook-diff'
       ? readFileDiffTarget(input, output, argumentsText)
@@ -345,13 +371,11 @@ export function ToolCallBlock({
   const openWorkspaceDiffTab = useBrowserPanelStore(s => s.openWorkspaceDiffTab)
   const openSubagentTab = useBrowserPanelStore(s => s.openSubagentTab)
   const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
-  const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
   const hasChildren = hasRenderableChildren(children)
   const expandable = hasStructuredPanel || hasChildren
   const interactive = expandable || canOpenWorkspaceDiff
-  const [expanded, setExpanded] = useState(
-    () => isError(state) && hasStructuredPanel,
-  )
+  const [expanded, setExpanded] = useState(() => isError(state) && hasStructuredPanel)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const Icon = TOOL_ICON_MAP[descriptor.kind]
   const running = isRunning(state)
   const errored = isError(state)
@@ -381,7 +405,6 @@ export function ToolCallBlock({
       title: 'All Changes',
       ownerId: workspaceDiffTarget.ownerId,
     })
-    setBrowserPanelOpen(true, workspaceDiffTarget.ownerId)
     requestScrollToFilePath({ path: workspaceDiffPath, tabId })
   }
 
@@ -391,7 +414,7 @@ export function ToolCallBlock({
     if (!sessionId || !subagentPanelName) {
       return
     }
-    const ownerId = useLayoutStore.getState().activeBrowserPanelOwnerId
+    const ownerId = useBrowserPanelStore.getState().activeOwnerId
     openSubagentTab({
       sessionId,
       threadId: toolCallId,
@@ -399,7 +422,6 @@ export function ToolCallBlock({
       agentRole: subagentPanelRole,
       ownerId,
     })
-    setBrowserPanelOpen(true, ownerId)
   }
 
   const toggleExpanded = () => {
@@ -469,6 +491,21 @@ export function ToolCallBlock({
               <TooltipContent sideOffset={6}>Open output</TooltipContent>
             </Tooltip>
           )}
+          {hasDetailPayload && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="h-6 px-2 text-[11px] text-muted-foreground"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setDetailsOpen(true)
+              }}
+            >
+              Details
+            </Button>
+          )}
           {expandable && (
             <ChevronRightIcon
               className={cn(
@@ -495,16 +532,16 @@ export function ToolCallBlock({
         {running && (
           <div className="h-px overflow-hidden bg-muted">
             {animated
-              ? (
-                <m.div
-                  className="h-full w-1/3 rounded-full bg-muted-foreground/25"
-                  animate={{ x: ['-100%', '400%'] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                />
-              )
-              : (
-                <div className="h-full w-1/3 rounded-full bg-muted-foreground/25" />
-              )}
+? (
+              <m.div
+                className="h-full w-1/3 rounded-full bg-muted-foreground/25"
+                animate={{ x: ['-100%', '400%'] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+              />
+            )
+: (
+              <div className="h-full w-1/3 rounded-full bg-muted-foreground/25" />
+            )}
           </div>
         )}
 
@@ -587,6 +624,27 @@ export function ToolCallBlock({
           {children}
         </div>
       )}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-h-[min(80vh,760px)] w-[min(920px,calc(100vw-2rem))] max-w-none overflow-y-auto sm:max-w-none">
+          <DialogHeader>
+            <DialogTitle>{descriptor.title}</DialogTitle>
+            <DialogDescription>
+              {descriptor.displayName}
+{' '}
+·
+{STATUS_LABELS[state]}
+            </DialogDescription>
+          </DialogHeader>
+          <_ToolDetails
+            descriptor={descriptor}
+            input={inputPayload}
+            output={outputPayload}
+            errorText={errorText}
+          >
+            {children}
+          </_ToolDetails>
+        </DialogContent>
+      </Dialog>
     </>
   )
 

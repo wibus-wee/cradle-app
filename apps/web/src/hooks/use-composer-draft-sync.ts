@@ -6,13 +6,19 @@ import {
   queueServerComposerDraftWrite,
   readServerComposerDraft,
 } from '~/features/chat/commands/composer-draft-command'
+import type { ComposerPastedText } from '~/features/chat/composer/pasted-text'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import type { ComposerDraft } from '~/store/composer-draft'
 import { useComposerDraftStore } from '~/store/composer-draft'
 
 const DEBOUNCE_MS = 300
 
-const EMPTY_COMPOSER_DRAFT: ComposerDraft = { text: '', contextParts: [] }
+const EMPTY_COMPOSER_DRAFT: ComposerDraft = {
+  text: '',
+  contextParts: [],
+  files: [],
+  pastedTexts: [],
+}
 
 interface ReplaceDraftState {
   draft: ComposerDraft | undefined
@@ -20,7 +26,12 @@ interface ReplaceDraftState {
 }
 
 function hasComposerDraftContent(draft: ComposerDraft): boolean {
-  return draft.text.trim() !== '' || draft.contextParts.length > 0
+  return (
+    draft.text.trim() !== ''
+    || draft.contextParts.length > 0
+    || draft.files.length > 0
+    || draft.pastedTexts.length > 0
+  )
 }
 
 /**
@@ -75,7 +86,9 @@ export function useComposerDraftSync(surfaceId: string) {
     const localDraft = getDraft(surfaceId)
     draftRef.current = localDraft ?? EMPTY_COMPOSER_DRAFT
     if (surfaceChanged) {
-      skipNextEmptyDraftChangeRef.current = Boolean(localDraft && hasComposerDraftContent(localDraft))
+      skipNextEmptyDraftChangeRef.current = Boolean(
+        localDraft && hasComposerDraftContent(localDraft),
+      )
       setReplaceDraftState(state => ({
         draft: localDraft ?? EMPTY_COMPOSER_DRAFT,
         key: state.key + 1,
@@ -117,7 +130,7 @@ export function useComposerDraftSync(surfaceId: string) {
           queueServerComposerDraftWrite(surfaceId, localDraft)
         }
       }
-      catch {
+ catch {
         // Keep local draft behavior when the server is temporarily unavailable.
       }
     })()
@@ -166,44 +179,52 @@ export function useComposerDraftSync(surfaceId: string) {
     queueServerComposerDraftDelete(surfaceId)
   }, [enabled, surfaceId, deleteDraft])
 
-  const handleDraftPartsChange = useCallback((text: string, contextParts: ChatContextPart[]) => {
-    if (!enabled) {
-      return
-    }
+  const handleDraftPartsChange = useCallback(
+    (
+      text: string,
+      contextParts: ChatContextPart[],
+      files: ComposerDraft['files'],
+      pastedTexts: ComposerPastedText[],
+    ) => {
+      if (!enabled) {
+        return
+      }
 
-    const draft = { text, contextParts }
-    const draftHasContent = hasComposerDraftContent(draft)
-    if (
-      !draftHasContent
-      && skipNextEmptyDraftChangeRef.current
-      && hasComposerDraftContent(draftRef.current)
-    ) {
+      const draft = { text, contextParts, files, pastedTexts }
+      const draftHasContent = hasComposerDraftContent(draft)
+      if (
+        !draftHasContent
+        && skipNextEmptyDraftChangeRef.current
+        && hasComposerDraftContent(draftRef.current)
+      ) {
+        skipNextEmptyDraftChangeRef.current = false
+        return
+      }
+
       skipNextEmptyDraftChangeRef.current = false
-      return
-    }
+      localEditVersionRef.current += 1
+      draftRef.current = draft
 
-    skipNextEmptyDraftChangeRef.current = false
-    localEditVersionRef.current += 1
-    draftRef.current = draft
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
+      // Don't persist empty drafts
+      if (!draftHasContent) {
+        deleteDraft(surfaceId)
+        queueServerComposerDraftDelete(surfaceId)
+        return
+      }
 
-    // Don't persist empty drafts
-    if (!draftHasContent) {
-      deleteDraft(surfaceId)
-      queueServerComposerDraftDelete(surfaceId)
-      return
-    }
-
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      setDraft(surfaceId, draft)
-      queueServerComposerDraftWrite(surfaceId, draft)
-    }, DEBOUNCE_MS)
-  }, [enabled, surfaceId, setDraft, deleteDraft])
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null
+        setDraft(surfaceId, draft)
+        queueServerComposerDraftWrite(surfaceId, draft)
+      }, DEBOUNCE_MS)
+    },
+    [enabled, surfaceId, setDraft, deleteDraft],
+  )
 
   return {
     /** Pass into Composer's externalSignals.replaceDraft */

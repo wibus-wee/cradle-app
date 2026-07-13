@@ -1,14 +1,20 @@
 import type { UIMessage } from 'ai'
 
 import type {
+  ChatFileLineCommentContextMessagePart,
   ChatPluginContextMessagePart,
   ChatSkillContextMessagePart,
 } from '../context/chat-context-parts'
 import {
+  isChatFileLineCommentContextPart,
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
-import { readBuiltinToolCallInputPayload, readBuiltinToolCallResultPayload, toolNameFromPart } from './chat-tool-entities'
+import {
+  readBuiltinToolCallInputPayload,
+  readBuiltinToolCallResultPayload,
+  toolNameFromPart,
+} from './chat-tool-entities'
 import type { RenderableToolPart, ToolUiKind } from './tool-ui-classifier'
 import { normalizeToolName } from './tool-ui-classifier'
 
@@ -39,6 +45,7 @@ export type ChatRenderSegment
     | { kind: 'tool-group', items: ToolCallRenderItem[], uiKind: ToolUiKind, key: string }
     | (MessagePartRefBase & { kind: 'skill-context' })
     | (MessagePartRefBase & { kind: 'plugin-context' })
+    | (MessagePartRefBase & { kind: 'file-line-comment-context' })
     | (MessagePartRefBase & { kind: 'file-attachment' })
 
 export type ChatRenderItem
@@ -48,6 +55,7 @@ export type ChatRenderItem
     | { kind: 'tool-group', items: ToolCallRenderItem[], uiKind: ToolUiKind, key: string }
     | { kind: 'skill-context', part: ChatSkillContextMessagePart, key: string }
     | { kind: 'plugin-context', part: ChatPluginContextMessagePart, key: string }
+    | { kind: 'file-line-comment-context', part: ChatFileLineCommentContextMessagePart, key: string }
     | { kind: 'file-attachment', part: FileMessagePart, key: string }
 
 export interface ExecutionPhaseSplit {
@@ -105,9 +113,11 @@ export function isRuntimeUserInputToolPart(part: RenderableToolPart): boolean {
 }
 
 function readBuiltinToolApiName(value: unknown): string | null {
-  return readBuiltinToolCallInputPayload(value)?.apiName
+  return (
+    readBuiltinToolCallInputPayload(value)?.apiName
     ?? readBuiltinToolCallResultPayload(value)?.apiName
     ?? null
+  )
 }
 
 export function groupMessagePartRefs(input: GroupMessagePartsInput): ChatRenderSegment[] {
@@ -156,6 +166,14 @@ export function groupMessagePartRefs(input: GroupMessagePartsInput): ChatRenderS
  else if (isChatPluginContextPart(part)) {
       items.push({
         kind: 'plugin-context',
+        key,
+        messageId: input.messageId,
+        partIndex: i,
+      })
+    }
+ else if (isChatFileLineCommentContextPart(part)) {
+      items.push({
+        kind: 'file-line-comment-context',
         key,
         messageId: input.messageId,
         partIndex: i,
@@ -213,6 +231,13 @@ export function groupMessageParts(input: GroupMessagePartsInput): ChatRenderItem
     }
  else if (isChatPluginContextPart(part)) {
       items.push({ kind: 'plugin-context', part: part as ChatPluginContextMessagePart, key })
+    }
+ else if (isChatFileLineCommentContextPart(part)) {
+      items.push({
+        kind: 'file-line-comment-context',
+        part: part as ChatFileLineCommentContextMessagePart,
+        key,
+      })
     }
  else {
       const toolPart = readRenderableToolPart(part)
@@ -338,8 +363,8 @@ export function splitExecutionPhase(
     }
 
     const previousItems = items.slice(0, index)
-    const hasExecutionToolBeforeFinalText = previousItems
-      .some(candidate => isExecutionPhaseToolItem(candidate, options))
+    const hasExecutionToolBeforeFinalText = previousItems.some(candidate =>
+      isExecutionPhaseToolItem(candidate, options))
 
     if (!hasExecutionToolBeforeFinalText) {
       continue
@@ -347,8 +372,9 @@ export function splitExecutionPhase(
 
     const retainedFinalItems = previousItems.filter(candidate =>
       shouldKeepToolWithFinalReply(candidate, options))
-    const executionItems = previousItems.filter(candidate =>
-      !shouldKeepToolWithFinalReply(candidate, options))
+    const executionItems = previousItems.filter(
+      candidate => !shouldKeepToolWithFinalReply(candidate, options),
+    )
 
     return {
       executionItems,
@@ -370,8 +396,8 @@ export function splitSegmentExecutionPhase(
     }
 
     const previousItems = items.slice(0, index)
-    const hasExecutionToolBeforeFinalText = previousItems
-      .some(candidate => isExecutionPhaseToolItem(candidate, options))
+    const hasExecutionToolBeforeFinalText = previousItems.some(candidate =>
+      isExecutionPhaseToolItem(candidate, options))
 
     if (!hasExecutionToolBeforeFinalText) {
       continue
@@ -379,8 +405,9 @@ export function splitSegmentExecutionPhase(
 
     const retainedFinalItems = previousItems.filter(candidate =>
       shouldKeepToolWithFinalReply(candidate, options))
-    const executionItems = previousItems.filter(candidate =>
-      !shouldKeepToolWithFinalReply(candidate, options))
+    const executionItems = previousItems.filter(
+      candidate => !shouldKeepToolWithFinalReply(candidate, options),
+    )
 
     return {
       executionItems,

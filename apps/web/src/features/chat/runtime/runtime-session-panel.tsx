@@ -21,7 +21,6 @@ import { cn } from '~/lib/cn'
 import { formatElapsedRangeMs, formatPercentFromRatio } from '~/lib/number-format'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { chatSelectors, useChatStore } from '~/store/chat'
-import { useLayoutStore } from '~/store/layout'
 
 import type {
   ChatRuntimeCrewAgentItem,
@@ -353,8 +352,7 @@ function SubagentsPanel({
   crewState: ChatRuntimeCrewUiSlotState | null
 }) {
   const openSubagentTab = useBrowserPanelStore(state => state.openSubagentTab)
-  const browserPanelOwnerId = useLayoutStore(state => state.activeBrowserPanelOwnerId)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
+  const browserPanelOwnerId = useBrowserPanelStore(state => state.activeOwnerId)
   const agents = crewState ? readCrewAgents(crewState) : []
   const openAgent = (agent: ChatRuntimeCrewAgentItem) => {
     openSubagentTab({
@@ -364,7 +362,6 @@ function SubagentsPanel({
       agentRole: agent.agentRole,
       ownerId: browserPanelOwnerId,
     })
-    setBrowserPanelOpen(true, browserPanelOwnerId)
   }
 
   if (agents.length === 0) {

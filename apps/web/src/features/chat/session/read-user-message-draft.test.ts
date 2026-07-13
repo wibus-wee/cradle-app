@@ -26,7 +26,12 @@ describe('readUserMessageDraft', () => {
       role: 'user',
       parts: [{ type: 'text', text: 'Hello there' }],
     }
-    expect(readUserMessageDraft(message)).toEqual({ text: 'Hello there', contextParts: [], files: [] })
+    expect(readUserMessageDraft(message)).toEqual({
+      text: 'Hello there',
+      contextParts: [],
+      files: [],
+      pastedTexts: [],
+    })
   })
 
   it('returns null for non-user messages', () => {
@@ -78,6 +83,27 @@ describe('readUserMessageDraft', () => {
       files: draft!.files,
     })
     expect(readUserMessageDraft(rebuilt)).toEqual(draft)
+  })
+
+  it('recovers file line comments and collapsed pasted text', () => {
+    const message = buildOptimisticUserMessage({
+      messageId: 'm-line-comment',
+      text: 'Please update this\n\n<pasted_text>\n[{"text":"large pasted body"}]\n</pasted_text>',
+      contextParts: [{
+        type: 'data-cradle-file-line-comment',
+        workspaceId: 'workspace-1',
+        path: 'src/app.ts',
+        lineStart: 4,
+        lineEnd: 4,
+        comment: 'Extract this condition.',
+      }],
+    })
+
+    expect(readUserMessageDraft(message)).toMatchObject({
+      text: 'Please update this',
+      contextParts: [{ type: 'data-cradle-file-line-comment', path: 'src/app.ts', lineStart: 4 }],
+      pastedTexts: [{ text: 'large pasted body' }],
+    })
   })
 })
 

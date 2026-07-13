@@ -1,12 +1,12 @@
 // Provider-native runtime settings helpers for the chat composer.
 import type { TFunction } from 'i18next'
 
-import type { RuntimeSettingsFieldDescriptor, RuntimeSettingsFormValue } from '~/features/agent-management/runtime-settings-schema'
+import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
+import type { RuntimeSettingsFieldDescriptor, RuntimeSettingsFormValue } from '~/features/agent-runtime/runtime-settings-schema'
 import {
   listRuntimeSettingsFieldsForRuntime,
   readRuntimeSettingsFormValues,
-} from '~/features/agent-management/runtime-settings-schema'
-import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
+} from '~/features/agent-runtime/runtime-settings-schema'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 
 import type { RuntimeSettings, RuntimeSettingsPatch, RuntimeSettingsPatchValue } from '../commands/chat-response-command'

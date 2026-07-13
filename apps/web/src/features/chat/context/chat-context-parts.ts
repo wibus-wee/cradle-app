@@ -35,7 +35,20 @@ export interface ChatPluginContextPart {
   position?: number
 }
 
-export type ChatContextPart = ChatSkillContextPart | ChatPluginContextPart
+export interface ChatFileLineCommentContextPart {
+  type: 'data-cradle-file-line-comment'
+  workspaceId: string
+  path: string
+  lineStart: number
+  lineEnd: number
+  comment: string
+  position?: number
+}
+
+export type ChatContextPart
+  = | ChatSkillContextPart
+    | ChatPluginContextPart
+    | ChatFileLineCommentContextPart
 export type ChatSkillContextMessagePart = {
   type: 'data-cradle-skill'
   data: ChatSkillContextPart
@@ -44,7 +57,14 @@ export type ChatPluginContextMessagePart = {
   type: 'data-cradle-plugin'
   data: ChatPluginContextPart
 }
-export type ChatContextMessagePart = ChatSkillContextMessagePart | ChatPluginContextMessagePart
+export type ChatFileLineCommentContextMessagePart = {
+  type: 'data-cradle-file-line-comment'
+  data: ChatFileLineCommentContextPart
+}
+export type ChatContextMessagePart
+  = | ChatSkillContextMessagePart
+    | ChatPluginContextMessagePart
+    | ChatFileLineCommentContextMessagePart
 
 function readSkillContextPayload(part: unknown): ChatSkillContextPart | null {
   if (!part || typeof part !== 'object') {
@@ -54,9 +74,17 @@ function readSkillContextPayload(part: unknown): ChatSkillContextPart | null {
   if (record.type !== 'data-cradle-skill') {
     return null
   }
-  const data = record.data && typeof record.data === 'object'
-    ? record.data as { type?: unknown, name?: unknown, path?: unknown, scope?: unknown, description?: unknown, position?: unknown }
-    : null
+  const data
+    = record.data && typeof record.data === 'object'
+      ? (record.data as {
+          type?: unknown
+          name?: unknown
+          path?: unknown
+          scope?: unknown
+          description?: unknown
+          position?: unknown
+        })
+      : null
   if (
     data?.type !== 'data-cradle-skill'
     || typeof data.name !== 'string'
@@ -75,9 +103,17 @@ function readPluginContextPayload(part: unknown): ChatPluginContextPart | null {
   if (record.type !== 'data-cradle-plugin') {
     return null
   }
-  const data = record.data && typeof record.data === 'object'
-    ? record.data as { type?: unknown, pluginName?: unknown, displayName?: unknown, routeSegment?: unknown, capabilities?: unknown, mcpServers?: unknown }
-    : null
+  const data
+    = record.data && typeof record.data === 'object'
+      ? (record.data as {
+          type?: unknown
+          pluginName?: unknown
+          displayName?: unknown
+          routeSegment?: unknown
+          capabilities?: unknown
+          mcpServers?: unknown
+        })
+      : null
   if (
     data?.type !== 'data-cradle-plugin'
     || typeof data.pluginName !== 'string'
@@ -88,12 +124,40 @@ function readPluginContextPayload(part: unknown): ChatPluginContextPart | null {
   ) {
     return null
   }
-  const nativeMention = readPluginNativeMention((record.data as { nativeMention?: unknown }).nativeMention)
+  const nativeMention = readPluginNativeMention(
+    (record.data as { nativeMention?: unknown }).nativeMention,
+  )
   return {
     ...(record.data as ChatPluginContextPart),
     provider: (record.data as { provider?: unknown }).provider === 'codex' ? 'codex' : 'cradle',
     nativeMention,
   }
+}
+
+function readFileLineCommentPayload(part: unknown): ChatFileLineCommentContextPart | null {
+  if (!part || typeof part !== 'object') {
+    return null
+  }
+  const record = part as { type?: unknown, data?: unknown }
+  if (
+    record.type !== 'data-cradle-file-line-comment'
+    || !record.data
+    || typeof record.data !== 'object'
+  ) {
+    return null
+  }
+  const data = record.data as Partial<ChatFileLineCommentContextPart>
+  if (
+    data.type !== 'data-cradle-file-line-comment'
+    || typeof data.workspaceId !== 'string'
+    || typeof data.path !== 'string'
+    || typeof data.lineStart !== 'number'
+    || typeof data.lineEnd !== 'number'
+    || typeof data.comment !== 'string'
+  ) {
+    return null
+  }
+  return data as ChatFileLineCommentContextPart
 }
 
 function readPluginNativeMention(value: unknown): ChatPluginNativeMention | null {
@@ -118,6 +182,12 @@ export function isChatPluginContextPart(part: unknown): part is ChatPluginContex
   return readPluginContextPayload(part) !== null
 }
 
+export function isChatFileLineCommentContextPart(
+  part: unknown,
+): part is ChatFileLineCommentContextMessagePart {
+  return readFileLineCommentPayload(part) !== null
+}
+
 export function readSkillContextPart(part: unknown): ChatSkillContextPart | null {
   return readSkillContextPayload(part)
 }
@@ -126,11 +196,20 @@ export function readPluginContextPart(part: unknown): ChatPluginContextPart | nu
   return readPluginContextPayload(part)
 }
 
+export function readFileLineCommentContextPart(
+  part: unknown,
+): ChatFileLineCommentContextPart | null {
+  return readFileLineCommentPayload(part)
+}
+
 function toMessageContextPart(part: ChatContextPart): ChatContextMessagePart {
   if (part.type === 'data-cradle-skill') {
     return { type: 'data-cradle-skill', data: part }
   }
-  return { type: 'data-cradle-plugin', data: part }
+  if (part.type === 'data-cradle-plugin') {
+    return { type: 'data-cradle-plugin', data: part }
+  }
+  return { type: 'data-cradle-file-line-comment', data: part }
 }
 
 export function toMessageContextParts(parts: ChatContextPart[]): ChatContextMessagePart[] {
@@ -147,14 +226,17 @@ export function toOrderedUserMessageParts(
   }
 
   const leadingTrim = sourceText.length - sourceText.trimStart().length
-  const sortedParts = [...contextParts].sort((left, right) => (left.position ?? sourceText.length) - (right.position ?? sourceText.length))
+  const sortedParts = [...contextParts].sort(
+    (left, right) => (left.position ?? sourceText.length) - (right.position ?? sourceText.length),
+  )
   const parts: Array<ChatContextMessagePart | { type: 'text', text: string }> = []
   let offset = 0
 
   for (const contextPart of sortedParts) {
-    const position = typeof contextPart.position === 'number'
-      ? Math.max(0, Math.min(text.length, contextPart.position - leadingTrim))
-      : text.length
+    const position
+      = typeof contextPart.position === 'number'
+        ? Math.max(0, Math.min(text.length, contextPart.position - leadingTrim))
+        : text.length
     if (position > offset) {
       parts.push({ type: 'text', text: text.slice(offset, position) })
     }
@@ -175,4 +257,10 @@ export function readSkillContextLabel(part: ChatSkillContextPart): string {
 
 export function readPluginContextLabel(part: ChatPluginContextPart): string {
   return part.displayName || part.pluginName
+}
+
+export function readFileLineCommentContextLabel(part: ChatFileLineCommentContextPart): string {
+  const lines
+    = part.lineStart === part.lineEnd ? `L${part.lineStart}` : `L${part.lineStart}-L${part.lineEnd}`
+  return `${part.path}:${lines}`
 }

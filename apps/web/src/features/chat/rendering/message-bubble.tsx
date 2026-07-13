@@ -1,5 +1,7 @@
 import { Streamdown } from '@cradle/streamdown'
 import {
+  BookmarkLine as BookmarkIcon,
+  BookmarksLine as MarkerIcon,
   CheckLine as CheckIcon,
   CopyLine as CopyIcon,
   PencilLine as PencilIcon,
@@ -9,21 +11,17 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
+import { toastManager } from '~/components/ui/toast'
+import { sessionEnvironmentApi } from '~/features/session-environment/api/session-environment'
 import { cn } from '~/lib/cn'
 import { chatSelectors } from '~/store/chat'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
 import { readChatContinuationMetadata } from '../capabilities/chat-continuation-metadata'
-import {
-  readBangCommandMetadata,
-  readBangResultMetadata,
-} from '../commands/bang-command-metadata'
+import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
 import { BangCommandBlock, BangCommandPromptBlock } from './blocks/bang-command-block'
 import { ReasoningBlock } from './blocks/reasoning-block'
-import type {
-  ChatRenderItem,
-  ChatRenderSegment,
-} from './chat-render-plan'
+import type { ChatRenderItem, ChatRenderSegment } from './chat-render-plan'
 import {
   groupMessageParts,
   splitExecutionPhase,
@@ -32,12 +30,18 @@ import {
 import { useChatRenderStore, useChatRenderStoreApi } from './chat-render-store'
 import { ImageLightbox } from './image-lightbox'
 import { MarkdownFileLink } from './markdown-file-link'
-import { FileAttachmentBlock, PluginContextBlock, SkillContextBlock } from './message-attachment-blocks'
-import { ExecutionPhaseFold, GoalMessageLabel, SteerMessageLabel, ThinkingPlaceholder } from './message-bubble-chrome'
-import type {
-  MessageFrame,
-  MessageTextTransform,
-} from './message-bubble-selectors'
+import {
+  FileAttachmentBlock,
+  PluginContextBlock,
+  SkillContextBlock,
+} from './message-attachment-blocks'
+import {
+  ExecutionPhaseFold,
+  GoalMessageLabel,
+  SteerMessageLabel,
+  ThinkingPlaceholder,
+} from './message-bubble-chrome'
+import type { MessageFrame, MessageTextTransform } from './message-bubble-selectors'
 import {
   areMessageFramesEqual,
   areRenderSegmentsEqual,
@@ -57,6 +61,7 @@ import {
   readUserDisplayText,
 } from './message-bubble-selectors'
 import {
+  MessageFileLineCommentContextPartById,
   MessageFilePartById,
   MessagePluginContextPartById,
   MessageReasoningPartById,
@@ -189,7 +194,12 @@ const MessageCopyActionById = ({
   }, [])
 
   const handleCopy = async () => {
-    const plainText = readPlainTextFromState(chatStore.getState(), sessionId, messageId, textTransform)
+    const plainText = readPlainTextFromState(
+      chatStore.getState(),
+      sessionId,
+      messageId,
+      textTransform,
+    )
     await navigator.clipboard.writeText(plainText)
     setCopied(true)
 
@@ -201,6 +211,59 @@ const MessageCopyActionById = ({
       setCopied(false)
       copyFeedbackTimerRef.current = null
     }, 1500)
+  }
+
+  const handlePin = async () => {
+    const result = await sessionEnvironmentApi.pinMessage({
+      path: { id: sessionId, messageId },
+    })
+    if (result.error) {
+      toastManager.add({ type: 'error', title: 'Pin failed', description: String(result.error) })
+      return
+    }
+    toastManager.add({ type: 'success', title: 'Message pinned' })
+  }
+
+  const handleMarkSelection = async () => {
+    const selection = window.getSelection()
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+    const bubble = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`)
+    const content = bubble?.querySelector('[data-message-content]')
+    if (
+      !selection
+      || !range
+      || !content
+      || selection.isCollapsed
+      || !content.contains(range.startContainer)
+      || !content.contains(range.endContainer)
+    ) {
+      toastManager.add({ type: 'error', title: 'Select text in this message first' })
+      return
+    }
+    const startRange = document.createRange()
+    startRange.selectNodeContents(content)
+    startRange.setEnd(range.startContainer, range.startOffset)
+    const endRange = document.createRange()
+    endRange.selectNodeContents(content)
+    endRange.setEnd(range.endContainer, range.endOffset)
+    const selectedText = range.toString()
+    const result = await sessionEnvironmentApi.createMarker({
+      path: { id: sessionId },
+      body: {
+        messageId,
+        startOffset: startRange.toString().length,
+        endOffset: endRange.toString().length,
+        selectedText,
+        style: 'highlight',
+        color: 'yellow',
+      },
+    })
+    if (result.error) {
+      toastManager.add({ type: 'error', title: 'Marker failed', description: String(result.error) })
+      return
+    }
+    selection.removeAllRanges()
+    toastManager.add({ type: 'success', title: 'Selection marked' })
   }
 
   if (!hasPlainText && !editAction) {
@@ -227,12 +290,38 @@ const MessageCopyActionById = ({
           data-testid="chat-edit-previous-btn"
         >
           {editAction.busy
-            ? (
-                <Spinner className="size-3.5" aria-hidden="true" />
-              )
-            : (
-                <PencilIcon className="size-3.5" aria-hidden="true" />
-              )}
+? (
+            <Spinner className="size-3.5" aria-hidden="true" />
+          )
+: (
+            <PencilIcon className="size-3.5" aria-hidden="true" />
+          )}
+        </Button>
+      )}
+      {hasPlainText && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={() => void handlePin()}
+          className="text-muted-foreground/50 hover:text-foreground"
+          aria-label="Pin message"
+          title="Pin in environment"
+        >
+          <BookmarkIcon className="size-3.5" aria-hidden="true" />
+        </Button>
+      )}
+      {hasPlainText && isUser && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={() => void handleMarkSelection()}
+          className="text-muted-foreground/50 hover:text-foreground"
+          aria-label="Mark selected text"
+          title="Mark selected text in environment"
+        >
+          <MarkerIcon className="size-3.5" aria-hidden="true" />
         </Button>
       )}
       {hasPlainText && (
@@ -245,12 +334,12 @@ const MessageCopyActionById = ({
           aria-label="Copy message"
         >
           {copied
-            ? (
-                <CheckIcon className="size-3.5 !text-emerald-500" aria-hidden="true" />
-              )
-            : (
-                <CopyIcon className="size-3.5" aria-hidden="true" />
-              )}
+? (
+            <CheckIcon className="size-3.5 !text-emerald-500" aria-hidden="true" />
+          )
+: (
+            <CopyIcon className="size-3.5" aria-hidden="true" />
+          )}
         </Button>
       )}
     </div>
@@ -338,6 +427,14 @@ const MessageSegmentView = ({
           partIndex={segment.partIndex}
         />
       )
+    case 'file-line-comment-context':
+      return (
+        <MessageFileLineCommentContextPartById
+          sessionId={sessionId}
+          messageId={segment.messageId}
+          partIndex={segment.partIndex}
+        />
+      )
     default:
       return null
   }
@@ -364,9 +461,10 @@ const MessageBubbleSegmentsView = ({
   const chatStore = useChatRenderStoreApi()
   const isUser = frame.role === 'user'
   const isAssistant = frame.role === 'assistant'
-  const activeStreamingSegmentKey = isStreaming && !frame.hasHiddenRuntimeUserInputTail
-    ? readActiveStreamingSegmentKey(segments)
-    : null
+  const activeStreamingSegmentKey
+    = isStreaming && !frame.hasHiddenRuntimeUserInputTail
+      ? readActiveStreamingSegmentKey(segments)
+      : null
   const executionPhaseSplit = isStreaming
     ? null
     : splitSegmentExecutionPhase(segments, {
@@ -549,6 +647,7 @@ const MessageBubbleSegmentsView = ({
           {frame.isSteerMessage && <SteerMessageLabel />}
           {frame.isGoalMessage && <GoalMessageLabel />}
           <div
+            data-message-content
             className={cn(
               'rounded-lg text-sm leading-relaxed',
               isUser

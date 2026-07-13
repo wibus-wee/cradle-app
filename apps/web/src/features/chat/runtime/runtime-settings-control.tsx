@@ -19,8 +19,8 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
-import type { RuntimeSettingsFieldDescriptor } from '~/features/agent-management/runtime-settings-schema'
 import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
+import type { RuntimeSettingsFieldDescriptor } from '~/features/agent-runtime/runtime-settings-schema'
 import { cn } from '~/lib/cn'
 
 import type { RuntimeSettings, RuntimeSettingsPatch } from '../commands/chat-response-command'

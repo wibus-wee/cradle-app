@@ -34,9 +34,15 @@
   --dv-inactivegroup-hiddenpanel-tab-color: var(--text-dim);
 
   --dv-icon-hover-background-color: var(--accent);
-  --dv-drag-over-background-color: color-mix(in srgb, var(--primary) 12%, transparent);
-  --dv-drag-over-border-color: var(--primary);
-  --dv-drag-over-border: 2px solid var(--primary);
+  /*
+   * Match stock dockview / VS Code split feedback: a soft fill that slides
+   * between quadrants. No loud primary outline — that reads as a custom
+   * "selection box", not a native drop target.
+   */
+  --dv-drag-over-background-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --dv-drag-over-border-color: transparent;
+  --dv-drag-over-border: none;
+  --dv-transition-duration: 120ms;
 
   --dv-floating-box-shadow: var(--shadow-lg);
   --dv-floating-border: 1px solid var(--border);
@@ -62,8 +68,55 @@
     color var(--duration-quick) var(--ease-standard);
 }
 
-/* External-drag overlay (sidebar session → new split pane) reuses the same
-   accent treatment as dockview's own internal drag overlay. */
+/* External HTML5 drag overlay (dockview multi-pane) keeps dockview's own
+   geometry transitions; just ensure opacity eases consistently. */
 .dockview-theme-cradle .dv-drop-target-dropzone {
-  transition: opacity var(--duration-quick) var(--ease-standard);
+  transition: opacity var(--dv-transition-duration, 120ms) ease-out;
+}
+
+/*
+ * Custom first-split / top-tab indicator — mirrors dockview's
+ * `.dv-drop-target-selection` geometry animation so flat + tab hovers
+ * feel like the same system as multi-pane dockview drops.
+ */
+@keyframes chat-split-drop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.chat-split-drop-indicator {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: var(--dv-drag-over-border, none);
+  background-color: var(
+    --dv-drag-over-background-color,
+    color-mix(in srgb, var(--foreground) 10%, transparent)
+  );
+  border-radius: var(--dv-border-radius, var(--radius-md));
+  opacity: 1;
+  will-change: top, left, width, height, opacity;
+  /* Appear once; subsequent quadrant moves only use the geometry transition. */
+  animation: chat-split-drop-in var(--dv-transition-duration, 120ms) ease-out;
+  transition:
+    top var(--dv-transition-duration, 120ms) ease-out,
+    left var(--dv-transition-duration, 120ms) ease-out,
+    width var(--dv-transition-duration, 120ms) ease-out,
+    height var(--dv-transition-duration, 120ms) ease-out,
+    opacity var(--dv-transition-duration, 120ms) ease-out;
+}
+
+.chat-split-drop-indicator-host {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.chat-split-drop-indicator-host-local {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
 }

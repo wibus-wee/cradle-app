@@ -124,25 +124,73 @@ export const ChatRuntimeModel = {
     surfaceId: t.String({ minLength: 1 }),
   }),
 
-  composerDraftPayload: t.Object({
-    text: t.String(),
-    contextParts: t.Array(contextPartSchema),
-  }, { additionalProperties: false }),
-
-  composerDraftWriteBody: t.Object({
-    draft: t.Object({
+  composerDraftPayload: t.Object(
+    {
       text: t.String(),
       contextParts: t.Array(contextPartSchema),
-    }, { additionalProperties: false }),
-  }, { additionalProperties: false }),
+      files: t.Array(filePartSchema),
+      pastedTexts: t.Array(
+        t.Object(
+          {
+            id: t.String({ minLength: 1 }),
+            text: t.String(),
+            lineCount: t.Number({ minimum: 0 }),
+            charCount: t.Number({ minimum: 0 }),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    },
+    { additionalProperties: false },
+  ),
+
+  composerDraftWriteBody: t.Object(
+    {
+      draft: t.Object(
+        {
+          text: t.String(),
+          contextParts: t.Array(contextPartSchema),
+          files: t.Array(filePartSchema),
+          pastedTexts: t.Array(
+            t.Object(
+              {
+                id: t.String({ minLength: 1 }),
+                text: t.String(),
+                lineCount: t.Number({ minimum: 0 }),
+                charCount: t.Number({ minimum: 0 }),
+              },
+              { additionalProperties: false },
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    },
+    { additionalProperties: false },
+  ),
 
   composerDraftResponse: t.Object({
     surfaceId: t.String(),
     draft: t.Union([
-      t.Object({
-        text: t.String(),
-        contextParts: t.Array(contextPartSchema),
-      }, { additionalProperties: false }),
+      t.Object(
+        {
+          text: t.String(),
+          contextParts: t.Array(contextPartSchema),
+          files: t.Array(filePartSchema),
+          pastedTexts: t.Array(
+            t.Object(
+              {
+                id: t.String({ minLength: 1 }),
+                text: t.String(),
+                lineCount: t.Number({ minimum: 0 }),
+                charCount: t.Number({ minimum: 0 }),
+              },
+              { additionalProperties: false },
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
       t.Null(),
     ]),
     revision: t.Number(),
@@ -395,10 +443,13 @@ export const ChatRuntimeModel = {
     terminated: t.Boolean(),
   }),
 
-  chatMessages: t.Object({
-    revision: t.Number({ minimum: 0 }),
-    rows: t.Array(chatMessageSnapshotSchema),
-  }, { additionalProperties: false }),
+  chatMessages: t.Object(
+    {
+      revision: t.Number({ minimum: 0 }),
+      rows: t.Array(chatMessageSnapshotSchema),
+    },
+    { additionalProperties: false },
+  ),
 
   queueItem: queueItemSchema,
 

@@ -6,7 +6,6 @@ import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 import { clampPercent, formatTokenCount } from '~/lib/number-format'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import type {
   ChatRuntimeCompactUiSlotState,
@@ -102,8 +101,7 @@ export function ContextUsageDetailPanel({
   const openContextUsageReportTab = useBrowserPanelStore(
     state => state.openContextUsageReportTab,
   )
-  const browserPanelOwnerId = useLayoutStore(state => state.activeBrowserPanelOwnerId)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
+  const browserPanelOwnerId = useBrowserPanelStore(state => state.activeOwnerId)
   const { data, isError, isLoading } = useQuery({
     queryKey: ['chat', 'context-window-usage', sessionId ?? 'no-session'],
     queryFn: ({ signal }) => getChatRuntimeContextUsage(sessionId!, signal),
@@ -122,7 +120,6 @@ export function ContextUsageDetailPanel({
       return
     }
     openContextUsageReportTab({ sessionId, ownerId: browserPanelOwnerId })
-    setBrowserPanelOpen(true, browserPanelOwnerId)
     onClose()
   }
 

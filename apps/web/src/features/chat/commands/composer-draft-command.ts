@@ -62,7 +62,9 @@ export async function writeServerComposerDraft(
   return projectComposerDraftResponse(data)
 }
 
-export async function deleteServerComposerDraft(surfaceId: string): Promise<ComposerDraftServerState> {
+export async function deleteServerComposerDraft(
+  surfaceId: string,
+): Promise<ComposerDraftServerState> {
   const { data } = await deleteChatComposerDraftsBySurfaceId({
     path: { surfaceId },
     throwOnError: true,
@@ -109,13 +111,17 @@ function appendServerDraftOperation(surfaceId: string, operation: () => Promise<
   })
 }
 
-function projectComposerDraftResponse(response: ComposerDraftApiResponse): ComposerDraftServerState {
+function projectComposerDraftResponse(
+  response: ComposerDraftApiResponse,
+): ComposerDraftServerState {
   return {
     surfaceId: response.surfaceId,
     draft: response.draft
       ? {
           text: response.draft.text,
           contextParts: response.draft.contextParts as ChatContextPart[],
+          files: (response.draft.files ?? []) as ComposerDraft['files'],
+          pastedTexts: (response.draft.pastedTexts ?? []) as ComposerDraft['pastedTexts'],
         }
       : null,
     revision: response.revision,
