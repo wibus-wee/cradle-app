@@ -773,6 +773,15 @@ describe('profiles capability', () => {
         })
       }
 
+      if (url === 'https://example.com/v1/models') {
+        return new Response(JSON.stringify({
+          data: [{ id: 'vendor-gpt4o' }],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+
       throw new Error(`Unexpected fetch request: ${url}`)
     })
 
