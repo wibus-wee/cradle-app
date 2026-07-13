@@ -1228,6 +1228,31 @@ export const zGetAssetsByIdContentPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetBackgroundJobsQuery = z.object({
+    workspaceId: z.string().min(1).optional(),
+    ownerNamespace: z.string().min(1).optional(),
+    ownerResourceType: z.string().min(1).optional(),
+    ownerResourceId: z.string().min(1).optional(),
+    ownerResourceKey: z.string().min(1).optional(),
+    kind: z.string().min(1).optional(),
+    status: z.enum([
+        'pending',
+        'running',
+        'succeeded',
+        'failed',
+        'cancelled'
+    ]).optional(),
+    limit: z.number().gte(1).lte(200).optional()
+});
+
+export const zGetBackgroundJobsByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostBackgroundJobsByIdCancelPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zGetSessionsQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     origin: z.string().min(1).optional(),

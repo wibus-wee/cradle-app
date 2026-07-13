@@ -191,6 +191,30 @@ export type PutPreferencesChatResponses = {
 
 export type PutPreferencesChatResponse = PutPreferencesChatResponses[keyof PutPreferencesChatResponses];
 
+export type GetPreferencesKeybindingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/preferences/keybindings';
+};
+
+export type GetPreferencesKeybindingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        configPath: string;
+        rules: Array<{
+            command: string;
+            key: string;
+            when?: string;
+        }>;
+        errors: Array<string>;
+    };
+};
+
+export type GetPreferencesKeybindingsResponse = GetPreferencesKeybindingsResponses[keyof GetPreferencesKeybindingsResponses];
+
 export type GetPreferencesCodexData = {
     body?: never;
     path?: never;
@@ -4022,6 +4046,7 @@ export type GetProvidersTargetsByProviderTargetIdModelsCacheResponses = {
         }>;
         cached: boolean;
         stale: boolean;
+        coolingDown: boolean;
         providerLabel: string;
     };
 };
@@ -4072,6 +4097,7 @@ export type GetProvidersByProfileIdModelsCacheResponses = {
         }>;
         cached: boolean;
         stale: boolean;
+        coolingDown: boolean;
     };
 };
 
@@ -5536,6 +5562,151 @@ export type GetAssetsByIdContentData = {
     query?: never;
     url: '/assets/{id}/content';
 };
+
+export type GetBackgroundJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        ownerNamespace?: string;
+        ownerResourceType?: string;
+        ownerResourceId?: string;
+        ownerResourceKey?: string;
+        kind?: string;
+        status?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        limit?: number;
+    };
+    url: '/background-jobs/';
+};
+
+export type GetBackgroundJobsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetBackgroundJobsResponse = GetBackgroundJobsResponses[keyof GetBackgroundJobsResponses];
+
+export type GetBackgroundJobsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/background-jobs/{id}';
+};
+
+export type GetBackgroundJobsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type GetBackgroundJobsByIdResponse = GetBackgroundJobsByIdResponses[keyof GetBackgroundJobsByIdResponses];
+
+export type PostBackgroundJobsByIdCancelData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/background-jobs/{id}/cancel';
+};
+
+export type PostBackgroundJobsByIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        ownerNamespace: string;
+        ownerResourceType: string;
+        ownerResourceId: string;
+        ownerResourceKey: string | null;
+        kind: string;
+        status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        sourceKind: string;
+        sourceSessionId: string | null;
+        sourceRunId: string | null;
+        attempts: number;
+        maxAttempts: number;
+        context: unknown;
+        progress: unknown;
+        result: unknown;
+        errorCode: string | null;
+        errorMessage: string | null;
+        errorDetails: unknown;
+        cancelRequestedAt: number | null;
+        startedAt: number | null;
+        finishedAt: number | null;
+        projectedAt: number | null;
+        projectionAttempts: number;
+        projectionError: string | null;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostBackgroundJobsByIdCancelResponse = PostBackgroundJobsByIdCancelResponses[keyof PostBackgroundJobsByIdCancelResponses];
 
 export type GetSessionsData = {
     body?: never;

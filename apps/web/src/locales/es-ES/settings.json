@@ -943,6 +943,10 @@
   "shortcut.builtIn.workspaceCopyRelativePath.label": "Copiar ruta relativa",
   "shortcut.configurable.description": "Atajos de escritorio que se pueden cambiar aquí.",
   "shortcut.configurable.title": "Atajos configurables",
+  "shortcut.file.description": "Reemplaza comandos registrados con reglas JSON. Las teclas admiten mod, cmd, ctrl, shift y alt; las expresiones when admiten !, &&, || y paréntesis.",
+  "shortcut.file.open": "Abrir archivo",
+  "shortcut.file.pathLabel": "Ruta de configuración",
+  "shortcut.file.title": "Archivo de atajos",
   "shortcut.overlay.dismissHint": "para cerrar",
   "shortcut.overlay.title": "Atajos de teclado",
   "shortcut.page.description": "Configura el comportamiento de los atajos globales de escritorio.",
@@ -1024,5 +1028,6 @@
   "worktrees.list.loading": "Cargando worktrees...",
   "worktrees.list.title": "Worktrees administrados por Cradle",
   "worktrees.page.description": "Gestiona los git worktrees creados por Cradle en todos los workspaces y libera espacio cuando los checkouts aislados antiguos ya no sean necesarios.",
-  "worktrees.page.title": "Worktrees"
+  "worktrees.page.title": "Worktrees",
+  "nav.editor": "Editor"
 }

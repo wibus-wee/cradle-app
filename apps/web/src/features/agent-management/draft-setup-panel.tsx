@@ -73,6 +73,15 @@ const SecretCreateResponseSchema = z.object({
   id: z.string().min(1),
 })
 
+function universalEndpointDefaults(baseUrl: string): { openaiBaseUrl: string, anthropicBaseUrl: string } {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '')
+  const anthropicBaseUrl = trimmed.replace(/\/v1$/i, '')
+  return {
+    openaiBaseUrl: /\/v1$/i.test(trimmed) ? trimmed : `${trimmed}/v1`,
+    anthropicBaseUrl,
+  }
+}
+
 export function DraftSetupPanel({
   draft,
   onSelectPreset,
@@ -303,6 +312,14 @@ function PresetSetupForm({
     const selectedClaudeAuthMode = isClaudeProvider
       ? normalizeClaudeAuthMode(currentValues.values.claudeAuthMode)
       : CLAUDE_AUTH_MODE_API_KEY
+    if (isUniversalPreset) {
+      const openaiBaseUrl = currentValues.values.openaiBaseUrl?.trim() ?? ''
+      const anthropicBaseUrl = currentValues.values.anthropicBaseUrl?.trim() ?? ''
+      if (!openaiBaseUrl || !anthropicBaseUrl) {
+        setStatus({ ok: false, text: 'Both OpenAI and Anthropic endpoints are required' })
+        return
+      }
+    }
     if (requiresApiKey) {
       if (isCodexProvider) {
         if (selectedCodexAuthMode === CODEX_AUTH_MODE_CHATGPT && !chatgptCredentialRef) {
@@ -364,8 +381,11 @@ function PresetSetupForm({
           ? ''
           : (currentValues.values.baseUrl ?? '')
       }
-      else if (currentValues.values.baseUrl) {
-        config.baseUrl = currentValues.values.baseUrl
+      else {
+        const baseUrl = currentValues.values.baseUrl ?? ''
+        const defaults = universalEndpointDefaults(baseUrl)
+        config.openaiBaseUrl = currentValues.values.openaiBaseUrl?.trim() || defaults.openaiBaseUrl
+        config.anthropicBaseUrl = currentValues.values.anthropicBaseUrl?.trim() || defaults.anthropicBaseUrl
       }
       if (currentValues.values.model) {
         config.model = currentValues.values.model
@@ -438,7 +458,37 @@ function PresetSetupForm({
           />
         </SettingsRow>
 
-        {showEndpoint && (
+        {isUniversalPreset
+          ? (
+              <>
+                <SettingsDivider />
+                <SettingsRow label="Endpoints" description="OpenAI normally uses /v1; Anthropic normally does not." vertical>
+                  <div className="flex w-full max-w-[28rem] flex-col gap-2">
+                    <Input
+                      data-testid="provider-openai-baseurl"
+                      value={values.openaiBaseUrl ?? ''}
+                      onChange={(event) => {
+                        const nextOpenaiBaseUrl = event.target.value
+                        form.setValue('values.openaiBaseUrl', nextOpenaiBaseUrl, { shouldDirty: true })
+                        if (!values.anthropicBaseUrl) {
+                          form.setValue('values.anthropicBaseUrl', universalEndpointDefaults(nextOpenaiBaseUrl).anthropicBaseUrl, { shouldDirty: true })
+                        }
+                      }}
+                      placeholder="OpenAI endpoint, e.g. https://api.example.com/v1"
+                      className="h-9 text-[12.5px] font-mono"
+                    />
+                    <Input
+                      data-testid="provider-anthropic-baseurl"
+                      value={values.anthropicBaseUrl ?? ''}
+                      onChange={event => form.setValue('values.anthropicBaseUrl', event.target.value, { shouldDirty: true })}
+                      placeholder="Anthropic endpoint, e.g. https://api.example.com"
+                      className="h-9 text-[12.5px] font-mono"
+                    />
+                  </div>
+                </SettingsRow>
+              </>
+            )
+          : showEndpoint && (
           <>
             <SettingsDivider />
             <SettingsRow label="Endpoint" description="Base URL for the API">

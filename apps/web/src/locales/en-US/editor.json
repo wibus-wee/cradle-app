@@ -1,0 +1,13 @@
+{
+  "chooseEditor": "Choose editor",
+  "description": "Choose your favorite editor for opening files and worktrees.",
+  "desktopOnly": "Editor selection is available in the Cradle desktop app.",
+  "favoriteHint": "Editors detected on this machine.",
+  "favoriteLabel": "Favorite editor",
+  "loading": "Detecting editors…",
+  "noneFound": "No supported editors were detected.",
+  "open": "Open",
+  "openInPreferred": "Open in {{editor}}",
+  "title": "Editor",
+  "toast.failed": "Could not open the path in the editor."
+}

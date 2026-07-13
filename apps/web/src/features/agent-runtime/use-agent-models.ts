@@ -105,6 +105,7 @@ const ProviderTargetModelsCacheSchema = z.object({
   models: ModelDescriptorListSchema,
   cached: z.boolean(),
   stale: z.boolean(),
+  coolingDown: z.boolean(),
   providerLabel: z.string(),
 })
 const ModelInventoryErrorSchema = z.object({
@@ -133,7 +134,7 @@ function isApiProviderKind(providerKind: ProviderKind): providerKind is ApiProvi
   return providerKind !== 'cli-tool'
 }
 
-export function shouldRefreshProviderTargetModelsOnCacheMiss(
+export function isRuntimeOwnedProviderTarget(
   target: Pick<ProviderTarget, 'id'> & { sourceKey?: string | null },
 ): boolean {
   return target.id.startsWith(RUNTIME_OWNED_PROVIDER_TARGET_PREFIX)
@@ -144,9 +145,10 @@ export function shouldRefreshProviderTargetModelsOnCacheMiss(
 export function shouldLiveRefreshModelInventory(cache: {
   cached: boolean
   stale: boolean
+  coolingDown: boolean
   models: readonly unknown[]
 }): boolean {
-  return !cache.cached || cache.models.length === 0 || cache.stale
+  return !cache.coolingDown && (!cache.cached || cache.models.length === 0 || cache.stale)
 }
 
 const inFlightProviderTargetModelRefreshes = new Map<string, Promise<ModelDescriptor[]>>()
@@ -299,6 +301,12 @@ async function fetchVisibleModelsForProviderTarget(
     return filterVisibleModels(liveModels, visibility)
   }
 
+  if (cache.coolingDown) {
+    return cache.cached
+      ? filterVisibleModels(ModelDescriptorListSchema.parse(cache.models), visibility)
+      : []
+  }
+
   if (cache.cached && cache.models.length > 0) {
     return filterVisibleModels(ModelDescriptorListSchema.parse(cache.models), visibility)
   }
@@ -448,19 +456,20 @@ export function useProviderTargetModelMap(
   const [requestedProviderTargetIds, setRequestedProviderTargetIds] = useState<Set<string>>(
     () => new Set(initialProviderTargetIds.flatMap(targetId => (targetId ? [targetId] : []))),
   )
+  const requestedProviderTargetIdsRef = useRef(new Set(initialProviderTargetIds.flatMap(targetId => (targetId ? [targetId] : []))))
 
   useEffect(() => {
-    setRequestedProviderTargetIds((current) => {
-      let changed = false
-      const next = new Set(current)
-      for (const targetId of initialProviderTargetIds) {
-        if (targetId && !next.has(targetId)) {
-          next.add(targetId)
-          changed = true
-        }
+    const next = new Set(requestedProviderTargetIdsRef.current)
+    for (const targetId of initialProviderTargetIds) {
+      if (targetId) {
+        next.add(targetId)
       }
-      return changed ? next : current
-    })
+    }
+    if (next.size === requestedProviderTargetIdsRef.current.size) {
+      return
+    }
+    requestedProviderTargetIdsRef.current = next
+    setRequestedProviderTargetIds(next)
   }, [initialProviderTargetIds])
 
   const requestedTargets = useMemo(
@@ -539,6 +548,13 @@ export function useProviderTargetModelMap(
     if (!target.enabled || !isApiProviderKind(target.providerKind)) {
       return
     }
+    // Runtime-owned targets (currently OpenCode) are projected at runtime and
+    // have no durable provider_target_model_cache row. Their initial query
+    // already fetched the live catalog; treating that permanent cache miss as
+    // a background-refresh signal creates an endless fetch → query update loop.
+    if (isRuntimeOwnedProviderTarget(target)) {
+      return
+    }
     if (refreshesRef.current.has(target.id)) {
       return
     }
@@ -583,27 +599,27 @@ export function useProviderTargetModelMap(
   }, [ensureProviderTargetModelsFresh, inventorySyncKey])
 
   const requestProviderTargetModels = useCallback((targetId: string, options?: { refresh?: boolean }) => {
-    setRequestedProviderTargetIds((current) => {
-      if (current.has(targetId)) {
-        return current
-      }
-      const next = new Set(current)
-      next.add(targetId)
-      return next
-    })
-
     const target = providerTargets.find(candidate => candidate.id === targetId)
     if (!target?.enabled) {
       return
     }
 
-    if (options?.refresh) {
-      liveRefreshProviderTargetModels(target)
-      return
+    const alreadyRequested = requestedProviderTargetIdsRef.current.has(targetId)
+    if (!alreadyRequested) {
+      const next = new Set(requestedProviderTargetIdsRef.current)
+      next.add(targetId)
+      requestedProviderTargetIdsRef.current = next
+      setRequestedProviderTargetIds(next)
     }
 
-    ensureProviderTargetModelsFresh(target)
-  }, [ensureProviderTargetModelsFresh, liveRefreshProviderTargetModels, providerTargets])
+    if (options?.refresh) {
+      liveRefreshProviderTargetModels(target)
+    }
+
+    // A mounted query owns the initial cache read and any automatic refresh.
+    // Menu open, focus, hover, and a previously failed query must never retry
+    // the provider implicitly. Only an explicit { refresh: true } may do that.
+  }, [liveRefreshProviderTargetModels, providerTargets])
 
   const modelsByProviderTargetId: Record<string, ModelDescriptor[]> = {}
   const loadingProviderTargetIds = new Set<string>()

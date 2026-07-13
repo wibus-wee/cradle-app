@@ -22,10 +22,13 @@ import {
   CodexPreferencesJsonSchema,
   DesktopPreferencesJsonSchema,
   JarvisPreferencesJsonSchema,
+  KeybindingsPreferencesJsonSchema,
   NetworkPreferencesJsonSchema,
 } from './model'
 
-export type AppFeatureFlagKey = keyof Static<typeof PreferencesModel['appPreferences']>['featureFlags']
+export type AppFeatureFlagKey = keyof Static<
+  (typeof PreferencesModel)['appPreferences']
+>['featureFlags']
 
 function getPath(name: string): string {
   const config = getServerConfig()
@@ -33,12 +36,14 @@ function getPath(name: string): string {
   return join(baseDir, 'preferences', `${name}.json`)
 }
 
-export async function getChatPreferences(): Promise<Static<typeof PreferencesModel['chatPreferences']>> {
+export async function getChatPreferences(): Promise<
+  Static<(typeof PreferencesModel)['chatPreferences']>
+> {
   const filePath = getPath('chat')
   try {
     return ChatPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return ChatPreferencesJsonSchema.parse(undefined)
     }
@@ -46,12 +51,14 @@ export async function getChatPreferences(): Promise<Static<typeof PreferencesMod
   }
 }
 
-export async function getAppPreferences(): Promise<Static<typeof PreferencesModel['appPreferences']>> {
+export async function getAppPreferences(): Promise<
+  Static<(typeof PreferencesModel)['appPreferences']>
+> {
   const filePath = getPath('app')
   try {
     return AppPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return AppPreferencesJsonSchema.parse(undefined)
     }
@@ -59,12 +66,12 @@ export async function getAppPreferences(): Promise<Static<typeof PreferencesMode
   }
 }
 
-export function getAppPreferencesSync(): Static<typeof PreferencesModel['appPreferences']> {
+export function getAppPreferencesSync(): Static<(typeof PreferencesModel)['appPreferences']> {
   const filePath = getPath('app')
   try {
     return AppPreferencesJsonSchema.parse(readFileSync(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return AppPreferencesJsonSchema.parse(undefined)
     }
@@ -87,7 +94,9 @@ export function assertAppFeatureFlagEnabled(
   throw new AppError(error)
 }
 
-export async function setAppPreferences(preferences: Static<typeof PreferencesModel['appPreferences']>): Promise<void> {
+export async function setAppPreferences(
+  preferences: Static<(typeof PreferencesModel)['appPreferences']>,
+): Promise<void> {
   const filePath = getPath('app')
   const normalized = AppPreferencesJsonSchema.parse(JSON.stringify(preferences))
   await mkdir(dirname(filePath), { recursive: true })
@@ -95,13 +104,19 @@ export async function setAppPreferences(preferences: Static<typeof PreferencesMo
   if (normalized.featureFlags.nativeProviderSkillProjection) {
     applyNativeProviderSkillProjections()
   }
-  else {
+ else {
     removeNativeProviderSkillProjections()
   }
-  const { setCodexAppServerLogInsertBlocker } = await import('../chat-runtime-providers/codex/app-server/log-insert-blocker')
-  const result = setCodexAppServerLogInsertBlocker(normalized.featureFlags.blockCodexAppServerLogInserts)
+  const { setCodexAppServerLogInsertBlocker }
+    = await import('../chat-runtime-providers/codex/app-server/log-insert-blocker')
+  const result = setCodexAppServerLogInsertBlocker(
+    normalized.featureFlags.blockCodexAppServerLogInserts,
+  )
   if (result.status === 'failed') {
-    console.warn('[preferences] Failed to apply Codex app-server log insert blocker feature flag:', result)
+    console.warn(
+      '[preferences] Failed to apply Codex app-server log insert blocker feature flag:',
+      result,
+    )
   }
 }
 
@@ -113,10 +128,10 @@ function applyNativeProviderSkillProjections(): void {
   for (const target of targets) {
     registerNativeSkillProjectionTarget(target)
   }
-  reconcileNativeSkillProjections([
-    ...getBuiltinSkillProjectionSources(),
-    ...getPluginSkillProjectionSources(),
-  ], targets)
+  reconcileNativeSkillProjections(
+    [...getBuiltinSkillProjectionSources(), ...getPluginSkillProjectionSources()],
+    targets,
+  )
 }
 
 function removeNativeProviderSkillProjections(): void {
@@ -130,12 +145,12 @@ function removeNativeProviderSkillProjections(): void {
   }
 }
 
-export function getChatPreferencesSync(): Static<typeof PreferencesModel['chatPreferences']> {
+export function getChatPreferencesSync(): Static<(typeof PreferencesModel)['chatPreferences']> {
   const filePath = getPath('chat')
   try {
     return ChatPreferencesJsonSchema.parse(readFileSync(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return ChatPreferencesJsonSchema.parse(undefined)
     }
@@ -143,19 +158,23 @@ export function getChatPreferencesSync(): Static<typeof PreferencesModel['chatPr
   }
 }
 
-export async function setChatPreferences(preferences: Static<typeof PreferencesModel['chatPreferencesUpdate']>): Promise<void> {
+export async function setChatPreferences(
+  preferences: Static<(typeof PreferencesModel)['chatPreferencesUpdate']>,
+): Promise<void> {
   const filePath = getPath('chat')
   const normalized = ChatPreferencesJsonSchema.parse(JSON.stringify(preferences))
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8')
 }
 
-export async function getCodexPreferences(): Promise<Static<typeof PreferencesModel['codexPreferences']>> {
+export async function getCodexPreferences(): Promise<
+  Static<(typeof PreferencesModel)['codexPreferences']>
+> {
   const filePath = getPath('codex')
   try {
     return CodexPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return CodexPreferencesJsonSchema.parse(undefined)
     }
@@ -163,12 +182,12 @@ export async function getCodexPreferences(): Promise<Static<typeof PreferencesMo
   }
 }
 
-export function getCodexPreferencesSync(): Static<typeof PreferencesModel['codexPreferences']> {
+export function getCodexPreferencesSync(): Static<(typeof PreferencesModel)['codexPreferences']> {
   const filePath = getPath('codex')
   try {
     return CodexPreferencesJsonSchema.parse(readFileSync(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return CodexPreferencesJsonSchema.parse(undefined)
     }
@@ -176,19 +195,23 @@ export function getCodexPreferencesSync(): Static<typeof PreferencesModel['codex
   }
 }
 
-export async function setCodexPreferences(preferences: Static<typeof PreferencesModel['codexPreferences']>): Promise<void> {
+export async function setCodexPreferences(
+  preferences: Static<(typeof PreferencesModel)['codexPreferences']>,
+): Promise<void> {
   const filePath = getPath('codex')
   const normalized = CodexPreferencesJsonSchema.parse(JSON.stringify(preferences))
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8')
 }
 
-export async function getDesktopPreferences(): Promise<Static<typeof PreferencesModel['desktopPreferences']>> {
+export async function getDesktopPreferences(): Promise<
+  Static<(typeof PreferencesModel)['desktopPreferences']>
+> {
   const filePath = getPath('desktop')
   try {
     return DesktopPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return DesktopPreferencesJsonSchema.parse(undefined)
     }
@@ -196,19 +219,23 @@ export async function getDesktopPreferences(): Promise<Static<typeof Preferences
   }
 }
 
-export async function setDesktopPreferences(preferences: Static<typeof PreferencesModel['desktopPreferences']>): Promise<void> {
+export async function setDesktopPreferences(
+  preferences: Static<(typeof PreferencesModel)['desktopPreferences']>,
+): Promise<void> {
   const filePath = getPath('desktop')
   const normalized = DesktopPreferencesJsonSchema.parse(JSON.stringify(preferences))
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8')
 }
 
-export async function getNetworkPreferences(): Promise<Static<typeof PreferencesModel['networkPreferences']>> {
+export async function getNetworkPreferences(): Promise<
+  Static<(typeof PreferencesModel)['networkPreferences']>
+> {
   const filePath = getPath('network')
   try {
     return NetworkPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return NetworkPreferencesJsonSchema.parse(undefined)
     }
@@ -216,12 +243,14 @@ export async function getNetworkPreferences(): Promise<Static<typeof Preferences
   }
 }
 
-export function getNetworkPreferencesSync(): Static<typeof PreferencesModel['networkPreferences']> {
+export function getNetworkPreferencesSync(): Static<
+  (typeof PreferencesModel)['networkPreferences']
+> {
   const filePath = getPath('network')
   try {
     return NetworkPreferencesJsonSchema.parse(readFileSync(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return NetworkPreferencesJsonSchema.parse(undefined)
     }
@@ -229,19 +258,23 @@ export function getNetworkPreferencesSync(): Static<typeof PreferencesModel['net
   }
 }
 
-export async function setNetworkPreferences(preferences: Static<typeof PreferencesModel['networkPreferences']>): Promise<void> {
+export async function setNetworkPreferences(
+  preferences: Static<(typeof PreferencesModel)['networkPreferences']>,
+): Promise<void> {
   const filePath = getPath('network')
   const normalized = NetworkPreferencesJsonSchema.parse(JSON.stringify(preferences))
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8')
 }
 
-export async function getJarvisPreferences(): Promise<Static<typeof PreferencesModel['jarvisPreferences']>> {
+export async function getJarvisPreferences(): Promise<
+  Static<(typeof PreferencesModel)['jarvisPreferences']>
+> {
   const filePath = getPath('jarvis')
   try {
     return JarvisPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
   }
-  catch (error) {
+ catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return JarvisPreferencesJsonSchema.parse(undefined)
     }
@@ -249,9 +282,33 @@ export async function getJarvisPreferences(): Promise<Static<typeof PreferencesM
   }
 }
 
-export async function setJarvisPreferences(preferences: Static<typeof PreferencesModel['jarvisPreferences']>): Promise<void> {
+export async function setJarvisPreferences(
+  preferences: Static<(typeof PreferencesModel)['jarvisPreferences']>,
+): Promise<void> {
   const filePath = getPath('jarvis')
   const normalized = JarvisPreferencesJsonSchema.parse(JSON.stringify(preferences))
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8')
+}
+
+export async function getKeybindingsPreferences(): Promise<
+  Static<(typeof PreferencesModel)['keybindingsPreferences']>
+> {
+  const filePath = getPath('keybindings')
+  try {
+    const rules = KeybindingsPreferencesJsonSchema.parse(await readFile(filePath, 'utf8'))
+    return { configPath: filePath, rules, errors: [] }
+  }
+ catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      await mkdir(dirname(filePath), { recursive: true })
+      await writeFile(filePath, '[]\n', 'utf8')
+      return { configPath: filePath, rules: [], errors: [] }
+    }
+    return {
+      configPath: filePath,
+      rules: [],
+      errors: [error instanceof Error ? error.message : String(error)],
+    }
+  }
 }

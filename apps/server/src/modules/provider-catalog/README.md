@@ -16,6 +16,9 @@ This module owns **Inventory** (layer 1):
   - `getCachedModelsForTarget` is **async**: loads inventory from DB, applies current
     `enrichModelsFromRegistryMappings`, then `projectProviderModelListCapabilities`. Mapping changes
     take effect on the next read without a cache invalidation.
+  - Failed upstream refreshes use a two-minute in-process negative-cache cooldown. During that
+    window automatic UI refreshes retain a warm inventory (or return no models on a cold cache)
+    instead of repeatedly probing the provider; an explicit refresh still bypasses it.
 
 ## Files
 
