@@ -20,11 +20,7 @@ import type { ChatContextPart } from '~/features/chat/context/chat-context-parts
 import { readRunRuntimeSettingsPatch } from '~/features/chat/runtime/runtime-settings-presenter'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
-import {
-  classifyProductAnalyticsFailure,
-  trackProductTaskFinished,
-  trackProductTaskStarted,
-} from '~/features/product-analytics/client'
+import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
 import { isLocalWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
@@ -157,19 +153,11 @@ export function NewWorkPage() {
       result = await postWorks({ body })
     }
     catch (requestError) {
-      trackProductTaskFinished(
-        analyticsTask,
-        'failed',
-        classifyProductAnalyticsFailure(requestError),
-      )
+      trackProductTaskFinished(analyticsTask, 'failed')
       throw requestError
     }
     if (result.error || !result.data) {
-      trackProductTaskFinished(
-        analyticsTask,
-        'failed',
-        classifyProductAnalyticsFailure(result.error ?? new Error(t('new.createFailed'))),
-      )
+      trackProductTaskFinished(analyticsTask, 'failed')
       setError(result.error ?? new Error(t('new.createFailed')))
       if (isDirtySourceError(result.error) || isRemoteBaseUnavailableError(result.error)) {
         setPendingObjective({ text, files, contextParts, options })

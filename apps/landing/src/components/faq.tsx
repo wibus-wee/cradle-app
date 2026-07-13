@@ -19,7 +19,7 @@ const FAQS = [
   },
   {
     q: 'Does my code leave my machine?',
-    a: 'No. Cradle is local-first — no cloud relay. API keys live in your system keychain and sessions stay on disk.',
+    a: 'No. Cradle is local-first — no cloud relay, no telemetry. API keys live in your system keychain and sessions stay on disk.',
   },
   {
     q: 'What platforms does it run on?',

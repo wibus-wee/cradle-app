@@ -5,7 +5,7 @@ import { toastManager } from '~/components/ui/toast'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { chatSurfaceId } from '~/navigation/surface-identity'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import type { ComposerDraft } from '~/store/composer-draft'
+import { useLayoutStore } from '~/store/layout'
 
 import type { PlanRefineEditorSaveDetail } from '../../browser/plan-refine-editor'
 import { PLAN_REFINE_EDITOR_SAVE_EVENT } from '../../browser/plan-refine-editor'
@@ -30,7 +30,6 @@ import type {
 import { ComposerSlotStates } from '../composer/composer-slot-states'
 import type { ChatComposerRuntime } from '../composer/use-chat-composer-runtime'
 import type { ComposerAppshotRuntime } from '../composer/use-composer-appshot-capture'
-import type { ChatContextPart } from '../context/chat-context-parts'
 import type { MentionItem, PluginMentionItem } from '../mentions/mention-panel'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { buildExitPlanModePatch } from '../runtime/runtime-settings-presenter'
@@ -44,7 +43,10 @@ const CODEX_PLAN_IMPLEMENTATION_PROMPT_PREFIX = 'PLEASE IMPLEMENT THIS PLAN:'
 const CODEX_PLAN_MAKE_GOAL_PROMPT_PREFIX = 'PLEASE MAKE A GOAL TO IMPLEMENT THIS PLAN:'
 const CODEX_PLAN_REFINE_PROMPT_PREFIX = 'PLEASE REFINE THIS PLAN:'
 
-type ComposerReplaceDraft = ComposerDraft
+type ComposerReplaceDraft = {
+  text: string
+  contextParts: ChatQueueItem['contextParts']
+}
 
 export type RollbackDraftSignal = {
   key: number
@@ -100,8 +102,6 @@ export function ChatComposerSection({
   rollbackDraftSignal,
   clearDraftSignal,
   suspendDraftPersistence,
-  promptHistory,
-  contextIngress,
 }: {
   sessionId: string | null
   runtimeKind?: RuntimeKind | null
@@ -142,15 +142,14 @@ export function ChatComposerSection({
   rollbackDraftSignal?: RollbackDraftSignal | null
   clearDraftSignal?: number
   suspendDraftPersistence?: boolean
-  promptHistory?: ComposerDraft[]
-  contextIngress?: { parts: ChatContextPart[], key: number } | null
 }) {
-  const activeBrowserPanelOwnerId = useBrowserPanelStore(s => s.activeOwnerId)
+  const activeBrowserPanelOwnerId = useLayoutStore(s => s.activeBrowserPanelOwnerId)
+  const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
   const openPlanRefineTab = useBrowserPanelStore(s => s.openPlanRefineTab)
   const [composerReplaceText, setComposerReplaceText] = useState<string | undefined>(undefined)
   const [composerReplaceTextKey, setComposerReplaceTextKey] = useState(0)
   const [composerReplaceDraft, setComposerReplaceDraft] = useState<
-    ComposerReplaceDraft | undefined
+    { text: string, contextParts: ChatQueueItem['contextParts'] } | undefined
   >(undefined)
   const [composerReplaceDraftKey, setComposerReplaceDraftKey] = useState(0)
   const [dismissPlanSignal, setDismissPlanSignal] = useState(0)
@@ -171,9 +170,7 @@ export function ChatComposerSection({
   )
 
   const submitComposerMessage = useCallback(
-    (
-      ...args: Parameters<ChatComposerRuntime['send']>
-    ): SendMessageResult | Promise<SendMessageResult> => {
+    (...args: Parameters<ChatComposerRuntime['send']>): SendMessageResult | Promise<SendMessageResult> => {
       const editingId = editingQueueItemIdRef.current
       if (editingId) {
         const [text, files, contextParts] = args
@@ -186,7 +183,7 @@ export function ChatComposerSection({
               runtimeSettings: runtimeSettings?.settings,
             })
           }
- catch (error) {
+          catch (error) {
             const code = (error as { code?: string } | null)?.code
             const status = (error as { status?: number } | null)?.status
             if (code === 'chat_queue_item_not_pending' || status === 409) {
@@ -196,11 +193,11 @@ export function ChatComposerSection({
                 description: 'This queue item was already claimed or cancelled.',
               })
             }
- else {
+            else {
               throw error
             }
           }
- finally {
+          finally {
             editingQueueItemIdRef.current = null
             setEditingQueueItemId(null)
           }
@@ -231,23 +228,21 @@ export function ChatComposerSection({
     setComposerHasDraft(Boolean(value.trim()))
   }, [])
 
-  const handleEditQueueItem = useCallback(
-    (item: ChatQueueItem) => {
-      editingQueueItemIdRef.current = item.id
-      setEditingQueueItemId(item.id)
-      setComposerReplaceDraft({
-        text: item.text,
-        contextParts: item.contextParts,
-        files: item.files,
-        pastedTexts: [],
-      })
-      setComposerReplaceDraftKey(key => key + 1)
-      if (item.runtimeSettings) {
-        runtimeSettings?.onChange(item.runtimeSettings)
-      }
-    },
-    [runtimeSettings],
-  )
+  const handleEditQueueItem = useCallback((item: ChatQueueItem) => {
+    editingQueueItemIdRef.current = item.id
+    setEditingQueueItemId(item.id)
+    setComposerReplaceDraft({
+      text: item.text,
+      contextParts: item.contextParts,
+    })
+    setComposerReplaceDraftKey(key => key + 1)
+    if (item.files.length > 0) {
+      appshotRuntime.appendFileParts(item.files)
+    }
+    if (item.runtimeSettings) {
+      runtimeSettings?.onChange(item.runtimeSettings)
+    }
+  }, [appshotRuntime, runtimeSettings])
 
   useEffect(() => {
     if (!rollbackDraftSignal) {
@@ -314,7 +309,7 @@ export function ChatComposerSection({
       try {
         await submitComposerMessage(prompt, [], [], options)
       }
- catch (error) {
+      catch (error) {
         toastManager.add({
           type: 'error',
           title: 'Plan action failed',
@@ -376,6 +371,7 @@ export function ChatComposerSection({
           ownerId: activeBrowserPanelOwnerId,
         })
         setActivePlanRefineTabId(tabId)
+        setBrowserPanelOpen(true, activeBrowserPanelOwnerId)
         return false
       },
     }
@@ -389,6 +385,7 @@ export function ChatComposerSection({
     runtimeKind,
     runtimeSettings,
     sessionId,
+    setBrowserPanelOpen,
     submitComposerMessage,
   ])
 
@@ -446,8 +443,6 @@ export function ChatComposerSection({
           externalSignals={{
             appendText: droppedPath ? `${droppedPath.text}` : undefined,
             appendTextKey: droppedPath?.ts,
-            appendContextParts: contextIngress?.parts,
-            appendContextPartsKey: contextIngress?.key,
             clearDraftKey: clearDraftSignal,
             suspendDraftPersistence,
             replaceText: composerReplaceText,
@@ -469,7 +464,6 @@ export function ChatComposerSection({
             sessionContextWindow: composerRuntime.tokenUsage?.contextWindow,
             compactState: composerRuntime.compactState,
             surfaceId: sessionId ? chatSurfaceId(sessionId) : undefined,
-            promptHistory,
           }}
         />
       </div>

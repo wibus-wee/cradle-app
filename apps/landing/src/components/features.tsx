@@ -42,7 +42,7 @@ const FEATURES: Feature[] = [
   {
     Illustration: LocalFirstIllustration,
     title: 'Local-first by default',
-    desc: 'No cloud relay. API keys in your keychain, sessions on disk. Your code stays yours.',
+    desc: 'No cloud relay, no telemetry. API keys in your keychain, sessions on disk. Your code stays yours.',
   },
 ]
 

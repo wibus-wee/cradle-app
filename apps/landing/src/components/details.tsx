@@ -94,11 +94,11 @@ const DETAILS: Detail[] = [
   },
   {
     eyebrow: 'Your Data, Your Control',
-    title: 'Local-first. No cloud relay.',
+    title: 'Local-first. No telemetry. No cloud relay.',
     desc: 'Your data stays on your machine. Cradle is built privacy-first — full local control over your agents and conversations.',
     points: [
       'API keys in your keychain, sessions on disk',
-      'No cloud dependency, full local control',
+      'No telemetry, no cloud dependency',
       'Your code and conversations never leave your machine',
     ],
     image: '/details/about-data-care.webp',

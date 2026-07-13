@@ -11,7 +11,7 @@ import { motion } from 'motion/react'
 const PRINCIPLES = [
   {
     title: 'Local-first by default',
-    desc: 'No cloud relay. Your code, keys, and sessions stay on your machine.',
+    desc: 'No cloud relay. No telemetry. Your code, keys, and sessions stay on your machine.',
   },
   {
     title: 'Open source, forever',
