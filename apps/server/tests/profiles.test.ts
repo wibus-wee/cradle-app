@@ -80,6 +80,12 @@ describe('profiles capability', () => {
           headers: { 'content-type': 'application/json' },
         })
       }
+      if (url === 'https://example.com/v1/models') {
+        return new Response(JSON.stringify({ data: [{ id: 'gpt-4o' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
 
       throw new Error(`Unexpected fetch request: ${url}`)
     })
@@ -150,30 +156,13 @@ describe('profiles capability', () => {
       )
       expect(modelsRes.status).toBe(200)
       expect(await modelsRes.json()).toEqual([
-        expect.objectContaining({ id: 'gpt-4o-mini', providerKind: 'openai-compatible' }),
         expect.objectContaining({ id: 'gpt-4o', providerKind: 'openai-compatible' }),
       ])
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://example.com/v1/models',
       ).length
-      expect(providerFetchCount).toBe(0)
-      expect(codexClientOptions).toEqual([
-        {
-          apiKey: 'sk-test-abcdef',
-          config: {
-            model_provider: 'cradle-openai-compatible',
-            model_providers: {
-              'cradle-openai-compatible': {
-                name: 'Cradle OpenAI Compatible',
-                base_url: 'https://example.com/v1',
-                env_key: 'CRADLE_CODEX_API_KEY',
-                wire_api: 'responses',
-                requires_openai_auth: true,
-              },
-            },
-          },
-        },
-      ])
+      expect(providerFetchCount).toBe(1)
+      expect(codexClientOptions).toEqual([])
 
       const listSecrets = await app.handle(new Request('http://localhost/secrets'))
       expect(listSecrets.status).toBe(200)
@@ -777,6 +766,12 @@ describe('profiles capability', () => {
           headers: { 'content-type': 'application/json' },
         })
       }
+      if (url === 'https://example.com/v1/models') {
+        return new Response(JSON.stringify({ data: [{ id: 'vendor-gpt4o' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
 
       throw new Error(`Unexpected fetch request: ${url}`)
     })
@@ -896,7 +891,7 @@ describe('profiles capability', () => {
       const providerFetchCount = fetchSpy.mock.calls.filter(
         ([callInput]) => getRequestUrl(callInput) === 'https://example.com/v1/models',
       ).length
-      expect(providerFetchCount).toBe(0)
+      expect(providerFetchCount).toBe(2)
     }
  finally {
       shutdownInfra()

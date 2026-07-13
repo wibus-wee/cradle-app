@@ -4053,6 +4053,8 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       promptTokens: 0,
       completionTokens: 10,
       totalTokens: 10,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
     })
 
     // totalUsage should be the sum of all usage
@@ -4060,6 +4062,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       promptTokens: 100,
       completionTokens: 85, // 50 + 25 + 10
       totalTokens: 185,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
+      reasoningOutputTokens: 0,
     })
   })
 })

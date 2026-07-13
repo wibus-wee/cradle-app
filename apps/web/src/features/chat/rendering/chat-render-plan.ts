@@ -10,6 +10,8 @@ import {
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
+import type { RuntimeWarningMessagePart } from '../runtime-warning'
+import { isRuntimeWarningMessagePart } from '../runtime-warning'
 import {
   readBuiltinToolCallInputPayload,
   readBuiltinToolCallResultPayload,
@@ -47,6 +49,7 @@ export type ChatRenderSegment
     | (MessagePartRefBase & { kind: 'plugin-context' })
     | (MessagePartRefBase & { kind: 'file-line-comment-context' })
     | (MessagePartRefBase & { kind: 'file-attachment' })
+    | (MessagePartRefBase & { kind: 'runtime-warning' })
 
 export type ChatRenderItem
   = | { kind: 'text', text: string, key: string }
@@ -57,6 +60,7 @@ export type ChatRenderItem
     | { kind: 'plugin-context', part: ChatPluginContextMessagePart, key: string }
     | { kind: 'file-line-comment-context', part: ChatFileLineCommentContextMessagePart, key: string }
     | { kind: 'file-attachment', part: FileMessagePart, key: string }
+    | { kind: 'runtime-warning', part: RuntimeWarningMessagePart, key: string }
 
 export interface ExecutionPhaseSplit {
   executionItems: ChatRenderItem[]
@@ -179,6 +183,14 @@ export function groupMessagePartRefs(input: GroupMessagePartsInput): ChatRenderS
         partIndex: i,
       })
     }
+ else if (isRuntimeWarningMessagePart(part)) {
+      items.push({
+        kind: 'runtime-warning',
+        key,
+        messageId: input.messageId,
+        partIndex: i,
+      })
+    }
  else {
       const toolPart = readRenderableToolPart(part)
       if (!toolPart) {
@@ -238,6 +250,9 @@ export function groupMessageParts(input: GroupMessagePartsInput): ChatRenderItem
         part: part as ChatFileLineCommentContextMessagePart,
         key,
       })
+    }
+ else if (isRuntimeWarningMessagePart(part)) {
+      items.push({ kind: 'runtime-warning', part, key })
     }
  else {
       const toolPart = readRenderableToolPart(part)
