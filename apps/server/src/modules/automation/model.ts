@@ -54,6 +54,12 @@ const recipeSchema = t.Object({
     t.Literal('xhigh'),
     t.Literal('max'),
   ])),
+  sessionPolicy: t.Optional(t.Union([t.Literal('new'), t.Literal('heartbeat')])),
+  isolationPolicy: t.Optional(t.Union([t.Literal('workspace'), t.Literal('worktree_per_run')])),
+  completionPolicy: t.Optional(t.Object({
+    stopWhen: t.Optional(t.Literal('agent_complete')),
+    noFindingsBehavior: t.Optional(t.Union([t.Literal('archive'), t.Literal('triage')])),
+  }, { additionalProperties: false })),
 }, { additionalProperties: false })
 
 const createdByKindSchema = t.Union([t.Literal('agent'), t.Literal('user'), t.Literal('system')])
@@ -148,6 +154,15 @@ export const AutomationModel = {
     scheduledFor: t.Optional(t.Number()),
   }, { additionalProperties: false }),
 
+  triageQuery: t.Object({
+    workspaceId: t.Optional(t.String({ minLength: 1 })),
+    status: t.Optional(t.Union([t.Literal('unread'), t.Literal('read'), t.Literal('resolved'), t.Literal('archived'), t.Literal('all')])),
+  }, { additionalProperties: false }),
+
+  triageBody: t.Object({
+    status: t.Union([t.Literal('unread'), t.Literal('read'), t.Literal('resolved'), t.Literal('archived')]),
+  }, { additionalProperties: false }),
+
   definition: t.Object({
     id: t.String(),
     workspaceId: t.Nullable(t.String()),
@@ -177,6 +192,10 @@ export const AutomationModel = {
     backendRunId: t.Nullable(t.String()),
     artifactCount: t.Number(),
     errorText: t.Nullable(t.String()),
+    resultKind: t.Nullable(t.Union([t.Literal('findings'), t.Literal('no_findings'), t.Literal('stopped'), t.Literal('error')])),
+    resultSummary: t.Nullable(t.String()),
+    triageStatus: t.Nullable(t.Union([t.Literal('unread'), t.Literal('read'), t.Literal('resolved'), t.Literal('archived')])),
+    triagedAt: t.Nullable(t.Number()),
     scheduledFor: t.Nullable(t.Number()),
     claimedAt: t.Nullable(t.Number()),
     startedAt: t.Nullable(t.Number()),

@@ -9,7 +9,7 @@ import {
   automationRuns,
 } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
-import { and, desc, eq, isNull, lte, or } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, lte, or } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
@@ -18,6 +18,7 @@ import * as ChatRuntime from '../chat-runtime/runtime'
 import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../provider-contracts/types'
 import * as Session from '../session/service'
+import * as Worktree from '../worktree/service'
 import type { AutomationTrigger, DueOccurrence } from './scheduler'
 import { getNextOccurrence, listDueOccurrences } from './scheduler'
 
@@ -43,6 +44,12 @@ export interface AutomationRecipe {
   runtimeKind?: RuntimeKind
   modelId?: string
   thinkingEffort?: ChatThinkingEffort
+  sessionPolicy?: 'new' | 'heartbeat'
+  isolationPolicy?: 'workspace' | 'worktree_per_run'
+  completionPolicy?: {
+    stopWhen?: 'agent_complete'
+    noFindingsBehavior?: 'archive' | 'triage'
+  }
 }
 
 export interface AutomationDefinitionView {
@@ -74,6 +81,10 @@ export interface AutomationRunView {
   backendRunId: string | null
   artifactCount: number
   errorText: string | null
+  resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null
+  resultSummary: string | null
+  triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null
+  triagedAt: number | null
   scheduledFor: number | null
   claimedAt: number | null
   startedAt: number | null
@@ -156,6 +167,10 @@ function toRunView(row: AutomationRun): AutomationRunView {
     backendRunId: row.backendRunId,
     artifactCount: row.artifactCount,
     errorText: row.errorText,
+    resultKind: row.resultKind,
+    resultSummary: row.resultSummary,
+    triageStatus: row.triageStatus,
+    triagedAt: row.triagedAt,
     scheduledFor: row.scheduledFor,
     claimedAt: row.claimedAt,
     startedAt: row.startedAt,
@@ -259,10 +274,37 @@ function buildRunPrompt(recipe: AutomationRecipe): string {
     = recipe.artifactRequests.length > 0
       ? `\n\nRequested artifacts:\n${recipe.artifactRequests.map(item => `- ${item.kind}: ${item.name}${item.description ? ` - ${item.description}` : ''}`).join('\n')}`
       : ''
-  return `${recipe.prompt}${inputs}${artifacts}`
+  const completionContract = `\n\nAutomation completion contract:\nEnd your final response with exactly one line:\nCRADLE_AUTOMATION_RESULT: findings | <short summary>\nor\nCRADLE_AUTOMATION_RESULT: no_findings | <short summary>\nUse no_findings only when there is genuinely nothing actionable to report.`
+  return `${recipe.prompt}${inputs}${artifacts}${completionContract}`
+}
+
+function readAutomationResult(markdown: string): {
+  kind: 'findings' | 'no_findings'
+  summary: string
+} {
+  const matches = [...markdown.matchAll(/^CRADLE_AUTOMATION_RESULT:\s*(findings|no_findings)\s*\|\s*(.+)$/gim)]
+  const match = matches.at(-1)
+  if (!match) {
+    return { kind: 'findings', summary: 'Automation completed without a structured result summary.' }
+  }
+  return { kind: match[1].toLowerCase() as 'findings' | 'no_findings', summary: match[2].trim() }
+}
+
+function findHeartbeatSession(definitionId: string): string | null {
+  return db().select({ chatSessionId: automationRuns.chatSessionId }).from(automationRuns).where(and(
+      eq(automationRuns.automationDefinitionId, definitionId),
+      isNotNull(automationRuns.chatSessionId),
+    )).orderBy(desc(automationRuns.createdAt)).get()?.chatSessionId ?? null
 }
 
 function validateRecipe(recipe: AutomationRecipe): void {
+  if (recipe.sessionPolicy === 'heartbeat' && recipe.isolationPolicy === 'worktree_per_run') {
+    throw new AppError({
+      code: 'automation_incompatible_execution_policies',
+      status: 400,
+      message: 'Heartbeat sessions cannot use worktree-per-run isolation',
+    })
+  }
   for (const input of recipe.inputs) {
     if (input.type === 'file_ref' && !path.isAbsolute(input.path)) {
       throw new AppError({
@@ -563,14 +605,33 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
     if (recipe.kind !== 'agent_task') {
       throw new Error(`Unsupported automation recipe kind: ${(recipe as { kind?: string }).kind}`)
     }
-    const session = await Session.create({
-      workspaceId: run.workspaceId,
-      title: `Automation: ${getDefinitionRow(run.automationDefinitionId).title}`,
-      origin: 'automation',
-      providerTargetId: recipe.providerTargetId,
-      agentId: recipe.agentId,
-      runtimeKind: recipe.runtimeKind,
-    })
+    const definition = getDefinitionRow(run.automationDefinitionId)
+    const heartbeatSessionId = recipe.sessionPolicy === 'heartbeat'
+      ? findHeartbeatSession(run.automationDefinitionId)
+      : null
+    const heartbeatSession = heartbeatSessionId ? Session.get(heartbeatSessionId) : null
+    const session = heartbeatSession
+      ?? await (async () => {
+          const sessionId = randomUUID()
+          const worktree = recipe.isolationPolicy === 'worktree_per_run' && run.workspaceId
+            ? await Worktree.createWorktree({
+                sourceWorkspaceId: run.workspaceId,
+                sessionId,
+                slug: `${definition.title}-${run.id.slice(0, 8)}`,
+                baseStrategy: 'remote-default',
+              })
+            : null
+          return Session.create({
+            id: sessionId,
+            workspaceId: run.workspaceId,
+            title: `Automation: ${definition.title}`,
+            origin: 'automation',
+            providerTargetId: recipe.providerTargetId,
+            agentId: recipe.agentId,
+            runtimeKind: recipe.runtimeKind,
+            worktreeId: worktree?.id,
+          })
+        })()
     chatSessionId = session.id
     const backendRun = await ChatRuntime.createRun({
       sessionId: session.id,
@@ -593,8 +654,15 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
     if (completed.status !== 'complete') {
       throw new Error(completed.errorText ?? `Backend run ended with status ${completed.status}`)
     }
+    if (getRunRow(run.id).status === 'cancelled') {
+      return getRun(run.automationDefinitionId, run.id)
+    }
 
     const markdown = Session.exportMarkdown(session.id)
+    const result = readAutomationResult(markdown)
+    const triageStatus = result.kind === 'no_findings' && recipe.completionPolicy?.noFindingsBehavior !== 'triage'
+      ? 'archived'
+      : 'unread'
     const artifactName = recipe.artifactRequests[0]?.name ?? 'automation-run.md'
     db()
       .insert(automationArtifacts)
@@ -619,6 +687,9 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
         status: 'complete',
         artifactCount: 1,
         errorText: null,
+        resultKind: result.kind,
+        resultSummary: result.summary,
+        triageStatus,
         finishedAt,
         updatedAt: finishedAt,
       })
@@ -639,7 +710,10 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
       message: 'Automation run completed',
     })
   }
- catch (error) {
+  catch (error) {
+    if (getRunRow(run.id).status === 'cancelled') {
+      return getRun(run.automationDefinitionId, run.id)
+    }
     const errorText = error instanceof Error ? error.message : String(error)
     const failedAt = currentUnixSeconds()
     db()
@@ -649,6 +723,9 @@ export async function executeRun(runId: string): Promise<AutomationRunView> {
         chatSessionId,
         backendRunId,
         errorText,
+        resultKind: 'error',
+        resultSummary: errorText,
+        triageStatus: 'unread',
         finishedAt: failedAt,
         updatedAt: failedAt,
       })
@@ -677,8 +754,58 @@ export function listRuns(definitionId: string): AutomationRunView[] {
     .map(toRunView)
 }
 
+export function listRunsForSession(sessionId: string): AutomationRunView[] {
+  return db()
+    .select()
+    .from(automationRuns)
+    .where(eq(automationRuns.chatSessionId, sessionId))
+    .orderBy(desc(automationRuns.updatedAt))
+    .all()
+    .map(toRunView)
+}
+
 export function getRun(definitionId: string, runId: string): AutomationRunView {
   return toRunView(getRunRow(runId, definitionId))
+}
+
+export function listTriage(input: {
+  workspaceId?: string
+  status?: 'unread' | 'read' | 'resolved' | 'archived' | 'all'
+}): AutomationRunView[] {
+  const predicates: SQL[] = [isNotNull(automationRuns.triageStatus)]
+  if (input.workspaceId) { predicates.push(eq(automationRuns.workspaceId, input.workspaceId)) }
+  if (input.status && input.status !== 'all') { predicates.push(eq(automationRuns.triageStatus, input.status)) }
+  return db().select().from(automationRuns).where(and(...predicates)).orderBy(desc(automationRuns.finishedAt), desc(automationRuns.createdAt)).all().map(toRunView)
+}
+
+export function setTriageStatus(
+  definitionId: string,
+  runId: string,
+  status: 'unread' | 'read' | 'resolved' | 'archived',
+): AutomationRunView {
+  getRunRow(runId, definitionId)
+  const timestamp = currentUnixSeconds()
+  db().update(automationRuns).set({
+    triageStatus: status,
+    triagedAt: status === 'unread' ? null : timestamp,
+    updatedAt: timestamp,
+  }).where(eq(automationRuns.id, runId)).run()
+  return getRun(definitionId, runId)
+}
+
+export async function stopRun(definitionId: string, runId: string): Promise<AutomationRunView> {
+  const run = getRunRow(runId, definitionId)
+  if (run.chatSessionId) { await ChatRuntime.cancelSession(run.chatSessionId) }
+  const timestamp = currentUnixSeconds()
+  db().update(automationRuns).set({
+    status: 'cancelled',
+resultKind: 'stopped',
+resultSummary: 'Stopped by user.',
+    triageStatus: 'unread',
+finishedAt: timestamp,
+updatedAt: timestamp,
+  }).where(eq(automationRuns.id, runId)).run()
+  return getRun(definitionId, runId)
 }
 
 export function listArtifacts(definitionId: string, runId?: string): AutomationArtifactView[] {
