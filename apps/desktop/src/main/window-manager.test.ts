@@ -6,9 +6,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { TearoffSurfaceRoute } from './window-manager'
-
-const CHAT_SURFACE_ROUTE: TearoffSurfaceRoute = { to: '/chat/$sessionId', params: { sessionId: 'session-1' } }
+const CHAT_SURFACE_ROUTE = { to: '/chat/$sessionId', params: { sessionId: 'session-1' } }
 
 const electronMocks = vi.hoisted(() => {
   type Listener = (...args: unknown[]) => void
@@ -121,6 +119,21 @@ const electronMocks = vi.hoisted(() => {
 })
 
 vi.mock('electron', () => electronMocks)
+vi.mock('./desktop-assets', () => ({
+  resolveDesktopPreloadPath: vi.fn(() => '/tmp/preload.js'),
+  resolveDesktopRendererIndexPath: vi.fn(() => '/tmp/index.html'),
+  resolveDesktopRendererTearoffPath: vi.fn(() => '/tmp/tearoff.html'),
+}))
+vi.mock('./external-link-policy', () => ({
+  installExternalLinkPolicy: vi.fn(),
+}))
+vi.mock('./ipc-devtool', () => ({
+  subscribeAcpDevtool: vi.fn(() => vi.fn()),
+  subscribeIpcDevtool: vi.fn(() => vi.fn()),
+}))
+vi.mock('./server-process', () => ({
+  getDesktopServerAuthToken: vi.fn(() => 'test-server-auth-token'),
+}))
 
 const previousRendererUrl = process.env.ELECTRON_RENDERER_URL
 const tempRoots: string[] = []

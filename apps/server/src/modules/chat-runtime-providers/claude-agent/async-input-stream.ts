@@ -12,6 +12,7 @@ import { AsyncEventQueue } from '../async-event-queue'
 import type { ClaudeAgentUserContent } from './types'
 
 export type ClaudeAgentInputPriority = NonNullable<SDKUserMessage['priority']>
+type ClaudeAgentMessageUuid = NonNullable<SDKUserMessage['uuid']>
 
 export class ClaudeAgentInputStream implements AsyncIterable<SDKUserMessage> {
   private readonly queue = new AsyncEventQueue<SDKUserMessage>()
@@ -29,10 +30,10 @@ export class ClaudeAgentInputStream implements AsyncIterable<SDKUserMessage> {
       toolUseResult?: unknown
       /** Defaults to `next` so mid-turn follow-ups queue instead of competing with interrupt semantics. */
       priority?: ClaudeAgentInputPriority
-      uuid?: string
+      uuid?: ClaudeAgentMessageUuid
     } = {},
-  ): string {
-    const uuid = options.uuid?.trim() || randomUUID()
+  ): ClaudeAgentMessageUuid {
+    const uuid = options.uuid ?? randomUUID()
     const accepted = this.queue.push({
       type: 'user',
       message: { role: 'user', content },

@@ -1108,6 +1108,9 @@ describe('opencodeProvider streamTurn', () => {
       promptTokens: 10,
       completionTokens: 5,
       totalTokens: 15,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
+      reasoningOutputTokens: 1,
     })
   })
 

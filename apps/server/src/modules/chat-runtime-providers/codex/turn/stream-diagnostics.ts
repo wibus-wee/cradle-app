@@ -4,6 +4,7 @@
  * Position: Codex provider package owner for stream failure reporting.
  */
 
+import type { RuntimeWarningPartData } from '../../../chat-runtime/runtime-provider-types'
 import { OBSERVABILITY_CODES } from '../../../observability/contract'
 import type { RuntimeKind } from '../../../provider-contracts/types'
 import type { CodexAppServerMessage } from '../app-server/client'
@@ -181,6 +182,27 @@ export function createCodexAppServerError(notification: CodexAppServerMessage, d
 
 export function isRetryableCodexAppServerError(notification: CodexAppServerMessage): boolean {
   return (notification.params as ErrorNotificationParams | undefined)?.willRetry === true
+}
+
+export function readRetryableCodexAppServerWarning(
+  notification: Pick<CodexAppServerMessage, 'method' | 'params'>,
+): RuntimeWarningPartData | null {
+  if (notification.method !== 'error') {
+    return null
+  }
+  const params = notification.params as ErrorNotificationParams | undefined
+  if (params?.willRetry !== true) {
+    return null
+  }
+  const message = normalizeProviderErrorMessage(params.error?.message ?? params.message)
+  const additionalDetails = normalizeProviderErrorMessage(params.error?.additionalDetails)
+  if (!message && !additionalDetails) {
+    return null
+  }
+  return {
+    message: message ?? 'Codex is reconnecting',
+    additionalDetails,
+  }
 }
 
 export function createCodexEmptyStreamError(errorText: string, diagnostics: CodexStreamDiagnostics): CodexProviderError {

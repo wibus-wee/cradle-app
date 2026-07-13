@@ -310,6 +310,11 @@ export type RuntimeMcpAuthStatus
 export type RuntimeApprovalStatus = 'pending' | 'approved' | 'denied' | 'timedOut' | 'aborted'
 export type RuntimeAlertSeverity = 'info' | 'warning' | 'error'
 
+export interface RuntimeWarningPartData {
+  message: string
+  additionalDetails: string | null
+}
+
 export interface RuntimeTokenUsageBreakdown {
   totalTokens: number
   inputTokens: number
