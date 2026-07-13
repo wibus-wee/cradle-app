@@ -1188,7 +1188,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const userContent = projectClaudeAgentInput(message, 'Claude Agent native queue')
     const messageUuid = entry.inputStream.push(userContent, {
       priority: 'next',
-      uuid: queueItemId,
     })
     entry.nativeFollowUps.set(queueItemId, {
       queueItemId,
