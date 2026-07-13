@@ -50,6 +50,14 @@ export const automationRuns = sqliteTable('automation_runs', {
     .references(() => backendRuns.id, { onDelete: 'set null' }),
   artifactCount: int('artifact_count').notNull().default(0),
   errorText: text('error_text'),
+  resultKind: text('result_kind', {
+    enum: ['findings', 'no_findings', 'stopped', 'error'],
+  }),
+  resultSummary: text('result_summary'),
+  triageStatus: text('triage_status', {
+    enum: ['unread', 'read', 'resolved', 'archived'],
+  }),
+  triagedAt: int('triaged_at'),
   scheduledFor: int('scheduled_for'),
   claimedAt: int('claimed_at'),
   startedAt: int('started_at'),
@@ -59,6 +67,7 @@ export const automationRuns = sqliteTable('automation_runs', {
   byDefinition: index('automation_runs_definition_id_idx').on(table.automationDefinitionId),
   byWorkspace: index('automation_runs_workspace_id_idx').on(table.workspaceId),
   byStatus: index('automation_runs_status_idx').on(table.status),
+  byTriage: index('automation_runs_triage_status_idx').on(table.triageStatus, table.finishedAt),
   byBackendRun: index('automation_runs_backend_run_id_idx').on(table.backendRunId),
   byOccurrence: uniqueIndex('automation_runs_definition_occurrence_unique').on(table.automationDefinitionId, table.occurrenceKey),
 }))

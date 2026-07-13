@@ -1043,7 +1043,13 @@ export const zPostAutomationsBody = z.object({
             'high',
             'xhigh',
             'max'
-        ]).optional()
+        ]).optional(),
+        sessionPolicy: z.enum(['new', 'heartbeat']).optional(),
+        isolationPolicy: z.enum(['workspace', 'worktree_per_run']).optional(),
+        completionPolicy: z.object({
+            stopWhen: z.string().optional(),
+            noFindingsBehavior: z.enum(['archive', 'triage']).optional()
+        }).optional()
     }),
     createdByKind: z.enum([
         'agent',
@@ -1115,7 +1121,13 @@ export const zPatchAutomationsByIdBody = z.object({
             'high',
             'xhigh',
             'max'
-        ]).optional()
+        ]).optional(),
+        sessionPolicy: z.enum(['new', 'heartbeat']).optional(),
+        isolationPolicy: z.enum(['workspace', 'worktree_per_run']).optional(),
+        completionPolicy: z.object({
+            stopWhen: z.string().optional(),
+            noFindingsBehavior: z.enum(['archive', 'triage']).optional()
+        }).optional()
     }).optional(),
     createdByKind: z.enum([
         'agent',
@@ -1155,6 +1167,25 @@ export const zGetAutomationsByIdRunsByRunIdPath = z.object({
     runId: z.string().min(1)
 });
 
+export const zPostAutomationsByIdRunsByRunIdStopPath = z.object({
+    id: z.string().min(1),
+    runId: z.string().min(1)
+});
+
+export const zPatchAutomationsByIdRunsByRunIdTriageBody = z.object({
+    status: z.enum([
+        'unread',
+        'read',
+        'resolved',
+        'archived'
+    ])
+});
+
+export const zPatchAutomationsByIdRunsByRunIdTriagePath = z.object({
+    id: z.string().min(1),
+    runId: z.string().min(1)
+});
+
 export const zGetAutomationsByIdRunsByRunIdArtifactsPath = z.object({
     id: z.string().min(1),
     runId: z.string().min(1)
@@ -1167,6 +1198,17 @@ export const zGetAutomationsByIdArtifactsPath = z.object({
 export const zGetAutomationsByIdArtifactsByArtifactIdPath = z.object({
     id: z.string().min(1),
     artifactId: z.string().min(1)
+});
+
+export const zGetAutomationTriageQuery = z.object({
+    workspaceId: z.string().min(1).optional(),
+    status: z.enum([
+        'unread',
+        'read',
+        'resolved',
+        'archived',
+        'all'
+    ]).optional()
 });
 
 export const zGetCronJobsQuery = z.object({

@@ -48,6 +48,12 @@ const AutomationRecipeSchema = z.object({
   runtimeKind: z.string().min(1).optional(),
   modelId: z.string().optional(),
   thinkingEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  sessionPolicy: z.enum(['new', 'heartbeat']).optional(),
+  isolationPolicy: z.enum(['workspace', 'worktree_per_run']).optional(),
+  completionPolicy: z.object({
+    stopWhen: z.literal('agent_complete').optional(),
+    noFindingsBehavior: z.enum(['archive', 'triage']).optional(),
+  }).optional(),
 })
 
 const AutomationDefinitionSchema = z.object({
@@ -79,6 +85,10 @@ const AutomationRunSchema = z.object({
   backendRunId: z.string().nullable(),
   artifactCount: z.number(),
   errorText: z.string().nullable(),
+  resultKind: z.enum(['findings', 'no_findings', 'stopped', 'error']).nullable().optional().default(null),
+  resultSummary: z.string().nullable().optional().default(null),
+  triageStatus: z.enum(['unread', 'read', 'resolved', 'archived']).nullable().optional().default(null),
+  triagedAt: z.number().nullable().optional().default(null),
   scheduledFor: z.number().nullable(),
   claimedAt: z.number().nullable(),
   startedAt: z.number().nullable(),
@@ -191,5 +201,31 @@ export async function runAutomationNow(automationId: string): Promise<Automation
   return RunAutomationNowResponseSchema.parse(await requestAutomationJson(
     `/automations/${encodeURIComponent(automationId)}/run`,
     { method: 'POST', body: JSON.stringify({}) },
+  )) satisfies AutomationRun
+}
+
+export async function listAutomationTriage(workspaceId?: string | null): Promise<AutomationRun[]> {
+  const params = new URLSearchParams({ status: 'unread' })
+  if (workspaceId) { params.set('workspaceId', workspaceId) }
+  return AutomationRunCollectionSchema.parse(
+    await requestAutomationJson(`/automation-triage?${params.toString()}`),
+  ) satisfies AutomationRun[]
+}
+
+export async function stopAutomationRun(input: { automationId: string, runId: string }): Promise<AutomationRun> {
+  return RunAutomationNowResponseSchema.parse(await requestAutomationJson(
+    `/automations/${encodeURIComponent(input.automationId)}/runs/${encodeURIComponent(input.runId)}/stop`,
+    { method: 'POST', body: JSON.stringify({}) },
+  )) satisfies AutomationRun
+}
+
+export async function updateAutomationRunTriage(input: {
+  automationId: string
+  runId: string
+  status: 'unread' | 'read' | 'resolved' | 'archived'
+}): Promise<AutomationRun> {
+  return RunAutomationNowResponseSchema.parse(await requestAutomationJson(
+    `/automations/${encodeURIComponent(input.automationId)}/runs/${encodeURIComponent(input.runId)}/triage`,
+    { method: 'PATCH', body: JSON.stringify({ status: input.status }) },
   )) satisfies AutomationRun
 }
