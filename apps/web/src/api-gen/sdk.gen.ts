@@ -6761,7 +6761,7 @@ export const postChronicleEmbeddings = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Get the shared opencode server process resource usage
+ * Get one active pooled opencode host process resource sample
  */
 export const getOpencodeServerResources = <ThrowOnError extends boolean = false>(options?: Options<GetOpencodeServerResourcesData, ThrowOnError>) => (options?.client ?? client).get<GetOpencodeServerResourcesResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({

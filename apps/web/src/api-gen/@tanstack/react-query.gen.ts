@@ -8149,7 +8149,7 @@ export const postChronicleEmbeddingsMutation = (options?: Partial<Options<PostCh
 export const getOpencodeServerResourcesQueryKey = (options?: Options<GetOpencodeServerResourcesData>) => createQueryKey('getOpencodeServerResources', options);
 
 /**
- * Get the shared opencode server process resource usage
+ * Get one active pooled opencode host process resource sample
  */
 export const getOpencodeServerResourcesOptions = (options?: Options<GetOpencodeServerResourcesData>) => queryOptions<GetOpencodeServerResourcesResponse, DefaultError, GetOpencodeServerResourcesResponse, ReturnType<typeof getOpencodeServerResourcesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
