@@ -377,4 +377,44 @@ describe('codexAppServerClient', () => {
     })
     await expect(client.request('config/read')).rejects.toThrow('Codex app-server is closed')
   })
+
+  it('keeps NDJSON frames intact when JSON strings contain U+2028 line separators', async () => {
+    const child = createAppServerProcess()
+    managedProcessMock.mockReturnValueOnce(child)
+    const client = new CodexAppServerClient({ codexPath: 'codex-test' })
+
+    const description = [
+      'Use Flight Network ChatGPT app to find and compare real-time flight options directly in your chat.',
+      '\u2028\n\nSimply type @Flight Network followed by your request',
+      '\u2028\n\nReal-Time Data: Access live pricing',
+    ].join('')
+    const notification = {
+      method: 'app/list/updated',
+      params: {
+        data: [{ name: 'Flight Network', description }],
+      },
+    }
+
+    const pending = client.nextNotification()
+    child.stdout.write(`${JSON.stringify(notification)}\n`)
+
+    await expect(pending).resolves.toEqual(notification)
+    await client.close()
+  })
+
+  it('ignores plaintext stdout pollution instead of failing the turn via jsonrepair', async () => {
+    const child = createAppServerProcess()
+    managedProcessMock.mockReturnValueOnce(child)
+    const client = new CodexAppServerClient({ codexPath: 'codex-test' })
+
+    const pending = client.nextNotification()
+    child.stdout.write('\\n\\nSimply type @Flight Network followed by your request\n')
+    child.stdout.write(`${JSON.stringify({ method: 'thread/status/changed', params: { status: 'idle' } })}\n`)
+
+    await expect(pending).resolves.toEqual({
+      method: 'thread/status/changed',
+      params: { status: 'idle' },
+    })
+    await client.close()
+  })
 })
