@@ -43,6 +43,17 @@ describe('provider input projector', () => {
             nativeMention: { name: 'github', path: 'mcp://github' },
           },
         },
+        {
+          type: 'data-cradle-file-line-comment',
+          data: {
+            type: 'data-cradle-file-line-comment',
+            workspaceId: 'workspace-1',
+            path: 'src/app.ts',
+            lineStart: 12,
+            lineEnd: 12,
+            comment: 'Extract this branch.',
+          },
+        },
       ],
     })
 
@@ -61,6 +72,10 @@ describe('provider input projector', () => {
       expect.objectContaining({
         type: 'plugin',
         plugin: expect.objectContaining({ pluginName: '@cradle/github', provider: 'cradle' }),
+      }),
+      expect.objectContaining({
+        type: 'text',
+        text: '<file_line_comment path="src/app.ts" lines="L12">\nExtract this branch.\n</file_line_comment>',
       }),
     ])
   })
