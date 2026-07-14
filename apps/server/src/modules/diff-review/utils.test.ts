@@ -9,7 +9,7 @@ describe('safeJsonParse', () => {
 
   it('repairs common LLM JSON mistakes via jsonrepair', () => {
     expect(safeJsonParse('{"a":1,}')).toEqual({ a: 1 })
-    expect(safeJsonParse("{'a':1}")).toEqual({ a: 1 })
+    expect(safeJsonParse('{\'a\':1}')).toEqual({ a: 1 })
     expect(safeJsonParse('{"a":"hello\nworld"}')).toEqual({ a: 'hello\nworld' })
   })
 

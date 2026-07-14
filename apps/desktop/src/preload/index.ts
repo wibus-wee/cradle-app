@@ -1,4 +1,5 @@
-import { pathToFileURL } from 'url'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { contextBridge, ipcRenderer } from 'electron'
 
@@ -160,7 +161,7 @@ const cradleElectron = {
   browser: {
     getWebviewConfig: (input: { threadId: string }) => ({
       partition: browserSessionPartition(input.threadId),
-      preloadUrl: pathToFileURL(`${__dirname}/browser-panel.js`).toString(),
+      preloadUrl: pathToFileURL(path.join(__dirname, 'browser-panel.js')).toString(),
     }),
     open: (input: unknown) => ipcRenderer.invoke('desktop:browser-open', input),
     close: (input: unknown) => ipcRenderer.invoke('desktop:browser-close', input),

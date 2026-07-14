@@ -227,7 +227,7 @@ async function spawnServer(opts: {
   credentialSecret: string
   serverAuthToken: string
 }): Promise<void> {
-  const { host, port, dataDir, credentialSecret, serverAuthToken } = opts
+  const { host, port, dataDir, credentialSecret } = opts
 
   // In dev, use tsx to run the TS source directly
   // In production, run the compiled server entry
