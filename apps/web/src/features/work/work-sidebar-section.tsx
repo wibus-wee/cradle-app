@@ -1,11 +1,17 @@
 import {
   GitPullRequestLine as PullRequestIcon,
+  LoadingLine,
   More2Line as MoreIcon,
   PinLine as PinIcon,
 } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
+import {
+  STATUS_ICON,
+  STATUS_ICON_CLASS,
+  statusKind,
+} from '~/features/pull-requests/status-meta'
 import { SessionRenameInput } from '~/features/workspace/session-rename-input'
 import type { WorkspaceSession } from '~/features/workspace/use-session'
 import { cn } from '~/lib/cn'
@@ -56,13 +62,36 @@ function WorkRow({
   const isRegeneratingTitle = useTitleRegenerationStore(state =>
     state.regeneratingSessionIds.has(work.primarySessionId))
   const title = session?.title?.trim() || work.title
+  const activityLabel = t(`aside.activity.${work.activity}`)
+  const isRunning = work.activity === 'running'
+  // The trailing chip only carries the PR label when there *is* a PR.
+  // Activity is conveyed by the leading status icon + corner dot (below),
+  // mirroring the Pull Requests page's "icon color + dot" idiom - so we no
+  // longer render a "运行中"/"空闲" text chip on the right.
   const pullRequestLabel = work.pullRequest
     ? work.pullRequest.merged
       ? t('sidebar.merged', { number: work.pullRequest.number })
       : work.pullRequest.isDraft
         ? t('sidebar.draft', { number: work.pullRequest.number })
         : t('sidebar.ready', { number: work.pullRequest.number })
-    : t(`aside.activity.${work.activity}`)
+    : undefined
+  const prStatus = work.pullRequest ? statusKind(work.pullRequest) : null
+  const LeadingIcon = prStatus ? STATUS_ICON[prStatus] : PullRequestIcon
+  const leadingIconClass = prStatus ? STATUS_ICON_CLASS[prStatus] : 'text-muted-foreground'
+  // Corner dot encodes agent activity the way the PR page's dot encodes CI
+  // state. Running is carried by the trailing spinner instead of a dot, so the
+  // two never compete; idle shows nothing at all.
+  const activityDotClass
+    = work.activity === 'blocked'
+      ? 'bg-destructive'
+      : work.activity === 'waiting'
+        ? 'bg-warning'
+        : null
+  const stateLabel = pullRequestLabel
+    ? work.activity === 'idle'
+      ? pullRequestLabel
+      : `${pullRequestLabel} · ${activityLabel}`
+    : activityLabel
 
   const openMenu = (anchor: WorkMenuAnchor, surface: 'button' | 'context') => {
     onOpenMenu({
@@ -121,7 +150,23 @@ function WorkRow({
                 onClick={() => openWork(work.id)}
                 className="relative z-10 flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5 py-1.5 text-sidebar-foreground/80"
               >
-                <PullRequestIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                <span
+                  className={cn('relative shrink-0', leadingIconClass)}
+                  title={stateLabel}
+                  data-testid={`work-status-${work.id}`}
+                >
+                  <LeadingIcon className="size-3.5" aria-hidden="true" />
+                  {activityDotClass && (
+                    <span
+                      className={cn(
+                        'absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full outline outline-2 outline-background',
+                        activityDotClass,
+                      )}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span className="sr-only">{stateLabel}</span>
+                </span>
                 {session?.pinned
                   ? (
                       <PinIcon
@@ -144,7 +189,24 @@ function WorkRow({
                 >
                   {title}
                 </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground/70">{pullRequestLabel}</span>
+                {isRunning
+                  ? (
+                      <span
+                        className="grid size-3.5 shrink-0 animate-spin place-items-center text-muted-foreground/70 [contain:layout_paint] [will-change:transform] motion-reduce:animate-none"
+                        role="status"
+                        aria-label={activityLabel}
+                        data-testid={`work-running-indicator-${work.id}`}
+                      >
+                        <LoadingLine className="size-3.5" aria-hidden="true" />
+                      </span>
+                    )
+                  : pullRequestLabel
+                    ? (
+                        <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                          {pullRequestLabel}
+                        </span>
+                      )
+                    : null}
               </button>
               <Button
                 type="button"
