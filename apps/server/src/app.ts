@@ -44,7 +44,7 @@ import { profiles } from './modules/profiles'
 import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
-import { pullRequest } from './modules/pull-request'
+import { pullRequest, pullRequestFeed } from './modules/pull-request'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
@@ -183,6 +183,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(work)
   app.use(sessionWork)
   app.use(pullRequest)
+  app.use(pullRequestFeed)
   app.use(sessionGroup)
   app.use(sessionAwait)
   app.use(issue)

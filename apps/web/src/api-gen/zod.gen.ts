@@ -1649,8 +1649,28 @@ export const zPostSessionsByIdPullRequestPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetSessionsByIdPullRequestDetailPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zPostSessionsByIdPullRequestReadyPath = z.object({
     id: z.string().min(1)
+});
+
+export const zGetPullRequestsAuthoredQuery = z.object({
+    login: z.string().min(1),
+    after: z.string().optional()
+});
+
+export const zGetPullRequestsReviewingQuery = z.object({
+    login: z.string().min(1),
+    after: z.string().optional()
+});
+
+export const zGetPullRequestsByOwnerByRepoByNumberDetailPath = z.object({
+    owner: z.string().min(1),
+    repo: z.string().min(1),
+    number: z.string().min(1)
 });
 
 export const zGetSessionGroupsQuery = z.object({
