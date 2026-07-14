@@ -1,0 +1,13 @@
+{
+  "title": "エディター",
+  "description": "ファイルやワークツリーを開く際の preferred エディターを選択します。",
+  "favoriteLabel": "preferred エディター",
+  "favoriteHint": "このマシンで検出されたエディター。",
+  "loading": "エディターを検出中…",
+  "noneFound": "対応するエディターは検出されませんでした。",
+  "desktopOnly": "エディターの選択は Cradle デスクトップアプリで利用できます。",
+  "open": "開く",
+  "openInPreferred": "{{editor}} で開く",
+  "chooseEditor": "エディターを選択",
+  "toast.failed": "エディターでパスを開けませんでした。"
+}

@@ -943,6 +943,10 @@
   "shortcut.builtIn.workspaceCopyRelativePath.label": "相対パスをコピー",
   "shortcut.configurable.description": "ここで変更できるデスクトップ所有のショートカットです。",
   "shortcut.configurable.title": "設定可能なショートカット",
+  "shortcut.file.description": "JSON ルールで登録済みコマンドを上書きします。キーは mod、cmd、ctrl、shift、alt、when 式は !、&&、||、括弧を使用できます。",
+  "shortcut.file.open": "ファイルを開く",
+  "shortcut.file.pathLabel": "設定パス",
+  "shortcut.file.title": "キーバインドファイル",
   "shortcut.overlay.dismissHint": "で閉じる",
   "shortcut.overlay.title": "キーボードショートカット",
   "shortcut.page.description": "デスクトップのグローバルショートカットの挙動を設定します。",
@@ -1024,5 +1028,6 @@
   "worktrees.list.loading": "worktree を読み込み中...",
   "worktrees.list.title": "Cradle 管理 worktree",
   "worktrees.page.description": "すべての workspace の Cradle 作成 git worktree を管理し、不要になった隔離 checkout のディスク容量を解放します。",
-  "worktrees.page.title": "Worktrees"
+  "worktrees.page.title": "Worktrees",
+  "nav.editor": "エディター"
 }

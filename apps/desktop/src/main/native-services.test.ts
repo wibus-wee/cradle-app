@@ -9,7 +9,7 @@ import {
   readScreenPointAppshotAnimationTarget,
   readScreenPointAppshotDestinationFrame,
 } from './native-appshot-target'
-import { readEditorLaunchCandidates } from './native-editor-launcher'
+import { readAvailableEditors } from './native-editor-launcher'
 import { buildAppTerminalCandidate, readTerminalLaunchCandidates } from './native-terminal-launcher'
 
 function frontmostContext(): MacAppshotFrontmostContext {
@@ -107,23 +107,13 @@ describe('readScreenPointAppshotAnimationTarget', () => {
   })
 })
 
-describe('readEditorLaunchCandidates', () => {
-  it('prefers macOS app launches before command line editor fallbacks on Darwin', () => {
-    const candidates = readEditorLaunchCandidates('darwin')
+describe('readAvailableEditors', () => {
+  it('always includes the OS-provided file-manager and system-default options', async () => {
+    const editors = await readAvailableEditors('darwin')
+    const ids = editors.map(editor => editor.id)
 
-    expect(candidates.slice(0, 3).map(candidate => candidate.label)).toEqual([
-      'Visual Studio Code',
-      'Cursor',
-      'Windsurf',
-    ])
-    expect(candidates.some(candidate => candidate.executable === 'code')).toBe(true)
-  })
-
-  it('uses command line editor candidates on non-macOS platforms', () => {
-    const candidates = readEditorLaunchCandidates('linux')
-
-    expect(candidates[0]?.label).toBe('code')
-    expect(candidates.every(candidate => candidate.executable !== '/usr/bin/open')).toBe(true)
+    expect(ids).toContain('file-manager')
+    expect(ids).toContain('system-default')
   })
 })
 

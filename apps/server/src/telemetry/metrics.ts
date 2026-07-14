@@ -251,7 +251,7 @@ export function initializeCradleMetrics(): void {
   })
 
   const opencodeRssGauge = meter.createObservableGauge('cradle_opencode_server_rss_bytes', {
-    description: 'Shared opencode server process RSS in bytes.',
+    description: 'One active pooled opencode host sample: process RSS in bytes.',
   })
   opencodeRssGauge.addCallback((result) => {
     if (opencodeServerSnapshot?.rssMB !== null && opencodeServerSnapshot?.rssMB !== undefined) {
@@ -260,7 +260,7 @@ export function initializeCradleMetrics(): void {
   })
 
   const opencodeStateGauge = meter.createObservableGauge('cradle_opencode_server_state', {
-    description: 'Shared opencode server running state and CPU percent.',
+    description: 'One active pooled opencode host sample: running state and CPU percent.',
   })
   opencodeStateGauge.addCallback((result) => {
     if (!opencodeServerSnapshot) {
@@ -273,7 +273,7 @@ export function initializeCradleMetrics(): void {
   })
 
   const opencodeUptimeGauge = meter.createObservableGauge('cradle_opencode_server_uptime_seconds', {
-    description: 'Shared opencode server process uptime in seconds.',
+    description: 'One active pooled opencode host sample: process uptime in seconds.',
   })
   opencodeUptimeGauge.addCallback((result) => {
     if (opencodeServerSnapshot?.uptimeSeconds !== null && opencodeServerSnapshot?.uptimeSeconds !== undefined) {

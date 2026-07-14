@@ -178,6 +178,7 @@ export default {
   'models.time.justNow': 'just now',
   'models.time.minutesAgo': '{{minuteCount}}m ago',
   'runtime.action.addManualProvider': 'Add manual provider',
+  'runtime.action.addProvider': 'Add provider',
   'runtime.action.import': 'Import',
   'runtime.action.refreshSources': 'Refresh sources',
   'runtime.deleteDialog.cancel': 'Cancel',

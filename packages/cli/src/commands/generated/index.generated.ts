@@ -176,6 +176,7 @@ import { register as registerPreferencesDesktopGet } from './preferences/desktop
 import { register as registerPreferencesDesktopSet } from './preferences/desktop/set'
 import { register as registerPreferencesJarvisGet } from './preferences/jarvis/get'
 import { register as registerPreferencesJarvisSet } from './preferences/jarvis/set'
+import { register as registerPreferencesKeybindingsGet } from './preferences/keybindings/get'
 import { register as registerProfileCustomModels } from './profile/custom-models'
 import { register as registerProfileDelete } from './profile/delete'
 import { register as registerProfileGet } from './profile/get'
@@ -496,6 +497,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerPreferencesDesktopSet(program)
   registerPreferencesJarvisGet(program)
   registerPreferencesJarvisSet(program)
+  registerPreferencesKeybindingsGet(program)
   registerProfileCustomModels(program)
   registerProfileDelete(program)
   registerProfileGet(program)

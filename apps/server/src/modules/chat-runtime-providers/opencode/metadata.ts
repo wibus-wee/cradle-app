@@ -17,6 +17,8 @@ export const OPENCODE_RUNTIME_METADATA = {
   label: 'Opencode',
   description: 'Opencode server runtime',
   providerKinds: ['openai-compatible', 'anthropic', 'universal'],
+  // OpenCode owns its native config, auth, and provider lifecycle. Ordinary
+  // Cradle provider targets must not be projected into the managed host.
   providerBinding: 'runtime-owned',
   iconKey: 'opencode',
   surfaces: ['chat', 'jarvis'],

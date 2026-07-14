@@ -1,4 +1,5 @@
 type ShortcutModifiers = {
+  mod?: boolean
   meta?: boolean
   ctrl?: boolean
   shift?: boolean
@@ -22,10 +23,13 @@ export function matchesShortcut(event: KeyboardEvent, shortcut: ShortcutDefiniti
   if (event.key.toLowerCase() !== key) {
     return false
   }
-  if (!!shortcut.meta !== event.metaKey) {
+  const modUsesMeta = navigator.platform.toLowerCase().includes('mac')
+  const expectedMeta = Boolean(shortcut.meta) || Boolean(shortcut.mod && modUsesMeta)
+  const expectedCtrl = Boolean(shortcut.ctrl) || Boolean(shortcut.mod && !modUsesMeta)
+  if (expectedMeta !== event.metaKey) {
     return false
   }
-  if (!!shortcut.ctrl !== event.ctrlKey) {
+  if (expectedCtrl !== event.ctrlKey) {
     return false
   }
   if (!!shortcut.shift !== event.shiftKey) {

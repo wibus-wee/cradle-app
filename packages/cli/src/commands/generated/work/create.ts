@@ -39,6 +39,16 @@ const spec = {
       "type": "string"
     },
     {
+      "name": "baseStrategy",
+      "required": false,
+      "target": "body.baseStrategy",
+      "type": "string",
+      "values": [
+        "source-head",
+        "remote-default"
+      ]
+    },
+    {
       "name": "providerTargetId",
       "required": false,
       "target": "body.providerTargetId",

@@ -1035,6 +1035,10 @@
   "shortcut.builtIn.workspaceCopyRelativePath.label": "复制相对路径",
   "shortcut.configurable.description": "可在这里修改的桌面端快捷键。",
   "shortcut.configurable.title": "可配置快捷键",
+  "shortcut.file.description": "使用 JSON 规则覆盖已注册命令。按键支持 mod、cmd、ctrl、shift、alt；when 表达式支持 !、&&、|| 和括号。",
+  "shortcut.file.open": "打开文件",
+  "shortcut.file.pathLabel": "配置路径",
+  "shortcut.file.title": "快捷键文件",
   "shortcut.overlay.dismissHint": "关闭",
   "shortcut.overlay.title": "键盘快捷键",
   "shortcut.page.description": "配置桌面端全局快捷键行为。",
@@ -1116,5 +1120,6 @@
   "worktrees.list.loading": "正在加载 worktree...",
   "worktrees.list.title": "Cradle 管理的 worktree",
   "worktrees.page.description": "统一管理所有 workspace 中由 Cradle 创建的 git worktree，并在旧隔离 checkout 不再需要时释放磁盘空间。",
-  "worktrees.page.title": "Worktrees"
+  "worktrees.page.title": "Worktrees",
+  "nav.editor": "编辑器"
 }

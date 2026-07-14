@@ -167,6 +167,7 @@
   "models.time.justNow": "just now",
   "models.time.minutesAgo": "{{minuteCount}}m ago",
   "runtime.action.addManualProvider": "Add manual provider",
+  "runtime.action.addProvider": "添加 Provider",
   "runtime.action.import": "Import",
   "runtime.action.refreshSources": "刷新来源",
   "runtime.deleteDialog.cancel": "取消",

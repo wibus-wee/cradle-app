@@ -21,6 +21,7 @@ import {
   patchProfilesByIdIcon,
   postProvidersModels,
   postSecrets,
+  postSecretsByIdReveal,
   putProfilesById,
 } from '~/api-gen/sdk.gen'
 import { ProviderIcon } from '~/components/common/provider-icons'
@@ -58,7 +59,6 @@ import {
   writeClaudeAgentModelAliases,
 } from '~/features/agent-runtime/claude-agent-config'
 import { ProfileConfigJsonSchema } from '~/features/agent-runtime/profile-config-schema'
-import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 import type { AgentProfile, ApiProviderKind, ModelDescriptor, ProviderTarget } from '~/features/agent-runtime/types'
 import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { apiErrorMessage } from '~/lib/api-error'
@@ -100,16 +100,6 @@ import {
   updateProviderTargetCustomModels,
   updateProviderTargetModelVisibility,
 } from './provider-target-model-settings'
-import type {
-  RuntimeSettingsFieldDescriptor,
-  RuntimeSettingsFormValue,
-} from './runtime-settings-schema'
-import {
-  listRuntimeSettingsFields,
-  readRuntimeSettingsFormValues,
-  writeRuntimeSettingsConfig,
-} from './runtime-settings-schema'
-import { RuntimeSettingsSchemaFields } from './runtime-settings-schema-fields'
 import type { ChatgptCredentialLoginStart } from './use-chatgpt-credential-login'
 import {
   openChatgptCredentialLoginUrl,
@@ -125,7 +115,6 @@ type ProfileTextField = 'name' | 'apiKey' | 'baseUrl' | 'openaiBaseUrl' | 'anthr
 
 interface BuildProfileConfigOptions {
   codexAuthMode?: string | null
-  runtimeSettingsFields?: RuntimeSettingsFieldDescriptor[]
 }
 
 interface CustomModelsState {
@@ -146,7 +135,6 @@ interface ProfileDetailFormValues {
   bedrockRegion: string
   claudeAgentAliases: ClaudeAgentModelAliases
   enabledModels: string[]
-  runtimeSettingsValues: Record<string, RuntimeSettingsFormValue>
 }
 
 interface ProfileDetailUiState {
@@ -272,7 +260,6 @@ function getInitialEnabledModels(enabledModels: string[]): string[] {
 
 function getProfileFormValues(
   profile: AgentProfile,
-  runtimeSettingsFields: RuntimeSettingsFieldDescriptor[] = [],
 ): ProfileDetailFormValues {
   const config = ProfileConfigJsonSchema.parse(profile.configJson)
   return {
@@ -290,7 +277,6 @@ function getProfileFormValues(
     bedrockRegion: config.bedrock?.region ?? '',
     claudeAgentAliases: readClaudeAgentModelAliases(config),
     enabledModels: getInitialEnabledModels(config.enabledModels),
-    runtimeSettingsValues: readRuntimeSettingsFormValues(config, runtimeSettingsFields),
   }
 }
 
@@ -335,19 +321,22 @@ function buildProfileConfig(
     openaiBaseUrl: _openaiBaseUrl,
     anthropicBaseUrl: _anthropicBaseUrl,
     api: _api,
+    accessMode: _accessMode,
+    interactionMode: _interactionMode,
+    permissionMode: _permissionMode,
     ...rest
   } = currentConfig
   if (values.providerKind === 'universal') {
-    return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
+    return applyClaudeAgentAliasesToProfileConfig({
       ...rest,
       openaiBaseUrl: values.openaiBaseUrl,
       anthropicBaseUrl: values.anthropicBaseUrl,
       model: values.model || undefined,
-    }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
+    }, values)
   }
   if (values.providerKind === 'openai-compatible' && options.codexAuthMode) {
     const codexAuthMode = normalizeCodexAuthMode(options.codexAuthMode)
-    return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
+    return applyClaudeAgentAliasesToProfileConfig({
       ...rest,
       authMode: codexAuthMode,
       baseUrl: codexAuthMode === CODEX_AUTH_MODE_API_KEY ? values.baseUrl : '',
@@ -356,24 +345,24 @@ function buildProfileConfig(
       ...(codexAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY
         ? { bedrock: { region: values.bedrockRegion.trim() } }
         : {}),
-    }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
+    }, values)
   }
   if (values.providerKind === 'anthropic') {
     const claudeAuthMode = normalizeClaudeAuthMode(values.authMode)
-    return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
+    return applyClaudeAgentAliasesToProfileConfig({
       ...rest,
       authMode: claudeAuthMode,
       baseUrl: claudeAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI ? '' : values.baseUrl,
       model: values.model || undefined,
       api: values.api || undefined,
-    }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
+    }, values)
   }
-  return writeRuntimeSettingsConfig(applyClaudeAgentAliasesToProfileConfig({
+  return applyClaudeAgentAliasesToProfileConfig({
     ...rest,
     baseUrl: values.baseUrl,
     model: values.model || undefined,
     api: values.api || undefined,
-  }, values), options.runtimeSettingsFields ?? [], values.runtimeSettingsValues)
+  }, values)
 }
 
 function createProfileSignature(values: ProfileDetailFormValues): string {
@@ -390,18 +379,7 @@ function createProfileSignature(values: ProfileDetailFormValues): string {
     bedrockRegion: values.bedrockRegion,
     claudeAgentAliases: values.claudeAgentAliases,
     enabledModels: values.enabledModels,
-    runtimeSettingsValues: values.runtimeSettingsValues,
   })
-}
-
-function createRuntimeSettingsFieldsSignature(fields: RuntimeSettingsFieldDescriptor[]): string {
-  return JSON.stringify(fields.map(field => ({
-    runtimeKind: field.runtimeKind,
-    key: field.key,
-    type: field.type,
-    defaultValue: field.defaultValue,
-    enumOptions: field.enumOptions,
-  })))
 }
 
 function readCustomModelsState(customModelsJson: string): CustomModelsState {
@@ -422,13 +400,11 @@ function clearTimer(timerRef: MutableRefObject<ReturnType<typeof setTimeout> | n
 
 export function ProfileDetailPanel({
   profile,
-  runtimeSettingsDescriptors,
   onRemove,
   onToggle,
   onSaved,
 }: {
   profile: AgentProfile
-  runtimeSettingsDescriptors?: RuntimeCatalogItem[]
   onRemove: () => void
   onToggle: (enabled: boolean) => void
   onSaved: () => void
@@ -437,11 +413,8 @@ export function ProfileDetailPanel({
   const providerTarget: ProviderTarget = ({ kind: 'manual', id: profile.id })
 
   const supportsModels = true
-  const runtimeSettingsFields = listRuntimeSettingsFields(runtimeSettingsDescriptors ?? [])
-  const runtimeSettingsFieldsSignature = createRuntimeSettingsFieldsSignature(runtimeSettingsFields)
-
   const form = useForm<ProfileDetailFormValues>({
-    defaultValues: getProfileFormValues(profile, runtimeSettingsFields),
+    defaultValues: getProfileFormValues(profile),
   })
   const name = useWatch({ control: form.control, name: 'name' }) ?? ''
   const apiKey = useWatch({ control: form.control, name: 'apiKey' }) ?? ''
@@ -457,8 +430,6 @@ export function ProfileDetailPanel({
     = useWatch({ control: form.control, name: 'claudeAgentAliases' }) ?? DEFAULT_CLAUDE_AGENT_ALIASES
   const enabledModels
     = useWatch({ control: form.control, name: 'enabledModels' }) ?? EMPTY_ENABLED_MODELS
-  const runtimeSettingsValues
-    = useWatch({ control: form.control, name: 'runtimeSettingsValues' }) ?? {}
 
   const [uiState, dispatch] = useReducer(profileDetailUiReducer, INITIAL_UI_STATE)
   const { availableModels, modelsLoading, modelsCachedAt, saveState, confirmRemove } = uiState
@@ -467,10 +438,9 @@ export function ProfileDetailPanel({
   const savedClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const modelsRequestRef = useRef(0)
   const saveRequestRef = useRef(0)
-  const savedSignatureRef = useRef(createProfileSignature(getProfileFormValues(profile, runtimeSettingsFields)))
+  const savedSignatureRef = useRef(createProfileSignature(getProfileFormValues(profile)))
   const latestProfileRef = useRef(profile)
   const selectedProfileIdRef = useRef(profile.id)
-  const runtimeSettingsFieldsSignatureRef = useRef(runtimeSettingsFieldsSignature)
   const [chatgptLogin, dispatchChatgptLogin] = useReducer(
     chatgptLoginReducer,
     INITIAL_CHATGPT_LOGIN_STATE,
@@ -578,13 +548,6 @@ export function ProfileDetailPanel({
       form.setValue('enabledModels', next, { shouldDirty: true })
     }
 
-  const handleRuntimeSettingChange = (key: string, value: RuntimeSettingsFormValue) => {
-      form.setValue('runtimeSettingsValues', {
-        ...form.getValues('runtimeSettingsValues'),
-        [key]: value,
-      }, { shouldDirty: true })
-    }
-
   const handleClaudeAgentAliasesChange = (next: ClaudeAgentModelAliases) => {
       form.setValue('claudeAgentAliases', next, { shouldDirty: true })
     }
@@ -642,11 +605,11 @@ export function ProfileDetailPanel({
     clearSavedClearTimer()
     modelsRequestRef.current += 1
     saveRequestRef.current += 1
-    const initialValues = getProfileFormValues(profile, runtimeSettingsFields)
+    const initialValues = getProfileFormValues(profile)
     savedSignatureRef.current = createProfileSignature(initialValues)
     form.reset(initialValues)
     dispatch({ type: 'reset' })
-  }, [form, profile, runtimeSettingsFields, runtimeSettingsFieldsSignature])
+  }, [form, profile])
 
   // Visibility lives in enabled_models_json (model-settings), not connectionConfigJson.
   useEffect(() => {
@@ -672,23 +635,6 @@ export function ProfileDetailPanel({
       active = false
     }
   }, [form, profile.id])
-
-  useEffect(() => {
-    if (runtimeSettingsFieldsSignatureRef.current === runtimeSettingsFieldsSignature) {
-      return
-    }
-    runtimeSettingsFieldsSignatureRef.current = runtimeSettingsFieldsSignature
-    const currentValues = form.getValues()
-    const nextValues = {
-      ...currentValues,
-      runtimeSettingsValues: readRuntimeSettingsFormValues(
-        ProfileConfigJsonSchema.parse(latestProfileRef.current.configJson),
-        runtimeSettingsFields,
-      ),
-    }
-    savedSignatureRef.current = createProfileSignature(nextValues)
-    form.reset(nextValues)
-  }, [form, runtimeSettingsFields, runtimeSettingsFieldsSignature])
 
   useEffect(() => {
     if (profile.providerKind !== 'openai-compatible') {
@@ -802,8 +748,7 @@ export function ProfileDetailPanel({
           enabled: profile.enabled,
           config: supportsModels
             ? buildProfileConfig(currentValues, ProfileConfigJsonSchema.parse(profile.configJson), {
-                codexAuthMode,
-                runtimeSettingsFields,
+              codexAuthMode,
               })
             : ProfileConfigJsonSchema.parse(profile.configJson),
           credentialRef,
@@ -853,7 +798,6 @@ export function ProfileDetailPanel({
         bedrockRegion,
         claudeAgentAliases,
         enabledModels,
-        runtimeSettingsValues,
       })
 
   // Auto-save with debounce — but skip the very first run after switching profiles
@@ -938,12 +882,6 @@ export function ProfileDetailPanel({
           activeChatgptLogin={chatgptLogin.activeLogin}
           onChatgptLogin={handleChatgptLogin}
           onCancelChatgptLogin={handleCancelChatgptLogin}
-        />
-
-        <RuntimeSettingsSchemaFields
-          fields={runtimeSettingsFields}
-          values={runtimeSettingsValues}
-          onChange={handleRuntimeSettingChange}
         />
 
         {showCodexAccountDiagnostics && (
@@ -1266,13 +1204,48 @@ function ProfileCredentialSettings({
     : CLAUDE_AUTH_MODE_API_KEY
   const claudeAiLogin = isClaudeProvider && claudeAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI
   const showChatgptControls = isCodexProvider && codexAuthMode === CODEX_AUTH_MODE_CHATGPT
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null)
+  const [revealingSecret, setRevealingSecret] = useState(false)
+  const [replacingSecret, setReplacingSecret] = useState(false)
   const description = isCodexProvider
     ? 'How this provider signs in to Codex.'
     : isClaudeProvider
       ? 'How this provider authenticates to Claude.'
       : profile.credentialRef
-        ? 'A credential is already stored. Leave empty to keep it.'
+        ? 'Stored securely. Reveal it briefly or replace it with a new value.'
         : 'Stored locally and encrypted.'
+
+  useEffect(() => {
+    if (!revealedSecret) {
+      return
+    }
+    const timeoutId = setTimeout(setRevealedSecret, 15_000, null)
+    return () => clearTimeout(timeoutId)
+  }, [revealedSecret])
+
+  const revealSecret = async () => {
+    if (!profile.credentialRef || revealingSecret) {
+      return
+    }
+    setRevealingSecret(true)
+    try {
+      const { data } = await postSecretsByIdReveal({
+        path: { id: profile.credentialRef },
+        throwOnError: true,
+      })
+      setRevealedSecret(data.secret)
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: 'Could not reveal API key',
+        description: apiErrorMessage(error),
+      })
+    }
+    finally {
+      setRevealingSecret(false)
+    }
+  }
 
   return (
     <SettingsRow
@@ -1340,7 +1313,31 @@ function ProfileCredentialSettings({
         {showChatgptControls && credentialMetadata && isChatgptCredential && (
           <ChatgptCredentialSummary credential={credentialMetadata} />
         )}
-        {!showChatgptControls && !claudeAiLogin && (
+        {!showChatgptControls && !claudeAiLogin && revealedSecret && (
+          <div className="flex flex-col gap-1.5">
+            <Input value={revealedSecret} readOnly type="text" className="h-9 font-mono text-[12.5px]" />
+            <div className="flex items-center gap-2">
+              <Button type="button" size="xs" variant="outline" onClick={() => setRevealedSecret(null)}>
+                Hide API key
+              </Button>
+              <span className="text-[11px] text-muted-foreground">Hidden automatically after 15 seconds.</span>
+            </div>
+          </div>
+        )}
+        {!showChatgptControls && !claudeAiLogin && !revealedSecret && profile.credentialRef && !replacingSecret && (
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-muted-foreground">{credentialMetadata?.maskedSecret ?? 'Stored API key'}</span>
+            <Button type="button" size="xs" variant="outline" onClick={() => void revealSecret()} disabled={readOnly || revealingSecret}>
+              {revealingSecret ? <Spinner className="size-3" /> : null}
+              Reveal
+            </Button>
+            <Button type="button" size="xs" variant="outline" onClick={() => setReplacingSecret(true)} disabled={readOnly}>
+              Replace
+            </Button>
+          </div>
+        )}
+        {!showChatgptControls && !claudeAiLogin && !revealedSecret && (!profile.credentialRef || replacingSecret) && (
+          <div className="flex flex-col gap-1.5">
           <Input
             data-testid="provider-edit-apikey"
             type="password"
@@ -1354,6 +1351,12 @@ function ProfileCredentialSettings({
                 : codexCredentialPlaceholder(CODEX_AUTH_MODE_API_KEY, !!profile.credentialRef)}
             className="h-9 text-[12.5px] font-mono"
           />
+            {profile.credentialRef && (
+              <Button type="button" size="xs" variant="ghost" className="self-start" onClick={() => setReplacingSecret(false)}>
+                Keep current API key
+              </Button>
+            )}
+          </div>
         )}
         {isCodexProvider && codexAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY && (
           <Input

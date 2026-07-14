@@ -1,0 +1,13 @@
+{
+  "title": "编辑器",
+  "description": "选择你用来打开文件和工作树的首选编辑器。",
+  "favoriteLabel": "首选编辑器",
+  "favoriteHint": "在此机器上检测到的编辑器。",
+  "loading": "正在检测编辑器…",
+  "noneFound": "未检测到受支持的编辑器。",
+  "desktopOnly": "编辑器选择仅在 Cradle 桌面应用中可用。",
+  "open": "打开",
+  "openInPreferred": "在 {{editor}} 中打开",
+  "chooseEditor": "选择编辑器",
+  "toast.failed": "无法在编辑器中打开该路径。"
+}

@@ -1,8 +1,10 @@
 import { KeyboardLine as KeyboardIcon } from '@mingcute/react'
+import { useQuery } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -11,6 +13,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Switch } from '~/components/ui/switch'
+import { keybindingsQueryOptions } from '~/features/shortcuts/api/keybindings'
 import { BUILT_IN_SHORTCUT_GROUPS } from '~/features/shortcuts/built-in-shortcuts'
 import type { MacInputBareModifier } from '~/lib/electron'
 import { isElectron, nativeIpc } from '~/lib/electron'
@@ -59,6 +62,7 @@ export function ShortcutSettings() {
     isSaving: isSavingDesktopPrefs,
     savePrefs: saveDesktopPrefs,
   } = useDesktopPreferences()
+  const keybindingsQuery = useQuery(keybindingsQueryOptions())
 
   const savePreference = useCallback(
     (updates: Partial<DesktopPreferences>) => {
@@ -73,6 +77,8 @@ export function ShortcutSettings() {
 
   const prefsDisabled = !desktopPrefs || isSavingDesktopPrefs
   const selectedTrigger = desktopPrefs?.appshotHotkeyTrigger ?? 'DoubleCommand'
+  const desktopIpc = isElectron ? nativeIpc : null
+  const keybindingsConfigPath = keybindingsQuery.data?.configPath
 
   return (
     <SettingsPage
@@ -131,6 +137,32 @@ export function ShortcutSettings() {
               aria-label={t('shortcut.appshotHotkey.enabledLabel' as SettingsKey)}
               data-testid="shortcut-appshot-hotkey"
             />
+          </div>
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup
+        label={t('shortcut.file.title' as SettingsKey)}
+        description={t('shortcut.file.description' as SettingsKey)}
+      >
+        <SettingsRow
+          label={t('shortcut.file.pathLabel' as SettingsKey)}
+          description={keybindingsQuery.data?.errors.join('; ') || undefined}
+        >
+          <div className="flex max-w-md items-center gap-2">
+            <code className="min-w-0 truncate rounded-md bg-[var(--color-surface-inset)] px-2 py-1.5 font-mono text-[11px] text-[var(--text-secondary)] shadow-[var(--shadow-inset-ring)]">
+              {keybindingsConfigPath ?? 'Loading…'}
+            </code>
+            {desktopIpc && keybindingsConfigPath && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void desktopIpc.native.openPath(keybindingsConfigPath)}
+              >
+                {t('shortcut.file.open' as SettingsKey)}
+              </Button>
+            )}
           </div>
         </SettingsRow>
       </SettingsGroup>
