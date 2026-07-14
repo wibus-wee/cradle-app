@@ -14,9 +14,6 @@ interface LayoutState {
   asideOpen: boolean
   asideActiveTab: string
   bottomPanelOpen: boolean
-  activeBrowserPanelOwnerId: string
-  browserPanelOpen: boolean
-  browserPanelOpenByOwnerId: Record<string, boolean>
   browserPanelRatio: number
   setSidebarWidth: (w: number) => void
   setSidebarCollapsed: (collapsed: boolean) => void
@@ -29,9 +26,6 @@ interface LayoutState {
   openAsideTab: (tab: string) => void
   toggleBottomPanel: () => void
   setBottomPanelOpen: (open: boolean) => void
-  setActiveBrowserPanelOwner: (ownerId: string | null | undefined) => void
-  toggleBrowserPanel: (ownerId?: string | null) => void
-  setBrowserPanelOpen: (open: boolean, ownerId?: string | null) => void
   setBrowserPanelRatio: (r: number) => void
 }
 
@@ -51,12 +45,6 @@ interface LayoutStoreGlobal {
   __CRADLE_LAYOUT_STORE__?: LayoutStore
 }
 
-export const DEFAULT_LAYOUT_BROWSER_PANEL_OWNER_ID = 'global'
-
-function normalizeBrowserPanelOwnerId(ownerId: string | null | undefined): string {
-  return ownerId || DEFAULT_LAYOUT_BROWSER_PANEL_OWNER_ID
-}
-
 const layoutPersistKey = isTearoffWindow
   ? `cradle:layout:tearoff:${tearoffSurfaceId ?? 'unknown'}:v1`
   : 'cradle:layout:v1'
@@ -72,9 +60,6 @@ function createLayoutStore(): LayoutStore {
       asideOpen: false,
       asideActiveTab: 'files',
       bottomPanelOpen: !isTearoffWindow,
-      activeBrowserPanelOwnerId: DEFAULT_LAYOUT_BROWSER_PANEL_OWNER_ID,
-      browserPanelOpen: false,
-      browserPanelOpenByOwnerId: {},
       browserPanelRatio: 0.4,
       setSidebarWidth: sidebarWidth => set(s => s.sidebarWidth === sidebarWidth ? s : { sidebarWidth }),
       setSidebarCollapsed: sidebarCollapsed => set(s => s.sidebarCollapsed === sidebarCollapsed ? s : { sidebarCollapsed }),
@@ -87,43 +72,6 @@ function createLayoutStore(): LayoutStore {
       openAsideTab: (tab: string) => set({ asideOpen: true, asideActiveTab: tab }),
       toggleBottomPanel: () => set(s => ({ bottomPanelOpen: !s.bottomPanelOpen })),
       setBottomPanelOpen: (open: boolean) => set(s => (s.bottomPanelOpen === open ? s : { bottomPanelOpen: open })),
-      setActiveBrowserPanelOwner: ownerIdInput => set((s) => {
-        const activeBrowserPanelOwnerId = normalizeBrowserPanelOwnerId(ownerIdInput)
-        if (s.activeBrowserPanelOwnerId === activeBrowserPanelOwnerId) {
-          return s
-        }
-        return {
-          activeBrowserPanelOwnerId,
-          browserPanelOpen: s.browserPanelOpenByOwnerId[activeBrowserPanelOwnerId] ?? false,
-        }
-      }),
-      toggleBrowserPanel: ownerIdInput => set((s) => {
-        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? s.activeBrowserPanelOwnerId)
-        const browserPanelOpen = !(s.browserPanelOpenByOwnerId[ownerId] ?? false)
-        return {
-          ...(ownerId === s.activeBrowserPanelOwnerId ? { browserPanelOpen } : {}),
-          browserPanelOpenByOwnerId: {
-            ...s.browserPanelOpenByOwnerId,
-            [ownerId]: browserPanelOpen,
-          },
-        }
-      }),
-      setBrowserPanelOpen: (open: boolean, ownerIdInput) => set((s) => {
-        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? s.activeBrowserPanelOwnerId)
-        if (
-          (s.browserPanelOpenByOwnerId[ownerId] ?? false) === open
-          && (ownerId !== s.activeBrowserPanelOwnerId || s.browserPanelOpen === open)
-        ) {
-          return s
-        }
-        return {
-          ...(ownerId === s.activeBrowserPanelOwnerId ? { browserPanelOpen: open } : {}),
-          browserPanelOpenByOwnerId: {
-            ...s.browserPanelOpenByOwnerId,
-            [ownerId]: open,
-          },
-        }
-      }),
       setBrowserPanelRatio: (r: number) => set((s) => {
         const browserPanelRatio = Math.max(0.2, Math.min(0.7, r))
         return s.browserPanelRatio === browserPanelRatio ? s : { browserPanelRatio }

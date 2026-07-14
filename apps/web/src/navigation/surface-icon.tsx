@@ -28,6 +28,7 @@ export function SurfaceIcon({ surface, className }: { surface: Pick<AppSurface, 
       return <HomeIcon className={cls} />
     case 'new-work':
     case 'work':
+    case 'pull-requests':
       return <WorkIcon className={cls} />
     case 'new-chat':
       return <MessageSquarePlusIcon className={cls} />

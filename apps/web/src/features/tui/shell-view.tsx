@@ -1,11 +1,4 @@
-import { ClipboardAddon } from '@xterm/addon-clipboard'
 import { FitAddon } from '@xterm/addon-fit'
-import { ImageAddon } from '@xterm/addon-image'
-import { LigaturesAddon } from '@xterm/addon-ligatures'
-import { ProgressAddon } from '@xterm/addon-progress'
-import { SearchAddon } from '@xterm/addon-search'
-import { Unicode11Addon } from '@xterm/addon-unicode11'
-import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
@@ -17,6 +10,7 @@ import {
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
+import { installTerminalAddons } from './terminal-addons'
 import { getTerminalFontFamily } from './terminal-font'
 import type { TerminalMetadata } from './terminal-metadata'
 import { mergeTerminalMetadata, readTerminalMetadata } from './terminal-metadata'
@@ -25,16 +19,6 @@ import { useTerminalPreferencesStore } from './terminal-preferences'
 const EXIT_BANNER = '\r\n\x1B[2m[Process exited]\x1B[0m\r\n'
 const MAX_TRANSCRIPT_CHARS = 8_000
 const MAX_OSC_LOOKBEHIND_CHARS = 1_000
-
-// xterm's ImageAddon ships memory-hostile defaults: a 128 MB FIFO decode cache
-// plus a worker that permanently reserves `pixelLimit * 4` bytes (default
-// 4096x4096 px ≈ 64 MB) the moment the addon loads — paid per terminal whether
-// or not an inline image is ever rendered. Two shells (bottom panel + a browser
-// TUI tab) silently reserve ~270 MB of working set this way. Clamp to amounts
-// sufficient for terminal inline imagery: a 1024x1024 decode ceiling (~4 MB
-// worker reservation) and a 16 MB cache.
-const TERMINAL_IMAGE_PIXEL_LIMIT = 1024 * 1024
-const TERMINAL_IMAGE_STORAGE_LIMIT_MB = 16
 
 const RE_OSC = /\u001B\][^\u0007]*(\u0007|\u001B\\)/g
 // eslint-disable-next-line regexp/no-obscure-range
@@ -157,36 +141,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
       })
     }
 
-    // ── Always-on addons ──────────────────────────────────────────────────────
-    terminal.loadAddon(new Unicode11Addon())
-    terminal.unicode.activeVersion = '11'
-    terminal.loadAddon(new ClipboardAddon())
-    terminal.loadAddon(new ProgressAddon())
-    const searchAddon = new SearchAddon()
-    terminal.loadAddon(searchAddon)
-
-    // ── GPU-accelerated renderer ──────────────────────────────────────────────
-    let webglLoaded = false
-    try {
-      const webgl = new WebglAddon()
-      webgl.onContextLoss(() => {
-        webgl.dispose()
-      })
-      terminal.loadAddon(webgl)
-      webglLoaded = true
-      terminal.loadAddon(new ImageAddon({
-        pixelLimit: TERMINAL_IMAGE_PIXEL_LIMIT,
-        storageLimit: TERMINAL_IMAGE_STORAGE_LIMIT_MB,
-      }))
-    }
-    catch { /* WebGL unavailable — fall back to DOM renderer */ }
-
-    if (!webglLoaded) {
-      try {
-        terminal.loadAddon(new LigaturesAddon())
-      }
-      catch { /* ligatures unavailable */ }
-    }
+    installTerminalAddons(terminal)
 
     // ── Unified resize debounce ───────────────────────────────────────────────
     let lastCols = 0
