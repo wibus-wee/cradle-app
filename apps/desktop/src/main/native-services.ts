@@ -51,7 +51,7 @@ import {
   readScreenPointAppshotAnimationTarget,
   readScreenPointAppshotDestinationFrame,
 } from './native-appshot-target'
-import { launchPathInEditor } from './native-editor-launcher'
+import { launchPathInEditor, readAvailableEditors } from './native-editor-launcher'
 import { launchPathInTerminal } from './native-terminal-launcher'
 import type { QuitGuard } from './quit-guard'
 import type { DesktopUpdateManager, DesktopUpdateStatus } from './update-manager'
@@ -99,6 +99,12 @@ export interface NativeAuthAuthenticateResult {
   status: NativeAuthAuthenticateStatus
   method: 'local-authentication' | null
   message?: string
+}
+
+export interface AvailableEditor {
+  id: string
+  label: string
+  iconDataUrl?: string
 }
 
 /**
@@ -282,10 +288,28 @@ class NativeService extends IpcService {
   }
 
   @IpcMethod()
-  async openPathInEditor(fullPath: string): Promise<{ editor: string }> {
+  async openPathInEditor(fullPath: string, editorId?: string): Promise<{ editor: string }> {
     const resolvedPath = await validateNativePath(fullPath)
-    const editor = await launchPathInEditor(resolvedPath)
+    const editor = await launchPathInEditor(resolvedPath, editorId)
     return { editor }
+  }
+
+  @IpcMethod()
+  async listAvailableEditors(): Promise<AvailableEditor[]> {
+    const editors = await readAvailableEditors()
+    return Promise.all(editors.map(async ({ applicationPath, ...editor }) => {
+      if (!applicationPath) {
+        return editor
+      }
+
+      try {
+        const icon = await app.getFileIcon(applicationPath, { size: 'normal' })
+        return icon.isEmpty() ? editor : { ...editor, iconDataUrl: icon.toDataURL() }
+      }
+      catch {
+        return editor
+      }
+    }))
   }
 
   @IpcMethod()

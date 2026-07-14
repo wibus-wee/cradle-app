@@ -21,6 +21,14 @@ export const secrets = new Elysia({
     body: SecretsModel.saveBody,
     response: { 200: SecretsModel.secretMetadata },
   })
+  .post('/:id/reveal', ({ params }) => ({ secret: Secrets.readSecret(params.id) }), {
+    detail: {
+      summary: 'Reveal a secret value',
+      description: 'Returns a decrypted credential only after an explicit local user action. This endpoint is intentionally not exposed through the CLI.',
+    },
+    params: SecretsModel.idParams,
+    response: { 200: SecretsModel.revealedSecret },
+  })
   .delete('/:id', ({ params }) => {
     Secrets.removeSecret(params.id)
     return { ok: true as const }

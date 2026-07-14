@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
+import type { MenuPortalProps } from '~/components/ui/menu'
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from '~/components/ui/menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { Spinner } from '~/components/ui/spinner'
@@ -451,11 +452,13 @@ export function AgentProviderModelPicker({
   providerTargetId,
   modelId,
   thinkingEffort,
+  menuPortalProps,
 }: {
   providerTargets: ProviderTargetOption[]
   providerTargetId: string | null
   modelId: string | null
   thinkingEffort: ThinkingEffort
+  menuPortalProps?: MenuPortalProps
 }) {
   const { t } = useTranslation('agentManagement')
   const form = useFormContext<AgentDetailFormValues>()
@@ -537,6 +540,7 @@ export function AgentProviderModelPicker({
       emptySelectionLabel={t('detail.providerModel.emptySelection')}
       menuSide="bottom"
       menuAlign="end"
+      menuPortalProps={menuPortalProps}
       triggerTestId="agent-provider-model-selector"
       getThinkingOptionsForModel={model => filterThinkingOptionsForModel(model, thinkingOptions)}
       onRequestProviderTargetModels={requestProviderTargetModels}

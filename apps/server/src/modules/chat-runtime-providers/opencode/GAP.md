@@ -13,8 +13,8 @@
 | Event-first Turn | `event.subscribe()` + `session.promptAsync()` | ✅ session-scoped 持续 event pump；同时投影 `message.*` 与 `session.next.*`；prompt/idle recovery 有上限 | 高 |
 | Permission Approval | `permission.updated` + `postSessionIdPermissionsPermissionId()` | ✅ 已接入 Chat Runtime pending tool approval | 高 |
 | File/Image 输入 | `FilePartInput` | ✅ AI SDK file part 会投影为 opencode file part | 高 |
-| Plugin MCP 配置 | `Config.mcp` local/remote servers | ✅ Cradle plugin registry 会投影为 OpenCode `config.mcp[...]` | 高 |
-| MCP 生命周期管理 | `mcp.add/connect/disconnect/auth.*` | ⏸ 只接入插件配置与 `mcp.status()` 状态；未提供 Cradle UI/route 管理 OpenCode MCP 生命周期 | 中 |
+| Native MCP 配置 | `Config.mcp` local/remote servers | ✅ 继承用户 OpenCode config 与 workspace project scope；Cradle plugin registry 不做跨 namespace 投影 | 高 |
+| MCP 生命周期管理 | `mcp.add/connect/disconnect/auth.*` | ⏸ 只读取原生 `mcp.status()` 状态；未提供 Cradle UI/route 管理 OpenCode MCP 生命周期 | 中 |
 | Provider Threads / Fork | `session.list/get/messages/delete/fork()` | ✅ 已接入 Chat Runtime provider-thread 与 side-chat fork hooks | 中 |
 | UI Slot 状态 | `session.status()`、`session.todo()`、`session.diff()`、`mcp.status()`、`file.status()`、permission/question lifecycle、task/subagent bindings | ✅ 已实现 status/model/progress/diff/approvals/MCP/filesystem/agents/user-input 状态；crew 来自当前 session 创建的 task/subagent，不来自全局支持列表；step/compact 仍走 stream evidence | 中 |
 | Provider Thread Metadata | `session.share`、`session.summary`、`session.revert`、`session.children()` | ✅ provider-thread source/threadSource 包含 shareUrl、summary、revert、childCount | 中 |
@@ -155,7 +155,7 @@
 - `listProviderThreads()`、`readProviderThread()`、`deleteProviderThread()`、`listProviderThreadTurns()` 已接入 Chat Runtime provider-thread API。
 - `forkRuntimeSession()` 已接入 side-chat native fork；当父 session 有 OpenCode provider session id 时，side conversation 优先走 `session.fork()`。
 
-### 8. Plugin MCP 配置与生命周期
+### 8. Native MCP 配置与生命周期
 
 **SDK 可用资源**:
 - Config 字段 `mcp`:
@@ -164,9 +164,9 @@
 - API: `mcp.status()` — 读取当前 workspace directory 下 MCP server 状态
 - API: `mcp.add()`、`mcp.connect()`、`mcp.disconnect()`、`mcp.auth.start()`、`mcp.auth.callback()`、`mcp.auth.authenticate()`、`mcp.auth.remove()` — OpenCode 原生 MCP server 生命周期与 OAuth 管理
 
-**Cradle 接口**: Cradle 插件系统通过 `apps/server/src/plugins/mcp-registry.ts` 注册插件提供的 MCP server。Claude Agent 和 Codex provider 已经消费该 registry；OpenCode provider 现在也通过 `config.ts` 将同一 registry 投影成 OpenCode `Config.mcp`，并由 `runtime-context.ts` 通过 `OPENCODE_CONFIG_CONTENT` 注入共享 OpenCode server 的启动配置。Cradle 同时把 OpenCode `cwd`、`OPENCODE_CONFIG_DIR`、`OPENCODE_DB` 隔离到 `CRADLE_DATA_DIR/runtime/opencode`，并设置 `OPENCODE_DISABLE_PROJECT_CONFIG=1`，避免在 active workspace directory 写入项目级 `config.json` 或复用用户全局 OpenCode DB。
+**Cradle 接口**: OpenCode provider 使用用户原生的 OpenCode config、auth、project scope 与 MCP 配置。`runtime-context.ts` 按 binary path 和 workspace cwd 池化 managed `opencode serve` 进程，不设置 `OPENCODE_CONFIG_CONTENT`、`OPENCODE_CONFIG_DIR`、`OPENCODE_DB` 或 `OPENCODE_DISABLE_PROJECT_CONFIG`，也不向 active workspace 写入 Cradle-owned OpenCode 配置。Cradle plugin registry 当前不会投影进 native OpenCode host；插件 MCP 与 OpenCode 原生 MCP 的生命周期保持各自 namespace 所有权。
 
-**当前状态**: 插件 MCP 已接入。stdio 插件 server 会投影为 OpenCode local MCP，command 为 `[command, ...args]`，env 会投影到 `environment`；streamable HTTP 插件 server 会投影为 OpenCode remote MCP，url 和 headers 会投影到 `url`/`headers`。`getUiSlotStates()` 仍通过 `mcp.status()` 读取状态。尚未实现的是面向用户的 Cradle MCP lifecycle UI/route：用户还不能在 Cradle 内对 OpenCode 调用 `mcp.add/connect/disconnect/auth.*`。
+**当前状态**: OpenCode host 继承用户原生 MCP 配置，Cradle plugin registry 不会投影为 OpenCode local/remote MCP。`getUiSlotStates()` 通过 `mcp.status()` 读取当前 workspace 的原生状态。尚未实现面向用户的 Cradle MCP lifecycle UI/route：用户还不能在 Cradle 内对 OpenCode 调用 `mcp.add/connect/disconnect/auth.*`。
 
 ### 9. UI Slot 状态
 
@@ -187,7 +187,7 @@
 - `rollbackLastTurn?(input): Promise<RollbackLastTurnResult>`
 
 **当前状态**:
-- `rollbackLastTurn()` 已实现：读取最近 assistant message 后调用 `session.revert()`，不回滚工作区文件。
+- `rollbackLastTurn()` 已实现：读取完整 native message history，按请求的 turn 数选择历史 assistant message 后调用 `session.revert()`，不回滚工作区文件。
 - `steerTurn` 未声明：Cradle 当前 hook 面向 active turn live steering，opencode v1 SDK 暴露的是 session revert/unrevert primitive，不具备同等语义。
 
 ### 11. Structured User Input

@@ -85,10 +85,11 @@ import {
   OPENCODE_RUNTIME_METADATA,
 } from './metadata'
 import { listOpencodeRuntimeModels, OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID } from './model-inventory'
+import { readOpenCodeRuntimeNativeProviderId } from './native-provider-target-id'
 import { OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS } from './owned-provider-targets'
 import { createOpencodeRuntimePresentation } from './presentation'
 import type { OpencodeRuntimeResource } from './runtime-context'
-import { acquireOpencodeRuntimeResource } from './runtime-context'
+import { acquireOpencodeRuntimeResource, tryRetainOpencodeRuntimeResource } from './runtime-context'
 import type { OpencodeSubagentBinding } from './subagent-bridge'
 import {
   OpencodeSubagentRegistry,
@@ -919,7 +920,7 @@ export class OpencodeProvider implements ChatRuntime {
     const handle = readOpencodeRuntimeHandle(this.runtimeKind, input.runtimeSession)
     const messagesResult = await handle.client.session.messages({
       path: { id: providerSessionId },
-      query: { directory: input.workspacePath, limit: 50 },
+      query: { directory: input.workspacePath },
     })
     if (messagesResult.error) {
       throw new ProviderRuntimeError(
@@ -927,14 +928,15 @@ export class OpencodeProvider implements ChatRuntime {
       )
     }
 
-    const message = readLastAssistantMessage(messagesResult.data)
+    const message = readAssistantMessageForRollback(messagesResult.data, input.numTurns)
     if (!message) {
-      return {
-        runtimeKind: this.runtimeKind,
-        providerSessionId,
-        rolledBackTurns: 0,
-        fileChangesReverted: false,
-      }
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(
+          this.runtimeKind,
+          'session.revert',
+          `Session does not contain ${input.numTurns} assistant turns to roll back`,
+        ),
+      )
     }
 
     const revertResult = await handle.client.session.revert({
@@ -951,7 +953,7 @@ export class OpencodeProvider implements ChatRuntime {
     return {
       runtimeKind: this.runtimeKind,
       providerSessionId,
-      rolledBackTurns: 1,
+      rolledBackTurns: input.numTurns,
       fileChangesReverted: false,
       providerResult: revertResult.data,
     }
@@ -1968,6 +1970,14 @@ export class OpencodeProvider implements ChatRuntime {
     providerTargetId: string | null
     hostProviderTargetId: string
   }> {
+    const nativeConfig = resolveNativeOpencodeRuntimeConfig({
+      providerTargetId: input.profile?.providerTargetId,
+      requestedModelId: input.requestedModelId,
+    })
+    if (nativeConfig) {
+      return nativeConfig
+    }
+
     if (input.profile) {
       const resolved = await resolveOpencodeConfig({
         profile: input.profile,
@@ -1992,6 +2002,30 @@ export class OpencodeProvider implements ChatRuntime {
       providerTargetId: null,
       hostProviderTargetId: OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID,
     }
+  }
+}
+
+export function resolveNativeOpencodeRuntimeConfig(input: {
+  providerTargetId?: string | null
+  requestedModelId?: string | null
+}): {
+  config: Config
+  model: { providerID: string, modelID: string } | null
+  modelId: string | null
+  providerTargetId: null
+  hostProviderTargetId: string
+} | null {
+  if (!readOpenCodeRuntimeNativeProviderId(input.providerTargetId ?? '')) {
+    return null
+  }
+  return {
+    config: {
+      ...(input.requestedModelId ? { model: input.requestedModelId } : {}),
+    },
+    model: parseOpenCodeModelRef(input.requestedModelId),
+    modelId: input.requestedModelId ?? null,
+    providerTargetId: null,
+    hostProviderTargetId: OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID,
   }
 }
 
@@ -2209,7 +2243,7 @@ function readOpencodeRuntimeHandle(runtimeKind: RuntimeKind, runtimeSession: Run
 function createOpencodeChildRuntimeLease(
   resource: OpencodeRuntimeResource,
 ): RuntimeLiveResourceLease<OpencodeRuntimeResource> {
-  return {
+  return tryRetainOpencodeRuntimeResource(resource) ?? {
     resource,
     refresh() {},
     release() {},
@@ -2906,19 +2940,16 @@ function readProviderThreadOffset(cursor: string | null | undefined): number {
   return Number.isFinite(offset) && offset > 0 ? offset : 0
 }
 
-function readLastAssistantMessage(
+function readAssistantMessageForRollback(
   messages: Array<{ info: OpencodeMessage, parts: OpencodePart[] }>,
+  numTurns: number,
 ): OpencodeAssistantMessage | null {
-  let selected: OpencodeAssistantMessage | null = null
-  for (const message of messages) {
-    if (message.info.role !== 'assistant') {
-      continue
-    }
-    if (!selected || message.info.time.created >= selected.time.created) {
-      selected = message.info
-    }
-  }
-  return selected
+  const assistantMessages = messages
+    .filter((message): message is { info: OpencodeAssistantMessage, parts: OpencodePart[] } =>
+      message.info.role === 'assistant')
+    .map(message => message.info)
+    .sort((left, right) => left.time.created - right.time.created)
+  return assistantMessages[assistantMessages.length - numTurns] ?? null
 }
 
 function readOpencodeMessageIds(

@@ -13,7 +13,11 @@ import type {
   RuntimeUserInputResolution,
 } from '../../chat-runtime/runtime-provider-types'
 import type { OpencodeStreamEvent } from './event-stream'
-import { formatOpencodeAssistantError, OpencodeProvider } from './provider'
+import {
+  formatOpencodeAssistantError,
+  OpencodeProvider,
+  resolveNativeOpencodeRuntimeConfig,
+} from './provider'
 import type { OpencodeRuntimeResource } from './runtime-context'
 
 type OpencodeAssistantError = NonNullable<OpencodeAssistantMessage['error']>
@@ -211,6 +215,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     fork: vi.fn(async () => ({ data: state.forkSessionData, error: undefined })),
     children: vi.fn(async () => ({ data: state.sessionChildrenData, error: undefined })),
     delete: vi.fn(),
+    revert: vi.fn(async () => ({ data: true, error: undefined })),
     status: vi.fn(async () => ({ data: state.sessionStatusData, error: undefined })),
     todo: vi.fn(async () => ({ data: state.sessionTodoData, error: undefined })),
     diff: vi.fn(async () => ({ data: state.sessionDiffData, error: undefined })),
@@ -317,6 +322,63 @@ describe('formatOpencodeAssistantError', () => {
 
     expect(formatOpencodeAssistantError(error)).toContain('401: Unauthorized')
     expect(formatOpencodeAssistantError(error)).toContain('the API key or AK/SK in the request is missing or invalid')
+  })
+})
+
+describe('resolveNativeOpencodeRuntimeConfig', () => {
+  it('keeps native provider and model ids for runtime-owned provider targets', () => {
+    expect(resolveNativeOpencodeRuntimeConfig({
+      providerTargetId: 'runtime-native:opencode:openai',
+      requestedModelId: 'openai/gpt-5',
+    })).toEqual({
+      config: { model: 'openai/gpt-5' },
+      model: { providerID: 'openai', modelID: 'gpt-5' },
+      modelId: 'openai/gpt-5',
+      providerTargetId: null,
+      hostProviderTargetId: 'runtime-native-opencode',
+    })
+  })
+
+  it('leaves ordinary provider profiles on the existing projection path', () => {
+    expect(resolveNativeOpencodeRuntimeConfig({
+      providerTargetId: 'manual-provider-target',
+      requestedModelId: 'openai/gpt-5',
+    })).toBeNull()
+  })
+})
+
+describe('opencodeProvider rollback', () => {
+  it('rewinds to the requested historical assistant message', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    fake.state.sessionMessagesData.push(
+      { info: assistantMessage({ id: 'assistant-1', time: { created: 1, completed: 1 } }), parts: [] },
+      { info: assistantMessage({ id: 'assistant-2', time: { created: 2, completed: 2 } }), parts: [] },
+      { info: assistantMessage({ id: 'assistant-3', time: { created: 3, completed: 3 } }), parts: [] },
+    )
+
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+    await expect(provider.rollbackLastTurn({
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      workspacePath: '/tmp/workspace',
+      numTurns: 2,
+    })).resolves.toMatchObject({
+      runtimeKind: 'opencode',
+      providerSessionId: 'ses_1',
+      rolledBackTurns: 2,
+      fileChangesReverted: false,
+    })
+
+    expect(fake.session.messages).toHaveBeenCalledWith({
+      path: { id: 'ses_1' },
+      query: { directory: '/tmp/workspace' },
+    })
+    expect(fake.session.revert).toHaveBeenCalledWith({
+      path: { id: 'ses_1' },
+      query: { directory: '/tmp/workspace' },
+      body: { messageID: 'assistant-2' },
+    })
   })
 })
 

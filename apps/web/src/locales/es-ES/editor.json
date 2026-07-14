@@ -1,0 +1,13 @@
+{
+  "title": "Editor",
+  "description": "Elige tu editor favorito para abrir archivos y árboles de trabajo.",
+  "favoriteLabel": "Editor favorito",
+  "favoriteHint": "Editores detectados en esta máquina.",
+  "loading": "Detectando editores…",
+  "noneFound": "No se detectaron editores compatibles.",
+  "desktopOnly": "La selección de editor está disponible en la app de escritorio de Cradle.",
+  "open": "Abrir",
+  "openInPreferred": "Abrir en {{editor}}",
+  "chooseEditor": "Elegir editor",
+  "toast.failed": "No se pudo abrir la ruta en el editor."
+}

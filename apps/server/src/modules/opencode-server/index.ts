@@ -5,7 +5,7 @@ import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/r
 export const opencodeServer = new Elysia({ prefix: '/opencode' })
   .get('/server/resources', () => getOpencodeServerResources(), {
     detail: {
-      'summary': 'Get the shared opencode server process resource usage',
+      'summary': 'Get one active pooled opencode host process resource sample',
       'tags': ['opencode'],
       'x-cradle-cli': { command: ['opencode', 'server', 'resources'] },
     },

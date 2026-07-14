@@ -54,7 +54,6 @@ import type { AgentProfile } from '~/features/agent-runtime/types'
 import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { useAgentProfiles } from '~/features/agent-runtime/use-agent-profiles'
 import { AGENTS_QUERY_KEY } from '~/features/agent-runtime/use-agents'
-import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { cn } from '~/lib/cn'
 
 import { SettingsMasterDetail } from '../settings/settings-container'
@@ -75,7 +74,6 @@ import {
   PROVIDER_KIND_LABELS,
   providerListEntryId,
 } from './provider-settings-utils'
-import { listRuntimeSettingsDescriptorsForProviderKind } from './runtime-settings-schema'
 import {
   applyVisibleRangeSelection,
   mergeVisibleSelection,
@@ -217,7 +215,6 @@ export function AgentRuntimeSettings() {
     updateProfile,
     removeProfile,
   } = useAgentProfiles()
-  const { runtimes } = useRuntimeCatalog()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const selectionAnchorIdRef = useRef<string | null>(null)
   const [draft, setDraft] = useState<DraftProvider | null>(null)
@@ -356,12 +353,6 @@ export function AgentRuntimeSettings() {
   const selectedExternalRecords = useMemo(
     () => selectedEntries.flatMap(entry => (entry.kind === 'external' ? [entry.record] : [])),
     [selectedEntries],
-  )
-  const selectedRuntimeSettingsDescriptors = useMemo(
-    () => selectedEntry?.kind === 'manual'
-      ? listRuntimeSettingsDescriptorsForProviderKind(runtimes, selectedEntry.profile.providerKind)
-      : [],
-    [runtimes, selectedEntry],
   )
   const toggleableSelectedProfiles = selectedProfiles
   const toggleableSelectedExternalRecords = selectedExternalRecords.filter(externalRecordCanToggle)
@@ -593,7 +584,7 @@ export function AgentRuntimeSettings() {
       </Button>
       <Button data-testid="add-provider-btn" size="sm" onClick={startDraft} disabled={!!draft}>
         <PlusIcon />
-        {t('runtime.action.addManualProvider')}
+        {t('runtime.action.addProvider')}
       </Button>
     </div>
   )
@@ -841,7 +832,6 @@ export function AgentRuntimeSettings() {
         <div key={selectedEntry.profile.id} className="min-w-0 flex-1">
           <ProfileDetailPanel
             profile={selectedEntry.profile}
-            runtimeSettingsDescriptors={selectedRuntimeSettingsDescriptors}
             onRemove={() => void handleRemoveProfile(selectedEntry.profile.id)}
             onToggle={enabled => void handleToggleProfile(selectedEntry.profile, enabled)}
             onSaved={() => {

@@ -1,7 +1,11 @@
 import type { UIMessage } from 'ai'
 
 import type { ChatPluginContextPart, ChatSkillContextPart } from '../../chat-runtime/context-parts'
-import { readChatPluginContextPart, readChatSkillContextPart } from '../../chat-runtime/context-parts'
+import {
+  readChatFileLineCommentContextPart,
+  readChatPluginContextPart,
+  readChatSkillContextPart,
+} from '../../chat-runtime/context-parts'
 
 export type RuntimeMessageInput = UIMessage | string
 
@@ -41,6 +45,20 @@ export function projectProviderInputParts(message: RuntimeMessageInput): Provide
     const pluginPart = readChatPluginContextPart(part)
     if (pluginPart) {
       return { type: 'plugin', plugin: pluginPart, part }
+    }
+    const fileLineComment = readChatFileLineCommentContextPart(part)
+    if (fileLineComment) {
+      const lineLabel = fileLineComment.lineStart === fileLineComment.lineEnd
+        ? `L${fileLineComment.lineStart}`
+        : `L${fileLineComment.lineStart}-L${fileLineComment.lineEnd}`
+      return {
+        type: 'text',
+        text: [
+          `<file_line_comment path=${JSON.stringify(fileLineComment.path)} lines=${JSON.stringify(lineLabel)}>`,
+          fileLineComment.comment,
+          '</file_line_comment>',
+        ].join('\n'),
+      }
     }
     return { type: 'unsupported', partType: part.type, part }
   })

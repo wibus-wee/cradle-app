@@ -11,11 +11,21 @@ import { providerTargetCacheId } from '../provider-targets/service'
 import { projectProviderModelListCapabilities } from './model-capabilities'
 
 const STALE_THRESHOLD_S = 60 * 60 // 1 hour soft TTL — clients may background-refresh when stale
+const FAILED_REFRESH_COOLDOWN_S = 2 * 60
+
+// A failed upstream inventory probe is transient operational state, not inventory.
+// Keep it in-process so a broken provider cannot be retried on every menu event,
+// without persisting an obsolete outage across an app restart.
+const failedModelRefreshRetryAfterByTargetId = new Map<string, number>()
 
 export interface CachedModelsResult {
   models: ModelDescriptor[]
   fetchedAt: number
   cached: boolean
+}
+
+export interface CachedModelRefreshFailure {
+  retryAfter: number
 }
 
 const ModelCapabilitiesSchema = z.object({
@@ -117,6 +127,7 @@ export function setCachedModelsForTarget(target: ProviderTarget, models: ModelDe
         fetchedAt: now,
       },
     }).run()
+    clearCachedModelRefreshFailure(target)
   }
   catch (err: any) {
     if (err?.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
@@ -124,6 +135,34 @@ export function setCachedModelsForTarget(target: ProviderTarget, models: ModelDe
     }
     throw err
   }
+}
+
+/**
+ * Suppress automatic live retries for a short period after an upstream inventory
+ * request fails. Explicit refreshes still bypass this cooldown.
+ */
+export function setCachedModelRefreshFailure(target: ProviderTarget): void {
+  failedModelRefreshRetryAfterByTargetId.set(
+    providerTargetCacheId(target),
+    Math.floor(Date.now() / 1000) + FAILED_REFRESH_COOLDOWN_S,
+  )
+}
+
+export function getCachedModelRefreshFailure(target: ProviderTarget): CachedModelRefreshFailure | null {
+  const targetId = providerTargetCacheId(target)
+  const retryAfter = failedModelRefreshRetryAfterByTargetId.get(targetId)
+  if (!retryAfter) {
+    return null
+  }
+  if (retryAfter <= Math.floor(Date.now() / 1000)) {
+    failedModelRefreshRetryAfterByTargetId.delete(targetId)
+    return null
+  }
+  return { retryAfter }
+}
+
+export function clearCachedModelRefreshFailure(target: ProviderTarget): void {
+  failedModelRefreshRetryAfterByTargetId.delete(providerTargetCacheId(target))
 }
 
 export function deleteCachedModelsForTarget(target: ProviderTarget): void {

@@ -846,6 +846,10 @@ export const zPostSecretsBody = z.object({
     secret: z.string().min(1)
 });
 
+export const zPostSecretsByIdRevealPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zDeleteSecretsByIdPath = z.object({
     id: z.string().min(1)
 });
