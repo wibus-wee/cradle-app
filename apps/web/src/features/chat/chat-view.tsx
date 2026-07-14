@@ -4,6 +4,7 @@ import {
   PencilLine as PencilIcon,
 } from '@mingcute/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -17,10 +18,14 @@ import { RemoteHostConnectionNotice } from '~/features/remote-hosts/remote-host-
 import { useRemoteHostConnection } from '~/features/remote-hosts/use-remote-host-connection'
 import { IsolationBoundaryDialog } from '~/features/session/isolation-boundary-dialog'
 import { IsolationMissingDialog } from '~/features/session/isolation-missing-dialog'
-import { useSessionIsolationState, useStartSessionIsolation } from '~/features/session/use-session-isolation'
+import {
+  useSessionIsolationState,
+  useStartSessionIsolation,
+} from '~/features/session/use-session-isolation'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { useChatStore } from '~/store/chat'
+import type { ComposerDraft } from '~/store/composer-draft'
 
 import type { ChatRuntimeGoalUiSlotState } from './capabilities/chat-capabilities'
 import { runtimeUiSlotStatesQueryKey } from './capabilities/chat-capabilities'
@@ -41,7 +46,9 @@ import type {
 import type { ChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import { useChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import { useComposerAppshotCapture } from './composer/use-composer-appshot-capture'
+import type { ChatContextPart } from './context/chat-context-parts'
 import {
+  registerChatComposerContextIngressHandler,
   registerChatComposerFileIngressHandler,
   registerChatPromptIngressHandler,
 } from './prompt-ingress'
@@ -60,6 +67,7 @@ import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 } from './slash-commands/chat-slash-commands'
+import { ThreadHandoffMenu } from './thread-handoff-menu'
 import type { RollbackDraftSignal } from './ui/chat-composer-section'
 import { ChatComposerSection } from './ui/chat-composer-section'
 import { ChatGoalEditorDialog } from './ui/chat-goal-editor-dialog'
@@ -69,6 +77,7 @@ import { useChatScrollRuntime } from './ui/use-chat-scroll-runtime'
 export type { ChatViewProps } from './chat-view-types'
 
 const EMPTY_FILES: NonNullable<ChatViewProps['availableFiles']> = []
+const EMPTY_CHAT_MESSAGES: UIMessage[] = []
 
 export function ChatView({
   active = true,
@@ -130,7 +139,13 @@ export function ChatView({
   const [usageSlotSessionId, setUsageSlotSessionId] = useState<string | null>(null)
   const [rollbackBusy, setRollbackBusy] = useState(false)
   const [rollbackDraftSignal, setRollbackDraftSignal] = useState<RollbackDraftSignal | null>(null)
-  const [clearComposerDraftSignal, setClearComposerDraftSignal] = useState<number | undefined>(undefined)
+  const [clearComposerDraftSignal, setClearComposerDraftSignal] = useState<number | undefined>(
+    undefined,
+  )
+  const [composerContextIngress, setComposerContextIngress] = useState<{
+    parts: ChatContextPart[]
+    key: number
+  } | null>(null)
   const [pendingRollbackMessageId, setPendingRollbackMessageId] = useState<string | null>(null)
   const pendingRollbackMessageIdRef = useRef<string | null>(null)
   const runtimeSettings = useRuntimeSettings(sessionId, chatActive)
@@ -151,15 +166,30 @@ export function ChatView({
     sendMessage,
     stop,
   })
-  const gatedComposerRuntime = useMemo(() => ({
-    ...composerRuntime,
-    disabled: composerRuntime.disabled || remoteConnectionBlocked,
-  }), [composerRuntime, remoteConnectionBlocked])
+  const gatedComposerRuntime = useMemo(
+    () => ({
+      ...composerRuntime,
+      disabled: composerRuntime.disabled || remoteConnectionBlocked,
+    }),
+    [composerRuntime, remoteConnectionBlocked],
+  )
   const scrollRuntime = useChatScrollRuntime({ active: chatActive, sessionId, messageIds, status })
   const appshotRuntime = useComposerAppshotCapture({
     active: chatActive,
     supportsAttachments: composerRuntime.supportsAttachments,
   })
+  const historyMessages = useChatStore(state =>
+    sessionId ? state.messagesMap.get(sessionId) ?? EMPTY_CHAT_MESSAGES : EMPTY_CHAT_MESSAGES)
+  const promptHistory = useMemo<ComposerDraft[]>(() => {
+    const drafts: ComposerDraft[] = []
+    for (let index = historyMessages.length - 1; index >= 0 && drafts.length < 100; index--) {
+      const draft = readUserMessageDraft(historyMessages[index])
+      if (draft) {
+        drafts.push(draft)
+      }
+    }
+    return drafts
+  }, [historyMessages])
   const editPreviousMessageId = useChatStore((state) => {
     if (!sessionId || !rollback.supported) {
       return null
@@ -231,9 +261,10 @@ export function ChatView({
         const rollbackMessageId = pendingRollbackMessageIdRef.current
         if (rollbackMessageId) {
           const messages = sessionId
-            ? useChatStore.getState().messagesMap.get(sessionId) ?? []
+            ? (useChatStore.getState().messagesMap.get(sessionId) ?? [])
             : []
-          const latestUserMessage = [...messages].reverse().find(message => message.role === 'user') ?? null
+          const latestUserMessage
+            = [...messages].reverse().find(message => message.role === 'user') ?? null
           if (latestUserMessage?.id !== rollbackMessageId) {
             setPendingRollbackTarget(null)
             throw new Error(t('rollback.error.stale'))
@@ -244,12 +275,13 @@ export function ChatView({
             await rollback.rollback()
             setPendingRollbackTarget(null)
           }
-          catch (error) {
-            const friendly = describeRollbackLastTurnError(error)
-              ?? (error instanceof Error ? error.message : t('rollback.error.fallback'))
+ catch (error) {
+            const friendly
+              = describeRollbackLastTurnError(error)
+                ?? (error instanceof Error ? error.message : t('rollback.error.fallback'))
             throw new Error(friendly)
           }
-          finally {
+ finally {
             setRollbackBusy(false)
           }
         }
@@ -275,13 +307,25 @@ export function ChatView({
     return registerChatComposerFileIngressHandler(sessionId, appshotRuntime.appendFileParts)
   }, [appshotRuntime.appendFileParts, sessionId])
 
+  useEffect(() => {
+    if (!sessionId) {
+      return
+    }
+    return registerChatComposerContextIngressHandler(sessionId, (parts) => {
+      setComposerContextIngress(current => ({
+        parts,
+        key: (current?.key ?? 0) + 1,
+      }))
+    })
+  }, [sessionId])
+
   const handleEditPrevious = useCallback(async () => {
     if (!sessionId || rollbackBusy) {
       return
     }
     const messages = useChatStore.getState().messagesMap.get(sessionId) ?? []
     const lastUserMessage = editPreviousMessageId
-      ? messages.find(message => message.id === editPreviousMessageId) ?? null
+      ? (messages.find(message => message.id === editPreviousMessageId) ?? null)
       : null
     const draft = readUserMessageDraft(lastUserMessage)
     if (!draft) {
@@ -296,19 +340,9 @@ export function ChatView({
     setPendingRollbackTarget(editPreviousMessageId)
     setRollbackDraftSignal(signal => ({
       key: (signal?.key ?? 0) + 1,
-      draft: { text: draft.text, contextParts: draft.contextParts },
+      draft,
     }))
-    if (draft.files.length > 0) {
-      appshotRuntime.appendFileParts(draft.files)
-    }
-  }, [
-    appshotRuntime,
-    editPreviousMessageId,
-    rollbackBusy,
-    sessionId,
-    setPendingRollbackTarget,
-    t,
-  ])
+  }, [editPreviousMessageId, rollbackBusy, sessionId, setPendingRollbackTarget, t])
 
   const editPreviousAction = useMemo<MessageBubbleEditAction | undefined>(() => {
     if (!rollback.supported || !editPreviousMessageId) {
@@ -318,11 +352,12 @@ export function ChatView({
       busy: rollbackBusy,
       disabled: !rollback.canRollback || rollbackBusy,
       label: t('rollback.action.label'),
-      title: pendingRollbackMessageId === editPreviousMessageId
-        ? t('rollback.action.pendingHint')
-        : rollback.canRollback
-        ? t('rollback.action.fileCaveat')
-        : t('rollback.action.disabledHint'),
+      title:
+        pendingRollbackMessageId === editPreviousMessageId
+          ? t('rollback.action.pendingHint')
+          : rollback.canRollback
+            ? t('rollback.action.fileCaveat')
+            : t('rollback.action.disabledHint'),
       onEdit: handleEditPrevious,
     }
   }, [
@@ -402,14 +437,14 @@ export function ChatView({
         if (action === 'set') {
           await setCodexThreadGoal({ sessionId, ...params })
         }
-        else {
+ else {
           await clearCodexThreadGoal({ sessionId, threadId: params.threadId })
         }
         refreshGoalRuntimeState()
         setGoalActionBusy(false)
         return true
       }
-      catch (error) {
+ catch (error) {
         toastManager.add({
           type: 'error',
           title: failureTitle,
@@ -625,11 +660,7 @@ export function ChatView({
       // the context bar; the runtime gear and provider/model/thinking toolbar
       // are noise on a per-message basis. Keep only the host-supplied addon
       // (which renders nothing when there are no explicit attachments).
-      return (
-        <div className="flex min-w-0 items-center gap-1">
-          {composerToolbarAddon}
-        </div>
-      )
+      return <div className="flex min-w-0 items-center gap-1">{composerToolbarAddon}</div>
     }
     if (!sessionId) {
       return (
@@ -671,38 +702,57 @@ export function ChatView({
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-0.5">
-        {sessionId && workspaceId && !sessionMetaQuery.data?.isIsolated && !sessionMetaQuery.data?.worktreeId && !sessionMetaQuery.data?.pendingWorktreeId && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className="gap-1 text-muted-foreground"
-            title={tIsolation('chat.isolateTooltip')}
-            disabled={startIsolation.isPending}
-            data-testid="chat-isolate-action"
-            onClick={() => {
-              void startIsolation.mutateAsync({
-                sessionId,
-                workspaceId,
-                slug: sessionMetaQuery.data?.title ?? undefined,
-              }).then(() => {
-                toastManager.add({
-                  type: 'success',
-                  title: tIsolation('chat.isolateSuccess'),
-                })
-              }).catch((isolationError) => {
-                toastManager.add({
-                  type: 'error',
-                  title: tIsolation('boundary.errorTitle'),
-                  description: isolationError instanceof Error ? isolationError.message : String(isolationError),
-                })
-              })
-            }}
-          >
-            <WorktreeIcon className="size-3 shrink-0" aria-hidden />
-            <span className="text-[11px]">{tIsolation('chat.isolate')}</span>
-          </Button>
+        {sessionId && (
+          <ThreadHandoffMenu
+            sessionId={sessionId}
+            providerTargetId={sessionMetaQuery.data?.providerTargetId ?? null}
+            runtimeKind={sessionMetaQuery.data?.runtimeKind ?? null}
+            workspaceId={workspaceId ?? null}
+            disabled={status === 'streaming'}
+          />
         )}
+        {sessionId
+          && workspaceId
+          && !sessionMetaQuery.data?.isIsolated
+          && !sessionMetaQuery.data?.worktreeId
+          && !sessionMetaQuery.data?.pendingWorktreeId && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="gap-1 text-muted-foreground"
+              title={tIsolation('chat.isolateTooltip')}
+              disabled={startIsolation.isPending}
+              data-testid="chat-isolate-action"
+              onClick={() => {
+                void startIsolation
+                  .mutateAsync({
+                    sessionId,
+                    workspaceId,
+                    slug: sessionMetaQuery.data?.title ?? undefined,
+                  })
+                  .then(() => {
+                    toastManager.add({
+                      type: 'success',
+                      title: tIsolation('chat.isolateSuccess'),
+                    })
+                  })
+                  .catch((isolationError) => {
+                    toastManager.add({
+                      type: 'error',
+                      title: tIsolation('boundary.errorTitle'),
+                      description:
+                        isolationError instanceof Error
+                          ? isolationError.message
+                          : String(isolationError),
+                    })
+                  })
+              }}
+            >
+              <WorktreeIcon className="size-3 shrink-0" aria-hidden />
+              <span className="text-[11px]">{tIsolation('chat.isolate')}</span>
+            </Button>
+          )}
         {import.meta.env.DEV && (
           <RuntimeDiagnosticsPopover
             slots={composerRuntime.uiSlots}
@@ -715,11 +765,14 @@ export function ChatView({
       composerRuntime.slotStates,
       composerRuntime.uiSlots,
       sessionId,
+      sessionMetaQuery.data?.providerTargetId,
+      sessionMetaQuery.data?.runtimeKind,
       sessionMetaQuery.data?.isIsolated,
       sessionMetaQuery.data?.worktreeId,
       sessionMetaQuery.data?.pendingWorktreeId,
       sessionMetaQuery.data?.title,
       startIsolation,
+      status,
       tIsolation,
       workspaceId,
     ],
@@ -729,8 +782,8 @@ export function ChatView({
 
   useRegisterLayoutSlots(sessionId ?? '', layoutSlots)
 
-  const showIsolationBoundary = sessionMetaQuery.data?.isolationBoundaryRequired === true
-    && status !== 'streaming'
+  const showIsolationBoundary
+    = sessionMetaQuery.data?.isolationBoundaryRequired === true && status !== 'streaming'
   const showMissingIsolation = !!(
     isolationStateQuery.data?.worktreeId
     && isolationStateQuery.data.worktreeHealth
@@ -781,12 +834,12 @@ export function ChatView({
         composerStack={(
           <>
             {remoteConnectionBlocked
-              ? (
-                  <div className="mb-2">
-                    <RemoteHostConnectionNotice gate={remoteConnection.gate} />
-                  </div>
-                )
-              : null}
+? (
+              <div className="mb-2">
+                <RemoteHostConnectionNotice gate={remoteConnection.gate} />
+              </div>
+            )
+: null}
             <ChatComposerSection
               sessionId={sessionId}
               runtimeKind={runtimeSettings.runtimeKind ?? _runtimeKind}
@@ -805,11 +858,15 @@ export function ChatView({
               searchSkills={searchSkills}
               toolbar={runtimeSettingsToolbar}
               runtimeSettings={{
-              runtimeKind: runtimeSettings.runtimeKind ?? _runtimeKind,
-              settings: runtimeSettings.settings,
-              disabled: !isReady || !runtimeSettings.loaded || runtimeSettings.loading || remoteConnectionBlocked,
-              onChange: updateRuntimeSettings,
-            }}
+                runtimeKind: runtimeSettings.runtimeKind ?? _runtimeKind,
+                settings: runtimeSettings.settings,
+                disabled:
+                  !isReady
+                  || !runtimeSettings.loaded
+                  || runtimeSettings.loading
+                  || remoteConnectionBlocked,
+                onChange: updateRuntimeSettings,
+              }}
               contextBar={effectiveComposerContextBar}
               droppedPath={droppedPath}
               goalActions={goalActions}
@@ -817,12 +874,14 @@ export function ChatView({
               reviewSlot={reviewSlot}
               usageSlot={usageSlot}
               onQuickQuestion={
-              sessionId && hasQuickQuestionSlot ? quickQuestion.openQuickQuestion : undefined
-            }
+                sessionId && hasQuickQuestionSlot ? quickQuestion.openQuickQuestion : undefined
+              }
               onComposerFocusChange={scrollRuntime.handleComposerFocusChange}
               rollbackDraftSignal={rollbackDraftSignal}
               clearDraftSignal={clearComposerDraftSignal}
               suspendDraftPersistence={Boolean(pendingRollbackMessageId)}
+              promptHistory={promptHistory}
+              contextIngress={composerContextIngress}
             />
           </>
         )}

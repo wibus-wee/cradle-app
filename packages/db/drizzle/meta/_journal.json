@@ -218,6 +218,13 @@
       "when": 1783949444792,
       "tag": "0030_nifty_puma",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1783865129819,
+      "tag": "0031_outstanding_leper_queen",
+      "breakpoints": true
     }
   ]
 }

@@ -6,24 +6,40 @@ import { simpleGit } from 'simple-git'
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
+import type { GitHubSearchPullRequest, GitHubViewer } from '../../lib/github-api'
 import {
   createPullRequest as createGitHubPullRequest,
+  fetchAuthenticatedUser,
+  fetchCheckRuns,
+  fetchCombinedStatus,
   fetchPullRequest,
+  fetchPullRequestComments,
+  fetchPullRequestDetail,
+  fetchPullRequestFiles,
+  fetchPullRequestReviews,
   fetchRepo,
   GitHubApiError,
   hasGitHubToken,
   markPullRequestReady as markGitHubPullRequestReady,
+  searchAuthoredPullRequests,
+  searchReviewRequestedPullRequests,
   updatePullRequest as updateGitHubPullRequest,
 } from '../../lib/github-api'
 import * as Worktree from '../worktree/service'
 import { isForceWithLeaseRejection, resolveDeliveryPushArgs } from './delivery-push'
 import { parseGitHubOwnerRepo } from './github-remote'
-import type { pullRequestViewSchema } from './model'
+import type { pullRequestSearchViewSchema, pullRequestViewSchema } from './model'
 import { withCradlePullRequestFooter } from './pr-body'
 
 export { resolveDeliveryPushArgs } from './delivery-push'
 
 export type SessionPullRequestView = Static<typeof pullRequestViewSchema>
+export type PullRequestSearchView = Static<typeof pullRequestSearchViewSchema>
+export interface PullRequestSearchPage {
+  items: PullRequestSearchView[]
+  hasNextPage: boolean
+  endCursor: string | null
+}
 export interface PullRequestReadiness {
   isolated: boolean
   clean: boolean
@@ -32,8 +48,81 @@ export interface PullRequestReadiness {
   commitsAhead: number
   changedFiles: number
 }
+export type PullRequestCheckState = 'success' | 'failure' | 'pending' | 'neutral'
+export interface SessionPullRequestDetail {
+  pullRequest: SessionPullRequestView & {
+    body: string | null
+    author: {
+      login: string
+      avatarUrl: string
+      url: string
+    } | null
+    additions: number
+    deletions: number
+    changedFiles: number
+    commits: number
+    comments: number
+    reviewComments: number
+    mergeable: boolean | null
+    mergeableState: string
+    createdAtIso: string
+    updatedAtIso: string
+    closedAtIso: string | null
+    mergedAtIso: string | null
+    reviewers: Array<{
+      login: string
+      avatarUrl: string
+      url: string
+    }>
+    assignees: Array<{
+      login: string
+      avatarUrl: string
+      url: string
+    }>
+    labels: Array<{ name: string, color: string }>
+    checksState: PullRequestCheckState
+    checks: Array<{
+      id: string
+      name: string
+      status: 'queued' | 'in_progress' | 'completed'
+      conclusion: string | null
+      url: string | null
+    }>
+  }
+  timeline: Array<{
+    id: string
+    kind: 'comment' | 'review'
+    author: {
+      login: string
+      avatarUrl: string | null
+      url: string | null
+    } | null
+    body: string | null
+    state: string | null
+    createdAt: string
+    url: string | null
+  }>
+  files: Array<{
+    sha: string
+    filename: string
+    previousFilename: string | null
+    status: string
+    additions: number
+    deletions: number
+    changes: number
+    patch: string | null
+    blobUrl: string
+    rawUrl: string
+  }>
+}
 export { parseGitHubOwnerRepo } from './github-remote'
 export { withCradlePullRequestFooter } from './pr-body'
+
+interface StoredSessionPullRequestAuthor {
+  login: string
+  avatarUrl: string
+  url: string
+}
 
 interface StoredSessionPullRequest {
   owner: string
@@ -49,6 +138,13 @@ interface StoredSessionPullRequest {
   headSha: string | null
   createdAt: number
   updatedAt: number
+  author?: StoredSessionPullRequestAuthor | null
+  additions?: number
+  deletions?: number
+}
+
+function toStoredAuthor(user: { login: string, avatar_url: string, html_url: string } | null | undefined): StoredSessionPullRequestAuthor | null {
+  return user ? { login: user.login, avatarUrl: user.avatar_url, url: user.html_url } : null
 }
 
 function nowSeconds(): number {
@@ -127,7 +223,25 @@ function readStoredPullRequest(configJson: string | null | undefined): StoredSes
     headSha: typeof value.headSha === 'string' ? value.headSha : null,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    author: readStoredAuthor(value.author),
+    additions: typeof value.additions === 'number' ? value.additions : undefined,
+    deletions: typeof value.deletions === 'number' ? value.deletions : undefined,
   }
+}
+
+function readStoredAuthor(value: unknown): StoredSessionPullRequestAuthor | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const author = value as Record<string, unknown>
+  if (
+    typeof author.login !== 'string'
+    || typeof author.avatarUrl !== 'string'
+    || typeof author.url !== 'string'
+  ) {
+    return null
+  }
+  return { login: author.login, avatarUrl: author.avatarUrl, url: author.url }
 }
 
 function writeStoredPullRequest(
@@ -326,6 +440,9 @@ export async function getPullRequest(sessionId: string): Promise<SessionPullRequ
       headSha: live.head.sha,
       url: live.html_url ?? stored.url,
       updatedAt: nowSeconds(),
+      author: live.user !== undefined ? toStoredAuthor(live.user) : stored.author,
+      additions: live.additions ?? stored.additions,
+      deletions: live.deletions ?? stored.deletions,
     }
     return persistPullRequest(sessionId, next)
   }
@@ -334,6 +451,283 @@ export async function getPullRequest(sessionId: string): Promise<SessionPullRequ
       return toView(stored)
     }
     return toView(stored)
+  }
+}
+
+function deriveChecksState(checks: SessionPullRequestDetail['pullRequest']['checks']): PullRequestCheckState {
+  if (checks.length === 0) {
+    return 'neutral'
+  }
+  if (checks.some(check => check.status !== 'completed' || check.conclusion === null)) {
+    return 'pending'
+  }
+  const failedConclusions = new Set([
+    'action_required',
+    'cancelled',
+    'failure',
+    'stale',
+    'startup_failure',
+    'timed_out',
+  ])
+  return checks.some(check => check.conclusion && failedConclusions.has(check.conclusion))
+    ? 'failure'
+    : 'success'
+}
+
+export async function getPullRequestDetail(sessionId: string): Promise<SessionPullRequestDetail> {
+  const session = requireSession(sessionId)
+  const stored = readStoredPullRequest(session.configJson)
+  if (!stored) {
+    throw new AppError({
+      code: 'pull_request_not_bound',
+      status: 404,
+      message: 'No pull request is bound to this session.',
+    })
+  }
+  return fetchPullRequestDetailByRef(stored.owner, stored.repo, stored.number)
+}
+
+/**
+ * Fetches live GitHub pull request detail directly by owner/repo/number.
+ * This is the generic, session-independent core of PR detail lookup - a
+ * session is just one optional way to have already resolved these three
+ * values (see `getPullRequestDetail` above). PRs discovered via GitHub
+ * search (not created through Cradle Work) use this function directly.
+ */
+export async function fetchPullRequestDetailByRef(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<SessionPullRequestDetail> {
+  const [live, comments, reviews, files] = await Promise.all([
+    fetchPullRequestDetail(owner, repo, number),
+    fetchPullRequestComments(owner, repo, number),
+    fetchPullRequestReviews(owner, repo, number),
+    fetchPullRequestFiles(owner, repo, number),
+  ])
+  if (!live) {
+    throw new AppError({
+      code: 'github_pr_unavailable',
+      status: 502,
+      message: 'GitHub pull request details are currently unavailable.',
+      details: { owner, repo, number },
+    })
+  }
+  const [checkRuns, combinedStatus] = await Promise.all([
+    fetchCheckRuns(owner, repo, live.head.sha),
+    fetchCombinedStatus(owner, repo, live.head.sha),
+  ])
+
+  const checks: SessionPullRequestDetail['pullRequest']['checks'] = [
+    ...(checkRuns?.check_runs ?? []).map(check => ({
+      id: `check-run:${check.id ?? check.name}`,
+      name: check.name,
+      status: check.status,
+      conclusion: check.conclusion,
+      url: check.html_url ?? check.details_url ?? null,
+    })),
+    ...(combinedStatus?.statuses ?? []).map((status, index) => ({
+      id: `commit-status:${status.context}:${index}`,
+      name: status.context,
+      status: status.state === 'pending' ? 'in_progress' as const : 'completed' as const,
+      conclusion: status.state === 'success' ? 'success' : status.state === 'pending' ? null : 'failure',
+      url: status.target_url,
+    })),
+  ]
+
+  const timeline: SessionPullRequestDetail['timeline'] = [
+    ...(comments ?? []).map(comment => ({
+      id: `comment:${comment.id}`,
+      kind: 'comment' as const,
+      author: comment.user
+        ? {
+            login: comment.user.login,
+            avatarUrl: comment.user.avatar_url,
+            url: comment.user.html_url,
+          }
+        : null,
+      body: comment.body,
+      state: null,
+      createdAt: comment.created_at,
+      url: comment.html_url,
+    })),
+    ...(reviews ?? []).flatMap(review => review.submitted_at
+      ? [{
+          id: `review:${review.id}`,
+          kind: 'review' as const,
+          author: review.user
+            ? { login: review.user.login, avatarUrl: null, url: null }
+            : null,
+          body: review.body,
+          state: review.state,
+          createdAt: review.submitted_at,
+          url: review.html_url,
+        }]
+      : []),
+  ].toSorted((left, right) => left.createdAt.localeCompare(right.createdAt))
+
+  const reviewers = new Map<string, {
+    login: string
+    avatarUrl: string
+    url: string
+  }>()
+  for (const reviewer of live.requested_reviewers) {
+    reviewers.set(reviewer.login, {
+      login: reviewer.login,
+      avatarUrl: reviewer.avatar_url,
+      url: reviewer.html_url,
+    })
+  }
+  for (const review of reviews ?? []) {
+    if (review.user) {
+      reviewers.set(review.user.login, {
+        login: review.user.login,
+        avatarUrl: review.user.avatar_url,
+        url: review.user.html_url,
+      })
+    }
+  }
+
+  return {
+    pullRequest: {
+      owner,
+      repo,
+      number: live.number,
+      url: live.html_url,
+      title: live.title,
+      isDraft: live.draft,
+      state: live.state,
+      merged: live.merged,
+      headRef: live.head.ref,
+      baseRef: live.base.ref,
+      headSha: live.head.sha,
+      createdAt: Math.floor(new Date(live.created_at).getTime() / 1000),
+      updatedAt: Math.floor(new Date(live.updated_at).getTime() / 1000),
+      body: live.body,
+      author: live.user
+        ? {
+            login: live.user.login,
+            avatarUrl: live.user.avatar_url,
+            url: live.user.html_url,
+          }
+        : null,
+      additions: live.additions,
+      deletions: live.deletions,
+      changedFiles: live.changed_files,
+      commits: live.commits,
+      comments: live.comments,
+      reviewComments: live.review_comments,
+      mergeable: live.mergeable,
+      mergeableState: live.mergeable_state,
+      createdAtIso: live.created_at,
+      updatedAtIso: live.updated_at,
+      closedAtIso: live.closed_at,
+      mergedAtIso: live.merged_at,
+      reviewers: [...reviewers.values()],
+      assignees: live.assignees.map(assignee => ({
+        login: assignee.login,
+        avatarUrl: assignee.avatar_url,
+        url: assignee.html_url,
+      })),
+      labels: live.labels,
+      checksState: deriveChecksState(checks),
+      checks,
+    },
+    timeline,
+    files: (files ?? []).map(file => ({
+      sha: file.sha,
+      filename: file.filename,
+      previousFilename: file.previous_filename,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+      patch: file.patch,
+      blobUrl: file.blob_url,
+      rawUrl: file.raw_url,
+    })),
+  }
+}
+
+function toSearchView(pr: GitHubSearchPullRequest): PullRequestSearchView {
+  return {
+    owner: pr.owner,
+    repo: pr.repo,
+    number: pr.number,
+    url: pr.url,
+    title: pr.title,
+    isDraft: pr.isDraft,
+    state: pr.state,
+    merged: pr.merged,
+    headRef: pr.headRef,
+    baseRef: pr.baseRef,
+    headSha: pr.headSha,
+    createdAt: Math.floor(new Date(pr.createdAt).getTime() / 1000),
+    updatedAt: Math.floor(new Date(pr.updatedAt).getTime() / 1000),
+    author: pr.author,
+    additions: pr.additions,
+    deletions: pr.deletions,
+    checksState: pr.checksState,
+  }
+}
+
+function requireGitHubToken(): void {
+  if (!hasGitHubToken()) {
+    throw new AppError({
+      code: 'github_auth_required',
+      status: 401,
+      message: 'GitHub authentication required. Set GH_TOKEN / GITHUB_TOKEN or run `gh auth login`.',
+    })
+  }
+}
+
+/**
+ * Resolves the GitHub identity the "authored"/"reviewing" feeds below are
+ * scoped to. The standalone Pull Requests surface fetches this once, then
+ * passes `login` into `listAuthoredPullRequests`/`listReviewRequestedPullRequests`
+ * itself - the identity rarely changes and each feed page shouldn't have to
+ * re-resolve it.
+ */
+export async function getViewerIdentity(): Promise<GitHubViewer> {
+  requireGitHubToken()
+  try {
+    return await fetchAuthenticatedUser()
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to resolve the authenticated GitHub identity.')
+  }
+}
+
+/**
+ * Pull requests authored by `login`, most recently updated first. Not
+ * bounded to any Cradle session - Work-bound PRs are a separate, optional
+ * overlay resolved client-side by matching owner/repo/number. Paginated via
+ * `after` (GitHub search cursor); there is no server-side item cap, so a
+ * viewer with a long history can page through all of it.
+ */
+export async function listAuthoredPullRequests(login: string, after?: string): Promise<PullRequestSearchPage> {
+  requireGitHubToken()
+  try {
+    const page = await searchAuthoredPullRequests(login, after || null)
+    return { items: page.items.map(toSearchView), hasNextPage: page.hasNextPage, endCursor: page.endCursor }
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to list pull requests you authored.')
+  }
+}
+
+/**
+ * Pull requests where `login` is a requested reviewer, most recently
+ * updated first. See `listAuthoredPullRequests` for pagination semantics.
+ */
+export async function listReviewRequestedPullRequests(login: string, after?: string): Promise<PullRequestSearchPage> {
+  requireGitHubToken()
+  try {
+    const page = await searchReviewRequestedPullRequests(login, after || null)
+    return { items: page.items.map(toSearchView), hasNextPage: page.hasNextPage, endCursor: page.endCursor }
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to list pull requests you are requested to review.')
   }
 }
 
@@ -460,6 +854,9 @@ export async function createDraftPullRequest(input: {
     headSha: created.head.sha,
     createdAt: timestamp,
     updatedAt: timestamp,
+    author: toStoredAuthor(created.user),
+    additions: created.additions,
+    deletions: created.deletions,
   }
 
   return persistPullRequest(input.sessionId, stored)
@@ -536,6 +933,9 @@ export async function updatePullRequest(input: {
     headSha: updated.head.sha,
     url: updated.html_url,
     updatedAt: nowSeconds(),
+    author: updated.user !== undefined ? toStoredAuthor(updated.user) : stored.author,
+    additions: updated.additions ?? stored.additions,
+    deletions: updated.deletions ?? stored.deletions,
   })
 }
 

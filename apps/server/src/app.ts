@@ -20,6 +20,7 @@ import {
   chatRuntimeGlobalEventRoutes,
 } from './modules/chat-runtime/http/events.routes'
 import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked-session-proxy'
+import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { chronicle } from './modules/chronicle'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
@@ -43,7 +44,7 @@ import { profiles } from './modules/profiles'
 import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
-import { pullRequest } from './modules/pull-request'
+import { pullRequest, pullRequestFeed } from './modules/pull-request'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
@@ -52,10 +53,14 @@ import { search } from './modules/search'
 import { secrets } from './modules/secrets'
 import { session } from './modules/session'
 import { sessionAwait } from './modules/session-await'
+import { sessionEnvironment } from './modules/session-environment'
 import { sessionGroup } from './modules/session-group'
 import { skills } from './modules/skills'
 import { registerSyncGatewayRoutes } from './modules/sync-gateway'
 import { testReset } from './modules/test-reset'
+import { threadHandoff } from './modules/thread-handoff'
+import { turnCheckpoint } from './modules/turn-checkpoint'
+import * as TurnCheckpoint from './modules/turn-checkpoint/service'
 import { usage } from './modules/usage'
 import { sessionWork, work } from './modules/work'
 import { workflowRules } from './modules/workflow-rules'
@@ -103,6 +108,14 @@ function isAllowedCorsOrigin({ headers }: { headers: Headers }): boolean {
 }
 
 export async function createServerContractApp(options: CreateServerContractAppOptions = {}) {
+  registerTurnCheckpointHooks({
+    captureStart: async (input) => {
+      await TurnCheckpoint.captureRunStart(input)
+    },
+    captureEnd: async (input) => {
+      await TurnCheckpoint.captureRunEnd(input)
+    },
+  })
   const { includeRuntimeHttpPlugins = false } = options
   const app = new Elysia({
     name: 'cradle.server.elysia',
@@ -164,9 +177,13 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(assets)
   app.use(backgroundJob)
   app.use(session)
+  app.use(sessionEnvironment)
+  app.use(threadHandoff)
+  app.use(turnCheckpoint)
   app.use(work)
   app.use(sessionWork)
   app.use(pullRequest)
+  app.use(pullRequestFeed)
   app.use(sessionGroup)
   app.use(sessionAwait)
   app.use(issue)

@@ -18,7 +18,6 @@ import { Progress } from '~/components/ui/progress'
 import { cn } from '~/lib/cn'
 import { boundedPercent } from '~/lib/number-format'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import { projectChatTodos, readTodoCompletion } from '../../capabilities/chat-todo-projection'
 import type { ToolPayload, ToolState, ToolUiDescriptor, WorkflowPhase } from '../tool-ui-classifier'
@@ -436,7 +435,6 @@ function PlanSummary({
       ?? output.rawText
       ?? input.rawText
   const openPlanDocumentTab = useBrowserPanelStore(s => s.openPlanDocumentTab)
-  const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
 
   if (!text) {
     return null
@@ -444,7 +442,6 @@ function PlanSummary({
 
   const openPlan = () => {
     openPlanDocumentTab({ toolCallId, text })
-    setBrowserPanelOpen(true)
   }
 
   const handlePreviewClick = (event: MouseEvent<HTMLDivElement>) => {

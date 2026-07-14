@@ -73,6 +73,8 @@ function createActiveRun(input: {
 
 function createDeps(overrides: Partial<TurnExecutorDeps> = {}): TurnExecutorDeps {
   return {
+    captureTurnCheckpointStart: vi.fn().mockResolvedValue(undefined),
+    captureTurnCheckpointEnd: vi.fn().mockResolvedValue(undefined),
     stream: {
       flushPendingRunDelta: vi.fn(),
       publishRunStartChunk: vi.fn(),

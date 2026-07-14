@@ -1,19 +1,29 @@
-import {
-  TerminalBoxLine as SquareTerminalIcon,
-} from '@mingcute/react'
+import { TerminalBoxLine as SquareTerminalIcon } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
 import type { ChangeEvent } from 'react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useComposerDraftSync } from '~/hooks/use-composer-draft-sync'
 import { cn } from '~/lib/cn'
 import { isLocalMode } from '~/lib/electron'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
+import type { ComposerDraft } from '~/store/composer-draft'
 
 import type { ChatRuntimeCompactUiSlotState } from '../capabilities/chat-capabilities'
 import { readBangCommand } from '../commands/bang-command'
-import type { ChatRuntimeSettings, ChatRuntimeSettingsPatch } from '../commands/chat-response-command'
+import type {
+  ChatRuntimeSettings,
+  ChatRuntimeSettingsPatch,
+} from '../commands/chat-response-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../mentions/mention-panel'
 import { MentionPanel } from '../mentions/mention-panel'
@@ -45,10 +55,7 @@ import { readComposerActionContext } from './composer-action-context'
 import { ComposerActions } from './composer-actions'
 import { useComposerAttachments } from './composer-attachment-state'
 import type { PendingAppshotAttachment } from './composer-attachments'
-import {
-  ComposerAttachmentInput,
-  ComposerAttachmentList,
-} from './composer-attachments'
+import { ComposerAttachmentInput, ComposerAttachmentList } from './composer-attachments'
 import { composerReducer, INITIAL_COMPOSER_STATE } from './composer-state'
 import type { ComposerSendHandler, ComposerSendResult } from './composer-submit'
 import {
@@ -57,7 +64,18 @@ import {
   reportComposerSubmitError,
   submitAndClearDraft,
 } from './composer-submit'
-import type { PromptEditorController, PromptEditorSnapshot, PromptEditorTriggerRange } from './prompt-editor'
+import type { ComposerPastedText } from './pasted-text'
+import {
+  appendPastedTextsToPrompt,
+  createComposerPastedText,
+  shouldCollapsePastedText,
+} from './pasted-text'
+import { PastedTextCard } from './pasted-text-card'
+import type {
+  PromptEditorController,
+  PromptEditorSnapshot,
+  PromptEditorTriggerRange,
+} from './prompt-editor'
 import { PromptEditor } from './prompt-editor'
 
 export type { ComposerSendHandler } from './composer-submit'
@@ -85,7 +103,11 @@ export interface ComposerSendController {
 
 export interface ComposerCommandController {
   commands?: ChatComposerSlashCommand[]
-  runAction?: (command: ChatComposerSlashCommand, context: ComposerSlashCommandActionContext, tools?: ComposerSlashCommandActionTools) => void | ComposerSlashCommandActionResult | Promise<void | ComposerSlashCommandActionResult>
+  runAction?: (
+    command: ChatComposerSlashCommand,
+    context: ComposerSlashCommandActionContext,
+    tools?: ComposerSlashCommandActionTools,
+  ) => void | ComposerSlashCommandActionResult | Promise<void | ComposerSlashCommandActionResult>
 }
 
 export interface ComposerAttachmentIntegration {
@@ -113,14 +135,18 @@ export interface ComposerExternalSignals {
   /** Temporarily prevents the visible draft from being written to normal draft storage. */
   suspendDraftPersistence?: boolean
   /** Replaces the current structured draft when the key changes, used by queue edit. */
-  replaceDraft?: {
-    text: string
-    contextParts: ChatContextPart[]
-  }
+  replaceDraft?: ComposerDraft
   replaceDraftKey?: number
   /** Appends text to the composer input when the key changes, used by parent DnD. */
   appendText?: string
   appendTextKey?: number
+  appendContextParts?: ChatContextPart[]
+  appendContextPartsKey?: number
+  /** Injects context parts into the current draft when the key changes. */
+  contextIngress?: {
+    parts: ChatContextPart[]
+    key: number
+  } | null
 }
 
 export interface ComposerRuntimeSettingsController {
@@ -167,6 +193,8 @@ export interface ComposerViewOptions {
    * and restores it on remount. This prevents draft loss on tab switches.
    */
   surfaceId?: string
+  /** Latest-first user-authored drafts used by ArrowUp/ArrowDown history navigation. */
+  promptHistory?: ComposerDraft[]
 }
 
 export interface ComposerTestIds {
@@ -250,6 +278,9 @@ export function Composer({
   const parentReplaceDraftKey = externalSignals?.replaceDraftKey
   const appendText = externalSignals?.appendText
   const appendTextKey = externalSignals?.appendTextKey
+  const appendContextParts = externalSignals?.appendContextParts
+  const appendContextPartsKey = externalSignals?.appendContextPartsKey
+  const contextIngress = externalSignals?.contextIngress
 
   // Per-surface draft persistence — restores draft on remount (e.g. tab switch)
   const surfaceId = view?.surfaceId
@@ -289,11 +320,9 @@ export function Composer({
     sessionTokens,
     sessionContextWindow,
     compactState,
+    promptHistory = [],
   } = view ?? {}
-  const {
-    textareaAriaLabel = 'Message',
-    sendButtonAriaLabel,
-  } = accessibility ?? {}
+  const { textareaAriaLabel = 'Message', sendButtonAriaLabel } = accessibility ?? {}
   const [state, dispatch] = useReducer(composerReducer, INITIAL_COMPOSER_STATE)
   const stateRef = useRef(state)
   stateRef.current = state
@@ -302,14 +331,22 @@ export function Composer({
   const composerAttachments = attachmentController.attachments
   const appendComposerFileParts = attachmentController.appendFileParts
   const clearComposerAttachments = attachmentController.clearAttachments
+  const replaceComposerAttachments = attachmentController.replaceAttachments
   const handleAttachmentFilesSelected = attachmentController.handleFilesSelected
   const handleAttachmentPaste = attachmentController.handlePaste
   const promptEditorRef = useRef<PromptEditorController>(null)
+  const [pastedTexts, setPastedTexts] = useState<ComposerPastedText[]>([])
+  const historyIndexRef = useRef<number | null>(null)
+  const historyDraftRef = useRef<ComposerDraft | null>(null)
+  const historyAppliedTextRef = useRef<string | null>(null)
   const actionTargetRef = useRef<HTMLDivElement>(null)
-  const setActionTargetElement = useCallback((element: HTMLDivElement | null) => {
-    actionTargetRef.current = element
-    onActionTargetElementChange?.(element)
-  }, [onActionTargetElementChange])
+  const setActionTargetElement = useCallback(
+    (element: HTMLDivElement | null) => {
+      actionTargetRef.current = element
+      onActionTargetElementChange?.(element)
+    },
+    [onActionTargetElementChange],
+  )
   const visibleSlashCommands = useMemo(
     () => getVisibleSlashCommands(slashCommands, Boolean(onSlashCommandAction)),
     [onSlashCommandAction, slashCommands],
@@ -319,87 +356,113 @@ export function Composer({
     [state.slashQuery, visibleSlashCommands],
   )
   const slashPanelHasResults = state.slashActive && slashPanelItems.length > 0
-  const mentionItems = useMemo<MentionPickerItem[]>(() => [
-    ...availablePlugins,
-    ...availableFiles,
-  ], [availableFiles, availablePlugins])
-  const searchMentionItems = useCallback(async (query: string, signal?: AbortSignal): Promise<MentionPickerItem[]> => {
-    const [plugins, files] = await Promise.all([
-      searchPlugins ? searchPlugins(query, signal) : Promise.resolve(availablePlugins),
-      searchFiles ? searchFiles(query, signal) : Promise.resolve(availableFiles),
-    ])
-    return [...plugins, ...files]
-  }, [availableFiles, availablePlugins, searchFiles, searchPlugins])
+  const mentionItems = useMemo<MentionPickerItem[]>(
+    () => [...availablePlugins, ...availableFiles],
+    [availableFiles, availablePlugins],
+  )
+  const searchMentionItems = useCallback(
+    async (query: string, signal?: AbortSignal): Promise<MentionPickerItem[]> => {
+      const [plugins, files] = await Promise.all([
+        searchPlugins ? searchPlugins(query, signal) : Promise.resolve(availablePlugins),
+        searchFiles ? searchFiles(query, signal) : Promise.resolve(availableFiles),
+      ])
+      return [...plugins, ...files]
+    },
+    [availableFiles, availablePlugins, searchFiles, searchPlugins],
+  )
 
   const mentionRangeRef = useRef<PromptEditorTriggerRange | null>(null)
   const slashRangeRef = useRef<PromptEditorTriggerRange | null>(null)
   const skillRangeRef = useRef<PromptEditorTriggerRange | null>(null)
-  const activeSlashCommand = getActiveSlashCommand(state.inputValue, state.selectedSlashCommand, visibleSlashCommands)
+  const activeSlashCommand = getActiveSlashCommand(
+    state.inputValue,
+    state.selectedSlashCommand,
+    visibleSlashCommands,
+  )
   const slashCommandPrefix = activeSlashCommand ? getSlashCommandPrefix(activeSlashCommand) : ''
   const slashAwaitingRequiredArgument = activeSlashCommand
     ? isSlashCommandAwaitingRequiredArgument(state.inputValue, activeSlashCommand)
     : false
-  const slashArgumentHint = activeSlashCommand?.argumentHint && (
-    state.inputValue.replace(LEADING_HORIZONTAL_WHITESPACE_RE, '') === slashCommandPrefix
-    || slashAwaitingRequiredArgument
-  )
-    ? activeSlashCommand.argumentHint
-    : ''
+  const slashArgumentHint
+    = activeSlashCommand?.argumentHint
+      && (state.inputValue.replace(LEADING_HORIZONTAL_WHITESPACE_RE, '') === slashCommandPrefix
+        || slashAwaitingRequiredArgument)
+      ? activeSlashCommand.argumentHint
+      : ''
   const actionTargetTestId = testIds?.actionTarget ?? 'chat-composer-action-target'
   const textareaTestId = testIds?.textarea ?? 'chat-composer-textarea'
   const fileInputTestId = testIds?.fileInput ?? 'chat-file-input'
   const attachButtonTestId = testIds?.attachButton ?? 'chat-attach-btn'
   const sendButtonTestId = testIds?.sendButton ?? 'chat-send-btn'
   const stopButtonTestId = testIds?.stopButton ?? 'chat-stop-btn'
-  const hasVisibleInputPayload = !inputCollapsed && (
-    Boolean(state.inputValue.trim())
-    || attachmentController.hasAttachments
-    || state.contextParts.length > 0
-  )
+  const hasVisibleInputPayload
+    = !inputCollapsed
+      && (Boolean(state.inputValue.trim())
+        || attachmentController.hasAttachments
+        || state.contextParts.length > 0
+        || pastedTexts.length > 0)
   const hasDraft = hasVisibleInputPayload || Boolean(allowEmptySend)
-  const bangCommandPreview = !inputCollapsed && !attachmentController.hasAttachments && state.contextParts.length === 0
-    ? readBangCommandDraft(state.inputValue)
-    : null
-  const bangCommand = !inputCollapsed && !attachmentController.hasAttachments && state.contextParts.length === 0
-    ? readBangCommand(state.inputValue)
-    : null
+  const bangCommandPreview
+    = !inputCollapsed && !attachmentController.hasAttachments && state.contextParts.length === 0
+      ? readBangCommandDraft(state.inputValue)
+      : null
+  const bangCommand
+    = !inputCollapsed && !attachmentController.hasAttachments && state.contextParts.length === 0
+      ? readBangCommand(state.inputValue)
+      : null
   const isBangMode = bangCommandPreview !== null
   const sendBlocked = (isBangMode && bangCommand === null) || slashAwaitingRequiredArgument
   const effectiveDisabled = disabled || isSending
-  const textareaRowsClassName = textareaRows === undefined
-    ? undefined
-    : textareaRowsClasses[textareaRows] ?? textareaRowsClasses[3]
+  const textareaRowsClassName
+    = textareaRows === undefined
+      ? undefined
+      : (textareaRowsClasses[textareaRows] ?? textareaRowsClasses[3])
   const isPlanMode = isPlanRuntimeSettings(runtimeSettings?.settings ?? {})
   const runtimeSettingsDisabled = runtimeSettings?.disabled ?? false
   const onRuntimeSettingsChange = runtimeSettings?.onChange
   const runtimeKind = runtimeSettings?.runtimeKind ?? null
 
-  const handleEditorChange = useCallback((snapshot: PromptEditorSnapshot) => {
-    const currentState = stateRef.current
-    const selectedSlashCommand = snapshot.trigger?.kind === 'slash'
-      ? snapshot.trigger.selectedCommand
-      : getActiveSlashCommand(snapshot.text, currentState.selectedSlashCommand, visibleSlashCommands)
+  const handleEditorChange = useCallback(
+    (snapshot: PromptEditorSnapshot) => {
+      if (historyAppliedTextRef.current === snapshot.text) {
+        historyAppliedTextRef.current = null
+      }
+ else if (historyIndexRef.current !== null) {
+        historyIndexRef.current = null
+        historyDraftRef.current = null
+      }
+      const currentState = stateRef.current
+      const selectedSlashCommand
+        = snapshot.trigger?.kind === 'slash'
+          ? snapshot.trigger.selectedCommand
+          : getActiveSlashCommand(
+              snapshot.text,
+              currentState.selectedSlashCommand,
+              visibleSlashCommands,
+            )
 
-    mentionRangeRef.current = snapshot.trigger?.kind === 'file' ? snapshot.trigger.range : null
-    slashRangeRef.current = snapshot.trigger?.kind === 'slash' ? snapshot.trigger.range : null
-    skillRangeRef.current = snapshot.trigger?.kind === 'skill' ? snapshot.trigger.range : null
+      mentionRangeRef.current = snapshot.trigger?.kind === 'file' ? snapshot.trigger.range : null
+      slashRangeRef.current = snapshot.trigger?.kind === 'slash' ? snapshot.trigger.range : null
+      skillRangeRef.current = snapshot.trigger?.kind === 'skill' ? snapshot.trigger.range : null
 
-    dispatch({
-      type: 'input/changed',
-      state: {
-        ...currentState,
-        inputValue: snapshot.text,
-        contextParts: snapshot.contextParts,
-        mentionActive: snapshot.trigger?.kind === 'file',
-        mentionQuery: snapshot.trigger?.kind === 'file' ? snapshot.trigger.query : '',
-        slashActive: snapshot.trigger?.kind === 'slash',
-        slashQuery: snapshot.trigger?.kind === 'slash' ? snapshot.trigger.query : '',
-        skillActive: snapshot.trigger?.kind === 'skill',
-        skillQuery: snapshot.trigger?.kind === 'skill' ? snapshot.trigger.query : '',
-        selectedSlashCommand,
-      },
-    })
-  }, [visibleSlashCommands])
+      dispatch({
+        type: 'input/changed',
+        state: {
+          ...currentState,
+          inputValue: snapshot.text,
+          contextParts: snapshot.contextParts,
+          mentionActive: snapshot.trigger?.kind === 'file',
+          mentionQuery: snapshot.trigger?.kind === 'file' ? snapshot.trigger.query : '',
+          slashActive: snapshot.trigger?.kind === 'slash',
+          slashQuery: snapshot.trigger?.kind === 'slash' ? snapshot.trigger.query : '',
+          skillActive: snapshot.trigger?.kind === 'skill',
+          skillQuery: snapshot.trigger?.kind === 'skill' ? snapshot.trigger.query : '',
+          selectedSlashCommand,
+        },
+      })
+    },
+    [visibleSlashCommands],
+  )
 
   const handleMentionSelect = useCallback((item: MentionPickerItem) => {
     const range = mentionRangeRef.current
@@ -409,7 +472,7 @@ export function Composer({
     if (item.kind === 'plugin') {
       promptEditorRef.current?.insertPluginMention(item, range)
     }
-    else {
+ else {
       promptEditorRef.current?.insertFileMention(item, range)
     }
     dispatch({ type: 'mention/selected' })
@@ -437,164 +500,203 @@ export function Composer({
     dispatch({ type: 'skill/selected' })
   }, [])
 
-  const handleSlashCommandSelect = useCallback((command: ChatComposerSlashCommand) => {
-    const currentState = stateRef.current
-    const range = slashRangeRef.current ?? { from: 1, to: Math.max(1, currentState.inputValue.length + 1) }
-    const inputSnapshot = currentState.inputValue
+  const handleSlashCommandSelect = useCallback(
+    (command: ChatComposerSlashCommand) => {
+      const currentState = stateRef.current
+      const range = slashRangeRef.current ?? {
+        from: 1,
+        to: Math.max(1, currentState.inputValue.length + 1),
+      }
+      const inputSnapshot = currentState.inputValue
 
-    if (command.action.kind === 'uiAction') {
-      dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
-      void (async () => {
-        if (!onSlashCommandAction) {
-          return
-        }
+      if (command.action.kind === 'uiAction') {
+        dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
+        void (async () => {
+          if (!onSlashCommandAction) {
+            return
+          }
 
-        const readActionContext = (options?: ComposerActionContextOptions) => readComposerActionContext(actionTargetRef.current, options)
-        const result = await onSlashCommandAction(command, readActionContext(), { readActionContext })
-        if (result?.fileParts?.length) {
-          appendComposerFileParts(result.fileParts)
-        }
-        if (typeof result?.insertText !== 'string') {
-          return
-        }
+          const readActionContext = (options?: ComposerActionContextOptions) =>
+            readComposerActionContext(actionTargetRef.current, options)
+          const result = await onSlashCommandAction(command, readActionContext(), {
+            readActionContext,
+          })
+          if (result?.fileParts?.length) {
+            appendComposerFileParts(result.fileParts)
+          }
+          if (typeof result?.insertText !== 'string') {
+            return
+          }
 
-        const currentValue = promptEditorRef.current?.getText() ?? inputSnapshot
-        if (currentValue !== inputSnapshot) {
-          return
-        }
+          const currentValue = promptEditorRef.current?.getText() ?? inputSnapshot
+          if (currentValue !== inputSnapshot) {
+            return
+          }
 
-        const next = replaceSlashTrigger(inputSnapshot, range.to - 1, range.from - 1, result.insertText)
-        dispatch({ type: 'slash/selected', inputValue: next.value, command: null })
-        promptEditorRef.current?.replaceRangeWithText(range, result.insertText)
-      })()
-      requestAnimationFrame(() => promptEditorRef.current?.focus())
-      return
-    }
-
-    if (command.action.kind === 'submitText') {
-      const submitText = command.action.text
-      const hasComposerPayload = composerAttachments.length > 0 || currentState.contextParts.length > 0
-      if (disabled || isSending || sendDisabled || (command.action.requiresEmptyComposer && hasComposerPayload)) {
+          const next = replaceSlashTrigger(
+            inputSnapshot,
+            range.to - 1,
+            range.from - 1,
+            result.insertText,
+          )
+          dispatch({ type: 'slash/selected', inputValue: next.value, command: null })
+          promptEditorRef.current?.replaceRangeWithText(range, result.insertText)
+        })()
         requestAnimationFrame(() => promptEditorRef.current?.focus())
         return
       }
 
-      dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
+      if (command.action.kind === 'submitText') {
+        const submitText = command.action.text
+        const hasComposerPayload
+          = composerAttachments.length > 0 || currentState.contextParts.length > 0
+        if (
+          disabled
+          || isSending
+          || sendDisabled
+          || (command.action.requiresEmptyComposer && hasComposerPayload)
+        ) {
+          requestAnimationFrame(() => promptEditorRef.current?.focus())
+          return
+        }
+
+        dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
+        submitAndClearDraft({
+          appendFileParts: appendComposerFileParts,
+          clearAttachments: clearComposerAttachments,
+          contextParts: [],
+          dispatch,
+          files: [],
+          promptEditor: promptEditorRef.current,
+          submit,
+          text: submitText,
+        })
+        requestAnimationFrame(() => promptEditorRef.current?.focus())
+        return
+      }
+
+      const insertText = command.action.text
+      const next = replaceSlashTrigger(
+        currentState.inputValue,
+        range.to - 1,
+        range.from - 1,
+        insertText,
+      )
+      dispatch({ type: 'slash/selected', inputValue: next.value, command })
+      promptEditorRef.current?.replaceRangeWithText(range, insertText)
+    },
+    [
+      appendComposerFileParts,
+      clearComposerAttachments,
+      composerAttachments,
+      disabled,
+      isSending,
+      onSlashCommandAction,
+      sendDisabled,
+      submit,
+    ],
+  )
+
+  const handleSend = useCallback(
+    (
+      options?: { invertContinuationMode?: boolean },
+      submitHandler: ComposerSendHandler = submit,
+    ) => {
+      const currentState = stateRef.current
+      const editorText = inputCollapsed
+        ? ''
+        : (promptEditorRef.current?.getText() ?? currentState.inputValue)
+      const contextParts = inputCollapsed
+        ? []
+        : (promptEditorRef.current?.getContextParts() ?? currentState.contextParts)
+      const text = appendPastedTextsToPrompt(editorText, pastedTexts)
+      const files = inputCollapsed ? [] : composerAttachments
+      if (disabled || isSending || sendDisabled || sendBlocked) {
+        return
+      }
+      if (!allowEmptySend && !text && files.length === 0 && contextParts.length === 0) {
+        return
+      }
+      if (inputCollapsed) {
+        let result: ComposerSendResult | Promise<ComposerSendResult>
+        try {
+          result = options ? submitHandler('', [], [], options) : submitHandler('', [], [])
+        }
+ catch (error) {
+          reportComposerSubmitError(error)
+          return
+        }
+        if (isComposerSendPromise(result)) {
+          void result.catch(reportComposerSubmitError)
+        }
+        return
+      }
+
+      if (onQuickQuestion) {
+        const btwMatch = text.match(BTW_QUICK_QUESTION_RE)
+        if (btwMatch?.[1]) {
+          const question = btwMatch[1].trim()
+          onQuickQuestion(question)
+          dispatch({ type: 'input/cleared' })
+          promptEditorRef.current?.setText('')
+          return
+        }
+      }
+
       submitAndClearDraft({
         appendFileParts: appendComposerFileParts,
         clearAttachments: clearComposerAttachments,
-        contextParts: [],
+        contextParts,
         dispatch,
-        files: [],
+        files,
+        options,
         promptEditor: promptEditorRef.current,
-        submit,
-        text: submitText,
+        submit: submitHandler,
+        text,
       })
-      requestAnimationFrame(() => promptEditorRef.current?.focus())
-      return
-    }
-
-    const insertText = command.action.text
-    const next = replaceSlashTrigger(currentState.inputValue, range.to - 1, range.from - 1, insertText)
-    dispatch({ type: 'slash/selected', inputValue: next.value, command })
-    promptEditorRef.current?.replaceRangeWithText(range, insertText)
-  }, [
-    appendComposerFileParts,
-    clearComposerAttachments,
-    composerAttachments,
-    disabled,
-    isSending,
-    onSlashCommandAction,
-    sendDisabled,
-    submit,
-  ])
-
-  const handleSend = useCallback((
-    options?: { invertContinuationMode?: boolean },
-    submitHandler: ComposerSendHandler = submit,
-  ) => {
-    const currentState = stateRef.current
-    const editorText = inputCollapsed ? '' : promptEditorRef.current?.getText() ?? currentState.inputValue
-    const contextParts = inputCollapsed ? [] : promptEditorRef.current?.getContextParts() ?? currentState.contextParts
-    const text = editorText.trim()
-    const files = inputCollapsed ? [] : composerAttachments
-    if (disabled || isSending || sendDisabled || sendBlocked) {
-      return
-    }
-    if (!allowEmptySend && !text && files.length === 0 && contextParts.length === 0) {
-      return
-    }
-    if (inputCollapsed) {
-      let result: ComposerSendResult | Promise<ComposerSendResult>
-      try {
-        result = options
-          ? submitHandler('', [], [], options)
-          : submitHandler('', [], [])
+      // Clear persisted draft on send
+      if (surfaceId) {
+        clearSyncedDraft()
       }
-      catch (error) {
-        reportComposerSubmitError(error)
-        return
-      }
-      if (isComposerSendPromise(result)) {
-        void result.catch(reportComposerSubmitError)
-      }
-      return
-    }
-
-    if (onQuickQuestion) {
-      const btwMatch = text.match(BTW_QUICK_QUESTION_RE)
-      if (btwMatch?.[1]) {
-        const question = btwMatch[1].trim()
-        onQuickQuestion(question)
-        dispatch({ type: 'input/cleared' })
-        promptEditorRef.current?.setText('')
-        return
-      }
-    }
-
-    submitAndClearDraft({
-      appendFileParts: appendComposerFileParts,
-      clearAttachments: clearComposerAttachments,
-      contextParts,
-      dispatch,
-      files,
-      options,
-      promptEditor: promptEditorRef.current,
-      submit: submitHandler,
-      text,
-    })
-    // Clear persisted draft on send
-    if (surfaceId) {
-      clearSyncedDraft()
-    }
-  }, [
-    allowEmptySend,
-    appendComposerFileParts,
-    clearComposerAttachments,
-    composerAttachments,
-    disabled,
-    inputCollapsed,
-    isSending,
-    onQuickQuestion,
-    sendBlocked,
-    sendDisabled,
-    submit,
-    clearSyncedDraft,
-    surfaceId,
-  ])
+      setPastedTexts([])
+      historyIndexRef.current = null
+      historyDraftRef.current = null
+    },
+    [
+      allowEmptySend,
+      appendComposerFileParts,
+      clearComposerAttachments,
+      composerAttachments,
+      disabled,
+      inputCollapsed,
+      isSending,
+      onQuickQuestion,
+      sendBlocked,
+      sendDisabled,
+      submit,
+      clearSyncedDraft,
+      pastedTexts,
+      surfaceId,
+    ],
+  )
 
   const sendVariantActions = useMemo(
-    () => (sendVariants ?? []).map(variant => ({
-      id: variant.id,
-      label: variant.label,
-      icon: variant.icon,
-      onSelect: () => handleSend(undefined, variant.submitHandler),
-    })),
+    () =>
+      (sendVariants ?? []).map(variant => ({
+        id: variant.id,
+        label: variant.label,
+        icon: variant.icon,
+        onSelect: () => handleSend(undefined, variant.submitHandler),
+      })),
     [sendVariants, handleSend],
   )
 
   const toggleRuntimeInteractionMode = useCallback(() => {
-    if (runtimeSettingsDisabled || !onRuntimeSettingsChange || !supportsPlanModeToggle(runtimeKind)) {
+    if (
+      runtimeSettingsDisabled
+      || !onRuntimeSettingsChange
+      || !supportsPlanModeToggle(runtimeKind)
+    ) {
       return false
     }
 
@@ -606,49 +708,136 @@ export function Composer({
     return true
   }, [onRuntimeSettingsChange, runtimeKind, runtimeSettings?.settings, runtimeSettingsDisabled])
 
-  const handlePaste = useCallback((event: ClipboardEvent) => {
-    handleAttachmentPaste(event as unknown as React.ClipboardEvent<HTMLElement>)
-  }, [handleAttachmentPaste])
+  const handlePaste = useCallback(
+    (event: ClipboardEvent) => {
+      handleAttachmentPaste(event as unknown as React.ClipboardEvent<HTMLElement>)
+      if (event.defaultPrevented) {
+        return
+      }
+      const text = event.clipboardData?.getData('text/plain') ?? ''
+      if (!shouldCollapsePastedText(text)) {
+        return
+      }
+      event.preventDefault()
+      setPastedTexts(current => [...current, createComposerPastedText(text)])
+    },
+    [handleAttachmentPaste],
+  )
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Don't interfere with IME composition (e.g. Chinese input)
-    if (e.isComposing) {
-      return
-    }
+  const applyHistoryDraft = useCallback(
+    (draft: ComposerDraft) => {
+      historyAppliedTextRef.current = draft.text
+      promptEditorRef.current?.setDraft(draft.text, draft.contextParts)
+      replaceComposerAttachments(draft.files)
+      setPastedTexts(draft.pastedTexts)
+    },
+    [replaceComposerAttachments],
+  )
 
-    if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      if (toggleRuntimeInteractionMode()) {
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Don't interfere with IME composition (e.g. Chinese input)
+      if (e.isComposing) {
+        return
+      }
+
+      if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (toggleRuntimeInteractionMode()) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+        return
+      }
+
+      // If a picker is active, let it handle Enter/Escape/arrows/Tab.
+      const currentState = stateRef.current
+      const currentSlashPanelHasResults
+        = currentState.slashActive
+          && getSlashCommandPanelItems(visibleSlashCommands, currentState.slashQuery).length > 0
+      if (currentState.mentionActive || currentState.skillActive || currentSlashPanelHasResults) {
+        if (['Enter', 'Escape', 'ArrowUp', 'ArrowDown', 'Tab'].includes(e.key)) {
+          return
+        }
+      }
+
+      if (
+        (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+        && !e.metaKey
+        && !e.ctrlKey
+        && !e.altKey
+        && !e.shiftKey
+        && promptHistory.length > 0
+      ) {
+        const direction = e.key === 'ArrowUp' ? 'older' : 'newer'
+        if (promptEditorRef.current?.canNavigateHistory(direction)) {
+          const currentIndex = historyIndexRef.current
+          if (direction === 'older') {
+            if (currentIndex === null) {
+              historyDraftRef.current = {
+                text: promptEditorRef.current.getText(),
+                contextParts: promptEditorRef.current.getContextParts(),
+                files: composerAttachments,
+                pastedTexts,
+              }
+            }
+            const nextIndex = Math.min((currentIndex ?? -1) + 1, promptHistory.length - 1)
+            const nextDraft = promptHistory[nextIndex]
+            if (nextDraft) {
+              historyIndexRef.current = nextIndex
+              applyHistoryDraft(nextDraft)
+              e.preventDefault()
+              return
+            }
+          }
+ else if (currentIndex !== null) {
+            if (currentIndex === 0) {
+              const draft = historyDraftRef.current
+              historyIndexRef.current = null
+              historyDraftRef.current = null
+              if (draft) {
+                applyHistoryDraft(draft)
+              }
+            }
+ else {
+              const nextIndex = currentIndex - 1
+              const nextDraft = promptHistory[nextIndex]
+              if (nextDraft) {
+                historyIndexRef.current = nextIndex
+                applyHistoryDraft(nextDraft)
+              }
+            }
+            e.preventDefault()
+            return
+          }
+        }
+      }
+
+      if (e.key === 'Enter' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        e.stopPropagation()
-      }
-      return
-    }
-
-    // If a picker is active, let it handle Enter/Escape/arrows/Tab.
-    const currentState = stateRef.current
-    const currentSlashPanelHasResults = currentState.slashActive
-      && getSlashCommandPanelItems(visibleSlashCommands, currentState.slashQuery).length > 0
-    if (currentState.mentionActive || currentState.skillActive || currentSlashPanelHasResults) {
-      if (['Enter', 'Escape', 'ArrowUp', 'ArrowDown', 'Tab'].includes(e.key)) {
+        if (submitInNewWindow) {
+          handleSend(undefined, submitInNewWindow)
+          return
+        }
+        handleSend({ invertContinuationMode: true })
         return
       }
-    }
 
-    if (e.key === 'Enter' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      if (submitInNewWindow) {
-        handleSend(undefined, submitInNewWindow)
-        return
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        handleSend()
       }
-      handleSend({ invertContinuationMode: true })
-      return
-    }
-
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }, [handleSend, submitInNewWindow, toggleRuntimeInteractionMode, visibleSlashCommands])
+    },
+    [
+      applyHistoryDraft,
+      composerAttachments,
+      handleSend,
+      pastedTexts,
+      promptHistory,
+      submitInNewWindow,
+      toggleRuntimeInteractionMode,
+      visibleSlashCommands,
+    ],
+  )
 
   // Append externally-provided text (e.g. from DnD drop on parent container)
   useEffect(() => {
@@ -658,6 +847,23 @@ export function Composer({
     promptEditorRef.current?.appendText(appendText)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appendTextKey])
+
+  useEffect(() => {
+    if (!appendContextParts || appendContextParts.length === 0) {
+      return
+    }
+    const editor = promptEditorRef.current
+    if (!editor) {
+      return
+    }
+    const text = editor.getText()
+    const position = text.length
+    editor.setDraft(text, [
+      ...editor.getContextParts(),
+      ...appendContextParts.map(part => ({ ...part, position })),
+    ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appendContextPartsKey])
 
   useEffect(() => {
     if (typeof replaceText !== 'string') {
@@ -672,6 +878,7 @@ export function Composer({
       return
     }
     clearComposerAttachments()
+    setPastedTexts([])
     promptEditorRef.current?.clear()
     dispatch({ type: 'input/cleared' })
     if (surfaceId) {
@@ -685,16 +892,36 @@ export function Composer({
       return
     }
     promptEditorRef.current?.setDraft(replaceDraft.text, replaceDraft.contextParts)
+    replaceComposerAttachments(replaceDraft.files)
+    setPastedTexts(replaceDraft.pastedTexts)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replaceDraftKey])
+  }, [replaceDraftKey, replaceComposerAttachments])
+
+  useEffect(() => {
+    if (!contextIngress) {
+      return
+    }
+    const currentText = promptEditorRef.current?.getText() ?? stateRef.current.inputValue
+    promptEditorRef.current?.setDraft(currentText, contextIngress.parts)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextIngress?.key])
 
   useEffect(() => {
     onDraftChange?.(state.inputValue)
     onDraftPartsChange?.(state.inputValue, state.contextParts)
     if (!suspendDraftPersistence) {
-      handleDraftPartsChange(state.inputValue, state.contextParts)
+      handleDraftPartsChange(state.inputValue, state.contextParts, composerAttachments, pastedTexts)
     }
-  }, [onDraftChange, onDraftPartsChange, handleDraftPartsChange, state.inputValue, state.contextParts, suspendDraftPersistence])
+  }, [
+    composerAttachments,
+    handleDraftPartsChange,
+    onDraftChange,
+    onDraftPartsChange,
+    pastedTexts,
+    state.contextParts,
+    state.inputValue,
+    suspendDraftPersistence,
+  ])
 
   // Append externally-injected file parts (e.g. from Cmd+Cmd appshot hotkey)
   useLayoutEffect(() => {
@@ -705,37 +932,43 @@ export function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appendExternalFilePartsKey])
 
-  const handleEditorFocusChange = useCallback((focused: boolean) => {
-    onFocusChange?.(focused)
-    if (!focused) {
-      window.setTimeout(() => {
-        dispatch({ type: 'pickers/closed' })
-      }, 150)
-    }
-  }, [onFocusChange])
+  const handleEditorFocusChange = useCallback(
+    (focused: boolean) => {
+      onFocusChange?.(focused)
+      if (!focused) {
+        window.setTimeout(() => {
+          dispatch({ type: 'pickers/closed' })
+        }, 150)
+      }
+    },
+    [onFocusChange],
+  )
 
-  const handleEditorDrop = useCallback((event: DragEvent) => {
-    // First, check if this is a workspace file drag (internal drag from file tree)
-    const path = event.dataTransfer ? readWorkspaceFileDragText(event.dataTransfer) : ''
-    if (path) {
-      event.preventDefault()
-      event.stopPropagation()
-      promptEditorRef.current?.appendText(path)
-      return true
-    }
+  const handleEditorDrop = useCallback(
+    (event: DragEvent) => {
+      // First, check if this is a workspace file drag (internal drag from file tree)
+      const path = event.dataTransfer ? readWorkspaceFileDragText(event.dataTransfer) : ''
+      if (path) {
+        event.preventDefault()
+        event.stopPropagation()
+        promptEditorRef.current?.appendText(path)
+        return true
+      }
 
-    // In local mode, handle external file drops as attachments
-    if (isLocalMode() && event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      event.preventDefault()
-      event.stopPropagation()
-      void handleAttachmentFilesSelected({
-        target: { files: event.dataTransfer.files, value: '' },
-      } as ChangeEvent<HTMLInputElement>)
-      return true
-    }
+      // In local mode, handle external file drops as attachments
+      if (isLocalMode() && event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+        event.preventDefault()
+        event.stopPropagation()
+        void handleAttachmentFilesSelected({
+          target: { files: event.dataTransfer.files, value: '' },
+        } as ChangeEvent<HTMLInputElement>)
+        return true
+      }
 
-    return false
-  }, [handleAttachmentFilesSelected])
+      return false
+    },
+    [handleAttachmentFilesSelected],
+  )
 
   const handleMentionClose = useCallback(() => {
     dispatch({ type: 'mention/closed' })
@@ -850,6 +1083,27 @@ export function Composer({
             />
           </div>
 
+          {!inputCollapsed && pastedTexts.length > 0 && (
+            <div className="border-t border-[var(--color-border-content)] px-3 py-2">
+              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {pastedTexts.map(pastedText => (
+                  <PastedTextCard
+                    key={pastedText.id}
+                    pastedText={pastedText}
+                    onRemove={() =>
+                      setPastedTexts(current =>
+                        current.filter(item => item.id !== pastedText.id))}
+                    onRestore={() => {
+                      promptEditorRef.current?.insertText(pastedText.text)
+                      setPastedTexts(current =>
+                        current.filter(item => item.id !== pastedText.id))
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {!inputCollapsed && (
             <ComposerAttachmentList
               attachments={attachmentController.attachments}
@@ -861,10 +1115,7 @@ export function Composer({
 
           {/* Action bar — subtle, blends with the card */}
           <div
-            className={cn(
-              'flex items-center justify-between gap-2 px-3 py-2',
-              actionBarClassName,
-            )}
+            className={cn('flex items-center justify-between gap-2 px-3 py-2', actionBarClassName)}
           >
             {/* Left: custom toolbar from parent */}
             <div className={cn('min-w-0 flex-1', toolbarClassName)}>
@@ -889,9 +1140,17 @@ export function Composer({
                     className="inline-flex h-6 max-w-64 items-center gap-1.5 rounded-md bg-muted px-2 font-mono text-[11px] text-muted-foreground"
                     data-testid="chat-bang-command-indicator"
                   >
-                    <SquareTerminalIcon className="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                    <SquareTerminalIcon
+                      className="size-3.5 shrink-0 opacity-70"
+                      aria-hidden="true"
+                    />
                     <span className="truncate">{bangCommandPreview}</span>
-                    {sendBlocked && <span className="ml-0.5 h-3 w-1 rounded-full bg-muted-foreground/60" aria-hidden="true" />}
+                    {sendBlocked && (
+                      <span
+                        className="ml-0.5 h-3 w-1 rounded-full bg-muted-foreground/60"
+                        aria-hidden="true"
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -929,9 +1188,7 @@ export function Composer({
         </div>
         {footer && (
           <div className=" relative -mt-4 flex min-h-11 min-w-0 items-center rounded-b-2xl bg-background/90 backdrop-blur-lg text-[13px] shadow-sm">
-            <div className="bg-muted/45 h-full w-full px-2.5 pb-1 pt-5 ">
-              {footer}
-            </div>
+            <div className="bg-muted/45 h-full w-full px-2.5 pb-1 pt-5 ">{footer}</div>
           </div>
         )}
       </div>

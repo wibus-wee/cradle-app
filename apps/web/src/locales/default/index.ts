@@ -14,6 +14,7 @@ import home from './home'
 import kanban from './kanban'
 import newChat from './new-chat'
 import onboarding from './onboarding'
+import pullRequests from './pull-requests'
 import search from './search'
 import sessionIsolation from './session-isolation'
 import sessionPullRequest from './session-pull-request'
@@ -41,6 +42,7 @@ const resources = {
   kanban,
   'new-chat': newChat,
   onboarding,
+  'pull-requests': pullRequests,
   search,
   'session-isolation': sessionIsolation,
   'session-pull-request': sessionPullRequest,
