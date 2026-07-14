@@ -17044,6 +17044,14 @@ export type DeleteChatComposerDraftsBySurfaceIdResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
             }>;
         } | null;
         revision: number;
@@ -17098,6 +17106,14 @@ export type GetChatComposerDraftsBySurfaceIdResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
             }>;
         } | null;
         revision: number;
@@ -17138,6 +17154,14 @@ export type PutChatComposerDraftsBySurfaceIdData = {
                     name: string;
                     path: string;
                 } | null;
+                position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
                 position?: number;
             }>;
         };
@@ -17183,6 +17207,14 @@ export type PutChatComposerDraftsBySurfaceIdResponses = {
                     name: string;
                     path: string;
                 } | null;
+                position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
                 position?: number;
             }>;
         } | null;
@@ -18352,6 +18384,14 @@ export type GetChatSessionsBySessionIdQueueResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
             }>;
             providerTargetId: string | null;
             modelId: string | null;
@@ -18408,6 +18448,14 @@ export type PostChatSessionsBySessionIdQueueData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId?: string;
@@ -18469,6 +18517,14 @@ export type PostChatSessionsBySessionIdQueueResponses = {
                 path: string;
             } | null;
             position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
+            position?: number;
         }>;
         providerTargetId: string | null;
         modelId: string | null;
@@ -18524,6 +18580,14 @@ export type PostChatSessionsBySessionIdSteerData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId?: string;
@@ -18599,6 +18663,14 @@ export type PostChatSessionsBySessionIdSteerResponses = {
                     name: string;
                     path: string;
                 } | null;
+                position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
                 position?: number;
             }>;
             providerTargetId: string | null;
@@ -18676,6 +18748,14 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
             }>;
             providerTargetId: string | null;
             modelId: string | null;
@@ -18750,6 +18830,14 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
                 path: string;
             } | null;
             position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
+            position?: number;
         }>;
         providerTargetId: string | null;
         modelId: string | null;
@@ -18805,6 +18893,14 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId?: string;
@@ -18866,6 +18962,14 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId: string | null;
@@ -19080,6 +19184,14 @@ export type PostChatSessionsBySessionIdResponseData = {
                 path: string;
             } | null;
             position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
+            position?: number;
         }>;
         messages?: Array<{
             id: string;
@@ -19151,6 +19263,14 @@ export type PostChatSideConversationsBySideConversationIdResponseData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         messages?: Array<{
