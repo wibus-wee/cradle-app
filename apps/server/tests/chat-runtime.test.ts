@@ -689,7 +689,7 @@ class TestCodexRollbackRuntime implements ChatRuntime {
     return {
       runtimeKind: 'codex',
       providerSessionId: input.runtimeSession.providerSessionId,
-      rolledBackTurns: 1,
+      rolledBackTurns: input.numTurns,
       fileChangesReverted: false,
     }
   }
@@ -901,13 +901,31 @@ class TestProviderSyntheticTurnRuntime implements ChatRuntime {
 
   readonly capabilities = TEST_CODEX_RUNTIME_CAPABILITIES
   readonly streamInputs: StreamTurnInput[] = []
+  readonly syntheticStarted: Promise<void>
   readonly syntheticSettled: Promise<void>
+  private resolveSyntheticStarted: (() => void) | null = null
   private resolveSyntheticSettled: (() => void) | null = null
+  private readonly syntheticFinishGate: Promise<void>
+  private resolveSyntheticFinish: (() => void) | null = null
 
-  constructor(private readonly syntheticDelayMs = 0) {
+  constructor(
+    private readonly syntheticDelayMs = 0,
+    private readonly syntheticProviderThreadId: string | null = 'toolu_background_agent',
+    private readonly gateSyntheticFinish = false,
+  ) {
+    this.syntheticStarted = new Promise((resolve) => {
+      this.resolveSyntheticStarted = resolve
+    })
     this.syntheticSettled = new Promise((resolve) => {
       this.resolveSyntheticSettled = resolve
     })
+    this.syntheticFinishGate = new Promise((resolve) => {
+      this.resolveSyntheticFinish = resolve
+    })
+  }
+
+  finishSyntheticTurn(): void {
+    this.resolveSyntheticFinish?.()
   }
 
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
@@ -931,7 +949,7 @@ class TestProviderSyntheticTurnRuntime implements ChatRuntime {
       void (async () => {
         await input.onProviderSyntheticTurnEvent?.({
           providerTurnId: 'provider-background-turn-1',
-          providerThreadId: 'toolu_background_agent',
+          providerThreadId: this.syntheticProviderThreadId,
           chunks: [
             { type: 'text-start', id: 'provider-background-text' },
             {
@@ -939,6 +957,16 @@ class TestProviderSyntheticTurnRuntime implements ChatRuntime {
               id: 'provider-background-text',
               delta: 'Background agent report',
             },
+          ],
+        })
+        this.resolveSyntheticStarted?.()
+        if (this.gateSyntheticFinish) {
+          await this.syntheticFinishGate
+        }
+        await input.onProviderSyntheticTurnEvent?.({
+          providerTurnId: 'provider-background-turn-1',
+          providerThreadId: this.syntheticProviderThreadId,
+          chunks: [
             { type: 'text-end', id: 'provider-background-text' },
             { type: 'finish', finishReason: 'stop' },
           ],
@@ -5103,6 +5131,119 @@ describe('chat runtime capability', () => {
       rmSync(workspaceRoot, { recursive: true, force: true })
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
       restoreEnv('CRADLE_CREDENTIAL_SECRET', previousSecret)
+    }
+  })
+
+  it('persists top-level provider synthetic turns as durable assistant messages', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousSecret = process.env.CRADLE_CREDENTIAL_SECRET
+    const previousAuthToken = process.env.CRADLE_AUTH_TOKEN
+    const previousAuthRequired = process.env.CRADLE_AUTH_REQUIRED
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_CREDENTIAL_SECRET = 'chat-runtime-secret'
+    delete process.env.CRADLE_AUTH_TOKEN
+    delete process.env.CRADLE_AUTH_REQUIRED
+
+    const runtime = new TestProviderSyntheticTurnRuntime(25, null, true)
+    const originalClaudeRuntime = getRuntimeRegistry().get('claude-agent')
+    let app: Awaited<ReturnType<typeof createServerApp>> | undefined
+
+    try {
+      app = await createServerApp()
+      registerRuntime(runtime)
+      db()
+        .insert(workspaces)
+        .values({
+          id: 'workspace-chat-main-synthetic-turn',
+          name: 'Workspace Chat Main Synthetic Turn',
+          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          path: workspaceRoot,
+        })
+        .run()
+
+      await createProfileAndSession(app, 'workspace-chat-main-synthetic-turn', {
+        providerTargetId: 'provider-target-chat-main-synthetic-turn',
+        sessionId: 'session-chat-main-synthetic-turn',
+        providerKind: 'anthropic',
+        runtimeKind: 'claude-agent',
+      })
+
+      const runRes = await app.handle(
+        new Request(
+          'http://localhost/chat/sessions/session-chat-main-synthetic-turn/response',
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ text: 'Launch background agent' }),
+          },
+        ),
+      )
+      expect(runRes.status).toBe(200)
+      await collectSseChunks(runRes)
+      await runtime.syntheticStarted
+
+      await waitForCondition(() => {
+        const syntheticRun = db()
+          .select()
+          .from(backendRuns)
+          .where(eq(backendRuns.chatSessionId, 'session-chat-main-synthetic-turn'))
+          .all()
+          .find(row => row.origin === 'system')
+        expect(syntheticRun).toEqual(expect.objectContaining({ status: 'streaming' }))
+        return syntheticRun!
+      }, 'streaming top-level provider synthetic run')
+
+      const syntheticStreamRes = await app.handle(
+        new Request('http://localhost/chat/sessions/session-chat-main-synthetic-turn/stream'),
+      )
+      expect(syntheticStreamRes.status).toBe(200)
+      const syntheticChunksPromise = collectSseChunks(syntheticStreamRes)
+      runtime.finishSyntheticTurn()
+      await runtime.syntheticSettled
+      const syntheticChunks = await syntheticChunksPromise
+      expect(syntheticChunks).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'start' }),
+        expect.objectContaining({ type: 'text-delta', delta: 'Background agent report' }),
+        expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+      ]))
+
+      await waitForCondition(async () => {
+        const messageRows = await getChatMessages(app!, 'session-chat-main-synthetic-turn')
+        expect(
+          messageRows.map(row => ({ role: row.role, status: row.status, content: row.content })),
+        ).toEqual([
+          { role: 'user', status: 'complete', content: 'Launch background agent' },
+          { role: 'assistant', status: 'complete', content: 'Parent response' },
+          { role: 'assistant', status: 'complete', content: 'Background agent report' },
+        ])
+        return messageRows
+      }, 'top-level provider synthetic assistant message')
+
+      const runRows = db()
+        .select()
+        .from(backendRuns)
+        .where(eq(backendRuns.chatSessionId, 'session-chat-main-synthetic-turn'))
+        .all()
+        .sort((left, right) => left.startedAt - right.startedAt)
+      expect(runRows.map(row => ({ origin: row.origin, status: row.status }))).toEqual([
+        { origin: 'user', status: 'complete' },
+        { origin: 'system', status: 'complete' },
+      ])
+      expect(getActiveSessionRun('session-chat-main-synthetic-turn')).toBeNull()
+    }
+    finally {
+      if (originalClaudeRuntime) {
+        registerRuntime(originalClaudeRuntime)
+      }
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_CREDENTIAL_SECRET', previousSecret)
+      restoreEnv('CRADLE_AUTH_TOKEN', previousAuthToken)
+      restoreEnv('CRADLE_AUTH_REQUIRED', previousAuthRequired)
     }
   })
 

@@ -3098,7 +3098,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.dispose()
   })
 
-  it('starts a synthetic turn from SDK system task notifications after the parent result', async () => {
+  it('keeps task notifications out of the main turn and persists the following top-level reply', async () => {
     const prompts: unknown[] = []
     sdkMocks.query.mockImplementation((call: { prompt?: AsyncIterable<{ message: { content: unknown } }> }) => {
       expect(call.prompt).toBeDefined()
@@ -3125,6 +3125,18 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
             status: 'completed',
             output_file: '/tmp/background-task.json',
             summary: 'Background task finished',
+          },
+          {
+            type: 'assistant',
+            session_id: 'claude-session-task-notification',
+            message: {
+              content: [{ type: 'text', text: 'Background analysis complete. Want me to change it?' }],
+            },
+          },
+          {
+            type: 'result',
+            session_id: 'claude-session-task-notification',
+            usage: { input_tokens: 2, output_tokens: 3 },
           },
         ],
         [
@@ -3164,7 +3176,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     await vi.waitFor(() => {
       expect(syntheticEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'text-delta', delta: 'Background task finished' }),
+        expect.objectContaining({
+          type: 'text-delta',
+          delta: 'Background analysis complete. Want me to change it?',
+        }),
+        expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
       ]))
     })
     const slotStates = await provider.getUiSlotStates({
@@ -3193,8 +3209,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       }),
     ]))
     expect(syntheticEvents.flatMap(event => event.chunks)).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+      expect.objectContaining({ type: 'text-delta', delta: 'Background task finished' }),
     ]))
+    expect(new Set(syntheticEvents.map(event => event.providerTurnId)).size).toBe(1)
+    expect(syntheticEvents.every(event => event.providerThreadId === null)).toBe(true)
 
     for await (const chunk of provider.streamTurn({
       runId: 'run-claude-agent-background-notification-next',
@@ -3209,11 +3227,6 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       expect(chunk.type).toBeDefined()
     }
 
-    expect(syntheticEvents.flatMap(event => event.chunks)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
-    ]))
-    expect(new Set(syntheticEvents.map(event => event.providerTurnId)).size).toBe(1)
-    expect(syntheticEvents.every(event => event.providerThreadId === 'agent-background-task')).toBe(true)
     expect(prompts).toEqual(['Launch background work', 'Next task'])
 
     await provider.dispose()
