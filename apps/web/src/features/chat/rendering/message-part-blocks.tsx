@@ -6,10 +6,16 @@ import { ReasoningBlock } from './blocks/reasoning-block'
 import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
 import { useChatRenderStore } from './chat-render-store'
 import { MarkdownFileLink } from './markdown-file-link'
-import { FileAttachmentBlock, PluginContextBlock, SkillContextBlock } from './message-attachment-blocks'
+import {
+  FileAttachmentBlock,
+  FileLineCommentContextBlock,
+  PluginContextBlock,
+  SkillContextBlock,
+} from './message-attachment-blocks'
 import type { MessageTextTransform } from './message-bubble-selectors'
 import {
   areReasoningPartsEqual,
+  readFileLineCommentContextPartFromState,
   readFilePartFromState,
   readMarkdownAnchorProps,
   readPluginContextPartFromState,
@@ -137,6 +143,24 @@ export const MessagePluginContextPartById = ({
   return <PluginContextBlock part={part} />
 }
 MessagePluginContextPartById.displayName = 'MessagePluginContextPartById'
+
+export const MessageFileLineCommentContextPartById = ({
+  sessionId,
+  messageId,
+  partIndex,
+}: {
+  sessionId: string
+  messageId: string
+  partIndex: number
+}) => {
+  const part = useChatRenderStore(state =>
+    readFileLineCommentContextPartFromState(state, sessionId, messageId, partIndex))
+  if (!part) {
+    return null
+  }
+  return <FileLineCommentContextBlock part={part} />
+}
+MessageFileLineCommentContextPartById.displayName = 'MessageFileLineCommentContextPartById'
 
 export const MessageRuntimeWarningPartById = ({
   sessionId,

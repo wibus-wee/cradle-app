@@ -61,6 +61,8 @@ export function describeRollbackLastTurnError(error: unknown): string | null {
   switch (code) {
     case 'chat_rollback_run_in_progress':
       return 'Wait for the active run to finish before editing the previous message.'
+    case 'chat_rollback_in_progress':
+      return 'Wait for the current rollback to finish before editing the previous message.'
     case 'chat_rollback_queue_in_progress':
       return 'Clear the pending queue before editing the previous message.'
     case 'chat_rollback_streaming_tail':

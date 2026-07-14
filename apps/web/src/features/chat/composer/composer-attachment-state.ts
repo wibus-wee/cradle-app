@@ -17,6 +17,7 @@ export interface ComposerAttachmentController {
   handlePaste: (event: ClipboardEvent<HTMLElement>) => void
   pickFiles: () => void
   removeAttachment: (index: number) => void
+  replaceAttachments: (fileParts: FileUIPart[]) => void
 }
 
 interface ComposerAttachmentConfig {
@@ -38,7 +39,11 @@ function readFileAsDataUrl(file: File): Promise<string> {
  */
 async function convertFileToFileUIPart(file: File): Promise<FileUIPart> {
   // In local mode, if the file has a path property (from Electron drag), use it directly
-  if (isLocalMode() && 'path' in file && typeof (file as File & { path?: string }).path === 'string') {
+  if (
+    isLocalMode()
+    && 'path' in file
+    && typeof (file as File & { path?: string }).path === 'string'
+  ) {
     const filePath = (file as File & { path?: string }).path!
     return {
       type: 'file' as const,
@@ -102,51 +107,70 @@ export function useComposerAttachments({
     setAttachments(current => [...fileParts, ...current])
   }, [])
 
-  const appendSelectedFiles = useCallback(async (files: FileList) => {
-    if (files.length === 0 || !supportsAttachments) {
-      return
+  const replaceAttachments = useCallback((fileParts: FileUIPart[]) => {
+    setAttachments(fileParts)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
-    // In local mode, use our custom converter that preserves file paths
-    if (isLocalMode()) {
-      const fileParts = await convertFileArrayToFileUIParts(Array.from(files))
+  }, [])
+
+  const appendSelectedFiles = useCallback(
+    async (files: FileList) => {
+      if (files.length === 0 || !supportsAttachments) {
+        return
+      }
+      // In local mode, use our custom converter that preserves file paths
+      if (isLocalMode()) {
+        const fileParts = await convertFileArrayToFileUIParts(Array.from(files))
+        appendFileParts(fileParts)
+      }
+ else {
+        const fileParts = await convertFileListToFileUIParts(files)
+        appendFileParts(fileParts)
+      }
+    },
+    [appendFileParts, supportsAttachments],
+  )
+
+  const appendPastedFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0 || !supportsAttachments) {
+        return
+      }
+      const fileParts = await convertFileArrayToFileUIParts(files)
       appendFileParts(fileParts)
-    }
-    else {
-      const fileParts = await convertFileListToFileUIParts(files)
-      appendFileParts(fileParts)
-    }
-  }, [appendFileParts, supportsAttachments])
+    },
+    [appendFileParts, supportsAttachments],
+  )
 
-  const appendPastedFiles = useCallback(async (files: File[]) => {
-    if (files.length === 0 || !supportsAttachments) {
-      return
-    }
-    const fileParts = await convertFileArrayToFileUIParts(files)
-    appendFileParts(fileParts)
-  }, [appendFileParts, supportsAttachments])
+  const handleFilesSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const selectedFiles = event.target.files
+      if (!selectedFiles || selectedFiles.length === 0) {
+        return
+      }
+      await appendSelectedFiles(selectedFiles)
+      event.target.value = ''
+    },
+    [appendSelectedFiles],
+  )
 
-  const handleFilesSelected = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = event.target.files
-    if (!selectedFiles || selectedFiles.length === 0) {
-      return
-    }
-    await appendSelectedFiles(selectedFiles)
-    event.target.value = ''
-  }, [appendSelectedFiles])
+  const handlePaste = useCallback(
+    (event: ClipboardEvent<HTMLElement>) => {
+      if (!supportsAttachments) {
+        return
+      }
 
-  const handlePaste = useCallback((event: ClipboardEvent<HTMLElement>) => {
-    if (!supportsAttachments) {
-      return
-    }
+      const files = readClipboardFiles(event.clipboardData)
+      if (files.length === 0) {
+        return
+      }
 
-    const files = readClipboardFiles(event.clipboardData)
-    if (files.length === 0) {
-      return
-    }
-
-    event.preventDefault()
-    void appendPastedFiles(files)
-  }, [appendPastedFiles, supportsAttachments])
+      event.preventDefault()
+      void appendPastedFiles(files)
+    },
+    [appendPastedFiles, supportsAttachments],
+  )
 
   const pickFiles = useCallback(() => {
     fileInputRef.current?.click()
@@ -163,25 +187,30 @@ export function useComposerAttachments({
     clearAttachments()
   }, [clearAttachments, supportsAttachments])
 
-  return useMemo(() => ({
-    attachments,
-    appendFileParts,
-    fileInputRef,
-    hasAttachments: attachments.length > 0,
-    supportsAttachments,
-    clearAttachments,
-    handleFilesSelected,
-    handlePaste,
-    pickFiles,
-    removeAttachment,
-  }), [
-    attachments,
-    appendFileParts,
-    clearAttachments,
-    handleFilesSelected,
-    handlePaste,
-    pickFiles,
-    removeAttachment,
-    supportsAttachments,
-  ])
+  return useMemo(
+    () => ({
+      attachments,
+      appendFileParts,
+      fileInputRef,
+      hasAttachments: attachments.length > 0,
+      supportsAttachments,
+      clearAttachments,
+      handleFilesSelected,
+      handlePaste,
+      pickFiles,
+      removeAttachment,
+      replaceAttachments,
+    }),
+    [
+      attachments,
+      appendFileParts,
+      clearAttachments,
+      handleFilesSelected,
+      handlePaste,
+      pickFiles,
+      removeAttachment,
+      replaceAttachments,
+      supportsAttachments,
+    ],
+  )
 }

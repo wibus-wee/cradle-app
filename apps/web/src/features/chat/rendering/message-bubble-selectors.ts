@@ -4,29 +4,21 @@ import type { AnchorHTMLAttributes } from 'react'
 import type { useChatStore } from '~/store/chat'
 
 import { readChatContinuationMetadata } from '../capabilities/chat-continuation-metadata'
+import type { BangCommandMetadata, BangResultMetadata } from '../commands/bang-command-metadata'
+import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
 import type {
-  BangCommandMetadata,
-  BangResultMetadata,
-} from '../commands/bang-command-metadata'
-import {
-  readBangCommandMetadata,
-  readBangResultMetadata,
-} from '../commands/bang-command-metadata'
-import type {
+  ChatFileLineCommentContextMessagePart,
   ChatPluginContextMessagePart,
   ChatSkillContextMessagePart,
 } from '../context/chat-context-parts'
 import {
+  isChatFileLineCommentContextPart,
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
 import type { RuntimeWarningMessagePart } from '../runtime-warning'
 import { isRuntimeWarningMessagePart } from '../runtime-warning'
-import type {
-  ChatRenderItem,
-  ChatRenderSegment,
-  FileMessagePart,
-} from './chat-render-plan'
+import type { ChatRenderItem, ChatRenderSegment, FileMessagePart } from './chat-render-plan'
 import {
   groupMessagePartRefs,
   isRuntimeUserInputToolPart,
@@ -109,7 +101,10 @@ function projectMessageText(message: UIMessage, textTransform?: MessageTextTrans
   return changed ? { ...message, parts } : message
 }
 
-export function readMessageDisplayText(message: UIMessage, textTransform?: MessageTextTransform): string {
+export function readMessageDisplayText(
+  message: UIMessage,
+  textTransform?: MessageTextTransform,
+): string {
   const projected = projectMessageText(message, textTransform)
   const goalObjective = readGoalMetadataObjective(message)
   if (projected.role === 'user' && goalObjective) {
@@ -141,7 +136,9 @@ export function readMessageFromState(
   messageId: string,
   textTransform?: MessageTextTransform,
 ): UIMessage | undefined {
-  const message = (state.messagesMap.get(sessionId) ?? []).find(message => message.id === messageId)
+  const message = (state.messagesMap.get(sessionId) ?? []).find(
+    message => message.id === messageId,
+  )
   return message ? projectMessageText(message, textTransform) : undefined
 }
 
@@ -167,7 +164,10 @@ export function readMessageFrameFromState(
   }
 }
 
-export function areMessageFramesEqual(left: MessageFrame | null, right: MessageFrame | null): boolean {
+export function areMessageFramesEqual(
+  left: MessageFrame | null,
+  right: MessageFrame | null,
+): boolean {
   return (
     left?.id === right?.id
     && left?.role === right?.role
@@ -221,7 +221,10 @@ export function readRenderSegmentsFromState(
   })
 }
 
-export function areRenderSegmentsEqual(left: ChatRenderSegment[], right: ChatRenderSegment[]): boolean {
+export function areRenderSegmentsEqual(
+  left: ChatRenderSegment[],
+  right: ChatRenderSegment[],
+): boolean {
   if (left === right) {
     return true
   }
@@ -252,12 +255,14 @@ function areRenderSegmentEqual(left: ChatRenderSegment, right: ChatRenderSegment
     case 'file-attachment':
     case 'skill-context':
     case 'plugin-context':
+    case 'file-line-comment-context':
     case 'runtime-warning':
       return (
         (right.kind === 'reasoning'
           || right.kind === 'file-attachment'
           || right.kind === 'skill-context'
           || right.kind === 'plugin-context'
+          || right.kind === 'file-line-comment-context'
           || right.kind === 'runtime-warning')
         && left.kind === right.kind
         && left.messageId === right.messageId
@@ -363,6 +368,16 @@ export function readPluginContextPartFromState(
 ): ChatPluginContextMessagePart | null {
   const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
   return isChatPluginContextPart(part) ? part : null
+}
+
+export function readFileLineCommentContextPartFromState(
+  state: ChatStoreSnapshot,
+  sessionId: string,
+  messageId: string,
+  partIndex: number,
+): ChatFileLineCommentContextMessagePart | null {
+  const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
+  return isChatFileLineCommentContextPart(part) ? part : null
 }
 
 export function readRuntimeWarningPartFromState(

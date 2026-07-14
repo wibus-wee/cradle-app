@@ -28,6 +28,7 @@ export default {
   'footer.action.askJarvis': 'Ask Jarvis',
   'rightAside.tab.files': 'Files',
   'rightAside.tab.work': 'Work',
+  'rightAside.tab.environment': 'Environment',
   'rightAside.tab.changes': 'Changes',
   'rightAside.tab.git': 'Git',
   'rightAside.tab.issue': 'Issue',

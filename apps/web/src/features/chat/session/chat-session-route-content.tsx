@@ -109,9 +109,9 @@ export function ChatSessionRouteContent({
     () => runtimes.find(runtime => runtime.runtimeKind === session?.runtimeKind) ?? null,
     [runtimes, session?.runtimeKind],
   )
-  const usesCollapsedRuntimeView = sessionRuntime
+  const usesCollapsedRuntimeView = session?.runtimeKind === 'cli-tui' || (sessionRuntime
     ? runtimeComposerUsesCollapsedInput(sessionRuntime.composer)
-    : false
+    : false)
 
   useEffect(() => {
     if (typeof session?.archivedAt !== 'number') {
@@ -179,7 +179,7 @@ export function ChatSessionRouteContent({
           workspacePath={workspacePath}
         />
         <Suspense fallback={null}>
-          <TuiView sessionId={sessionId} />
+          <TuiView sessionId={sessionId} visible={active} />
         </Suspense>
       </>
     )

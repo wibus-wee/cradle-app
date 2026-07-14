@@ -67,6 +67,14 @@ export interface ExecuteRunInput {
 }
 
 export interface TurnExecutorDeps {
+  captureTurnCheckpointStart: (input: {
+    sessionId: string
+    runId: string
+    assistantMessageId: string | null
+    workspaceId: string | null
+    workspacePath: string | null
+  }) => Promise<void>
+  captureTurnCheckpointEnd: (input: { sessionId: string, runId: string }) => Promise<void>
   stream: {
     flushPendingRunDelta: (activeRun: ActiveRun) => void
     publishRunStartChunk: (activeRun: ActiveRun) => void
@@ -147,6 +155,21 @@ export async function executeRun(
     }
 
     try {
+      if (activeRun.internalContinuation !== 'runtimeGoal') {
+        await deps.captureTurnCheckpointStart({
+          sessionId: activeRun.sessionId,
+          runId: activeRun.runId,
+          assistantMessageId: activeRun.messageId,
+          workspaceId: input.workspaceId ?? null,
+          workspacePath: input.workspacePath ?? null,
+        }).catch((error) => {
+          deps.warn('failed to capture turn-start checkpoint', {
+            error,
+            sessionId: activeRun.sessionId,
+            runId: activeRun.runId,
+          })
+        })
+      }
       const { finalChunk, failurePayload } = await pumpRuntimeStream(
         activeRun,
         input,
@@ -162,6 +185,18 @@ export async function executeRun(
         profile,
         deps,
       )
+      if (activeRun.internalContinuation !== 'runtimeGoal') {
+        await deps.captureTurnCheckpointEnd({
+          sessionId: activeRun.sessionId,
+          runId: activeRun.runId,
+        }).catch((error) => {
+          deps.warn('failed to capture turn-end checkpoint', {
+            error,
+            sessionId: activeRun.sessionId,
+            runId: activeRun.runId,
+          })
+        })
+      }
       completeRun(
         activeRun,
         finalChunk,

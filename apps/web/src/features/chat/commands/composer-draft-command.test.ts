@@ -14,6 +14,8 @@ const SURFACE_ID = 'surface-1'
 const DRAFT: ComposerDraft = {
   text: 'Queued draft',
   contextParts: [],
+  files: [],
+  pastedTexts: [],
 }
 
 function serverResponse(draft: ComposerDraft | null = DRAFT) {
