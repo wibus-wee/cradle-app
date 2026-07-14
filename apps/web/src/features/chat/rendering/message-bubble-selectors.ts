@@ -18,11 +18,7 @@ import {
 } from '../context/chat-context-parts'
 import type { RuntimeWarningMessagePart } from '../runtime-warning'
 import { isRuntimeWarningMessagePart } from '../runtime-warning'
-import type {
-  ChatRenderItem,
-  ChatRenderSegment,
-  FileMessagePart,
-} from './chat-render-plan'
+import type { ChatRenderItem, ChatRenderSegment, FileMessagePart } from './chat-render-plan'
 import {
   groupMessagePartRefs,
   isRuntimeUserInputToolPart,

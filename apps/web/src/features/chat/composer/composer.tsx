@@ -142,6 +142,11 @@ export interface ComposerExternalSignals {
   appendTextKey?: number
   appendContextParts?: ChatContextPart[]
   appendContextPartsKey?: number
+  /** Injects context parts into the current draft when the key changes. */
+  contextIngress?: {
+    parts: ChatContextPart[]
+    key: number
+  } | null
 }
 
 export interface ComposerRuntimeSettingsController {
@@ -275,6 +280,7 @@ export function Composer({
   const appendTextKey = externalSignals?.appendTextKey
   const appendContextParts = externalSignals?.appendContextParts
   const appendContextPartsKey = externalSignals?.appendContextPartsKey
+  const contextIngress = externalSignals?.contextIngress
 
   // Per-surface draft persistence — restores draft on remount (e.g. tab switch)
   const surfaceId = view?.surfaceId
@@ -890,6 +896,14 @@ export function Composer({
     setPastedTexts(replaceDraft.pastedTexts)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replaceDraftKey, replaceComposerAttachments])
+  useEffect(() => {
+    if (!contextIngress) {
+      return
+    }
+    const currentText = promptEditorRef.current?.getText() ?? stateRef.current.inputValue
+    promptEditorRef.current?.setDraft(currentText, contextIngress.parts)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextIngress?.key])
 
   useEffect(() => {
     onDraftChange?.(state.inputValue)

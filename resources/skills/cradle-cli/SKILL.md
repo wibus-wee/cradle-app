@@ -295,12 +295,13 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `preferences` | 11 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |
+| `pull-request` | 4 | Generated Cradle CLI module. | `cradle man pull-request` |
 | `relay-server` | 4 | Generated Cradle CLI module. | `cradle man relay-server` |
 | `relay-transport` | 5 | Generated Cradle CLI module. | `cradle man relay-transport` |
 | `remote-host` | 8 | Generated Cradle CLI module. | `cradle man remote-host` |
 | `search` | 2 | Search Cradle data. | `cradle man search` |
 | `secret` | 2 | Manage secret metadata. | `cradle man secret` |
-| `session` | 25 | Manage chat sessions and session links. | `cradle man session` |
+| `session` | 27 | Manage chat sessions and session links. | `cradle man session` |
 | `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
 | `usage` | 10 | Inspect usage and cost data. | `cradle man usage` |
@@ -309,4 +310,3 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `workspace` | 53 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 
 <!-- CRADLE_CLI_MODULES_END -->
-

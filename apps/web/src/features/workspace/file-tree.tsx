@@ -21,7 +21,6 @@ import { getAuthenticatedEventSourceUrl, getServerUrl, isElectron, nativeIpc, pl
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
 import { serializeWorkspaceFileDragPayload, writeWorkspaceFileDragData } from '~/lib/workspace-drag-data'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import type { WorkspaceFileEntry } from './api/files'
 import { listWorkspaceFileChildren } from './api/files'
@@ -498,7 +497,6 @@ function FileTreeInner({ workspaceId, paths, preparedInput, ready, gitStatus, on
     return activeTab.path
   })
   const openWorkspaceFileTab = useBrowserPanelStore(state => state.openWorkspaceFileTab)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
   const activeWorkspaceFilePathRef = useRef<string | null>(null)
   const copyPathChordActiveRef = useRef(false)
   const refreshWorkspaceFiles = async () => {
@@ -558,7 +556,6 @@ function FileTreeInner({ workspaceId, paths, preparedInput, ready, gitStatus, on
 
   const openWorkspaceFile = (path: string, view: 'editor' | 'preview') => {
     openWorkspaceFileTab({ workspaceId, path, view })
-    setBrowserPanelOpen(true)
   }
   const copyRelativePath = async (path: string) => {
     await navigator.clipboard.writeText(path)

@@ -48,6 +48,7 @@
   "nav.diffs": "Diffs",
   "nav.newChat": "Nuevo chat",
   "nav.newWork": "Nuevo Work",
+  "nav.pullRequests": "Pull requests",
   "nav.profile": "Profile",
   "nav.search": "Buscar",
   "nav.settings": "Configuración",
@@ -255,5 +256,8 @@
   "workspace.toast.remoteWorkspaceCreated": "Remote workspace added",
   "workspace.toast.remoteWorkspaceCreateFailed": "Remote workspace could not be added",
   "workspace.toast.renameFailed": "No se pudo renombrar el espacio de trabajo",
-  "session.aria.remote": "Se ejecuta en el host remoto {{hostName}}"
+  "session.aria.remote": "Se ejecuta en el host remoto {{hostName}}",
+  "session.action.exportZip": "Exportar como ZIP",
+  "session.toast.exportZipBusy": "La sesión aún se está transmitiendo. Espera a que termine.",
+  "session.toast.exportZipFailed": "No se pudo exportar la sesión como archivo ZIP."
 }

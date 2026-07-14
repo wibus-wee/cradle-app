@@ -4,6 +4,7 @@ import { AppError } from '../../errors/app-error'
 import * as Issue from '../issue/service'
 import { WorktreeModel } from '../worktree/model'
 import * as Worktree from '../worktree/service'
+import { sessionArchiveChunks } from './export-archive'
 import { SessionModel } from './model'
 import * as Session from './service'
 
@@ -167,6 +168,39 @@ export const session = new Elysia({
     },
     params: SessionModel.idParams,
     response: { 200: SessionModel.exportMarkdownResponse },
+  })
+  .get('/:id/export/zip', ({ params }) => {
+    // exportArchive throws AppError 404 (not found) / 409 (still streaming)
+    // synchronously, which Elysia maps through the standard error handler.
+    const { archive, filename } = Session.exportArchive(params.id)
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          for await (const chunk of sessionArchiveChunks(archive)) {
+            controller.enqueue(chunk)
+          }
+          controller.close()
+        }
+        catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+    return new Response(stream, {
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${filename}"`,
+        'cache-control': 'no-store',
+      },
+    })
+  }, {
+    detail: {
+      'summary': 'Export session as zip archive (session.json + transcript.md)',
+      'x-cradle-cli': {
+        command: ['session', 'export', 'zip'],
+      },
+    },
+    params: SessionModel.idParams,
   })
 
   // ── linked issue ──

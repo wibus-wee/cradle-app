@@ -7,6 +7,7 @@ import {
   CopyLine as ClipboardCopyIcon,
   CopyLine as CopyIcon,
   DeleteLine as Trash2Icon,
+  DownloadLine as DownloadIcon,
   DownSmallLine as ChevronDownIcon,
   ExternalLinkLine as ExternalLinkIcon,
   FileNewLine as FilePlusIcon,
@@ -117,6 +118,7 @@ import {
   remoteHostUpstreamQueryKey,
 } from '~/features/remote-hosts/upstream-fetch'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
+import { downloadSessionZip } from '~/features/session/download-session-zip'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
@@ -138,6 +140,7 @@ import {
   openDiff,
   openNewChat,
   openNewWork,
+  openPullRequests,
   openSettingsSection,
   openUsage,
   openWork,
@@ -579,6 +582,24 @@ function SessionActionsMenu({
     }
   }, [session])
 
+  const handleExportZip = useCallback(async () => {
+    if (!session) {
+      return
+    }
+    try {
+      await downloadSessionZip(session.id)
+    }
+    catch (error) {
+      const code = error instanceof Error ? error.message : ''
+      if (code === 'session-export-busy') {
+        toastManager.add({ type: 'error', title: t('session.toast.exportZipBusy') })
+      }
+      else {
+        toastManager.add({ type: 'error', title: t('session.toast.exportZipFailed') })
+      }
+    }
+  }, [session, t])
+
   const handleArchive = useCallback(async () => {
     if (!session) {
       return
@@ -632,6 +653,13 @@ function SessionActionsMenu({
         icon: <ClipboardCopyIcon />,
         testId: `session-menu-copy-markdown-${session.id}`,
         invoke: handleExport,
+      },
+      {
+        key: 'export-zip',
+        label: t('session.action.exportZip'),
+        icon: <DownloadIcon />,
+        testId: `session-menu-export-zip-${session.id}`,
+        invoke: handleExportZip,
       },
     ]
     if (import.meta.env.DEV) {
@@ -704,6 +732,7 @@ function SessionActionsMenu({
   }, [
     handleArchive,
     handleExport,
+    handleExportZip,
     handleOpenInNewTab,
     handleOpenInNewWindow,
     handleRegenerateTitle,
@@ -3094,6 +3123,7 @@ WorkspaceGroup.displayName = 'WorkspaceGroup'
 // ── Top nav items ─────────────────────────────────────────────────────────────
 
 interface NavItemProps {
+  active?: boolean
   icon: React.ReactNode
   label: string
   shortcut?: string
@@ -3103,6 +3133,7 @@ interface NavItemProps {
 }
 
 function TopNavItem({
+  active = false,
   icon,
   label,
   shortcut,
@@ -3110,8 +3141,10 @@ function TopNavItem({
   onClick,
   dataTestId,
 }: NavItemProps) {
-  const className
-    = 'group flex h-7 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-sidebar-foreground/80 hover:bg-accent/50 hover:text-sidebar-foreground overflow-hidden'
+  const className = cn(
+    'group flex h-7 w-full items-center gap-2 overflow-hidden rounded-lg px-2.5 py-1.5 text-xs text-sidebar-foreground/80 hover:bg-accent/50 hover:text-sidebar-foreground',
+    active && 'bg-accent/70 text-sidebar-foreground',
+  )
   const iconNode = (
     <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground/70">
       {icon}
@@ -3154,7 +3187,13 @@ function TopNavItem({
   )
 
   return (
-    <button type="button" onClick={onClick} data-testid={dataTestId} className={className}>
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={dataTestId}
+      className={className}
+      aria-current={active ? 'page' : undefined}
+    >
       {content}
     </button>
   )
@@ -3625,6 +3664,7 @@ WorkspaceSidebarBody.displayName = 'WorkspaceSidebarBody'
 
 export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boolean }) => {
   const { t } = useTranslation('workspace')
+  const pullRequestsActive = useIsActiveSurfaceId('pull-requests')
   const queryClient = useQueryClient()
   const { workspaces, ready: workspacesReady } = useWorkspaces()
   const { sessions } = useAllSessions()
@@ -3842,6 +3882,14 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
             collapsed={collapsed}
             onClick={openDiff}
             dataTestId="nav-diffs"
+          />
+          <TopNavItem
+            icon={<WorkIcon className="size-3.5" />}
+            label={t('nav.pullRequests')}
+            collapsed={collapsed}
+            active={pullRequestsActive}
+            onClick={openPullRequests}
+            dataTestId="nav-pull-requests"
           />
           <TopNavItem
             icon={<CalendarClockIcon className="size-3.5" />}

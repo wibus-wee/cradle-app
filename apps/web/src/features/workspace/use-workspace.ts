@@ -13,7 +13,11 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { PostWorkspacesData, PostWorkspacesInspectDirectoryResponse } from '~/api-gen/types.gen'
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
-import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
+import {
+  classifyProductAnalyticsFailure,
+  trackProductTaskFinished,
+  trackProductTaskStarted,
+} from '~/features/product-analytics/client'
 import { useAppPreferencesQuery, useUpdateAppPreferencesMutation } from '~/features/settings/use-app-preferences'
 
 export const WORKSPACES_QUERY_KEY = getWorkspacesQueryKey()
@@ -86,7 +90,11 @@ export function useAddWorkspace() {
         trackProductTaskFinished(analyticsTask, 'success')
       }
       catch (error) {
-        trackProductTaskFinished(analyticsTask, 'failed')
+        trackProductTaskFinished(
+          analyticsTask,
+          'failed',
+          classifyProductAnalyticsFailure(error),
+        )
         throw error
       }
     }
@@ -129,7 +137,11 @@ export function useAddWorkspace() {
       setRecognition(null)
     }
     catch (error) {
-      trackProductTaskFinished(analyticsTask, 'failed')
+      trackProductTaskFinished(
+        analyticsTask,
+        'failed',
+        classifyProductAnalyticsFailure(error),
+      )
       throw error
     }
     finally {
@@ -158,7 +170,11 @@ export function useAddWorkspace() {
       setRecognition(null)
     }
     catch (error) {
-      trackProductTaskFinished(analyticsTask, 'failed')
+      trackProductTaskFinished(
+        analyticsTask,
+        'failed',
+        classifyProductAnalyticsFailure(error),
+      )
       throw error
     }
     finally {
@@ -179,7 +195,11 @@ export function useAddWorkspace() {
       trackProductTaskFinished(analyticsTask, 'success')
     }
     catch (error) {
-      trackProductTaskFinished(analyticsTask, 'failed')
+      trackProductTaskFinished(
+        analyticsTask,
+        'failed',
+        classifyProductAnalyticsFailure(error),
+      )
       throw error
     }
     finally {

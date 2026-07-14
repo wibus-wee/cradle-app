@@ -25,6 +25,7 @@ import {
   MenuTrigger,
 } from '~/components/ui/menu'
 import { toastManager } from '~/components/ui/toast'
+import { OpenInPicker } from '~/features/editor/open-in-picker'
 import { cn } from '~/lib/cn'
 import { openChatSession } from '~/navigation/navigation-commands'
 
@@ -95,6 +96,9 @@ export function SessionIsolationChrome({ sessionId, workspaceId }: SessionIsolat
 
   return (
     <>
+      {isolation.worktreePath && (
+        <OpenInPicker path={isolation.worktreePath} />
+      )}
       <Menu>
         <MenuTrigger
           className={cn(
