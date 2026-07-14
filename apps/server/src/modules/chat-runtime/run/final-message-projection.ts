@@ -227,6 +227,12 @@ export function projectFinalMessageChunk(
         providerMetadata: chunk.providerMetadata,
       })
       break
+    case 'data-runtime-warning':
+      message.parts.push({
+        type: chunk.type,
+        data: chunk.data,
+      })
+      break
   }
 }
 

@@ -210,6 +210,7 @@ export function readPersistedThinkingEffort(effort: unknown): PersistedThinkingE
     || effort === 'high'
     || effort === 'xhigh'
     || effort === 'max'
+    || effort === 'ultra'
     ? effort
     : null
 }

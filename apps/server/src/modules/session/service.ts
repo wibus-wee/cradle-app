@@ -92,7 +92,7 @@ const SessionCreateInputSchema = z.object({
   sideContextSource: z.enum(['provider-native', 'cradle-context']).nullable().optional(),
   providerTargetId: z.string().optional(),
   modelId: z.string().nullable().optional(),
-  thinkingEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).nullable().optional(),
+  thinkingEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']).nullable().optional(),
   runtimeKind: z.string().trim().min(1).optional(),
   runtimeSettings: z.unknown().optional(),
   agentId: z.string().nullable().optional(),
@@ -169,6 +169,7 @@ export function readSessionThinkingEffortPreference(
     case 'high':
     case 'xhigh':
     case 'max':
+    case 'ultra':
       return config.requestedThinkingEffort
     default:
       return null

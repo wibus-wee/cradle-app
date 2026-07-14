@@ -107,16 +107,24 @@ describe('plugin source installer', () => {
     await writePluginPackage(repoRoot, '.', '@acme/git-plugin')
     const archive = await createArchive(archiveRoot, 'acme-plugin-pack-testref')
     const fetchMock = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(archive)))
-    vi.stubGlobal('fetch', fetchMock)
 
     const discoveryDir = await resolvePluginSourceDirectory(source({
       id: 'git-source',
       kind: 'git',
       location: 'acme/plugin-pack',
       ref: 'testref',
-    }))
+    }), { fetchFn: fetchMock })
 
     expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/acme/plugin-pack/tarball/testref',
+      {
+        headers: {
+          'accept': 'application/vnd.github+json',
+          'user-agent': 'Cradle-Server-Plugin-Source-Installer',
+        },
+      },
+    )
     const entries = await readFile(resolve(discoveryDir, 'acme-plugin-pack', 'package.json'), 'utf8')
     expect(JSON.parse(entries)).toMatchObject({ name: '@acme/git-plugin' })
   })

@@ -29,7 +29,7 @@ const messageInsertOrder = sql`messages.rowid`
 export function reportRuntimeSessionTitle(input: {
   sessionId: string
   title: string
-  overwriteUserTitle?: boolean
+  overwriteExistingTitle?: boolean
 }): Promise<void> {
   const title = normalizeRuntimeSessionTitle(input.title)
   if (!title) {
@@ -44,18 +44,16 @@ export function reportRuntimeSessionTitle(input: {
   if (!session) {
     return Promise.resolve()
   }
-  if (
-    session.title === title
-    && (!input.overwriteUserTitle || session.titleSource === 'provider')
-  ) {
+  if (session.title === title) {
     return Promise.resolve()
   }
 
-  // Don't overwrite user-set titles
-  if (session.titleSource === 'user' && !input.overwriteUserTitle) {
+  // Provider sessions are recreated when their target changes. Their initial title
+  // must not rename an already-named Cradle session.
+  if (session.titleSource !== 'initial' && !input.overwriteExistingTitle) {
     return Promise.resolve()
   }
-  if (!input.overwriteUserTitle && isTrivialContinuationTitle(title)) {
+  if (!input.overwriteExistingTitle && isTrivialContinuationTitle(title)) {
     return Promise.resolve()
   }
 
@@ -167,7 +165,7 @@ export async function regenerateSessionTitle(
   await reportRuntimeSessionTitle({
     sessionId,
     title,
-    overwriteUserTitle: true,
+    overwriteExistingTitle: true,
   })
   attachBinding({
     sessionId,

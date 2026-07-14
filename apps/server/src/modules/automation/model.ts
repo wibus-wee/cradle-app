@@ -53,6 +53,7 @@ const recipeSchema = t.Object({
     t.Literal('high'),
     t.Literal('xhigh'),
     t.Literal('max'),
+    t.Literal('ultra'),
   ])),
   sessionPolicy: t.Optional(t.Union([t.Literal('new'), t.Literal('heartbeat')])),
   isolationPolicy: t.Optional(t.Union([t.Literal('workspace'), t.Literal('worktree_per_run')])),

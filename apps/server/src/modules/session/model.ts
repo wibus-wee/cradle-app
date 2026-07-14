@@ -15,6 +15,7 @@ const thinkingEffortSchema = t.Union([
   t.Literal('high'),
   t.Literal('xhigh'),
   t.Literal('max'),
+  t.Literal('ultra'),
 ])
 const sessionStatusSchema = t.Union([t.Literal('idle'), t.Literal('streaming'), t.Literal('error')])
 const sideContextSourceSchema = t.Union([t.Literal('provider-native'), t.Literal('cradle-context')])

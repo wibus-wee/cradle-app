@@ -28,6 +28,7 @@ export const ThreadHandoffModel = {
       t.Literal('high'),
       t.Literal('xhigh'),
       t.Literal('max'),
+      t.Literal('ultra'),
     ]))),
   }, { additionalProperties: false }),
   createResponse: t.Object({ handoff, session: SessionModel.session }),

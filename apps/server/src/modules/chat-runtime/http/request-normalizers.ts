@@ -8,6 +8,7 @@ export function readChatThinkingEffort(value: unknown): ChatThinkingEffort | und
     || value === 'high'
     || value === 'xhigh'
     || value === 'max'
+    || value === 'ultra'
     ? value
     : undefined
 }

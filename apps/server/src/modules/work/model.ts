@@ -63,6 +63,7 @@ const thinkingEffort = t.Union([
   t.Literal('high'),
   t.Literal('xhigh'),
   t.Literal('max'),
+  t.Literal('ultra'),
 ])
 
 export const WorkModel = {

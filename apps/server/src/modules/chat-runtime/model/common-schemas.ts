@@ -174,6 +174,7 @@ export const runtimeModelDescriptorSchema = t.Object({
           t.Literal('high'),
           t.Literal('xhigh'),
           t.Literal('max'),
+          t.Literal('ultra'),
         ]),
       ),
     ),
@@ -328,6 +329,7 @@ export const thinkingEffortSchema = t.Union([
   t.Literal('high'),
   t.Literal('xhigh'),
   t.Literal('max'),
+  t.Literal('ultra'),
 ])
 export const nullableModelIdSchema = t.Union([t.String(), t.Null()])
 

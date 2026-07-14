@@ -28,6 +28,36 @@ function readToolPart(message: UIMessage, toolCallId: string): UIMessage['parts'
 }
 
 describe('projectFinalMessageChunk', () => {
+  it('persists runtime warnings in their streamed message position', () => {
+    const run = createProjectionRun()
+
+    projectFinalMessageChunk(run, { type: 'text-start', id: 'before' })
+    projectFinalMessageChunk(run, { type: 'text-delta', id: 'before', delta: 'Before' })
+    projectFinalMessageChunk(run, { type: 'text-end', id: 'before' })
+    projectFinalMessageChunk(run, {
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Reconnecting... 2/5',
+        additionalDetails: 'request timed out',
+      },
+    })
+    projectFinalMessageChunk(run, { type: 'text-start', id: 'after' })
+    projectFinalMessageChunk(run, { type: 'text-delta', id: 'after', delta: 'After' })
+    projectFinalMessageChunk(run, { type: 'text-end', id: 'after' })
+
+    expect(run.finalMessage.parts).toEqual([
+      { type: 'text', text: 'Before', state: 'done' },
+      {
+        type: 'data-runtime-warning',
+        data: {
+          message: 'Reconnecting... 2/5',
+          additionalDetails: 'request timed out',
+        },
+      },
+      { type: 'text', text: 'After', state: 'done' },
+    ])
+  })
+
   it('merges message metadata chunks into the final message', () => {
     const run = createProjectionRun()
 

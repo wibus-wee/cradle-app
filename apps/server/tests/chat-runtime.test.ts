@@ -1228,7 +1228,7 @@ class TestPendingRuntimeSettingsRuntime implements ChatRuntime {
 }
 
 describe('chat runtime capability', () => {
-  it('ignores trivial provider session titles', async () => {
+  it('ignores trivial and subsequent provider session titles', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
     process.env.CRADLE_DATA_DIR = dataDir
@@ -1263,6 +1263,22 @@ describe('chat runtime capability', () => {
       reportRuntimeSessionTitle({
         sessionId: 'session-provider-title-trivial',
         title: 'Provider switch recovery',
+      })
+
+      expect(
+        db()
+          .select({ title: sessions.title, titleSource: sessions.titleSource })
+          .from(sessions)
+          .where(eq(sessions.id, 'session-provider-title-trivial'))
+          .get(),
+      ).toEqual({
+        title: 'Provider switch recovery',
+        titleSource: 'provider',
+      })
+
+      reportRuntimeSessionTitle({
+        sessionId: 'session-provider-title-trivial',
+        title: 'Replacement provider title',
       })
 
       expect(
