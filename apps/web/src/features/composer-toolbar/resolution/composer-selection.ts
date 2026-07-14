@@ -26,6 +26,7 @@ export function readComposerThinkingEffort(value: string | null | undefined): Th
     case 'high':
     case 'xhigh':
     case 'max':
+    case 'ultra':
       return value
     default:
       return null
@@ -37,6 +38,8 @@ export function resolvePreferredThinkingEffort(input: {
   boundSessionThinkingEffort: ThinkingEffort
   boundAgentThinkingEffort: ThinkingEffort
   selectedAgentThinkingEffort: ThinkingEffort
+  lastModelThinkingEffort: ThinkingEffort
+  lastProviderThinkingEffort: ThinkingEffort
   lastThinkingEffort: ThinkingEffort
 }): {
   thinkingEffort: ThinkingEffort
@@ -59,6 +62,8 @@ export function resolvePreferredThinkingEffort(input: {
   return {
     thinkingEffort: input.boundAgentThinkingEffort
       ?? input.selectedAgentThinkingEffort
+      ?? input.lastModelThinkingEffort
+      ?? input.lastProviderThinkingEffort
       ?? input.lastThinkingEffort,
     usesBoundSessionThinkingEffort: false,
   }
@@ -150,7 +155,7 @@ export function resolveComposerModelId(input: {
     return input.selectedAgentModelId
   }
   if (input.context === 'chat') {
-    return resolveChatModelId({
+    const boundModelId = resolveChatModelId({
       boundAgentModelId: input.boundAgentModelId,
       boundAgentProviderTargetId: input.boundAgentProviderTargetId,
       boundModelId: input.boundModelId,
@@ -158,6 +163,9 @@ export function resolveComposerModelId(input: {
       manualProfileId: input.manualProfileId,
       models: input.models,
     })
+    if (boundModelId) {
+      return boundModelId
+    }
   }
   const persisted = input.profileId ? input.lastModelByProfile[input.profileId] : undefined
   // Persisted provider model is restored as an orphan when not in the current visible list
@@ -165,5 +173,5 @@ export function resolveComposerModelId(input: {
   if (persisted) {
     return persisted
   }
-  return null
+  return input.models[0]?.id ?? null
 }

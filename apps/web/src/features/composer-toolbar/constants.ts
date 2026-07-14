@@ -15,6 +15,7 @@ export const THINKING_EFFORTS: { value: ConcreteThinkingEffort, label: string, d
   { value: 'high', label: '', description: '' },
   { value: 'xhigh', label: '', description: '' },
   { value: 'max', label: '', description: '' },
+  { value: 'ultra', label: '', description: '' },
 ]
 
 export interface RuntimeKindOption {
@@ -28,7 +29,7 @@ export interface RuntimeKindOption {
 
 export type ThinkingCapabilityTier = 'none' | 'standard' | 'extended'
 
-const EXTENDED_REASONING_EFFORTS = new Set(['minimal', 'xhigh', 'max'])
+const EXTENDED_REASONING_EFFORTS = new Set(['minimal', 'xhigh', 'max', 'ultra'])
 
 /**
  * Returns declared effort values when the server/registry set `reasoningEfforts`
@@ -85,7 +86,7 @@ export function filterThinkingOptionsForModel<TThinking extends string | null>(
     if (tier === 'none') {
       return false
     }
-    if (option.value === 'none' || option.value === 'minimal' || option.value === 'xhigh' || option.value === 'max') {
+    if (option.value === 'none' || option.value === 'minimal' || option.value === 'xhigh' || option.value === 'max' || option.value === 'ultra') {
       return tier === 'extended'
     }
     return true

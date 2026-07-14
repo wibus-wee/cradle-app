@@ -52,6 +52,21 @@ describe('thinking capability filtering', () => {
     }))).toBe('extended')
   })
 
+  it('exposes ultra only when the runtime model declares it', () => {
+    const options = filterThinkingOptionsForModel(
+      model({
+        id: 'codex-ultra',
+        capabilities: {
+          reasoning: true,
+          reasoningEfforts: ['low', 'medium', 'high', 'ultra'],
+        },
+      }),
+      THINKING_EFFORTS,
+    )
+
+    expect(options.map(option => option.value)).toEqual(['low', 'medium', 'high', 'ultra'])
+  })
+
   it('uses the requested fallback before the first supported effort', () => {
     expect(selectSupportedThinkingValue(
       model({

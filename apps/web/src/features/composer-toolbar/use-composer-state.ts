@@ -112,7 +112,8 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
   const setLastThinkingEffort = useNewChatStore(s => s.setLastThinkingEffort)
   const lastThinkingByProfile = useNewChatStore(s => s.lastThinkingByProfile)
   const setLastThinkingForProfile = useNewChatStore(s => s.setLastThinkingForProfile)
-  const reconcileProfiles = useNewChatStore(s => s.reconcileProfiles)
+  const lastThinkingByProviderModel = useNewChatStore(s => s.lastThinkingByProviderModel)
+  const setLastThinkingForProviderModel = useNewChatStore(s => s.setLastThinkingForProviderModel)
 
   // Data — remote execution uses the remote host catalog; local stays on /provider-targets.
   const { agents, isLoading: isLoadingAgents } = useAgents()
@@ -318,13 +319,6 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     [providerOptions, runtimeKind, runtimes],
   )
 
-  useEffect(() => {
-    if (selectableProfiles.length === 0) {
-      return
-    }
-    reconcileProfiles(selectableProfiles.map(profile => profile.id))
-  }, [reconcileProfiles, selectableProfiles])
-
   const selectedAgentThinkingEffort = selectedNewChatAgent
     ? readComposerThinkingEffort(selectedNewChatAgent.thinkingEffort)
     : null
@@ -345,7 +339,7 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     return null
   }, [runtimeKind, context, boundAgent, selectedNewChatAgent])
 
-  // Resolve effective profile before thinking so provider-scoped prefs can restore.
+  // Resolve provider and model before thinking so both preference scopes can restore.
   const profileId = useMemo(() => {
     return resolveComposerProfileId({
       composerUsesModelSelection,
@@ -362,20 +356,6 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
       selectableProfiles,
     })
   }, [composerUsesModelSelection, context, targetMode, selectedNewChatAgent, effectiveManualProfileId, boundAgent, boundProviderTargetId, boundModelId, providerBinding, lastProfileId, selectableProfiles])
-
-  const lastThinkingForProfile = profileId
-    ? readComposerThinkingEffort(lastThinkingByProfile[profileId])
-    : null
-  const {
-    thinkingEffort,
-    usesBoundSessionThinkingEffort,
-  } = resolvePreferredThinkingEffort({
-    manualThinkingEffort: effectiveManualThinkingEffort,
-    boundSessionThinkingEffort,
-    boundAgentThinkingEffort,
-    selectedAgentThinkingEffort,
-    lastThinkingEffort: lastThinkingForProfile ?? readComposerThinkingEffort(lastThinkingEffort),
-  })
 
   const initialModelProfileIds = useMemo(() => [profileId], [profileId])
   const {
@@ -413,6 +393,25 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
       lastModelByProfile,
     })
   }, [composerUsesModelSelection, context, targetMode, selectedNewChatAgent, effectiveManualModelId, models, boundModelId, boundAgent, effectiveManualProfileId, boundProviderTargetId, profileId, lastModelByProfile])
+
+  const lastModelThinkingEffort = profileId && modelId
+    ? readComposerThinkingEffort(lastThinkingByProviderModel[profileId]?.[modelId])
+    : null
+  const lastProviderThinkingEffort = profileId
+    ? readComposerThinkingEffort(lastThinkingByProfile[profileId])
+    : null
+  const {
+    thinkingEffort,
+    usesBoundSessionThinkingEffort,
+  } = resolvePreferredThinkingEffort({
+    manualThinkingEffort: effectiveManualThinkingEffort,
+    boundSessionThinkingEffort,
+    boundAgentThinkingEffort,
+    selectedAgentThinkingEffort,
+    lastModelThinkingEffort,
+    lastProviderThinkingEffort,
+    lastThinkingEffort: readComposerThinkingEffort(lastThinkingEffort),
+  })
 
   const effectiveAgent = useMemo(
     () => boundAgent?.id === agentId
@@ -529,6 +528,7 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
       setLastProfileId(targetProfileId)
     }
     setManualModelId(id)
+    setManualThinkingEffort(undefined)
     setLastModelForProfile(targetProfileId, id)
   }
 
@@ -538,6 +538,9 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     setLastThinkingEffort(effort)
     if (profileId) {
       setLastThinkingForProfile(profileId, effort)
+      if (modelId) {
+        setLastThinkingForProviderModel(profileId, modelId, effort)
+      }
     }
   }
 

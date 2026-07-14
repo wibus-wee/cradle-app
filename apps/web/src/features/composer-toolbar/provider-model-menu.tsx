@@ -200,13 +200,10 @@ function ProviderTargetGroup<TThinking extends string | null>({
       <MenuSubTrigger
         data-testid={`provider-target-option-${providerTarget.id}`}
         onClick={() => {
-          onRequestProviderTargetModels?.(providerTarget.id)
           if (!isProviderTargetSelectionDisabled) {
             onSelectProviderTarget(providerTarget.id)
           }
         }}
-        onFocus={() => onRequestProviderTargetModels?.(providerTarget.id)}
-        onPointerEnter={() => onRequestProviderTargetModels?.(providerTarget.id)}
         className={cn(isActive && 'font-medium')}
       >
         <CheckIcon className={cn('size-3.5 shrink-0', isActive ? '!text-primary' : '!text-transparent')} />

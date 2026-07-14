@@ -46,7 +46,7 @@ describe('readComposerThinkingEffort', () => {
     expect(readComposerThinkingEffort('minimal')).toBe('minimal')
     expect(readComposerThinkingEffort('xhigh')).toBe('xhigh')
     expect(readComposerThinkingEffort('max')).toBe('max')
-    expect(readComposerThinkingEffort('ultra')).toBeNull()
+    expect(readComposerThinkingEffort('ultra')).toBe('ultra')
     expect(readComposerThinkingEffort(undefined)).toBeNull()
   })
 })
@@ -58,6 +58,8 @@ describe('resolvePreferredThinkingEffort', () => {
       boundSessionThinkingEffort: 'high',
       boundAgentThinkingEffort: 'medium',
       selectedAgentThinkingEffort: null,
+      lastModelThinkingEffort: null,
+      lastProviderThinkingEffort: null,
       lastThinkingEffort: 'xhigh',
     })).toEqual({
       thinkingEffort: 'low',
@@ -71,11 +73,39 @@ describe('resolvePreferredThinkingEffort', () => {
       boundSessionThinkingEffort: 'xhigh',
       boundAgentThinkingEffort: 'medium',
       selectedAgentThinkingEffort: null,
+      lastModelThinkingEffort: 'low',
+      lastProviderThinkingEffort: 'high',
       lastThinkingEffort: null,
     })).toEqual({
       thinkingEffort: 'xhigh',
       usesBoundSessionThinkingEffort: true,
     })
+  })
+
+  it('restores model, then provider, then global thinking preferences', () => {
+    const base = {
+      manualThinkingEffort: undefined,
+      boundSessionThinkingEffort: null,
+      boundAgentThinkingEffort: null,
+      selectedAgentThinkingEffort: null,
+      lastThinkingEffort: 'low' as const,
+    }
+
+    expect(resolvePreferredThinkingEffort({
+      ...base,
+      lastModelThinkingEffort: 'xhigh',
+      lastProviderThinkingEffort: 'high',
+    }).thinkingEffort).toBe('xhigh')
+    expect(resolvePreferredThinkingEffort({
+      ...base,
+      lastModelThinkingEffort: null,
+      lastProviderThinkingEffort: 'high',
+    }).thinkingEffort).toBe('high')
+    expect(resolvePreferredThinkingEffort({
+      ...base,
+      lastModelThinkingEffort: null,
+      lastProviderThinkingEffort: null,
+    }).thinkingEffort).toBe('low')
   })
 })
 
@@ -215,7 +245,7 @@ describe('resolveComposerModelId', () => {
     })).toBe('manual-orphan')
   })
 
-  it('returns null instead of silently picking models[0] when nothing is selected', () => {
+  it('uses models[0] when the provider has no remembered model', () => {
     expect(resolveComposerModelId({
       composerUsesModelSelection: true,
       context: 'new-chat',
@@ -231,7 +261,26 @@ describe('resolveComposerModelId', () => {
       manualProfileId: null,
       profileId: 'provider-1',
       lastModelByProfile: {},
-    })).toBeNull()
+    })).toBe('first-model')
+  })
+
+  it('uses models[0] in chat when neither the session nor provider has a remembered model', () => {
+    expect(resolveComposerModelId({
+      composerUsesModelSelection: true,
+      context: 'chat',
+      targetMode: 'provider',
+      selectedAgentId: null,
+      selectedAgentModelId: null,
+      manualModelId: null,
+      models: [model({ id: 'first-model' }), model({ id: 'second-model' })],
+      boundAgentModelId: null,
+      boundAgentProviderTargetId: null,
+      boundModelId: null,
+      boundProviderTargetId: null,
+      manualProfileId: 'provider-1',
+      profileId: 'provider-1',
+      lastModelByProfile: {},
+    })).toBe('first-model')
   })
 
   it('delegates chat model precedence to the bound session and agent resolver', () => {

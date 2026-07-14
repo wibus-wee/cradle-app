@@ -4,7 +4,7 @@ import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import type { ClaudeAgentModelAliasesSlot } from '~/features/chat/runtime/claude-session-model-matrix-control'
 import { ClaudeAgentModelAliasesSubmenu } from '~/features/chat/runtime/claude-session-model-matrix-control'
 
-import { filterThinkingOptionsForModel, selectSupportedThinkingValue, THINKING_EFFORTS } from './constants'
+import { filterThinkingOptionsForModel, THINKING_EFFORTS } from './constants'
 import type { ThinkingOption } from './provider-model-menu'
 import { ProviderModelPicker } from './provider-model-picker'
 import type { ModelsByProfileId, ProviderModelOption, ThinkingEffort } from './types'
@@ -20,6 +20,7 @@ const thinkingLabelKeys = {
   high: 'thinking.high.label',
   xhigh: 'thinking.xhigh.label',
   max: 'thinking.max.label',
+  ultra: 'thinking.ultra.label',
 } satisfies Record<ThinkingOptionKey, CommonKey>
 
 const thinkingDescriptionKeys = {
@@ -30,6 +31,7 @@ const thinkingDescriptionKeys = {
   high: 'thinking.high.description',
   xhigh: 'thinking.xhigh.description',
   max: 'thinking.max.description',
+  ultra: 'thinking.ultra.description',
 } satisfies Record<ThinkingOptionKey, CommonKey>
 
 interface ProviderModelSelectorProps {
@@ -82,9 +84,6 @@ export function ProviderModelSelector({
   const thinkingOptions = useProviderThinkingOptions()
   const hiddenThinkingOptions: Array<ThinkingOption<ThinkingEffort>> = [{ value: null, label: '', description: '' }]
   const menuThinkingOptions = showThinkingInModelMenu ? thinkingOptions : hiddenThinkingOptions
-  const selectThinkingForModel = (model: ModelDescriptor | null): ThinkingEffort =>
-      selectSupportedThinkingValue(model, thinkingOptions, thinkingEffort, 'high')
-
   return (
     <ProviderModelPicker
       providerTargets={profiles}
@@ -124,10 +123,6 @@ export function ProviderModelSelector({
       onSelectModel={(id, profileId) => {
         if (id) {
           onSelectModel(id, profileId)
-          const nextModel = (modelsByProfileId[profileId] ?? []).find(model => model.id === id) ?? null
-          if (showThinkingInModelMenu) {
-            onSelectThinkingEffort(selectThinkingForModel(nextModel))
-          }
         }
       }}
       onSelectThinking={onSelectThinkingEffort}

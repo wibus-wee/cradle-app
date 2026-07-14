@@ -141,6 +141,7 @@ export function ChatRuntimeView({
     successfulProfileIds,
   } = composerState
   const selectedProfileId = selection.profileId
+  const selectedModelId = selection.modelId
 
   useEffect(() => {
     if (!pendingProviderTargetId) {
@@ -150,19 +151,28 @@ export function ChatRuntimeView({
       setPendingProviderTargetId(null)
       return
     }
+    if (selectedModelId) {
+      setPendingProviderTargetId(null)
+      void persistSessionProviderModel({
+        providerTargetId: pendingProviderTargetId,
+        modelId: selectedModelId,
+      })
+      return
+    }
     const nextModels = modelsByProfileId[pendingProviderTargetId] ?? []
     if (nextModels.length === 0) {
       if (successfulProfileIds.has(pendingProviderTargetId)) {
         // Inventory loaded empty — clear pending; do not invent a model id.
         setPendingProviderTargetId(null)
       }
-      return
     }
-    // Wait for an explicit model pick — do not auto-persist models[0] into the session.
-    setPendingProviderTargetId(null)
+    // When inventory is present, the selection resolver chooses models[0]
+    // and this effect persists it on the next render.
   }, [
     modelsByProfileId,
     pendingProviderTargetId,
+    persistSessionProviderModel,
+    selectedModelId,
     selectedProfileId,
     successfulProfileIds,
     runtimeKind,
@@ -173,16 +183,6 @@ export function ChatRuntimeView({
     setProfileId: (id: string) => {
       composerState.setProfileId(id)
       composerState.requestProfileModels(id)
-      const nextModels = composerState.modelsByProfileId[id] ?? []
-      const currentModelId = composerState.selection.modelId
-      const keepCurrent = currentModelId && nextModels.some(model => model.id === currentModelId)
-      if (keepCurrent && currentModelId) {
-        setPendingProviderTargetId(null)
-        void persistSessionProviderModel({ providerTargetId: id, modelId: currentModelId })
-        return
-      }
-      // Switch provider without inventing a default model — user must pick.
-      composerState.setModelId(null, id)
       setPendingProviderTargetId(id)
       void persistSessionProviderModel({ providerTargetId: id, modelId: null })
     },
