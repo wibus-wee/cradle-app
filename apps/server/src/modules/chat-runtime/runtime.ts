@@ -38,8 +38,11 @@ import {
   finalizeInterruptedPersistedStreamingSessionIfIdle as finalizeInterruptedPersistedStreamingSessionIfIdleFromLifecycle,
   releaseTerminalPersistedActiveRunForSession as releaseTerminalPersistedActiveRunForSessionFromLifecycle,
 } from './lifecycle/cancel'
-import type { RollbackLastTurnDto } from './lifecycle/rollback'
-import { rollbackLastTurn as rollbackLastTurnFromLifecycle } from './lifecycle/rollback'
+import type { RollbackLastTurnDto, RollbackLastTurnOptions } from './lifecycle/rollback'
+import {
+  rollbackLastTurn as rollbackLastTurnFromLifecycle,
+  rollbackTurns as rollbackTurnsFromLifecycle,
+} from './lifecycle/rollback'
 import { setRuntimeUserInputPublisher } from './pending-user-input'
 import {
   cancelSessionQueueItem as cancelSessionQueueItemFromQueueApi,
@@ -248,7 +251,9 @@ const sideChatDeps: CreateSideChatDeps = {
 }
 const queueDrainDeps: QueueDrainDeps = {
   hasActiveOrPendingRun: sessionId =>
-    runRegistry.hasActiveRunForSession(sessionId) || runRegistry.hasPendingRun(sessionId),
+    runRegistry.hasActiveRunForSession(sessionId)
+    || runRegistry.hasPendingRun(sessionId)
+    || runRegistry.hasSessionMaintenance(sessionId),
   readSessionRuntimeSettings: (sessionId) => {
     const session = assertStoredSession(sessionId)
     const runtimeKind = session.runtimeKind ?? 'standard'
@@ -273,7 +278,9 @@ const queueDrainDeps: QueueDrainDeps = {
 }
 const runtimeGoalContinuationDeps: RuntimeGoalContinuationSchedulerDeps = {
   hasActiveOrPendingRun: sessionId =>
-    runRegistry.hasActiveRunForSession(sessionId) || runRegistry.hasPendingRun(sessionId),
+    runRegistry.hasActiveRunForSession(sessionId)
+    || runRegistry.hasPendingRun(sessionId)
+    || runRegistry.hasSessionMaintenance(sessionId),
   pendingQueueItemCount: sessionId => listPendingQueueRows(sessionId).length,
   scheduleQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   readRuntimeBinding: readDurableProviderRuntimeBinding,
@@ -342,10 +349,25 @@ export async function executeBangCommand(input: ExecuteBangCommandInput) {
 
 // ── public runtime API ──
 
-export async function rollbackLastTurn(sessionId: string): Promise<RollbackLastTurnDto> {
+export async function rollbackLastTurn(
+  sessionId: string,
+  options: RollbackLastTurnOptions = {},
+): Promise<RollbackLastTurnDto> {
   return rollbackLastTurnFromLifecycle(sessionId, {
     finalizeInterruptedPersistedStreamingSessionIfIdle,
-  })
+    scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
+  }, options)
+}
+
+export async function rollbackTurns(
+  sessionId: string,
+  numTurns: number,
+  options: RollbackLastTurnOptions = {},
+): Promise<RollbackLastTurnDto> {
+  return rollbackTurnsFromLifecycle(sessionId, numTurns, {
+    finalizeInterruptedPersistedStreamingSessionIfIdle,
+    scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
+  }, options)
 }
 
 export async function createRun(input: CreateRunInput) {

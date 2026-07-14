@@ -94,6 +94,15 @@ export async function createRun(
       details: { sessionId: input.sessionId },
     })
   }
+  const maintenanceKind = runRegistry.getSessionMaintenance(input.sessionId)
+  if (maintenanceKind) {
+    throw new AppError({
+      code: 'chat_session_maintenance_in_progress',
+      status: 409,
+      message: 'Chat session is completing an exclusive maintenance operation',
+      details: { sessionId: input.sessionId, maintenanceKind },
+    })
+  }
   if (input.internalContinuation !== 'runtimeGoal') {
     cancelPendingRuntimeGoalContinuation(input.sessionId)
   }

@@ -873,12 +873,12 @@ export class CodexProvider implements ChatRuntime {
     try {
       const response = await context.client.request('thread/rollback', {
         threadId: providerSessionId,
-        numTurns: 1,
+        numTurns: input.numTurns,
       })
       return {
         runtimeKind: this.runtimeKind,
         providerSessionId,
-        rolledBackTurns: 1,
+        rolledBackTurns: input.numTurns,
         fileChangesReverted: false,
         providerResult: response,
       }
