@@ -7,6 +7,7 @@ import chronicle from './chronicle'
 import common from './common'
 import devtool from './devtool'
 import diffReview from './diff-review'
+import editor from './editor'
 import filesystem from './filesystem'
 import git from './git'
 import home from './home'
@@ -33,6 +34,7 @@ const resources = {
   common,
   devtool,
   'diff-review': diffReview,
+  editor,
   filesystem,
   git,
   home,

@@ -5,8 +5,10 @@ import * as ModelRegistry from '../model-registry/service'
 import { resolveProviderTarget } from '../provider-targets/service'
 import { ProvidersModel } from './model'
 import {
+  getCachedModelRefreshFailure,
   getCachedModelsForTarget,
   isCacheStale,
+  setCachedModelRefreshFailure,
   setCachedModelsForTarget,
 } from './model-cache'
 import { projectProviderModelListCapabilities } from './model-capabilities'
@@ -20,22 +22,29 @@ export const providers = new Elysia({
     '/models',
     async ({ body }) => {
       const request = Providers.ProviderRequestSchema.parse(body)
-      // Collect raw inventory first so we can cache it before enriching
-      const inventory = await Providers.collectProviderModelInventory(request)
-      if (request.providerTargetId) {
-        setCachedModelsForTarget(
-          {
+      const target = request.providerTargetId
+        ? {
             ...(request.providerTargetKind ? { kind: request.providerTargetKind } : {}),
             id: request.providerTargetId,
-          },
-          inventory,
-        )
+          }
+        : request.profileId
+          ? { kind: 'manual' as const, id: request.profileId }
+          : null
+      try {
+        // Collect raw inventory first so we can cache it before enriching.
+        const inventory = await Providers.collectProviderModelInventory(request)
+        if (target) {
+          setCachedModelsForTarget(target, inventory)
+        }
+        const enriched = await enrichModelsFromRegistryMappings(inventory, ModelRegistry.listMappingEntries())
+        return projectProviderModelListCapabilities(enriched)
       }
-      else if (request.profileId) {
-        setCachedModelsForTarget({ kind: 'manual', id: request.profileId }, inventory)
+      catch (error) {
+        if (target) {
+          setCachedModelRefreshFailure(target)
+        }
+        throw error
       }
-      const enriched = await enrichModelsFromRegistryMappings(inventory, ModelRegistry.listMappingEntries())
-      return projectProviderModelListCapabilities(enriched)
     },
     {
       detail: {
@@ -52,15 +61,19 @@ export const providers = new Elysia({
     '/targets/:providerTargetId/models-cache',
     async ({ params }) => {
       const target = { id: params.providerTargetId }
-      const cached = await getCachedModelsForTarget(target)
+      const [cached, failure] = await Promise.all([
+        getCachedModelsForTarget(target),
+        getCachedModelRefreshFailure(target),
+      ])
       if (!cached) {
-        return { models: [], cached: false, stale: false, providerLabel: '' }
+        return { models: [], cached: false, stale: false, coolingDown: failure !== null, providerLabel: '' }
       }
       const resolved = resolveProviderTarget(target)
       return {
         models: cached.models,
         cached: true,
         stale: isCacheStale(cached.fetchedAt),
+        coolingDown: failure !== null,
         providerLabel: resolved.label,
       }
     },
@@ -76,6 +89,7 @@ export const providers = new Elysia({
           models: t.Array(ProvidersModel.modelDescriptor),
           cached: t.Boolean(),
           stale: t.Boolean(),
+          coolingDown: t.Boolean(),
           providerLabel: t.String(),
         }),
       },
@@ -84,11 +98,20 @@ export const providers = new Elysia({
   .get(
     '/:profileId/models-cache',
     async ({ params }) => {
-      const cached = await getCachedModelsForTarget({ kind: 'manual', id: params.profileId })
+      const target = { kind: 'manual' as const, id: params.profileId }
+      const [cached, failure] = await Promise.all([
+        getCachedModelsForTarget(target),
+        getCachedModelRefreshFailure(target),
+      ])
       if (!cached) {
-        return { models: [], cached: false, stale: false }
+        return { models: [], cached: false, stale: false, coolingDown: failure !== null }
       }
-      return { models: cached.models, cached: true, stale: isCacheStale(cached.fetchedAt) }
+      return {
+        models: cached.models,
+        cached: true,
+        stale: isCacheStale(cached.fetchedAt),
+        coolingDown: failure !== null,
+      }
     },
     {
       detail: {
@@ -102,6 +125,7 @@ export const providers = new Elysia({
           models: t.Array(ProvidersModel.modelDescriptor),
           cached: t.Boolean(),
           stale: t.Boolean(),
+          coolingDown: t.Boolean(),
         }),
       },
     },

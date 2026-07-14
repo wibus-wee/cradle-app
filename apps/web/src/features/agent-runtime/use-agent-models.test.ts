@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 import {
   AGENT_MODELS_QUERY_KEY,
   agentModelsQueryKey,
+  isRuntimeOwnedProviderTarget,
   providerTargetModelsQueryKey,
   shouldLiveRefreshModelInventory,
-  shouldRefreshProviderTargetModelsOnCacheMiss,
 } from './use-agent-models'
 
 describe('agentModelsQueryKey', () => {
@@ -44,22 +44,22 @@ describe('providerTargetModelsQueryKey', () => {
   })
 })
 
-describe('shouldRefreshProviderTargetModelsOnCacheMiss', () => {
-  it('refreshes runtime-owned provider targets on cache miss', () => {
-    expect(shouldRefreshProviderTargetModelsOnCacheMiss({
+describe('isRuntimeOwnedProviderTarget', () => {
+  it('identifies runtime-owned provider targets', () => {
+    expect(isRuntimeOwnedProviderTarget({
       id: 'runtime-native:opencode:opencode-go',
     })).toBe(true)
   })
 
-  it('refreshes provider targets from runtime-owned sources on cache miss', () => {
-    expect(shouldRefreshProviderTargetModelsOnCacheMiss({
+  it('identifies provider targets from runtime-owned sources', () => {
+    expect(isRuntimeOwnedProviderTarget({
       id: 'projected-provider',
       sourceKey: 'runtime-native:opencode',
     })).toBe(true)
   })
 
-  it('keeps ordinary provider targets cache-only until the user explicitly refreshes', () => {
-    expect(shouldRefreshProviderTargetModelsOnCacheMiss({
+  it('excludes ordinary provider targets', () => {
+    expect(isRuntimeOwnedProviderTarget({
       id: 'manual-provider',
       sourceKey: 'external-source:local-agent-config',
     })).toBe(false)
@@ -71,6 +71,7 @@ describe('shouldLiveRefreshModelInventory', () => {
     expect(shouldLiveRefreshModelInventory({
       cached: false,
       stale: false,
+      coolingDown: false,
       models: [],
     })).toBe(true)
   })
@@ -79,6 +80,7 @@ describe('shouldLiveRefreshModelInventory', () => {
     expect(shouldLiveRefreshModelInventory({
       cached: true,
       stale: false,
+      coolingDown: false,
       models: [],
     })).toBe(true)
   })
@@ -87,6 +89,7 @@ describe('shouldLiveRefreshModelInventory', () => {
     expect(shouldLiveRefreshModelInventory({
       cached: true,
       stale: true,
+      coolingDown: false,
       models: [{ id: 'model-1' }],
     })).toBe(true)
   })
@@ -95,7 +98,17 @@ describe('shouldLiveRefreshModelInventory', () => {
     expect(shouldLiveRefreshModelInventory({
       cached: true,
       stale: false,
+      coolingDown: false,
       models: [{ id: 'model-1' }],
+    })).toBe(false)
+  })
+
+  it('does not retry while the server is cooling down after a failed refresh', () => {
+    expect(shouldLiveRefreshModelInventory({
+      cached: false,
+      stale: false,
+      coolingDown: true,
+      models: [],
     })).toBe(false)
   })
 })
