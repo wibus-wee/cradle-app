@@ -223,7 +223,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     conversationBridgeSupervisor,
     { destroyWorkspaceFileIndexes },
     localRelaydSupervisor,
-    { startOpencodeServer, stopOpencodeServer },
+    { stopOpencodeServer },
     { initHostConnectorService, getHostConnectorService },
     { shutdownRemoteHostConnections },
   ] = await Promise.all([
@@ -309,12 +309,6 @@ const runtimeResources = new RuntimeResourceRegistry()
       chronicleService.startSlackBackgroundSync()
     }
     providerRuntimeHostManager.startReaper()
-    // The opencode server is a single shared, always-on host for every chat
-    // session; warm it up at boot so the first turn does not pay the spawn cost.
-    // Failures are non-fatal — the lazy acquire path retries on demand.
-    void startOpencodeServer().catch((error) => {
-      console.error('[opencode] shared server warm-start failed:', error)
-    })
     void conversationBridgeSupervisor.startEnabledConversationBridgeConnections().catch((error) => {
       console.error('[conversation-bridge] start enabled connections failed:', error)
     })

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { ProviderIcon } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
+import type { MenuPortalProps } from '~/components/ui/menu'
 import { Menu, MenuPopup, MenuTrigger } from '~/components/ui/menu'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS } from '~/features/browser/native-surface-occlusion'
@@ -28,6 +29,7 @@ interface ProviderModelPickerProps<TThinking extends string | null> {
   emptySelectionLabel?: string
   menuSide?: 'top' | 'bottom' | 'left' | 'right'
   menuAlign?: 'start' | 'center' | 'end'
+  menuPortalProps?: MenuPortalProps
   triggerTestId?: string
   disabled?: boolean
   showProviderLabel?: boolean
@@ -61,6 +63,7 @@ export function ProviderModelPicker<TThinking extends string | null>({
   emptySelectionLabel,
   menuSide = 'top',
   menuAlign = 'start',
+  menuPortalProps,
   triggerTestId = 'provider-model-selector',
   disabled = false,
   showProviderLabel = false,
@@ -150,6 +153,7 @@ export function ProviderModelPicker<TThinking extends string | null>({
       <MenuPopup
         side={menuSide}
         align={menuAlign}
+        portalProps={menuPortalProps}
         {...(occludeNativeBrowserSurface ? BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS : {})}
       >
         <ProviderModelMenu
@@ -163,6 +167,7 @@ export function ProviderModelPicker<TThinking extends string | null>({
           getThinkingOptionsForModel={getThinkingOptionsForModel}
           emptyProviderTargetsLabel={emptyProviderTargetsLabel}
           occludeNativeBrowserSurface={occludeNativeBrowserSurface}
+          menuPortalProps={menuPortalProps}
           leadingSelection={leadingSelection}
           leadingContent={leadingContent}
           onRequestProviderTargetModels={onRequestProviderTargetModels}

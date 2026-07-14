@@ -191,6 +191,30 @@ export type PutPreferencesChatResponses = {
 
 export type PutPreferencesChatResponse = PutPreferencesChatResponses[keyof PutPreferencesChatResponses];
 
+export type GetPreferencesKeybindingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/preferences/keybindings';
+};
+
+export type GetPreferencesKeybindingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        configPath: string;
+        rules: Array<{
+            command: string;
+            key: string;
+            when?: string;
+        }>;
+        errors: Array<string>;
+    };
+};
+
+export type GetPreferencesKeybindingsResponse = GetPreferencesKeybindingsResponses[keyof GetPreferencesKeybindingsResponses];
+
 export type GetPreferencesCodexData = {
     body?: never;
     path?: never;
@@ -3760,6 +3784,26 @@ export type PostSecretsResponses = {
 
 export type PostSecretsResponse = PostSecretsResponses[keyof PostSecretsResponses];
 
+export type PostSecretsByIdRevealData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/secrets/{id}/reveal';
+};
+
+export type PostSecretsByIdRevealResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        secret: string;
+    };
+};
+
+export type PostSecretsByIdRevealResponse = PostSecretsByIdRevealResponses[keyof PostSecretsByIdRevealResponses];
+
 export type DeleteSecretsByIdData = {
     body?: never;
     path: {
@@ -4022,6 +4066,7 @@ export type GetProvidersTargetsByProviderTargetIdModelsCacheResponses = {
         }>;
         cached: boolean;
         stale: boolean;
+        coolingDown: boolean;
         providerLabel: string;
     };
 };
@@ -4072,6 +4117,7 @@ export type GetProvidersByProfileIdModelsCacheResponses = {
         }>;
         cached: boolean;
         stale: boolean;
+        coolingDown: boolean;
     };
 };
 

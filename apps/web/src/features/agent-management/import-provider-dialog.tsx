@@ -49,6 +49,15 @@ const KIND_OPTIONS: { value: ApiProviderKind, label: string }[] = [
   { value: 'universal', label: 'Universal' },
 ]
 
+const FLAT_IMPORT_FIELD_CLASS = [
+  'h-7 rounded-sm border-0 border-b border-transparent bg-transparent px-1 shadow-none',
+  'text-[11px] font-mono placeholder:text-muted-foreground/45',
+  'transition-[background-color,border-color] duration-150 hover:bg-muted/50',
+  'focus-visible:border-ring focus-visible:bg-muted/50 focus-visible:ring-0 focus-visible:ring-offset-0',
+].join(' ')
+
+const IMPORT_FIELD_LABEL_CLASS = 'text-[9px] font-medium uppercase tracking-wide text-muted-foreground/55'
+
 function hostnameFromUrl(url: string): string {
   try { return new URL(url).hostname }
  catch { return url }
@@ -67,6 +76,15 @@ function baseUrlIncludesV1(baseUrl: string): boolean {
 function shouldShowV1Reminder(baseUrl: string): boolean {
   const trimmed = baseUrl.trim()
   return trimmed.length > 0 && !baseUrlIncludesV1(trimmed)
+}
+
+function universalEndpointDefaults(baseUrl: string): { openaiBaseUrl: string, anthropicBaseUrl: string } {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '')
+  const anthropicBaseUrl = trimmed.replace(/\/v1$/i, '')
+  return {
+    openaiBaseUrl: /\/v1$/i.test(trimmed) ? trimmed : `${trimmed}/v1`,
+    anthropicBaseUrl,
+  }
 }
 
 function fingerprintProvider(provider: ParsedProvider): string {
@@ -101,6 +119,10 @@ export function ImportProviderDialog({
   const [importing, setImporting] = useState(false)
   const [enabledSet, setEnabledSet] = useState<Set<number>>(() => new Set())
   const [kinds, setKinds] = useState<ApiProviderKind[]>([])
+  const [apiKeys, setApiKeys] = useState<string[]>([])
+  const [baseUrls, setBaseUrls] = useState<string[]>([])
+  const [openaiBaseUrls, setOpenaiBaseUrls] = useState<string[]>([])
+  const [anthropicBaseUrls, setAnthropicBaseUrls] = useState<string[]>([])
   const [manualUrl, setManualUrl] = useState('')
   const [manualKind, setManualKind] = useState<ApiProviderKind>('openai-compatible')
   const prevParsedConfigKeyRef = useRef<string | null>(null)
@@ -142,6 +164,10 @@ export function ImportProviderDialog({
     if (!nextParseResult) {
       setResolvedNames(prev => (prev.length === 0 ? prev : []))
       setKinds(prev => (prev.length === 0 ? prev : []))
+      setApiKeys(prev => (prev.length === 0 ? prev : []))
+      setBaseUrls(prev => (prev.length === 0 ? prev : []))
+      setOpenaiBaseUrls(prev => (prev.length === 0 ? prev : []))
+      setAnthropicBaseUrls(prev => (prev.length === 0 ? prev : []))
       setEnabledSet(prev => (prev.size === 0 ? prev : new Set()))
       setManualUrl('')
       return
@@ -150,6 +176,10 @@ export function ImportProviderDialog({
     const nextNames = computeResolvedNames(nextParseResult.providers)
     setResolvedNames(prev => (stringArraysEqual(prev, nextNames) ? prev : nextNames))
     setKinds(nextParseResult.providers.map(p => p.providerKind))
+    setApiKeys(nextParseResult.providers.map(p => p.apiKey))
+    setBaseUrls(nextParseResult.providers.map(p => p.baseUrl))
+    setOpenaiBaseUrls(nextParseResult.providers.map(p => universalEndpointDefaults(p.baseUrl).openaiBaseUrl))
+    setAnthropicBaseUrls(nextParseResult.providers.map(p => universalEndpointDefaults(p.baseUrl).anthropicBaseUrl))
     setManualUrl('')
     setEnabledSet(new Set(nextParseResult.providers.map((_, i) => i)))
   }
@@ -160,6 +190,10 @@ export function ImportProviderDialog({
     setManualUrl('')
     setResolvedNames([])
     setKinds([])
+    setApiKeys([])
+    setBaseUrls([])
+    setOpenaiBaseUrls([])
+    setAnthropicBaseUrls([])
     setEnabledSet(new Set())
   }
 
@@ -183,7 +217,7 @@ export function ImportProviderDialog({
       finalKinds.push(manualKind)
     }
 
-    if (!token || providers.length === 0) { return }
+    if (providers.length === 0) { return }
     const selectedProviders: { provider: ParsedProvider, index: number }[] = []
     for (let index = 0; index < providers.length; index++) {
       if (enabledSet.has(index) || providers.length === 1) {
@@ -199,12 +233,19 @@ export function ImportProviderDialog({
 
       for (const { provider: p, index } of selectedProviders) {
         const kind = finalKinds[index] ?? p.providerKind
-        const secretKey = `${kind}\0${p.apiKey}`
+        const apiKey = apiKeys[index]?.trim() ?? p.apiKey
+        const baseUrl = baseUrls[index]?.trim() ?? p.baseUrl
+        const openaiBaseUrl = openaiBaseUrls[index]?.trim() ?? universalEndpointDefaults(baseUrl).openaiBaseUrl
+        const anthropicBaseUrl = anthropicBaseUrls[index]?.trim() ?? universalEndpointDefaults(baseUrl).anthropicBaseUrl
+        if (!apiKey || (kind === 'universal' ? !openaiBaseUrl || !anthropicBaseUrl : !baseUrl)) {
+          continue
+        }
+        const secretKey = `${kind}\0${apiKey}`
         let credentialRef = credentialRefs.get(secretKey)
 
         if (!credentialRef) {
           const { data: meta } = await postSecrets({
-            body: { kind, label: resolvedNames[index] ?? p.name, secret: p.apiKey },
+            body: { kind, label: resolvedNames[index] ?? p.name, secret: apiKey },
           })
           credentialRef = SecretCreateResponseSchema.parse(meta).id
           credentialRefs.set(secretKey, credentialRef)
@@ -212,7 +253,9 @@ export function ImportProviderDialog({
 
         const name = resolvedNames[index] ?? p.name
         const profileId = buildProfileId(name, `imported-${importBatchId}-${index}`)
-        const config = { baseUrl: p.baseUrl }
+        const config = kind === 'universal'
+          ? { openaiBaseUrl, anthropicBaseUrl }
+          : { baseUrl }
         await createProfile.mutateAsync({
           path: { id: profileId },
           body: {
@@ -225,7 +268,7 @@ export function ImportProviderDialog({
         })
 
         // Auto-populate custom models from endpoint template
-        const template = matchProviderEndpoint(p.baseUrl)
+        const template = matchProviderEndpoint(kind === 'universal' ? openaiBaseUrl : baseUrl)
         if (template && template.models.length > 0) {
           void patchProfilesByIdCustomModels({
             path: { id: profileId },
@@ -261,9 +304,15 @@ export function ImportProviderDialog({
   }
 
   const providerCount = hasProviders
-    ? parseResult!.providers.filter((_, i) => enabledSet.has(i)).length
+    ? parseResult!.providers.filter((_, i) => {
+      const kind = kinds[i] ?? 'openai-compatible'
+      const hasEndpoint = kind === 'universal'
+        ? !!openaiBaseUrls[i]?.trim() && !!anthropicBaseUrls[i]?.trim()
+        : !!baseUrls[i]?.trim()
+      return enabledSet.has(i) && !!apiKeys[i]?.trim() && hasEndpoint
+    }).length
     : (token && manualUrl.trim() ? 1 : 0)
-  const canImport = !!token && providerCount > 0
+  const canImport = providerCount > 0
   const showManualV1Reminder = showManualEntry && shouldShowV1Reminder(manualUrl)
 
   return (
@@ -322,9 +371,12 @@ export function ImportProviderDialog({
                     {parseResult.providers.map((p, i) => (
                       <ProviderCard
                         key={fingerprintProvider(p)}
-                        provider={p}
                         resolvedName={resolvedNames[i] ?? p.name}
                         kind={kinds[i] ?? p.providerKind}
+                        apiKey={apiKeys[i] ?? p.apiKey}
+                        baseUrl={baseUrls[i] ?? p.baseUrl}
+                        openaiBaseUrl={openaiBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).openaiBaseUrl}
+                        anthropicBaseUrl={anthropicBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).anthropicBaseUrl}
                         enabled={enabledSet.has(i)}
                         onToggle={() => {
                           setEnabledSet((prev) => {
@@ -340,6 +392,11 @@ export function ImportProviderDialog({
                             next[i] = k
                             return next
                           })
+                          if (k === 'universal') {
+                            const defaults = universalEndpointDefaults(baseUrls[i] ?? p.baseUrl)
+                            setOpenaiBaseUrls(prev => prev.map((value, index) => index === i ? (value || defaults.openaiBaseUrl) : value))
+                            setAnthropicBaseUrls(prev => prev.map((value, index) => index === i ? (value || defaults.anthropicBaseUrl) : value))
+                          }
                         }}
                         onNameChange={(name) => {
                           setResolvedNames((prev) => {
@@ -348,6 +405,10 @@ export function ImportProviderDialog({
                             return next
                           })
                         }}
+                        onApiKeyChange={value => setApiKeys(prev => prev.map((entry, index) => index === i ? value : entry))}
+                        onBaseUrlChange={value => setBaseUrls(prev => prev.map((entry, index) => index === i ? value : entry))}
+                        onOpenaiBaseUrlChange={value => setOpenaiBaseUrls(prev => prev.map((entry, index) => index === i ? value : entry))}
+                        onAnthropicBaseUrlChange={value => setAnthropicBaseUrls(prev => prev.map((entry, index) => index === i ? value : entry))}
                       />
                     ))}
                   </div>
@@ -415,24 +476,38 @@ export function ImportProviderDialog({
 }
 
 function ProviderCard({
-  provider,
   resolvedName,
   kind,
+  apiKey,
+  baseUrl,
+  openaiBaseUrl,
+  anthropicBaseUrl,
   enabled,
   onToggle,
   onKindChange,
   onNameChange,
+  onApiKeyChange,
+  onBaseUrlChange,
+  onOpenaiBaseUrlChange,
+  onAnthropicBaseUrlChange,
 }: {
-  provider: ParsedProvider
   resolvedName: string
   kind: ApiProviderKind
+  apiKey: string
+  baseUrl: string
+  openaiBaseUrl: string
+  anthropicBaseUrl: string
   enabled: boolean
   onToggle: () => void
   onKindChange: (k: ApiProviderKind) => void
   onNameChange: (name: string) => void
+  onApiKeyChange: (value: string) => void
+  onBaseUrlChange: (value: string) => void
+  onOpenaiBaseUrlChange: (value: string) => void
+  onAnthropicBaseUrlChange: (value: string) => void
 }) {
   return (
-    <label
+    <div
       className={cn(
         'flex items-start gap-3 rounded-lg border p-3 transition-colors cursor-pointer',
         enabled
@@ -471,23 +546,32 @@ function ProviderCard({
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <GlobeIcon className="size-3 shrink-0" />
-            <span className="truncate font-mono text-[11px]">{provider.baseUrl}</span>
-          </div>
-          {provider.apiKey && (
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <KeyIcon className="size-3 shrink-0" />
-              <span className="truncate font-mono text-[11px]">
-                {provider.apiKey.length > 40
-                  ? `${provider.apiKey.slice(0, 20)}...${provider.apiKey.slice(-8)}`
-                  : provider.apiKey}
-              </span>
-            </div>
-          )}
-          {shouldShowV1Reminder(provider.baseUrl) && <BaseUrlV1Reminder />}
+          {kind === 'universal'
+            ? (
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex flex-col gap-0.5">
+                    <span className={IMPORT_FIELD_LABEL_CLASS}>OpenAI endpoint</span>
+                    <Input value={openaiBaseUrl} onChange={event => onOpenaiBaseUrlChange(event.target.value)} placeholder="Usually ends in /v1" className={FLAT_IMPORT_FIELD_CLASS} />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    <span className={IMPORT_FIELD_LABEL_CLASS}>Anthropic endpoint</span>
+                    <Input value={anthropicBaseUrl} onChange={event => onAnthropicBaseUrlChange(event.target.value)} placeholder="Usually has no /v1" className={FLAT_IMPORT_FIELD_CLASS} />
+                  </label>
+                </div>
+              )
+            : (
+                <label className="flex flex-col gap-0.5">
+                  <span className={IMPORT_FIELD_LABEL_CLASS}>Endpoint</span>
+                  <Input value={baseUrl} onChange={event => onBaseUrlChange(event.target.value)} placeholder="https://api.example.com/v1" className={FLAT_IMPORT_FIELD_CLASS} />
+                </label>
+              )}
+          <label className="flex flex-col gap-0.5">
+            <span className={IMPORT_FIELD_LABEL_CLASS}>API key</span>
+            <Input type="password" value={apiKey} onChange={event => onApiKeyChange(event.target.value)} placeholder="Enter API key" className={FLAT_IMPORT_FIELD_CLASS} />
+          </label>
+          {kind !== 'universal' && shouldShowV1Reminder(baseUrl) && <BaseUrlV1Reminder />}
           {(() => {
-            const template = matchProviderEndpoint(provider.baseUrl)
+            const template = matchProviderEndpoint(kind === 'universal' ? openaiBaseUrl : baseUrl)
             return template
               ? (
                   <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/8 px-2 py-1 text-[11px] leading-snug text-emerald-700 dark:text-emerald-300">
@@ -507,7 +591,7 @@ models will be auto-configured
           })()}
         </div>
       </div>
-    </label>
+    </div>
   )
 }
 

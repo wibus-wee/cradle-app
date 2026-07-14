@@ -4,6 +4,8 @@ import {
 } from '@mingcute/react'
 import { m } from 'motion/react'
 import { Select as RadixSelect } from 'radix-ui'
+import type { RefObject } from 'react'
+import { useRef } from 'react'
 import { FormProvider } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -54,19 +56,27 @@ export function CreateAgentDialog({
   onOpenChange: (open: boolean) => void
   onCreated: (agentId: string) => void
 }) {
+  const dialogContentRef = useRef<HTMLDivElement>(null)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-4 sm:max-w-md">
-        <CreateAgentDialogBody onCreated={onCreated} onClose={() => onOpenChange(false)} />
+      <DialogContent ref={dialogContentRef} className="flex max-h-[85vh] flex-col gap-4 sm:max-w-md">
+        <CreateAgentDialogBody
+          menuPortalContainer={dialogContentRef}
+          onCreated={onCreated}
+          onClose={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   )
 }
 
 function CreateAgentDialogBody({
+  menuPortalContainer,
   onCreated,
   onClose,
 }: {
+  menuPortalContainer: RefObject<HTMLDivElement | null>
   onCreated: (agentId: string) => void
   onClose: () => void
 }) {
@@ -75,6 +85,8 @@ function CreateAgentDialogBody({
   const draft = owner.draft
   const cliEnvParseResult = parseCliEnvText(draft.cliTuiEnvText)
   const invalidEnvLineSummary = cliEnvParseResult.invalidLineNumbers.join(', ')
+  const showCreateDisabledReason = owner.createDisabledReason !== 'detail.create.disabled.nameRequired'
+    || owner.form.formState.touchedFields.name
   const selectedRuntimeOption = owner.runtimeOptions.find(option => option.value === draft.runtimeKind)
     ?? { value: draft.runtimeKind, label: draft.runtimeKind }
 
@@ -299,6 +311,7 @@ function CreateAgentDialogBody({
                       providerTargetId={draft.providerTargetId}
                       modelId={draft.modelId}
                       thinkingEffort={draft.thinkingEffort}
+                      menuPortalProps={{ container: menuPortalContainer, className: 'contents' }}
                     />
                     {owner.providerDisabledReason && (
                       <p
@@ -332,7 +345,7 @@ function CreateAgentDialogBody({
 
       <DialogFooter>
         {owner.saveError && <p className="mr-auto text-[11px] text-destructive">{owner.saveError}</p>}
-        {!owner.saveError && owner.createDisabledReason && (
+        {!owner.saveError && owner.createDisabledReason && showCreateDisabledReason && (
           <p className="mr-auto text-[11px] text-muted-foreground" data-testid="agent-create-disabled-reason">
             {t(owner.createDisabledReason)}
           </p>
