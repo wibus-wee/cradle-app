@@ -24,6 +24,8 @@ const SURFACE_ID = 'surface-1'
 const LOCAL_DRAFT: ComposerDraft = {
   text: 'Local draft',
   contextParts: [],
+  files: [],
+  pastedTexts: [],
 }
 
 let latestSync: DraftSync | null = null
@@ -78,7 +80,7 @@ describe('useComposerDraftSync', () => {
     expect(latestSync?.replaceDraft).toEqual(LOCAL_DRAFT)
 
     act(() => {
-      latestSync?.handleDraftPartsChange('', [])
+      latestSync?.handleDraftPartsChange('', [], [], [])
     })
 
     expect(useComposerDraftStore.getState().getDraft(SURFACE_ID)).toEqual(LOCAL_DRAFT)
@@ -107,7 +109,12 @@ describe('useComposerDraftSync', () => {
     await waitFor(() => {
       expect(useComposerDraftStore.getState().getDraft(SURFACE_ID)).toBeNull()
     })
-    expect(latestSync?.replaceDraft).toEqual({ text: '', contextParts: [] })
+    expect(latestSync?.replaceDraft).toEqual({
+      text: '',
+      contextParts: [],
+      files: [],
+      pastedTexts: [],
+    })
     expect(commandMocks.queueServerComposerDraftWrite).not.toHaveBeenCalled()
   })
 
@@ -116,7 +123,7 @@ describe('useComposerDraftSync', () => {
     render(<Probe onSync={captureLatestSync} surfaceId={SURFACE_ID} />)
 
     act(() => {
-      latestSync?.handleDraftPartsChange('Hello', [])
+      latestSync?.handleDraftPartsChange('Hello', [], [], [])
     })
 
     expect(useComposerDraftStore.getState().getDraft(SURFACE_ID)).toBeNull()
@@ -126,12 +133,12 @@ describe('useComposerDraftSync', () => {
       vi.advanceTimersByTime(300)
     })
 
-    const draft = { text: 'Hello', contextParts: [] }
+    const draft = { text: 'Hello', contextParts: [], files: [], pastedTexts: [] }
     expect(useComposerDraftStore.getState().getDraft(SURFACE_ID)).toEqual(draft)
     expect(commandMocks.queueServerComposerDraftWrite).toHaveBeenCalledWith(SURFACE_ID, draft)
 
     act(() => {
-      latestSync?.handleDraftPartsChange('', [])
+      latestSync?.handleDraftPartsChange('', [], [], [])
     })
 
     expect(useComposerDraftStore.getState().getDraft(SURFACE_ID)).toBeNull()

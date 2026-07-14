@@ -4,6 +4,7 @@ import {
   PencilLine as PencilIcon,
 } from '@mingcute/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -24,6 +25,7 @@ import {
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { useChatStore } from '~/store/chat'
+import type { ComposerDraft } from '~/store/composer-draft'
 
 import type { ChatRuntimeGoalUiSlotState } from './capabilities/chat-capabilities'
 import { runtimeUiSlotStatesQueryKey } from './capabilities/chat-capabilities'
@@ -75,6 +77,7 @@ import { useChatScrollRuntime } from './ui/use-chat-scroll-runtime'
 export type { ChatViewProps } from './chat-view-types'
 
 const EMPTY_FILES: NonNullable<ChatViewProps['availableFiles']> = []
+const EMPTY_CHAT_MESSAGES: UIMessage[] = []
 
 export function ChatView({
   active = true,
@@ -175,6 +178,18 @@ export function ChatView({
     active: chatActive,
     supportsAttachments: composerRuntime.supportsAttachments,
   })
+  const historyMessages = useChatStore(state =>
+    sessionId ? state.messagesMap.get(sessionId) ?? EMPTY_CHAT_MESSAGES : EMPTY_CHAT_MESSAGES)
+  const promptHistory = useMemo<ComposerDraft[]>(() => {
+    const drafts: ComposerDraft[] = []
+    for (let index = historyMessages.length - 1; index >= 0 && drafts.length < 100; index--) {
+      const draft = readUserMessageDraft(historyMessages[index])
+      if (draft) {
+        drafts.push(draft)
+      }
+    }
+    return drafts
+  }, [historyMessages])
   const editPreviousMessageId = useChatStore((state) => {
     if (!sessionId || !rollback.supported) {
       return null
@@ -865,6 +880,7 @@ export function ChatView({
               rollbackDraftSignal={rollbackDraftSignal}
               clearDraftSignal={clearComposerDraftSignal}
               suspendDraftPersistence={Boolean(pendingRollbackMessageId)}
+              promptHistory={promptHistory}
               contextIngress={composerContextIngress}
             />
           </>

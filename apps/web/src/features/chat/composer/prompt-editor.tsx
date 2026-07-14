@@ -12,10 +12,18 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 
 import { cn } from '~/lib/cn'
 
-import type { ChatContextPart, ChatPluginContextPart, ChatSkillContextPart } from '../context/chat-context-parts'
+import type {
+  ChatContextPart,
+  ChatFileLineCommentContextPart,
+  ChatPluginContextPart,
+  ChatSkillContextPart,
+} from '../context/chat-context-parts'
 import type { MentionItem, PluginMentionItem } from '../mentions/mention-panel'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
-import { formatSkillMentionTokenLabel, SKILL_MENTION_TOKEN_CLASS } from '../mentions/skill-mention-token'
+import {
+  formatSkillMentionTokenLabel,
+  SKILL_MENTION_TOKEN_CLASS,
+} from '../mentions/skill-mention-token'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import { getActiveSlashCommand } from '../slash-commands/slash-command-input'
 
@@ -31,7 +39,12 @@ export interface PromptEditorTriggerRange {
 export type PromptEditorTrigger
   = | { kind: 'file', query: string, range: PromptEditorTriggerRange }
     | { kind: 'skill', query: string, range: PromptEditorTriggerRange }
-    | { kind: 'slash', query: string, range: PromptEditorTriggerRange, selectedCommand: ChatComposerSlashCommand | null }
+    | {
+      kind: 'slash'
+      query: string
+      range: PromptEditorTriggerRange
+      selectedCommand: ChatComposerSlashCommand | null
+    }
     | null
 
 export interface PromptEditorSnapshot {
@@ -42,6 +55,7 @@ export interface PromptEditorSnapshot {
 
 export interface PromptEditorController {
   appendText: (text: string) => void
+  canNavigateHistory: (direction: 'newer' | 'older') => boolean
   clear: () => void
   focus: () => void
   getContextParts: () => ChatContextPart[]
@@ -99,7 +113,8 @@ const fileMentionSpec: NodeSpec = {
     return [
       'span',
       {
-        'class': 'inline-flex max-w-full items-center rounded-md bg-muted px-1.5 py-0.5 align-baseline text-[0.8125em] leading-none text-foreground ring-1 ring-border/50',
+        'class':
+          'inline-flex max-w-full items-center rounded-md bg-muted px-1.5 py-0.5 align-baseline text-[0.8125em] leading-none text-foreground ring-1 ring-border/50',
         'data-file-mention-label': node.attrs.label,
         'data-file-mention-path': node.attrs.path,
         'data-file-mention-type': node.attrs.type,
@@ -108,19 +123,21 @@ const fileMentionSpec: NodeSpec = {
       node.attrs.label,
     ]
   },
-  parseDOM: [{
-    tag: 'span[data-file-mention-path]',
-    getAttrs(element) {
-      if (!(element instanceof HTMLElement)) {
-        return false
-      }
-      return {
-        label: element.getAttribute('data-file-mention-label') ?? element.textContent ?? '',
-        path: element.getAttribute('data-file-mention-path') ?? '',
-        type: element.getAttribute('data-file-mention-type') ?? 'file',
-      }
+  parseDOM: [
+    {
+      tag: 'span[data-file-mention-path]',
+      getAttrs(element) {
+        if (!(element instanceof HTMLElement)) {
+          return false
+        }
+        return {
+          label: element.getAttribute('data-file-mention-label') ?? element.textContent ?? '',
+          path: element.getAttribute('data-file-mention-path') ?? '',
+          type: element.getAttribute('data-file-mention-type') ?? 'file',
+        }
+      },
     },
-  }],
+  ],
 }
 
 const hardBreakSpec: NodeSpec = {
@@ -154,22 +171,24 @@ const skillMentionSpec: NodeSpec = {
       formatSkillMentionTokenLabel(String(text)),
     ]
   },
-  parseDOM: [{
-    tag: 'span[data-skill-mention-name][data-skill-mention-path]',
-    getAttrs(element) {
-      if (!(element instanceof HTMLElement)) {
-        return false
-      }
-      const name = element.getAttribute('data-skill-mention-name') ?? ''
-      return {
-        name,
-        displayName: element.getAttribute('data-skill-mention-display-name') ?? name,
-        path: element.getAttribute('data-skill-mention-path') ?? '',
-        description: element.getAttribute('data-skill-mention-description') || null,
-        scope: element.getAttribute('data-skill-mention-scope') ?? '',
-      }
+  parseDOM: [
+    {
+      tag: 'span[data-skill-mention-name][data-skill-mention-path]',
+      getAttrs(element) {
+        if (!(element instanceof HTMLElement)) {
+          return false
+        }
+        const name = element.getAttribute('data-skill-mention-name') ?? ''
+        return {
+          name,
+          displayName: element.getAttribute('data-skill-mention-display-name') ?? name,
+          path: element.getAttribute('data-skill-mention-path') ?? '',
+          description: element.getAttribute('data-skill-mention-description') || null,
+          scope: element.getAttribute('data-skill-mention-scope') ?? '',
+        }
+      },
     },
-  }],
+  ],
 }
 
 const pluginMentionSpec: NodeSpec = {
@@ -200,26 +219,81 @@ const pluginMentionSpec: NodeSpec = {
       `@${text}`,
     ]
   },
-  parseDOM: [{
-    tag: 'span[data-plugin-mention-name]',
-    getAttrs(element) {
-      if (!(element instanceof HTMLElement)) {
-        return false
-      }
-      const pluginName = element.getAttribute('data-plugin-mention-name') ?? ''
-      return {
-        provider: element.getAttribute('data-plugin-mention-provider') === 'codex' ? 'codex' : 'cradle',
-        pluginName,
-        displayName: element.getAttribute('data-plugin-mention-display-name') ?? pluginName,
-        description: element.getAttribute('data-plugin-mention-description') || null,
-        iconUrl: element.getAttribute('data-plugin-mention-icon-url') || null,
-        routeSegment: element.getAttribute('data-plugin-mention-route-segment') ?? '',
-        capabilities: readJsonAttribute(element, 'data-plugin-mention-capabilities', []),
-        mcpServers: readJsonAttribute(element, 'data-plugin-mention-mcp-servers', []),
-        nativeMention: readJsonAttribute(element, 'data-plugin-mention-native-mention', null),
-      }
+  parseDOM: [
+    {
+      tag: 'span[data-plugin-mention-name]',
+      getAttrs(element) {
+        if (!(element instanceof HTMLElement)) {
+          return false
+        }
+        const pluginName = element.getAttribute('data-plugin-mention-name') ?? ''
+        return {
+          provider:
+            element.getAttribute('data-plugin-mention-provider') === 'codex' ? 'codex' : 'cradle',
+          pluginName,
+          displayName: element.getAttribute('data-plugin-mention-display-name') ?? pluginName,
+          description: element.getAttribute('data-plugin-mention-description') || null,
+          iconUrl: element.getAttribute('data-plugin-mention-icon-url') || null,
+          routeSegment: element.getAttribute('data-plugin-mention-route-segment') ?? '',
+          capabilities: readJsonAttribute(element, 'data-plugin-mention-capabilities', []),
+          mcpServers: readJsonAttribute(element, 'data-plugin-mention-mcp-servers', []),
+          nativeMention: readJsonAttribute(element, 'data-plugin-mention-native-mention', null),
+        }
+      },
     },
-  }],
+  ],
+}
+
+const fileLineCommentSpec: NodeSpec = {
+  attrs: {
+    workspaceId: { default: '' },
+    path: { default: '' },
+    lineStart: { default: 1 },
+    lineEnd: { default: 1 },
+    comment: { default: '' },
+  },
+  atom: true,
+  inline: true,
+  group: 'inline',
+  draggable: false,
+  selectable: false,
+  toDOM(node) {
+    const lines
+      = node.attrs.lineStart === node.attrs.lineEnd
+        ? `L${node.attrs.lineStart}`
+        : `L${node.attrs.lineStart}-L${node.attrs.lineEnd}`
+    return [
+      'span',
+      {
+        'class':
+          'inline-flex max-w-full items-center rounded-md bg-[var(--color-accent-scope)]/10 px-1.5 py-0.5 align-baseline text-[0.8125em] font-medium leading-none text-[var(--color-accent-scope)] ring-1 ring-[var(--color-accent-scope)]/15',
+        'data-file-line-comment-workspace-id': node.attrs.workspaceId,
+        'data-file-line-comment-path': node.attrs.path,
+        'data-file-line-comment-start': String(node.attrs.lineStart),
+        'data-file-line-comment-end': String(node.attrs.lineEnd),
+        'data-file-line-comment-text': node.attrs.comment,
+        'contenteditable': 'false',
+      },
+      `${node.attrs.path}:${lines}`,
+    ]
+  },
+  parseDOM: [
+    {
+      tag: 'span[data-file-line-comment-path]',
+      getAttrs(element) {
+        if (!(element instanceof HTMLElement)) {
+          return false
+        }
+        return {
+          workspaceId: element.getAttribute('data-file-line-comment-workspace-id') ?? '',
+          path: element.getAttribute('data-file-line-comment-path') ?? '',
+          lineStart: Number(element.getAttribute('data-file-line-comment-start') ?? 1),
+          lineEnd: Number(element.getAttribute('data-file-line-comment-end') ?? 1),
+          comment: element.getAttribute('data-file-line-comment-text') ?? '',
+        }
+      },
+    },
+  ],
 }
 
 export const promptEditorSchema = new Schema({
@@ -236,245 +310,290 @@ export const promptEditorSchema = new Schema({
     fileMention: fileMentionSpec,
     skillMention: skillMentionSpec,
     pluginMention: pluginMentionSpec,
+    fileLineComment: fileLineCommentSpec,
   },
   marks: {},
 })
 
-export const PromptEditor = forwardRef((
-  {
-    ariaActiveDescendant,
-    ariaControls,
-    ariaDescribedBy,
-    ariaExpanded,
-    ariaLabel,
-    className,
-    disabled,
-    onChange,
-    onDrop,
-    onFocusChange,
-    onKeyDown,
-    onPaste,
-    placeholder,
-    selectedSlashCommand,
-    slashCommands,
-    testId,
-  }: PromptEditorProps,
-  ref: Ref<PromptEditorController>,
-) => {
-  const mountRef = useRef<HTMLDivElement>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  const lastDocRef = useRef(createPromptDoc(''))
-  const initialPlaceholderRef = useRef(placeholder)
-  const activePlaceholderRef = useRef(placeholder)
-  const propsRef = useRef({
-    disabled,
-    onChange,
-    onDrop,
-    onFocusChange,
-    onKeyDown,
-    onPaste,
-    placeholder,
-    selectedSlashCommand,
-    slashCommands,
-  })
-
-  propsRef.current = {
-    disabled,
-    onChange,
-    onDrop,
-    onFocusChange,
-    onKeyDown,
-    onPaste,
-    placeholder,
-    selectedSlashCommand,
-    slashCommands,
-  }
-
-  const controller = useMemo<PromptEditorController>(() => ({
-    appendText(text) {
-      const view = viewRef.current
-      if (!view || text.trim().length === 0) {
-        return
-      }
-      appendPlainText(view, text)
-    },
-    clear() {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      replaceEditorDoc(view, createPromptDoc(''))
-    },
-    focus() {
-      viewRef.current?.focus()
-    },
-    getContextParts() {
-      const view = viewRef.current
-      return view ? readContextParts(view.state.doc) : []
-    },
-    getText() {
-      const view = viewRef.current
-      return view ? serializePromptDoc(view.state.doc) : ''
-    },
-    insertFileMention(item, range) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      const path = item.type === 'directory' && !item.path.endsWith('/') ? `${item.path}/` : item.path
-      const label = path
-      const node = promptEditorSchema.nodes.fileMention.create({
-        label,
-        path,
-        type: item.type,
-      })
-      replaceRangeWithInlineNode(view, range, node)
-    },
-    insertPluginMention(item, range) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      const node = promptEditorSchema.nodes.pluginMention.create({
-        provider: item.provider ?? 'cradle',
-        pluginName: item.pluginName,
-        displayName: item.displayName,
-        description: item.description,
-        iconUrl: item.iconUrl,
-        routeSegment: item.routeSegment,
-        capabilities: item.capabilities,
-        mcpServers: item.mcpServers,
-        nativeMention: item.nativeMention ?? null,
-      })
-      replaceRangeWithInlineNode(view, range, node)
-    },
-    insertSkillMention(item, range) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      const node = promptEditorSchema.nodes.skillMention.create({
-        name: item.name,
-        displayName: item.name,
-        path: item.location,
-        description: item.description,
-        scope: item.scope,
-      })
-      replaceRangeWithInlineNode(view, range, node)
-    },
-    insertText(text) {
-      const view = viewRef.current
-      if (!view || text.length === 0) {
-        return
-      }
-      const { from, to } = view.state.selection
-      const tr = view.state.tr.insertText(text, from, to)
-      tr.setSelection(TextSelection.create(tr.doc, from + text.length))
-      view.dispatch(tr)
-      view.focus()
-    },
-    replaceFileTriggerWithText(item, range) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      const path = item.type === 'directory' && !item.path.endsWith('/') ? `${item.path}/` : item.path
-      replaceRangeWithPlainText(view, range, `@${path}`)
-    },
-    replaceRangeWithText(range, text) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      replaceRangeWithPlainText(view, range, text)
-    },
-    setPlaceholder(nextPlaceholder) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      const currentPlaceholder = PLACEHOLDER_PLUGIN_KEY.getState(view.state)?.placeholder
-      if (currentPlaceholder === nextPlaceholder) {
-        return
-      }
-      view.dispatch(view.state.tr.setMeta(PLACEHOLDER_PLUGIN_KEY, { placeholder: nextPlaceholder }))
-    },
-    setDraft(text, contextParts) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      setEditorDraft(view, text, contextParts)
-    },
-    setText(text) {
-      const view = viewRef.current
-      if (!view) {
-        return
-      }
-      setEditorText(view, text)
-    },
-  }), [])
-
-  useImperativeHandle(ref, () => controller, [controller])
-
-  useEffect(() => {
-    const mount = mountRef.current
-    if (!mount) {
-      return
-    }
-
-    let editorView: EditorView | null = null
-    let detachDomAdapter: (() => void) | null = null
-    const getView = () => editorView
-    editorView = new EditorView(mount, createEditorProps({
-      getView,
-      initialDoc: lastDocRef.current,
-      onStateUpdate: (nextState) => {
-        lastDocRef.current = nextState.doc
-      },
-      placeholder: propsRef.current.placeholder ?? initialPlaceholderRef.current,
-      propsRef,
-    }))
-    detachDomAdapter = attachPromptEditorDomAdapter(editorView, propsRef)
-    viewRef.current = editorView
-    propsRef.current.onChange(readSnapshot(editorView.state, propsRef.current.slashCommands, propsRef.current.selectedSlashCommand))
-
-    return () => {
-      if (editorView) {
-        lastDocRef.current = editorView.state.doc
-      }
-      detachDomAdapter?.()
-      editorView?.destroy()
-      editorView = null
-      detachDomAdapter = null
-      viewRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    if (activePlaceholderRef.current === placeholder) {
-      return
-    }
-    activePlaceholderRef.current = placeholder
-    controller.setPlaceholder(placeholder)
-  }, [controller, placeholder])
-
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) {
-      return
-    }
-    view.setProps({
-      editable: () => !disabled,
-      attributes: {
-        ...editorAttributes({ ariaActiveDescendant, ariaControls, ariaDescribedBy, ariaExpanded, ariaLabel, testId }),
-        class: editorClassName(className),
-      },
+export const PromptEditor = forwardRef(
+  (
+    {
+      ariaActiveDescendant,
+      ariaControls,
+      ariaDescribedBy,
+      ariaExpanded,
+      ariaLabel,
+      className,
+      disabled,
+      onChange,
+      onDrop,
+      onFocusChange,
+      onKeyDown,
+      onPaste,
+      placeholder,
+      selectedSlashCommand,
+      slashCommands,
+      testId,
+    }: PromptEditorProps,
+    ref: Ref<PromptEditorController>,
+  ) => {
+    const mountRef = useRef<HTMLDivElement>(null)
+    const viewRef = useRef<EditorView | null>(null)
+    const lastDocRef = useRef(createPromptDoc(''))
+    const initialPlaceholderRef = useRef(placeholder)
+    const activePlaceholderRef = useRef(placeholder)
+    const propsRef = useRef({
+      disabled,
+      onChange,
+      onDrop,
+      onFocusChange,
+      onKeyDown,
+      onPaste,
+      placeholder,
+      selectedSlashCommand,
+      slashCommands,
     })
-  }, [ariaActiveDescendant, ariaControls, ariaDescribedBy, ariaExpanded, ariaLabel, className, disabled, testId])
 
-  return <div ref={mountRef} />
-})
+    propsRef.current = {
+      disabled,
+      onChange,
+      onDrop,
+      onFocusChange,
+      onKeyDown,
+      onPaste,
+      placeholder,
+      selectedSlashCommand,
+      slashCommands,
+    }
+
+    const controller = useMemo<PromptEditorController>(
+      () => ({
+        appendText(text) {
+          const view = viewRef.current
+          if (!view || text.trim().length === 0) {
+            return
+          }
+          appendPlainText(view, text)
+        },
+        clear() {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          replaceEditorDoc(view, createPromptDoc(''))
+        },
+        focus() {
+          viewRef.current?.focus()
+        },
+        getContextParts() {
+          const view = viewRef.current
+          return view ? readContextParts(view.state.doc) : []
+        },
+        getText() {
+          const view = viewRef.current
+          return view ? serializePromptDoc(view.state.doc) : ''
+        },
+        insertFileMention(item, range) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          const path
+            = item.type === 'directory' && !item.path.endsWith('/') ? `${item.path}/` : item.path
+          const label = path
+          const node = promptEditorSchema.nodes.fileMention.create({
+            label,
+            path,
+            type: item.type,
+          })
+          replaceRangeWithInlineNode(view, range, node)
+        },
+        insertPluginMention(item, range) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          const node = promptEditorSchema.nodes.pluginMention.create({
+            provider: item.provider ?? 'cradle',
+            pluginName: item.pluginName,
+            displayName: item.displayName,
+            description: item.description,
+            iconUrl: item.iconUrl,
+            routeSegment: item.routeSegment,
+            capabilities: item.capabilities,
+            mcpServers: item.mcpServers,
+            nativeMention: item.nativeMention ?? null,
+          })
+          replaceRangeWithInlineNode(view, range, node)
+        },
+        insertSkillMention(item, range) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          const node = promptEditorSchema.nodes.skillMention.create({
+            name: item.name,
+            displayName: item.name,
+            path: item.location,
+            description: item.description,
+            scope: item.scope,
+          })
+          replaceRangeWithInlineNode(view, range, node)
+        },
+        insertText(text) {
+          const view = viewRef.current
+          if (!view || text.length === 0) {
+            return
+          }
+          const { from, to } = view.state.selection
+          const tr = view.state.tr.insertText(text, from, to)
+          tr.setSelection(TextSelection.create(tr.doc, from + text.length))
+          view.dispatch(tr)
+          view.focus()
+        },
+        canNavigateHistory(direction) {
+          const view = viewRef.current
+          if (!view || !view.state.selection.empty) {
+            return false
+          }
+          const topLevelIndex = view.state.selection.$from.index(0)
+          return direction === 'older'
+            ? topLevelIndex === 0
+            : topLevelIndex === view.state.doc.childCount - 1
+        },
+        replaceFileTriggerWithText(item, range) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          const path
+            = item.type === 'directory' && !item.path.endsWith('/') ? `${item.path}/` : item.path
+          replaceRangeWithPlainText(view, range, `@${path}`)
+        },
+        replaceRangeWithText(range, text) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          replaceRangeWithPlainText(view, range, text)
+        },
+        setPlaceholder(nextPlaceholder) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          const currentPlaceholder = PLACEHOLDER_PLUGIN_KEY.getState(view.state)?.placeholder
+          if (currentPlaceholder === nextPlaceholder) {
+            return
+          }
+          view.dispatch(
+            view.state.tr.setMeta(PLACEHOLDER_PLUGIN_KEY, { placeholder: nextPlaceholder }),
+          )
+        },
+        setDraft(text, contextParts) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          setEditorDraft(view, text, contextParts)
+        },
+        setText(text) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          setEditorText(view, text)
+        },
+      }),
+      [],
+    )
+
+    useImperativeHandle(ref, () => controller, [controller])
+
+    useEffect(() => {
+      const mount = mountRef.current
+      if (!mount) {
+        return
+      }
+
+      let editorView: EditorView | null = null
+      let detachDomAdapter: (() => void) | null = null
+      const getView = () => editorView
+      editorView = new EditorView(
+        mount,
+        createEditorProps({
+          getView,
+          initialDoc: lastDocRef.current,
+          onStateUpdate: (nextState) => {
+            lastDocRef.current = nextState.doc
+          },
+          placeholder: propsRef.current.placeholder ?? initialPlaceholderRef.current,
+          propsRef,
+        }),
+      )
+      detachDomAdapter = attachPromptEditorDomAdapter(editorView, propsRef)
+      viewRef.current = editorView
+      propsRef.current.onChange(
+        readSnapshot(
+          editorView.state,
+          propsRef.current.slashCommands,
+          propsRef.current.selectedSlashCommand,
+        ),
+      )
+
+      return () => {
+        if (editorView) {
+          lastDocRef.current = editorView.state.doc
+        }
+        detachDomAdapter?.()
+        editorView?.destroy()
+        editorView = null
+        detachDomAdapter = null
+        viewRef.current = null
+      }
+    }, [])
+
+    useEffect(() => {
+      if (activePlaceholderRef.current === placeholder) {
+        return
+      }
+      activePlaceholderRef.current = placeholder
+      controller.setPlaceholder(placeholder)
+    }, [controller, placeholder])
+
+    useEffect(() => {
+      const view = viewRef.current
+      if (!view) {
+        return
+      }
+      view.setProps({
+        editable: () => !disabled,
+        attributes: {
+          ...editorAttributes({
+            ariaActiveDescendant,
+            ariaControls,
+            ariaDescribedBy,
+            ariaExpanded,
+            ariaLabel,
+            testId,
+          }),
+          class: editorClassName(className),
+        },
+      })
+    }, [
+      ariaActiveDescendant,
+      ariaControls,
+      ariaDescribedBy,
+      ariaExpanded,
+      ariaLabel,
+      className,
+      disabled,
+      testId,
+    ])
+
+    return <div ref={mountRef} />
+  },
+)
 
 function createEditorProps({
   getView,
@@ -532,7 +651,13 @@ function createEditorProps({
       view.updateState(nextState)
       onStateUpdate(nextState)
       if (transaction.docChanged || transaction.selectionSet) {
-        propsRef.current.onChange(readSnapshot(nextState, propsRef.current.slashCommands, propsRef.current.selectedSlashCommand))
+        propsRef.current.onChange(
+          readSnapshot(
+            nextState,
+            propsRef.current.slashCommands,
+            propsRef.current.selectedSlashCommand,
+          ),
+        )
       }
     },
     handleDOMEvents: {
@@ -609,8 +734,14 @@ function attachPromptEditorDomAdapter(
     const clipboardEvent = event as ClipboardEvent
     propsRef.current.onPaste?.(clipboardEvent)
 
-    const clipboardData = clipboardEvent.clipboardData as (DataTransfer & { getData?: unknown }) | null
-    if (clipboardEvent.defaultPrevented || !clipboardData || typeof clipboardData.getData !== 'function') {
+    const clipboardData = clipboardEvent.clipboardData as
+      | (DataTransfer & { getData?: unknown })
+      | null
+    if (
+      clipboardEvent.defaultPrevented
+      || !clipboardData
+      || typeof clipboardData.getData !== 'function'
+    ) {
       clipboardEvent.preventDefault()
       clipboardEvent.stopImmediatePropagation()
     }
@@ -733,6 +864,10 @@ function createContextPartMentionNode(part: ChatContextPart): ProseMirrorNode {
     })
   }
 
+  if (part.type === 'data-cradle-file-line-comment') {
+    return promptEditorSchema.nodes.fileLineComment.create(part)
+  }
+
   return promptEditorSchema.nodes.skillMention.create({
     name: part.name,
     displayName: part.name,
@@ -767,7 +902,12 @@ function appendPlainText(view: EditorView, text: string) {
   const endSelection = TextSelection.atEnd(view.state.doc)
   let tr = view.state.tr.setSelection(endSelection)
   const endPosition = tr.selection.from
-  const textBefore = tr.doc.textBetween(Math.max(0, endPosition - 1), endPosition, '\n', TOKEN_LEAF_TEXT)
+  const textBefore = tr.doc.textBetween(
+    Math.max(0, endPosition - 1),
+    endPosition,
+    '\n',
+    TOKEN_LEAF_TEXT,
+  )
   const prefix = textBefore.length > 0 && !/\s/.test(textBefore) ? ' ' : ''
   tr = tr.insertText(`${prefix}${insertion}`, endPosition)
   tr = tr.setSelection(TextSelection.create(tr.doc, endPosition + prefix.length + insertion.length))
@@ -775,7 +915,11 @@ function appendPlainText(view: EditorView, text: string) {
   view.focus()
 }
 
-function replaceRangeWithInlineNode(view: EditorView, range: PromptEditorTriggerRange, node: ProseMirrorNode) {
+function replaceRangeWithInlineNode(
+  view: EditorView,
+  range: PromptEditorTriggerRange,
+  node: ProseMirrorNode,
+) {
   let tr = view.state.tr.replaceRangeWith(range.from, range.to, node)
   const afterNode = tr.mapping.map(range.from) + node.nodeSize
   const $after = tr.doc.resolve(afterNode)
@@ -796,29 +940,38 @@ function replaceRangeWithInlineNode(view: EditorView, range: PromptEditorTrigger
 
 function createMentionNodeView(node: ProseMirrorNode): NodeView {
   const dom = document.createElement('span')
-  const attrs = node.type.name === 'skillMention'
-    ? skillMentionDomAttrs(node)
-    : node.type.name === 'pluginMention'
-      ? pluginMentionDomAttrs(node)
-      : fileMentionDomAttrs(node)
+  const attrs
+    = node.type.name === 'skillMention'
+      ? skillMentionDomAttrs(node)
+      : node.type.name === 'pluginMention'
+        ? pluginMentionDomAttrs(node)
+        : fileMentionDomAttrs(node)
   for (const [name, value] of Object.entries(attrs)) {
     dom.setAttribute(name, value)
   }
-  if (node.type.name === 'pluginMention' && typeof node.attrs.iconUrl === 'string' && node.attrs.iconUrl.length > 0) {
+  if (
+    node.type.name === 'pluginMention'
+    && typeof node.attrs.iconUrl === 'string'
+    && node.attrs.iconUrl.length > 0
+  ) {
     const image = document.createElement('img')
     image.src = node.attrs.iconUrl
     image.alt = ''
     image.setAttribute('aria-hidden', 'true')
-    image.className = 'size-3 shrink-0 rounded-sm object-cover ring-1 ring-black/10 dark:ring-white/10'
+    image.className
+      = 'size-3 shrink-0 rounded-sm object-cover ring-1 ring-black/10 dark:ring-white/10'
     dom.appendChild(image)
-    dom.appendChild(document.createTextNode(`@${String(node.attrs.displayName || node.attrs.pluginName)}`))
+    dom.appendChild(
+      document.createTextNode(`@${String(node.attrs.displayName || node.attrs.pluginName)}`),
+    )
   }
-  else {
-    dom.textContent = node.type.name === 'skillMention'
-      ? formatSkillMentionTokenLabel(String(node.attrs.displayName || node.attrs.name))
-      : node.type.name === 'pluginMention'
-        ? `@${String(node.attrs.displayName || node.attrs.pluginName)}`
-        : String(node.attrs.label)
+ else {
+    dom.textContent
+      = node.type.name === 'skillMention'
+        ? formatSkillMentionTokenLabel(String(node.attrs.displayName || node.attrs.name))
+        : node.type.name === 'pluginMention'
+          ? `@${String(node.attrs.displayName || node.attrs.pluginName)}`
+          : String(node.attrs.label)
   }
   dom.contentEditable = 'false'
 
@@ -831,7 +984,8 @@ function createMentionNodeView(node: ProseMirrorNode): NodeView {
 
 function fileMentionDomAttrs(node: ProseMirrorNode): Record<string, string> {
   return {
-    'class': 'inline-flex max-w-full items-center rounded-md bg-muted px-1.5 py-0.5 align-baseline text-[0.8125em] leading-none text-foreground ring-1 ring-border/50',
+    'class':
+      'inline-flex max-w-full items-center rounded-md bg-muted px-1.5 py-0.5 align-baseline text-[0.8125em] leading-none text-foreground ring-1 ring-border/50',
     'data-file-mention-label': String(node.attrs.label),
     'data-file-mention-path': String(node.attrs.path),
     'data-file-mention-type': String(node.attrs.type),
@@ -845,7 +999,8 @@ function skillMentionDomAttrs(node: ProseMirrorNode): Record<string, string> {
     'data-skill-mention-name': String(node.attrs.name),
     'data-skill-mention-display-name': text,
     'data-skill-mention-path': String(node.attrs.path),
-    'data-skill-mention-description': typeof node.attrs.description === 'string' ? node.attrs.description : '',
+    'data-skill-mention-description':
+      typeof node.attrs.description === 'string' ? node.attrs.description : '',
     'data-skill-mention-scope': String(node.attrs.scope),
   }
 }
@@ -853,12 +1008,15 @@ function skillMentionDomAttrs(node: ProseMirrorNode): Record<string, string> {
 function pluginMentionDomAttrs(node: ProseMirrorNode): Record<string, string> {
   const text = String(node.attrs.displayName || node.attrs.pluginName)
   return {
-    'class': 'inline-flex max-w-full items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 align-baseline text-[0.8125em] font-medium leading-none text-primary ring-1 ring-primary/15',
+    'class':
+      'inline-flex max-w-full items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 align-baseline text-[0.8125em] font-medium leading-none text-primary ring-1 ring-primary/15',
     'data-plugin-mention-provider': String(node.attrs.provider === 'codex' ? 'codex' : 'cradle'),
     'data-plugin-mention-name': String(node.attrs.pluginName),
     'data-plugin-mention-display-name': text,
-    'data-plugin-mention-description': typeof node.attrs.description === 'string' ? node.attrs.description : '',
-    'data-plugin-mention-icon-url': typeof node.attrs.iconUrl === 'string' ? node.attrs.iconUrl : '',
+    'data-plugin-mention-description':
+      typeof node.attrs.description === 'string' ? node.attrs.description : '',
+    'data-plugin-mention-icon-url':
+      typeof node.attrs.iconUrl === 'string' ? node.attrs.iconUrl : '',
     'data-plugin-mention-route-segment': String(node.attrs.routeSegment),
     'data-plugin-mention-capabilities': JSON.stringify(node.attrs.capabilities ?? []),
     'data-plugin-mention-mcp-servers': JSON.stringify(node.attrs.mcpServers ?? []),
@@ -874,7 +1032,7 @@ function readJsonAttribute<T>(element: HTMLElement, name: string, fallback: T): 
   try {
     return JSON.parse(raw) as T
   }
-  catch {
+ catch {
     return fallback
   }
 }
@@ -900,16 +1058,19 @@ export function serializePromptDoc(doc: ProseMirrorNode): string {
       if (node.isText) {
         text += node.text ?? ''
       }
-      else if (node.type.name === 'fileMention') {
+ else if (node.type.name === 'fileMention') {
         text += `@${node.attrs.path}`
       }
-      else if (node.type.name === 'skillMention') {
+ else if (node.type.name === 'skillMention') {
         text += ''
       }
-      else if (node.type.name === 'pluginMention') {
+ else if (node.type.name === 'pluginMention') {
         text += ''
       }
-      else if (node.type.name === 'hardBreak') {
+ else if (node.type.name === 'fileLineComment') {
+        text += ''
+      }
+ else if (node.type.name === 'hardBreak') {
         text += '\n'
       }
     })
@@ -951,7 +1112,22 @@ export function readContextParts(doc: ProseMirrorNode): ChatContextPart[] {
           routeSegment: String(node.attrs.routeSegment),
           capabilities: Array.isArray(node.attrs.capabilities) ? node.attrs.capabilities : [],
           mcpServers: Array.isArray(node.attrs.mcpServers) ? node.attrs.mcpServers : [],
-          nativeMention: isPluginNativeMention(node.attrs.nativeMention) ? node.attrs.nativeMention : null,
+          nativeMention: isPluginNativeMention(node.attrs.nativeMention)
+            ? node.attrs.nativeMention
+            : null,
+          position: textOffset,
+        }
+        parts.push(part)
+        return
+      }
+      if (node.type.name === 'fileLineComment') {
+        const part: ChatFileLineCommentContextPart = {
+          type: 'data-cradle-file-line-comment',
+          workspaceId: String(node.attrs.workspaceId),
+          path: String(node.attrs.path),
+          lineStart: Number(node.attrs.lineStart),
+          lineEnd: Number(node.attrs.lineEnd),
+          comment: String(node.attrs.comment),
           position: textOffset,
         }
         parts.push(part)
@@ -1050,7 +1226,11 @@ function readActiveTrigger(
   return null
 }
 
-function replaceRangeWithPlainText(view: EditorView, range: PromptEditorTriggerRange, text: string) {
+function replaceRangeWithPlainText(
+  view: EditorView,
+  range: PromptEditorTriggerRange,
+  text: string,
+) {
   const tr = view.state.tr.insertText(text, range.from, range.to)
   tr.setSelection(TextSelection.create(tr.doc, range.from + text.length))
   view.dispatch(tr)

@@ -22,7 +22,10 @@ import { readBangCommandMetadata, readBangResultMetadata } from '../commands/ban
 import { BangCommandBlock, BangCommandPromptBlock } from './blocks/bang-command-block'
 import { ReasoningBlock } from './blocks/reasoning-block'
 import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
-import type { ChatRenderItem, ChatRenderSegment } from './chat-render-plan'
+import type {
+  ChatRenderItem,
+  ChatRenderSegment,
+} from './chat-render-plan'
 import {
   groupMessageParts,
   splitExecutionPhase,
@@ -62,6 +65,7 @@ import {
   readUserDisplayText,
 } from './message-bubble-selectors'
 import {
+  MessageFileLineCommentContextPartById,
   MessageFilePartById,
   MessagePluginContextPartById,
   MessageReasoningPartById,
@@ -423,6 +427,14 @@ const MessageSegmentView = ({
     case 'plugin-context':
       return (
         <MessagePluginContextPartById
+          sessionId={sessionId}
+          messageId={segment.messageId}
+          partIndex={segment.partIndex}
+        />
+      )
+    case 'file-line-comment-context':
+      return (
+        <MessageFileLineCommentContextPartById
           sessionId={sessionId}
           messageId={segment.messageId}
           partIndex={segment.partIndex}

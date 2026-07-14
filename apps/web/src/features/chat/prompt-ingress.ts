@@ -10,7 +10,7 @@ export interface ChatPromptIngressPayload {
 
 export type ChatPromptIngressHandler = (payload: ChatPromptIngressPayload) => void
 export type ChatComposerFileIngressHandler = (files: FileUIPart[]) => void
-export type ChatComposerContextIngressHandler = (parts: ChatContextPart[]) => void
+export type ChatComposerContextIngressHandler = (contextParts: ChatContextPart[]) => void
 
 const handlers = new Map<string, ChatPromptIngressHandler>()
 const fileHandlers = new Map<string, ChatComposerFileIngressHandler>()
@@ -52,10 +52,7 @@ export function registerChatComposerFileIngressHandler(
   }
 }
 
-export function submitChatComposerFileIngress(
-  sessionId: string,
-  files: FileUIPart[],
-): boolean {
+export function submitChatComposerFileIngress(sessionId: string, files: FileUIPart[]): boolean {
   const handler = fileHandlers.get(sessionId)
   if (!handler) {
     return false
@@ -78,12 +75,12 @@ export function registerChatComposerContextIngressHandler(
 
 export function submitChatComposerContextIngress(
   sessionId: string,
-  parts: ChatContextPart[],
+  contextParts: ChatContextPart[],
 ): boolean {
   const handler = contextHandlers.get(sessionId)
   if (!handler) {
     return false
   }
-  handler(parts)
+  handler(contextParts)
   return true
 }

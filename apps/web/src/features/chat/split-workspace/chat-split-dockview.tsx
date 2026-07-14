@@ -155,16 +155,16 @@ export function ChatSplitDockview({
     }
     return registerChatSplitDockviewApi(surfaceId, {
       api: dockviewApi,
-      addSession: (sessionId, direction) => {
+      addSession: (sessionId, direction, referenceGroup) => {
         if (dockviewApi.getPanel(sessionId)) {
           dockviewApi.getPanel(sessionId)?.api.setActive()
           return false
         }
-        const referenceGroup = dockviewApi.activeGroup ?? dockviewApi.groups[0]
-        if (!referenceGroup) {
+        const group = referenceGroup ?? dockviewApi.activeGroup ?? dockviewApi.groups[0]
+        if (!group) {
           return false
         }
-        addSessionPanel(dockviewApi, sessionId, direction, referenceGroup)
+        addSessionPanel(dockviewApi, sessionId, direction, group)
         return true
       },
     })

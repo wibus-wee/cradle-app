@@ -70,11 +70,7 @@ export const runtimeCapabilitiesSchema = t.Object({
 
 export const runtimeCapabilityDegradationSchema = t.Object({
   capability: t.String({ minLength: 1 }),
-  status: t.Union([
-    t.Literal('unsupported'),
-    t.Literal('partial'),
-    t.Literal('experimental'),
-  ]),
+  status: t.Union([t.Literal('unsupported'), t.Literal('partial'), t.Literal('experimental')]),
   reason: t.String({ minLength: 1 }),
 })
 
@@ -84,27 +80,29 @@ export const runtimeIconDescriptorSchema = t.Union([
   t.Object({ url: t.String({ minLength: 1 }) }, { additionalProperties: false }),
 ])
 
-export const runtimeComposerDescriptorSchema = t.Object({
-  inputMode: t.Union([
-    t.Literal('rich'),
-    t.Literal('collapsed'),
-    t.Literal('none'),
-  ]),
-  allowEmptySubmit: t.Optional(t.Boolean()),
-  modelSelection: t.Union([
-    t.Literal('provider-model'),
-    t.Literal('runtime-owned'),
-    t.Literal('alias-matrix'),
-    t.Literal('none'),
-  ]),
-  thinking: t.Union([
-    t.Object({
-      efforts: t.Array(t.String({ minLength: 1 })),
-    }, { additionalProperties: false }),
-    t.Literal('per-model'),
-    t.Literal('unsupported'),
-  ]),
-}, { additionalProperties: false })
+export const runtimeComposerDescriptorSchema = t.Object(
+  {
+    inputMode: t.Union([t.Literal('rich'), t.Literal('collapsed'), t.Literal('none')]),
+    allowEmptySubmit: t.Optional(t.Boolean()),
+    modelSelection: t.Union([
+      t.Literal('provider-model'),
+      t.Literal('runtime-owned'),
+      t.Literal('alias-matrix'),
+      t.Literal('none'),
+    ]),
+    thinking: t.Union([
+      t.Object(
+        {
+          efforts: t.Array(t.String({ minLength: 1 })),
+        },
+        { additionalProperties: false },
+      ),
+      t.Literal('per-model'),
+      t.Literal('unsupported'),
+    ]),
+  },
+  { additionalProperties: false },
+)
 
 export const runtimeCatalogItemSchema = t.Object({
   runtimeKind: t.String(),

@@ -2,7 +2,12 @@ import type { UIMessage, UIMessageChunk } from 'ai'
 import { readUIMessageStream } from 'ai'
 
 import type { ProductAnalyticsTaskTimer } from '~/features/product-analytics/client'
-import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
+import {
+  classifyProductAnalyticsFailure,
+  trackProductTaskFinished,
+  trackProductTaskStarted,
+} from '~/features/product-analytics/client'
+import type { ProductAnalyticsFailureCategory } from '~/features/product-analytics/event-model'
 import type { MessageReconcileChange } from '~/store/chat'
 import { useChatStore } from '~/store/chat'
 
@@ -33,6 +38,7 @@ export class ChatStreamingHandler {
   private currentChunkReplay = false
   private replayBatchOpen = false
   private analyticsTask: ProductAnalyticsTaskTimer | null = null
+  private failureCategory: ProductAnalyticsFailureCategory | null = null
 
   constructor(
     sessionId: string,
@@ -121,6 +127,7 @@ export class ChatStreamingHandler {
       return
     }
     this.terminated = true
+    this.failureCategory = classifyProductAnalyticsFailure(error)
     const messageId = this.activeMessageId ?? this.messageId
     const store = this.store.getState()
     store.failGeneration(messageId, error)
@@ -303,6 +310,7 @@ export class ChatStreamingHandler {
         trackProductTaskFinished(
           analyticsTask,
           status === 'complete' ? 'success' : status === 'aborted' ? 'cancelled' : 'failed',
+          status === 'error' ? this.failureCategory ?? 'unknown' : null,
         )
       }
     }

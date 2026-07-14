@@ -2,7 +2,6 @@ import { handleExternalMarkdownLinkClick, isExternalMarkdownHref } from '@cradle
 import type { AnchorHTMLAttributes } from 'react'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import { useSessionBinding } from '../session/use-session-binding'
 
@@ -17,7 +16,6 @@ interface MarkdownFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> 
  */
 export function MarkdownFileLink({ href, sessionId, children, ...props }: MarkdownFileLinkProps) {
   const openWorkspaceFileTab = useBrowserPanelStore(state => state.openWorkspaceFileTab)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
   const sessionBinding = useSessionBinding(sessionId ?? null, Boolean(sessionId))
   const workspaceId = sessionBinding?.workspaceId ?? null
 
@@ -42,7 +40,6 @@ export function MarkdownFileLink({ href, sessionId, children, ...props }: Markdo
         path: filePath,
         view: getDefaultViewForPath(filePath),
       })
-      setBrowserPanelOpen(true)
       return
     }
 
