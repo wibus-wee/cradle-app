@@ -30,6 +30,7 @@ import type {
 import { ComposerSlotStates } from '../composer/composer-slot-states'
 import type { ChatComposerRuntime } from '../composer/use-chat-composer-runtime'
 import type { ComposerAppshotRuntime } from '../composer/use-composer-appshot-capture'
+import type { ChatContextPart } from '../context/chat-context-parts'
 import type { MentionItem, PluginMentionItem } from '../mentions/mention-panel'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import { buildExitPlanModePatch } from '../runtime/runtime-settings-presenter'
@@ -102,6 +103,7 @@ export function ChatComposerSection({
   rollbackDraftSignal,
   clearDraftSignal,
   suspendDraftPersistence,
+  contextIngress,
 }: {
   sessionId: string | null
   runtimeKind?: RuntimeKind | null
@@ -142,6 +144,10 @@ export function ChatComposerSection({
   rollbackDraftSignal?: RollbackDraftSignal | null
   clearDraftSignal?: number
   suspendDraftPersistence?: boolean
+  contextIngress?: {
+    parts: ChatContextPart[]
+    key: number
+  } | null
 }) {
   const activeBrowserPanelOwnerId = useLayoutStore(s => s.activeBrowserPanelOwnerId)
   const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
@@ -449,6 +455,7 @@ export function ChatComposerSection({
             replaceTextKey: composerReplaceTextKey,
             replaceDraft: composerReplaceDraft,
             replaceDraftKey: composerReplaceDraftKey,
+            contextIngress,
           }}
           view={{
             placeholder,

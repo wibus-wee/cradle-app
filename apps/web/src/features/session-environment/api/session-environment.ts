@@ -1,0 +1,31 @@
+import {
+  deleteSessionsByIdEnvironmentMarkersByMarkerIdMutation,
+  deleteSessionsByIdEnvironmentPinsByMessageIdMutation,
+  getSessionsByIdEnvironmentOptions,
+  getSessionsByIdEnvironmentQueryKey,
+  patchSessionsByIdEnvironmentMarkersByMarkerIdMutation,
+  patchSessionsByIdEnvironmentPinsByMessageIdMutation,
+  postSessionsByIdTurnCheckpointsByCheckpointIdRestoreMutation,
+  postSessionsByIdTurnCheckpointsByCheckpointIdRewindMutation,
+  postWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompareMutation,
+  putSessionsByIdEnvironmentNotesMutation,
+} from '~/api-gen/@tanstack/react-query.gen'
+import {
+  postSessionsByIdEnvironmentMarkers,
+  postSessionsByIdEnvironmentPinsByMessageId,
+} from '~/api-gen/sdk.gen'
+
+export const sessionEnvironmentApi = {
+  createMarker: postSessionsByIdEnvironmentMarkers,
+  createReviewMutation: postWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompareMutation,
+  deleteMarkerMutation: deleteSessionsByIdEnvironmentMarkersByMarkerIdMutation,
+  deletePinMutation: deleteSessionsByIdEnvironmentPinsByMessageIdMutation,
+  environmentQueryOptions: getSessionsByIdEnvironmentOptions,
+  environmentQueryKey: getSessionsByIdEnvironmentQueryKey,
+  patchMarkerMutation: patchSessionsByIdEnvironmentMarkersByMarkerIdMutation,
+  patchPinMutation: patchSessionsByIdEnvironmentPinsByMessageIdMutation,
+  pinMessage: postSessionsByIdEnvironmentPinsByMessageId,
+  rewindCheckpointMutation: postSessionsByIdTurnCheckpointsByCheckpointIdRewindMutation,
+  restoreCheckpointMutation: postSessionsByIdTurnCheckpointsByCheckpointIdRestoreMutation,
+  updateNotesMutation: putSessionsByIdEnvironmentNotesMutation,
+} as const

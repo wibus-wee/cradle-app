@@ -119,6 +119,10 @@ import {
 } from './stream/live-run-streams'
 import { normalizeRuntimeSessionTitle, reportRuntimeSessionTitle } from './title-service'
 import { readFullSessionTranscript } from './transcript'
+import {
+  captureTurnCheckpointEnd,
+  captureTurnCheckpointStart,
+} from './turn-checkpoint-hooks'
 
 export { reportRuntimeSessionTitle }
 export { resolvePlanImplementationApproval } from './interaction/plan-implementation-approval'
@@ -296,6 +300,12 @@ const runtimeGoalContinuationDeps: RuntimeGoalContinuationSchedulerDeps = {
   },
 }
 const turnExecutorDeps: TurnExecutorDeps = {
+  captureTurnCheckpointStart: async (input) => {
+    await captureTurnCheckpointStart(input)
+  },
+  captureTurnCheckpointEnd: async (input) => {
+    await captureTurnCheckpointEnd(input)
+  },
   stream: {
     flushPendingRunDelta,
     publishRunStartChunk,

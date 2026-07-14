@@ -1455,6 +1455,105 @@ export const zGetSessionsByIdIsolationPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetSessionsByIdEnvironmentPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPutSessionsByIdEnvironmentNotesBody = z.object({
+    notes: z.string().max(16000)
+});
+
+export const zPutSessionsByIdEnvironmentNotesPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zDeleteSessionsByIdEnvironmentPinsByMessageIdPath = z.object({
+    id: z.string().min(1),
+    messageId: z.string().min(1)
+});
+
+export const zPatchSessionsByIdEnvironmentPinsByMessageIdBody = z.object({
+    label: z.string().max(120).nullish(),
+    done: z.boolean().optional()
+});
+
+export const zPatchSessionsByIdEnvironmentPinsByMessageIdPath = z.object({
+    id: z.string().min(1),
+    messageId: z.string().min(1)
+});
+
+export const zPostSessionsByIdEnvironmentPinsByMessageIdPath = z.object({
+    id: z.string().min(1),
+    messageId: z.string().min(1)
+});
+
+export const zPostSessionsByIdEnvironmentMarkersBody = z.object({
+    messageId: z.string().min(1),
+    startOffset: z.number().gte(0),
+    endOffset: z.number().gte(1),
+    selectedText: z.string().min(1).max(2000),
+    style: z.enum(['highlight', 'underline']),
+    color: z.enum([
+        'yellow',
+        'blue',
+        'green',
+        'pink'
+    ])
+});
+
+export const zPostSessionsByIdEnvironmentMarkersPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zDeleteSessionsByIdEnvironmentMarkersByMarkerIdPath = z.object({
+    id: z.string().min(1),
+    markerId: z.string().min(1)
+});
+
+export const zPatchSessionsByIdEnvironmentMarkersByMarkerIdBody = z.object({
+    label: z.string().max(120).nullish(),
+    done: z.boolean().optional()
+});
+
+export const zPatchSessionsByIdEnvironmentMarkersByMarkerIdPath = z.object({
+    id: z.string().min(1),
+    markerId: z.string().min(1)
+});
+
+export const zPostThreadHandoffsBody = z.object({
+    requestId: z.string().min(1),
+    sourceSessionId: z.string().min(1),
+    destinationProviderTargetId: z.string().min(1),
+    modelId: z.string().min(1).nullish(),
+    thinkingEffort: z.enum([
+        'none',
+        'minimal',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max'
+    ]).nullish()
+});
+
+export const zGetThreadHandoffsDestinationBySessionIdPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetSessionsByIdTurnCheckpointsPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostSessionsByIdTurnCheckpointsByCheckpointIdRestorePath = z.object({
+    id: z.string().min(1),
+    checkpointId: z.string().min(1)
+});
+
+export const zPostSessionsByIdTurnCheckpointsByCheckpointIdRewindPath = z.object({
+    id: z.string().min(1),
+    checkpointId: z.string().min(1)
+});
+
 export const zGetWorksQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     linkedIssueId: z.string().min(1).optional(),

@@ -121,6 +121,11 @@ export interface ComposerExternalSignals {
   /** Appends text to the composer input when the key changes, used by parent DnD. */
   appendText?: string
   appendTextKey?: number
+  /** Injects context parts into the current draft when the key changes. */
+  contextIngress?: {
+    parts: ChatContextPart[]
+    key: number
+  } | null
 }
 
 export interface ComposerRuntimeSettingsController {
@@ -250,6 +255,7 @@ export function Composer({
   const parentReplaceDraftKey = externalSignals?.replaceDraftKey
   const appendText = externalSignals?.appendText
   const appendTextKey = externalSignals?.appendTextKey
+  const contextIngress = externalSignals?.contextIngress
 
   // Per-surface draft persistence — restores draft on remount (e.g. tab switch)
   const surfaceId = view?.surfaceId
@@ -687,6 +693,15 @@ export function Composer({
     promptEditorRef.current?.setDraft(replaceDraft.text, replaceDraft.contextParts)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replaceDraftKey])
+
+  useEffect(() => {
+    if (!contextIngress) {
+      return
+    }
+    const currentText = promptEditorRef.current?.getText() ?? stateRef.current.inputValue
+    promptEditorRef.current?.setDraft(currentText, contextIngress.parts)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextIngress?.key])
 
   useEffect(() => {
     onDraftChange?.(state.inputValue)
