@@ -143,7 +143,10 @@ export function ChatComposerSection({
   clearDraftSignal?: number
   suspendDraftPersistence?: boolean
   promptHistory?: ComposerDraft[]
-  contextIngress?: { parts: ChatContextPart[], key: number } | null
+  contextIngress?: {
+    parts: ChatContextPart[]
+    key: number
+  } | null
 }) {
   const activeBrowserPanelOwnerId = useBrowserPanelStore(s => s.activeOwnerId)
   const openPlanRefineTab = useBrowserPanelStore(s => s.openPlanRefineTab)
@@ -454,6 +457,7 @@ export function ChatComposerSection({
             replaceTextKey: composerReplaceTextKey,
             replaceDraft: composerReplaceDraft,
             replaceDraftKey: composerReplaceDraftKey,
+            contextIngress,
           }}
           view={{
             placeholder,
