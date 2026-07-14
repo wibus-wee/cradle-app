@@ -11,7 +11,9 @@ import type {
   BrowserAnnotationRuntimeEvent,
   BrowserAnnotationRuntimeInput,
   BrowserAnnotationRuntimeNotificationInput,
+  BrowserAttachWebviewInput,
   BrowserCaptureScreenshotResult,
+  BrowserDetachWebviewInput,
   BrowserExecuteCdpInput,
   BrowserLocalServer,
   BrowserNavigateInput,
@@ -32,6 +34,8 @@ export const BROWSER_IPC_CHANNELS = {
   hide: 'desktop:browser-hide',
   getState: 'desktop:browser-get-state',
   setBounds: 'desktop:browser-set-bounds',
+  attachWebview: 'desktop:browser-attach-webview',
+  detachWebview: 'desktop:browser-detach-webview',
   requestOpenPanel: 'desktop:browser-use-request-open-panel',
   copyScreenshotToClipboard: 'desktop:browser-copy-screenshot-to-clipboard',
   captureScreenshot: 'desktop:browser-capture-screenshot',
@@ -112,6 +116,15 @@ export function registerBrowserIpcHandlers(
   ipcMain.removeAllListeners(BROWSER_IPC_CHANNELS.setBounds)
   ipcMain.on(BROWSER_IPC_CHANNELS.setBounds, (_event, input: BrowserSetPanelBoundsInput) => {
     browserManager.setPanelBounds(input)
+  })
+
+  ipcMain.removeHandler(BROWSER_IPC_CHANNELS.attachWebview)
+  ipcMain.handle(BROWSER_IPC_CHANNELS.attachWebview, async (_event, input: BrowserAttachWebviewInput) =>
+    browserManager.attachWebview(input))
+
+  ipcMain.removeHandler(BROWSER_IPC_CHANNELS.detachWebview)
+  ipcMain.handle(BROWSER_IPC_CHANNELS.detachWebview, async (_event, input: BrowserDetachWebviewInput) => {
+    browserManager.detachWebview(input)
   })
 
   ipcMain.removeHandler(BROWSER_IPC_CHANNELS.captureScreenshot)

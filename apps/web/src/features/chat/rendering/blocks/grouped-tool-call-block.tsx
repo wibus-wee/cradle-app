@@ -11,7 +11,6 @@ import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useLayoutStore } from '~/store/layout'
 
 import { hasTerminalDetails } from '../terminal-tool-details'
 import { PLURAL_TITLES, STATUS_LABELS, TOOL_ICON_MAP } from '../tool-block-constants'
@@ -107,7 +106,6 @@ export function GroupedToolCallBlock({
   const groupTitle = PLURAL_TITLES[uiKind] ?? firstDescriptor.title
   const openWorkspaceDiffTab = useBrowserPanelStore(s => s.openWorkspaceDiffTab)
   const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
-  const setBrowserPanelOpen = useLayoutStore(s => s.setBrowserPanelOpen)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
     return new Set(
       items
@@ -138,7 +136,6 @@ export function GroupedToolCallBlock({
       title: 'All Changes',
       ownerId: workspaceDiffTarget.ownerId,
     })
-    setBrowserPanelOpen(true, workspaceDiffTarget.ownerId)
     requestScrollToFilePath({ path, tabId })
   }
 

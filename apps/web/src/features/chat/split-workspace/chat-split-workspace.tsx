@@ -1,21 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { ChatSessionRouteContent } from '~/features/chat/session/chat-session-route-content'
 import { chatSurfaceId } from '~/navigation/surface-identity'
 
 import { ChatSplitDockview } from './chat-split-dockview'
-import type { FlatSplitDirection } from './chat-split-drop-quadrant'
-import { directionFromDropPoint } from './chat-split-drop-quadrant'
-import { ChatSplitDropIndicator, ChatSplitFlatDropZone } from './chat-split-flat-drop-zone'
-import { subscribeChatSurfaceDrag } from './chat-split-surface-drop'
+import { ChatSplitDropIndicatorFromHover, ChatSplitFlatDropZone } from './chat-split-flat-drop-zone'
+import { useChatSplitHover } from './chat-split-hover'
+import { subscribeChatSurfaceDrag, updateChatSurfaceDragHover } from './chat-split-surface-drop'
 import { useChatSplitWorkspaceStore } from './chat-split-workspace-store'
 
 /**
  * VSCode-style split view host for a chat surface (top-level tab). Renders
  * the plain single-pane chat view until a session is dropped onto it from
- * the sidebar, at which point it mounts a `dockview` instance so multiple
- * sessions can be viewed side-by-side within the same tab.
+ * the sidebar or another chat tab, at which point it mounts a `dockview`
+ * instance so multiple sessions can be viewed side-by-side within the same tab.
  *
  * `sessionId` is always the *primary* pane — the one bound to this surface's
  * `/chat/$sessionId` route. It can gain sibling panes but is never itself
@@ -23,30 +22,18 @@ import { useChatSplitWorkspaceStore } from './chat-split-workspace-store'
  */
 export function ChatSplitWorkspace({ sessionId }: { sessionId: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [surfaceDropDirection, setSurfaceDropDirection] = useState<FlatSplitDirection | null>(null)
   const surfaceId = chatSurfaceId(sessionId)
   const ensureWorkspace = useChatSplitWorkspaceStore(state => state.ensureWorkspace)
+  const hover = useChatSplitHover(surfaceId)
 
   useEffect(() => {
     ensureWorkspace(surfaceId, sessionId)
   }, [ensureWorkspace, surfaceId, sessionId])
 
-  useEffect(() => subscribeChatSurfaceDrag((detail) => {
-    const container = containerRef.current
-    if (!container || detail.sessionId === null || detail.sessionId === sessionId || detail.clientX === null || detail.clientY === null) {
-      setSurfaceDropDirection(null)
-      return
-    }
-    const target = document.elementFromPoint(detail.clientX, detail.clientY)
-    if (!target || !container.contains(target)) {
-      setSurfaceDropDirection(null)
-      return
-    }
-    setSurfaceDropDirection(directionFromDropPoint(container.getBoundingClientRect(), {
-      clientX: detail.clientX,
-      clientY: detail.clientY,
-    }))
-  }), [sessionId])
+  // One global subscriber is enough: hit resolution is pointer-driven and
+  // does not need a per-workspace container ref. Keep the effect for lifecycle
+  // only when this workspace is mounted (inactive surfaces unmount with the route).
+  useEffect(() => subscribeChatSurfaceDrag(updateChatSurfaceDragHover), [])
 
   const paneSessionIds = useChatSplitWorkspaceStore(
     useShallow(state => state.workspaces[surfaceId]?.paneSessionIds ?? [sessionId]),
@@ -75,7 +62,7 @@ export function ChatSplitWorkspace({ sessionId }: { sessionId: string }) {
       className="relative h-full min-h-0 w-full min-w-0"
     >
       {content}
-      {surfaceDropDirection && <ChatSplitDropIndicator direction={surfaceDropDirection} />}
+      {hover && <ChatSplitDropIndicatorFromHover hover={hover} />}
     </div>
   )
 }

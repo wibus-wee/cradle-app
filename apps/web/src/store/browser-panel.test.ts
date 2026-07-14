@@ -78,6 +78,7 @@ describe('browser panel shortcuts', () => {
     useBrowserPanelStore.setState({
       activeOwnerId: DEFAULT_BROWSER_PANEL_OWNER_ID,
       owners: {},
+      open: false,
       tabs: [],
       activeTabId: null,
       requestedTab: null,
@@ -231,6 +232,7 @@ describe('browser panel shortcuts', () => {
     })
     const requestedTab = useBrowserPanelStore.getState().requestedTab
 
+    expect(useBrowserPanelStore.getState().open).toBe(true)
     expect(requestedTab).toMatchObject({
       sessionId: 'session-a',
       sessionTitle: 'Session A',
@@ -394,6 +396,88 @@ describe('browser panel shortcuts', () => {
     ).toHaveLength(1)
   })
 
+  it('updates the singleton workspace diff pane when it is reopened for new content', () => {
+    const firstTabId = useBrowserPanelStore.getState().openWorkspaceDiffTab({
+      workspaceId: 'workspace-1',
+      title: 'All Changes',
+    })
+    const reopenedTabId = useBrowserPanelStore.getState().openWorkspaceDiffTab({
+      workspaceId: 'workspace-2',
+      repositoryPath: 'packages/web',
+      paths: ['src/app.tsx'],
+      title: 'app.tsx',
+    })
+
+    expect(reopenedTabId).toBe(firstTabId)
+    expect(useBrowserPanelStore.getState().tabs).toEqual([
+      expect.objectContaining({
+        id: firstTabId,
+        kind: 'workspace-diff',
+        workspaceId: 'workspace-2',
+        repositoryPath: 'packages/web',
+        paths: ['src/app.tsx'],
+        title: 'app.tsx',
+      }),
+    ])
+  })
+
+  it('opens a pull request in a reusable Browser Panel tab keyed by owner/repo/number', () => {
+    const firstTabId = useBrowserPanelStore.getState().openPullRequestTab({
+      owner: 'cradle',
+      repo: 'app',
+      number: 42,
+      workId: 'work-1',
+      sessionId: 'session-1',
+      title: 'Add pull request view',
+      ownerId: 'pull-requests',
+    })
+    useBrowserPanelStore.getState().createTab('https://example.com', undefined, 'pull-requests')
+
+    const reopenedTabId = useBrowserPanelStore.getState().openPullRequestTab({
+      owner: 'cradle',
+      repo: 'app',
+      number: 42,
+      workId: 'work-1',
+      sessionId: 'session-1',
+      title: 'Add pull request view',
+      ownerId: 'pull-requests',
+    })
+    const ownerState = useBrowserPanelStore.getState().owners['pull-requests']
+
+    expect(reopenedTabId).toBe(firstTabId)
+    expect(ownerState?.activeTabId).toBe(firstTabId)
+    expect(ownerState?.tabs.filter(tab => tab.kind === 'pull-request')).toEqual([
+      expect.objectContaining({
+        owner: 'cradle',
+        repo: 'app',
+        number: 42,
+        workId: 'work-1',
+        sessionId: 'session-1',
+      }),
+    ])
+  })
+
+  it('opens a non-Cradle pull request tab without workId or sessionId', () => {
+    const tabId = useBrowserPanelStore.getState().openPullRequestTab({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 7,
+      title: 'Improve README',
+      ownerId: 'pull-requests',
+    })
+    const ownerState = useBrowserPanelStore.getState().owners['pull-requests']
+    const tab = ownerState?.tabs.find(candidate => candidate.id === tabId)
+
+    expect(tab).toEqual(expect.objectContaining({
+      kind: 'pull-request',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 7,
+      workId: undefined,
+      sessionId: undefined,
+    }))
+  })
+
   it('updates an existing annotation by id while preserving creation time', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)
@@ -467,7 +551,7 @@ describe('browser panel shortcuts', () => {
     expect(useBrowserPanelStore.getState().annotationInteractionModeByOwnerId['app-tab-b']).toBeUndefined()
   })
 
-  it('persists only lightweight annotation UI preferences', () => {
+  it('persists annotation UI preferences without annotation payloads', () => {
     useBrowserPanelStore.getState().saveAnnotation(annotationInput({
       body: 'Screenshot note',
       attachedImages: [{
@@ -489,6 +573,55 @@ describe('browser panel shortcuts', () => {
     expect(persisted).toEqual({
       recentHistoryByOwnerId: {},
       annotationTrayCollapsedByOwnerId: { 'app-tab-a': true },
+      dockStateByOwnerId: {},
+    })
+  })
+
+  it('persists restorable dock panes per owner without runtime browser or TUI handles', () => {
+    const fileTabId = useBrowserPanelStore.getState().openWorkspaceFileTab({
+      workspaceId: 'workspace-1',
+      path: 'src/index.ts',
+      view: 'editor',
+      ownerId: 'chat:session-a',
+    })
+    useBrowserPanelStore.getState().createTab('https://example.com', undefined, 'chat:session-a')
+    useBrowserPanelStore.getState().openTuiTab({
+      cwd: '/tmp/workspace-1',
+      ownerId: 'chat:session-a',
+    })
+    useBrowserPanelStore.getState().setActiveTab(fileTabId, 'chat:session-a')
+
+    const partialize = useBrowserPanelStore.persist.getOptions().partialize
+    if (!partialize) {
+      throw new TypeError('Expected browser panel store persistence to define partialize')
+    }
+    const persisted = partialize(useBrowserPanelStore.getState()) as {
+      dockStateByOwnerId?: Record<string, { open: boolean, activePaneId: string | null, panes: Array<{ id: string, kind: string }> }>
+    }
+
+    expect(persisted.dockStateByOwnerId?.['chat:session-a']).toEqual({
+      open: true,
+      activePaneId: fileTabId,
+      panes: [expect.objectContaining({ id: fileTabId, kind: 'workspace-file' })],
+    })
+  })
+
+  it('releases runtime resources while retaining restorable thread dock metadata', () => {
+    const fileTabId = useBrowserPanelStore.getState().openWorkspaceFileTab({
+      workspaceId: 'workspace-1',
+      path: 'README.md',
+      view: 'preview',
+      ownerId: 'chat:session-a',
+    })
+    useBrowserPanelStore.getState().createTab('https://example.com', undefined, 'chat:session-a')
+
+    useBrowserPanelStore.getState().releaseOwnerRuntimeState('chat:session-a')
+
+    expect(useBrowserPanelStore.getState().owners['chat:session-a']).toMatchObject({
+      open: true,
+      threadState: null,
+      activeTabId: fileTabId,
+      tabs: [expect.objectContaining({ id: fileTabId, kind: 'workspace-file' })],
     })
   })
 
@@ -542,6 +675,37 @@ describe('browser panel shortcuts', () => {
     expect(readBrowserPanelPersistedState('not-an-object')).toEqual({
       recentHistoryByOwnerId: {},
       annotationTrayCollapsedByOwnerId: {},
+      dockStateByOwnerId: {},
+    })
+  })
+
+  it('drops stale persisted pane kinds and repairs the active pane', () => {
+    const restored = readBrowserPanelPersistedState({
+      dockStateByOwnerId: {
+        'chat:session-a': {
+          open: true,
+          activePaneId: 'legacy',
+          panes: [
+            { id: 'legacy', kind: 'removed-pane' },
+            {
+              kind: 'workspace-file',
+              id: 'file-a',
+              workspaceId: 'workspace-1',
+              path: 'README.md',
+              view: 'preview',
+              title: 'README.md',
+              loading: false,
+              favicon: null,
+            },
+          ],
+        },
+      },
+    })
+
+    expect(restored.dockStateByOwnerId?.['chat:session-a']).toEqual({
+      open: true,
+      activePaneId: 'file-a',
+      panes: [expect.objectContaining({ id: 'file-a', kind: 'workspace-file' })],
     })
   })
 

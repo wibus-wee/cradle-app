@@ -4,11 +4,18 @@
 // Depends on: Zustand persistence, browser IPC state snapshots
 
 import type { FileUIPart } from 'ai'
+import isEqual from 'fast-deep-equal'
 import { z } from 'zod'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 import { persistStorage } from './persist-storage'
+import {
+  closePaneInState,
+  openPaneInState,
+  setActivePaneInState,
+  setDockOpenInState,
+} from './right-dock.logic'
 
 export const DEFAULT_BROWSER_PANEL_OWNER_ID = 'global'
 export const BROWSER_PANEL_WEBVIEW_TAB_SHORTCUT_CHANNEL = 'browser-panel:webview-tab-shortcut'
@@ -17,12 +24,13 @@ const BROWSER_HISTORY_LIMIT = 12
 const EMPTY_BROWSER_HISTORY: BrowserHistoryEntry[] = []
 const EMPTY_BROWSER_ANNOTATIONS: BrowserAnnotationRecord[] = []
 const BROWSER_PANEL_STORAGE_KEY = 'cradle:browser-panel:v2'
-const BROWSER_PANEL_PERSIST_VERSION = 2
+const BROWSER_PANEL_PERSIST_VERSION = 3
 const BROWSER_PANEL_TAB_SHORTCUT_KEYS = new Set(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
 
 interface BrowserPanelPersistedState {
   recentHistoryByOwnerId?: Record<string, BrowserHistoryEntry[]>
   annotationTrayCollapsedByOwnerId?: Record<string, boolean>
+  dockStateByOwnerId?: Record<string, PersistedBrowserPanelDockState>
 }
 
 const browserHistoryEntrySchema = z.object({
@@ -36,6 +44,7 @@ const annotationTrayCollapsedByOwnerIdSchema = z.record(z.string(), z.boolean())
 const browserPanelPersistedStateSchema = z.object({
   recentHistoryByOwnerId: z.unknown().optional(),
   annotationTrayCollapsedByOwnerId: z.unknown().optional(),
+  dockStateByOwnerId: z.unknown().optional(),
 })
 
 export function readBrowserPanelPersistedState(raw: unknown): BrowserPanelPersistedState {
@@ -44,6 +53,7 @@ export function readBrowserPanelPersistedState(raw: unknown): BrowserPanelPersis
     return {
       recentHistoryByOwnerId: {},
       annotationTrayCollapsedByOwnerId: {},
+      dockStateByOwnerId: {},
     }
   }
 
@@ -57,6 +67,7 @@ export function readBrowserPanelPersistedState(raw: unknown): BrowserPanelPersis
   return {
     recentHistoryByOwnerId: recentHistoryResult?.success ? recentHistoryResult.data : {},
     annotationTrayCollapsedByOwnerId: collapsedResult?.success ? collapsedResult.data : {},
+    dockStateByOwnerId: sanitizePersistedDockStateByOwnerId(parsedState.data.dockStateByOwnerId),
   }
 }
 
@@ -123,6 +134,21 @@ export interface BrowserWorkspaceDiffTab {
   workspaceId: string
   repositoryPath?: string
   paths?: string[]
+  title: string
+  loading: false
+  favicon: null
+}
+
+export interface BrowserPullRequestTab {
+  kind: 'pull-request'
+  id: string
+  owner: string
+  repo: string
+  number: number
+  // Only present when Cradle created/bound this PR through a Work session -
+  // an optional overlay, not the PR's identity (see pull-request module README).
+  workId?: string
+  sessionId?: string
   title: string
   loading: false
   favicon: null
@@ -205,6 +231,7 @@ export type BrowserPanelTab
   = | BrowserWebTab
     | BrowserWorkspaceFileTab
     | BrowserWorkspaceDiffTab
+    | BrowserPullRequestTab
     | BrowserSubagentTab
     | BrowserSideConversationTab
     | BrowserContextUsageReportTab
@@ -212,6 +239,189 @@ export type BrowserPanelTab
     | BrowserTuiTab
     | BrowserPlanDocumentTab
     | BrowserPlanRefineTab
+
+export const BROWSER_PANEL_TAB_KINDS = [
+  'browser',
+  'workspace-file',
+  'workspace-diff',
+  'pull-request',
+  'subagent',
+  'side-conversation',
+  'context-usage-report',
+  'launcher',
+  'tui',
+  'plan-document',
+  'plan-refine',
+] as const satisfies readonly BrowserPanelTab['kind'][]
+
+export type BrowserPanelTabKind = (typeof BROWSER_PANEL_TAB_KINDS)[number]
+
+const MULTI_INSTANCE_BROWSER_PANEL_TAB_KINDS: ReadonlySet<BrowserPanelTabKind> = new Set([
+  'browser',
+  'workspace-file',
+  'pull-request',
+  'subagent',
+  'side-conversation',
+  'tui',
+  'plan-document',
+  'plan-refine',
+])
+
+export const SINGLETON_BROWSER_PANEL_TAB_KINDS: ReadonlySet<BrowserPanelTabKind> = new Set(
+  BROWSER_PANEL_TAB_KINDS.filter(kind => !MULTI_INSTANCE_BROWSER_PANEL_TAB_KINDS.has(kind)),
+)
+
+export function isSingletonBrowserPanelTabKind(kind: BrowserPanelTabKind): boolean {
+  return SINGLETON_BROWSER_PANEL_TAB_KINDS.has(kind)
+}
+
+type RestorableBrowserPanelTab = Exclude<
+  BrowserPanelTab,
+  BrowserWebTab | BrowserPanelLauncherTab | BrowserTuiTab
+>
+
+interface PersistedBrowserPanelDockState {
+  open: boolean
+  panes: RestorableBrowserPanelTab[]
+  activePaneId: string | null
+}
+
+const workspaceFileTabSchema = z.object({
+  kind: z.literal('workspace-file'),
+  id: z.string(),
+  workspaceId: z.string(),
+  path: z.string(),
+  view: z.enum(['editor', 'preview']),
+  title: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserWorkspaceFileTab>
+
+const workspaceDiffTabSchema = z.object({
+  kind: z.literal('workspace-diff'),
+  id: z.string(),
+  workspaceId: z.string(),
+  repositoryPath: z.string().optional(),
+  paths: z.array(z.string()).optional(),
+  title: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserWorkspaceDiffTab>
+
+const pullRequestTabSchema = z.object({
+  kind: z.literal('pull-request'),
+  id: z.string(),
+  owner: z.string(),
+  repo: z.string(),
+  number: z.number(),
+  workId: z.string().optional(),
+  sessionId: z.string().optional(),
+  title: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserPullRequestTab>
+
+const subagentTabSchema = z.object({
+  kind: z.literal('subagent'),
+  id: z.string(),
+  sessionId: z.string(),
+  threadId: z.string(),
+  agentName: z.string(),
+  agentRole: z.string().nullable(),
+  title: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserSubagentTab>
+
+const sideConversationTabSchema = z.object({
+  kind: z.literal('side-conversation'),
+  id: z.string(),
+  parentSessionId: z.string(),
+  sideConversationId: z.string(),
+  providerSessionId: z.string().nullable(),
+  title: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserSideConversationTab>
+
+const contextUsageReportTabSchema = z.object({
+  kind: z.literal('context-usage-report'),
+  id: z.string(),
+  sessionId: z.string(),
+  sessionTitle: z.string().nullable(),
+  title: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserContextUsageReportTab>
+
+const planDocumentTabSchema = z.object({
+  kind: z.literal('plan-document'),
+  id: z.string(),
+  sessionId: z.string().nullable(),
+  toolCallId: z.string(),
+  title: z.string(),
+  text: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserPlanDocumentTab>
+
+const planRefineTabSchema = z.object({
+  kind: z.literal('plan-refine'),
+  id: z.string(),
+  sessionId: z.string().nullable(),
+  requestId: z.string(),
+  title: z.string(),
+  text: z.string(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserPlanRefineTab>
+
+const restorableBrowserPanelTabSchema = z.discriminatedUnion('kind', [
+  workspaceFileTabSchema,
+  workspaceDiffTabSchema,
+  pullRequestTabSchema,
+  subagentTabSchema,
+  sideConversationTabSchema,
+  contextUsageReportTabSchema,
+  planDocumentTabSchema,
+  planRefineTabSchema,
+]) satisfies z.ZodType<RestorableBrowserPanelTab>
+
+const persistedBrowserPanelDockStateSchema = z.object({
+  open: z.boolean(),
+  panes: z.array(z.unknown()),
+  activePaneId: z.string().nullable(),
+})
+
+function sanitizePersistedDockStateByOwnerId(
+  value: unknown,
+): Record<string, PersistedBrowserPanelDockState> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+
+  const result: Record<string, PersistedBrowserPanelDockState> = {}
+  for (const [ownerId, rawState] of Object.entries(value)) {
+    const parsed = persistedBrowserPanelDockStateSchema.safeParse(rawState)
+    if (!parsed.success) {
+      continue
+    }
+    const panes = parsed.data.panes.flatMap((rawPane) => {
+      const pane = restorableBrowserPanelTabSchema.safeParse(rawPane)
+      return pane.success ? [pane.data] : []
+    })
+    const activePaneId = parsed.data.activePaneId
+      && panes.some(pane => pane.id === parsed.data.activePaneId)
+      ? parsed.data.activePaneId
+      : (panes[0]?.id ?? null)
+    result[ownerId] = {
+      open: panes.length > 0 && parsed.data.open,
+      panes,
+      activePaneId,
+    }
+  }
+  return result
+}
 
 export interface BrowserHistoryEntry {
   url: string
@@ -413,6 +623,7 @@ interface BrowserPanelTabShortcutInput {
 }
 
 interface BrowserPanelOwnerState {
+  open: boolean
   threadState: ThreadBrowserState | null
   tabs: BrowserPanelTab[]
   activeTabId: string | null
@@ -430,6 +641,7 @@ interface BrowserPanelOwnerState {
 interface BrowserPanelState {
   activeOwnerId: string
   owners: Record<string, BrowserPanelOwnerState | undefined>
+  open: boolean
   tabs: BrowserPanelTab[]
   activeTabId: string | null
   requestedTab: BrowserPanelOwnerState['requestedTab']
@@ -439,7 +651,10 @@ interface BrowserPanelState {
   annotationTrayCollapsedByOwnerId: Record<string, boolean | undefined>
   annotationAdjustmentSession: BrowserAnnotationAdjustmentSession | null
   setActiveOwner: (ownerId: string | null | undefined) => void
+  setDockOpen: (open: boolean, ownerId?: string | null) => void
+  toggleDock: (ownerId?: string | null) => void
   upsertOwnerState: (state: ThreadBrowserState) => void
+  releaseOwnerRuntimeState: (ownerId: string) => void
   removeOwnerState: (ownerId: string) => void
   requestTab: (url?: string, source?: BrowserTabSource, ownerId?: string | null) => void
   fulfillRequestedTab: (id: number, ownerId?: string | null) => void
@@ -465,6 +680,15 @@ interface BrowserPanelState {
     repositoryPath?: string | null
     paths?: string[]
     title?: string
+    ownerId?: string | null
+  }) => string
+  openPullRequestTab: (input: {
+    owner: string
+    repo: string
+    number: number
+    workId?: string
+    sessionId?: string
+    title: string
     ownerId?: string | null
   }) => string
   openSubagentTab: (input: {
@@ -556,6 +780,7 @@ function createEmptyThreadState(ownerId: string): ThreadBrowserState {
 
 function createEmptyOwnerState(ownerId: string): BrowserPanelOwnerState {
   return {
+    open: false,
     threadState: createEmptyThreadState(ownerId),
     tabs: [],
     activeTabId: null,
@@ -627,6 +852,7 @@ function projectThreadState(
     : null
 
   return {
+    open: previousOwnerState?.open ?? false,
     threadState: state,
     tabs: projectedTabs,
     activeTabId: shouldKeepWorkspaceActiveTab
@@ -649,6 +875,7 @@ function getOwnerState(state: BrowserPanelState, ownerId: string): BrowserPanelO
 
 function projectActiveOwner(ownerState: BrowserPanelOwnerState) {
   return {
+    open: ownerState.open,
     tabs: ownerState.tabs,
     activeTabId: ownerState.activeTabId,
     requestedTab: ownerState.requestedTab,
@@ -760,14 +987,147 @@ function createTuiTab(ownerId: string, input: { cwd: string, title?: string }): 
   }
 }
 
-function arePathListsEqual(a: string[] | undefined, b: string[] | undefined): boolean {
-  if (a === b) {
-    return true
-  }
-  if (!a || !b || a.length !== b.length) {
+function matchesMultiInstanceBrowserPanelTab(
+  existing: BrowserPanelTab,
+  incoming: BrowserPanelTab,
+): boolean {
+  if (existing.kind !== incoming.kind) {
     return false
   }
-  return a.every((path, index) => path === b[index])
+
+  switch (incoming.kind) {
+    case 'browser':
+    case 'tui':
+      return false
+    case 'workspace-file':
+      return existing.kind === 'workspace-file'
+        && existing.workspaceId === incoming.workspaceId
+        && existing.path === incoming.path
+        && existing.view === incoming.view
+    case 'pull-request':
+      return existing.kind === 'pull-request'
+        && existing.owner === incoming.owner
+        && existing.repo === incoming.repo
+        && existing.number === incoming.number
+    case 'subagent':
+      return existing.kind === 'subagent'
+        && existing.sessionId === incoming.sessionId
+        && existing.threadId === incoming.threadId
+    case 'side-conversation':
+      return existing.kind === 'side-conversation'
+        && existing.sideConversationId === incoming.sideConversationId
+    case 'plan-document':
+      return existing.kind === 'plan-document' && existing.toolCallId === incoming.toolCallId
+    case 'plan-refine':
+      return existing.kind === 'plan-refine' && existing.requestId === incoming.requestId
+    case 'workspace-diff':
+    case 'context-usage-report':
+    case 'launcher':
+      return false
+  }
+}
+
+function mergeReopenedSingletonBrowserPanelTab(
+  existing: BrowserPanelTab,
+  incoming: BrowserPanelTab,
+): BrowserPanelTab {
+  const merged = { ...incoming, id: existing.id } as BrowserPanelTab
+  return isEqual(existing, merged) ? existing : merged
+}
+
+const browserPanelDockPolicy = {
+  isSingletonKind: isSingletonBrowserPanelTabKind,
+  matchesMultiInstancePane: matchesMultiInstanceBrowserPanelTab,
+  mergeReopenedSingleton: mergeReopenedSingletonBrowserPanelTab,
+}
+
+function openTabInOwnerState(
+  ownerState: BrowserPanelOwnerState,
+  tab: BrowserPanelTab,
+): BrowserPanelOwnerState {
+  const next = openPaneInState({
+    open: ownerState.open,
+    panes: ownerState.tabs,
+    activePaneId: ownerState.activeTabId,
+  }, tab, browserPanelDockPolicy)
+  if (
+    next.open === ownerState.open
+    && next.panes === ownerState.tabs
+    && next.activePaneId === ownerState.activeTabId
+  ) {
+    return ownerState
+  }
+  return {
+    ...ownerState,
+    open: next.open,
+    tabs: next.panes,
+    activeTabId: next.activePaneId,
+  }
+}
+
+function isRestorableBrowserPanelTab(tab: BrowserPanelTab): tab is RestorableBrowserPanelTab {
+  return tab.kind !== 'browser' && tab.kind !== 'launcher' && tab.kind !== 'tui'
+}
+
+function toPersistedDockState(ownerState: BrowserPanelOwnerState): PersistedBrowserPanelDockState | null {
+  const panes = ownerState.tabs.filter(isRestorableBrowserPanelTab)
+  if (panes.length === 0) {
+    return null
+  }
+  return {
+    open: ownerState.open,
+    panes,
+    activePaneId: ownerState.activeTabId && panes.some(pane => pane.id === ownerState.activeTabId)
+      ? ownerState.activeTabId
+      : (panes[0]?.id ?? null),
+  }
+}
+
+function buildPersistedDockStateByOwnerId(
+  owners: BrowserPanelState['owners'],
+): Record<string, PersistedBrowserPanelDockState> {
+  const result: Record<string, PersistedBrowserPanelDockState> = {}
+  for (const [ownerId, ownerState] of Object.entries(owners)) {
+    if (!ownerState) {
+      continue
+    }
+    const persisted = toPersistedDockState(ownerState)
+    if (persisted) {
+      result[ownerId] = persisted
+    }
+  }
+  return result
+}
+
+function createOwnerStateFromPersisted(
+  ownerId: string,
+  state: PersistedBrowserPanelDockState,
+): BrowserPanelOwnerState {
+  return {
+    ...createEmptyOwnerState(ownerId),
+    open: state.open,
+    threadState: null,
+    tabs: state.panes,
+    activeTabId: state.activePaneId,
+  }
+}
+
+function commitOpenTab(
+  set: (update: (state: BrowserPanelState) => Partial<BrowserPanelState> | BrowserPanelState) => void,
+  ownerId: string,
+  tab: BrowserPanelTab,
+): string {
+  let openedTabId = tab.id
+  set((state) => {
+    const ownerState = getOwnerState(state, ownerId)
+    const nextOwnerState = openTabInOwnerState(ownerState, tab)
+    openedTabId = nextOwnerState.activeTabId ?? tab.id
+    if (nextOwnerState === ownerState) {
+      return state
+    }
+    return applyOwnerState(state, ownerId, nextOwnerState)
+  })
+  return openedTabId
 }
 
 function createBrowserPanelStore() {
@@ -776,6 +1136,7 @@ function createBrowserPanelStore() {
     (set, get) => ({
       activeOwnerId: DEFAULT_BROWSER_PANEL_OWNER_ID,
       owners: {},
+      open: false,
       tabs: [],
       activeTabId: null,
       requestedTab: null,
@@ -796,6 +1157,32 @@ function createBrowserPanelStore() {
             ...projectActiveOwner(getOwnerState(state, ownerId)),
           }
         })
+      },
+
+      setDockOpen: (open, ownerIdInput) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        set((state) => {
+          const ownerState = getOwnerState(state, ownerId)
+          const next = setDockOpenInState({
+            open: ownerState.open,
+            panes: ownerState.tabs,
+            activePaneId: ownerState.activeTabId,
+          }, open)
+          if (next.open === ownerState.open) {
+            return state
+          }
+          return applyOwnerState(state, ownerId, { ...ownerState, open: next.open })
+        })
+      },
+
+      toggleDock: (ownerIdInput) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        const ownerState = getOwnerState(get(), ownerId)
+        if (!ownerState.open && ownerState.tabs.length === 0) {
+          get().openLauncherTab(ownerId)
+          return
+        }
+        get().setDockOpen(!ownerState.open, ownerId)
       },
 
       upsertOwnerState: (threadState) => {
@@ -840,12 +1227,41 @@ function createBrowserPanelStore() {
         })
       },
 
+      releaseOwnerRuntimeState: (ownerIdInput) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput)
+        set((state) => {
+          const ownerState = state.owners[ownerId]
+          if (!ownerState) {
+            return state
+          }
+          const persisted = toPersistedDockState(ownerState)
+          if (!persisted) {
+            const owners = { ...state.owners }
+            delete owners[ownerId]
+            const empty = createEmptyOwnerState(ownerId)
+            return {
+              owners,
+              ...(state.activeOwnerId === ownerId ? projectActiveOwner(empty) : {}),
+            }
+          }
+          return applyOwnerState(
+            state,
+            ownerId,
+            createOwnerStateFromPersisted(ownerId, persisted),
+          )
+        })
+      },
+
       requestTab: (url, source, ownerIdInput) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
         set((state) => {
           const ownerState = getOwnerState(state, ownerId)
           return applyOwnerState(state, ownerId, {
             ...ownerState,
+            // A pending native-tab request is itself dock content intent. Open
+            // the host so its effects can fulfill the request, even before the
+            // native browser snapshot supplies the concrete pane.
+            open: true,
             requestedTab: {
               id: Date.now(),
               url,
@@ -873,15 +1289,7 @@ function createBrowserPanelStore() {
       createTab: (url, source, ownerIdInput) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
         const tab = createLocalBrowserTab(url, source)
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       closeTab: (id, ownerIdInput) => {
@@ -893,18 +1301,18 @@ function createBrowserPanelStore() {
           if (closedIndex === -1) {
             return state
           }
-          const tabs = ownerState.tabs.filter(tab => tab.id !== id)
-          result = { closed: true, closedLastTab: tabs.length === 0 }
-          const nextActiveTabId = ownerState.activeTabId === id
-            ? (tabs[Math.max(0, closedIndex - 1)]?.id ?? null)
-            : ownerState.activeTabId
+          const next = closePaneInState({
+            open: ownerState.open,
+            panes: ownerState.tabs,
+            activePaneId: ownerState.activeTabId,
+          }, id)
+          result = { closed: true, closedLastTab: next.panes.length === 0 }
           return applyOwnerState(state, ownerId, {
             ...ownerState,
-            tabs,
+            open: next.open,
+            tabs: next.panes,
             annotations: ownerState.annotations.filter(annotation => annotation.tabId !== id),
-            activeTabId: nextActiveTabId && tabs.some(tab => tab.id === nextActiveTabId)
-              ? nextActiveTabId
-              : (tabs.at(-1)?.id ?? null),
+            activeTabId: next.activePaneId,
           })
         })
         return result
@@ -914,10 +1322,19 @@ function createBrowserPanelStore() {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
         set((state) => {
           const ownerState = getOwnerState(state, ownerId)
-          if (!ownerState.tabs.some(tab => tab.id === id)) {
+          const next = setActivePaneInState({
+            open: ownerState.open,
+            panes: ownerState.tabs,
+            activePaneId: ownerState.activeTabId,
+          }, id)
+          if (next.open === ownerState.open && next.activePaneId === ownerState.activeTabId) {
             return state
           }
-          return applyOwnerState(state, ownerId, { ...ownerState, activeTabId: id })
+          return applyOwnerState(state, ownerId, {
+            ...ownerState,
+            open: next.open,
+            activeTabId: next.activePaneId,
+          })
         })
       },
 
@@ -965,17 +1382,6 @@ function createBrowserPanelStore() {
 
       openWorkspaceFileTab: ({ workspaceId, path, view, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const existing = getOwnerState(get(), ownerId).tabs.find(
-          tab =>
-            tab.kind === 'workspace-file'
-            && tab.workspaceId === workspaceId
-            && tab.path === path
-            && tab.view === view,
-        )
-        if (existing) {
-          get().setActiveTab(existing.id, ownerId)
-          return existing.id
-        }
         const tab: BrowserWorkspaceFileTab = {
           kind: 'workspace-file',
           id: `legacy-workspace-file-${++localTabCounter}`,
@@ -986,33 +1392,11 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openWorkspaceDiffTab: ({ workspaceId, repositoryPath, paths, title, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const ownerState = getOwnerState(get(), ownerId)
-        const existing = ownerState.tabs.find(
-          tab =>
-            tab.kind === 'workspace-diff'
-            && tab.workspaceId === workspaceId
-            && tab.repositoryPath === (repositoryPath ?? undefined)
-            && arePathListsEqual(tab.paths, paths),
-        )
-        if (existing) {
-          if (ownerState.activeTabId !== existing.id) {
-            get().setActiveTab(existing.id, ownerId)
-          }
-          return existing.id
-        }
         const tab: BrowserWorkspaceDiffTab = {
           kind: 'workspace-diff',
           id: `legacy-workspace-diff-${++localTabCounter}`,
@@ -1027,26 +1411,29 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
+      },
+
+      openPullRequestTab: ({ owner, repo, number, workId, sessionId, title, ownerId: ownerIdInput }) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        const tabId = `pull-request:${owner}/${repo}#${number}`
+        const tab: BrowserPullRequestTab = {
+          kind: 'pull-request',
+          id: tabId,
+          owner,
+          repo,
+          number,
+          workId,
+          sessionId,
+          title,
+          loading: false,
+          favicon: null,
+        }
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openSubagentTab: ({ sessionId, threadId, agentName, agentRole, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const existing = getOwnerState(get(), ownerId).tabs.find(
-          tab => tab.kind === 'subagent' && tab.threadId === threadId && tab.sessionId === sessionId,
-        )
-        if (existing) {
-          get().setActiveTab(existing.id, ownerId)
-          return existing.id
-        }
         const tab: BrowserSubagentTab = {
           kind: 'subagent',
           id: `subagent-${threadId}-${++localTabCounter}`,
@@ -1058,15 +1445,7 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openSideConversationTab: ({
@@ -1077,14 +1456,6 @@ function createBrowserPanelStore() {
         ownerId: ownerIdInput,
       }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const ownerState = getOwnerState(get(), ownerId)
-        const existing = ownerState.tabs.find(
-          tab => tab.kind === 'side-conversation' && tab.sideConversationId === sideConversationId,
-        )
-        if (existing) {
-          get().setActiveTab(existing.id, ownerId)
-          return existing.id
-        }
         const tab: BrowserSideConversationTab = {
           kind: 'side-conversation',
           id: `side:${sideConversationId}`,
@@ -1095,27 +1466,11 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openContextUsageReportTab: ({ sessionId, sessionTitle, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const ownerState = getOwnerState(get(), ownerId)
-        const existing = ownerState.tabs.find(
-          tab => tab.kind === 'context-usage-report' && tab.sessionId === sessionId,
-        )
-        if (existing) {
-          get().setActiveTab(existing.id, ownerId)
-          return existing.id
-        }
         const tab: BrowserContextUsageReportTab = {
           kind: 'context-usage-report',
           id: `context-usage-report:${sessionId}`,
@@ -1125,43 +1480,19 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openLauncherTab: (ownerIdInput) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
         const tab = createLauncherTab()
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openTuiTab: ({ cwd, title, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
         const tab = createTuiTab(ownerId, { cwd, title })
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       updateTuiTabTitle: (id, title, ownerIdInput) => {
@@ -1185,14 +1516,6 @@ function createBrowserPanelStore() {
 
       openPlanDocumentTab: ({ sessionId, toolCallId, title, text, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const ownerState = getOwnerState(get(), ownerId)
-        const existing = ownerState.tabs.find(
-          tab => tab.kind === 'plan-document' && tab.toolCallId === toolCallId,
-        )
-        if (existing) {
-          get().setActiveTab(existing.id, ownerId)
-          return existing.id
-        }
         const tab: BrowserPlanDocumentTab = {
           kind: 'plan-document',
           id: `plan-document:${toolCallId}`,
@@ -1203,27 +1526,11 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       openPlanRefineTab: ({ sessionId, requestId, title, text, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
-        const ownerState = getOwnerState(get(), ownerId)
-        const existing = ownerState.tabs.find(
-          tab => tab.kind === 'plan-refine' && tab.requestId === requestId,
-        )
-        if (existing) {
-          get().setActiveTab(existing.id, ownerId)
-          return existing.id
-        }
         const tab: BrowserPlanRefineTab = {
           kind: 'plan-refine',
           id: `plan-refine:${requestId}`,
@@ -1234,15 +1541,7 @@ function createBrowserPanelStore() {
           loading: false,
           favicon: null,
         }
-        set((state) => {
-          const ownerState = getOwnerState(state, ownerId)
-          return applyOwnerState(state, ownerId, {
-            ...ownerState,
-            tabs: [...ownerState.tabs, tab],
-            activeTabId: tab.id,
-          })
-        })
-        return tab.id
+        return commitOpenTab(set, ownerId, tab)
       },
 
       requestScrollToFilePath: ({ path, tabId }) => {
@@ -1400,11 +1699,26 @@ function createBrowserPanelStore() {
       partialize: state => ({
         recentHistoryByOwnerId: state.recentHistoryByOwnerId,
         annotationTrayCollapsedByOwnerId: state.annotationTrayCollapsedByOwnerId,
+        dockStateByOwnerId: buildPersistedDockStateByOwnerId(state.owners),
       }),
-      merge: (persisted, current) => ({
-        ...current,
-        ...readBrowserPanelPersistedState(persisted),
-      }),
+      merge: (persisted, current) => {
+        const restored = readBrowserPanelPersistedState(persisted)
+        const owners = Object.fromEntries(
+          Object.entries(restored.dockStateByOwnerId ?? {}).map(([ownerId, dockState]) => [
+            ownerId,
+            createOwnerStateFromPersisted(ownerId, dockState),
+          ]),
+        )
+        const activeOwnerState = owners[current.activeOwnerId]
+          ?? createEmptyOwnerState(current.activeOwnerId)
+        return {
+          ...current,
+          recentHistoryByOwnerId: restored.recentHistoryByOwnerId ?? {},
+          annotationTrayCollapsedByOwnerId: restored.annotationTrayCollapsedByOwnerId ?? {},
+          owners,
+          ...projectActiveOwner(activeOwnerState),
+        }
+      },
     },
     ),
   )
@@ -1447,6 +1761,11 @@ function isBrowserPanelTabShortcutPayload(
 export function selectOwnerBrowserState(ownerId: string) {
   return (store: BrowserPanelState): ThreadBrowserState | null =>
     store.owners[normalizeBrowserPanelOwnerId(ownerId)]?.threadState ?? null
+}
+
+export function selectOwnerDockOpen(ownerId: string) {
+  return (store: BrowserPanelState): boolean =>
+    store.owners[normalizeBrowserPanelOwnerId(ownerId)]?.open ?? false
 }
 
 export function selectOwnerBrowserHistory(ownerId: string) {

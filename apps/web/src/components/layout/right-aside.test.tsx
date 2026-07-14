@@ -74,16 +74,11 @@ describe('rightAside browser panel coupling', () => {
     useLayoutStore.setState({
       asideOpen: true,
       asideActiveTab: 'files',
-      activeBrowserPanelOwnerId: 'owner-a',
-      browserPanelOpen: true,
-      browserPanelOpenByOwnerId: {
-        'owner-a': true,
-        'owner-b': true,
-      },
     })
     useBrowserPanelStore.setState({
       activeOwnerId: 'owner-a',
       owners: {},
+      open: false,
       tabs: [],
       activeTabId: null,
       requestedTab: null,
@@ -115,9 +110,6 @@ describe('rightAside browser panel coupling', () => {
   it('repairs a visible stale right-aside active tab when adjustment is unavailable', async () => {
     useLayoutStore.setState({
       asideActiveTab: 'adjustment',
-      browserPanelOpenByOwnerId: {
-        'owner-b': true,
-      },
     })
 
     renderRightAside(<RightAside ownerId="owner-b" visible />)
@@ -128,9 +120,18 @@ describe('rightAside browser panel coupling', () => {
     })
   })
 
-  it('shows the Work tab only for Work-owned surfaces', () => {
+  it('shows the Environment tab for session-owned surfaces', () => {
     const { rerender } = renderRightAside(<RightAside ownerId="owner-b" visible />)
     expect(screen.queryByTestId('right-aside-tab-work')).toBeNull()
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TooltipProvider>
+          <RightAside ownerId="owner-b" sessionId="session-1" visible />
+        </TooltipProvider>
+      </QueryClientProvider>,
+    )
+    expect(screen.getByTestId('right-aside-tab-work')).not.toBeNull()
 
     rerender(
       <QueryClientProvider client={new QueryClient()}>
@@ -139,6 +140,6 @@ describe('rightAside browser panel coupling', () => {
         </TooltipProvider>
       </QueryClientProvider>,
     )
-    expect(screen.getByTestId('right-aside-tab-work')).not.toBeNull()
+    expect(screen.queryByTestId('right-aside-tab-work')).toBeNull()
   })
 })

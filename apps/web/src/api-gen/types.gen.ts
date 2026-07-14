@@ -6528,6 +6528,15 @@ export type GetSessionsByIdExportMarkdownResponses = {
 
 export type GetSessionsByIdExportMarkdownResponse = GetSessionsByIdExportMarkdownResponses[keyof GetSessionsByIdExportMarkdownResponses];
 
+export type GetSessionsByIdExportZipData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/export/zip';
+};
+
 export type DeleteSessionsByIdLinkedIssueData = {
     body?: never;
     path: {
@@ -6765,6 +6774,581 @@ export type GetSessionsByIdIsolationResponses = {
 
 export type GetSessionsByIdIsolationResponse = GetSessionsByIdIsolationResponses[keyof GetSessionsByIdIsolationResponses];
 
+export type GetSessionsByIdEnvironmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment';
+};
+
+export type GetSessionsByIdEnvironmentResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        notes: string;
+        pins: Array<{
+            sessionId: string;
+            messageId: string;
+            label: string | null;
+            done: boolean;
+            pinnedAt: number;
+            updatedAt: number;
+        }>;
+        markers: Array<{
+            id: string;
+            sessionId: string;
+            messageId: string;
+            startOffset: number;
+            endOffset: number;
+            selectedText: string;
+            style: 'highlight' | 'underline';
+            color: 'yellow' | 'blue' | 'green' | 'pink';
+            label: string | null;
+            done: boolean;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+        usage: {
+            totalTokens: number;
+            promptTokens: number;
+            completionTokens: number;
+            count: number;
+        };
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+        } | null;
+        automationRuns: Array<{
+            id: string;
+            automationDefinitionId: string;
+            workspaceId: string | null;
+            triggerType: 'manual' | 'scheduled';
+            occurrenceKey: string | null;
+            status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
+            triggerSnapshot: {
+                type: string;
+                rrule: string;
+                timezone: string;
+                misfirePolicy?: 'skip' | 'run_latest';
+            };
+            recipeSnapshot: {
+                kind: string;
+                prompt: string;
+                inputs: Array<{
+                    type: string;
+                    path: string;
+                } | {
+                    type: string;
+                    name: string;
+                    content: string;
+                } | {
+                    type: string;
+                    name: string;
+                    content: string;
+                } | {
+                    type: string;
+                    url: string;
+                }>;
+                artifactRequests: Array<{
+                    kind: 'markdown' | 'text' | 'json' | 'file_ref';
+                    name: string;
+                    description?: string;
+                }>;
+                agentId?: string;
+                providerTargetId?: string;
+                runtimeKind?: string;
+                modelId?: string;
+                thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+                sessionPolicy?: 'new' | 'heartbeat';
+                isolationPolicy?: 'workspace' | 'worktree_per_run';
+                completionPolicy?: {
+                    stopWhen?: string;
+                    noFindingsBehavior?: 'archive' | 'triage';
+                };
+            };
+            chatSessionId: string | null;
+            backendRunId: string | null;
+            artifactCount: number;
+            errorText: string | null;
+            resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+            resultSummary: string | null;
+            triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+            triagedAt: number | null;
+            scheduledFor: number | null;
+            claimedAt: number | null;
+            startedAt: number | null;
+            finishedAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+        checkpoints: Array<{
+            id: string;
+            sessionId: string;
+            runId: string;
+            assistantMessageId: string | null;
+            workspaceId: string | null;
+            workspacePath: string;
+            startRef: string;
+            endRef: string | null;
+            status: 'capturing' | 'completed' | 'failed';
+            changedFiles: number;
+            additions: number;
+            deletions: number;
+            errorText: string | null;
+            completedAt: number | null;
+            restoredAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+        handoff: {
+            id: string;
+            requestId: string;
+            sourceSessionId: string;
+            destinationSessionId: string;
+            sourceProviderTargetId: string | null;
+            destinationProviderTargetId: string;
+            importedMessageCount: number;
+            createdAt: number;
+        } | null;
+    };
+};
+
+export type GetSessionsByIdEnvironmentResponse = GetSessionsByIdEnvironmentResponses[keyof GetSessionsByIdEnvironmentResponses];
+
+export type PutSessionsByIdEnvironmentNotesData = {
+    body: {
+        notes: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/notes';
+};
+
+export type PutSessionsByIdEnvironmentNotesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        notes: string;
+        updatedAt: number;
+    };
+};
+
+export type PutSessionsByIdEnvironmentNotesResponse = PutSessionsByIdEnvironmentNotesResponses[keyof PutSessionsByIdEnvironmentNotesResponses];
+
+export type DeleteSessionsByIdEnvironmentPinsByMessageIdData = {
+    body?: never;
+    path: {
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/pins/{messageId}';
+};
+
+export type DeleteSessionsByIdEnvironmentPinsByMessageIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteSessionsByIdEnvironmentPinsByMessageIdResponse = DeleteSessionsByIdEnvironmentPinsByMessageIdResponses[keyof DeleteSessionsByIdEnvironmentPinsByMessageIdResponses];
+
+export type PatchSessionsByIdEnvironmentPinsByMessageIdData = {
+    body: {
+        label?: string | null;
+        done?: boolean;
+    };
+    path: {
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/pins/{messageId}';
+};
+
+export type PatchSessionsByIdEnvironmentPinsByMessageIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        messageId: string;
+        label: string | null;
+        done: boolean;
+        pinnedAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchSessionsByIdEnvironmentPinsByMessageIdResponse = PatchSessionsByIdEnvironmentPinsByMessageIdResponses[keyof PatchSessionsByIdEnvironmentPinsByMessageIdResponses];
+
+export type PostSessionsByIdEnvironmentPinsByMessageIdData = {
+    body?: never;
+    path: {
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/pins/{messageId}';
+};
+
+export type PostSessionsByIdEnvironmentPinsByMessageIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        messageId: string;
+        label: string | null;
+        done: boolean;
+        pinnedAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostSessionsByIdEnvironmentPinsByMessageIdResponse = PostSessionsByIdEnvironmentPinsByMessageIdResponses[keyof PostSessionsByIdEnvironmentPinsByMessageIdResponses];
+
+export type PostSessionsByIdEnvironmentMarkersData = {
+    body: {
+        messageId: string;
+        startOffset: number;
+        endOffset: number;
+        selectedText: string;
+        style: 'highlight' | 'underline';
+        color: 'yellow' | 'blue' | 'green' | 'pink';
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/markers';
+};
+
+export type PostSessionsByIdEnvironmentMarkersResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        messageId: string;
+        startOffset: number;
+        endOffset: number;
+        selectedText: string;
+        style: 'highlight' | 'underline';
+        color: 'yellow' | 'blue' | 'green' | 'pink';
+        label: string | null;
+        done: boolean;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostSessionsByIdEnvironmentMarkersResponse = PostSessionsByIdEnvironmentMarkersResponses[keyof PostSessionsByIdEnvironmentMarkersResponses];
+
+export type DeleteSessionsByIdEnvironmentMarkersByMarkerIdData = {
+    body?: never;
+    path: {
+        id: string;
+        markerId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/markers/{markerId}';
+};
+
+export type DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponse = DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponses[keyof DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponses];
+
+export type PatchSessionsByIdEnvironmentMarkersByMarkerIdData = {
+    body: {
+        label?: string | null;
+        done?: boolean;
+    };
+    path: {
+        id: string;
+        markerId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/environment/markers/{markerId}';
+};
+
+export type PatchSessionsByIdEnvironmentMarkersByMarkerIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        messageId: string;
+        startOffset: number;
+        endOffset: number;
+        selectedText: string;
+        style: 'highlight' | 'underline';
+        color: 'yellow' | 'blue' | 'green' | 'pink';
+        label: string | null;
+        done: boolean;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchSessionsByIdEnvironmentMarkersByMarkerIdResponse = PatchSessionsByIdEnvironmentMarkersByMarkerIdResponses[keyof PatchSessionsByIdEnvironmentMarkersByMarkerIdResponses];
+
+export type PostThreadHandoffsData = {
+    body: {
+        requestId: string;
+        sourceSessionId: string;
+        destinationProviderTargetId: string;
+        modelId?: string | null;
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/thread-handoffs';
+};
+
+export type PostThreadHandoffsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        handoff: {
+            id: string;
+            requestId: string;
+            sourceSessionId: string;
+            destinationSessionId: string;
+            sourceProviderTargetId: string | null;
+            destinationProviderTargetId: string;
+            importedMessageCount: number;
+            createdAt: number;
+        };
+        session: {
+            id: string;
+            execution: {
+                kind: string;
+            } | {
+                kind: string;
+                hostId: string;
+                remoteSessionId: string;
+            };
+            parentSessionId: string | null;
+            sideContextSource: 'provider-native' | 'cradle-context' | null;
+            workspaceId: string | null;
+            title: string | null;
+            origin: string;
+            providerTargetId: string | null;
+            agentId: string | null;
+            modelId: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+            linkedIssueId: string | null;
+            sessionGroupId: string | null;
+            runtimeKind: string;
+            status: 'idle' | 'streaming' | 'error';
+            pinned: number;
+            archivedAt: number | null;
+            lastReadAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            latestUserMessageAt: number | null;
+            latestAssistantMessageAt: number | null;
+            unread: boolean;
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+    };
+};
+
+export type PostThreadHandoffsResponse = PostThreadHandoffsResponses[keyof PostThreadHandoffsResponses];
+
+export type GetThreadHandoffsDestinationBySessionIdData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/thread-handoffs/destination/{sessionId}';
+};
+
+export type GetThreadHandoffsDestinationBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        requestId: string;
+        sourceSessionId: string;
+        destinationSessionId: string;
+        sourceProviderTargetId: string | null;
+        destinationProviderTargetId: string;
+        importedMessageCount: number;
+        createdAt: number;
+    } | null;
+};
+
+export type GetThreadHandoffsDestinationBySessionIdResponse = GetThreadHandoffsDestinationBySessionIdResponses[keyof GetThreadHandoffsDestinationBySessionIdResponses];
+
+export type GetSessionsByIdTurnCheckpointsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/turn-checkpoints';
+};
+
+export type GetSessionsByIdTurnCheckpointsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        sessionId: string;
+        runId: string;
+        assistantMessageId: string | null;
+        workspaceId: string | null;
+        workspacePath: string;
+        startRef: string;
+        endRef: string | null;
+        status: 'capturing' | 'completed' | 'failed';
+        changedFiles: number;
+        additions: number;
+        deletions: number;
+        errorText: string | null;
+        completedAt: number | null;
+        restoredAt: number | null;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetSessionsByIdTurnCheckpointsResponse = GetSessionsByIdTurnCheckpointsResponses[keyof GetSessionsByIdTurnCheckpointsResponses];
+
+export type PostSessionsByIdTurnCheckpointsByCheckpointIdRestoreData = {
+    body?: never;
+    path: {
+        id: string;
+        checkpointId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/turn-checkpoints/{checkpointId}/restore';
+};
+
+export type PostSessionsByIdTurnCheckpointsByCheckpointIdRestoreResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        checkpoint: {
+            id: string;
+            sessionId: string;
+            runId: string;
+            assistantMessageId: string | null;
+            workspaceId: string | null;
+            workspacePath: string;
+            startRef: string;
+            endRef: string | null;
+            status: 'capturing' | 'completed' | 'failed';
+            changedFiles: number;
+            additions: number;
+            deletions: number;
+            errorText: string | null;
+            completedAt: number | null;
+            restoredAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        };
+        transcriptReverted: boolean;
+        providerRolledBackTurns: number;
+    };
+};
+
+export type PostSessionsByIdTurnCheckpointsByCheckpointIdRestoreResponse = PostSessionsByIdTurnCheckpointsByCheckpointIdRestoreResponses[keyof PostSessionsByIdTurnCheckpointsByCheckpointIdRestoreResponses];
+
+export type PostSessionsByIdTurnCheckpointsByCheckpointIdRewindData = {
+    body?: never;
+    path: {
+        id: string;
+        checkpointId: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/turn-checkpoints/{checkpointId}/rewind';
+};
+
+export type PostSessionsByIdTurnCheckpointsByCheckpointIdRewindResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        checkpoint: {
+            id: string;
+            sessionId: string;
+            runId: string;
+            assistantMessageId: string | null;
+            workspaceId: string | null;
+            workspacePath: string;
+            startRef: string;
+            endRef: string | null;
+            status: 'capturing' | 'completed' | 'failed';
+            changedFiles: number;
+            additions: number;
+            deletions: number;
+            errorText: string | null;
+            completedAt: number | null;
+            restoredAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        };
+        transcriptReverted: boolean;
+        rewoundTurns: number;
+        providerRolledBackTurns: number;
+        removedCheckpointIds: Array<string>;
+    };
+};
+
+export type PostSessionsByIdTurnCheckpointsByCheckpointIdRewindResponse = PostSessionsByIdTurnCheckpointsByCheckpointIdRewindResponses[keyof PostSessionsByIdTurnCheckpointsByCheckpointIdRewindResponses];
+
 export type GetWorksData = {
     body?: never;
     path?: never;
@@ -6811,6 +7395,13 @@ export type GetWorksResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
     }>;
 };
@@ -6943,6 +7534,13 @@ export type PostWorksResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -7048,6 +7646,13 @@ export type GetWorksByIdResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -7155,6 +7760,13 @@ export type PostWorksByIdArchiveResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -7264,6 +7876,13 @@ export type PostWorksByIdPrepareResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -7374,6 +7993,13 @@ export type PostWorksByIdSubmitResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
     };
@@ -7426,6 +8052,13 @@ export type GetSessionsByIdWorkResponses = {
                 headSha: string | null;
                 createdAt: number;
                 updatedAt: number;
+                author?: {
+                    login: string;
+                    avatarUrl: string;
+                    url: string;
+                } | null;
+                additions?: number;
+                deletions?: number;
             } | null;
         } | null;
     };
@@ -7461,6 +8094,13 @@ export type GetSessionsByIdPullRequestResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         } | null;
     };
 };
@@ -7499,11 +8139,117 @@ export type PostSessionsByIdPullRequestResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         };
     };
 };
 
 export type PostSessionsByIdPullRequestResponse = PostSessionsByIdPullRequestResponses[keyof PostSessionsByIdPullRequestResponses];
+
+export type GetSessionsByIdPullRequestDetailData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/pull-request/detail';
+};
+
+export type GetSessionsByIdPullRequestDetailResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions: number;
+            deletions: number;
+            body: string | null;
+            changedFiles: number;
+            commits: number;
+            comments: number;
+            reviewComments: number;
+            mergeable: boolean | null;
+            mergeableState: string;
+            createdAtIso: string;
+            updatedAtIso: string;
+            closedAtIso: string | null;
+            mergedAtIso: string | null;
+            reviewers: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            assignees: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            labels: Array<{
+                name: string;
+                color: string;
+            }>;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+            checks: Array<{
+                id: string;
+                name: string;
+                status: 'queued' | 'in_progress' | 'completed';
+                conclusion: string | null;
+                url: string | null;
+            }>;
+        };
+        timeline: Array<{
+            id: string;
+            kind: 'comment' | 'review';
+            author: {
+                login: string;
+                avatarUrl: string | null;
+                url: string | null;
+            } | null;
+            body: string | null;
+            state: string | null;
+            createdAt: string;
+            url: string | null;
+        }>;
+        files: Array<{
+            sha: string;
+            filename: string;
+            previousFilename: string | null;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch: string | null;
+            blobUrl: string;
+            rawUrl: string;
+        }>;
+    };
+};
+
+export type GetSessionsByIdPullRequestDetailResponse = GetSessionsByIdPullRequestDetailResponses[keyof GetSessionsByIdPullRequestDetailResponses];
 
 export type PostSessionsByIdPullRequestReadyData = {
     body?: never;
@@ -7533,11 +8279,231 @@ export type PostSessionsByIdPullRequestReadyResponses = {
             headSha: string | null;
             createdAt: number;
             updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
         };
     };
 };
 
 export type PostSessionsByIdPullRequestReadyResponse = PostSessionsByIdPullRequestReadyResponses[keyof PostSessionsByIdPullRequestReadyResponses];
+
+export type GetPullRequestsViewerData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/pull-requests/viewer';
+};
+
+export type GetPullRequestsViewerResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        viewer: {
+            login: string;
+            avatarUrl: string;
+            url: string;
+        };
+    };
+};
+
+export type GetPullRequestsViewerResponse = GetPullRequestsViewerResponses[keyof GetPullRequestsViewerResponses];
+
+export type GetPullRequestsAuthoredData = {
+    body?: never;
+    path?: never;
+    query: {
+        login: string;
+        after?: string;
+    };
+    url: '/pull-requests/authored';
+};
+
+export type GetPullRequestsAuthoredResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        items: Array<{
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+        }>;
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+};
+
+export type GetPullRequestsAuthoredResponse = GetPullRequestsAuthoredResponses[keyof GetPullRequestsAuthoredResponses];
+
+export type GetPullRequestsReviewingData = {
+    body?: never;
+    path?: never;
+    query: {
+        login: string;
+        after?: string;
+    };
+    url: '/pull-requests/reviewing';
+};
+
+export type GetPullRequestsReviewingResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        items: Array<{
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+        }>;
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+};
+
+export type GetPullRequestsReviewingResponse = GetPullRequestsReviewingResponses[keyof GetPullRequestsReviewingResponses];
+
+export type GetPullRequestsByOwnerByRepoByNumberDetailData = {
+    body?: never;
+    path: {
+        owner: string;
+        repo: string;
+        number: string;
+    };
+    query?: never;
+    url: '/pull-requests/{owner}/{repo}/{number}/detail';
+};
+
+export type GetPullRequestsByOwnerByRepoByNumberDetailResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions: number;
+            deletions: number;
+            body: string | null;
+            changedFiles: number;
+            commits: number;
+            comments: number;
+            reviewComments: number;
+            mergeable: boolean | null;
+            mergeableState: string;
+            createdAtIso: string;
+            updatedAtIso: string;
+            closedAtIso: string | null;
+            mergedAtIso: string | null;
+            reviewers: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            assignees: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            labels: Array<{
+                name: string;
+                color: string;
+            }>;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+            checks: Array<{
+                id: string;
+                name: string;
+                status: 'queued' | 'in_progress' | 'completed';
+                conclusion: string | null;
+                url: string | null;
+            }>;
+        };
+        timeline: Array<{
+            id: string;
+            kind: 'comment' | 'review';
+            author: {
+                login: string;
+                avatarUrl: string | null;
+                url: string | null;
+            } | null;
+            body: string | null;
+            state: string | null;
+            createdAt: string;
+            url: string | null;
+        }>;
+        files: Array<{
+            sha: string;
+            filename: string;
+            previousFilename: string | null;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch: string | null;
+            blobUrl: string;
+            rawUrl: string;
+        }>;
+    };
+};
+
+export type GetPullRequestsByOwnerByRepoByNumberDetailResponse = GetPullRequestsByOwnerByRepoByNumberDetailResponses[keyof GetPullRequestsByOwnerByRepoByNumberDetailResponses];
 
 export type GetSessionGroupsData = {
     body?: never;
@@ -16662,6 +17628,28 @@ export type DeleteChatComposerDraftsBySurfaceIdResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
+            }>;
+            files: Array<{
+                type: string;
+                mediaType: string;
+                filename?: string;
+                url: string;
+                providerMetadata?: unknown;
+                [key: string]: unknown;
+            }>;
+            pastedTexts: Array<{
+                id: string;
+                text: string;
+                lineCount: number;
+                charCount: number;
             }>;
         } | null;
         revision: number;
@@ -16716,6 +17704,28 @@ export type GetChatComposerDraftsBySurfaceIdResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
+            }>;
+            files: Array<{
+                type: string;
+                mediaType: string;
+                filename?: string;
+                url: string;
+                providerMetadata?: unknown;
+                [key: string]: unknown;
+            }>;
+            pastedTexts: Array<{
+                id: string;
+                text: string;
+                lineCount: number;
+                charCount: number;
             }>;
         } | null;
         revision: number;
@@ -16757,6 +17767,28 @@ export type PutChatComposerDraftsBySurfaceIdData = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
+            }>;
+            files: Array<{
+                type: string;
+                mediaType: string;
+                filename?: string;
+                url: string;
+                providerMetadata?: unknown;
+                [key: string]: unknown;
+            }>;
+            pastedTexts: Array<{
+                id: string;
+                text: string;
+                lineCount: number;
+                charCount: number;
             }>;
         };
     };
@@ -16802,6 +17834,28 @@ export type PutChatComposerDraftsBySurfaceIdResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
+            }>;
+            files: Array<{
+                type: string;
+                mediaType: string;
+                filename?: string;
+                url: string;
+                providerMetadata?: unknown;
+                [key: string]: unknown;
+            }>;
+            pastedTexts: Array<{
+                id: string;
+                text: string;
+                lineCount: number;
+                charCount: number;
             }>;
         } | null;
         revision: number;
@@ -17970,6 +19024,14 @@ export type GetChatSessionsBySessionIdQueueResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
             }>;
             providerTargetId: string | null;
             modelId: string | null;
@@ -18026,6 +19088,14 @@ export type PostChatSessionsBySessionIdQueueData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId?: string;
@@ -18087,6 +19157,14 @@ export type PostChatSessionsBySessionIdQueueResponses = {
                 path: string;
             } | null;
             position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
+            position?: number;
         }>;
         providerTargetId: string | null;
         modelId: string | null;
@@ -18142,6 +19220,14 @@ export type PostChatSessionsBySessionIdSteerData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId?: string;
@@ -18217,6 +19303,14 @@ export type PostChatSessionsBySessionIdSteerResponses = {
                     name: string;
                     path: string;
                 } | null;
+                position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
                 position?: number;
             }>;
             providerTargetId: string | null;
@@ -18294,6 +19388,14 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
                     path: string;
                 } | null;
                 position?: number;
+            } | {
+                type: string;
+                workspaceId: string;
+                path: string;
+                lineStart: number;
+                lineEnd: number;
+                comment: string;
+                position?: number;
             }>;
             providerTargetId: string | null;
             modelId: string | null;
@@ -18368,6 +19470,14 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
                 path: string;
             } | null;
             position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
+            position?: number;
         }>;
         providerTargetId: string | null;
         modelId: string | null;
@@ -18423,6 +19533,14 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId?: string;
@@ -18484,6 +19602,14 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         providerTargetId: string | null;
@@ -18698,6 +19824,14 @@ export type PostChatSessionsBySessionIdResponseData = {
                 path: string;
             } | null;
             position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
+            position?: number;
         }>;
         messages?: Array<{
             id: string;
@@ -18769,6 +19903,14 @@ export type PostChatSideConversationsBySideConversationIdResponseData = {
                 name: string;
                 path: string;
             } | null;
+            position?: number;
+        } | {
+            type: string;
+            workspaceId: string;
+            path: string;
+            lineStart: number;
+            lineEnd: number;
+            comment: string;
             position?: number;
         }>;
         messages?: Array<{

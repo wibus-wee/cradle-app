@@ -10,7 +10,11 @@ import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
-import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
+import {
+  classifyProductAnalyticsFailure,
+  trackProductTaskFinished,
+  trackProductTaskStarted,
+} from '~/features/product-analytics/client'
 import { useMarkSessionPullRequestReady } from '~/features/session/use-session-pull-request'
 import { apiErrorMessage } from '~/lib/api-error'
 
@@ -72,7 +76,11 @@ export function WorkHeaderChrome({ workId }: { workId: string }) {
       trackProductTaskFinished(analyticsTask, 'success')
     }
     catch (error) {
-      trackProductTaskFinished(analyticsTask, 'failed')
+      trackProductTaskFinished(
+        analyticsTask,
+        'failed',
+        classifyProductAnalyticsFailure(error),
+      )
       toastManager.add({
         type: 'error',
         title: t('aside.submitFailed'),
@@ -104,7 +112,11 @@ export function WorkHeaderChrome({ workId }: { workId: string }) {
       })
     }
     catch (error) {
-      trackProductTaskFinished(analyticsTask, 'failed')
+      trackProductTaskFinished(
+        analyticsTask,
+        'failed',
+        classifyProductAnalyticsFailure(error),
+      )
       toastManager.add({
         type: 'error',
         title: t('aside.markReadyFailed'),

@@ -1,34 +1,86 @@
-import type { ReactNode } from 'react'
-import { useCallback, useRef, useState } from 'react'
+import './dockview-theme-cradle'
+
+import type { CSSProperties, ReactNode } from 'react'
+import { useCallback, useRef } from 'react'
 
 import { isSessionDragEvent, readDraggedSessionId } from '~/features/workspace/session-drag-data'
-import { cn } from '~/lib/utils'
 
 import type { FlatSplitDirection } from './chat-split-drop-quadrant'
 import { directionFromDropPoint } from './chat-split-drop-quadrant'
-import { useChatSplitWorkspaceStore } from './chat-split-workspace-store'
+import type { ChatSplitHover, ChatSplitHoverBounds } from './chat-split-hover'
+import { clearChatSplitHover, setChatSplitHover } from './chat-split-hover'
+import { splitSession } from './chat-split-session'
 
-const DIRECTION_OVERLAY_CLASSES: Record<FlatSplitDirection, string> = {
-  left: 'inset-y-0 left-0 w-1/2',
-  right: 'inset-y-0 right-0 w-1/2',
-  above: 'inset-x-0 top-0 h-1/2',
-  below: 'inset-x-0 bottom-0 h-1/2',
+/**
+ * Geometry for the sliding drop fill — same half-pane quadrants dockview uses,
+ * expressed as percentages so CSS can animate top/left/width/height between
+ * directions instead of swapping discrete class names.
+ */
+function indicatorStyleForDirection(direction: FlatSplitDirection): CSSProperties {
+  switch (direction) {
+    case 'left':
+      return { top: 0, left: 0, width: '50%', height: '100%' }
+    case 'right':
+      return { top: 0, left: '50%', width: '50%', height: '100%' }
+    case 'above':
+      return { top: 0, left: 0, width: '100%', height: '50%' }
+    case 'below':
+      return { top: '50%', left: 0, width: '100%', height: '50%' }
+  }
 }
 
-export function ChatSplitDropIndicator({ direction }: { direction: FlatSplitDirection }) {
-  return (
+function boundsFromRect(rect: DOMRectReadOnly): ChatSplitHoverBounds {
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  }
+}
+
+export function ChatSplitDropIndicator({
+  direction,
+  bounds,
+}: {
+  direction: FlatSplitDirection
+  bounds?: ChatSplitHoverBounds | null
+}) {
+  // Keep a single fill node so top/left/width/height can CSS-transition when
+  // the pointer crosses quadrants — same idea as dockview's selection overlay.
+  const fill = (
     <div
       aria-hidden="true"
-      className={cn(
-        'pointer-events-none absolute z-50 rounded-md border-2 transition-opacity duration-150 ease-out',
-        DIRECTION_OVERLAY_CLASSES[direction],
-      )}
-      style={{
-        backgroundColor: 'var(--dv-drag-over-background-color)',
-        borderColor: 'var(--dv-drag-over-border-color)',
-      }}
+      className="chat-split-drop-indicator"
+      style={indicatorStyleForDirection(direction)}
     />
   )
+
+  if (bounds) {
+    return (
+      <div
+        aria-hidden="true"
+        className="chat-split-drop-indicator-host dockview-theme-cradle"
+        style={{
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+        }}
+      >
+        {fill}
+      </div>
+    )
+  }
+
+  return (
+    <div aria-hidden="true" className="chat-split-drop-indicator-host-local dockview-theme-cradle">
+      {fill}
+    </div>
+  )
+}
+
+export function ChatSplitDropIndicatorFromHover({ hover }: { hover: ChatSplitHover }) {
+  return <ChatSplitDropIndicator direction={hover.direction} bounds={hover.bounds} />
 }
 
 /**
@@ -36,6 +88,9 @@ export function ChatSplitDropIndicator({ direction }: { direction: FlatSplitDire
  * sidebar can create the very first split pane. Once a workspace has two or
  * more panes, `dockview` itself takes over drag-and-drop handling — this
  * component only exists to bootstrap that transition.
+ *
+ * Hover feedback goes through the shared `chat-split-hover` state so the
+ * parent can render one overlay for both sidebar and top-tab drags.
  */
 export function ChatSplitFlatDropZone({
   surfaceId,
@@ -47,8 +102,6 @@ export function ChatSplitFlatDropZone({
   children: ReactNode
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [hoverDirection, setHoverDirection] = useState<FlatSplitDirection | null>(null)
-  const addPane = useChatSplitWorkspaceStore(state => state.addPane)
 
   const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (!isSessionDragEvent(event.dataTransfer)) {
@@ -60,16 +113,20 @@ export function ChatSplitFlatDropZone({
     if (!bounds) {
       return
     }
-    setHoverDirection(directionFromDropPoint(bounds, event))
-  }, [])
+    setChatSplitHover({
+      surfaceId,
+      direction: directionFromDropPoint(bounds, event),
+      bounds: boundsFromRect(bounds),
+    })
+  }, [surfaceId])
 
   const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     const nextTarget = event.relatedTarget
     if (containerRef.current && nextTarget instanceof Node && containerRef.current.contains(nextTarget)) {
       return
     }
-    setHoverDirection(null)
-  }, [])
+    clearChatSplitHover(surfaceId)
+  }, [surfaceId])
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (!isSessionDragEvent(event.dataTransfer)) {
@@ -78,14 +135,14 @@ export function ChatSplitFlatDropZone({
     event.preventDefault()
     const sessionId = readDraggedSessionId(event.dataTransfer)
     const bounds = containerRef.current?.getBoundingClientRect()
-    setHoverDirection(null)
+    clearChatSplitHover(surfaceId)
 
     if (!sessionId || sessionId === primarySessionId) {
       return
     }
     const direction = bounds ? directionFromDropPoint(bounds, event) : 'right'
-    addPane(surfaceId, sessionId, direction)
-  }, [addPane, primarySessionId, surfaceId])
+    splitSession(surfaceId, sessionId, direction)
+  }, [primarySessionId, surfaceId])
 
   return (
     <div
@@ -98,7 +155,6 @@ export function ChatSplitFlatDropZone({
       onDrop={handleDrop}
     >
       {children}
-      {hoverDirection && <ChatSplitDropIndicator direction={hoverDirection} />}
     </div>
   )
 }

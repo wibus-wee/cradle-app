@@ -7,7 +7,6 @@ import { submitSideConversationMessage } from '~/features/browser/side-conversat
 import { updateSessionInSessionLists } from '~/features/workspace/use-session'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { chatSelectors, useChatStore } from '~/store/chat'
-import { useLayoutStore } from '~/store/layout'
 
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
 import { readBangCommand } from '../commands/bang-command'
@@ -112,7 +111,7 @@ export function useChatActions(input: UseChatActionsInput) {
         })
         useChatStore.getState().removeMessage(chatSessionId, driverMessageId)
 
-        const ownerId = useLayoutStore.getState().activeBrowserPanelOwnerId
+        const ownerId = useBrowserPanelStore.getState().activeOwnerId
         useBrowserPanelStore.getState().openSideConversationTab({
           parentSessionId: chatSessionId,
           sideConversationId: result.sideConversationId,
@@ -120,8 +119,6 @@ export function useChatActions(input: UseChatActionsInput) {
           title: result.title,
           ownerId,
         })
-        useLayoutStore.getState().setBrowserPanelOpen(true, ownerId)
-
         if (sideChatMessage || files.length > 0 || contextParts.length > 0) {
           await submitSideConversationMessage({
             sideConversationId: result.sideConversationId,
@@ -285,8 +282,9 @@ export function useChatActions(input: UseChatActionsInput) {
           handler.finish('aborted')
         }
         else if (!acceptedByServer) {
+          // Always close the analytics task, even when the UI rolls back the optimistic turn.
+          handler.fail(err instanceof Error ? err.message : 'Stream failed')
           const store = useChatStore.getState()
-          store.finishGeneration(assistantMessageId)
           store.removeMessage(chatSessionId, assistantMessageId)
           store.removeMessage(chatSessionId, userMessageId)
           throw err

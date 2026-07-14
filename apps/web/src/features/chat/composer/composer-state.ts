@@ -50,16 +50,33 @@ function areContextPartsEqual(left: ChatContextPart[], right: ChatContextPart[])
 
   return left.every((leftPart, index) => {
     const rightPart = right[index]
-    if (!rightPart || leftPart.type !== rightPart.type || leftPart.position !== rightPart.position) {
+    if (
+      !rightPart
+      || leftPart.type !== rightPart.type
+      || leftPart.position !== rightPart.position
+    ) {
       return false
     }
 
     if (leftPart.type === 'data-cradle-skill') {
-      return rightPart.type === 'data-cradle-skill'
+      return (
+        rightPart.type === 'data-cradle-skill'
         && leftPart.name === rightPart.name
         && leftPart.path === rightPart.path
         && leftPart.scope === rightPart.scope
         && leftPart.description === rightPart.description
+      )
+    }
+
+    if (leftPart.type === 'data-cradle-file-line-comment') {
+      return (
+        rightPart.type === 'data-cradle-file-line-comment'
+        && leftPart.workspaceId === rightPart.workspaceId
+        && leftPart.path === rightPart.path
+        && leftPart.lineStart === rightPart.lineStart
+        && leftPart.lineEnd === rightPart.lineEnd
+        && leftPart.comment === rightPart.comment
+      )
     }
 
     if (rightPart.type !== 'data-cradle-plugin') {
@@ -68,15 +85,15 @@ function areContextPartsEqual(left: ChatContextPart[], right: ChatContextPart[])
 
     const leftNativeMention = leftPart.nativeMention ?? null
     const rightNativeMention = rightPart.nativeMention ?? null
-    const nativeMentionEqual = leftNativeMention === rightNativeMention
-      || (
-        leftNativeMention !== null
-        && rightNativeMention !== null
-        && leftNativeMention.name === rightNativeMention.name
-        && leftNativeMention.path === rightNativeMention.path
-      )
+    const nativeMentionEqual
+      = leftNativeMention === rightNativeMention
+        || (leftNativeMention !== null
+          && rightNativeMention !== null
+          && leftNativeMention.name === rightNativeMention.name
+          && leftNativeMention.path === rightNativeMention.path)
 
-    return nativeMentionEqual
+    return (
+      nativeMentionEqual
       && leftPart.provider === rightPart.provider
       && leftPart.pluginName === rightPart.pluginName
       && leftPart.displayName === rightPart.displayName
@@ -87,17 +104,21 @@ function areContextPartsEqual(left: ChatContextPart[], right: ChatContextPart[])
       && leftPart.capabilities.length === rightPart.capabilities.length
       && leftPart.capabilities.every((capability, capabilityIndex) => {
         const rightCapability = rightPart.capabilities[capabilityIndex]
-        return Boolean(rightCapability)
+        return (
+          Boolean(rightCapability)
           && capability.id === rightCapability.id
           && capability.type === rightCapability.type
           && capability.layer === rightCapability.layer
           && capability.label === rightCapability.label
+        )
       })
+    )
   })
 }
 
 function areComposerStatesEqual(left: ComposerState, right: ComposerState): boolean {
-  return left.inputValue === right.inputValue
+  return (
+    left.inputValue === right.inputValue
     && left.mentionActive === right.mentionActive
     && left.mentionQuery === right.mentionQuery
     && left.slashActive === right.slashActive
@@ -106,6 +127,7 @@ function areComposerStatesEqual(left: ComposerState, right: ComposerState): bool
     && left.skillQuery === right.skillQuery
     && left.selectedSlashCommand === right.selectedSlashCommand
     && areContextPartsEqual(left.contextParts, right.contextParts)
+  )
 }
 
 export function composerReducer(state: ComposerState, action: ComposerAction): ComposerState {

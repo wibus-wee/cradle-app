@@ -14,6 +14,7 @@ import {
   ExternalLinkLine as ExternalLinkIcon,
   FileLine as FileTextIcon,
   GitCompareLine as FileDiffIcon,
+  GitPullRequestLine as PullRequestIcon,
   GlobeLine as GlobeIcon,
   LayoutTopLine as PanelTopIcon,
   PencilLine as PencilIcon,
@@ -39,20 +40,16 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
-import {
-  Empty,
-  EmptyContent,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '~/components/ui/empty'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '~/components/ui/empty'
 import { Input } from '~/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Spinner } from '~/components/ui/spinner'
 import {
+submitChatComposerContextIngress,
   submitChatComposerFileIngress,
   submitChatPromptIngress,
 } from '~/features/chat/prompt-ingress'
+import { PullRequestDetailPanel } from '~/features/pull-requests/pull-request-detail-panel'
 import type { TerminalMetadata } from '~/features/tui/terminal-metadata'
 import { WorkspaceFileEditor } from '~/features/workspace/workspace-file-editor'
 import { WorkspaceFilePreview } from '~/features/workspace/workspace-file-preview'
@@ -78,9 +75,7 @@ import { useLayoutStore } from '~/store/layout'
 
 import { releaseSideConversation } from '../chat/commands/chat-response-command'
 import type { BrowserAnnotationAdjustmentApplyDetail } from './browser-annotation-adjustment-panel'
-import {
-  BROWSER_ANNOTATION_ADJUSTMENT_APPLY_EVENT,
-} from './browser-annotation-adjustment-panel'
+import { BROWSER_ANNOTATION_ADJUSTMENT_APPLY_EVENT } from './browser-annotation-adjustment-panel'
 import type { BrowserAddressSuggestion } from './browser-panel.logic'
 import {
   browserAddressDisplayValue,
@@ -105,6 +100,8 @@ import {
 } from './plan-refine-editor'
 import { SideConversationPanel } from './side-conversation-panel'
 import { SubagentOutputPanel } from './subagent-output-panel'
+import type { BrowserLocalServer } from './use-local-servers'
+import { useLocalServers } from './use-local-servers'
 import { WorkspaceDiffViewer } from './workspace-diff-viewer'
 
 interface BrowserPanelProps {
@@ -118,13 +115,6 @@ interface BrowserPanelProps {
 }
 
 type ChromeKey = keyof typeof import('~/locales/default').default.chrome
-
-interface BrowserLocalServer {
-  port: number
-  url: string
-  title: string
-  statusCode: number | null
-}
 
 interface BrowserPromptAttachment {
   filename?: string
@@ -187,7 +177,6 @@ const BROWSER_SCREENSHOT_CHUNK_SIZE = 0x8000
 const BROWSER_NATIVE_OCCLUSION_MARGIN = 6
 const BROWSER_NATIVE_OCCLUSION_MIN_SIZE = 32
 const EMPTY_BROWSER_PANEL_TABS: BrowserPanelTab[] = []
-const EMPTY_BROWSER_LOCAL_SERVERS: BrowserLocalServer[] = []
 const EMPTY_BROWSER_ANNOTATION_LAYOUT_HINTS: BrowserAnnotationLayoutHint[] = []
 const EMPTY_BROWSER_ANNOTATION_LAYOUT_HINTS_BY_TAB_ID: Record<
   string,
@@ -218,6 +207,22 @@ interface BrowserNativeBounds {
   width: number
   height: number
 }
+
+interface BrowserWebviewElement extends HTMLElement {
+  getWebContentsId?: () => number
+}
+
+const BROWSER_RENDERER_OBSCURING_OVERLAY_SELECTOR = [
+  '[data-slot="popover-content"]',
+  '[data-slot="dropdown-menu-content"]',
+  '[data-slot="context-menu-content"]',
+  '[data-slot="hover-card-content"]',
+  '[data-slot="select-content"]',
+  '[data-slot="command-dialog-content"]',
+  '[data-slot="dialog-content"]',
+  '[data-slot="alert-dialog-content"]',
+  '[role="dialog"][aria-modal="true"]',
+].join(', ')
 
 function readBrowserBridge() {
   return window.cradle?.browser ?? null
@@ -272,6 +277,35 @@ function rectsIntersect(
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 }
 
+function setBrowserWebviewOccluded(webview: BrowserWebviewElement | null, occluded: boolean): void {
+  if (!webview) {
+    return
+  }
+  webview.style.visibility = occluded ? 'hidden' : 'visible'
+  webview.style.pointerEvents = occluded ? 'none' : 'auto'
+}
+
+function hasRendererBrowserObscuringOverlay(viewportRect: DOMRect): boolean {
+  if (typeof document === 'undefined') {
+    return false
+  }
+  const overlays = document.querySelectorAll<HTMLElement>(
+    BROWSER_RENDERER_OBSCURING_OVERLAY_SELECTOR,
+  )
+  for (const overlay of overlays) {
+    const styles = window.getComputedStyle(overlay)
+    if (styles.display === 'none' || styles.visibility === 'hidden' || styles.opacity === '0') {
+      continue
+    }
+    for (const overlayRect of overlay.getClientRects()) {
+      if (rectsIntersect(viewportRect, overlayRect)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 function applyBrowserNativeSurfaceOcclusions(
   bounds: BrowserNativeBounds,
   viewportRect: DOMRect,
@@ -285,7 +319,9 @@ function applyBrowserNativeSurfaceOcclusions(
   const right = bounds.x + bounds.width
   let bottom = bounds.y + bounds.height
   const viewportCenterY = bounds.y + bounds.height / 2
-  const occluders = document.querySelectorAll<HTMLElement>(BROWSER_NATIVE_SURFACE_OCCLUSION_SELECTOR)
+  const occluders = document.querySelectorAll<HTMLElement>(
+    BROWSER_NATIVE_SURFACE_OCCLUSION_SELECTOR,
+  )
 
   for (const occluder of occluders) {
     const rect = occluder.getBoundingClientRect()
@@ -346,7 +382,9 @@ function isBrowserPanelTab(tab: BrowserPanelTab): tab is BrowserWebTab {
   return tab.kind === 'browser'
 }
 
-function isPlanRefineEditorDirtyEvent(event: Event): event is CustomEvent<PlanRefineEditorDirtyDetail> {
+function isPlanRefineEditorDirtyEvent(
+  event: Event,
+): event is CustomEvent<PlanRefineEditorDirtyDetail> {
   return (
     event instanceof CustomEvent
     && typeof event.detail === 'object'
@@ -356,7 +394,9 @@ function isPlanRefineEditorDirtyEvent(event: Event): event is CustomEvent<PlanRe
   )
 }
 
-function isPlanRefineEditorSaveEvent(event: Event): event is CustomEvent<PlanRefineEditorSaveDetail> {
+function isPlanRefineEditorSaveEvent(
+  event: Event,
+): event is CustomEvent<PlanRefineEditorSaveDetail> {
   return (
     event instanceof CustomEvent
     && typeof event.detail === 'object'
@@ -381,10 +421,6 @@ function localServerStatusLabel(statusCode: number | null): string {
     return `${statusCode} redirect`
   }
   return `${statusCode}`
-}
-
-function isReadyLocalServer(server: BrowserLocalServer): boolean {
-  return server.statusCode !== null && server.statusCode >= 200 && server.statusCode < 300
 }
 
 interface BrowserNewTabSurfaceProps {
@@ -501,9 +537,7 @@ function BrowserPanelCreateSurface({
           disabled={browserPending}
           aria-label="Create browser tab"
         >
-          {browserPending
-            ? <Spinner className="size-4" />
-            : <GlobeIcon className="size-4" />}
+          {browserPending ? <Spinner className="size-4" /> : <GlobeIcon className="size-4" />}
           <span>Browser</span>
         </Button>
         <Button
@@ -619,14 +653,10 @@ function isBrowserPromptAttachment(value: unknown): value is BrowserPromptAttach
     value
     && typeof value === 'object'
     && typeof (value as BrowserPromptAttachment).url === 'string'
-    && (
-      (value as BrowserPromptAttachment).filename === undefined
-      || typeof (value as BrowserPromptAttachment).filename === 'string'
-    )
-    && (
-      (value as BrowserPromptAttachment).mediaType === undefined
-      || typeof (value as BrowserPromptAttachment).mediaType === 'string'
-    ),
+    && ((value as BrowserPromptAttachment).filename === undefined
+      || typeof (value as BrowserPromptAttachment).filename === 'string')
+    && ((value as BrowserPromptAttachment).mediaType === undefined
+      || typeof (value as BrowserPromptAttachment).mediaType === 'string'),
   )
 }
 
@@ -635,11 +665,13 @@ function isBrowserPromptRequest(value: unknown): value is BrowserPromptRequest {
     return false
   }
   const candidate = value as BrowserPromptRequest
-  return typeof candidate.threadId === 'string'
+  return (
+    typeof candidate.threadId === 'string'
     && typeof candidate.tabId === 'string'
     && typeof candidate.text === 'string'
     && Array.isArray(candidate.attachments)
     && candidate.attachments.every(isBrowserPromptAttachment)
+  )
 }
 
 function isBrowserAnnotationRuntimeEvent(value: unknown): value is BrowserAnnotationRuntimeEvent {
@@ -647,10 +679,10 @@ function isBrowserAnnotationRuntimeEvent(value: unknown): value is BrowserAnnota
     return false
   }
   const candidate = value as BrowserAnnotationRuntimeEvent
-  return typeof candidate.threadId === 'string'
+  return (
+    typeof candidate.threadId === 'string'
     && typeof candidate.tabId === 'string'
-    && (
-      candidate.type === 'ready'
+    && (candidate.type === 'ready'
       || candidate.type === 'selected-element'
       || candidate.type === 'save'
       || candidate.type === 'submit'
@@ -661,8 +693,8 @@ function isBrowserAnnotationRuntimeEvent(value: unknown): value is BrowserAnnota
       || candidate.type === 'clear'
       || candidate.type === 'delete'
       || candidate.type === 'edit'
-      || candidate.type === 'layout-sync'
-    )
+      || candidate.type === 'layout-sync')
+  )
 }
 
 function isBrowserAnnotationAdjustmentApplyEvent(
@@ -696,7 +728,7 @@ function screenshotFileNameForBrowserAnnotationUrl(url: string): string {
     const host = parsed.hostname.replace(/[^a-z0-9.-]+/gi, '-').replace(/^-+|-+$/g, '')
     return `${host || 'browser'}-annotation.png`
   }
-  catch {
+ catch {
     return 'browser-annotation.png'
   }
 }
@@ -729,7 +761,7 @@ async function captureBrowserAnnotationScreenshot(input: {
       bytes: screenshot.bytes,
     })
   }
-  catch {
+ catch {
     const result = await input.bridge.executeCdp({
       threadId: input.threadId,
       tabId: input.tabId,
@@ -766,7 +798,9 @@ function formatBrowserAnnotationAnchor(anchor: BrowserAnnotationAnchor): string 
   return `region (${Math.round(anchor.x)}, ${Math.round(anchor.y)}, ${Math.round(anchor.width)} x ${Math.round(anchor.height)})`
 }
 
-function getBrowserAnnotationCropRect(anchor: BrowserAnnotationAnchor): BrowserAnnotationCropRect | null {
+function getBrowserAnnotationCropRect(
+  anchor: BrowserAnnotationAnchor,
+): BrowserAnnotationCropRect | null {
   if (anchor.kind === 'point') {
     return null
   }
@@ -852,9 +886,7 @@ async function createBrowserAnnotationCropFilePart(input: {
 
 function formatBrowserAnnotationElementDetails(anchor: BrowserAnnotationAnchor): string[] {
   if (anchor.kind === 'text') {
-    return [
-      `Selected text: "${anchor.text}"`,
-    ]
+    return [`Selected text: "${anchor.text}"`]
   }
   if (anchor.kind !== 'element') {
     return []
@@ -868,7 +900,9 @@ function formatBrowserAnnotationElementDetails(anchor: BrowserAnnotationAnchor):
     element.role ? `Element role: ${element.role}` : null,
     element.attributes?.testId ? `Element test id: ${element.attributes.testId}` : null,
     element.attributes?.href ? `Element href: ${element.attributes.href}` : null,
-    element.attributes?.placeholder ? `Element placeholder: ${element.attributes.placeholder}` : null,
+    element.attributes?.placeholder
+      ? `Element placeholder: ${element.attributes.placeholder}`
+      : null,
     'Element styles:',
     `- color: ${element.styles.color}`,
     `- background: ${element.styles.backgroundColor}`,
@@ -985,9 +1019,8 @@ function getBrowserAnnotationPreviewTarget(
     }
   }
 
-  const rect = annotation.anchor.kind === 'element'
-    ? annotation.anchor.element.rect
-    : annotation.anchor
+  const rect
+    = annotation.anchor.kind === 'element' ? annotation.anchor.element.rect : annotation.anchor
   return {
     mode: 'rect',
     style: {
@@ -1022,7 +1055,9 @@ function createBrowserAnnotationPrompt(input: {
     ...formatBrowserAnnotationDesignChange(input.designChange),
     '',
     input.body,
-  ].filter(line => line !== null).join('\n')
+  ]
+    .filter(line => line !== null)
+    .join('\n')
 }
 
 interface BrowserAnnotationRailProps {
@@ -1107,9 +1142,7 @@ function BrowserAnnotationRail({
         <div className="min-h-0 overflow-y-auto px-1.5 pb-1.5">
           {annotations.map((annotation, index) => {
             const previewTarget = getBrowserAnnotationPreviewTarget(annotation)
-            const designChangeCount = countBrowserAnnotationDesignChanges(
-              annotation.designChange,
-            )
+            const designChangeCount = countBrowserAnnotationDesignChanges(annotation.designChange)
             return (
               <div
                 key={annotation.id}
@@ -1199,12 +1232,16 @@ function BrowserAnnotationRail({
                         size="icon-sm"
                         className="size-6 rounded-md text-muted-foreground hover:text-foreground"
                         onClick={() => onSend(annotation)}
-                        title={annotation.status === 'sent'
-                          ? 'Resend browser annotation'
-                          : 'Send browser annotation'}
-                        aria-label={annotation.status === 'sent'
-                          ? 'Resend browser annotation'
-                          : 'Send browser annotation'}
+                        title={
+                          annotation.status === 'sent'
+                            ? 'Resend browser annotation'
+                            : 'Send browser annotation'
+                        }
+                        aria-label={
+                          annotation.status === 'sent'
+                            ? 'Resend browser annotation'
+                            : 'Send browser annotation'
+                        }
                       >
                         <SendIcon className="size-3" />
                       </Button>
@@ -1253,15 +1290,15 @@ export function BrowserPanel({
   const openLauncherTab = useBrowserPanelStore(state => state.openLauncherTab)
   const openTuiTab = useBrowserPanelStore(state => state.openTuiTab)
   const updateTuiTabTitle = useBrowserPanelStore(state => state.updateTuiTabTitle)
-  const openContextUsageReportTab = useBrowserPanelStore(
-    state => state.openContextUsageReportTab,
-  )
+  const openContextUsageReportTab = useBrowserPanelStore(state => state.openContextUsageReportTab)
   const saveAnnotation = useBrowserPanelStore(state => state.saveAnnotation)
   const markAnnotationSent = useBrowserPanelStore(state => state.markAnnotationSent)
   const deleteAnnotation = useBrowserPanelStore(state => state.deleteAnnotation)
   const clearAnnotations = useBrowserPanelStore(state => state.clearAnnotations)
   const syncAnnotationLayoutHints = useBrowserPanelStore(state => state.syncAnnotationLayoutHints)
-  const annotationAdjustmentSession = useBrowserPanelStore(state => state.annotationAdjustmentSession)
+  const annotationAdjustmentSession = useBrowserPanelStore(
+    state => state.annotationAdjustmentSession,
+  )
   const setAnnotationAdjustmentSession = useBrowserPanelStore(
     state => state.setAnnotationAdjustmentSession,
   )
@@ -1280,6 +1317,10 @@ export function BrowserPanel({
   )
 
   const viewportRef = useRef<HTMLDivElement | null>(null)
+  const browserWebviewHostRef = useRef<HTMLDivElement | null>(null)
+  const browserWebviewRef = useRef<BrowserWebviewElement | null>(null)
+  const browserWebviewTabIdRef = useRef<string | null>(null)
+  const browserWebviewAttachKeyRef = useRef<string | null>(null)
   const previousActiveTabIdRef = useRef<string | null>(null)
   const addressDraftByTabIdRef = useRef<Map<string, string>>(new Map())
   const lastSyncedAddressValueRef = useRef<string | undefined>(undefined)
@@ -1287,22 +1328,15 @@ export function BrowserPanel({
   const stableBoundsFrameCountRef = useRef(0)
   const animationFrameRef = useRef<number | null>(null)
   const lastNativeBoundsSignatureRef = useRef<string | null>(null)
-  const localServerDiscoveryRequestRef = useRef(0)
   const newTabRequestInFlightRef = useRef(false)
   const [addressValue, setAddressValue] = useState('')
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
-  const [annotationSession, setAnnotationSession] = useState<BrowserAnnotationRuntimeSession | null>(
-    null,
-  )
+  const [annotationSession, setAnnotationSession]
+    = useState<BrowserAnnotationRuntimeSession | null>(null)
   const [, setAnnotationSubmitting] = useState(false)
-  const [localServers, setLocalServers] = useState<BrowserLocalServer[]>(
-    EMPTY_BROWSER_LOCAL_SERVERS,
-  )
-  const [localServersLoading, setLocalServersLoading] = useState(false)
   const [newTabRequestPending, setNewTabRequestPending] = useState(false)
-  const [localServersError, setLocalServersError] = useState<string | null>(null)
   const [dirtyPlanRefineTabIds, setDirtyPlanRefineTabIds] = useState<Set<string>>(() => new Set())
   const [discardPromptTabId, setDiscardPromptTabId] = useState<string | null>(null)
   const nativeBrowserAvailable = Boolean(readBrowserBridge())
@@ -1320,96 +1354,41 @@ export function BrowserPanel({
   const activeBrowserTabId = activeBrowserTab?.id ?? null
   const activeBrowserTabUrl = activeBrowserTab?.lastCommittedUrl ?? activeBrowserTab?.url ?? null
   const activeBrowserTabIsBlank = isBrowserBlankTab(activeBrowserTab)
+  const {
+    servers: localServers,
+    loading: localServersLoading,
+    error: localServersError,
+    refresh: refreshLocalServers,
+  } = useLocalServers(activeBrowserTabIsBlank)
   const canCreateTuiTab = Boolean(terminalCwd)
-  const activeBrowserAnnotations = ownerAnnotations.filter(annotation => annotation.tabId === activeBrowserTabId)
+  const activeBrowserAnnotations = ownerAnnotations.filter(
+    annotation => annotation.tabId === activeBrowserTabId,
+  )
   const activeBrowserAnnotationLayoutHints = activeBrowserTabId
-    ? (
-        ownerAnnotationLayoutHintsByTabId[activeBrowserTabId]
-        ?? EMPTY_BROWSER_ANNOTATION_LAYOUT_HINTS
-      )
+    ? (ownerAnnotationLayoutHintsByTabId[activeBrowserTabId]
+      ?? EMPTY_BROWSER_ANNOTATION_LAYOUT_HINTS)
     : EMPTY_BROWSER_ANNOTATION_LAYOUT_HINTS
-  const activeAnnotationSession = annotationSession?.tabId === activeBrowserTabId
-    ? annotationSession
-    : null
+  const activeAnnotationSession
+    = annotationSession?.tabId === activeBrowserTabId ? annotationSession : null
   const hasActiveAnnotationSession = activeAnnotationSession !== null
   const suggestions = buildBrowserAddressSuggestions({
-        query: addressValue,
-        activeTabId: activeBrowserTabId,
-        tabs: browserTabs,
-        recentHistory,
-      })
-  const chromeStatus = activePanelTab?.kind === 'browser' || localError || browserState?.lastError
-    ? resolveBrowserChromeStatus({
-      localError,
-      threadLastError: browserState?.lastError,
-      activeTabStatus: activeBrowserTab?.status ?? 'suspended',
-      hasActiveTab: Boolean(activeBrowserTab),
-      workspaceReady: Boolean(browserState),
-    })
-    : null
+    query: addressValue,
+    activeTabId: activeBrowserTabId,
+    tabs: browserTabs,
+    recentHistory,
+  })
+  const chromeStatus
+    = activePanelTab?.kind === 'browser' || localError || browserState?.lastError
+      ? resolveBrowserChromeStatus({
+          localError,
+          threadLastError: browserState?.lastError,
+          activeTabStatus: activeBrowserTab?.status ?? 'suspended',
+          hasActiveTab: Boolean(activeBrowserTab),
+          workspaceReady: Boolean(browserState),
+        })
+      : null
   const chromeStatusLabel = chromeStatus?.label ?? null
   const chromeStatusTone = chromeStatus?.tone ?? null
-
-  const refreshLocalServers = useCallback(() => {
-    const requestId = localServerDiscoveryRequestRef.current + 1
-    localServerDiscoveryRequestRef.current = requestId
-
-    queueMicrotask(() => {
-      if (localServerDiscoveryRequestRef.current !== requestId) {
-        return
-      }
-
-      const bridge = readBrowserBridge()
-      if (!bridge) {
-        setLocalServers(EMPTY_BROWSER_LOCAL_SERVERS)
-        setLocalServersLoading(false)
-        setLocalServersError('Local discovery is available in the desktop app.')
-        return
-      }
-
-      setLocalServersLoading(true)
-      setLocalServersError(null)
-      void bridge
-        .discoverLocalServers()
-        .then((servers) => {
-          if (localServerDiscoveryRequestRef.current !== requestId) {
-            return
-          }
-          setLocalServers(servers.filter(isReadyLocalServer))
-        })
-        .catch((error) => {
-          if (localServerDiscoveryRequestRef.current !== requestId) {
-            return
-          }
-          const message = error instanceof Error ? error.message : 'Local discovery failed.'
-          setLocalServers(EMPTY_BROWSER_LOCAL_SERVERS)
-          setLocalServersError(message)
-        })
-        .finally(() => {
-          if (localServerDiscoveryRequestRef.current !== requestId) {
-            return
-          }
-          setLocalServersLoading(false)
-        })
-    })
-  }, [])
-
-  const refreshBlankLocalServers = useEffectEvent(() => {
-    if (!activeBrowserTabIsBlank) {
-      return
-    }
-    refreshLocalServers()
-  })
-
-  useEffect(() => {
-    return () => {
-      localServerDiscoveryRequestRef.current += 1
-    }
-  }, [])
-
-  useEffect(() => {
-    refreshBlankLocalServers()
-  }, [activeBrowserTabId, activeBrowserTabIsBlank])
 
   useEffect(() => {
     if (resolvedActivePanelTabId && resolvedActivePanelTabId !== activePanelTabId) {
@@ -1445,7 +1424,7 @@ export function BrowserPanel({
       setAnnotationSession(null)
       setAnnotationSubmitting(false)
       unsubscribe()
-      void bridge.hide({ threadId: resolvedOwnerId }).catch(() => { })
+      void bridge.hide({ threadId: resolvedOwnerId }).catch(() => {})
     }
   }, [resolvedOwnerId, upsertOwnerState])
 
@@ -1456,10 +1435,14 @@ export function BrowserPanel({
 
     const bridge = readBrowserBridge()
     if (!bridge) {
-      createBrowserTab(requestedTab.url ?? 'about:blank', {
-        sessionId: requestedTab.sessionId,
-        sessionTitle: requestedTab.sessionTitle,
-      }, resolvedOwnerId)
+      createBrowserTab(
+        requestedTab.url ?? 'about:blank',
+        {
+          sessionId: requestedTab.sessionId,
+          sessionTitle: requestedTab.sessionTitle,
+        },
+        resolvedOwnerId,
+      )
       fulfillRequestedTab(requestedTab.id, resolvedOwnerId)
       return
     }
@@ -1492,34 +1475,73 @@ export function BrowserPanel({
     upsertOwnerState,
   ])
 
+  const detachRendererBrowserWebview = useCallback(
+    (removeElement: boolean) => {
+      const webview = browserWebviewRef.current
+      const tabId = browserWebviewTabIdRef.current
+      let webContentsId: number | undefined
+      try {
+        webContentsId = webview?.getWebContentsId?.()
+      }
+ catch {
+        webContentsId = undefined
+      }
+
+      if (tabId && webContentsId && webContentsId > 0) {
+        void readBrowserBridge()
+          ?.detachWebview({
+            threadId: resolvedOwnerId,
+            tabId,
+            webContentsId,
+          })
+          .catch(() => {})
+      }
+
+      browserWebviewAttachKeyRef.current = null
+      browserWebviewTabIdRef.current = null
+      if (!removeElement) {
+        return
+      }
+      webview?.remove()
+      browserWebviewRef.current = null
+    },
+    [resolvedOwnerId],
+  )
+
   const hideNativeBrowserSurface = useCallback(() => {
     if (animationFrameRef.current !== null) {
       window.cancelAnimationFrame(animationFrameRef.current)
       animationFrameRef.current = null
       stableBoundsFrameCountRef.current = 0
     }
-    const nextSignature = `${resolvedOwnerId}:${browserNativeBoundsSignature(null)}`
+    const webview = browserWebviewRef.current
+    setBrowserWebviewOccluded(webview, true)
+    const surface = webview ? 'renderer' : 'native'
+    const nextSignature = `${resolvedOwnerId}:${surface}:${browserNativeBoundsSignature(null)}`
     if (lastNativeBoundsSignatureRef.current === nextSignature) {
       return
     }
     lastNativeBoundsSignatureRef.current = nextSignature
-    readBrowserBridge()?.setBounds({ threadId: resolvedOwnerId, bounds: null, surface: 'native' })
+    readBrowserBridge()?.setBounds({ threadId: resolvedOwnerId, bounds: null, surface })
   }, [resolvedOwnerId])
 
-  const shouldShowNativeBrowserSurface = useCallback(() =>
-    Boolean(
-      nativeSurfaceVisible
-      && browserState?.open
-      && activePanelTab?.kind === 'browser'
-      && !activeBrowserTabIsBlank
-      && nativeSurfaceSuppressCount === 0,
-    ), [
-    activeBrowserTabIsBlank,
-    activePanelTab?.kind,
-    browserState?.open,
-    nativeSurfaceVisible,
-    nativeSurfaceSuppressCount,
-  ])
+  const shouldShowNativeBrowserSurface = useCallback(
+    () =>
+      Boolean(
+        nativeSurfaceVisible
+        && browserState?.open
+        && activePanelTab?.kind === 'browser'
+        && !activeBrowserTabIsBlank
+        && nativeSurfaceSuppressCount === 0,
+      ),
+    [
+      activeBrowserTabIsBlank,
+      activePanelTab?.kind,
+      browserState?.open,
+      nativeSurfaceVisible,
+      nativeSurfaceSuppressCount,
+    ],
+  )
 
   useEffect(() => {
     if (shouldShowNativeBrowserSurface()) {
@@ -1555,26 +1577,47 @@ export function BrowserPanel({
       hideNativeBrowserSurface()
       return
     }
-    const bounds = applyBrowserNativeSurfaceOcclusions(rawBounds, viewportRect)
+    const webview = browserWebviewRef.current
+    const rendererOccluded = Boolean(
+      webview
+      && (nativeSurfaceSuppressCount > 0 || hasRendererBrowserObscuringOverlay(viewportRect)),
+    )
+    setBrowserWebviewOccluded(webview, rendererOccluded)
+    const surface = webview ? 'renderer' : 'native'
+    const bounds = rendererOccluded
+      ? null
+      : webview
+        ? rawBounds
+        : applyBrowserNativeSurfaceOcclusions(rawBounds, viewportRect)
     if (!bounds) {
-      hideNativeBrowserSurface()
+      if (!webview) {
+        hideNativeBrowserSurface()
+        return
+      }
+      const nextSignature = `${resolvedOwnerId}:${surface}:${browserNativeBoundsSignature(null)}`
+      if (lastNativeBoundsSignatureRef.current === nextSignature) {
+        return
+      }
+      lastNativeBoundsSignatureRef.current = nextSignature
+      bridge.setBounds({ threadId: resolvedOwnerId, surface, bounds: null })
       return
     }
 
-    const nextSignature = `${resolvedOwnerId}:${activeBrowserTabId ?? 'none'}:${browserNativeBoundsSignature(bounds)}`
+    const nextSignature = `${resolvedOwnerId}:${surface}:${activeBrowserTabId ?? 'none'}:${browserNativeBoundsSignature(bounds)}`
     if (lastNativeBoundsSignatureRef.current === nextSignature) {
       return
     }
     lastNativeBoundsSignatureRef.current = nextSignature
     bridge.setBounds({
       threadId: resolvedOwnerId,
-      surface: 'native',
+      surface,
       bounds,
     })
   }, [
     hideNativeBrowserSurface,
     activeBrowserTabId,
     nativeBoundsPaused,
+    nativeSurfaceSuppressCount,
     resolvedOwnerId,
     shouldShowNativeBrowserSurface,
   ])
@@ -1611,12 +1654,118 @@ export function BrowserPanel({
     }
 
     animationFrameRef.current = window.requestAnimationFrame(tick)
+  }, [hideNativeBrowserSurface, nativeBoundsPaused, shouldShowNativeBrowserSurface, syncBounds])
+
+  useLayoutEffect(() => {
+    const bridge = readBrowserBridge()
+    const host = browserWebviewHostRef.current
+    const canUseRendererWebview = Boolean(
+      bridge
+      && typeof bridge.getWebviewConfig === 'function'
+      && typeof bridge.attachWebview === 'function'
+      && typeof bridge.detachWebview === 'function',
+    )
+    if (
+      !bridge
+      || !host
+      || !canUseRendererWebview
+      || !nativeSurfaceVisible
+      || !browserState?.open
+      || activePanelTab?.kind !== 'browser'
+      || !activeBrowserTabId
+      || activeBrowserTabIsBlank
+    ) {
+      detachRendererBrowserWebview(true)
+      return
+    }
+
+    let webview = browserWebviewRef.current
+    if (!webview) {
+      const config = bridge.getWebviewConfig({ threadId: resolvedOwnerId })
+      webview = document.createElement('webview') as BrowserWebviewElement
+      webview.className = 'size-full'
+      webview.style.display = 'flex'
+      webview.style.width = '100%'
+      webview.style.height = '100%'
+      webview.style.backgroundColor = 'var(--background)'
+      webview.setAttribute('partition', config.partition)
+      webview.setAttribute('preload', config.preloadUrl)
+      webview.setAttribute('webpreferences', 'contextIsolation=yes,nodeIntegration=no,sandbox=yes')
+      webview.setAttribute('allowpopups', 'true')
+      browserWebviewRef.current = webview
+      host.append(webview)
+    }
+ else if (webview.parentElement !== host) {
+      host.append(webview)
+    }
+
+    if (browserWebviewTabIdRef.current !== activeBrowserTabId) {
+      detachRendererBrowserWebview(false)
+      browserWebviewTabIdRef.current = activeBrowserTabId
+      browserWebviewAttachKeyRef.current = null
+      webview.setAttribute('src', activeBrowserTabUrl || 'about:blank')
+    }
+
+    const attachVisibleWebview = () => {
+      let webContentsId: number | undefined
+      try {
+        webContentsId = webview.getWebContentsId?.()
+      }
+ catch {
+        return
+      }
+      if (!webContentsId || webContentsId <= 0) {
+        return
+      }
+
+      const attachKey = `${activeBrowserTabId}:${webContentsId}`
+      if (browserWebviewAttachKeyRef.current === attachKey) {
+        return
+      }
+      browserWebviewAttachKeyRef.current = attachKey
+      void bridge
+        .attachWebview({
+          threadId: resolvedOwnerId,
+          tabId: activeBrowserTabId,
+          webContentsId,
+        })
+        .then(upsertOwnerState)
+        .catch((error) => {
+          browserWebviewAttachKeyRef.current = null
+          setLocalError(formatBrowserActionError(error))
+        })
+    }
+
+    webview.addEventListener('dom-ready', attachVisibleWebview)
+    webview.addEventListener('did-start-loading', attachVisibleWebview)
+    const frameId = window.requestAnimationFrame(() => {
+      attachVisibleWebview()
+      scheduleStableBoundsSync()
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      webview.removeEventListener('dom-ready', attachVisibleWebview)
+      webview.removeEventListener('did-start-loading', attachVisibleWebview)
+    }
   }, [
-    hideNativeBrowserSurface,
-    nativeBoundsPaused,
-    shouldShowNativeBrowserSurface,
-    syncBounds,
+    activeBrowserTabId,
+    activeBrowserTabIsBlank,
+    activeBrowserTabUrl,
+    activePanelTab?.kind,
+    browserState?.open,
+    detachRendererBrowserWebview,
+    nativeSurfaceVisible,
+    resolvedOwnerId,
+    scheduleStableBoundsSync,
+    upsertOwnerState,
   ])
+
+  useEffect(() => {
+    return () => {
+      detachRendererBrowserWebview(true)
+    }
+  }, [detachRendererBrowserWebview])
 
   const scheduleStableBoundsSyncFromObserver = useEffectEvent(() => {
     scheduleStableBoundsSync()
@@ -1655,11 +1804,7 @@ export function BrowserPanel({
         animationFrameRef.current = null
       }
     }
-  }, [
-    activePanelTab?.kind,
-    nativeBoundsPaused,
-    shouldShowNativeBrowserSurface,
-  ])
+  }, [activePanelTab?.kind, nativeBoundsPaused, shouldShowNativeBrowserSurface])
 
   useEffect(() => {
     if (
@@ -1672,16 +1817,19 @@ export function BrowserPanel({
     }
 
     const observedOccluders = new Set<HTMLElement>()
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(scheduleStableBoundsSyncFromOcclusionObserver)
+    const resizeObserver
+      = typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(scheduleStableBoundsSyncFromOcclusionObserver)
 
     const syncObservedOccluders = () => {
       if (typeof document === 'undefined' || !document.body) {
         return
       }
       const nextOccluders = new Set(
-        document.querySelectorAll<HTMLElement>(BROWSER_NATIVE_SURFACE_OCCLUSION_SELECTOR),
+        document.querySelectorAll<HTMLElement>(
+          `${BROWSER_NATIVE_SURFACE_OCCLUSION_SELECTOR}, ${BROWSER_RENDERER_OBSCURING_OVERLAY_SELECTOR}`,
+        ),
       )
 
       for (const occluder of observedOccluders) {
@@ -1706,7 +1854,7 @@ export function BrowserPanel({
     const mutationObserver = new MutationObserver(syncObservedOccluders)
     mutationObserver.observe(document.body, {
       attributes: true,
-      attributeFilter: [BROWSER_NATIVE_SURFACE_OCCLUSION_ATTRIBUTE],
+      attributeFilter: [BROWSER_NATIVE_SURFACE_OCCLUSION_ATTRIBUTE, 'aria-hidden', 'data-state'],
       childList: true,
       subtree: true,
     })
@@ -1745,7 +1893,7 @@ export function BrowserPanel({
           designChange,
         })
       }
-      else {
+ else {
         await bridge.applyAnnotationDesign({
           threadId: resolvedOwnerId,
           tabId: activeBrowserTabId,
@@ -1779,10 +1927,12 @@ export function BrowserPanel({
   useEffect(() => {
     const previousAnnotationRuntimeTabId = previousAnnotationRuntimeTabIdRef.current
     if (previousAnnotationRuntimeTabId) {
-      void readBrowserBridge()?.clearAnnotationDesign({
-        threadId: resolvedOwnerId,
-        tabId: previousAnnotationRuntimeTabId,
-      }).catch(() => { })
+      void readBrowserBridge()
+        ?.clearAnnotationDesign({
+          threadId: resolvedOwnerId,
+          tabId: previousAnnotationRuntimeTabId,
+        })
+        .catch(() => {})
     }
     previousAnnotationRuntimeTabIdRef.current = activeBrowserTabId
     setAnnotationAdjustmentSession(null)
@@ -1813,7 +1963,7 @@ export function BrowserPanel({
     try {
       await action()
     }
-    catch (error) {
+ catch (error) {
       const message = formatBrowserActionError(error)
       if (message) {
         setLocalError(message)
@@ -1833,9 +1983,10 @@ export function BrowserPanel({
       }
 
       const ownerState = useBrowserPanelStore.getState().owners[resolvedOwnerId]
-      const sourceTab = ownerState?.tabs.find(
-        (tab): tab is BrowserWebTab => tab.id === request.tabId && tab.kind === 'browser',
-      ) ?? null
+      const sourceTab
+        = ownerState?.tabs.find(
+          (tab): tab is BrowserWebTab => tab.id === request.tabId && tab.kind === 'browser',
+        ) ?? null
       const targetSessionId = sourceTab?.sessionId ?? activeSessionId
       if (!targetSessionId) {
         setLocalError('Open a chat session to receive browser page prompts.')
@@ -1859,56 +2010,59 @@ export function BrowserPanel({
     openLauncherTab(resolvedOwnerId)
   }
 
-  const closeLocalPanelTab = useCallback((tabId: string) => {
-    const tab = useBrowserPanelStore
-      .getState()
-      .owners[resolvedOwnerId]
-      ?.tabs
-      .find(item => item.id === tabId)
+  const closeLocalPanelTab = useCallback(
+    (tabId: string) => {
+      const tab = useBrowserPanelStore
+        .getState()
+        .owners[resolvedOwnerId]
+?.tabs
+.find(item => item.id === tabId)
 
-    if (tab?.kind === 'side-conversation') {
-      void releaseSideConversation(tab.sideConversationId)
-    }
-
-    const result = closePanelTab(tabId, resolvedOwnerId)
-    setDirtyPlanRefineTabIds((previous) => {
-      if (!previous.has(tabId)) {
-        return previous
+      if (tab?.kind === 'side-conversation') {
+        void releaseSideConversation(tab.sideConversationId)
       }
-      const next = new Set(previous)
-      next.delete(tabId)
-      return next
-    })
-    setDiscardPromptTabId(current => current === tabId ? null : current)
 
-    if (result.closedLastTab) {
-      removeOwnerState(resolvedOwnerId)
-      onCloseLastTab?.(resolvedOwnerId)
-      return
-    }
-    const nextOwnerState = useBrowserPanelStore.getState().owners[resolvedOwnerId]
-    const nextActiveBrowserTab = nextOwnerState?.tabs.find(
-      item => item.id === nextOwnerState.activeTabId && item.kind === 'browser',
-    )
-    const bridge = readBrowserBridge()
-    if (nextActiveBrowserTab && bridge) {
-      void runBrowserAction(async () => {
-        upsertOwnerState(
-          await bridge.selectTab({
-            threadId: resolvedOwnerId,
-            tabId: nextActiveBrowserTab.id,
-          }),
-        )
+      const result = closePanelTab(tabId, resolvedOwnerId)
+      setDirtyPlanRefineTabIds((previous) => {
+        if (!previous.has(tabId)) {
+          return previous
+        }
+        const next = new Set(previous)
+        next.delete(tabId)
+        return next
       })
-    }
-  }, [
-    closePanelTab,
-    onCloseLastTab,
-    removeOwnerState,
-    resolvedOwnerId,
-    runBrowserAction,
-    upsertOwnerState,
-  ])
+      setDiscardPromptTabId(current => (current === tabId ? null : current))
+
+      if (result.closedLastTab) {
+        removeOwnerState(resolvedOwnerId)
+        onCloseLastTab?.(resolvedOwnerId)
+        return
+      }
+      const nextOwnerState = useBrowserPanelStore.getState().owners[resolvedOwnerId]
+      const nextActiveBrowserTab = nextOwnerState?.tabs.find(
+        item => item.id === nextOwnerState.activeTabId && item.kind === 'browser',
+      )
+      const bridge = readBrowserBridge()
+      if (nextActiveBrowserTab && bridge) {
+        void runBrowserAction(async () => {
+          upsertOwnerState(
+            await bridge.selectTab({
+              threadId: resolvedOwnerId,
+              tabId: nextActiveBrowserTab.id,
+            }),
+          )
+        })
+      }
+    },
+    [
+      closePanelTab,
+      onCloseLastTab,
+      removeOwnerState,
+      resolvedOwnerId,
+      runBrowserAction,
+      upsertOwnerState,
+    ],
+  )
 
   const handleCreateBrowserTab = (sourceTabId?: string) => {
     const bridge = readBrowserBridge()
@@ -1916,10 +2070,14 @@ export function BrowserPanel({
       return
     }
     if (!bridge) {
-      createBrowserTab('about:blank', {
-        sessionId: activeSessionId,
-        sessionTitle: activeSessionTitle,
-      }, resolvedOwnerId)
+      createBrowserTab(
+        'about:blank',
+        {
+          sessionId: activeSessionId,
+          sessionTitle: activeSessionTitle,
+        },
+        resolvedOwnerId,
+      )
       if (sourceTabId) {
         closeLocalPanelTab(sourceTabId)
       }
@@ -1930,10 +2088,10 @@ export function BrowserPanel({
     void runBrowserAction(async () => {
       const nextState = browserState?.open
         ? await bridge.newTab({
-          threadId: resolvedOwnerId,
-          url: 'about:blank',
-          activate: true,
-        })
+            threadId: resolvedOwnerId,
+            url: 'about:blank',
+            activate: true,
+          })
         : await bridge.open({ threadId: resolvedOwnerId, initialUrl: 'about:blank' })
       upsertOwnerState(nextState)
       if (nextState.activeTabId) {
@@ -1975,101 +2133,101 @@ export function BrowserPanel({
   }
 
   const handleCloseTab = (tabId: string) => {
-      const tab = tabs.find(item => item.id === tabId)
-      if (!tab) {
-        return
-      }
-
-      if (tab.kind === 'plan-refine' && dirtyPlanRefineTabIds.has(tabId)) {
-        setDiscardPromptTabId(tabId)
-        return
-      }
-
-      if (tab.kind !== 'browser') {
-        closeLocalPanelTab(tabId)
-        return
-      }
-
-      const bridge = readBrowserBridge()
-      if (!bridge) {
-        const result = closePanelTab(tabId, resolvedOwnerId)
-        if (result.closedLastTab) {
-          removeOwnerState(resolvedOwnerId)
-          onCloseLastTab?.(resolvedOwnerId)
-        }
-        return
-      }
-
-      void runBrowserAction(async () => {
-        const nextState = await bridge.closeTab({ threadId: resolvedOwnerId, tabId })
-        upsertOwnerState(nextState)
-        const remainingTabs
-          = useBrowserPanelStore.getState().owners[resolvedOwnerId]?.tabs ?? EMPTY_BROWSER_PANEL_TABS
-        if (remainingTabs.length === 0) {
-          removeOwnerState(resolvedOwnerId)
-          onCloseLastTab?.(resolvedOwnerId)
-        }
-      })
+    const tab = tabs.find(item => item.id === tabId)
+    if (!tab) {
+      return
     }
+
+    if (tab.kind === 'plan-refine' && dirtyPlanRefineTabIds.has(tabId)) {
+      setDiscardPromptTabId(tabId)
+      return
+    }
+
+    if (tab.kind !== 'browser') {
+      closeLocalPanelTab(tabId)
+      return
+    }
+
+    const bridge = readBrowserBridge()
+    if (!bridge) {
+      const result = closePanelTab(tabId, resolvedOwnerId)
+      if (result.closedLastTab) {
+        removeOwnerState(resolvedOwnerId)
+        onCloseLastTab?.(resolvedOwnerId)
+      }
+      return
+    }
+
+    void runBrowserAction(async () => {
+      const nextState = await bridge.closeTab({ threadId: resolvedOwnerId, tabId })
+      upsertOwnerState(nextState)
+      const remainingTabs
+        = useBrowserPanelStore.getState().owners[resolvedOwnerId]?.tabs ?? EMPTY_BROWSER_PANEL_TABS
+      if (remainingTabs.length === 0) {
+        removeOwnerState(resolvedOwnerId)
+        onCloseLastTab?.(resolvedOwnerId)
+      }
+    })
+  }
 
   const handleSelectTab = (tabId: string) => {
-      const tab = tabs.find(item => item.id === tabId)
-      if (!tab) {
-        return
-      }
-      if (tab.kind !== 'browser') {
-        hideNativeBrowserSurface()
-        setActiveTab(tabId, resolvedOwnerId)
-        return
-      }
-
-      const bridge = readBrowserBridge()
-      if (!bridge) {
-        setActiveTab(tabId, resolvedOwnerId)
-        return
-      }
-      setActiveTab(tabId, resolvedOwnerId)
-      void runBrowserAction(async () => {
-        upsertOwnerState(await bridge.selectTab({ threadId: resolvedOwnerId, tabId }))
-      })
+    const tab = tabs.find(item => item.id === tabId)
+    if (!tab) {
+      return
     }
+    if (tab.kind !== 'browser') {
+      hideNativeBrowserSurface()
+      setActiveTab(tabId, resolvedOwnerId)
+      return
+    }
+
+    const bridge = readBrowserBridge()
+    if (!bridge) {
+      setActiveTab(tabId, resolvedOwnerId)
+      return
+    }
+    setActiveTab(tabId, resolvedOwnerId)
+    void runBrowserAction(async () => {
+      upsertOwnerState(await bridge.selectTab({ threadId: resolvedOwnerId, tabId }))
+    })
+  }
 
   const navigateActiveTab = (url: string) => {
-      if (!activeBrowserTabId) {
-        return
-      }
-      const bridge = readBrowserBridge()
-      if (!bridge) {
-        return
-      }
-      void runBrowserAction(async () => {
-        const normalizedUrl = normalizeBrowserAddressInput(url)
-        upsertOwnerState(
-          await bridge.navigate({
-            threadId: resolvedOwnerId,
-            tabId: activeBrowserTabId,
-            url: normalizedUrl,
-          }),
-        )
-        lastSyncedAddressValueRef.current = browserAddressDisplayValue({ url: normalizedUrl })
-        addressDraftByTabIdRef.current.delete(activeBrowserTabId)
-        setSuggestionsOpen(false)
-      })
+    if (!activeBrowserTabId) {
+      return
     }
+    const bridge = readBrowserBridge()
+    if (!bridge) {
+      return
+    }
+    void runBrowserAction(async () => {
+      const normalizedUrl = normalizeBrowserAddressInput(url)
+      upsertOwnerState(
+        await bridge.navigate({
+          threadId: resolvedOwnerId,
+          tabId: activeBrowserTabId,
+          url: normalizedUrl,
+        }),
+      )
+      lastSyncedAddressValueRef.current = browserAddressDisplayValue({ url: normalizedUrl })
+      addressDraftByTabIdRef.current.delete(activeBrowserTabId)
+      setSuggestionsOpen(false)
+    })
+  }
 
   const handleSuggestion = (suggestion: BrowserAddressSuggestion) => {
-      if (suggestion.kind === 'tab' && suggestion.tabId) {
-        handleSelectTab(suggestion.tabId)
-        setSuggestionsOpen(false)
-        return
-      }
-      navigateActiveTab(suggestion.url)
+    if (suggestion.kind === 'tab' && suggestion.tabId) {
+      handleSelectTab(suggestion.tabId)
+      setSuggestionsOpen(false)
+      return
     }
+    navigateActiveTab(suggestion.url)
+  }
 
   const handleAddressSubmit = (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      navigateActiveTab(addressValue)
-    }
+    event.preventDefault()
+    navigateActiveTab(addressValue)
+  }
 
   const handleCaptureScreenshot = () => {
     if (!activeBrowserTabId) {
@@ -2110,10 +2268,12 @@ export function BrowserPanel({
       return
     }
     void runBrowserAction(async () => {
-      await bridge.clearAnnotationDesign({
-        threadId: resolvedOwnerId,
-        tabId: activeBrowserTabId,
-      }).catch(() => { })
+      await bridge
+        .clearAnnotationDesign({
+          threadId: resolvedOwnerId,
+          tabId: activeBrowserTabId,
+        })
+        .catch(() => {})
       const rect = viewport.getBoundingClientRect()
       if (rect.width <= 0 || rect.height <= 0) {
         throw new Error('The browser viewport isn\'t ready for annotation.')
@@ -2143,9 +2303,10 @@ export function BrowserPanel({
       throw new Error('Browser annotations are available in the desktop app.')
     }
     const ownerState = useBrowserPanelStore.getState().owners[resolvedOwnerId]
-    const sourceTab = ownerState?.tabs.find(
-      (tab): tab is BrowserWebTab => tab.id === input.tabId && tab.kind === 'browser',
-    ) ?? null
+    const sourceTab
+      = ownerState?.tabs.find(
+        (tab): tab is BrowserWebTab => tab.id === input.tabId && tab.kind === 'browser',
+      ) ?? null
     const sourceUrl = input.sourceUrl ?? sourceTab?.lastCommittedUrl ?? sourceTab?.url ?? ''
     const screenshot = await captureBrowserAnnotationScreenshot({
       bridge,
@@ -2165,9 +2326,7 @@ export function BrowserPanel({
       url: sourceUrl,
       body: input.body ?? '',
       anchor: input.anchor,
-      designChange: hasBrowserAnnotationDesignChanges(designChange)
-        ? designChange
-        : null,
+      designChange: hasBrowserAnnotationDesignChanges(designChange) ? designChange : null,
       attachedImages,
       screenshot,
       elements: input.elements ?? [],
@@ -2187,10 +2346,10 @@ export function BrowserPanel({
     const cropRect = getBrowserAnnotationCropRect(record.anchor)
     const cropPart = cropRect
       ? await createBrowserAnnotationCropFilePart({
-        imageDataUrl: record.screenshot.url,
-        cropRect,
-        surfaceSize: record.surfaceSize,
-      }).catch(() => null)
+          imageDataUrl: record.screenshot.url,
+          cropRect,
+          surfaceSize: record.surfaceSize,
+        }).catch(() => null)
       : null
     const files = cropPart
       ? [record.screenshot, cropPart, ...record.attachedImages]
@@ -2218,21 +2377,28 @@ export function BrowserPanel({
     if (!activeBrowserTabId) {
       return
     }
-    void readBrowserBridge()?.clearAnnotationDesign({
-      threadId: resolvedOwnerId,
-      tabId: activeBrowserTabId,
-    }).catch(() => { })
+    void readBrowserBridge()
+      ?.clearAnnotationDesign({
+        threadId: resolvedOwnerId,
+        tabId: activeBrowserTabId,
+      })
+      .catch(() => {})
   }, [activeBrowserTabId, resolvedOwnerId])
 
-  const stopAnnotationRuntime = useCallback((tabId: string | null = activeBrowserTabId) => {
-    if (!tabId) {
-      return
-    }
-    void readBrowserBridge()?.stopAnnotationRuntime({
-      threadId: resolvedOwnerId,
-      tabId,
-    }).catch(() => { })
-  }, [activeBrowserTabId, resolvedOwnerId])
+  const stopAnnotationRuntime = useCallback(
+    (tabId: string | null = activeBrowserTabId) => {
+      if (!tabId) {
+        return
+      }
+      void readBrowserBridge()
+        ?.stopAnnotationRuntime({
+          threadId: resolvedOwnerId,
+          tabId,
+        })
+        .catch(() => {})
+    },
+    [activeBrowserTabId, resolvedOwnerId],
+  )
 
   const closeAnnotationSession = useCallback(() => {
     clearAnnotationRuntimeDraft()
@@ -2245,7 +2411,12 @@ export function BrowserPanel({
   const handleCancelAnnotation = useCallback(() => {
     stopAnnotationRuntime(activeAnnotationSession?.tabId ?? activeBrowserTabId)
     closeAnnotationSession()
-  }, [activeAnnotationSession?.tabId, activeBrowserTabId, closeAnnotationSession, stopAnnotationRuntime])
+  }, [
+    activeAnnotationSession?.tabId,
+    activeBrowserTabId,
+    closeAnnotationSession,
+    stopAnnotationRuntime,
+  ])
 
   const handleRuntimeAnnotationCommit = (event: BrowserAnnotationRuntimeEvent) => {
     void (async () => {
@@ -2257,29 +2428,37 @@ export function BrowserPanel({
         setAnnotationSubmitting(false)
         return
       }
-      const annotationId = saveAnnotation({
-        ...recordInput,
-        id: annotationSession?.editingAnnotationId ?? event.runtimeAnnotationId ?? undefined,
-        status: 'saved',
-      }, resolvedOwnerId)
-      const nextAnnotations = useBrowserPanelStore
-        .getState()
-        .owners[resolvedOwnerId]
-        ?.annotations
-        .filter(annotation => annotation.tabId === event.tabId)
-        .map(annotation => ({
-          id: annotation.id,
-          anchor: annotation.anchor,
-          body: annotation.body,
-          designChange: annotation.designChange,
-          status: annotation.status,
-        })) ?? []
-      void readBrowserBridge()?.startAnnotationRuntime({
-        threadId: resolvedOwnerId,
-        tabId: event.tabId,
-        annotations: nextAnnotations,
-        layoutHints: activeBrowserAnnotationLayoutHints,
-      }).catch(() => { })
+      const annotationId = saveAnnotation(
+        {
+          ...recordInput,
+          id: annotationSession?.editingAnnotationId ?? event.runtimeAnnotationId ?? undefined,
+          status: 'saved',
+        },
+        resolvedOwnerId,
+      )
+      const nextAnnotations
+        = useBrowserPanelStore
+          .getState()
+          .owners[resolvedOwnerId]
+?.annotations
+.filter(
+            annotation => annotation.tabId === event.tabId,
+          )
+          .map(annotation => ({
+            id: annotation.id,
+            anchor: annotation.anchor,
+            body: annotation.body,
+            designChange: annotation.designChange,
+            status: annotation.status,
+          })) ?? []
+      void readBrowserBridge()
+        ?.startAnnotationRuntime({
+          threadId: resolvedOwnerId,
+          tabId: event.tabId,
+          annotations: nextAnnotations,
+          layoutHints: activeBrowserAnnotationLayoutHints,
+        })
+        .catch(() => {})
       if (event.type === 'save') {
         setAnnotationSubmitting(false)
         setAnnotationAdjustmentSession(null)
@@ -2304,9 +2483,7 @@ export function BrowserPanel({
     })()
   }
 
-  const handleApplyAnnotationAdjustment = (
-    detail: BrowserAnnotationAdjustmentApplyDetail,
-  ) => {
+  const handleApplyAnnotationAdjustment = (detail: BrowserAnnotationAdjustmentApplyDetail) => {
     if (detail.ownerId !== resolvedOwnerId || detail.tabId !== activeBrowserTabId) {
       return
     }
@@ -2366,141 +2543,158 @@ export function BrowserPanel({
     }
   }, [])
 
-  const handleEditSavedAnnotation = useCallback((annotation: BrowserAnnotationRecord) => {
-    if (activeBrowserTabId !== annotation.tabId) {
-      return
-    }
-    const bridge = readBrowserBridge()
-    if (!bridge) {
-      return
-    }
-    void runBrowserAction(async () => {
-      await bridge.startAnnotationRuntime({
-        threadId: resolvedOwnerId,
-        tabId: annotation.tabId,
-        annotations: activeBrowserAnnotations.map(toBrowserAnnotationRuntimeAnnotation),
-        editAnnotationId: annotation.id,
-        layoutHints: activeBrowserAnnotationLayoutHints,
+  const handleEditSavedAnnotation = useCallback(
+    (annotation: BrowserAnnotationRecord) => {
+      if (activeBrowserTabId !== annotation.tabId) {
+        return
+      }
+      const bridge = readBrowserBridge()
+      if (!bridge) {
+        return
+      }
+      void runBrowserAction(async () => {
+        await bridge.startAnnotationRuntime({
+          threadId: resolvedOwnerId,
+          tabId: annotation.tabId,
+          annotations: activeBrowserAnnotations.map(toBrowserAnnotationRuntimeAnnotation),
+          editAnnotationId: annotation.id,
+          layoutHints: activeBrowserAnnotationLayoutHints,
+        })
       })
-    })
-    if (annotation.anchor.kind === 'element') {
-      setAnnotationAdjustmentSession({
-        ownerId: resolvedOwnerId,
+      if (annotation.anchor.kind === 'element') {
+        setAnnotationAdjustmentSession({
+          ownerId: resolvedOwnerId,
+          tabId: annotation.tabId,
+          annotationId: annotation.id,
+          selectedElement: annotation.anchor.element,
+          designChanges: annotation.designChange ?? {},
+        })
+        openAsideTab('adjustment')
+      }
+ else {
+        setAnnotationAdjustmentSession(null)
+      }
+      setAnnotationSession({
         tabId: annotation.tabId,
-        annotationId: annotation.id,
-        selectedElement: annotation.anchor.element,
-        designChanges: annotation.designChange ?? {},
+        editingAnnotationId: annotation.id,
       })
-      openAsideTab('adjustment')
-    }
-    else {
-      setAnnotationAdjustmentSession(null)
-    }
-    setAnnotationSession({
-      tabId: annotation.tabId,
-      editingAnnotationId: annotation.id,
-    })
-  }, [
-    activeBrowserAnnotations,
-    activeBrowserAnnotationLayoutHints,
-    activeBrowserTabId,
-    resolvedOwnerId,
-    runBrowserAction,
-    openAsideTab,
-    setAnnotationAdjustmentSession,
-  ])
+    },
+    [
+      activeBrowserAnnotations,
+      activeBrowserAnnotationLayoutHints,
+      activeBrowserTabId,
+      resolvedOwnerId,
+      runBrowserAction,
+      openAsideTab,
+      setAnnotationAdjustmentSession,
+    ],
+  )
 
   const handleAnnotationRuntimeBridgeEvent = useEffectEvent((event: unknown) => {
-      if (!isBrowserAnnotationRuntimeEvent(event) || event.threadId !== resolvedOwnerId) {
-        return
-      }
-      if (event.type === 'ready') {
-        setAnnotationSession(previous => previous ?? {
-          tabId: event.tabId,
-          editingAnnotationId: null,
-        })
-        return
-      }
-      if (event.type === 'toggle') {
-        if (event.tabId !== activeBrowserTabId) {
-          return
-        }
-        handleToggleAnnotation()
-        return
-      }
-      if (event.type === 'selected-element') {
-        if (event.selectedElement) {
-          setAnnotationAdjustmentSession({
-            ownerId: resolvedOwnerId,
+    if (!isBrowserAnnotationRuntimeEvent(event) || event.threadId !== resolvedOwnerId) {
+      return
+    }
+    if (event.type === 'ready') {
+      setAnnotationSession(
+        previous =>
+          previous ?? {
             tabId: event.tabId,
-            annotationId: event.runtimeAnnotationId ?? annotationSession?.editingAnnotationId ?? null,
-            selectedElement: event.selectedElement,
-            designChanges: event.designChange ?? {},
-          })
-          openAsideTab('adjustment')
-        }
-        else {
-          setAnnotationAdjustmentSession(null)
-        }
+            editingAnnotationId: null,
+          },
+      )
+      return
+    }
+    if (event.type === 'toggle') {
+      if (event.tabId !== activeBrowserTabId) {
         return
       }
-      if (event.type === 'copy') {
-        if (event.layoutHints) {
-          syncAnnotationLayoutHints({
+      handleToggleAnnotation()
+      return
+    }
+    if (event.type === 'selected-element') {
+      if (event.selectedElement) {
+        setAnnotationAdjustmentSession({
+          ownerId: resolvedOwnerId,
+          tabId: event.tabId,
+          annotationId: event.runtimeAnnotationId ?? annotationSession?.editingAnnotationId ?? null,
+          selectedElement: event.selectedElement,
+          designChanges: event.designChange ?? {},
+        })
+        openAsideTab('adjustment')
+      }
+ else {
+        setAnnotationAdjustmentSession(null)
+      }
+      return
+    }
+    if (event.type === 'copy') {
+      if (event.layoutHints) {
+        syncAnnotationLayoutHints(
+          {
             tabId: event.tabId,
             hints: event.layoutHints,
-          }, resolvedOwnerId)
-        }
-        return
+          },
+          resolvedOwnerId,
+        )
       }
-      if (event.type === 'clear') {
-        clearAnnotations({ ownerId: resolvedOwnerId, tabId: event.tabId })
-        setAnnotationAdjustmentSession(null)
-        return
-      }
-      if (event.type === 'layout-sync') {
-        syncAnnotationLayoutHints({
+      return
+    }
+    if (event.type === 'clear') {
+      clearAnnotations({ ownerId: resolvedOwnerId, tabId: event.tabId })
+      setAnnotationAdjustmentSession(null)
+      return
+    }
+    if (event.type === 'layout-sync') {
+      syncAnnotationLayoutHints(
+        {
           tabId: event.tabId,
           hints: event.layoutHints ?? [],
-        }, resolvedOwnerId)
-        return
+        },
+        resolvedOwnerId,
+      )
+      return
+    }
+    if (event.type === 'delete') {
+      if (event.annotationId) {
+        deleteAnnotation(event.annotationId, resolvedOwnerId)
       }
-      if (event.type === 'delete') {
-        if (event.annotationId) {
-          deleteAnnotation(event.annotationId, resolvedOwnerId)
-        }
-        return
-      }
-      if (event.type === 'edit') {
-        const annotation = useBrowserPanelStore
-          .getState()
-          .owners[resolvedOwnerId]
-          ?.annotations
-          .find(candidate => candidate.id === event.annotationId && candidate.tabId === event.tabId)
-        if (annotation && event.annotationId && event.anchor && typeof event.body === 'string') {
-          saveAnnotation({
+      return
+    }
+    if (event.type === 'edit') {
+      const annotation = useBrowserPanelStore
+        .getState()
+        .owners[
+          resolvedOwnerId
+        ]
+?.annotations
+.find(candidate => candidate.id === event.annotationId && candidate.tabId === event.tabId)
+      if (annotation && event.annotationId && event.anchor && typeof event.body === 'string') {
+        saveAnnotation(
+          {
             ...annotation,
             anchor: event.anchor,
             body: event.body,
             designChange: event.designChange ?? annotation.designChange,
             elements: event.elements ?? annotation.elements,
             surfaceSize: event.surfaceSize ?? annotation.surfaceSize,
-          }, resolvedOwnerId)
-          setAnnotationAdjustmentSession(null)
-          return
-        }
-        if (annotation) {
-          handleEditSavedAnnotation(annotation)
-        }
+          },
+          resolvedOwnerId,
+        )
+        setAnnotationAdjustmentSession(null)
         return
       }
-      if (event.type === 'save' || event.type === 'submit') {
-        handleRuntimeAnnotationCommit(event)
-        return
+      if (annotation) {
+        handleEditSavedAnnotation(annotation)
       }
-      if (event.type === 'cancel' || event.type === 'closed') {
-        closeAnnotationSession()
-      }
+      return
+    }
+    if (event.type === 'save' || event.type === 'submit') {
+      handleRuntimeAnnotationCommit(event)
+      return
+    }
+    if (event.type === 'cancel' || event.type === 'closed') {
+      closeAnnotationSession()
+    }
   })
 
   useEffect(() => {
@@ -2524,51 +2718,51 @@ export function BrowserPanel({
   }
 
   const handlePanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      const isAnnotationToggle
-        = (event.nativeEvent.metaKey || event.nativeEvent.ctrlKey)
-          && event.nativeEvent.shiftKey
-          && !event.nativeEvent.altKey
-          && event.nativeEvent.key.toLowerCase() === 'f'
-      if (isAnnotationToggle) {
-        event.preventDefault()
-        event.stopPropagation()
-        event.nativeEvent.stopImmediatePropagation()
-        handleToggleAnnotation()
-        return
-      }
-
-      const isCommandOnly
-        = event.nativeEvent.metaKey
-          && !event.nativeEvent.altKey
-          && !event.nativeEvent.ctrlKey
-          && !event.nativeEvent.shiftKey
-      if (!isCommandOnly) {
-        return
-      }
-
-      const key = event.nativeEvent.key.toLowerCase()
-      if (key === 'w' && activePanelTab) {
-        event.preventDefault()
-        event.stopPropagation()
-        event.nativeEvent.stopImmediatePropagation()
-        handleCloseTab(activePanelTab.id)
-        return
-      }
-
-      if (!/^\d$/.test(key)) {
-        return
-      }
-
-      const targetIndex = key === '0' ? 9 : Number.parseInt(key, 10) - 1
-      const targetTab = tabs[targetIndex]
-      if (!targetTab) {
-        return
-      }
+    const isAnnotationToggle
+      = (event.nativeEvent.metaKey || event.nativeEvent.ctrlKey)
+        && event.nativeEvent.shiftKey
+        && !event.nativeEvent.altKey
+        && event.nativeEvent.key.toLowerCase() === 'f'
+    if (isAnnotationToggle) {
       event.preventDefault()
       event.stopPropagation()
       event.nativeEvent.stopImmediatePropagation()
-      handleSelectTab(targetTab.id)
+      handleToggleAnnotation()
+      return
     }
+
+    const isCommandOnly
+      = event.nativeEvent.metaKey
+        && !event.nativeEvent.altKey
+        && !event.nativeEvent.ctrlKey
+        && !event.nativeEvent.shiftKey
+    if (!isCommandOnly) {
+      return
+    }
+
+    const key = event.nativeEvent.key.toLowerCase()
+    if (key === 'w' && activePanelTab) {
+      event.preventDefault()
+      event.stopPropagation()
+      event.nativeEvent.stopImmediatePropagation()
+      handleCloseTab(activePanelTab.id)
+      return
+    }
+
+    if (!/^\d$/.test(key)) {
+      return
+    }
+
+    const targetIndex = key === '0' ? 9 : Number.parseInt(key, 10) - 1
+    const targetTab = tabs[targetIndex]
+    if (!targetTab) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    event.nativeEvent.stopImmediatePropagation()
+    handleSelectTab(targetTab.id)
+  }
 
   const handleOpenContextUsageReport = () => {
     if (!activeSessionId) {
@@ -2588,9 +2782,11 @@ export function BrowserPanel({
       }
       const tabExists = useBrowserPanelStore
         .getState()
-        .owners[resolvedOwnerId]
-        ?.tabs
-        .some(tab => tab.id === event.detail.tabId && tab.kind === 'plan-refine')
+        .owners[
+          resolvedOwnerId
+        ]
+?.tabs
+.some(tab => tab.id === event.detail.tabId && tab.kind === 'plan-refine')
       if (!tabExists) {
         return
       }
@@ -2603,7 +2799,7 @@ export function BrowserPanel({
         if (event.detail.dirty) {
           next.add(event.detail.tabId)
         }
-        else {
+ else {
           next.delete(event.detail.tabId)
         }
         return next
@@ -2626,9 +2822,11 @@ export function BrowserPanel({
       }
       const tab = useBrowserPanelStore
         .getState()
-        .owners[resolvedOwnerId]
-        ?.tabs
-        .find(item => item.id === event.detail.tabId && item.kind === 'plan-refine')
+        .owners[
+          resolvedOwnerId
+        ]
+?.tabs
+.find(item => item.id === event.detail.tabId && item.kind === 'plan-refine')
       if (!tab) {
         return
       }
@@ -2645,9 +2843,12 @@ export function BrowserPanel({
     }
   }, [closeLocalPanelTab, resolvedOwnerId])
 
-  const handleDiscardPlanRefineTab = useCallback((tabId: string) => {
-    closeLocalPanelTab(tabId)
-  }, [closeLocalPanelTab])
+  const handleDiscardPlanRefineTab = useCallback(
+    (tabId: string) => {
+      closeLocalPanelTab(tabId)
+    },
+    [closeLocalPanelTab],
+  )
 
   return (
     <div
@@ -2695,6 +2896,9 @@ export function BrowserPanel({
                 )}
                 {tab.kind === 'workspace-diff' && (
                   <FileDiffIcon className="size-3 shrink-0 !text-muted-foreground/60" />
+                )}
+                {tab.kind === 'pull-request' && (
+                  <PullRequestIcon className="size-3 shrink-0 !text-muted-foreground/60" />
                 )}
                 {tab.kind === 'subagent' && (
                   <BotIcon className="size-3 shrink-0 !text-muted-foreground/60" />
@@ -2810,180 +3014,180 @@ export function BrowserPanel({
         </Button>
       </div>
 
-      {
-        activeBrowserTab && (
-          <div className="relative flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-card px-2">
-            <div className="flex shrink-0 items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-                disabled={!activeBrowserTab?.canGoBack}
-                onClick={() => {
-                  const bridge = readBrowserBridge()
-                  if (bridge && activeBrowserTabId) {
-                    void runBrowserAction(async () => {
-                      upsertOwnerState(
-                        await bridge.goBack({ threadId: resolvedOwnerId, tabId: activeBrowserTabId }),
-                      )
-                    })
-                  }
-                }}
-                aria-label="Go back"
-              >
-                <ArrowLeftIcon className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-                disabled={!activeBrowserTab?.canGoForward}
-                onClick={() => {
-                  const bridge = readBrowserBridge()
-                  if (bridge && activeBrowserTabId) {
-                    void runBrowserAction(async () => {
-                      upsertOwnerState(
-                        await bridge.goForward({
-                          threadId: resolvedOwnerId,
-                          tabId: activeBrowserTabId,
-                        }),
-                      )
-                    })
-                  }
-                }}
-                aria-label="Go forward"
-              >
-                <ArrowRightIcon className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground"
-                disabled={!nativeBrowserAvailable || !activeBrowserTabId}
-                onClick={() => {
-                  const bridge = readBrowserBridge()
-                  if (bridge && activeBrowserTabId) {
-                    void runBrowserAction(async () => {
-                      upsertOwnerState(
-                        await bridge.reload({
-                          threadId: resolvedOwnerId,
-                          tabId: activeBrowserTabId,
-                        }),
-                      )
-                    })
-                  }
-                }}
-                aria-label="Reload"
-              >
-                <RefreshCwIcon
-                  className={cn('size-3.5', activeBrowserTab?.isLoading && 'animate-spin')}
-                />
-              </Button>
-            </div>
-
-            <form className="relative min-w-0 flex-1" onSubmit={handleAddressSubmit}>
-              <Input
-                type="text"
-                value={addressValue}
-                placeholder="Search or enter address"
-                aria-label="Search or enter address"
-                disabled={!nativeBrowserAvailable || !activeBrowserTab}
-                className="h-7 w-full rounded-md border-0 bg-foreground/5 px-3 text-xs shadow-none placeholder:text-muted-foreground/50 focus:bg-foreground/8 focus-visible:ring-0 md:text-xs"
-                onFocus={() => {
-                  setIsEditingAddress(true)
-                  setSuggestionsOpen(true)
-                }}
-                onBlur={() => {
-                  window.setTimeout(() => {
-                    setIsEditingAddress(false)
-                    setSuggestionsOpen(false)
-                  }, 120)
-                }}
-                onChange={(event) => {
-                  const nextValue = event.target.value
-                  setAddressValue(nextValue)
-                  if (activeBrowserTabId) {
-                    addressDraftByTabIdRef.current.set(activeBrowserTabId, nextValue)
-                  }
-                  setSuggestionsOpen(true)
-                }}
-              />
-              {suggestionsOpen && suggestions.length > 0 && (
-                <div
-                  className="absolute left-0 right-0 top-8 z-20 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-lg"
-                  {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
-                >
-                  {suggestions.map(suggestion => (
-                    <Button
-                      key={suggestion.id}
-                      type="button"
-                      variant="ghost"
-                      className="h-auto w-full min-w-0 justify-start gap-2 rounded-none px-2 py-1.5 text-left text-xs font-normal hover:bg-foreground/5"
-                      onMouseDown={event => event.preventDefault()}
-                      onClick={() => handleSuggestion(suggestion)}
-                    >
-                      {suggestion.faviconUrl && (
-                        <img
-                          src={suggestion.faviconUrl}
-                          alt=""
-                          className="size-3.5 shrink-0 rounded-sm"
-                        />
-                      )}
-                      {!suggestion.faviconUrl && (
-                        <GlobeIcon
-                          className="size-3.5 shrink-0 !text-muted-foreground/60"
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-foreground">{suggestion.title}</span>
-                        <span className="block truncate text-[10px] text-muted-foreground">
-                          {suggestion.detail}
-                        </span>
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </form>
-
+      {activeBrowserTab && (
+        <div className="relative flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-card px-2">
+          <div className="flex shrink-0 items-center gap-0.5">
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="size-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-              disabled={!nativeBrowserAvailable || !activeBrowserTabId}
-              onClick={handleCaptureScreenshot}
-              aria-label="Attach screenshot to composer"
+              className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
+              disabled={!activeBrowserTab?.canGoBack}
+              onClick={() => {
+                const bridge = readBrowserBridge()
+                if (bridge && activeBrowserTabId) {
+                  void runBrowserAction(async () => {
+                    upsertOwnerState(
+                      await bridge.goBack({ threadId: resolvedOwnerId, tabId: activeBrowserTabId }),
+                    )
+                  })
+                }
+              }}
+              aria-label="Go back"
             >
-              <CameraIcon className="size-3.5" />
+              <ArrowLeftIcon className="size-3.5" />
             </Button>
             <Button
               type="button"
               variant="ghost"
-              size="sm"
-              className={cn(
-                'h-7 shrink-0 gap-1 rounded-md px-2 text-xs disabled:opacity-30',
-                hasActiveAnnotationSession
-                  ? 'bg-primary/12 text-primary hover:bg-primary/16'
-                  : 'text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground',
-              )}
-              disabled={!nativeBrowserAvailable || !activeBrowserTabId}
-              onClick={hasActiveAnnotationSession ? handleCancelAnnotation : handleStartAnnotation}
-              aria-label={hasActiveAnnotationSession
-                ? t('browser.annotation.cancel' as ChromeKey)
-                : t('browser.annotation.comment' as ChromeKey)}
-              title={t('browser.annotation.toggleTitle' as ChromeKey)}
+              size="icon-sm"
+              className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
+              disabled={!activeBrowserTab?.canGoForward}
+              onClick={() => {
+                const bridge = readBrowserBridge()
+                if (bridge && activeBrowserTabId) {
+                  void runBrowserAction(async () => {
+                    upsertOwnerState(
+                      await bridge.goForward({
+                        threadId: resolvedOwnerId,
+                        tabId: activeBrowserTabId,
+                      }),
+                    )
+                  })
+                }
+              }}
+              aria-label="Go forward"
             >
-              <MessageSquarePlusIcon className="size-3.5" />
-              <span>{t('browser.annotation.comment' as ChromeKey)}</span>
+              <ArrowRightIcon className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              disabled={!nativeBrowserAvailable || !activeBrowserTabId}
+              onClick={() => {
+                const bridge = readBrowserBridge()
+                if (bridge && activeBrowserTabId) {
+                  void runBrowserAction(async () => {
+                    upsertOwnerState(
+                      await bridge.reload({
+                        threadId: resolvedOwnerId,
+                        tabId: activeBrowserTabId,
+                      }),
+                    )
+                  })
+                }
+              }}
+              aria-label="Reload"
+            >
+              <RefreshCwIcon
+                className={cn('size-3.5', activeBrowserTab?.isLoading && 'animate-spin')}
+              />
             </Button>
           </div>
-        )
-      }
+
+          <form className="relative min-w-0 flex-1" onSubmit={handleAddressSubmit}>
+            <Input
+              type="text"
+              value={addressValue}
+              placeholder="Search or enter address"
+              aria-label="Search or enter address"
+              disabled={!nativeBrowserAvailable || !activeBrowserTab}
+              className="h-7 w-full rounded-md border-0 bg-foreground/5 px-3 text-xs shadow-none placeholder:text-muted-foreground/50 focus:bg-foreground/8 focus-visible:ring-0 md:text-xs"
+              onFocus={() => {
+                setIsEditingAddress(true)
+                setSuggestionsOpen(true)
+              }}
+              onBlur={() => {
+                window.setTimeout(() => {
+                  setIsEditingAddress(false)
+                  setSuggestionsOpen(false)
+                }, 120)
+              }}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                setAddressValue(nextValue)
+                if (activeBrowserTabId) {
+                  addressDraftByTabIdRef.current.set(activeBrowserTabId, nextValue)
+                }
+                setSuggestionsOpen(true)
+              }}
+            />
+            {suggestionsOpen && suggestions.length > 0 && (
+              <div
+                className="absolute left-0 right-0 top-8 z-20 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-lg"
+                {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
+              >
+                {suggestions.map(suggestion => (
+                  <Button
+                    key={suggestion.id}
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full min-w-0 justify-start gap-2 rounded-none px-2 py-1.5 text-left text-xs font-normal hover:bg-foreground/5"
+                    onMouseDown={event => event.preventDefault()}
+                    onClick={() => handleSuggestion(suggestion)}
+                  >
+                    {suggestion.faviconUrl && (
+                      <img
+                        src={suggestion.faviconUrl}
+                        alt=""
+                        className="size-3.5 shrink-0 rounded-sm"
+                      />
+                    )}
+                    {!suggestion.faviconUrl && (
+                      <GlobeIcon
+                        className="size-3.5 shrink-0 !text-muted-foreground/60"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-foreground">{suggestion.title}</span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {suggestion.detail}
+                      </span>
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </form>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="size-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
+            disabled={!nativeBrowserAvailable || !activeBrowserTabId}
+            onClick={handleCaptureScreenshot}
+            aria-label="Attach screenshot to composer"
+          >
+            <CameraIcon className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'h-7 shrink-0 gap-1 rounded-md px-2 text-xs disabled:opacity-30',
+              hasActiveAnnotationSession
+                ? 'bg-primary/12 text-primary hover:bg-primary/16'
+                : 'text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground',
+            )}
+            disabled={!nativeBrowserAvailable || !activeBrowserTabId}
+            onClick={hasActiveAnnotationSession ? handleCancelAnnotation : handleStartAnnotation}
+            aria-label={
+              hasActiveAnnotationSession
+                ? t('browser.annotation.cancel' as ChromeKey)
+                : t('browser.annotation.comment' as ChromeKey)
+            }
+            title={t('browser.annotation.toggleTitle' as ChromeKey)}
+          >
+            <MessageSquarePlusIcon className="size-3.5" />
+            <span>{t('browser.annotation.comment' as ChromeKey)}</span>
+          </Button>
+        </div>
+      )}
 
       {chromeStatus && (
         <div
@@ -3002,6 +3206,7 @@ export function BrowserPanel({
         {activePanelTab?.kind === 'browser' && (
           <div className="absolute inset-0 flex min-h-0 flex-col bg-background">
             <div ref={viewportRef} className="relative min-h-0 flex-1 bg-background">
+              <div ref={browserWebviewHostRef} className="absolute inset-0" />
               {!nativeBrowserAvailable && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background px-6 text-center text-xs text-muted-foreground">
                   <GlobeIcon className="size-9 opacity-40" />
@@ -3046,11 +3251,30 @@ export function BrowserPanel({
                 ownerId: resolvedOwnerId,
               })
             }}
+            onAddLineComment={
+              activeSessionId
+                ? ({ workspaceId, path, lineNumber, comment }) => {
+                    submitChatComposerContextIngress(activeSessionId, [
+                      {
+                        type: 'data-cradle-file-line-comment',
+                        workspaceId,
+                        path,
+                        lineStart: lineNumber,
+                        lineEnd: lineNumber,
+                        comment,
+                      },
+                    ])
+                  }
+                : undefined
+            }
           />
         )}
 
         {activePanelTab?.kind === 'workspace-file' && activePanelTab.view === 'editor' && (
-          <WorkspaceFileEditor workspaceId={activePanelTab.workspaceId} path={activePanelTab.path} />
+          <WorkspaceFileEditor
+            workspaceId={activePanelTab.workspaceId}
+            path={activePanelTab.path}
+          />
         )}
 
         {activePanelTab?.kind === 'workspace-diff' && (
@@ -3060,6 +3284,15 @@ export function BrowserPanel({
             workspaceId={activePanelTab.workspaceId}
             repositoryPath={activePanelTab.repositoryPath}
             paths={activePanelTab.paths}
+          />
+        )}
+
+        {activePanelTab?.kind === 'pull-request' && (
+          <PullRequestDetailPanel
+            owner={activePanelTab.owner}
+            repo={activePanelTab.repo}
+            number={activePanelTab.number}
+            workId={activePanelTab.workId}
           />
         )}
 
@@ -3118,10 +3351,7 @@ export function BrowserPanel({
         )}
 
         {activePanelTab?.kind === 'plan-document' && (
-          <PlanDocumentViewer
-            title={activePanelTab.title}
-            text={activePanelTab.text}
-          />
+          <PlanDocumentViewer title={activePanelTab.title} text={activePanelTab.text} />
         )}
 
         {activePanelTab?.kind === 'plan-refine' && (

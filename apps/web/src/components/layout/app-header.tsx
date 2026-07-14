@@ -22,6 +22,7 @@ import { isTearoffWindow, windowControlsSafeArea } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
 import { SurfaceBar } from '~/navigation/surface-bar'
 import { chatSessionIdForSurface, workIdForSurface } from '~/navigation/surface-identity'
+import { useBrowserPanelStore } from '~/store/browser-panel'
 import { useLayoutStore } from '~/store/layout'
 
 interface AppHeaderProps {
@@ -60,7 +61,7 @@ export function AppHeader({
   const toggleAside = useLayoutStore(s => s.toggleAside)
   const sidebarCollapsed = useLayoutStore(s => s.sidebarCollapsed)
   const toggleSidebar = useLayoutStore(s => s.toggleSidebar)
-  const toggleBrowserPanel = useLayoutStore(s => s.toggleBrowserPanel)
+  const toggleBrowserPanel = useBrowserPanelStore(s => s.toggleDock)
   const activeSurface = useActiveSurface()
   const activeWorkId = workIdForSurface(activeSurface)
   const isSettingsActive = activeSurface?.kind === 'settings'

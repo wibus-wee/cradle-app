@@ -51,6 +51,10 @@ const surfaceRouteSchema = z.discriminatedUnion('to', [
     params: z.object({ workId: z.string() }),
   }),
   z.object({
+    to: z.literal('/pull-requests'),
+    search: z.object({ workId: optionalStringSchema }).optional(),
+  }),
+  z.object({
     to: z.literal('/chat/new'),
     search: z.object({ issueId: optionalStringSchema }).optional(),
   }),
@@ -100,6 +104,7 @@ const appSurfaceSchema = z.object({
     'home',
     'new-work',
     'work',
+    'pull-requests',
     'new-chat',
     'chat',
     'diff',

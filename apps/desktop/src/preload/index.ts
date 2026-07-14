@@ -1,5 +1,9 @@
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+
 import { contextBridge, ipcRenderer } from 'electron'
 
+import { browserSessionPartition } from '../shared/browser-session'
 import { resolveWindowControlsSafeArea } from '../shared/window-controls-safe-area'
 
 // Parse --server-url, --surface and --surface-route from additionalArguments
@@ -155,11 +159,17 @@ const cradleElectron = {
 
   /** Native BrowserPanel bridge backed by Electron WebContentsView. */
   browser: {
+    getWebviewConfig: (input: { threadId: string }) => ({
+      partition: browserSessionPartition(input.threadId),
+      preloadUrl: pathToFileURL(path.join(__dirname, 'browser-panel.js')).toString(),
+    }),
     open: (input: unknown) => ipcRenderer.invoke('desktop:browser-open', input),
     close: (input: unknown) => ipcRenderer.invoke('desktop:browser-close', input),
     hide: (input: unknown) => ipcRenderer.invoke('desktop:browser-hide', input),
     getState: (input: unknown) => ipcRenderer.invoke('desktop:browser-get-state', input),
     setBounds: (input: unknown) => ipcRenderer.send('desktop:browser-set-bounds', input),
+    attachWebview: (input: unknown) => ipcRenderer.invoke('desktop:browser-attach-webview', input),
+    detachWebview: (input: unknown) => ipcRenderer.invoke('desktop:browser-detach-webview', input),
     captureScreenshot: (input: unknown) =>
       ipcRenderer.invoke('desktop:browser-capture-screenshot', input),
     copyScreenshotToClipboard: (input: unknown) =>

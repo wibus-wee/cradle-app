@@ -80,6 +80,7 @@ export function featureDomainForSurface(surface: SurfaceKind): ProductFeatureDom
       return 'chat'
     case 'new-work':
     case 'work':
+    case 'pull-requests':
       return 'work'
     case 'workspace':
       return 'workspace'

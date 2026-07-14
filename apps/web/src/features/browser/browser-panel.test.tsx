@@ -163,6 +163,12 @@ vi.mock('~/features/workspace/workspace-file-preview', () => ({
   WorkspaceFilePreview: () => <div data-testid="workspace-file-preview" />,
 }))
 
+vi.mock('~/features/pull-requests/pull-request-detail-panel', () => ({
+  PullRequestDetailPanel: ({ owner, repo, number, workId }: { owner: string, repo: string, number: number, workId?: string }) => (
+    <div data-testid="pull-request-detail-panel">{`${owner}/${repo}#${number}:${workId}`}</div>
+  ),
+}))
+
 describe('browserPanel rendering', () => {
   let browserBridge: ReturnType<typeof installTestBrowserBridge>
 
@@ -199,6 +205,21 @@ describe('browserPanel rendering', () => {
     })
 
     expect(diffViewerRender).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders pull request details as a Browser Panel tab', () => {
+    useBrowserPanelStore.getState().openPullRequestTab({
+      owner: 'cradle',
+      repo: 'app',
+      number: 42,
+      workId: 'work-1',
+      sessionId: 'session-1',
+      title: 'Add pull request view',
+    })
+
+    render(<BrowserPanel />)
+
+    expect(screen.getByTestId('pull-request-detail-panel').textContent).toBe('cradle/app#42:work-1')
   })
 
   it('shows the source session marker for browser tabs from another session', () => {
@@ -279,6 +300,72 @@ describe('browserPanel rendering', () => {
     })
 
     expect(browserBridge.open).toHaveBeenCalledTimes(1)
+  })
+
+  it('attaches a renderer webview with the owner session and BrowserPanel preload', async () => {
+    const state = await browserBridge.open({
+      threadId: DEFAULT_BROWSER_PANEL_OWNER_ID,
+      initialUrl: 'https://example.com',
+    })
+    useBrowserPanelStore.getState().upsertOwnerState(state)
+
+    const attachWebview = vi.fn(async () => state)
+    const detachWebview = vi.fn(async () => {})
+    Object.assign(browserBridge, {
+      getWebviewConfig: vi.fn(() => ({
+        partition: 'persist:cradle-browser-test',
+        preloadUrl: 'file:///tmp/browser-panel.js',
+      })),
+      attachWebview,
+      detachWebview,
+    })
+
+    const originalCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options)
+      if (tagName.toLowerCase() === 'webview') {
+        Object.assign(element, { getWebContentsId: () => 42 })
+      }
+      return element
+    })
+
+    try {
+      render(<BrowserPanel />)
+
+      await waitFor(() => {
+        expect(attachWebview).toHaveBeenCalledWith({
+          threadId: DEFAULT_BROWSER_PANEL_OWNER_ID,
+          tabId: 'native-tab-1',
+          webContentsId: 42,
+        })
+      })
+
+      const webview = document.querySelector('webview')
+      expect(webview?.getAttribute('partition')).toBe('persist:cradle-browser-test')
+      expect(webview?.getAttribute('preload')).toBe('file:///tmp/browser-panel.js')
+      expect(webview?.getAttribute('allowpopups')).toBe('true')
+
+      const viewport = webview?.parentElement?.parentElement
+      expect(viewport).not.toBeNull()
+      viewport!.getBoundingClientRect = () => new DOMRect(0, 0, 600, 400)
+      const popover = originalCreateElement('div')
+      popover.setAttribute('data-slot', 'popover-content')
+      popover.getClientRects = () => [new DOMRect(100, 100, 200, 120)] as unknown as DOMRectList
+      document.body.append(popover)
+
+      await waitFor(() => {
+        expect((webview as HTMLElement).style.visibility).toBe('hidden')
+        expect(browserBridge.setBounds).toHaveBeenCalledWith({
+          threadId: DEFAULT_BROWSER_PANEL_OWNER_ID,
+          surface: 'renderer',
+          bounds: null,
+        })
+      })
+      popover.remove()
+    }
+    finally {
+      createElementSpy.mockRestore()
+    }
   })
 
   it('hides the native browser surface while a global suppressor is active', async () => {

@@ -45,6 +45,8 @@ import type { BrowserTabSource } from '~/store/browser-panel'
 import { DEFAULT_BROWSER_PANEL_OWNER_ID, useBrowserPanelStore } from '~/store/browser-panel'
 import { useLayoutStore } from '~/store/layout'
 
+import { BottomPanelVisibilityContext } from './bottom-panel-visibility'
+
 const ASIDE = { min: 200, max: 560 }
 const PANEL = { min: 80, max: 480 }
 
@@ -129,11 +131,9 @@ function installBrowserUseBridge({
 }): BrowserBridgeCleanup {
   const resolvedOwnerId = ownerId ?? DEFAULT_BROWSER_PANEL_OWNER_ID
   const requestBrowserTab = (payload: unknown) => {
-    openBrowserPanel()
     useBrowserPanelStore.getState().requestTab(parseBrowserTabRequest(payload), undefined, ownerId)
   }
   const createBrowserTab = async (url?: string) => {
-    openBrowserPanel()
     const bridge = window.cradle?.browser
     if (!bridge) {
       return useBrowserPanelStore.getState().createTab(url, undefined, ownerId)
@@ -147,6 +147,7 @@ function installBrowserUseBridge({
         })
       : await bridge.open({ threadId: resolvedOwnerId, initialUrl: url ?? 'about:blank' })
     useBrowserPanelStore.getState().upsertOwnerState(nextState)
+    openBrowserPanel()
     return nextState.activeTabId ?? nextState.tabs.at(-1)?.id ?? ''
   }
   const activateBrowserTab = async (tabId: string) => {
@@ -155,9 +156,9 @@ function installBrowserUseBridge({
       return false
     }
     try {
-      openBrowserPanel()
       const nextState = await bridge.selectTab({ threadId: resolvedOwnerId, tabId })
       useBrowserPanelStore.getState().upsertOwnerState(nextState)
+      openBrowserPanel()
       return true
     }
  catch {
@@ -429,15 +430,14 @@ function RetainedBottomPanels({
       {descriptors.map((descriptor) => {
         const panelVisible = visible && descriptor.ownerId === ownerId
         return (
-          <Activity
-            key={descriptor.ownerId}
-            mode={panelVisible ? 'visible' : 'hidden'}
-            name={`bottom-panel:${descriptor.ownerId}`}
-          >
-            <div className="h-full" aria-hidden={panelVisible ? undefined : 'true'}>
+          <BottomPanelVisibilityContext.Provider key={descriptor.ownerId} value={panelVisible}>
+            <div
+              className={cn('h-full', !panelVisible && 'hidden')}
+              aria-hidden={panelVisible ? undefined : 'true'}
+            >
               {descriptor.panel}
             </div>
-          </Activity>
+          </BottomPanelVisibilityContext.Provider>
         )
       })}
     </>
@@ -666,14 +666,13 @@ function AppLayoutContent({
   const bottomPanelHeight = useLayoutStore(state => state.bottomPanelHeight)
   const setBottomPanelHeight = useLayoutStore(state => state.setBottomPanelHeight)
   const bottomPanelOpen = useLayoutStore(state => state.bottomPanelOpen)
-  const browserPanelOpen = useLayoutStore(state =>
+  const browserPanelOpen = useBrowserPanelStore(state =>
     activeBrowserPanelOwnerId
-      ? (state.browserPanelOpenByOwnerId[activeBrowserPanelOwnerId] ?? false)
+      ? (state.owners[activeBrowserPanelOwnerId]?.open ?? false)
       : false)
   const browserPanelRatio = useLayoutStore(state => state.browserPanelRatio)
-  const setBrowserPanelOpen = useLayoutStore(state => state.setBrowserPanelOpen)
+  const setBrowserPanelOpen = useBrowserPanelStore(state => state.setDockOpen)
   const setBrowserPanelRatio = useLayoutStore(state => state.setBrowserPanelRatio)
-  const setActiveBrowserPanelOwner = useLayoutStore(state => state.setActiveBrowserPanelOwner)
   const isSettings = activeSurface?.kind === 'settings'
   const canUseRightAside
     = !isSettings && !!resolvedHasAside && (!!resolvedAsideSessionId || !!resolvedAsideWorkspaceId)
@@ -822,8 +821,7 @@ function AppLayoutContent({
 
   useEffect(() => {
     useBrowserPanelStore.getState().setActiveOwner(activeBrowserPanelOwnerId)
-    setActiveBrowserPanelOwner(activeBrowserPanelOwnerId)
-  }, [activeBrowserPanelOwnerId, setActiveBrowserPanelOwner])
+  }, [activeBrowserPanelOwnerId])
 
   useEffect(() => {
     if (!isElectron) {

@@ -16,6 +16,7 @@ import {
   HOME_SURFACE,
   kanbanSurfaceId,
   pluginSurfaceId,
+  pullRequestsSurfaceId,
   sortSurfaces,
   workspaceDiffsSurfaceId,
   workspaceSurfaceId,
@@ -105,6 +106,19 @@ export function openWork(workId: string, options: { replace?: boolean } = {}): v
     kind: 'work',
     title: getI18n().t('work:surface.work'),
     route: { to: '/work/$workId', params: { workId } },
+    closable: true,
+  }, options)
+}
+
+export function openPullRequests(options: { replace?: boolean, workId?: string } = {}): void {
+  openSurface({
+    id: pullRequestsSurfaceId(),
+    kind: 'pull-requests',
+    title: getI18n().t('pull-requests:surface.title'),
+    route: {
+      to: '/pull-requests',
+      search: { workId: options.workId },
+    },
     closable: true,
   }, options)
 }

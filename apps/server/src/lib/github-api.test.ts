@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { markPullRequestReady, resetTokenCache } from './github-api'
+import {
+  fetchPullRequestDetail,
+  fetchPullRequestFiles,
+  markPullRequestReady,
+  resetTokenCache,
+} from './github-api'
 
 const originalGitHubToken = process.env.GH_TOKEN
 
@@ -80,5 +85,86 @@ describe('markPullRequestReady', () => {
       variables: { pullRequestId: 'PR_node_id' },
       query: expect.stringContaining('markPullRequestReadyForReview'),
     }))
+  })
+})
+
+describe('pull request detail reads', () => {
+  beforeEach(() => {
+    process.env.GH_TOKEN = 'test-token'
+    resetTokenCache()
+  })
+
+  afterEach(() => {
+    if (originalGitHubToken === undefined) {
+      delete process.env.GH_TOKEN
+    }
+    else {
+      process.env.GH_TOKEN = originalGitHubToken
+    }
+    resetTokenCache()
+    vi.unstubAllGlobals()
+  })
+
+  it('parses live pull request metadata and changed-file patches from GitHub', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        number: 14,
+        title: 'Fix retries',
+        body: '## Summary\nFixes retries.',
+        state: 'open',
+        draft: false,
+        merged: false,
+        mergeable: true,
+        mergeable_state: 'clean',
+        html_url: 'https://github.com/cradle/app/pull/14',
+        user: {
+          login: 'wibus',
+          avatar_url: 'https://avatars.example/wibus',
+          html_url: 'https://github.com/wibus',
+        },
+        head: { sha: 'head-sha', ref: 'feature' },
+        base: { ref: 'main' },
+        additions: 12,
+        deletions: 3,
+        changed_files: 1,
+        commits: 2,
+        comments: 4,
+        review_comments: 1,
+        created_at: '2026-07-10T10:00:00Z',
+        updated_at: '2026-07-11T10:00:00Z',
+        closed_at: null,
+        merged_at: null,
+        requested_reviewers: [],
+        assignees: [],
+        labels: [{ name: 'desktop', color: 'ffffff' }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{
+        sha: 'file-sha',
+        filename: 'src/retry.ts',
+        status: 'modified',
+        additions: 12,
+        deletions: 3,
+        changes: 15,
+        blob_url: 'https://github.com/cradle/app/blob/head/src/retry.ts',
+        raw_url: 'https://github.com/cradle/app/raw/head/src/retry.ts',
+        contents_url: 'https://api.github.com/repos/cradle/app/contents/src/retry.ts',
+        patch: '@@ -1 +1 @@\n-old\n+new',
+      }]), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchPullRequestDetail('cradle', 'app', 14)).resolves.toMatchObject({
+      number: 14,
+      body: '## Summary\nFixes retries.',
+      additions: 12,
+      changed_files: 1,
+      user: { login: 'wibus' },
+    })
+    await expect(fetchPullRequestFiles('cradle', 'app', 14)).resolves.toEqual([
+      expect.objectContaining({
+        filename: 'src/retry.ts',
+        patch: '@@ -1 +1 @@\n-old\n+new',
+        previous_filename: null,
+      }),
+    ])
   })
 })

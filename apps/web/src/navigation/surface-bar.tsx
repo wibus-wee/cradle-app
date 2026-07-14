@@ -448,16 +448,21 @@ export const SurfaceBar = memo(({
       releaseCurrentDrag()
       return
     }
-    // No pill drop target → released on the content area or in place (no-op).
+    // No pill drop target → released on the content area (split) or in place.
     if (!target) {
       const sourceSurface = useSurfaceStore.getState().surfaces.find(surface => surface.id === source.id)
       const sessionId = sourceSurface ? readChatSessionId(sourceSurface) : null
       const releasePointer = dragReleaseClientPointerRef.current
       if (sessionId && releasePointer) {
-        dropChatSurfaceAtPoint({
+        const didSplit = dropChatSurfaceAtPoint({
           ...releasePointer,
           sessionId,
         })
+        // Match sidebar semantics: the dragged session is absorbed into the
+        // target surface's split, so the source top-level tab closes.
+        if (didSplit) {
+          closeSurfaceById(String(source.id))
+        }
       }
       releaseCurrentDrag()
       return
@@ -520,8 +525,10 @@ export const SurfaceBar = memo(({
             if (!surface) { return null }
             return (
               <div
+                // Keep the ghost out of hit-testing so elementFromPoint during
+                // split hover/drop sees the chat surface under the cursor.
                 className={cn(
-                  'mx-0.5 flex h-7.5 max-w-44 cursor-grabbing items-center justify-start gap-1.5 overflow-hidden rounded-md border border-border/50 bg-background text-[11px] font-medium opacity-90 shadow-lg',
+                  'pointer-events-none mx-0.5 flex h-7.5 max-w-44 cursor-grabbing items-center justify-start gap-1.5 overflow-hidden rounded-md border border-border/50 bg-background text-[11px] font-medium opacity-90 shadow-lg',
                   surface.closable ? 'pl-3 pr-7' : 'px-3',
                 )}
               >
