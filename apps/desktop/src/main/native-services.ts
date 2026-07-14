@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { extname, isAbsolute, join, relative } from 'node:path'
 
 import { createServices, getIpcContext, IpcMethod, IpcService } from '@cradle/ipc'
-import { app, BrowserWindow, dialog, screen, shell as nativeLauncher, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, nativeImage, screen, shell as nativeLauncher, systemPreferences } from 'electron'
 
 import { resolveWindowControlsSafeArea } from '../shared/window-controls-safe-area'
 import type {
@@ -51,6 +51,7 @@ import {
   readScreenPointAppshotAnimationTarget,
   readScreenPointAppshotDestinationFrame,
 } from './native-appshot-target'
+import { resolveMacApplicationIconPath } from './native-editor-icon'
 import { launchPathInEditor, readAvailableEditors } from './native-editor-launcher'
 import { launchPathInTerminal } from './native-terminal-launcher'
 import type { QuitGuard } from './quit-guard'
@@ -303,7 +304,12 @@ class NativeService extends IpcService {
       }
 
       try {
-        const icon = await app.getFileIcon(applicationPath, { size: 'normal' })
+        const iconPath = process.platform === 'darwin'
+          ? await resolveMacApplicationIconPath(applicationPath)
+          : undefined
+        const icon = iconPath
+          ? nativeImage.createFromPath(iconPath)
+          : await app.getFileIcon(applicationPath, { size: 'normal' })
         return icon.isEmpty() ? editor : { ...editor, iconDataUrl: icon.toDataURL() }
       }
       catch {

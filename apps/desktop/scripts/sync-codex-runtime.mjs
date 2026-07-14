@@ -8,6 +8,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   stat,
   writeFile,
@@ -142,10 +143,7 @@ export async function ensureCodexRuntime(input = {}) {
     await tar.x({ file: archivePath, cwd: extractDir })
 
     const extractedExecutable = await findExtractedCodexExecutable(extractDir, target)
-    await copyFile(extractedExecutable, executablePath)
-    if (target.platform !== 'win32') {
-      await chmod(executablePath, 0o755)
-    }
+    await installExecutableAtomically(extractedExecutable, executablePath, target)
 
     const binary = await readBinaryMetadata(executablePath, target)
     const manifest = {
@@ -176,6 +174,20 @@ export async function ensureCodexRuntime(input = {}) {
   }
   finally {
     await rm(tempDir, { recursive: true, force: true })
+  }
+}
+
+async function installExecutableAtomically(source, destination, target) {
+  const stagedPath = `${destination}.staged-${process.pid}-${Date.now()}`
+  try {
+    await copyFile(source, stagedPath)
+    if (target.platform !== 'win32') {
+      await chmod(stagedPath, 0o755)
+    }
+    await rename(stagedPath, destination)
+  }
+  finally {
+    await rm(stagedPath, { force: true })
   }
 }
 

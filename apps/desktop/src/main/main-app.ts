@@ -3,6 +3,11 @@ import { join, resolve } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen } from 'electron'
 import windowStateKeeper from 'electron-window-state'
 
+import type { DesktopServerStatus } from '../shared/server-runtime'
+import {
+  DESKTOP_SERVER_STATUS_CHANGED_CHANNEL,
+  DESKTOP_SERVER_STATUS_GET_CHANNEL,
+} from '../shared/server-runtime'
 import {
   resolveTrafficLightPosition,
   resolveWindowControlsOverlay,
@@ -82,6 +87,7 @@ let installQueue = Promise.resolve()
 let canProcessPluginInstallLinks = false
 const pendingPluginInstallUrls: string[] = []
 const browserManager = new DesktopBrowserManager()
+let desktopServerStatus: DesktopServerStatus = { state: 'starting' }
 
 async function readRendererRuntimeDiagnostics(): Promise<Array<Record<string, unknown>>> {
   const windows = BrowserWindow.getAllWindows().filter(window => !window.isDestroyed())
@@ -131,7 +137,7 @@ interface DesktopRuntimePreferences {
   autoDownloadUpdates: boolean
 }
 
-async function createMainWindow(serverUrl: string): Promise<BrowserWindow> {
+async function createMainWindow(): Promise<BrowserWindow> {
   const mainWindowStatePath = join(app.getPath('userData'), MAIN_WINDOW_STATE_FILE)
   const storedBounds = readStoredWindowBounds(mainWindowStatePath)
   const mainWindowState = windowStateKeeper({
@@ -181,7 +187,6 @@ async function createMainWindow(serverUrl: string): Promise<BrowserWindow> {
       sandbox: true,
       webviewTag: true,
       additionalArguments: [
-        `--server-url=${serverUrl}`,
         `--server-auth-token=${getDesktopServerAuthToken()}`,
       ],
     },
@@ -251,6 +256,15 @@ function broadcastUpdateStatus(status: unknown): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
       window.webContents.send('desktop-update:status-changed', status)
+    }
+  }
+}
+
+function publishDesktopServerStatus(status: DesktopServerStatus): void {
+  desktopServerStatus = status
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(DESKTOP_SERVER_STATUS_CHANGED_CHANNEL, status)
     }
   }
 }
@@ -513,6 +527,52 @@ async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void
   }
 }
 
+function initializeDesktopServicesForServer(serverUrl: string): void {
+  setPluginSourceSyncServerUrl(serverUrl)
+  bindDesktopObservabilityServerUrl(serverUrl)
+  startDesktopResourceReporting()
+  chatStreamBroker = new ChatStreamBroker({ serverUrl })
+  chatEventTailBroker = new ChatEventTailBroker({ serverUrl })
+
+  windowManager = new WindowManager(serverUrl)
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    windowManager.setMainWindow(mainWindow)
+  }
+
+  trayManager = new TrayManager({
+    serverUrl,
+    getMainWindow: () => mainWindow,
+    createMainWindow: async () => {
+      const win = await createMainWindow()
+      setMainWindow(win)
+      return win
+    },
+    requestQuit: () => {
+      quitGuard.allowNextQuit()
+      requestDesktopExit({
+        reason: 'tray quit',
+        exitCode: 0,
+        stopServerRuntime: true,
+      })
+    },
+  })
+  trayManager.initialize()
+
+  notificationCenterManager = new NotificationCenterManager({
+    serverUrl,
+    chatStreamBroker,
+    getMainWindow: () => mainWindow,
+  })
+  notificationCenterManager.start()
+
+  void syncDesktopPreferencesFromServer(serverUrl).then(() => {
+    updateManager?.startBackgroundChecks()
+  })
+  void syncAllDesktopLayerSources().catch((error) => {
+    console.error('[plugins] desktop source catch-up failed:', error)
+  })
+}
+
 export async function startDesktopApp(): Promise<void> {
   registerProcessShutdownHandlers()
   registerPluginInstallProtocol()
@@ -590,6 +650,7 @@ export async function startDesktopApp(): Promise<void> {
   })
   registerPluginSourceSyncIpcHandlers()
   updateManager.on('statusChanged', broadcastUpdateStatus)
+  ipcMain.handle(DESKTOP_SERVER_STATUS_GET_CHANNEL, () => desktopServerStatus)
 
   app.on('open-url', (event, url) => {
     event.preventDefault()
@@ -597,67 +658,41 @@ export async function startDesktopApp(): Promise<void> {
   })
 
   app.whenReady().then(async () => {
-    if (process.platform === 'darwin') {
-      await macBridgeManager?.start()
-    }
-
-    await activateDesktopPlugins()
-
-    const serverUrl = await startServer()
-    setPluginSourceSyncServerUrl(serverUrl)
-    bindDesktopObservabilityServerUrl(serverUrl)
-    startDesktopResourceReporting()
-    await syncDesktopPreferencesFromServer(serverUrl)
-    void syncAllDesktopLayerSources().catch((error) => {
-      console.error('[plugins] desktop source catch-up failed:', error)
-    })
-    chatStreamBroker = new ChatStreamBroker({ serverUrl })
-    chatEventTailBroker = new ChatEventTailBroker({ serverUrl })
-
-    windowManager = new WindowManager(serverUrl)
     appBadgeManager.initialize()
-
-    trayManager = new TrayManager({
-      serverUrl,
-      getMainWindow: () => mainWindow,
-      createMainWindow: async () => {
-        const win = await createMainWindow(serverUrl)
-        setMainWindow(win)
-        return win
-      },
-      requestQuit: () => {
-        quitGuard.allowNextQuit()
-        requestDesktopExit({
-          reason: 'tray quit',
-          exitCode: 0,
-          stopServerRuntime: true,
-        })
-      },
-    })
-    trayManager.initialize()
-
-    mainWindow = await createMainWindow(serverUrl)
+    mainWindow = await createMainWindow()
     setMainWindow(mainWindow)
-
-    notificationCenterManager = new NotificationCenterManager({
-      serverUrl,
-      chatStreamBroker,
-      getMainWindow: () => mainWindow,
-    })
-    notificationCenterManager.start()
-
-    updateManager?.startBackgroundChecks()
-    processPendingPluginInstallUrls()
-    handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
 
     app.on('activate', async () => {
       if (!mainWindow || mainWindow.isDestroyed()) {
-        const restoredWindow = await createMainWindow(serverUrl)
+        const restoredWindow = await createMainWindow()
         setMainWindow(restoredWindow)
         return
       }
       showMainWindow()
     })
+
+    void (async () => {
+      publishDesktopServerStatus({ state: 'starting' })
+      try {
+        if (process.platform === 'darwin') {
+          await macBridgeManager?.start()
+        }
+        await activateDesktopPlugins()
+        processPendingPluginInstallUrls()
+        handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
+
+        const serverUrl = await startServer()
+        initializeDesktopServicesForServer(serverUrl)
+        publishDesktopServerStatus({ state: 'ready', serverUrl })
+      }
+      catch (error) {
+        console.error('[desktop] runtime startup failed:', error)
+        publishDesktopServerStatus({
+          state: 'failed',
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })()
   }).catch((error) => {
     console.error('[desktop] app startup failed:', error)
     requestDesktopExit({

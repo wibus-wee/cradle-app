@@ -149,7 +149,7 @@ export async function startServer(): Promise<string> {
 
   const dataDir = join(app.getPath('userData'), 'data')
   const credentialSecret = resolveDesktopCredentialSecret(dataDir)
-  currentServerAuthToken = resolveDesktopServerAuthToken(dataDir)
+  currentServerAuthToken = getDesktopServerAuthToken()
   const existingServer = await readHealthyLocatedServerUrl(app.getPath('userData'))
   if (existingServer) {
     currentServerUrl = existingServer.serverUrl
@@ -653,6 +653,9 @@ function resolveDesktopServerAuthToken(dataDir: string): string {
 }
 
 export function getDesktopServerAuthToken(): string {
+  if (!currentServerAuthToken) {
+    currentServerAuthToken = resolveDesktopServerAuthToken(join(app.getPath('userData'), 'data'))
+  }
   return currentServerAuthToken
 }
 

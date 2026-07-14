@@ -4,6 +4,11 @@ import { pathToFileURL } from 'node:url'
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { browserSessionPartition } from '../shared/browser-session'
+import type { DesktopServerStatus } from '../shared/server-runtime'
+import {
+  DESKTOP_SERVER_STATUS_CHANGED_CHANNEL,
+  DESKTOP_SERVER_STATUS_GET_CHANNEL,
+} from '../shared/server-runtime'
 import { resolveWindowControlsSafeArea } from '../shared/window-controls-safe-area'
 
 // Parse --server-url, --surface and --surface-route from additionalArguments
@@ -113,6 +118,13 @@ const cradleElectron = {
         ipcRenderer.removeListener('desktop-update:status-changed', listener)
       }
     },
+  },
+
+  /** Desktop-owned server lifecycle facts for renderer bootstrap. */
+  serverRuntime: {
+    getStatus: () => ipcRenderer.invoke(DESKTOP_SERVER_STATUS_GET_CHANNEL) as Promise<DesktopServerStatus>,
+    onStatusChanged: (handler: (status: DesktopServerStatus) => void) =>
+      subscribeIpc(DESKTOP_SERVER_STATUS_CHANGED_CHANNEL, handler),
   },
 
   /** Desktop app icon badge bridge */
