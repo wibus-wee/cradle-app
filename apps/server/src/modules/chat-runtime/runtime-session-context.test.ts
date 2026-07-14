@@ -48,4 +48,28 @@ describe('getSessionRunContext', () => {
     expect(profileConfig.openaiBaseUrl).toBe('https://anyrouter.example.test/v1')
     expect(profileConfig.anthropicBaseUrl).toBe('https://anthropic.example.test/v1')
   })
+
+  it('rejects legacy OpenCode sessions bound to an ordinary provider target', () => {
+    db().insert(providerTargets).values({
+      id: 'ordinary-target',
+      kind: 'manual',
+      providerKind: 'openai-compatible',
+      displayName: 'Ordinary Target',
+      enabled: true,
+      connectionConfigJson: JSON.stringify({ baseUrl: 'https://provider.example.test/v1' }),
+      enabledModelsJson: '[]',
+      customModelsJson: '[]',
+    }).run()
+    db().insert(sessions).values({
+      id: 'opencode-session',
+      title: 'OpenCode Session',
+      providerTargetId: 'ordinary-target',
+      runtimeKind: 'opencode',
+      configJson: '{}',
+    }).run()
+
+    expect(() => getSessionRunContext('opencode-session')).toThrow(
+      'Runtime only supports runtime-owned provider targets',
+    )
+  })
 })
