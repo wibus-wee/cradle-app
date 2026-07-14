@@ -3,7 +3,7 @@ import { createIpcProxy } from '@cradle/ipc/client'
 import type { SurfaceRoute } from '~/navigation/surface-identity'
 
 import { cradleFetch } from './server-credential'
-import { getDefaultServerUrl, readCustomServerUrl } from './server-endpoint-preferences'
+import { getConfiguredServerUrl } from './server-endpoint-preferences'
 
 /**
  * Whether we're running inside Electron.
@@ -28,7 +28,7 @@ export function isLocalMode(): boolean {
  * WARNING: Unless you need to bypass api-gen's react-query integration, do not use this client directly.
  */
 export function getServerUrl(): string {
-  return readCustomServerUrl() ?? getDefaultServerUrl()
+  return getConfiguredServerUrl()
 }
 
 /**
@@ -127,7 +127,7 @@ interface WindowTitleBarOverlayInput {
   symbolColor: string
 }
 
-type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
 type RuntimeSettingsValue = string | number | boolean | null
 
 // ── Desktop Chat Stream Bridge ────────────────────────────────────────────────

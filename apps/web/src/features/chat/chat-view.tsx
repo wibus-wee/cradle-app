@@ -1,6 +1,5 @@
 import {
   CloseLine as XIcon,
-  GitBranchLine as WorktreeIcon,
   PencilLine as PencilIcon,
 } from '@mingcute/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -20,7 +19,6 @@ import { IsolationBoundaryDialog } from '~/features/session/isolation-boundary-d
 import { IsolationMissingDialog } from '~/features/session/isolation-missing-dialog'
 import {
   useSessionIsolationState,
-  useStartSessionIsolation,
 } from '~/features/session/use-session-isolation'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
@@ -54,7 +52,6 @@ import {
 } from './prompt-ingress'
 import type { MessageBubbleEditAction } from './rendering/message-bubble'
 import { clearCodexThreadGoal, setCodexThreadGoal } from './runtime/codex-app-server-bridge'
-import { RuntimeDiagnosticsPopover } from './runtime/runtime-diagnostics-popover'
 import { RuntimeSettingsControl } from './runtime/runtime-settings-control'
 import { resolveRuntimeCatalogItem } from './runtime/runtime-settings-presenter'
 import { useRuntimeSettings } from './runtime/use-runtime-settings'
@@ -102,7 +99,6 @@ export function ChatView({
 }: ChatViewProps) {
   const queryClient = useQueryClient()
   const { t } = useTranslation('chat')
-  const { t: tIsolation } = useTranslation('session-isolation')
   const surfaceActive = useSurfaceActive()
   const chatActive = active && surfaceActive
   const remoteConnection = useRemoteHostConnection(remoteHostId)
@@ -128,7 +124,6 @@ export function ChatView({
     enabled: chatActive && !!sessionId,
     staleTime: 5_000,
   })
-  const startIsolation = useStartSessionIsolation()
   const isolationStateQuery = useSessionIsolationState(sessionId)
   const { data: awaitSummary } = useSessionAwaitSummary(sessionId, chatActive)
   const [droppedPath, setDroppedPath] = useState<{ text: string, ts: number } | null>(null)
@@ -711,69 +706,13 @@ export function ChatView({
             disabled={status === 'streaming'}
           />
         )}
-        {sessionId
-          && workspaceId
-          && !sessionMetaQuery.data?.isIsolated
-          && !sessionMetaQuery.data?.worktreeId
-          && !sessionMetaQuery.data?.pendingWorktreeId && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="gap-1 text-muted-foreground"
-              title={tIsolation('chat.isolateTooltip')}
-              disabled={startIsolation.isPending}
-              data-testid="chat-isolate-action"
-              onClick={() => {
-                void startIsolation
-                  .mutateAsync({
-                    sessionId,
-                    workspaceId,
-                    slug: sessionMetaQuery.data?.title ?? undefined,
-                  })
-                  .then(() => {
-                    toastManager.add({
-                      type: 'success',
-                      title: tIsolation('chat.isolateSuccess'),
-                    })
-                  })
-                  .catch((isolationError) => {
-                    toastManager.add({
-                      type: 'error',
-                      title: tIsolation('boundary.errorTitle'),
-                      description:
-                        isolationError instanceof Error
-                          ? isolationError.message
-                          : String(isolationError),
-                    })
-                  })
-              }}
-            >
-              <WorktreeIcon className="size-3 shrink-0" aria-hidden />
-              <span className="text-[11px]">{tIsolation('chat.isolate')}</span>
-            </Button>
-          )}
-        {import.meta.env.DEV && (
-          <RuntimeDiagnosticsPopover
-            slots={composerRuntime.uiSlots}
-            states={composerRuntime.slotStates}
-          />
-        )}
       </div>
     ),
     [
-      composerRuntime.slotStates,
-      composerRuntime.uiSlots,
       sessionId,
       sessionMetaQuery.data?.providerTargetId,
       sessionMetaQuery.data?.runtimeKind,
-      sessionMetaQuery.data?.isIsolated,
-      sessionMetaQuery.data?.worktreeId,
-      sessionMetaQuery.data?.pendingWorktreeId,
-      sessionMetaQuery.data?.title,
-      startIsolation,
       status,
-      tIsolation,
       workspaceId,
     ],
   )

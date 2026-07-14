@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
-import { toastManager } from '~/components/ui/toast'
 import { getServerUrl } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
@@ -92,7 +91,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       return
     }
 
-    let interruptionToastShown = false
     const engine = new SessionSyncEngine({
       sessionId: chatSessionId,
       serverBaseUrl: getServerUrl(),
@@ -135,14 +133,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
         },
         onError: (error) => {
           console.warn('[session-sync-engine] event tail error', error)
-          if (!interruptionToastShown) {
-            interruptionToastShown = true
-            toastManager.add({
-              type: 'warning',
-              title: 'Connection interrupted',
-              description: 'Reconnecting and refreshing the chat session.',
-            })
-          }
         },
       },
     })

@@ -9,18 +9,16 @@
       crossorigin
     />
     <script>
-      (function () {
+      ;(function () {
         var parsed = JSON.parse(
-          localStorage.getItem("cradle:theme:v1") ||
-            '{"state":{"mode":"system"}}',
-        );
-        var mode = parsed.state.mode;
+          localStorage.getItem('cradle:theme:v1') || '{"state":{"mode":"system"}}'
+        )
+        var mode = parsed.state.mode
         var dark =
-          mode === "dark" ||
-          (mode === "system" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-      })();
+          mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+      })()
     </script>
     <style>
       html,
@@ -37,13 +35,100 @@
       html.dark #app {
         background: #171713;
       }
+
+      #bootstrap-shell {
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: rgb(36 36 31 / 38%);
+      }
+
+      .bootstrap-spinner {
+        width: 20px;
+        height: 20px;
+        animation: bootstrap-spin 800ms linear infinite;
+      }
+
+      .bootstrap-message {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      #bootstrap-shell.is-failed .bootstrap-spinner {
+        display: none;
+      }
+
+      #bootstrap-shell.is-failed .bootstrap-message {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+        color: #b42318;
+        font-family:
+          Geist,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        font-size: 12px;
+        white-space: normal;
+      }
+
+      @keyframes bootstrap-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      html.dark #bootstrap-shell {
+        color: rgb(238 238 232 / 42%);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .bootstrap-spinner {
+          animation: none;
+        }
+      }
     </style>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cradle Tear-Off</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="bootstrap-shell" role="status" aria-live="polite">
+        <svg class="bootstrap-spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bootstrap-spinner-a" x1="50%" x2="50%" y1="5.271%" y2="91.793%">
+              <stop offset="0%" stop-color="currentColor"></stop>
+              <stop offset="100%" stop-color="currentColor" stop-opacity=".55"></stop>
+            </linearGradient>
+            <linearGradient id="bootstrap-spinner-b" x1="50%" x2="50%" y1="8.877%" y2="90.415%">
+              <stop offset="0%" stop-color="currentColor" stop-opacity="0"></stop>
+              <stop offset="100%" stop-color="currentColor" stop-opacity=".55"></stop>
+            </linearGradient>
+          </defs>
+          <path
+            fill="url(#bootstrap-spinner-a)"
+            d="M8.886.006a1 1 0 0 1 .22 1.988A8.001 8.001 0 0 0 10 17.944v2c-5.523 0-10-4.476-10-10C0 4.838 3.848.566 8.886.007Z"
+            transform="translate(2 2.055)"
+          ></path>
+          <path
+            fill="url(#bootstrap-spinner-b)"
+            d="M14.322 1.985a1 1 0 0 1 1.392-.248A9.99 9.99 0 0 1 20 9.945c0 5.523-4.477 10-10 10v-2a8 8 0 0 0 4.57-14.567 1 1 0 0 1-.248-1.393"
+            transform="translate(2 2.055)"
+          ></path>
+        </svg>
+        <span class="bootstrap-message" data-bootstrap-message>Opening…</span>
+      </div>
+    </div>
     <script type="module" src="/src/tearoff-main.tsx"></script>
   </body>
 </html>

@@ -1,10 +1,19 @@
 const SERVER_ENDPOINT_STORAGE_KEY = 'cradle.web.serverEndpointUrl'
+let runtimeServerUrl: string | null = null
 
 export function getDefaultServerUrl(): string {
   if (window.cradle?.env?.serverUrl) {
     return window.cradle.env.serverUrl
   }
   return import.meta.env.VITE_SERVER_URL ?? 'http://127.0.0.1:21423'
+}
+
+export function getConfiguredServerUrl(): string {
+  return runtimeServerUrl ?? readCustomServerUrl() ?? getDefaultServerUrl()
+}
+
+export function setRuntimeServerUrl(value: string): void {
+  runtimeServerUrl = normalizeServerEndpointUrl(value)
 }
 
 export function normalizeServerEndpointUrl(value: string): string {
