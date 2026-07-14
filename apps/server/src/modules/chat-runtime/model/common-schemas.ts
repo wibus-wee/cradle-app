@@ -277,6 +277,18 @@ export const contextPartSchema = t.Union([
     },
     { additionalProperties: false },
   ),
+  t.Object(
+    {
+      type: t.Literal('data-cradle-file-line-comment'),
+      workspaceId: t.String({ minLength: 1 }),
+      path: t.String({ minLength: 1 }),
+      lineStart: t.Number({ minimum: 1 }),
+      lineEnd: t.Number({ minimum: 1 }),
+      comment: t.String({ minLength: 1 }),
+      position: t.Optional(t.Number({ minimum: 0 })),
+    },
+    { additionalProperties: false },
+  ),
 ])
 
 export const queueModeSchema = t.Literal('queue')
