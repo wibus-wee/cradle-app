@@ -10,7 +10,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shallow } from 'zustand/shallow'
 
 import { dropChatSurfaceAtPoint, publishChatSurfaceDrag } from '~/features/chat/split-workspace/chat-split-surface-drop'
-import { useRunningSessionIds, useUnreadSessionIds } from '~/features/workspace/use-session'
+import { usePreviewCard } from '~/features/workspace/preview-card/preview-card-context'
+import { PreviewCardProvider } from '~/features/workspace/preview-card/preview-card-provider'
+import { useAllSessions, useRunningSessionIds, useUnreadSessionIds } from '~/features/workspace/use-session'
 import { cn } from '~/lib/cn'
 import { nativeIpc, subscribePointerOutsideWindow } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'
@@ -67,6 +69,8 @@ interface SurfacePillProps {
   unread: boolean
   onActivate: (surfaceId: string) => void
   onClose: (event: React.MouseEvent, surfaceId: string) => void
+  onHoverStart?: (surface: AppSurface, anchor: HTMLElement) => void
+  onHoverEnd?: () => void
 }
 
 function SurfaceRunningIndicator() {
@@ -92,8 +96,25 @@ const SortableSurfacePill = memo(({
   unread,
   onActivate,
   onClose,
+  onHoverStart,
+  onHoverEnd,
 }: SurfacePillProps & { index: number }) => {
   const sortable = useSortable({ id: surface.id, index })
+  const isDragging = sortable.isDragging
+
+  const handlePointerEnter = useCallback((event: React.PointerEvent) => {
+    if (isDragging) {
+      return
+    }
+    onHoverStart?.(surface, event.currentTarget as HTMLElement)
+  }, [isDragging, onHoverStart, surface])
+
+  const handlePointerLeave = useCallback(() => {
+    if (isDragging) {
+      return
+    }
+    onHoverEnd?.()
+  }, [isDragging, onHoverEnd])
 
   const shortcutSlot = shortcutHint === undefined
     ? null
@@ -113,6 +134,8 @@ const SortableSurfacePill = memo(({
       ref={sortable.ref}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       onClick={() => onActivate(surface.id)}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
@@ -199,17 +222,38 @@ const SortableSurfacePill = memo(({
 })
 SortableSurfacePill.displayName = 'SortableSurfacePill'
 
+interface SurfaceBarProps {
+  className?: string
+  sessionScoped?: boolean
+  runningSessionIds?: ReadonlySet<string>
+  unreadSessionIds?: ReadonlySet<string>
+}
+
 export const SurfaceBar = memo(({
   className,
   sessionScoped = false,
   runningSessionIds: externalRunningSessionIds,
   unreadSessionIds: externalUnreadSessionIds,
-}: {
-  className?: string
-  sessionScoped?: boolean
-  runningSessionIds?: ReadonlySet<string>
-  unreadSessionIds?: ReadonlySet<string>
-}) => {
+}: SurfaceBarProps) => {
+  return (
+    <PreviewCardProvider>
+      <SurfaceBarInner
+        className={className}
+        sessionScoped={sessionScoped}
+        runningSessionIds={externalRunningSessionIds}
+        unreadSessionIds={externalUnreadSessionIds}
+      />
+    </PreviewCardProvider>
+  )
+})
+SurfaceBar.displayName = 'SurfaceBar'
+
+const SurfaceBarInner = memo(({
+  className,
+  sessionScoped = false,
+  runningSessionIds: externalRunningSessionIds,
+  unreadSessionIds: externalUnreadSessionIds,
+}: SurfaceBarProps) => {
   'use no memo'
 
   const surfaces = useSurfaceStore(state => state.surfaces)
@@ -249,6 +293,32 @@ export const SurfaceBar = memo(({
   const dragCleanupRef = useRef<(() => void) | null>(null)
   const [showMetaTabHints, setShowMetaTabHints] = useState(false)
   surfacesRef.current = surfaces
+
+  const previewCard = usePreviewCard()
+  const { sessions } = useAllSessions()
+  const sessionsById = useMemo(() => {
+    const map = new Map<string, typeof sessions[number]>()
+    for (const session of sessions) {
+      map.set(session.id, session)
+    }
+    return map
+  }, [sessions])
+
+  const handlePillHoverStart = useCallback((surface: AppSurface, anchor: HTMLElement) => {
+    const sessionId = readChatSessionId(surface)
+    if (!sessionId) {
+      return
+    }
+    const session = sessionsById.get(sessionId)
+    if (!session) {
+      return
+    }
+    previewCard.show({ kind: 'session', session, anchor, placement: 'bottom' })
+  }, [previewCard, sessionsById])
+
+  const handlePillHoverEnd = useCallback(() => {
+    previewCard.hide()
+  }, [previewCard])
 
   const releaseCurrentDrag = useCallback(() => {
     dragCleanupRef.current?.()
@@ -332,8 +402,6 @@ export const SurfaceBar = memo(({
     }
   }, [handleActivate])
 
-  // Resolve how a pill drag should be interpreted at release time.
-  // Returns 'tear-off' (dragged out of the window → standalone window), or null (no-op).
   const resolveDragOutcome = useCallback((): SurfaceDragOutcome | null => {
     if (sessionScoped) {
       return null
@@ -382,6 +450,7 @@ export const SurfaceBar = memo(({
   }, [resolveDragOutcome])
 
   const handleDragStart = useCallback((event: { operation: { source: { id: string | number } | null }, nativeEvent?: Event }) => {
+    previewCard.dismiss()
     const startPointer = getEventScreenCoordinates(event.nativeEvent ?? null, window)
     const startClientPointer = getEventClientCoordinates(event.nativeEvent ?? null)
     dragStartPointerRef.current = startPointer
@@ -448,7 +517,6 @@ export const SurfaceBar = memo(({
       releaseCurrentDrag()
       return
     }
-    // No pill drop target → released on the content area (split) or in place.
     if (!target) {
       const sourceSurface = useSurfaceStore.getState().surfaces.find(surface => surface.id === source.id)
       const sessionId = sourceSurface ? readChatSessionId(sourceSurface) : null
@@ -458,8 +526,6 @@ export const SurfaceBar = memo(({
           ...releasePointer,
           sessionId,
         })
-        // Match sidebar semantics: the dragged session is absorbed into the
-        // target surface's split, so the source top-level tab closes.
         if (didSplit) {
           closeSurfaceById(String(source.id))
         }
@@ -515,6 +581,8 @@ export const SurfaceBar = memo(({
               unread={sessionId ? unreadSessionIds.has(sessionId) : false}
               onActivate={handleActivate}
               onClose={handleClose}
+              onHoverStart={handlePillHoverStart}
+              onHoverEnd={handlePillHoverEnd}
             />
           )
         })}
@@ -525,8 +593,6 @@ export const SurfaceBar = memo(({
             if (!surface) { return null }
             return (
               <div
-                // Keep the ghost out of hit-testing so elementFromPoint during
-                // split hover/drop sees the chat surface under the cursor.
                 className={cn(
                   'pointer-events-none mx-0.5 flex h-7.5 max-w-44 cursor-grabbing items-center justify-start gap-1.5 overflow-hidden rounded-md border border-border/50 bg-background text-[11px] font-medium opacity-90 shadow-lg',
                   surface.closable ? 'pl-3 pr-7' : 'px-3',
@@ -560,4 +626,4 @@ export const SurfaceBar = memo(({
     </DragDropProvider>
   )
 })
-SurfaceBar.displayName = 'SurfaceBar'
+SurfaceBarInner.displayName = 'SurfaceBarInner'

@@ -154,6 +154,8 @@ import { chatSelectors, useChatStore } from '~/store/chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
+import { usePreviewCard } from './preview-card/preview-card-context'
+import { PreviewCardProvider } from './preview-card/preview-card-provider'
 import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
 import { SessionRenameInput } from './session-rename-input'
 import type { WorkspaceSession } from './use-session'
@@ -188,6 +190,7 @@ import type {
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
 
 type WorkspaceTranslation = TFunction<'workspace'>
+
 const SESSION_REVEAL_BATCH_SIZE = 64
 const SESSION_REVEAL_DELAY_MS = 16
 const RECENT_SESSION_WINDOW_SECONDS = 60 * 60
@@ -1708,6 +1711,7 @@ const SessionItem = memo(
     onRenameCancel: () => void
     onOpenSessionMenu: (request: SessionMenuRequest) => void
   }) => {
+    const previewCard = usePreviewCard()
     const sessionSurfaceId = chatSurfaceId(session.id)
     const active = useIsActiveSurfaceId(sessionSurfaceId)
     const isUnread = session.unread
@@ -1925,6 +1929,13 @@ const SessionItem = memo(
         onDragEnd={handleDragEnd}
         onContextMenu={isRenaming ? undefined : handleSessionContextMenu}
         onKeyDown={isRenaming ? undefined : handleSessionKeyDown}
+        onPointerEnter={isRenaming
+          ? undefined
+            : (event) => {
+                prefetchSession()
+                previewCard.show({ kind: 'session', session, anchor: event.currentTarget, placement: 'right' })
+              }}
+        onPointerLeave={isRenaming ? undefined : previewCard.hide}
         className={cn(
           'group relative isolate flex min-w-0 w-full items-center rounded-lg text-left text-xs hover:bg-accent/50 [content-visibility:auto] [contain-intrinsic-block-size:30px]',
           !isRenaming && 'cursor-grab active:cursor-grabbing',
@@ -1950,13 +1961,16 @@ const SessionItem = memo(
             <button
               type="button"
               onClick={() => {
+                previewCard.dismiss()
                 prepareSessionOpen()
                 openChatSession(session.id)
               }}
               onDoubleClick={isElectron ? handleSessionDoubleClick : undefined}
               onFocus={prefetchSession}
-              onPointerDown={prepareSessionOpen}
-              onPointerEnter={prefetchSession}
+              onPointerDown={() => {
+                previewCard.dismiss()
+                prepareSessionOpen()
+              }}
               data-testid={`session-open-${session.id}`}
               className={cn(
                 'relative z-10 flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5 py-1.5 text-sidebar-foreground/80',
@@ -2094,31 +2108,29 @@ const SessionListRows = memo(
     onOpenSessionMenu,
   }: SessionListProps) => {
     return (
-      <>
-        {sessions.map((session) => {
-          const isStreaming = isSessionRunning(session, locallyStreamingSessionIds)
-          return (
-            <SessionItem
-              key={session.id}
-              session={session}
-              isStreaming={isStreaming}
-              attentionKind={sessionAttentionBySessionId.get(session.id) ?? null}
-              hasError={
-                !isStreaming
-                && (session.status === 'error' || locallyErroredSessionIds.has(session.id))
-              }
-              isRenaming={session.id === renamingSessionId}
-              runtimeIcon={runtimeIconByKind.get(session.runtimeKind)}
-              t={t}
-              onPrepareSessionOpen={onPrepareSessionOpen}
-              onPrefetchSession={onPrefetchSession}
-              onRenameCommit={onRenameCommit}
-              onRenameCancel={onRenameCancel}
-              onOpenSessionMenu={onOpenSessionMenu}
-            />
-          )
-        })}
-      </>
+      sessions.map((session) => {
+        const isStreaming = isSessionRunning(session, locallyStreamingSessionIds)
+        return (
+          <SessionItem
+            key={session.id}
+            session={session}
+            isStreaming={isStreaming}
+            attentionKind={sessionAttentionBySessionId.get(session.id) ?? null}
+            hasError={
+              !isStreaming
+              && (session.status === 'error' || locallyErroredSessionIds.has(session.id))
+            }
+            isRenaming={session.id === renamingSessionId}
+            runtimeIcon={runtimeIconByKind.get(session.runtimeKind)}
+            t={t}
+            onPrepareSessionOpen={onPrepareSessionOpen}
+            onPrefetchSession={onPrefetchSession}
+            onRenameCommit={onRenameCommit}
+            onRenameCancel={onRenameCancel}
+            onOpenSessionMenu={onOpenSessionMenu}
+          />
+        )
+      })
     )
   },
 )
@@ -3391,7 +3403,7 @@ const WorkspaceSidebarBody = memo(
     }, [pruneWorkspaceSidebarState, workspaceIds, workspacesReady])
 
     return (
-      <>
+      <PreviewCardProvider>
         {/* ── Kanban section ── */}
         <KanbanSidebar collapsed={false} />
 
@@ -3656,7 +3668,7 @@ const WorkspaceSidebarBody = memo(
             ))}
           </nav>
         </div>
-      </>
+      </PreviewCardProvider>
     )
   },
 )
