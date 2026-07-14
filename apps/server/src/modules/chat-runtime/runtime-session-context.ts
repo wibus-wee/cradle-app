@@ -107,8 +107,19 @@ export function getSessionRunContext(
       providerTarget: null,
     }
   }
+  const runtime = getRuntimeRegistry().get(runtimeKind)
+  if (providerTarget && runtime?.metadata.providerBinding === 'runtime-owned') {
+    throw new AppError({
+      code: 'invalid_provider_target',
+      status: 400,
+      message: 'Runtime only supports runtime-owned provider targets',
+      details: {
+        providerTargetId,
+        runtimeKind,
+      },
+    })
+  }
   if (!providerTarget) {
-    const runtime = getRuntimeRegistry().get(runtimeKind)
     if (runtime?.metadata.providerBinding !== 'runtime-owned') {
       return null
     }
