@@ -31,6 +31,7 @@ import { externalWorkImport } from './modules/external-work-import'
 import { filesystem } from './modules/filesystem'
 import { git } from './modules/git'
 import { health } from './modules/health'
+import { imageOcr } from './modules/image-ocr'
 import { issue } from './modules/issue'
 import { issueAgent } from './modules/issue-agent'
 import { kanban } from './modules/kanban'
@@ -143,10 +144,12 @@ export async function createServerContractApp(options: CreateServerContractAppOp
     }),
   )
   app.use(createRequestIdPlugin())
-  app.use(createAuthPlugin({
-    ...loadServerAuthConfig(),
-    listRelayAuthTokens: listActiveRelayAuthTokens,
-  }))
+  app.use(
+    createAuthPlugin({
+      ...loadServerAuthConfig(),
+      listRelayAuthTokens: listActiveRelayAuthTokens,
+    }),
+  )
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
       import('./http/request-logger'),
@@ -187,6 +190,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(sessionGroup)
   app.use(sessionAwait)
   app.use(issue)
+  app.use(imageOcr)
   app.use(kanban)
   app.use(linkPreview)
   app.use(search)
@@ -243,6 +247,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     { stopOpencodeServer },
     { initHostConnectorService, getHostConnectorService },
     { shutdownRemoteHostConnections },
+    { shutdownImageOcr },
   ] = await Promise.all([
     import('./infra'),
     import('./modules/chat-runtime/runtime'),
@@ -260,6 +265,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/chat-runtime-providers/opencode/runtime-context'),
     import('./modules/relay-transport/host-connector'),
     import('./modules/remote-hosts/service'),
+    import('./modules/image-ocr/service'),
   ])
   if (recoverPersistedRunsOnCreate) {
     recoverPersistedRunProjections()
@@ -281,23 +287,68 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   await activateServerPlugins(app)
   reconcileExternalIssueSourceRegistrations()
 
-const runtimeResources = new RuntimeResourceRegistry()
-  runtimeResources.register({ name: 'active-run-snapshots', phase: 'drain', stop: flushAllActiveRunSnapshots })
+  const runtimeResources = new RuntimeResourceRegistry()
+  runtimeResources.register({
+    name: 'active-run-snapshots',
+    phase: 'drain',
+    stop: flushAllActiveRunSnapshots,
+  })
   runtimeResources.register({ name: 'active-chat-runs', phase: 'drain', stop: abortAllRuns })
-  runtimeResources.register({ name: 'side-conversations', phase: 'stop', stop: clearSideConversations })
-  runtimeResources.register({ name: 'conversation-bridge', phase: 'stop', stop: () => conversationBridgeSupervisor.stopAllConversationBridgeConnections() })
+  runtimeResources.register({
+    name: 'side-conversations',
+    phase: 'stop',
+    stop: clearSideConversations,
+  })
+  runtimeResources.register({
+    name: 'conversation-bridge',
+    phase: 'stop',
+    stop: () => conversationBridgeSupervisor.stopAllConversationBridgeConnections(),
+  })
   runtimeResources.register({ name: 'plugins', phase: 'stop', stop: deactivateAllPlugins })
-  runtimeResources.register({ name: 'provider-runtime', phase: 'stop', stop: () => providerRuntimeHostManager.shutdown() })
+  runtimeResources.register({
+    name: 'provider-runtime',
+    phase: 'stop',
+    stop: () => providerRuntimeHostManager.shutdown(),
+  })
   runtimeResources.register({ name: 'opencode-server', phase: 'stop', stop: stopOpencodeServer })
-  runtimeResources.register({ name: 'local-relayd', phase: 'stop', stop: () => localRelaydSupervisor.stopManagedLocalRelayd() })
-  runtimeResources.register({ name: 'background-job-poller', phase: 'cancel', stop: () => BackgroundJobPoller.stop() })
-  runtimeResources.register({ name: 'relay-host-connector', phase: 'cancel', stop: () => getHostConnectorService()?.stopAll() })
-  runtimeResources.register({ name: 'remote-host-connections', phase: 'cancel', stop: shutdownRemoteHostConnections })
-  runtimeResources.register({ name: 'chronicle-scheduler', phase: 'stop', stop: () => chronicleService.stopActivityPipelineScheduler() })
-  runtimeResources.register({ name: 'chronicle-slack-sync', phase: 'stop', stop: () => chronicleService.stopSlackBackgroundSync() })
+  runtimeResources.register({
+    name: 'local-relayd',
+    phase: 'stop',
+    stop: () => localRelaydSupervisor.stopManagedLocalRelayd(),
+  })
+  runtimeResources.register({
+    name: 'background-job-poller',
+    phase: 'cancel',
+    stop: () => BackgroundJobPoller.stop(),
+  })
+  runtimeResources.register({
+    name: 'relay-host-connector',
+    phase: 'cancel',
+    stop: () => getHostConnectorService()?.stopAll(),
+  })
+  runtimeResources.register({
+    name: 'remote-host-connections',
+    phase: 'cancel',
+    stop: shutdownRemoteHostConnections,
+  })
+  runtimeResources.register({
+    name: 'chronicle-scheduler',
+    phase: 'stop',
+    stop: () => chronicleService.stopActivityPipelineScheduler(),
+  })
+  runtimeResources.register({
+    name: 'chronicle-slack-sync',
+    phase: 'stop',
+    stop: () => chronicleService.stopSlackBackgroundSync(),
+  })
   runtimeResources.register({ name: 'chronicle-daemon', phase: 'stop', stop: chronicleCleanup })
   runtimeResources.register({ name: 'trace-streams', phase: 'stop', stop: shutdownTraceStreams })
-  runtimeResources.register({ name: 'workspace-indexes', phase: 'stop', stop: destroyWorkspaceFileIndexes })
+  runtimeResources.register({
+    name: 'workspace-indexes',
+    phase: 'stop',
+    stop: destroyWorkspaceFileIndexes,
+  })
+  runtimeResources.register({ name: 'image-ocr', phase: 'stop', stop: shutdownImageOcr })
   runtimeResources.register({ name: 'infrastructure', phase: 'close', stop: shutdownInfra })
   app.onStop(() => runtimeResources.shutdown())
 
@@ -337,7 +388,7 @@ const runtimeResources = new RuntimeResourceRegistry()
     try {
       hostConnector.startAll()
     }
-    catch (error) {
+ catch (error) {
       console.error('[relay-host-connector] startAll failed:', error)
     }
   }

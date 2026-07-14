@@ -70,8 +70,21 @@ function TokenProgress({
           className="size-6 cursor-pointer rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label={`Context usage: ${label}`}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="9" cy="9" r={TOKEN_CIRCLE_RADIUS} strokeWidth="2" className="stroke-muted" fill="none" />
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            style={{ transform: 'rotate(-90deg)' }}
+          >
+            <circle
+              cx="9"
+              cy="9"
+              r={TOKEN_CIRCLE_RADIUS}
+              strokeWidth="2"
+              className="stroke-muted"
+              fill="none"
+            />
             {contextWindow && (
               <circle
                 cx="9"
@@ -81,7 +94,11 @@ function TokenProgress({
                 fill="none"
                 className={cn(
                   'transition-[stroke] duration-150',
-                  isDanger ? 'stroke-destructive/70' : isWarning ? 'stroke-warning/70' : 'stroke-primary/50',
+                  isDanger
+                    ? 'stroke-destructive/70'
+                    : isWarning
+                      ? 'stroke-warning/70'
+                      : 'stroke-primary/50',
                 )}
                 strokeDasharray={TOKEN_CIRCUMFERENCE}
                 strokeDashoffset={offset}
@@ -91,7 +108,12 @@ function TokenProgress({
           </svg>
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="end" sideOffset={12} className="w-auto border-0 bg-transparent p-0 shadow-none ring-0">
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={12}
+        className="w-auto border-0 bg-transparent p-0 shadow-none ring-0"
+      >
         <ContextUsageDetailPanel
           sessionId={sessionId ?? null}
           compactState={compactState}
@@ -115,23 +137,18 @@ function ComposerSendIcon({
     return <Spinner className="size-3" aria-hidden="true" />
   }
 
-  const iconClassName = (active: boolean) => cn(
-    'absolute inset-0 size-3.5 transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
-    active ? 'scale-100 opacity-100 blur-0' : 'scale-[0.25] opacity-0 blur-[4px]',
-  )
+  const iconClassName = (active: boolean) =>
+    cn(
+      'absolute inset-0 size-3.5 transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+      active ? 'scale-100 opacity-100 blur-0' : 'scale-[0.25] opacity-0 blur-[4px]',
+    )
   const showPlanIcon = Boolean(!isBangMode && isPlanMode)
 
   return (
     <span className="relative size-3.5" aria-hidden="true">
-      <SendHorizonalIcon
-        className={iconClassName(!isBangMode && !isPlanMode)}
-      />
-      <RouteIcon
-        className={iconClassName(showPlanIcon)}
-      />
-      <SquareTerminalIcon
-        className={iconClassName(Boolean(isBangMode))}
-      />
+      <SendHorizonalIcon className={iconClassName(!isBangMode && !isPlanMode)} />
+      <RouteIcon className={iconClassName(showPlanIcon)} />
+      <SquareTerminalIcon className={iconClassName(Boolean(isBangMode))} />
     </span>
   )
 }
@@ -156,6 +173,7 @@ export function ComposerActions({
   sendButtonTestId,
   stopButtonTestId,
   attachmentController,
+  usesLightOcr,
   sessionId,
   sessionTokens,
   sessionContextWindow,
@@ -183,6 +201,7 @@ export function ComposerActions({
   sendButtonTestId: string
   stopButtonTestId: string
   attachmentController: ComposerAttachmentController | null
+  usesLightOcr?: boolean
   sessionId?: string | null
   sessionTokens?: number
   sessionContextWindow?: number | null
@@ -228,9 +247,11 @@ export function ComposerActions({
       {showCustomSendText && <span className="text-[11px] font-semibold">{sendButtonText}</span>}
     </Button>
   )
-  const sendVariantsAvailable = !!sendVariants && sendVariants.length > 0 && !isBangMode && !isPlanSendMode
-  const sendButtonNode = sendVariantsAvailable && sendVariants
-    ? (
+  const sendVariantsAvailable
+    = !!sendVariants && sendVariants.length > 0 && !isBangMode && !isPlanSendMode
+  const sendButtonNode
+    = sendVariantsAvailable && sendVariants
+? (
       <ButtonGroup>
         {sendButton}
         <DropdownMenu>
@@ -261,7 +282,9 @@ export function ComposerActions({
         </DropdownMenu>
       </ButtonGroup>
     )
-    : sendButton
+: (
+      sendButton
+    )
 
   return (
     <div className={cn('flex items-center gap-1', actionsClassName)}>
@@ -273,17 +296,21 @@ export function ComposerActions({
           iconClassName={attachIconClassName}
           onPickFiles={attachmentController.pickFiles}
           supportsAttachments={attachmentController.supportsAttachments}
+          usesLightOcr={usesLightOcr}
           testId={attachButtonTestId}
         />
       )}
-      {sessionTokens != null && sessionTokens > 0 && sessionContextWindow != null && sessionContextWindow > 0 && (
-        <TokenProgress
-          tokens={sessionTokens}
-          contextWindow={sessionContextWindow}
-          sessionId={sessionId}
-          compactState={compactState}
-        />
-      )}
+      {sessionTokens != null
+        && sessionTokens > 0
+        && sessionContextWindow != null
+        && sessionContextWindow > 0 && (
+          <TokenProgress
+            tokens={sessionTokens}
+            contextWindow={sessionContextWindow}
+            sessionId={sessionId}
+            compactState={compactState}
+          />
+        )}
       {isStreaming && hasDraft && (
         <Button
           variant="outline"
@@ -299,19 +326,21 @@ export function ComposerActions({
         </Button>
       )}
       {isStreaming
-        ? (
-            <Button
-              variant="default"
-              size="icon-xs"
-              onClick={onStop}
-              aria-label="Stop generation"
-              className={sendButtonClassName}
-              data-testid={stopButtonTestId}
-            >
-              <SquareIcon className="size-3" aria-hidden="true" />
-            </Button>
-          )
-        : sendButtonNode}
+? (
+        <Button
+          variant="default"
+          size="icon-xs"
+          onClick={onStop}
+          aria-label="Stop generation"
+          className={sendButtonClassName}
+          data-testid={stopButtonTestId}
+        >
+          <SquareIcon className="size-3" aria-hidden="true" />
+        </Button>
+      )
+: (
+        sendButtonNode
+      )}
     </div>
   )
 }

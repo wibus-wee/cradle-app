@@ -31,12 +31,18 @@ import { openSettingsSection as openSettingsRouteSection } from '~/navigation/na
 import { useNewChatStore } from '~/store/new-chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
-import type { RuntimeSettingsPatch, RuntimeSettingsPatchValue } from '../commands/chat-response-command'
+import type {
+  RuntimeSettingsPatch,
+  RuntimeSettingsPatchValue,
+} from '../commands/chat-response-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import type { MentionItem } from '../mentions/mention-panel'
 import { searchPluginMentions } from '../mentions/plugin-mentions'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
-import { useDraftClaudeAgentModelAliases, useProviderTargetClaudeAgentModelAliases } from '../runtime/claude-session-model-matrix-control'
+import {
+  useDraftClaudeAgentModelAliases,
+  useProviderTargetClaudeAgentModelAliases,
+} from '../runtime/claude-session-model-matrix-control'
 import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
 import {
   mergeRuntimeSettings,
@@ -52,9 +58,14 @@ import {
 } from '../slash-commands/chat-slash-commands'
 import { useRuntimeComposerSlashCommands } from '../slash-commands/use-runtime-composer-slash-commands'
 import { Composer } from './composer'
-import type { ComposerSlashCommandActionContext, ComposerSlashCommandActionResult, ComposerSlashCommandActionTools } from './composer-action-context'
-import { modelSupportsAttachments } from './composer-attachment-state'
+import type {
+  ComposerSlashCommandActionContext,
+  ComposerSlashCommandActionResult,
+  ComposerSlashCommandActionTools,
+} from './composer-action-context'
+import { modelSupportsAttachments, modelSupportsImageInput } from './composer-attachment-state'
 import { ComposerSlotStates } from './composer-slot-states'
+import { prepareLightOcrAttachments } from './light-ocr'
 import { useComposerAppshotCapture } from './use-composer-appshot-capture'
 
 type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
@@ -63,7 +74,10 @@ interface DraftClaudeAgentConfig {
   modelAliases: ClaudeAgentModelAliases
 }
 
-export type DraftChatRuntimeSettings = Record<string, RuntimeSettingsPatchValue | DraftClaudeAgentConfig | undefined> & {
+export type DraftChatRuntimeSettings = Record<
+  string,
+  RuntimeSettingsPatchValue | DraftClaudeAgentConfig | undefined
+> & {
   claudeAgent?: DraftClaudeAgentConfig | null
 }
 
@@ -169,7 +183,9 @@ function DraftChatComposerContent({
   const { selection, effectiveAgent, effectiveProfile, effectiveModel } = composerState
   const runtimeCatalogItem = resolveRuntimeCatalogItem(runtimes, selection.runtimeKind)
   const defaultRuntimeSettings = readDefaultRuntimeSettings(runtimeCatalogItem)
-  const storedRuntimeSettings = useNewChatStore(s => s.lastRuntimeSettingsByKind[selection.runtimeKind])
+  const storedRuntimeSettings = useNewChatStore(
+    s => s.lastRuntimeSettingsByKind[selection.runtimeKind],
+  )
   const patchRuntimeSettings = useNewChatStore(s => s.patchLastRuntimeSettings)
   const runtimeSettings = mergeRuntimeSettings(defaultRuntimeSettings, storedRuntimeSettings ?? {})
   const claudeAgentByProfile = useNewChatStore(s => s.lastClaudeAgentByProfile)
@@ -204,7 +220,11 @@ function DraftChatComposerContent({
         disabled: false,
       }
     }
-    if (selection.targetMode === 'provider' && composerState.providerBinding !== 'runtime-owned' && !effectiveProfile) {
+    if (
+      selection.targetMode === 'provider'
+      && composerState.providerBinding !== 'runtime-owned'
+      && !effectiveProfile
+    ) {
       return {
         key: 'providers',
         icon: SettingsIcon,
@@ -223,7 +243,10 @@ function DraftChatComposerContent({
     return searchWorkspaceFiles({ workspaceId, query, limit: 30, signal })
   }
 
-  const searchSkills = async (_query: string, signal?: AbortSignal): Promise<SkillMentionItem[]> => {
+  const searchSkills = async (
+    _query: string,
+    signal?: AbortSignal,
+  ): Promise<SkillMentionItem[]> => {
     const { data } = await getSkills({
       query: {
         workspaceId: workspaceId ?? undefined,
@@ -260,17 +283,25 @@ function DraftChatComposerContent({
     if (!selection.profileId) {
       return
     }
-    setClaudeAgentForProfile(selection.profileId, hasClaudeAgentModelAliases(next) ? { modelAliases: next } : null)
+    setClaudeAgentForProfile(
+      selection.profileId,
+      hasClaudeAgentModelAliases(next) ? { modelAliases: next } : null,
+    )
   }
 
   const selectedProviderKind = effectiveProfile?.providerKind
-  const selectedApiProviderKind: ApiProviderKind | null = selectedProviderKind && selectedProviderKind !== 'cli-tool'
-    ? selectedProviderKind
+  const selectedApiProviderKind: ApiProviderKind | null
+    = selectedProviderKind && selectedProviderKind !== 'cli-tool' ? selectedProviderKind : null
+  const claudeAgent = selection.profileId
+    ? (claudeAgentByProfile[selection.profileId] ?? null)
     : null
-  const claudeAgent = selection.profileId ? claudeAgentByProfile[selection.profileId] ?? null : null
-  const inputCollapsed = selection.targetMode === 'agent' && runtimeComposerUsesCollapsedInput(composerState.runtimeComposer)
+  const inputCollapsed
+    = selection.targetMode === 'agent'
+      && runtimeComposerUsesCollapsedInput(composerState.runtimeComposer)
   const allowEmptySubmit = runtimeComposerAllowsEmptySubmit(composerState.runtimeComposer)
-  const usesAliasMatrixModelSelection = runtimeComposerUsesAliasMatrixModelSelection(composerState.runtimeComposer)
+  const usesAliasMatrixModelSelection = runtimeComposerUsesAliasMatrixModelSelection(
+    composerState.runtimeComposer,
+  )
 
   const providerTargetAliases = useProviderTargetClaudeAgentModelAliases({
     providerTargetId: selection.profileId,
@@ -289,7 +320,8 @@ function DraftChatComposerContent({
   const claudeModelAliases = claudeModelAliasesSlot
     ? { slot: claudeModelAliasesSlot, providerSettingsLoading: providerTargetAliases.isLoading }
     : null
-  const supportsAttachments = modelSupportsAttachments(effectiveModel)
+  const usesLightOcr = !modelSupportsImageInput(effectiveModel)
+  const supportsAttachments = modelSupportsAttachments(effectiveModel) || usesLightOcr
   const appshotRuntime = useComposerAppshotCapture({
     active,
     supportsAttachments,
@@ -313,10 +345,14 @@ function DraftChatComposerContent({
 
     return [appshotCommand]
   })()
-  const slashCommands = useRuntimeComposerSlashCommands(selection.runtimeKind, composerState.runtimeComposer, cradleSlashCommands)
-  const sendDisabled = remoteConnectionBlocked || (selection.targetMode === 'agent'
-    ? !effectiveAgent || sending
-    : !effectiveProfile || sending)
+  const slashCommands = useRuntimeComposerSlashCommands(
+    selection.runtimeKind,
+    composerState.runtimeComposer,
+    cradleSlashCommands,
+  )
+  const sendDisabled
+    = remoteConnectionBlocked
+      || (selection.targetMode === 'agent' ? !effectiveAgent || sending : !effectiveProfile || sending)
 
   const toolbar = (
     <div className="flex min-w-0 items-center gap-1">
@@ -339,11 +375,7 @@ function DraftChatComposerContent({
           onChange={updateRuntimeSettings}
         />
       </div>
-      {contextBar && (
-        <div className="flex min-w-0 justify-end">
-          {contextBar}
-        </div>
-      )}
+      {contextBar && <div className="flex min-w-0 justify-end">{contextBar}</div>}
     </div>
   )
 
@@ -355,9 +387,11 @@ function DraftChatComposerContent({
   ) => {
     const trimmedText = text.trim()
     const hasDraft = trimmedText.length > 0 || files.length > 0 || contextParts.length > 0
-    const canSubmit = !remoteConnectionBlocked && (selection.targetMode === 'agent'
-      ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
-      : !!effectiveProfile && hasDraft && !sending)
+    const canSubmit
+      = !remoteConnectionBlocked
+        && (selection.targetMode === 'agent'
+        ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
+        : !!effectiveProfile && hasDraft && !sending)
 
     if (!canSubmit) {
       return false
@@ -366,7 +400,9 @@ function DraftChatComposerContent({
     setSending(true)
     const submitRuntimeSettings: DraftChatRuntimeSettings = {
       ...runtimeSettings,
-      ...(selection.targetMode === 'provider' && usesAliasMatrixModelSelection && claudeAgent ? { claudeAgent } : {}),
+      ...(selection.targetMode === 'provider' && usesAliasMatrixModelSelection && claudeAgent
+        ? { claudeAgent }
+        : {}),
     }
     const submitOptions: DraftChatComposerSubmitOptions = {
       runtimeKind: selection.runtimeKind,
@@ -381,15 +417,21 @@ function DraftChatComposerContent({
             providerTargetId: effectiveProfile?.id,
             providerTargetName: effectiveProfile?.name,
             modelId: usesAliasMatrixModelSelection
-              ? selection.modelId ?? undefined
-              : selection.modelId ?? effectiveModel?.id,
+              ? (selection.modelId ?? undefined)
+              : (selection.modelId ?? effectiveModel?.id),
             thinkingEffort: selection.thinkingEffort ?? undefined,
           }),
       runtimeSettings: submitRuntimeSettings,
     }
 
     return Promise.resolve()
-      .then(() => sendTarget(trimmedText, files, contextParts, submitOptions))
+      .then(async () =>
+        sendTarget(
+          trimmedText,
+          usesLightOcr ? await prepareLightOcrAttachments(files) : files,
+          contextParts,
+          submitOptions,
+        ))
       .then(() => true)
       .finally(() => {
         setSending(false)
@@ -400,28 +442,37 @@ function DraftChatComposerContent({
     return handleSendWithTarget(onSend, text, files, contextParts)
   }
 
-  const handleSendInNewWindow = (text: string, files: FileUIPart[], contextParts: ChatContextPart[]) => {
+  const handleSendInNewWindow = (
+    text: string,
+    files: FileUIPart[],
+    contextParts: ChatContextPart[],
+  ) => {
     return onSendInNewWindow
       ? handleSendWithTarget(onSendInNewWindow, text, files, contextParts)
       : handleSend(text, files, contextParts)
   }
 
-  const handleSendIsolated = (text: string, files: FileUIPart[], contextParts: ChatContextPart[]) => {
+  const handleSendIsolated = (
+    text: string,
+    files: FileUIPart[],
+    contextParts: ChatContextPart[],
+  ) => {
     return onSendIsolated
       ? handleSendWithTarget(onSendIsolated, text, files, contextParts)
       : handleSend(text, files, contextParts)
   }
 
-  const sendVariants = onSendIsolated && workspaceId
-    ? [
-      {
-        id: 'worktree',
-        label: t('send.inWorktree'),
-        icon: <ShieldIcon className="size-3.5" aria-hidden />,
-        submitHandler: handleSendIsolated,
-      },
-    ]
-    : undefined
+  const sendVariants
+    = onSendIsolated && workspaceId
+      ? [
+          {
+            id: 'worktree',
+            label: t('send.inWorktree'),
+            icon: <ShieldIcon className="size-3.5" aria-hidden />,
+            submitHandler: handleSendIsolated,
+          },
+        ]
+      : undefined
 
   const handleSlashCommandAction = async (
     command: ChatComposerSlashCommand,
@@ -459,7 +510,7 @@ function DraftChatComposerContent({
       await appshotRuntime.capture({ tools })
       return { insertText: '' }
     }
-    catch (error) {
+ catch (error) {
       toastManager.add({
         type: 'error',
         title: 'Appshot capture failed',
@@ -472,7 +523,10 @@ function DraftChatComposerContent({
     void handleSend(prompt, [], [])
   }
 
-  const resolveCodexReviewMergeBase = async (baseBranch: string, repositoryPath?: string | null) => {
+  const resolveCodexReviewMergeBase = async (
+    baseBranch: string,
+    repositoryPath?: string | null,
+  ) => {
     if (!workspaceId) {
       return null
     }
@@ -489,21 +543,17 @@ function DraftChatComposerContent({
     return result.data.mergeBaseSha
   }
 
-  const reviewSlot = ({
+  const reviewSlot = {
     open: reviewModeOpen,
     workspaceId,
     onDismiss: () => setReviewModeOpen(false),
     onSubmitPrompt: submitCodexReviewPrompt,
     resolveMergeBase: resolveCodexReviewMergeBase,
-  })
+  }
 
   return (
     <>
-      <ComposerSlotStates
-        slots={[]}
-        states={[]}
-        review={reviewSlot}
-      />
+      <ComposerSlotStates slots={[]} states={[]} review={reviewSlot} />
       <Composer
         send={{
           submit: handleSend,
@@ -520,6 +570,7 @@ function DraftChatComposerContent({
         }}
         attachments={{
           supportsAttachments,
+          usesLightOcr,
           appendFileParts: appshotRuntime.externalFileParts,
           appendFilePartsKey: appshotRuntime.externalFilePartsKey,
           pendingAppshots: appshotRuntime.pendingAppshots,
@@ -556,7 +607,8 @@ function DraftChatComposerContent({
             'focus-within:border-ring/50 focus-within:shadow-[var(--shadow-xs)]',
           ),
           textareaRows: 5,
-          textareaClassName: 'px-5 pt-5 pb-3 text-[15px] leading-[1.75] placeholder:text-muted-foreground/30 min-h-30 max-h-80 rounded-t-2xl disabled:opacity-30',
+          textareaClassName:
+            'px-5 pt-5 pb-3 text-[15px] leading-[1.75] placeholder:text-muted-foreground/30 min-h-30 max-h-80 rounded-t-2xl disabled:opacity-30',
           attachmentListClassName: 'border-border/60 px-3 py-2',
           actionBarClassName: cn(
             'px-2.5 py-2',
@@ -579,18 +631,18 @@ function DraftChatComposerContent({
         }}
       />
       {remoteConnectionBlocked
-        ? (
-            <div className="mt-2">
-              <RemoteHostConnectionNotice gate={remoteConnection.gate} />
-            </div>
-          )
-        : (
-            <DraftChatReadinessNotice
-              notice={readinessNotice}
-              onAction={openSettingsSection}
-              testIdPrefix={testIdPrefix}
-            />
-          )}
+? (
+        <div className="mt-2">
+          <RemoteHostConnectionNotice gate={remoteConnection.gate} />
+        </div>
+      )
+: (
+        <DraftChatReadinessNotice
+          notice={readinessNotice}
+          onAction={openSettingsSection}
+          testIdPrefix={testIdPrefix}
+        />
+      )}
     </>
   )
 }

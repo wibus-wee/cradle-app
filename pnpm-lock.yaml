@@ -510,15 +510,15 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.207
         version: 0.3.207(@anthropic-ai/sdk@0.81.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(zod@4.4.3)
+      '@arcships/light-ocr':
+        specifier: 0.1.0
+        version: 0.1.0
       '@cradle/chat-runtime-contracts':
         specifier: workspace:*
         version: link:../../packages/chat-runtime-contracts
       '@cradle/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@cradle/download-center':
-        specifier: workspace:*
-        version: link:../../packages/download-center
       '@cradle/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
@@ -1690,6 +1690,38 @@ packages:
     peerDependenciesMeta:
       zod:
         optional: true
+
+  '@arcships/light-ocr-darwin-arm64@0.1.0':
+    resolution: {integrity: sha512-JUMGDJtviyFdYMErMlNu+vJDWFKQdskFdunnoRx5N0wvu9ZK/1vC99aPAX5dJxNiVnVB4X/HuEMwS+niID4H0A==}
+    engines: {node: ^22.0.0 || ^24.0.0}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@arcships/light-ocr-darwin-x64@0.1.0':
+    resolution: {integrity: sha512-vFQdFPwMXr+KLO+OSOFZBzCDoLtGT8GVBxQmQHkRhcKuE/eZjUwi9cmLgv3ZCHMWWZcv1suzddqmFc5C2fazJA==}
+    engines: {node: ^22.0.0 || ^24.0.0}
+    cpu: [x64]
+    os: [darwin]
+
+  '@arcships/light-ocr-linux-x64-gnu@0.1.0':
+    resolution: {integrity: sha512-pC9UcqoCbS7q8tMR4Zfn3omonWksPLNgwMTQrXMQdNb4leAMaZ6IXapShR7LeocPQbOkWD8C4Q6+MjW7KvtCJg==}
+    engines: {node: ^22.0.0 || ^24.0.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@arcships/light-ocr-model-ppocrv6-small@0.1.0':
+    resolution: {integrity: sha512-xp4h3P924QtS7RSrx36djTag+vTKmPUh6vL8lEeZar+zjR3rnwKWvQytAEqJo9Y6Z2i5b9K1yb4AcQLbWNb9ow==}
+
+  '@arcships/light-ocr-win32-x64@0.1.0':
+    resolution: {integrity: sha512-vJghMn0FlBJdXvHd5q9RdpXdrYhAhA2p3Dto5rds8oCkqQGyt6mdC/4DNeMtvY/BDGIPB39GEScei+hEf/pkxw==}
+    engines: {node: ^22.0.0 || ^24.0.0}
+    cpu: [x64]
+    os: [win32]
+
+  '@arcships/light-ocr@0.1.0':
+    resolution: {integrity: sha512-54OUabOUvO2BYDaU5mLsM2f5cYWkvY258MzdOq+9lJHKXo4Aosj6zWyLhTCHZX00Vjz6Ky3mfv0K0TExZU+BaA==}
+    engines: {node: ^22.0.0 || ^24.0.0}
 
   '@asamuzakjp/css-color@5.1.10':
     resolution: {integrity: sha512-02OhhkKtgNRuicQ/nF3TRnGsxL9wp0r3Y7VlKWyOHHGmGyvXv03y+PnymU8FKFJMTjIr1Bk8U2g1HWSLrpAHww==}
@@ -14397,6 +14429,29 @@ snapshots:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
       zod: 4.4.3
+
+  '@arcships/light-ocr-darwin-arm64@0.1.0':
+    optional: true
+
+  '@arcships/light-ocr-darwin-x64@0.1.0':
+    optional: true
+
+  '@arcships/light-ocr-linux-x64-gnu@0.1.0':
+    optional: true
+
+  '@arcships/light-ocr-model-ppocrv6-small@0.1.0': {}
+
+  '@arcships/light-ocr-win32-x64@0.1.0':
+    optional: true
+
+  '@arcships/light-ocr@0.1.0':
+    dependencies:
+      '@arcships/light-ocr-model-ppocrv6-small': 0.1.0
+    optionalDependencies:
+      '@arcships/light-ocr-darwin-arm64': 0.1.0
+      '@arcships/light-ocr-darwin-x64': 0.1.0
+      '@arcships/light-ocr-linux-x64-gnu': 0.1.0
+      '@arcships/light-ocr-win32-x64': 0.1.0
 
   '@asamuzakjp/css-color@5.1.10':
     dependencies:

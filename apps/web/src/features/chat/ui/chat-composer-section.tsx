@@ -436,6 +436,7 @@ export function ChatComposerSection({
           }}
           attachments={{
             supportsAttachments: composerRuntime.supportsAttachments,
+            usesLightOcr: composerRuntime.usesLightOcr,
             appendFileParts: appshotRuntime.externalFileParts,
             appendFilePartsKey: appshotRuntime.externalFilePartsKey,
             pendingAppshots: appshotRuntime.pendingAppshots,

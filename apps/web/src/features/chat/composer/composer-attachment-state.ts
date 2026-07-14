@@ -90,6 +90,10 @@ export function modelSupportsAttachments(model: ModelDescriptor | null | undefin
   return modalities.some(modality => modality !== 'text')
 }
 
+export function modelSupportsImageInput(model: ModelDescriptor | null | undefined): boolean {
+  return model?.capabilities.inputModalities?.includes('image') ?? false
+}
+
 export function useComposerAttachments({
   supportsAttachments = false,
 }: ComposerAttachmentConfig = {}): ComposerAttachmentController {

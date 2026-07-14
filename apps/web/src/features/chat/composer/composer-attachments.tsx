@@ -6,9 +6,11 @@ import {
 import type { FileUIPart } from 'ai'
 import { m } from 'motion/react'
 import type { ChangeEvent, RefObject } from 'react'
+import { useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
@@ -21,6 +23,7 @@ interface ComposerAttachmentInputProps {
   fileInputRef: RefObject<HTMLInputElement | null>
   onFilesSelected: (event: ChangeEvent<HTMLInputElement>) => Promise<void>
   supportsAttachments: boolean
+  imageOnly?: boolean
   testId?: string
 }
 
@@ -30,6 +33,7 @@ interface ComposerAttachmentButtonProps {
   iconClassName?: string
   onPickFiles: () => void
   supportsAttachments: boolean
+  usesLightOcr?: boolean
   testId?: string
 }
 
@@ -52,6 +56,7 @@ export function ComposerAttachmentInput({
   fileInputRef,
   onFilesSelected,
   supportsAttachments,
+  imageOnly = false,
   testId = 'chat-file-input',
 }: ComposerAttachmentInputProps) {
   return (
@@ -59,7 +64,7 @@ export function ComposerAttachmentInput({
       ref={fileInputRef}
       type="file"
       multiple
-      accept={supportsAttachments ? undefined : ''}
+      accept={supportsAttachments ? (imageOnly ? 'image/*' : undefined) : ''}
       className="hidden"
       tabIndex={-1}
       aria-label="Attach files"
@@ -75,24 +80,56 @@ export function ComposerAttachmentButton({
   iconClassName,
   onPickFiles,
   supportsAttachments,
+  usesLightOcr = false,
   testId = 'chat-attach-btn',
 }: ComposerAttachmentButtonProps) {
+  const [ocrPopoverOpen, setOcrPopoverOpen] = useState(false)
+  const attachmentButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      disabled={disabled || !supportsAttachments}
+      onClick={usesLightOcr ? undefined : onPickFiles}
+      aria-label={usesLightOcr ? 'Attach image with local text recognition' : 'Attach files'}
+      className={className}
+      data-testid={testId}
+    >
+      <PaperclipIcon className={cn('size-3.5', iconClassName)} aria-hidden="true" />
+    </Button>
+  )
+
+  if (usesLightOcr) {
+    return (
+      <Popover open={ocrPopoverOpen} onOpenChange={setOcrPopoverOpen}>
+        <PopoverTrigger asChild>{attachmentButton}</PopoverTrigger>
+        <PopoverContent side="top" align="start" className="w-72 gap-3 p-3">
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Use local image text recognition?</p>
+            <p className="text-pretty text-xs leading-5 text-muted-foreground">
+              This model cannot see images. Cradle will extract their text locally and send only
+              that text to the model.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="xs"
+            className="self-end"
+            onClick={() => {
+              setOcrPopoverOpen(false)
+              onPickFiles()
+            }}
+          >
+            Choose images
+          </Button>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          disabled={disabled || !supportsAttachments}
-          onClick={onPickFiles}
-          aria-label="Attach files"
-          className={className}
-          data-testid={testId}
-        >
-          <PaperclipIcon className={cn('size-3.5', iconClassName)} aria-hidden="true" />
-        </Button>
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{attachmentButton}</TooltipTrigger>
       <TooltipContent side="top" className="text-[11px]">
         {supportsAttachments ? 'Attach files' : 'Current model does not accept file input'}
       </TooltipContent>
@@ -152,15 +189,17 @@ export function ComposerAttachmentList({
                 transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
               >
                 {isImage && !isFileUrl
-                  ? (
-                      <img
-                        src={attachment.url}
-                        alt={label}
-                        className="size-10 shrink-0 rounded-[4px] object-cover shadow-[inset_0_0_0_1px_rgba(0,0,0,0.10)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
-                        data-testid="chat-attachment-image-preview"
-                      />
-                    )
-                  : <FileIcon className="size-3.5 shrink-0" aria-hidden="true" />}
+? (
+                  <img
+                    src={attachment.url}
+                    alt={label}
+                    className="size-10 shrink-0 rounded-[4px] object-cover shadow-[inset_0_0_0_1px_rgba(0,0,0,0.10)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+                    data-testid="chat-attachment-image-preview"
+                  />
+                )
+: (
+                  <FileIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                )}
                 <span className="min-w-0 truncate">{label}</span>
                 <Button
                   type="button"
@@ -184,8 +223,8 @@ export function ComposerAttachmentList({
 
 function PendingAppshotSlot({ pending }: { pending: PendingAppshotAttachment }) {
   const height = pending.transitionSnapshotHeightResolved
-      ? (pending.transitionSnapshotHeight ?? APPSHOT_FALLBACK_HEIGHT)
-      : 0
+    ? (pending.transitionSnapshotHeight ?? APPSHOT_FALLBACK_HEIGHT)
+    : 0
   const transition = {
     type: 'spring' as const,
     visualDuration: pending.transitionSpringResponse ?? 0.35,

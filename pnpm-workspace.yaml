@@ -29,5 +29,11 @@ minimumReleaseAgeExclude:
   - '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.205'
   - '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.205'
   - '@anthropic-ai/claude-agent-sdk@0.3.205'
+  - '@arcships/light-ocr-darwin-arm64@0.1.0'
+  - '@arcships/light-ocr-darwin-x64@0.1.0'
+  - '@arcships/light-ocr-linux-x64-gnu@0.1.0'
+  - '@arcships/light-ocr-model-ppocrv6-small@0.1.0'
+  - '@arcships/light-ocr-win32-x64@0.1.0'
+  - '@arcships/light-ocr@0.1.0'
 patchedDependencies:
   '@elysiajs/node@1.4.5': patches/@elysiajs__node@1.4.5.patch

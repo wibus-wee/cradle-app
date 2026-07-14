@@ -14,11 +14,8 @@ import type {
 import { serializeChatError } from '../run/errors'
 import { annotateContinuationMessage, insertCompletedUserMessage } from '../run/turn-draft'
 import { runRegistry } from '../run-registry'
-import {
-  assertRuntimeCompatibleTarget,
-  getSessionRunContext,
-} from '../runtime-session-context'
-import { createUserMessage } from '../ui-message'
+import { assertRuntimeCompatibleTarget, getSessionRunContext } from '../runtime-session-context'
+import { createUserMessage, projectLightOcrMessage } from '../ui-message'
 
 export interface SubmitSessionSteerTurnDeps {
   finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
@@ -44,7 +41,8 @@ async function enqueueSteerRequestAsQueueItem(
     providerTargetId: input.providerTargetId,
   }
   const queueItem: ChatSessionQueueItemDto = await enqueueSessionQueueItem(enqueueInput, {
-    finalizeInterruptedPersistedStreamingSessionIfIdle: deps.finalizeInterruptedPersistedStreamingSessionIfIdle,
+    finalizeInterruptedPersistedStreamingSessionIfIdle:
+      deps.finalizeInterruptedPersistedStreamingSessionIfIdle,
     scheduleSessionQueueDrain: deps.scheduleSessionQueueDrain,
   })
   return {
@@ -111,7 +109,12 @@ export async function submitSessionSteerTurn(
   // `queue-fallback` runtimes always queue; `native` runtimes queue only when there's no active
   // run they can actually steer (not started yet, already finished, or targeting a different
   // provider context) rather than rejecting the request outright.
-  if (runtime.capabilities.steer === 'queue-fallback' || !activeRun || !steerHook || !hasMatchingActiveRun) {
+  if (
+    runtime.capabilities.steer === 'queue-fallback'
+    || !activeRun
+    || !steerHook
+    || !hasMatchingActiveRun
+  ) {
     return await enqueueSteerRequestAsQueueItem(input, deps)
   }
 
@@ -125,7 +128,7 @@ export async function submitSessionSteerTurn(
     await steerHook.call(activeRun.runtime, {
       runtimeSession: activeRun.runtimeSession,
       profile: context.profile,
-      message: steerMessage,
+      message: projectLightOcrMessage(steerMessage),
     })
   }
  catch (error) {
@@ -139,7 +142,11 @@ export async function submitSessionSteerTurn(
       code: 'chat_steer_rejected',
       status: 409,
       message: 'Runtime rejected live steer',
-      details: { sessionId: input.sessionId, runId: activeRun.runId, error: serializeChatError(error).text },
+      details: {
+        sessionId: input.sessionId,
+        runId: activeRun.runId,
+        error: serializeChatError(error).text,
+      },
     })
   }
 

@@ -24,24 +24,17 @@ import {
   readSessionRequestedThinkingEffort,
   resolveRuntimeSessionForContext,
 } from '../runtime-session-context'
-import {
-  readSessionRuntimeSettings,
-  resolveRunRuntimeSettings,
-} from '../runtime-settings'
+import { readSessionRuntimeSettings, resolveRunRuntimeSettings } from '../runtime-settings'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
 import {
   createAssistantMessage,
   createUserMessage,
+  projectLightOcrMessage,
+  projectLightOcrMessages,
 } from '../ui-message'
-import {
-  createFinalMessageProjectionState,
-} from './final-message-projection'
+import { createFinalMessageProjectionState } from './final-message-projection'
 import { cancelPendingRuntimeGoalContinuation } from './runtime-goal-continuation'
-import {
-  createDraftTurn,
-  createDraftTurnFromUserMessage,
-  startRun,
-} from './turn-draft'
+import { createDraftTurn, createDraftTurnFromUserMessage, startRun } from './turn-draft'
 import type { ExecuteRunInput } from './turn-executor'
 
 export interface CreateRunInput {
@@ -189,14 +182,13 @@ export async function createRun(
     }
     const runtimeRequestMessages = requestMessages
 
-    const sessionRuntimeSettings = readSessionRuntimeSettings(runtimeKind, context.session.configJson)
+    const sessionRuntimeSettings = readSessionRuntimeSettings(
+      runtimeKind,
+      context.session.configJson,
+    )
     const runtimeSettings = input.runtimeSettingsOverride
       ? { ...input.runtimeSettingsOverride }
-      : resolveRunRuntimeSettings(
-          runtimeKind,
-          sessionRuntimeSettings,
-          input.runtimeSettings,
-        )
+      : resolveRunRuntimeSettings(runtimeKind, sessionRuntimeSettings, input.runtimeSettings)
     const requestedModelId
       = input.modelId !== undefined
         ? input.modelId
@@ -228,10 +220,7 @@ export async function createRun(
             userMessageId: '',
             assistantMessageId: randomUUID(),
             userMessage: runtimeGoalContinuation!.annotateContinuationMessage({
-              message: createUserMessage(
-                randomUUID(),
-                runtimeGoalContinuation!.continuationPrompt,
-              ),
+              message: createUserMessage(randomUUID(), runtimeGoalContinuation!.continuationPrompt),
             }),
           }
         : lastRequestMessage?.role === 'assistant'
@@ -379,7 +368,7 @@ export async function createRun(
         })
 
     deps.executeRun(activeRun, {
-      message: draft.userMessage,
+      message: projectLightOcrMessage(draft.userMessage),
       profile: context.profile,
       modelId:
         requestedModelId !== undefined
@@ -389,8 +378,10 @@ export async function createRun(
       runtimeSettings,
       systemPrompt: turnContext.systemPrompt,
       transcript: turnContext.transcript,
-      history: turnContext.history?.length ? turnContext.history : undefined,
-      originalMessages: runtimeRequestMessages,
+      history: turnContext.history?.length
+        ? projectLightOcrMessages(turnContext.history)
+        : undefined,
+      originalMessages: projectLightOcrMessages(runtimeRequestMessages),
       workspaceId: context.session.workspaceId,
       workspacePath: context.workspacePath,
       agentId: context.session.agentId,

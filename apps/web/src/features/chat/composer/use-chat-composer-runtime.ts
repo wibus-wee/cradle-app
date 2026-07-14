@@ -24,9 +24,7 @@ import type { ChatContextPart } from '../context/chat-context-parts'
 import { readRunRuntimeSettingsPatch } from '../runtime/runtime-settings-presenter'
 import type { SendMessageOptions, SendMessageResult } from '../session/use-chat-session'
 import { useSessionBinding } from '../session/use-session-binding'
-import type {
-  ChatComposerSlashCommand,
-} from '../slash-commands/chat-slash-commands'
+import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   CRADLE_APPSHOT_SLASH_COMMAND,
   CRADLE_SIDE_CHAT_SLASH_COMMAND,
@@ -35,7 +33,8 @@ import {
   RUNTIME_USAGE_COMMAND_ACTION_ID,
   withSlashCommandAvailability,
 } from '../slash-commands/chat-slash-commands'
-import { modelSupportsAttachments } from './composer-attachment-state'
+import { modelSupportsAttachments, modelSupportsImageInput } from './composer-attachment-state'
+import { prepareLightOcrAttachments } from './light-ocr'
 
 interface ChatComposerSendOverrides {
   providerTargetId?: string
@@ -60,6 +59,7 @@ export interface ChatComposerRuntime {
   uiSlots: ChatRuntimeUiSlot[]
   slotStates: ChatRuntimeUiSlotState[]
   supportsAttachments: boolean
+  usesLightOcr: boolean
   tokenUsage: null | {
     tokens: number
     contextWindow: number
@@ -148,8 +148,12 @@ export function useChatComposerRuntime({
   const { runtimes } = useRuntimeCatalog()
   const runtimeSteerCapability = useMemo(() => {
     const runtimeKind = runtimeCapabilities?.runtimeKind
-    if (!runtimeKind) { return 'queue-fallback' }
-    return runtimes.find(r => r.runtimeKind === runtimeKind)?.capabilities?.steer ?? 'queue-fallback'
+    if (!runtimeKind) {
+      return 'queue-fallback'
+    }
+    return (
+      runtimes.find(r => r.runtimeKind === runtimeKind)?.capabilities?.steer ?? 'queue-fallback'
+    )
   }, [runtimeCapabilities?.runtimeKind, runtimes])
 
   const { data: runtimeUiSlotStates } = useQuery({
@@ -158,7 +162,9 @@ export function useChatComposerRuntime({
     enabled: sessionQueriesEnabled,
     staleTime: 2_000,
     refetchInterval: query =>
-      active && (isStreaming || shouldPollRuntimeSlotStates(query.state.data?.states ?? [])) ? 5_000 : false,
+      active && (isStreaming || shouldPollRuntimeSlotStates(query.state.data?.states ?? []))
+        ? 5_000
+        : false,
     retry: false,
   })
   const sessionBinding = useSessionBinding(sessionId, sessionQueriesEnabled)
@@ -171,14 +177,18 @@ export function useChatComposerRuntime({
   })
   const sessionModels = providerSessionModels
   const hasRuntimeCodeReviewSlot = useMemo(() => {
-    return Boolean(runtimeCapabilities?.uiSlots.some((slot) => {
-      return (
-        slot.commandAction?.kind === 'uiAction'
-        && slot.commandAction.actionId === RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID
-      )
-    }))
+    return Boolean(
+      runtimeCapabilities?.uiSlots.some((slot) => {
+        return (
+          slot.commandAction?.kind === 'uiAction'
+          && slot.commandAction.actionId === RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID
+        )
+      }),
+    )
   }, [runtimeCapabilities?.uiSlots])
-  const gitRepositoriesQuery = useGitRepositories(active && hasRuntimeCodeReviewSlot ? workspaceId : null)
+  const gitRepositoriesQuery = useGitRepositories(
+    active && hasRuntimeCodeReviewSlot ? workspaceId : null,
+  )
   const currentSessionModel = useMemo(() => {
     if (composerModel) {
       return composerModel
@@ -188,9 +198,13 @@ export function useChatComposerRuntime({
     }
     return sessionModels.find(candidate => candidate.id === sessionBinding.modelId) ?? null
   }, [composerModel, sessionBinding?.modelId, sessionModels])
+  const usesLightOcr = useMemo(
+    () => !modelSupportsImageInput(currentSessionModel),
+    [currentSessionModel],
+  )
   const supportsAttachments = useMemo(() => {
-    return modelSupportsAttachments(currentSessionModel)
-  }, [currentSessionModel])
+    return modelSupportsAttachments(currentSessionModel) || usesLightOcr
+  }, [currentSessionModel, usesLightOcr])
   const cradleSlashCommands = useMemo(() => {
     const appshotCommand = (() => {
       if (!isElectron || platform !== 'darwin') {
@@ -221,7 +235,8 @@ export function useChatComposerRuntime({
           readRuntimeCodeReviewAvailability({
             workspaceId,
             gitStatusLoading: gitRepositoriesQuery.isLoading,
-            gitStatusUnavailable: gitRepositoriesQuery.isError
+            gitStatusUnavailable:
+              gitRepositoriesQuery.isError
               || (gitRepositoriesQuery.isSuccess && (gitRepositoriesQuery.data?.length ?? 0) !== 1),
           }),
         )
@@ -287,7 +302,7 @@ export function useChatComposerRuntime({
   const slotStates = runtimeUiSlotStates?.states ?? EMPTY_RUNTIME_UI_SLOT_STATES
 
   const send = useCallback(
-    (
+    async (
       text: string,
       files: FileUIPart[],
       contextParts: ChatContextPart[],
@@ -307,7 +322,8 @@ export function useChatComposerRuntime({
         : defaultContinuationMode
       // Runtimes that lack native steer always queue — skip the round-trip.
       const continuationMode = runtimeSteerCapability === 'native' ? effectiveMode : 'queue'
-      return sendMessage(
+      const preparedFiles = usesLightOcr ? await prepareLightOcrAttachments(files) : files
+      return await sendMessage(
         text,
         {
           ...overrides,
@@ -316,11 +332,18 @@ export function useChatComposerRuntime({
             ? { runtimeSettings: readRunRuntimeSettingsPatch(options.runtimeSettings) }
             : {}),
         },
-        files,
+        preparedFiles,
         contextParts,
       )
     },
-    [chatPreferences?.continuationBehavior, isReady, runtimeSteerCapability, sendMessage, sendOverridesRef],
+    [
+      chatPreferences?.continuationBehavior,
+      isReady,
+      runtimeSteerCapability,
+      sendMessage,
+      sendOverridesRef,
+      usesLightOcr,
+    ],
   )
 
   return {
@@ -332,6 +355,7 @@ export function useChatComposerRuntime({
     uiSlots,
     slotStates,
     supportsAttachments,
+    usesLightOcr,
     tokenUsage,
     compactState: compactSlotState,
   }

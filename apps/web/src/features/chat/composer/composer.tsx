@@ -112,6 +112,7 @@ export interface ComposerCommandController {
 
 export interface ComposerAttachmentIntegration {
   supportsAttachments?: boolean
+  usesLightOcr?: boolean
   /** File parts injected externally, for example from native Appshot capture. */
   appendFileParts?: FileUIPart[]
   /** Used together with appendFileParts to re-trigger the append. */
@@ -263,6 +264,7 @@ export function Composer({
   const slashCommands = commands?.commands ?? EMPTY_SLASH_COMMANDS
   const onSlashCommandAction = commands?.runAction
   const supportsAttachments = attachments?.supportsAttachments
+  const usesLightOcr = attachments?.usesLightOcr ?? false
   const appendExternalFileParts = attachments?.appendFileParts
   const appendExternalFilePartsKey = attachments?.appendFilePartsKey
   const pendingAppshots = attachments?.pendingAppshots ?? []
@@ -1044,6 +1046,7 @@ export function Composer({
               fileInputRef={attachmentController.fileInputRef}
               onFilesSelected={attachmentController.handleFilesSelected}
               supportsAttachments={attachmentController.supportsAttachments}
+              imageOnly={usesLightOcr}
               testId={fileInputTestId}
             />
           )}
@@ -1172,6 +1175,7 @@ export function Composer({
               isSending={isSending}
               isStreaming={isStreaming}
               attachmentController={inputCollapsed ? null : attachmentController}
+              usesLightOcr={usesLightOcr}
               onSend={handleSend}
               onStop={send.stop}
               sendDisabled={sendDisabled}

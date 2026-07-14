@@ -17,11 +17,8 @@ import {
   assertRunnableSession,
   assertRuntimeCompatibleTarget,
 } from '../runtime-session-context'
-import {
-  readSessionRuntimeSettings,
-  resolveRunRuntimeSettings,
-} from '../runtime-settings'
-import { createUserMessage } from '../ui-message'
+import { readSessionRuntimeSettings, resolveRunRuntimeSettings } from '../runtime-settings'
+import { createUserMessage, projectLightOcrMessage, projectLightOcrMessages } from '../ui-message'
 import { createLiveSideConversationStream } from './live-stream'
 
 export interface StreamSideConversationResponseInput {
@@ -95,7 +92,10 @@ export async function streamSideConversationResponse(
   const assistantMessageId = randomUUID()
   const userMessageId = randomUUID()
   const runtimeKind = parentContext.session.runtimeKind ?? 'standard'
-  const parentRuntimeSettings = readSessionRuntimeSettings(runtimeKind, parentContext.session.configJson)
+  const parentRuntimeSettings = readSessionRuntimeSettings(
+    runtimeKind,
+    parentContext.session.configJson,
+  )
   const runtimeSettings = resolveRunRuntimeSettings(
     runtimeKind,
     parentRuntimeSettings,
@@ -116,13 +116,13 @@ export async function streamSideConversationResponse(
       runtime,
       runtimeSession: record.runtimeSession,
       profile: parentContext.profile,
-      message,
+      message: projectLightOcrMessage(message),
       responseMessageId: assistantMessageId,
       modelId,
       thinkingEffort: input.thinkingEffort,
       runtimeSettings,
       systemPrompt: resolveSessionSystemPrompt(parentContext.session),
-      history: record.history,
+      history: projectLightOcrMessages(record.history),
       onComplete: assistantMessage =>
         appendSideConversationHistory(input.sideConversationId, [message, assistantMessage]),
       workspaceId: parentContext.session.workspaceId,
