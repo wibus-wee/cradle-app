@@ -22,9 +22,10 @@ const EXIT_BANNER = '\r\n\x1B[2m[Process exited]\x1B[0m\r\n'
 
 interface TuiViewProps {
   sessionId: string
+  visible?: boolean
 }
 
-export function TuiView({ sessionId }: TuiViewProps) {
+export function TuiView({ sessionId, visible: _visible = true }: TuiViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<ReturnType<typeof createPtyChannel> | null>(null)
   const [ready, setReady] = useState(false)

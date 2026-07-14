@@ -2736,7 +2736,8 @@ export const zGetChatComposerDraftsBySurfaceIdPath = z.object({
 export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
     draft: z.object({
         text: z.string(),
-        contextParts: z.array(z.union([z.object({
+        contextParts: z.array(z.union([
+            z.object({
                 type: z.string(),
                 name: z.string().min(1),
                 path: z.string().min(1),
@@ -2750,7 +2751,8 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
                 ]),
                 description: z.string().nullable(),
                 position: z.number().gte(0).optional()
-            }), z.object({
+            }),
+            z.object({
                 type: z.string(),
                 provider: z.enum(['cradle', 'codex']).optional(),
                 pluginName: z.string().min(1),
@@ -2774,7 +2776,30 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
                     path: z.string().min(1)
                 }).nullish(),
                 position: z.number().gte(0).optional()
-            })]))
+            }),
+            z.object({
+                type: z.string(),
+                workspaceId: z.string().min(1),
+                path: z.string().min(1),
+                lineStart: z.number().gte(1),
+                lineEnd: z.number().gte(1),
+                comment: z.string().min(1),
+                position: z.number().gte(0).optional()
+            })
+        ])),
+        files: z.array(z.object({
+            type: z.string(),
+            mediaType: z.string().min(1),
+            filename: z.string().optional(),
+            url: z.string().min(1),
+            providerMetadata: z.unknown().optional()
+        })),
+        pastedTexts: z.array(z.object({
+            id: z.string().min(1),
+            text: z.string(),
+            lineCount: z.number().gte(0),
+            charCount: z.number().gte(0)
+        }))
     })
 });
 
@@ -2908,7 +2933,8 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
         url: z.string().min(1),
         providerMetadata: z.unknown().optional()
     })).optional(),
-    contextParts: z.array(z.union([z.object({
+    contextParts: z.array(z.union([
+        z.object({
             type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
@@ -2922,7 +2948,8 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
             ]),
             description: z.string().nullable(),
             position: z.number().gte(0).optional()
-        }), z.object({
+        }),
+        z.object({
             type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
@@ -2946,7 +2973,17 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
                 path: z.string().min(1)
             }).nullish(),
             position: z.number().gte(0).optional()
-        })])).optional(),
+        }),
+        z.object({
+            type: z.string(),
+            workspaceId: z.string().min(1),
+            path: z.string().min(1),
+            lineStart: z.number().gte(1),
+            lineEnd: z.number().gte(1),
+            comment: z.string().min(1),
+            position: z.number().gte(0).optional()
+        })
+    ])).optional(),
     providerTargetId: z.string().optional(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
@@ -2978,7 +3015,8 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
         url: z.string().min(1),
         providerMetadata: z.unknown().optional()
     })).optional(),
-    contextParts: z.array(z.union([z.object({
+    contextParts: z.array(z.union([
+        z.object({
             type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
@@ -2992,7 +3030,8 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
             ]),
             description: z.string().nullable(),
             position: z.number().gte(0).optional()
-        }), z.object({
+        }),
+        z.object({
             type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
@@ -3016,7 +3055,17 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
                 path: z.string().min(1)
             }).nullish(),
             position: z.number().gte(0).optional()
-        })])).optional(),
+        }),
+        z.object({
+            type: z.string(),
+            workspaceId: z.string().min(1),
+            path: z.string().min(1),
+            lineStart: z.number().gte(1),
+            lineEnd: z.number().gte(1),
+            comment: z.string().min(1),
+            position: z.number().gte(0).optional()
+        })
+    ])).optional(),
     providerTargetId: z.string().optional()
 });
 
@@ -3046,7 +3095,8 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
         url: z.string().min(1),
         providerMetadata: z.unknown().optional()
     })).optional(),
-    contextParts: z.array(z.union([z.object({
+    contextParts: z.array(z.union([
+        z.object({
             type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
@@ -3060,7 +3110,8 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
             ]),
             description: z.string().nullable(),
             position: z.number().gte(0).optional()
-        }), z.object({
+        }),
+        z.object({
             type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
@@ -3084,7 +3135,17 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
                 path: z.string().min(1)
             }).nullish(),
             position: z.number().gte(0).optional()
-        })])).optional(),
+        }),
+        z.object({
+            type: z.string(),
+            workspaceId: z.string().min(1),
+            path: z.string().min(1),
+            lineStart: z.number().gte(1),
+            lineEnd: z.number().gte(1),
+            comment: z.string().min(1),
+            position: z.number().gte(0).optional()
+        })
+    ])).optional(),
     providerTargetId: z.string().optional(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
@@ -3151,7 +3212,8 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
         url: z.string().min(1),
         providerMetadata: z.unknown().optional()
     })).optional(),
-    contextParts: z.array(z.union([z.object({
+    contextParts: z.array(z.union([
+        z.object({
             type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
@@ -3165,7 +3227,8 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
             ]),
             description: z.string().nullable(),
             position: z.number().gte(0).optional()
-        }), z.object({
+        }),
+        z.object({
             type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
@@ -3189,7 +3252,17 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
                 path: z.string().min(1)
             }).nullish(),
             position: z.number().gte(0).optional()
-        })])).optional(),
+        }),
+        z.object({
+            type: z.string(),
+            workspaceId: z.string().min(1),
+            path: z.string().min(1),
+            lineStart: z.number().gte(1),
+            lineEnd: z.number().gte(1),
+            comment: z.string().min(1),
+            position: z.number().gte(0).optional()
+        })
+    ])).optional(),
     messages: z.array(z.object({
         id: z.string(),
         role: z.enum([
@@ -3233,7 +3306,8 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
         url: z.string().min(1),
         providerMetadata: z.unknown().optional()
     })).optional(),
-    contextParts: z.array(z.union([z.object({
+    contextParts: z.array(z.union([
+        z.object({
             type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
@@ -3247,7 +3321,8 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
             ]),
             description: z.string().nullable(),
             position: z.number().gte(0).optional()
-        }), z.object({
+        }),
+        z.object({
             type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
@@ -3271,7 +3346,17 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
                 path: z.string().min(1)
             }).nullish(),
             position: z.number().gte(0).optional()
-        })])).optional(),
+        }),
+        z.object({
+            type: z.string(),
+            workspaceId: z.string().min(1),
+            path: z.string().min(1),
+            lineStart: z.number().gte(1),
+            lineEnd: z.number().gte(1),
+            comment: z.string().min(1),
+            position: z.number().gte(0).optional()
+        })
+    ])).optional(),
     messages: z.array(z.object({
         id: z.string(),
         role: z.enum([
