@@ -2,7 +2,8 @@ import { execSync } from 'node:child_process'
 
 import { z } from 'zod'
 
-import { getCached, isCacheStale, setCache } from './github-cache'
+import type { CachedFetchResult } from './github-cache'
+import { cachedFetch } from './github-cache'
 
 let cachedToken: string | null | undefined
 
@@ -56,12 +57,9 @@ export function resolveGitHubToken(): string | null {
 
 export function resetTokenCache() {
   cachedToken = undefined
-  etagCache.clear()
   rateLimitRemaining = 5000
   rateLimitReset = 0
 }
-
-const etagCache = new Map<string, { etag: string, data: unknown }>()
 
 interface JsonSchema<T> {
   parse: (data: unknown) => T
@@ -130,8 +128,7 @@ function buildGitHubHeaders(options?: { etag?: string, requireToken?: boolean })
 
 async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | null> {
   const url = `https://api.github.com${path}`
-  const cached = etagCache.get(url)
-  const headers = buildGitHubHeaders({ etag: cached?.etag })
+  const headers = buildGitHubHeaders()
 
   const res = await fetch(url, {
     headers,
@@ -139,9 +136,6 @@ async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | nu
   })
   recordRateLimit(res.headers)
 
-  if (res.status === 304) {
-    return cached ? schema.parse(cached.data) : null
-  }
   if (!res.ok) {
     if (res.status === 404 || res.status === 422) {
       throw new GitHubApiError({
@@ -153,12 +147,66 @@ async function githubGet<T>(path: string, schema: JsonSchema<T>): Promise<T | nu
     return null
   }
 
-  const data = schema.parse(await res.json())
-  const etag = res.headers.get('ETag')
-  if (etag) {
-    etagCache.set(url, { etag, data })
+  return schema.parse(await res.json())
+}
+
+function createRestFetcher<T>(path: string, schema: JsonSchema<T>): (etag: string | null) => Promise<CachedFetchResult<T>> {
+  return async (etag: string | null) => {
+    const url = `https://api.github.com${path}`
+    const headers = buildGitHubHeaders({ etag: etag ?? undefined })
+
+    const res = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+    })
+    recordRateLimit(res.headers)
+
+    if (res.status === 304) {
+      return { data: null, etag: null, status: 304 }
+    }
+
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 422) {
+        throw new GitHubApiError({
+          status: res.status,
+          path,
+          message: await readGitHubErrorMessage(res),
+        })
+      }
+      return { data: null, etag: null, status: res.status }
+    }
+
+    const data = schema.parse(await res.json())
+    const newEtag = res.headers.get('ETag')
+    return { data, etag: newEtag, status: res.status }
   }
-  return data
+}
+
+function createGraphQLFetcher<T>(query: string, variables: Record<string, unknown>, schema: JsonSchema<T>): (etag: string | null) => Promise<CachedFetchResult<T>> {
+  return async (_etag: string | null) => {
+    const headers = buildGitHubHeaders({ requireToken: true })
+    headers['Content-Type'] = 'application/json'
+
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+    })
+    recordRateLimit(res.headers)
+
+    const payload = GitHubGraphQLResponseSchema.parse(await res.json())
+    const errorMessage = payload.errors?.map(error => error.message).join('; ')
+    if (!res.ok || errorMessage || payload.data === undefined) {
+      throw new GitHubApiError({
+        status: res.ok ? 422 : res.status,
+        path: '/graphql',
+        message: errorMessage || `GitHub GraphQL API returned ${res.status}`,
+      })
+    }
+
+    return { data: schema.parse(payload.data), etag: null, status: res.status }
+  }
 }
 
 async function githubMutate<T>(
@@ -671,17 +719,22 @@ const GitHubViewerDataSchema = z.object({
 })
 
 export function fetchAuthenticatedUser(): Promise<GitHubViewer> {
-  return githubGraphQL(
-    `query ViewerIdentity {
-      viewer {
-        login
-        avatarUrl
-        url
-      }
-    }`,
-    {},
-    GitHubViewerDataSchema,
-  ).then(data => data.viewer)
+  return cachedFetch({
+    cacheKey: `viewer:${resolveGitHubToken()?.slice(0, 8) ?? 'anon'}`,
+    ttlS: 300,
+    etag: false,
+    fetcher: createGraphQLFetcher(
+      `query ViewerIdentity {
+        viewer {
+          login
+          avatarUrl
+          url
+        }
+      }`,
+      {},
+      GitHubViewerDataSchema,
+    ),
+  }).then(data => data!.viewer)
 }
 
 export type GitHubPullRequestChecksState = 'success' | 'failure' | 'pending' | 'neutral'
@@ -866,27 +919,67 @@ async function searchPullRequestsPage(searchQuery: string, after: string | null)
 }
 
 export function searchAuthoredPullRequests(login: string, after: string | null = null): Promise<GitHubSearchPullRequestPage> {
-  return searchPullRequestsPage(`is:pr author:${login}`, after)
+  return cachedFetch({
+    cacheKey: `search-authored:login:${login}:${after ?? 'first'}`,
+    ttlS: 60,
+    etag: false,
+    fetcher: async () => {
+      const data = await searchPullRequestsPage(`is:pr author:${login}`, after)
+      return { data, etag: null, status: 200 }
+    },
+  }).then(data => data!)
 }
 
-export function searchReviewRequestedPullRequests(login: string, after: string | null = null): Promise<GitHubSearchPullRequestPage> {
-  return searchPullRequestsPage(`is:pr review-requested:${login}`, after)
+export function searchReviewingPullRequests(login: string, after: string | null = null): Promise<GitHubSearchPullRequestPage> {
+  return cachedFetch({
+    cacheKey: `search-reviewing:login:${login}:${after ?? 'first'}`,
+    ttlS: 60,
+    etag: false,
+    fetcher: async () => {
+      const data = await searchPullRequestsPage(`is:pr (review-requested:${login} OR reviewed-by:${login})`, after)
+      return { data, etag: null, status: 200 }
+    },
+  }).then(data => data!)
 }
 
 export function fetchPullRequest(owner: string, repo: string, pr: number): Promise<GitHubPullRequest | null> {
-  return githubGet(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestSchema)
+  return cachedFetch({
+    cacheKey: `pr:${owner}/${repo}:${pr}`,
+    ttlS: 30,
+    fetcher: createRestFetcher(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestSchema),
+  })
 }
 
 export function fetchPullRequestDetail(owner: string, repo: string, pr: number): Promise<GitHubPullRequestDetail | null> {
-  return githubGet(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestDetailSchema)
+  return cachedFetch({
+    cacheKey: `pr-detail:${owner}/${repo}:${pr}`,
+    ttlS: 30,
+    fetcher: createRestFetcher(`/repos/${owner}/${repo}/pulls/${pr}`, GitHubPullRequestDetailSchema),
+  })
 }
 
 export function fetchPullRequestComments(owner: string, repo: string, pr: number): Promise<GitHubPullRequestComment[] | null> {
-  return githubGetPaged(`/repos/${owner}/${repo}/issues/${pr}/comments`, z.array(GitHubPullRequestCommentSchema))
+  return cachedFetch({
+    cacheKey: `pr-comments:${owner}/${repo}:${pr}`,
+    ttlS: 60,
+    etag: false,
+    fetcher: async () => {
+      const data = await githubGetPaged(`/repos/${owner}/${repo}/issues/${pr}/comments`, z.array(GitHubPullRequestCommentSchema))
+      return { data, etag: null, status: 200 }
+    },
+  })
 }
 
 export function fetchPullRequestFiles(owner: string, repo: string, pr: number): Promise<GitHubPullRequestFile[] | null> {
-  return githubGetPaged(`/repos/${owner}/${repo}/pulls/${pr}/files`, z.array(GitHubPullRequestFileSchema))
+  return cachedFetch({
+    cacheKey: `pr-files:${owner}/${repo}:${pr}`,
+    ttlS: 60,
+    etag: false,
+    fetcher: async () => {
+      const data = await githubGetPaged(`/repos/${owner}/${repo}/pulls/${pr}/files`, z.array(GitHubPullRequestFileSchema))
+      return { data, etag: null, status: 200 }
+    },
+  })
 }
 
 function fetchPullRequestNode(owner: string, repo: string, pr: number): Promise<{ node_id: string } | null> {
@@ -966,23 +1059,30 @@ export async function markPullRequestReady(
 }
 
 export async function fetchCheckRuns(owner: string, repo: string, ref: string): Promise<GitHubCheckRunsResponse | null> {
-  const runs: GitHubCheckRun[] = []
-  let totalCount = 0
-  for (let page = 1; page <= 10; page++) {
-    const data = await githubGet(
-      `/repos/${owner}/${repo}/commits/${ref}/check-runs?per_page=100&page=${page}`,
-      GitHubCheckRunsResponseSchema,
-    )
-    if (!data) {
-      return null
-    }
-    totalCount = data.total_count
-    runs.push(...data.check_runs)
-    if (data.check_runs.length < 100 || runs.length >= data.total_count) {
-      break
-    }
-  }
-  return { total_count: totalCount, check_runs: runs }
+  return cachedFetch({
+    cacheKey: `check-runs:${owner}/${repo}:${ref}`,
+    ttlS: 30,
+    etag: false,
+    fetcher: async () => {
+      const runs: GitHubCheckRun[] = []
+      let totalCount = 0
+      for (let page = 1; page <= 10; page++) {
+        const data = await githubGet(
+          `/repos/${owner}/${repo}/commits/${ref}/check-runs?per_page=100&page=${page}`,
+          GitHubCheckRunsResponseSchema,
+        )
+        if (!data) {
+          return { data: null, etag: null, status: 200 }
+        }
+        totalCount = data.total_count
+        runs.push(...data.check_runs)
+        if (data.check_runs.length < 100 || runs.length >= data.total_count) {
+          break
+        }
+      }
+      return { data: { total_count: totalCount, check_runs: runs }, etag: null, status: 200 }
+    },
+  })
 }
 
 export function fetchCheckRun(owner: string, repo: string, checkRunId: number): Promise<GitHubCheckRun | null> {
@@ -1034,7 +1134,11 @@ const GitHubRepoSchema = z.object({
 }).passthrough()
 
 export function fetchRepo(owner: string, repo: string): Promise<{ default_branch: string } | null> {
-  return githubGet(`/repos/${owner}/${repo}`, GitHubRepoSchema)
+  return cachedFetch({
+    cacheKey: `repo:${owner}/${repo}`,
+    ttlS: 3600,
+    fetcher: createRestFetcher(`/repos/${owner}/${repo}`, GitHubRepoSchema),
+  })
 }
 
 const GitHubBranchHeadSchema = z.object({
@@ -1042,16 +1146,31 @@ const GitHubBranchHeadSchema = z.object({
 }).passthrough()
 
 export function fetchBranchHead(owner: string, repo: string, branch: string): Promise<{ sha: string } | null> {
-  return githubGet(`/repos/${owner}/${repo}/branches/${branch}`, GitHubBranchHeadSchema)
-    .then(data => data ? { sha: data.commit.sha } : null)
+  return cachedFetch({
+    cacheKey: `branch-head:${owner}/${repo}:${branch}`,
+    ttlS: 300,
+    fetcher: createRestFetcher(`/repos/${owner}/${repo}/branches/${branch}`, GitHubBranchHeadSchema),
+  }).then(data => data ? { sha: data.commit.sha } : null)
 }
 
 export function fetchCombinedStatus(owner: string, repo: string, ref: string): Promise<GitHubCombinedStatus | null> {
-  return githubGet(`/repos/${owner}/${repo}/commits/${ref}/status`, GitHubCombinedStatusSchema)
+  return cachedFetch({
+    cacheKey: `combined-status:${owner}/${repo}:${ref}`,
+    ttlS: 30,
+    fetcher: createRestFetcher(`/repos/${owner}/${repo}/commits/${ref}/status`, GitHubCombinedStatusSchema),
+  })
 }
 
 export function fetchPullRequestReviews(owner: string, repo: string, pr: number): Promise<GitHubPullRequestReview[] | null> {
-  return githubGetPaged(`/repos/${owner}/${repo}/pulls/${pr}/reviews`, z.array(GitHubPullRequestReviewSchema))
+  return cachedFetch({
+    cacheKey: `pr-reviews:${owner}/${repo}:${pr}`,
+    ttlS: 60,
+    etag: false,
+    fetcher: async () => {
+      const data = await githubGetPaged(`/repos/${owner}/${repo}/pulls/${pr}/reviews`, z.array(GitHubPullRequestReviewSchema))
+      return { data, etag: null, status: 200 }
+    },
+  })
 }
 
 export interface BranchProtectionResult {
@@ -1067,53 +1186,47 @@ const BranchProtectionSchema = z.object({
 const BRANCH_PROTECTION_CACHE_TTL_S = 60 * 60 // 1 hour
 
 export async function fetchBranchProtection(owner: string, repo: string, branch: string): Promise<BranchProtectionResult | null> {
-  const cacheKey = `branch-protection:${owner}/${repo}:${branch}`
+  return cachedFetch({
+    cacheKey: `branch-protection:${owner}/${repo}:${branch}`,
+    ttlS: BRANCH_PROTECTION_CACHE_TTL_S,
+    fetcher: async (etag) => {
+      const token = resolveGitHubToken()
+      const url = `https://api.github.com/repos/${owner}/${repo}/branches/${branch}/protection`
+      const headers: Record<string, string> = {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      }
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+      if (etag) {
+        headers['If-None-Match'] = etag
+      }
 
-  if (!isCacheStale(cacheKey, BRANCH_PROTECTION_CACHE_TTL_S)) {
-    const cached = getCached<BranchProtectionResult>(cacheKey)
-    if (cached) {
-      return cached.data
-    }
-  }
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+      })
+      recordRateLimit(res.headers)
 
-  const token = resolveGitHubToken()
-  const url = `https://api.github.com/repos/${owner}/${repo}/branches/${branch}/protection`
-  const headers: Record<string, string> = {
-    'Accept': 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
+      if (res.status === 304) {
+        return { data: null, etag: null, status: 304 }
+      }
 
-  const cachedEntry = getCached<{ etag?: string }>(cacheKey)
-  if (cachedEntry?.etag) {
-    headers['If-None-Match'] = cachedEntry.etag
-  }
+      if (res.status === 404) {
+        return { data: { requiredContexts: [] }, etag: null, status: res.status }
+      }
 
-  const res = await fetch(url, { headers })
-  recordRateLimit(res.headers)
+      if (!res.ok) {
+        return { data: null, etag: null, status: res.status }
+      }
 
-  if (res.status === 304) {
-    const cached = getCached<BranchProtectionResult>(cacheKey)
-    return cached?.data ?? null
-  }
-
-  if (res.status === 404) {
-    const result: BranchProtectionResult = { requiredContexts: [] }
-    setCache(cacheKey, result, null)
-    return result
-  }
-
-  if (!res.ok) {
-    return getCached<BranchProtectionResult>(cacheKey)?.data ?? null
-  }
-
-  const raw = BranchProtectionSchema.parse(await res.json())
-  const result: BranchProtectionResult = {
-    requiredContexts: raw.required_status_checks?.contexts ?? [],
-  }
-  const etag = res.headers.get('ETag')
-  setCache(cacheKey, result, etag)
-  return result
+      const raw = BranchProtectionSchema.parse(await res.json())
+      const result: BranchProtectionResult = {
+        requiredContexts: raw.required_status_checks?.contexts ?? [],
+      }
+      const newEtag = res.headers.get('ETag')
+      return { data: result, etag: newEtag, status: res.status }
+    },
+  })
 }

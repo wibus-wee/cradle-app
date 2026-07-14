@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { sessions, works, workspaces, workThreads, worktrees } from '@cradle/db'
+import { sessionAwaits, sessions, works, workspaces, workThreads, worktrees } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,6 +12,7 @@ import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
+import * as SessionAwait from '../session-await/service'
 import * as Worktree from '../worktree/service'
 import * as Work from './service'
 
@@ -83,12 +84,35 @@ function mockHealthyDetailReads() {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  db().delete(sessionAwaits).run()
   db().delete(workThreads).run()
   db().delete(works).run()
   db().delete(sessions).run()
   db().delete(worktrees).run()
   db().delete(workspaces).run()
 })
+
+function mockSessionAwaitRegister() {
+  return vi.spyOn(SessionAwait, 'register').mockImplementation(async input => ({
+    id: `mock-await-${input.source}`,
+    chatSessionId: input.chatSessionId,
+    workspaceId: input.workspaceId,
+    source: input.source,
+    filterJson: input.filterJson,
+    status: 'pending' as const,
+    reason: input.reason ?? null,
+    resumeText: null,
+    resumePayloadJson: null,
+    failureKind: null,
+    bypassedChecksJson: null,
+    createdAt: Math.floor(Date.now() / 1000),
+    triggeredAt: null,
+    expiresAt: null,
+    fireAt: null,
+    lastCheckedAt: null,
+    lastErrorText: null,
+  }))
+}
 
 describe('deriveActivity', () => {
   it('uses blocked, waiting, running, idle precedence', () => {
@@ -227,6 +251,7 @@ describe('work delivery control', () => {
 
     pullRequest.mockResolvedValue(OPEN_PULL_REQUEST)
     vi.spyOn(PullRequest, 'updatePullRequest').mockResolvedValue(OPEN_PULL_REQUEST)
+    mockSessionAwaitRegister()
     const submitted = await Work.submit({ id: WORK_ID })
     expect(submitted.work.lastSubmittedAt).toBeGreaterThan(submitted.work.preparedAt!)
   })
@@ -291,6 +316,7 @@ describe('work delivery control', () => {
       preparedAt: 10,
     }).run()
     const createPullRequest = vi.spyOn(PullRequest, 'createDraftPullRequest').mockResolvedValue(OPEN_PULL_REQUEST)
+    mockSessionAwaitRegister()
 
     const detail = await Work.submit({ id: WORK_ID })
 
@@ -320,6 +346,7 @@ describe('work delivery control', () => {
       title: 'Updated title',
       updatedAt: 20,
     })
+    mockSessionAwaitRegister()
 
     await Work.submit({ id: WORK_ID })
 
@@ -373,6 +400,59 @@ describe('work delivery control', () => {
       preparedAt: 20,
       lastSubmittedAt: null,
     })
+  })
+
+  it('auto-registers github-ci and github-review Session Awaits after Draft PR creation', async () => {
+    seedWork()
+    mockHealthyDetailReads()
+    db().update(works).set({
+      handoffTitle: 'Draft title',
+      handoffSummary: 'Implemented the flow.',
+      handoffTestPlan: 'Run focused tests.',
+      preparedAt: 10,
+    }).run()
+    vi.spyOn(PullRequest, 'createDraftPullRequest').mockResolvedValue(OPEN_PULL_REQUEST)
+    const registerSpy = mockSessionAwaitRegister()
+
+    await Work.submit({ id: WORK_ID })
+
+    expect(registerSpy).toHaveBeenCalledTimes(2)
+    expect(registerSpy).toHaveBeenCalledWith(expect.objectContaining({
+      chatSessionId: SESSION_ID,
+      workspaceId: WORKSPACE_ID,
+      source: 'github-ci',
+      filterJson: JSON.stringify({ repo: 'acme/cradle', pr: 42 }),
+    }))
+    expect(registerSpy).toHaveBeenCalledWith(expect.objectContaining({
+      chatSessionId: SESSION_ID,
+      workspaceId: WORKSPACE_ID,
+      source: 'github-review',
+      filterJson: JSON.stringify({ repo: 'acme/cradle', pr: 42, mode: 'approved' }),
+    }))
+  })
+
+  it('does not re-register Session Awaits if they already exist', async () => {
+    seedWork()
+    mockHealthyDetailReads()
+    db().update(works).set({
+      handoffTitle: 'Draft title',
+      handoffSummary: 'Implemented the flow.',
+      handoffTestPlan: 'Run focused tests.',
+      preparedAt: 10,
+    }).run()
+    vi.spyOn(PullRequest, 'createDraftPullRequest').mockResolvedValue(OPEN_PULL_REQUEST)
+    db().insert(sessionAwaits).values({
+      id: 'existing-await',
+      chatSessionId: SESSION_ID,
+      workspaceId: WORKSPACE_ID,
+      source: 'github-ci',
+      filterJson: JSON.stringify({ repo: 'acme/cradle', pr: 42 }),
+    }).run()
+    const registerSpy = vi.spyOn(SessionAwait, 'register')
+
+    await Work.submit({ id: WORK_ID })
+
+    expect(registerSpy).not.toHaveBeenCalled()
   })
 
   it('rejects creation before Session persistence when the source checkout is dirty', async () => {

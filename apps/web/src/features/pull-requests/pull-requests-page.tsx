@@ -283,7 +283,7 @@ export function PullRequestsPage({
  *  (`TextTabs` in reviews-list-page.tsx), kept as a plain `role="group"` of
  *  buttons rather than the Radix Tabs primitive: these filter one list in
  *  place, they don't switch between separate tabpanels. Filters are by the
- *  viewer's *role* on the PR (authored vs requested reviewer), not by PR
+ *  viewer's *role* on the PR (authored vs reviewer), not by PR lifecycle
  *  lifecycle state - lifecycle state is conveyed per-row by the status icon.
  */
 function FilterTabs({

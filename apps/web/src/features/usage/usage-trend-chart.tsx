@@ -38,11 +38,6 @@ interface UsageTrendChartProps {
   hasCost: boolean
 }
 
-// How many models get their own colored stack before the rest collapse into
-// "Other" - keeps the legend readable for workspaces that cycle through many
-// models.
-const MODEL_STACK_LIMIT = 6
-
 export function UsageTrendChart({ dailyCost, dailyByModel, range, hasCost }: UsageTrendChartProps) {
   const { t } = useTranslation('usage')
   const resolvedMode = useResolvedThemeMode()
@@ -52,7 +47,7 @@ export function UsageTrendChart({ dailyCost, dailyByModel, range, hasCost }: Usa
   const activeMetric: TrendMetric = hasCost ? metric : 'tokens'
 
   const costData = useMemo(() => denseCostSeries(dailyCost, days), [dailyCost, days])
-  const tokenStack = useMemo(() => denseModelStackSeries(dailyByModel, days, MODEL_STACK_LIMIT), [dailyByModel, days])
+  const tokenStack = useMemo(() => denseModelStackSeries(dailyByModel, days, Infinity), [dailyByModel, days])
 
   const option = useMemo(
     () => buildTrendOption({ metric: activeMetric, tokenStack, costData, days, isDark, t }),

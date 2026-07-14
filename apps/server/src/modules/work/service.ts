@@ -11,6 +11,7 @@ import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-us
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
+import type { SessionAwaitSource } from '../session-await/types'
 import * as Worktree from '../worktree/service'
 
 export type WorkActivity = 'idle' | 'running' | 'waiting' | 'blocked'
@@ -394,6 +395,44 @@ function requireHandoffValue(value: string | null | undefined, field: string): s
   return normalized
 }
 
+async function registerWorkAwaits(
+  sessionId: string,
+  workspaceId: string,
+  pr: { owner: string, repo: string, number: number },
+): Promise<void> {
+  const existing = SessionAwait.listBySession(sessionId)
+  if (existing.length > 0) {
+    return
+  }
+
+  const ciFilter = JSON.stringify({
+    repo: `${pr.owner}/${pr.repo}`,
+    pr: pr.number,
+  })
+  const reviewFilter = JSON.stringify({
+    repo: `${pr.owner}/${pr.repo}`,
+    pr: pr.number,
+    mode: 'approved',
+  })
+
+  await Promise.all([
+    SessionAwait.register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: 'github-ci' satisfies SessionAwaitSource['source'],
+      filterJson: ciFilter,
+      reason: `CI checks for PR #${pr.number}`,
+    }),
+    SessionAwait.register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: 'github-review' satisfies SessionAwaitSource['source'],
+      filterJson: reviewFilter,
+      reason: `Review approval for PR #${pr.number}`,
+    }),
+  ])
+}
+
 export async function submit(input: {
   id: string
   title?: string
@@ -420,21 +459,26 @@ export async function submit(input: {
     })
   }
 
+  let pr: { owner: string, repo: string, number: number }
   if (existing) {
     await PullRequest.updatePullRequest({
       sessionId: primaryThread.id,
       title,
       body,
     })
+    pr = { owner: existing.owner, repo: existing.repo, number: existing.number }
   }
   else {
-    await PullRequest.createDraftPullRequest({
+    const created = await PullRequest.createDraftPullRequest({
       sessionId: primaryThread.id,
       title,
       body,
       base: input.base,
     })
+    pr = { owner: created.owner, repo: created.repo, number: created.number }
   }
+
+  await registerWorkAwaits(primaryThread.id, primaryThread.workspaceId!, pr)
 
   const timestamp = nextTimestampAfter(work.preparedAt, work.lastSubmittedAt)
   db().update(works).set({

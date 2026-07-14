@@ -22,7 +22,7 @@ import {
   hasGitHubToken,
   markPullRequestReady as markGitHubPullRequestReady,
   searchAuthoredPullRequests,
-  searchReviewRequestedPullRequests,
+  searchReviewingPullRequests,
   updatePullRequest as updateGitHubPullRequest,
 } from '../../lib/github-api'
 import * as Worktree from '../worktree/service'
@@ -684,7 +684,7 @@ function requireGitHubToken(): void {
 /**
  * Resolves the GitHub identity the "authored"/"reviewing" feeds below are
  * scoped to. The standalone Pull Requests surface fetches this once, then
- * passes `login` into `listAuthoredPullRequests`/`listReviewRequestedPullRequests`
+ * passes `login` into `listAuthoredPullRequests`/`listReviewingPullRequests`
  * itself - the identity rarely changes and each feed page shouldn't have to
  * re-resolve it.
  */
@@ -717,13 +717,14 @@ export async function listAuthoredPullRequests(login: string, after?: string): P
 }
 
 /**
- * Pull requests where `login` is a requested reviewer, most recently
- * updated first. See `listAuthoredPullRequests` for pagination semantics.
+ * Pull requests where `login` is involved as a reviewer (either requested or
+ * already reviewed), most recently updated first. See
+ * `listAuthoredPullRequests` for pagination semantics.
  */
-export async function listReviewRequestedPullRequests(login: string, after?: string): Promise<PullRequestSearchPage> {
+export async function listReviewingPullRequests(login: string, after?: string): Promise<PullRequestSearchPage> {
   requireGitHubToken()
   try {
-    const page = await searchReviewRequestedPullRequests(login, after || null)
+    const page = await searchReviewingPullRequests(login, after || null)
     return { items: page.items.map(toSearchView), hasNextPage: page.hasNextPage, endCursor: page.endCursor }
   }
   catch (error) {

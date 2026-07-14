@@ -89,9 +89,9 @@ export const pullRequestFeed = new Elysia({
     query: PullRequestModel.searchPageQuery,
     response: { 200: PullRequestModel.searchPageResponse },
   })
-  .get('/reviewing', async ({ query }) => await PullRequest.listReviewRequestedPullRequests(query.login, query.after), {
+  .get('/reviewing', async ({ query }) => await PullRequest.listReviewingPullRequests(query.login, query.after), {
     detail: {
-      'summary': 'List pull requests where the given GitHub login is a requested reviewer, most recently updated first, paginated via `after`',
+      'summary': 'List pull requests where the given GitHub login is involved as a reviewer (requested or already reviewed), most recently updated first, paginated via `after`',
       'x-cradle-cli': { command: ['pull-request', 'reviewing'] },
     },
     query: PullRequestModel.searchPageQuery,

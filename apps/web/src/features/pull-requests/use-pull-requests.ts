@@ -12,9 +12,8 @@ export type PullRequestRole = 'authored' | 'reviewing'
 /**
  * A pull request the viewer is involved in on GitHub, with an optional
  * Cradle Work overlay when Cradle happens to have created/bound it. `role`
- * reflects the viewer's relationship to the PR (author vs requested
- * reviewer), matching the "全部/正在审查/由我创建" filter semantics - it is
- * independent of the PR's lifecycle state (draft/ready/merged/closed).
+ * reflects the viewer's relationship to the PR (author vs reviewer), matching
+ * the "全部/我审查的/由我创建" filter semantics - it is independent of the PR's lifecycle state (draft/ready/merged/closed).
  */
 export interface CradlePullRequest {
   id: string
