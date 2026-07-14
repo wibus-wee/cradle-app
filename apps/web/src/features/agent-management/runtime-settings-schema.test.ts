@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
 
 import {
+  listRuntimeSettingsDescriptorsForProviderKind,
   listRuntimeSettingsFields,
   readRuntimeSettingsFormValues,
   writeRuntimeSettingsConfig,
@@ -87,6 +88,42 @@ function remoteMockRuntime(overrides: Partial<RuntimeCatalogItem> = {}): Runtime
 }
 
 describe('runtime-settings-schema', () => {
+  it('filters provider-compatible descriptors with settings schemas', () => {
+    const runtimes = [
+      runtimeCatalogItem({
+        runtimeKind: 'anthropic-runtime',
+        providerKinds: ['anthropic'],
+        settingsSchema: {
+          type: 'object',
+          properties: {
+            endpoint: { type: 'string' },
+          },
+        },
+      }),
+      runtimeCatalogItem({
+        runtimeKind: 'missing-schema',
+        providerKinds: ['openai-compatible'],
+      }),
+      remoteMockRuntime(),
+      runtimeCatalogItem({
+        runtimeKind: 'early-openai-runtime',
+        providerKinds: ['openai-compatible'],
+        sortOrder: 10,
+        settingsSchema: {
+          type: 'object',
+          properties: {
+            host: { type: 'string' },
+          },
+        },
+      }),
+    ]
+
+    expect(
+      listRuntimeSettingsDescriptorsForProviderKind(runtimes, 'openai-compatible')
+        .map(runtime => runtime.runtimeKind),
+    ).toEqual(['early-openai-runtime', 'remote-mock'])
+  })
+
   it('projects JSON schema properties into editable runtime settings fields', () => {
     expect(listRuntimeSettingsFields([remoteMockRuntime()])).toEqual([
       {

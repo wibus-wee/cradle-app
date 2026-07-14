@@ -3784,6 +3784,26 @@ export type PostSecretsResponses = {
 
 export type PostSecretsResponse = PostSecretsResponses[keyof PostSecretsResponses];
 
+export type PostSecretsByIdRevealData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/secrets/{id}/reveal';
+};
+
+export type PostSecretsByIdRevealResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        secret: string;
+    };
+};
+
+export type PostSecretsByIdRevealResponse = PostSecretsByIdRevealResponses[keyof PostSecretsByIdRevealResponses];
+
 export type DeleteSecretsByIdData = {
     body?: never;
     path: {

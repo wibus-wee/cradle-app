@@ -1,4 +1,5 @@
 import type { RuntimeCatalogItem } from '~/features/agent-runtime/runtime-catalog'
+import type { ApiProviderKind } from '~/features/agent-runtime/types'
 
 export type RuntimeSettingsFieldType = 'string' | 'boolean' | 'number' | 'integer'
 export type RuntimeSettingsFormValue = string | number | boolean
@@ -32,6 +33,20 @@ type RuntimeSettingsPropertySchema = {
   description?: unknown
   default?: unknown
   enum?: unknown
+}
+
+export function listRuntimeSettingsDescriptorsForProviderKind(
+  runtimes: RuntimeCatalogItem[],
+  providerKind: ApiProviderKind,
+): RuntimeCatalogItem[] {
+  return runtimes
+    .filter(runtime =>
+      runtime.settingsSchema
+      && runtime.providerKinds.includes(providerKind))
+    .sort((left, right) =>
+      (left.sortOrder ?? 1000) - (right.sortOrder ?? 1000)
+      || left.label.localeCompare(right.label)
+      || left.runtimeKind.localeCompare(right.runtimeKind))
 }
 
 export function listRuntimeSettingsFieldsForRuntime(
