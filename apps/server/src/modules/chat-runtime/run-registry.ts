@@ -71,21 +71,25 @@ export interface PendingRunState {
   queueItemId?: string
 }
 
+export type SessionMaintenanceKind = 'rollback'
+
 /**
- * The active-run registry owns the three module-level maps that track
- * in-flight chat runs:
+ * The active-run registry owns the module-level maps that track in-flight chat
+ * runs and short-lived exclusive maintenance:
  *  - activeRuns: runId → ActiveRun
  *  - activeRunIdsBySession: sessionId → runId (single-flight index)
  *  - pendingRunSessions: sessionId → PendingRunState (runs being set up)
+ *  - sessionMaintenance: sessionId → SessionMaintenanceKind (rollback window)
  *
  * Encapsulating them behind methods (rather than raw Maps) gives a single
  * ownership boundary, makes the access surface explicit, and lets extracted
  * concern modules consume run state via the imported `runRegistry` handle.
  */
-class RunRegistry {
+export class RunRegistry {
   private readonly activeRuns = new Map<string, ActiveRun>()
   private readonly activeRunIdsBySession = new Map<string, string>()
   private readonly pendingRunSessions = new Map<string, PendingRunState>()
+  private readonly sessionMaintenance = new Map<string, SessionMaintenanceKind>()
 
   // ── active runs ──
   getActiveRun(runId: string): ActiveRun | undefined {
@@ -113,14 +117,13 @@ class RunRegistry {
   }
 
   /**
-   * Clear all in-flight run state (abortAllRuns / shutdown). Clears all three
-   * maps atomically since activeRuns + activeRunIdsBySession + pendingRunSessions
-   * are always cleared together.
+   * Clear all in-flight run and maintenance state (abortAllRuns / shutdown).
    */
   clearAll(): void {
     this.activeRuns.clear()
     this.activeRunIdsBySession.clear()
     this.pendingRunSessions.clear()
+    this.sessionMaintenance.clear()
   }
 
   // ── session → active run (single-flight index) ──
@@ -155,6 +158,33 @@ class RunRegistry {
 
   hasPendingRun(sessionId: string): boolean {
     return this.pendingRunSessions.has(sessionId)
+  }
+
+  // ── short-lived exclusive session maintenance ──
+  claimSessionMaintenance(sessionId: string, kind: SessionMaintenanceKind): boolean {
+    if (
+      this.activeRunIdsBySession.has(sessionId)
+      || this.pendingRunSessions.has(sessionId)
+      || this.sessionMaintenance.has(sessionId)
+    ) {
+      return false
+    }
+    this.sessionMaintenance.set(sessionId, kind)
+    return true
+  }
+
+  releaseSessionMaintenance(sessionId: string, kind: SessionMaintenanceKind): void {
+    if (this.sessionMaintenance.get(sessionId) === kind) {
+      this.sessionMaintenance.delete(sessionId)
+    }
+  }
+
+  getSessionMaintenance(sessionId: string): SessionMaintenanceKind | undefined {
+    return this.sessionMaintenance.get(sessionId)
+  }
+
+  hasSessionMaintenance(sessionId: string): boolean {
+    return this.sessionMaintenance.has(sessionId)
   }
 }
 

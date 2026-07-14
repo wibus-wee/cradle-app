@@ -27,110 +27,210 @@ export interface RollbackLastTurnDto {
 
 export interface RollbackLastTurnDeps {
   finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
+  scheduleSessionQueueDrain: (sessionId: string) => void
 }
+
+export interface RollbackTurnsOptions {
+  beforeProviderRollback?: () => Promise<void>
+  afterRollback?: (result: RollbackLastTurnDto) => Promise<void>
+}
+
+export type RollbackLastTurnOptions = RollbackTurnsOptions
 
 export async function rollbackLastTurn(
   sessionId: string,
   deps: RollbackLastTurnDeps,
+  options: RollbackTurnsOptions = {},
 ): Promise<RollbackLastTurnDto> {
-  await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(sessionId)
+  return rollbackTurns(sessionId, 1, deps, options)
+}
 
-  if (runRegistry.hasActiveRunForSession(sessionId) || runRegistry.hasPendingRun(sessionId)) {
+export async function rollbackTurns(
+  sessionId: string,
+  numTurns: number,
+  deps: RollbackLastTurnDeps,
+  options: RollbackTurnsOptions = {},
+): Promise<RollbackLastTurnDto> {
+  if (!Number.isInteger(numTurns) || numTurns < 1) {
     throw new AppError({
-      code: 'chat_rollback_run_in_progress',
-      status: 409,
-      message: 'Chat session has an active or pending run',
-      details: { sessionId },
+      code: 'chat_rollback_invalid_turn_count',
+      status: 400,
+      message: 'Rollback turn count must be a positive integer',
+      details: { sessionId, numTurns },
     })
   }
 
-  const queue = readBlockingQueueCounts(sessionId)
-  if (queue.pending > 0 || queue.running > 0) {
-    throw new AppError({
-      code: 'chat_rollback_queue_in_progress',
-      status: 409,
-      message: 'Chat session has pending or running queue items',
-      details: { sessionId, queue },
-    })
-  }
-
-  const tailRows = readLastTopLevelUserTurnTail(sessionId)
-  const streamingMessage = tailRows.find(row => row.status === 'streaming')
-  if (streamingMessage) {
-    throw new AppError({
-      code: 'chat_rollback_streaming_tail',
-      status: 409,
-      message: 'Cannot roll back a streaming chat turn',
-      details: { sessionId, messageId: streamingMessage.id },
-    })
-  }
-
-  const resolved = await resolveRuntimeSessionContext(sessionId)
-  cancelPendingRuntimeGoalContinuation(sessionId)
-  const messageIds = tailRows.map(row => row.id)
-  const providerResult = shouldRollbackProviderTurn(tailRows)
-    ? await rollbackProviderLastTurn(sessionId, resolved)
-    : {
-        runtimeKind: resolved.runtimeKind,
-        providerSessionId: resolved.runtimeSession.providerSessionId,
-        rolledBackTurns: 0,
-        fileChangesReverted: false as const,
-      }
-
+  claimRollbackSession(sessionId)
   try {
-    await commitLastTurnRolledBack({
+    await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(sessionId)
+
+    const queue = readBlockingQueueCounts(sessionId)
+    if (queue.pending > 0 || queue.running > 0) {
+      throw new AppError({
+        code: 'chat_rollback_queue_in_progress',
+        status: 409,
+        message: 'Chat session has pending or running queue items',
+        details: { sessionId, queue },
+      })
+    }
+
+    const tailRows = readTopLevelUserTurnTail(sessionId, numTurns)
+    const streamingMessage = tailRows.find(row => row.status === 'streaming')
+    if (streamingMessage) {
+      throw new AppError({
+        code: 'chat_rollback_streaming_tail',
+        status: 409,
+        message: 'Cannot roll back a streaming chat turn',
+        details: { sessionId, messageId: streamingMessage.id },
+      })
+    }
+
+    const resolved = await resolveRuntimeSessionContext(sessionId)
+    const providerTurnCount = countProviderTurns(tailRows)
+    if (providerTurnCount > 0) {
+      readProviderRollback(sessionId, resolved)
+    }
+    await options.beforeProviderRollback?.()
+    cancelPendingRuntimeGoalContinuation(sessionId)
+
+    const messageIds = tailRows.map(row => row.id)
+    const providerResult = providerTurnCount > 0
+      ? await rollbackProviderTurns(sessionId, resolved, providerTurnCount)
+      : {
+          runtimeKind: resolved.runtimeKind,
+          providerSessionId: resolved.runtimeSession.providerSessionId,
+          rolledBackTurns: 0,
+          fileChangesReverted: false as const,
+        }
+
+    try {
+      await commitLastTurnRolledBack({
+        sessionId,
+        messageIds,
+        providerRuntimeKind: providerResult.runtimeKind,
+        providerSessionId: providerResult.providerSessionId,
+        providerRolledBackTurns: providerResult.rolledBackTurns,
+        fileChangesReverted: providerResult.fileChangesReverted,
+      })
+    }
+    catch (error) {
+      throw new AppError({
+        code: 'chat_rollback_projection_failed',
+        status: 500,
+        message:
+          'Provider rollback succeeded, but Cradle failed to record the transcript rollback. The session may need recovery.',
+        details: {
+          sessionId,
+          messageIds,
+          runtimeKind: providerResult.runtimeKind,
+          providerSessionId: providerResult.providerSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+
+    attachBinding({
+      sessionId,
+      providerTargetId: resolved.context.providerTarget?.id ?? null,
+      runtimeKind: resolved.runtimeSession.runtimeKind,
+      runtimeSession: resolved.runtimeSession,
+      requestedModelId: resolved.modelId ?? null,
+    })
+
+    const result: RollbackLastTurnDto = {
+      ok: true,
       sessionId,
       messageIds,
       providerRuntimeKind: providerResult.runtimeKind,
       providerSessionId: providerResult.providerSessionId,
       providerRolledBackTurns: providerResult.rolledBackTurns,
       fileChangesReverted: providerResult.fileChangesReverted,
-    })
+    }
+    await options.afterRollback?.(result)
+    return result
   }
- catch (error) {
-    throw new AppError({
-      code: 'chat_rollback_projection_failed',
-      status: 500,
-      message:
-        'Provider rollback succeeded, but Cradle failed to record the transcript rollback. The session may need recovery.',
-      details: {
-        sessionId,
-        messageIds,
-        runtimeKind: providerResult.runtimeKind,
-        providerSessionId: providerResult.providerSessionId,
-        error: error instanceof Error ? error.message : String(error),
-      },
-    })
-  }
-
-  attachBinding({
-    sessionId,
-    providerTargetId: resolved.context.providerTarget?.id ?? null,
-    runtimeKind: resolved.runtimeSession.runtimeKind,
-    runtimeSession: resolved.runtimeSession,
-    requestedModelId: resolved.modelId ?? null,
-  })
-
-  return {
-    ok: true,
-    sessionId,
-    messageIds,
-    providerRuntimeKind: providerResult.runtimeKind,
-    providerSessionId: providerResult.providerSessionId,
-    providerRolledBackTurns: providerResult.rolledBackTurns,
-    fileChangesReverted: providerResult.fileChangesReverted,
+  finally {
+    runRegistry.releaseSessionMaintenance(sessionId, 'rollback')
+    deps.scheduleSessionQueueDrain(sessionId)
   }
 }
 
-async function rollbackProviderLastTurn(
+function claimRollbackSession(sessionId: string): void {
+  if (runRegistry.claimSessionMaintenance(sessionId, 'rollback')) {
+    return
+  }
+  const maintenanceKind = runRegistry.getSessionMaintenance(sessionId)
+  if (maintenanceKind) {
+    throw new AppError({
+      code: 'chat_rollback_in_progress',
+      status: 409,
+      message: 'Chat session already has a rollback in progress',
+      details: { sessionId, maintenanceKind },
+    })
+  }
+  throw new AppError({
+    code: 'chat_rollback_run_in_progress',
+    status: 409,
+    message: 'Chat session has an active or pending run',
+    details: { sessionId },
+  })
+}
+
+async function rollbackProviderTurns(
   sessionId: string,
   resolved: Awaited<ReturnType<typeof resolveRuntimeSessionContext>>,
+  numTurns: number,
 ): Promise<{
   runtimeKind: string
   providerSessionId: string | null
   rolledBackTurns: number
   fileChangesReverted: false
 }> {
+  const rollback = readProviderRollback(sessionId, resolved)
+
+  try {
+    const result = await rollback.call(resolved.runtime, {
+      ...buildRuntimeProviderInput(resolved),
+      numTurns,
+    })
+    if (result.rolledBackTurns !== numTurns) {
+      throw new AppError({
+        code: 'chat_rollback_provider_count_mismatch',
+        status: 502,
+        message: 'The provider did not roll back the requested number of turns',
+        details: {
+          sessionId,
+          runtimeKind: resolved.runtimeKind,
+          providerSessionId: resolved.runtimeSession.providerSessionId,
+          requestedTurns: numTurns,
+          rolledBackTurns: result.rolledBackTurns,
+        },
+      })
+    }
+    return result
+  }
+  catch (error) {
+    if (error instanceof AppError) {
+      throw error
+    }
+    throw new AppError({
+      code: 'chat_rollback_provider_failed',
+      status: 502,
+      message: 'The provider failed to roll back the requested turns',
+      details: {
+        sessionId,
+        runtimeKind: resolved.runtimeKind,
+        providerSessionId: resolved.runtimeSession.providerSessionId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    })
+  }
+}
+
+function readProviderRollback(
+  sessionId: string,
+  resolved: Awaited<ReturnType<typeof resolveRuntimeSessionContext>>,
+) {
   if (
     !resolved.runtime.capabilities.supportsLastTurnRollback
     || !resolved.runtime.rollbackLastTurn
@@ -142,26 +242,7 @@ async function rollbackProviderLastTurn(
       details: { sessionId, runtimeKind: resolved.runtimeKind },
     })
   }
-
-  try {
-    return await resolved.runtime.rollbackLastTurn(buildRuntimeProviderInput(resolved))
-  }
-  catch (error) {
-    if (error instanceof AppError) {
-      throw error
-    }
-    throw new AppError({
-      code: 'chat_rollback_provider_failed',
-      status: 502,
-      message: 'The provider failed to roll back the last turn',
-      details: {
-        sessionId,
-        runtimeKind: resolved.runtimeKind,
-        providerSessionId: resolved.runtimeSession.providerSessionId,
-        error: error instanceof Error ? error.message : String(error),
-      },
-    })
-  }
+  return resolved.runtime.rollbackLastTurn
 }
 
 export function shouldRollbackProviderTurn(tailRows: (typeof messages.$inferSelect)[]): boolean {
@@ -172,6 +253,23 @@ export function shouldRollbackProviderTurn(tailRows: (typeof messages.$inferSele
       || row.content.trim().length > 0
       || hasNonEmptyMessageParts(row.messageJson)
     ))
+}
+
+export function countProviderTurns(tailRows: (typeof messages.$inferSelect)[]): number {
+  let count = 0
+  let turnStart = 0
+  for (let index = 1; index <= tailRows.length; index += 1) {
+    const row = tailRows[index]
+    const startsNextTurn = row?.role === 'user' && row.status === 'complete'
+    if (index < tailRows.length && !startsNextTurn) {
+      continue
+    }
+    if (shouldRollbackProviderTurn(tailRows.slice(turnStart, index))) {
+      count += 1
+    }
+    turnStart = index
+  }
+  return count
 }
 
 function hasNonEmptyMessageParts(messageJson: string): boolean {
@@ -207,7 +305,10 @@ function readBlockingQueueCounts(sessionId: string): { pending: number, running:
   )
 }
 
-function readLastTopLevelUserTurnTail(sessionId: string): (typeof messages.$inferSelect)[] {
+function readTopLevelUserTurnTail(
+  sessionId: string,
+  numTurns: number,
+): (typeof messages.$inferSelect)[] {
   assertStoredSession(sessionId)
   const rows = db()
     .select()
@@ -216,23 +317,22 @@ function readLastTopLevelUserTurnTail(sessionId: string): (typeof messages.$infe
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()
 
-  let lastUserIndex = -1
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
+  const userIndices: number[] = []
+  for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]
     if (row?.role === 'user' && row.status === 'complete') {
-      lastUserIndex = index
-      break
+      userIndices.push(index)
     }
   }
 
-  if (lastUserIndex < 0) {
+  if (userIndices.length < numTurns) {
     throw new AppError({
-      code: 'chat_rollback_no_turn',
+      code: 'chat_rollback_turn_count_out_of_range',
       status: 409,
-      message: 'Chat session has no completed user turn to roll back',
-      details: { sessionId },
+      message: 'Chat session does not contain enough completed turns to roll back',
+      details: { sessionId, requestedTurns: numTurns, availableTurns: userIndices.length },
     })
   }
 
-  return rows.slice(lastUserIndex)
+  return rows.slice(userIndices[userIndices.length - numTurns]!)
 }

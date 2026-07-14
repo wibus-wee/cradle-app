@@ -205,7 +205,12 @@ async function pumpRuntimeStream(
 ): Promise<RunStreamPumpResult> {
   let finalChunk: UIMessageChunk = { type: 'finish', finishReason: 'stop' }
   let failurePayload: SerializedChatError['payload'] | undefined
-  const onProviderSyntheticTurnEvent = createProviderSyntheticTurnEventHandler(activeRun)
+  const onProviderSyntheticTurnEvent = createProviderSyntheticTurnEventHandler(activeRun, {
+    stream: deps.stream,
+    publishTerminalChunk: deps.publishTerminalChunk,
+    releaseActiveRun: deps.releaseActiveRun,
+    scheduleQueueDrain: deps.scheduleQueueDrain,
+  })
 
   try {
     for await (const chunk of activeRun.runtime.streamTurn({
