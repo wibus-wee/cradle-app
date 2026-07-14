@@ -102,7 +102,7 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
           return
         }
 
-        if (error instanceof AppError && error.code === 'chat_run_in_progress') {
+        if (isDeferredQueueDrainError(error)) {
           await releaseClaimedQueueItem(sessionId, claimed.id)
           return
         }
@@ -121,6 +121,14 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
       scheduleSessionQueueDrain(sessionId, deps)
     }
   }
+}
+
+export function isDeferredQueueDrainError(error: unknown): boolean {
+  return error instanceof AppError
+    && (
+      error.code === 'chat_run_in_progress'
+      || error.code === 'chat_session_maintenance_in_progress'
+    )
 }
 
 async function claimQueueItem(sessionId: string, queueItemId: string) {
