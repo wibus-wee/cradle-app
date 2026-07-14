@@ -2,44 +2,35 @@ import { randomUUID } from 'node:crypto'
 
 import type { UIMessageChunk } from 'ai'
 
-import { currentUnixSeconds } from '../../../helpers/time'
-import { commitSessionEventsWithProjection, readRunStopReason, readRunTerminalEventType } from '../es/commands'
-import type { BackendRunStartedFact } from '../es/events'
-import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
-import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
-import type { ProviderSyntheticTurnEvent, RuntimeSession } from '../runtime-provider-types'
-import { attachBinding } from '../runtime-session-context'
-import { deleteRunStreamCheckpoint } from '../stream/checkpoint-store'
-import { providerThreadStreamStore } from '../stream/live-run-streams'
-import {
-  createAssistantMessage,
-  extractMessageText,
-  normalizeMessageSnapshot,
-} from '../ui-message'
-import type { FinalMessageProjectionRun } from './final-message-projection'
-import {
-  createFinalMessageProjectionState,
-  finalizeFinalMessageProjection,
-  flushProjectedToolInputs,
-  projectFinalMessageChunk,
-} from './final-message-projection'
-import { isTerminalUIMessageChunk, readTerminalStatus } from './stream-chunks'
+import type { ActiveRun } from '../run-registry'
+import { runRegistry } from '../run-registry'
+import type { ProviderSyntheticTurnEvent } from '../runtime-provider-types'
+import { providerThreadStreamStore, waitForRunCompletion } from '../stream/live-run-streams'
+import { createAssistantMessage } from '../ui-message'
+import { createFinalMessageProjectionState } from './final-message-projection'
+import { isTerminalUIMessageChunk } from './stream-chunks'
+import { startRun } from './turn-draft'
 
-interface ProviderSyntheticTurnState extends FinalMessageProjectionRun {
+interface ProviderSyntheticTurnHandlerDeps {
+  stream: {
+    publishRunStartChunk: (activeRun: ActiveRun) => void
+    publishRuntimeChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => void
+  }
+  publishTerminalChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => Promise<boolean>
+  releaseActiveRun: (activeRun: ActiveRun) => void
+  scheduleQueueDrain: (sessionId: string) => void
+}
+
+interface ProviderSyntheticTurnState {
   providerTurnId: string
-  providerThreadId: string | null
-  runId: string | null
-  sessionId: string
-  messageId: string
-  runtimeSession: RuntimeSession
-  providerTargetId: string | null
-  modelId: string | null
-  terminalStatus?: TerminalChatMessageStatus
+  providerThreadId: null
+  activeRun: ActiveRun
 }
 
 export function createProviderSyntheticTurnEventHandler(
-  activeRun: ActiveRun,
+  parentRun: ActiveRun,
+  deps: ProviderSyntheticTurnHandlerDeps,
 ): (event: ProviderSyntheticTurnEvent) => Promise<void> {
   const syntheticTurns = new Map<string, ProviderSyntheticTurnState>()
 
@@ -51,7 +42,7 @@ export function createProviderSyntheticTurnEventHandler(
     if (event.providerThreadId) {
       publishProviderThreadEvent({
         store: providerThreadStreamStore,
-        sessionId: activeRun.sessionId,
+        sessionId: parentRun.sessionId,
         event: {
           providerThreadId: event.providerThreadId,
           providerTurnId: event.providerTurnId,
@@ -66,26 +57,25 @@ export function createProviderSyntheticTurnEventHandler(
     let syntheticTurn = syntheticTurns.get(event.providerTurnId)
     try {
       if (!syntheticTurn) {
-        syntheticTurn = startProviderSyntheticTurn(activeRun, event)
+        syntheticTurn = await startProviderSyntheticTurn(parentRun, event)
         syntheticTurns.set(event.providerTurnId, syntheticTurn)
       }
 
       for (const chunk of event.chunks) {
-        await applyProviderSyntheticTurnChunk(syntheticTurn, chunk)
-        if (syntheticTurn.terminalStatus) {
+        await applyProviderSyntheticTurnChunk(syntheticTurn, chunk, deps)
+        if (syntheticTurn.activeRun.terminalStatus) {
           syntheticTurns.delete(event.providerTurnId)
           break
         }
       }
     }
- catch (error) {
-      if (syntheticTurn && !syntheticTurn.terminalStatus) {
+    catch (error) {
+      if (syntheticTurn && !syntheticTurn.activeRun.terminalStatus) {
         syntheticTurns.delete(event.providerTurnId)
         await finalizeProviderSyntheticTurn(
           syntheticTurn,
-          'failed',
-          error instanceof Error ? error.message : String(error),
           { type: 'error', errorText: error instanceof Error ? error.message : String(error) },
+          deps,
         )
       }
       throw error
@@ -93,151 +83,100 @@ export function createProviderSyntheticTurnEventHandler(
   }
 }
 
-function startProviderSyntheticTurn(
+async function startProviderSyntheticTurn(
   parentRun: ActiveRun,
   event: ProviderSyntheticTurnEvent,
-): ProviderSyntheticTurnState {
+): Promise<ProviderSyntheticTurnState> {
+  // The provider can emit the first background continuation immediately after closing the
+  // parent stream. Wait until the parent's terminal fact is durable before starting the next
+  // system run so the session aggregate never observes two concurrent top-level runs.
+  await waitForRunCompletion(parentRun.runId, { timeoutMs: null })
+
   const messageId = randomUUID()
   const assistantMessage = createAssistantMessage(messageId)
+  const run = await startRun({
+    sessionId: parentRun.sessionId,
+    messageId,
+    origin: 'system',
+    assistantMessage,
+  })
+  const activeRun: ActiveRun = {
+    runId: run.id,
+    sessionId: parentRun.sessionId,
+    messageId,
+    providerTargetKind: parentRun.providerTargetKind,
+    providerTargetId: parentRun.providerTargetId,
+    runtime: parentRun.runtime,
+    runtimeSession: parentRun.runtimeSession,
+    modelId: parentRun.modelId,
+    chunkBuffer: [],
+    chunkBufferIndexByKey: new Map(),
+    chunkBufferDroppedCount: 0,
+    pendingDeltaChunk: null,
+    pendingDeltaFlushTimer: null,
+    snapshotTimer: null,
+    finalMessage: assistantMessage,
+    finalProjection: createFinalMessageProjectionState(),
+    firstTokenDeltaSnapshotRecorded: false,
+    firstTextDeltaSnapshotRecorded: false,
+    lastStreamingSnapshotMessageJson: null,
+    pendingStreamingSnapshotMessageJson: null,
+    runtimeSettings: parentRun.runtimeSettings,
+    runSnapshotId: null,
+    runSnapshotSeq: 0,
+    snapshotEventIdByCoalesceKey: new Map(),
+    runSnapshotTruncatedEventId: null,
+    runSnapshotDroppedEventCount: 0,
+  }
+  runRegistry.setActiveRun(activeRun.runId, activeRun)
+  runRegistry.setActiveRunIdForSession(activeRun.sessionId, activeRun.runId)
 
   return {
     providerTurnId: event.providerTurnId,
-    providerThreadId: event.providerThreadId ?? null,
-    runId: null,
-    sessionId: parentRun.sessionId,
-    messageId,
-    runtimeSession: parentRun.runtimeSession,
-    providerTargetId: parentRun.providerTargetId,
-    modelId: parentRun.modelId,
-    finalMessage: assistantMessage,
-    finalProjection: createFinalMessageProjectionState(),
+    providerThreadId: null,
+    activeRun,
   }
 }
 
 async function applyProviderSyntheticTurnChunk(
   syntheticTurn: ProviderSyntheticTurnState,
   chunk: UIMessageChunk,
+  deps: ProviderSyntheticTurnHandlerDeps,
 ): Promise<void> {
-  if (syntheticTurn.terminalStatus) {
+  const activeRun = syntheticTurn.activeRun
+  if (activeRun.terminalStatus) {
     return
   }
 
-  if (!isTerminalUIMessageChunk(chunk)) {
-    projectFinalMessageChunk(syntheticTurn, chunk)
+  if (isTerminalUIMessageChunk(chunk)) {
+    await finalizeProviderSyntheticTurn(syntheticTurn, chunk, deps)
     return
   }
 
-  await finalizeProviderSyntheticTurn(
-    syntheticTurn,
-    readTerminalStatus(chunk),
-    chunk.type === 'error' ? chunk.errorText : null,
-    chunk,
-  )
+  if (chunk.type !== 'start') {
+    deps.stream.publishRunStartChunk(activeRun)
+  }
+  if (chunk.type === 'start' && activeRun.startChunkPublished) {
+    return
+  }
+  deps.stream.publishRuntimeChunk(activeRun, chunk)
 }
 
 async function finalizeProviderSyntheticTurn(
   syntheticTurn: ProviderSyntheticTurnState,
-  status: TerminalChatMessageStatus,
-  errorText: string | null,
   terminalChunk: UIMessageChunk,
+  deps: ProviderSyntheticTurnHandlerDeps,
 ): Promise<void> {
-  if (syntheticTurn.terminalStatus) {
+  const activeRun = syntheticTurn.activeRun
+  if (activeRun.terminalStatus) {
     return
   }
-  syntheticTurn.terminalStatus = status
-  projectFinalMessageChunk(syntheticTurn, terminalChunk)
-  finalizeFinalMessageProjection(syntheticTurn)
-  await flushProjectedToolInputs(syntheticTurn)
 
-  const bindingId = recordProviderSyntheticTurnBindingId(syntheticTurn)
-  const now = currentUnixSeconds()
-  const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(syntheticTurn.finalMessage))
-  const messageJson = JSON.stringify(message)
-  const run = {
-    id: randomUUID(),
-    bindingId: bindingId ?? null,
-    chatSessionId: syntheticTurn.sessionId,
-    messageId: syntheticTurn.messageId,
-    origin: 'system',
-    status: 'streaming',
-    stopReason: null,
-    errorText: null,
-    startedAt: now,
-    finishedAt: null,
-  } satisfies BackendRunStartedFact
-  syntheticTurn.runId = run.id
-  await commitSessionEventsWithProjection(
-    syntheticTurn.sessionId,
-    [
-      {
-        type: 'RunStarted',
-        payload: {
-          run,
-          assistantMessage: {
-            id: syntheticTurn.messageId,
-            sessionId: syntheticTurn.sessionId,
-            parentMessageId: null,
-            parentToolCallId: null,
-            taskId: null,
-            depth: 0,
-            role: 'assistant',
-            status: 'streaming',
-            content: extractMessageText(message),
-            messageJson,
-            errorText: null,
-            createdAt: now,
-            updatedAt: now,
-          },
-          queueItemId: null,
-        },
-      },
-      {
-        type: 'AssistantMessageCompleted',
-        payload: {
-          message: {
-            id: syntheticTurn.messageId,
-            sessionId: syntheticTurn.sessionId,
-            content: extractMessageText(message),
-            messageJson,
-            status,
-            errorText,
-            updatedAt: now,
-          },
-        },
-      },
-      {
-        type: readRunTerminalEventType(status),
-        payload: {
-          runId: run.id,
-          sessionId: syntheticTurn.sessionId,
-          queueItemId: null,
-          ...(bindingId !== undefined ? { bindingId } : {}),
-          status,
-          stopReason: readRunStopReason(status),
-          errorText,
-          finishedAt: now,
-        },
-      },
-    ],
-    (tx) => {
-      deleteRunStreamCheckpoint(run.id, tx)
-    },
-  )
-}
-
-function recordProviderSyntheticTurnBindingId(
-  syntheticTurn: ProviderSyntheticTurnState,
-): string | undefined {
   try {
-    return attachBinding({
-      sessionId: syntheticTurn.sessionId,
-      providerTargetId: syntheticTurn.providerTargetId,
-      runtimeKind: syntheticTurn.runtimeSession.runtimeKind,
-      runtimeSession: syntheticTurn.runtimeSession,
-      requestedModelId: syntheticTurn.modelId,
-    })?.id
+    await deps.publishTerminalChunk(activeRun, terminalChunk)
   }
- catch {
-    return undefined
+  finally {
+    deps.releaseActiveRun(activeRun)
+    deps.scheduleQueueDrain(activeRun.sessionId)
   }
 }

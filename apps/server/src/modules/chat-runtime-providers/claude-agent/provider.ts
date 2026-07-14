@@ -134,7 +134,8 @@ type ActiveClaudeQuery = {
   providerTargetId: string
   releaseLiveRuntimeSession: () => void
   currentTurn: ActiveClaudeTurn | null
-  syntheticTurn: ActiveClaudeSyntheticTurn | null
+  mainSyntheticTurn: ActiveClaudeSyntheticTurn | null
+  providerThreadSyntheticTurns: Map<string, ActiveClaudeSyntheticTurn>
   providerThreadTurns: Map<string, ActiveClaudeProviderThreadTurn>
   completedProviderThreadParentOutputIds: Set<string>
   onProviderSyntheticTurnEvent: StreamTurnInput['onProviderSyntheticTurnEvent'] | null
@@ -536,7 +537,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
         providerTargetId: profile.providerTargetId,
         releaseLiveRuntimeSession: () => undefined,
         currentTurn: null,
-        syntheticTurn: null,
+        mainSyntheticTurn: null,
+        providerThreadSyntheticTurns: new Map(),
         providerThreadTurns: new Map(),
         completedProviderThreadParentOutputIds: new Set(),
         onProviderSyntheticTurnEvent: null,
@@ -580,7 +582,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       )
     }
     else {
-      await this.completeClaudeSyntheticTurn(activeEntry)
+      await this.completeClaudeSyntheticTurns(activeEntry)
       await this.updateActiveQueryPermissionMode({
         runtimeSession: input.runtimeSession,
         mode: turnPermissionMode,
@@ -741,7 +743,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         turn.queue.close()
         entry.currentTurn = null
       }
-      await this.completeClaudeSyntheticTurn(entry)
+      await this.completeClaudeSyntheticTurns(entry)
       entry.closed = true
       entry.nativeFollowUps.clear()
       entry.preAdoptBuffer = []
@@ -1012,11 +1014,33 @@ export class ClaudeAgentProvider implements ChatRuntime {
   }
 
   private async handleClaudeSyntheticSessionMessage(entry: ActiveClaudeQuery, message: SDKMessage): Promise<void> {
-    if (!shouldRouteClaudeMessageToSyntheticTurn(entry, message)) {
+    const providerThreadId = readClaudeMessageParentToolUseId(message)
+    if (providerThreadId) {
+      const syntheticTurn = this.ensureClaudeProviderThreadSyntheticTurn(entry, providerThreadId)
+      if (!syntheticTurn) {
+        return
+      }
+
+      const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(message, syntheticTurn.mapperState)
+      await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
+      if (message.type === 'result') {
+        entry.providerThreadSyntheticTurns.delete(providerThreadId)
+      }
       return
     }
 
-    const syntheticTurn = this.ensureClaudeSyntheticTurn(entry, message)
+    // Task lifecycle notifications update Cradle's provider-owned crew/task snapshots above.
+    // They do not own the main Claude conversation. In particular, `task_id` identifies the
+    // completed background task, not the assistant turn that Claude may generate afterwards.
+    if (readClaudeSystemSyntheticEventKind(message)) {
+      return
+    }
+
+    if (!shouldRouteClaudeMessageToMainSyntheticTurn(entry, message)) {
+      return
+    }
+
+    const syntheticTurn = this.ensureClaudeMainSyntheticTurn(entry)
     if (!syntheticTurn) {
       return
     }
@@ -1024,16 +1048,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(message, syntheticTurn.mapperState)
     await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
     if (message.type === 'result') {
-      entry.syntheticTurn = null
+      entry.mainSyntheticTurn = null
     }
   }
 
-  private ensureClaudeSyntheticTurn(
+  private ensureClaudeMainSyntheticTurn(
     entry: ActiveClaudeQuery,
-    message: SDKMessage,
   ): ActiveClaudeSyntheticTurn | null {
-    if (entry.syntheticTurn) {
-      return entry.syntheticTurn
+    if (entry.mainSyntheticTurn) {
+      return entry.mainSyntheticTurn
     }
     const onProviderSyntheticTurnEvent = entry.onProviderSyntheticTurnEvent
     if (!onProviderSyntheticTurnEvent) {
@@ -1042,24 +1065,50 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     const syntheticTurn: ActiveClaudeSyntheticTurn = {
       providerTurnId: `claude-synthetic-${randomUUID()}`,
-      providerThreadId: readClaudeSyntheticProviderThreadId(message),
+      providerThreadId: null,
       mapperState: createClaudeAgentChunkMapperState(undefined, entry.taskLaunchesById),
       onProviderSyntheticTurnEvent,
     }
-    entry.syntheticTurn = syntheticTurn
+    entry.mainSyntheticTurn = syntheticTurn
     return syntheticTurn
   }
 
-  private async completeClaudeSyntheticTurn(entry: ActiveClaudeQuery): Promise<void> {
-    const syntheticTurn = entry.syntheticTurn
-    if (!syntheticTurn) {
-      return
+  private ensureClaudeProviderThreadSyntheticTurn(
+    entry: ActiveClaudeQuery,
+    providerThreadId: string,
+  ): ActiveClaudeSyntheticTurn | null {
+    const existing = entry.providerThreadSyntheticTurns.get(providerThreadId)
+    if (existing) {
+      return existing
+    }
+    const onProviderSyntheticTurnEvent = entry.onProviderSyntheticTurnEvent
+    if (!onProviderSyntheticTurnEvent) {
+      return null
     }
 
-    await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, [
-      providerChunk.finish('stop'),
-    ])
-    entry.syntheticTurn = null
+    const syntheticTurn: ActiveClaudeSyntheticTurn = {
+      providerTurnId: `claude-synthetic-${randomUUID()}`,
+      providerThreadId,
+      mapperState: createClaudeAgentChunkMapperState(undefined, entry.taskLaunchesById),
+      onProviderSyntheticTurnEvent,
+    }
+    entry.providerThreadSyntheticTurns.set(providerThreadId, syntheticTurn)
+    return syntheticTurn
+  }
+
+  private async completeClaudeSyntheticTurns(entry: ActiveClaudeQuery): Promise<void> {
+    const syntheticTurns = [
+      ...(entry.mainSyntheticTurn ? [entry.mainSyntheticTurn] : []),
+      ...entry.providerThreadSyntheticTurns.values(),
+    ]
+    entry.mainSyntheticTurn = null
+    entry.providerThreadSyntheticTurns.clear()
+
+    for (const syntheticTurn of syntheticTurns) {
+      await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, [
+        providerChunk.finish('stop'),
+      ])
+    }
   }
 
   private async publishClaudeSyntheticTurnEvent(
@@ -1778,23 +1827,16 @@ function readTerminalProviderThreadErrorText(chunks: UIMessageChunk[]): string |
   return error?.errorText ?? null
 }
 
-function shouldRouteClaudeMessageToSyntheticTurn(entry: ActiveClaudeQuery, message: SDKMessage): boolean {
+function shouldRouteClaudeMessageToMainSyntheticTurn(entry: ActiveClaudeQuery, message: SDKMessage): boolean {
   if (entry.currentTurn) {
     return false
   }
-  if (entry.syntheticTurn) {
+  if (entry.mainSyntheticTurn) {
     return true
   }
   if (message.type === 'result') {
     return false
   }
-  if (readClaudeMessageParentToolUseId(message)) {
-    return true
-  }
-  if (readClaudeSystemSyntheticEventKind(message)) {
-    return true
-  }
-
   switch (message.type as string) {
     case 'assistant':
     case 'stream_event':
@@ -1818,18 +1860,6 @@ function readClaudeSystemSyntheticEventKind(message: SDKMessage): string | null 
     default:
       return null
   }
-}
-
-function readClaudeSyntheticProviderThreadId(message: SDKMessage): string | null {
-  const parentToolUseId = readClaudeMessageParentToolUseId(message)
-  if (parentToolUseId) {
-    return parentToolUseId
-  }
-  if (!('task_id' in message)) {
-    return null
-  }
-  const taskId = (message as { task_id?: unknown }).task_id
-  return typeof taskId === 'string' && taskId.length > 0 ? taskId : null
 }
 
 function normalizeClaudeSessionTitle(title: string | null | undefined): string | null {
