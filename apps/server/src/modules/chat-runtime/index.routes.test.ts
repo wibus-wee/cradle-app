@@ -99,6 +99,8 @@ describe('chat runtime route composition', () => {
         draft: {
           text: 'Draft question',
           contextParts: [],
+          files: [],
+          pastedTexts: [],
         },
       }),
     }))
@@ -110,7 +112,7 @@ describe('chat runtime route composition', () => {
 
     expect(writeResponse.status).toBe(200)
     expect(written).toEqual(expect.objectContaining({
-      draft: { text: 'Draft question', contextParts: [] },
+      draft: { text: 'Draft question', contextParts: [], files: [], pastedTexts: [] },
       revision: 1,
       deletedAt: null,
     }))
@@ -119,7 +121,7 @@ describe('chat runtime route composition', () => {
     const read = await readResponse.json() as typeof written
 
     expect(readResponse.status).toBe(200)
-    expect(read.draft).toEqual({ text: 'Draft question', contextParts: [] })
+    expect(read.draft).toEqual({ text: 'Draft question', contextParts: [], files: [], pastedTexts: [] })
 
     const deleteResponse = await app.handle(new Request(`http://localhost/chat/composer-drafts/${surfaceId}`, {
       method: 'DELETE',
