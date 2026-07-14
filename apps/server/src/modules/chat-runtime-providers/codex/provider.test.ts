@@ -851,7 +851,7 @@ describe('codexProvider app-server integration', () => {
     })
   })
 
-  it('rolls back exactly one Codex thread turn without forking', async () => {
+  it('rolls back multiple Codex thread turns without forking', async () => {
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)
 
@@ -860,10 +860,11 @@ describe('codexProvider app-server integration', () => {
       profile: createProfile(),
       workspaceId: 'workspace-1',
       workspacePath: '/tmp/cradle-workspace',
+      numTurns: 3,
     })).resolves.toMatchObject({
       runtimeKind: 'codex',
       providerSessionId: 'codex-thread-1',
-      rolledBackTurns: 1,
+      rolledBackTurns: 3,
       fileChangesReverted: false,
     })
 
@@ -872,7 +873,7 @@ describe('codexProvider app-server integration', () => {
         method: 'thread/rollback',
         params: {
           threadId: 'codex-thread-1',
-          numTurns: 1,
+          numTurns: 3,
         },
       },
     ])

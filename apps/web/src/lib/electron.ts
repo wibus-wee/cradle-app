@@ -285,6 +285,12 @@ export function readDesktopChatEventTailBridge(): DesktopChatEventTailBridge | n
 
 // ── IPC Proxy (typed) ─────────────────────────────────────────────────────────
 
+export interface AvailableEditor {
+  id: string
+  label: string
+  iconDataUrl?: string
+}
+
 interface NativeServiceMethods {
   showOpenDialog: (options: {
     title?: string
@@ -302,7 +308,8 @@ interface NativeServiceMethods {
   openExternal: (url: string) => Promise<void>
   openPath: (fullPath: string) => Promise<void>
   showItemInFolder: (fullPath: string) => Promise<void>
-  openPathInEditor: (fullPath: string) => Promise<{ editor: string }>
+  openPathInEditor: (fullPath: string, editorId?: string) => Promise<{ editor: string }>
+  listAvailableEditors: () => Promise<AvailableEditor[]>
   openPathInTerminal: (fullPath: string) => Promise<{ terminal: string }>
   getCradleDataPaths: () => Promise<{
     userDataPath: string

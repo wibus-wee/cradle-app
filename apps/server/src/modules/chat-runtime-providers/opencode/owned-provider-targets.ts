@@ -22,26 +22,21 @@ export const OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS = {
     now: input.now,
   }),
   listProviderTargets: async (input) => {
-    try {
-      const { listOpencodeRuntimeProviderGroups } = await import('./model-inventory')
-      const groups = await listOpencodeRuntimeProviderGroups({
-        runtimeKind: input.runtimeKind,
-        workspacePath: input.workspacePath,
+    const { listOpencodeRuntimeProviderGroups } = await import('./model-inventory')
+    const groups = await listOpencodeRuntimeProviderGroups({
+      runtimeKind: input.runtimeKind,
+      workspacePath: input.workspacePath,
+    })
+    return groups.flatMap((group) => {
+      const target = projectOpencodeRuntimeOwnedProviderTarget({
+        providerTargetId: group.id,
+        now: input.now,
+        displayName: `OpenCode / ${group.label}`,
+        providerKind: group.providerKind,
+        externalRecordId: group.nativeProviderId,
       })
-      return groups.flatMap((group) => {
-        const target = projectOpencodeRuntimeOwnedProviderTarget({
-          providerTargetId: group.id,
-          now: input.now,
-          displayName: `OpenCode / ${group.label}`,
-          providerKind: group.providerKind,
-          externalRecordId: group.nativeProviderId,
-        })
-        return target ? [target] : []
-      })
-    }
-    catch {
-      return []
-    }
+      return target ? [target] : []
+    })
   },
   listModelsForProviderTarget: async (input) => {
     const { listOpencodeRuntimeModelsForProviderTarget } = await import('./model-inventory')

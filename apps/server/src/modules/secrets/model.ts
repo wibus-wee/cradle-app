@@ -28,6 +28,10 @@ export const SecretsModel = {
     id: t.String({ minLength: 1 }),
   }),
 
+  revealedSecret: t.Object({
+    secret: t.String(),
+  }),
+
   saveBody: t.Object({
     kind: t.String({ minLength: 1 }),
     label: t.String({ minLength: 1 }),

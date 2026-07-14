@@ -25,7 +25,10 @@ import { register as registerAutomationGet } from './automation/get'
 import { register as registerAutomationList } from './automation/list'
 import { register as registerAutomationRun } from './automation/run'
 import { register as registerAutomationRunGet } from './automation/run/get'
+import { register as registerAutomationRunStop } from './automation/run/stop'
+import { register as registerAutomationRunTriage } from './automation/run/triage'
 import { register as registerAutomationRuns } from './automation/runs'
+import { register as registerAutomationTriageList } from './automation/triage/list'
 import { register as registerAutomationUpdate } from './automation/update'
 import { register as registerBackgroundJobCancel } from './background-job/cancel'
 import { register as registerBackgroundJobGet } from './background-job/get'
@@ -173,6 +176,7 @@ import { register as registerPreferencesDesktopGet } from './preferences/desktop
 import { register as registerPreferencesDesktopSet } from './preferences/desktop/set'
 import { register as registerPreferencesJarvisGet } from './preferences/jarvis/get'
 import { register as registerPreferencesJarvisSet } from './preferences/jarvis/set'
+import { register as registerPreferencesKeybindingsGet } from './preferences/keybindings/get'
 import { register as registerProfileCustomModels } from './profile/custom-models'
 import { register as registerProfileDelete } from './profile/delete'
 import { register as registerProfileGet } from './profile/get'
@@ -342,7 +346,10 @@ export function registerGeneratedCommands(program: Command): void {
   registerAutomationList(program)
   registerAutomationRun(program)
   registerAutomationRunGet(program)
+  registerAutomationRunStop(program)
+  registerAutomationRunTriage(program)
   registerAutomationRuns(program)
+  registerAutomationTriageList(program)
   registerAutomationUpdate(program)
   registerBackgroundJobCancel(program)
   registerBackgroundJobGet(program)
@@ -490,6 +497,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerPreferencesDesktopSet(program)
   registerPreferencesJarvisGet(program)
   registerPreferencesJarvisSet(program)
+  registerPreferencesKeybindingsGet(program)
   registerProfileCustomModels(program)
   registerProfileDelete(program)
   registerProfileGet(program)

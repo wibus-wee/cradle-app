@@ -36,6 +36,7 @@ import {
   projectRuntimeOwnedProviderTarget,
   readRuntimeOwnedProviderTargetOwner,
   readRuntimeUniversalProviderKind,
+  runtimeOwnsProviderBinding,
   runtimeSupportsProviderKind,
 } from '../provider-contracts/runtime-compatibility'
 import type { ModelCapabilities, ProviderKind, RuntimeKind } from '../provider-contracts/types'
@@ -291,14 +292,14 @@ export async function listProviderTargets(input: ListProviderTargetsInput = {}):
     return rows
   }
   const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
-  return [
-    ...rows,
-    ...await listRuntimeOwnedProviderTargets({
-      runtimeKind: input.runtimeKind,
-      workspacePath,
-      now: nowUnix(),
-    }),
-  ]
+  const runtimeOwnedTargets = await listRuntimeOwnedProviderTargets({
+    runtimeKind: input.runtimeKind,
+    workspacePath,
+    now: nowUnix(),
+  })
+  return runtimeOwnsProviderBinding(input.runtimeKind)
+    ? runtimeOwnedTargets
+    : [...rows, ...runtimeOwnedTargets]
 }
 
 export function getProviderTarget(id: string): ProviderTargetRow | null {
@@ -543,6 +544,17 @@ export function assertProviderTargetCompatibleWithRuntime(
         providerTargetId,
         runtimeKind,
         owningRuntimeKind,
+      },
+    })
+  }
+  if (runtimeOwnsProviderBinding(runtimeKind)) {
+    throw new AppError({
+      code: 'invalid_provider_target',
+      status: 400,
+      message: 'Runtime only supports runtime-owned provider targets',
+      details: {
+        providerTargetId,
+        runtimeKind,
       },
     })
   }
