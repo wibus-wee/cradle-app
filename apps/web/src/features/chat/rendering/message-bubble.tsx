@@ -21,7 +21,11 @@ import { readChatContinuationMetadata } from '../capabilities/chat-continuation-
 import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
 import { BangCommandBlock, BangCommandPromptBlock } from './blocks/bang-command-block'
 import { ReasoningBlock } from './blocks/reasoning-block'
-import type { ChatRenderItem, ChatRenderSegment } from './chat-render-plan'
+import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
+import type {
+  ChatRenderItem,
+  ChatRenderSegment,
+} from './chat-render-plan'
 import {
   groupMessageParts,
   splitExecutionPhase,
@@ -65,6 +69,7 @@ import {
   MessageFilePartById,
   MessagePluginContextPartById,
   MessageReasoningPartById,
+  MessageRuntimeWarningPartById,
   MessageSkillContextPartById,
   MessageTextPartById,
 } from './message-part-blocks'
@@ -430,6 +435,14 @@ const MessageSegmentView = ({
     case 'file-line-comment-context':
       return (
         <MessageFileLineCommentContextPartById
+          sessionId={sessionId}
+          messageId={segment.messageId}
+          partIndex={segment.partIndex}
+        />
+      )
+    case 'runtime-warning':
+      return (
+        <MessageRuntimeWarningPartById
           sessionId={sessionId}
           messageId={segment.messageId}
           partIndex={segment.partIndex}
@@ -879,6 +892,8 @@ function MessageBubbleView({
         return <SkillContextBlock key={item.key} part={item.part} />
       case 'plugin-context':
         return <PluginContextBlock key={item.key} part={item.part} />
+      case 'runtime-warning':
+        return <RuntimeWarningBlock key={item.key} warning={item.part.data} />
 
       default:
         return null

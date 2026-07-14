@@ -3,6 +3,7 @@ import { Streamdown } from '@cradle/streamdown'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
 import { ReasoningBlock } from './blocks/reasoning-block'
+import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
 import { useChatRenderStore } from './chat-render-store'
 import { MarkdownFileLink } from './markdown-file-link'
 import {
@@ -19,6 +20,7 @@ import {
   readMarkdownAnchorProps,
   readPluginContextPartFromState,
   readReasoningPartFromState,
+  readRuntimeWarningPartFromState,
   readSkillContextPartFromState,
   readTextPartFromState,
   readUserDisplayText,
@@ -159,3 +161,18 @@ export const MessageFileLineCommentContextPartById = ({
   return <FileLineCommentContextBlock part={part} />
 }
 MessageFileLineCommentContextPartById.displayName = 'MessageFileLineCommentContextPartById'
+
+export const MessageRuntimeWarningPartById = ({
+  sessionId,
+  messageId,
+  partIndex,
+}: {
+  sessionId: string
+  messageId: string
+  partIndex: number
+}) => {
+  const part = useChatRenderStore(state =>
+    readRuntimeWarningPartFromState(state, sessionId, messageId, partIndex))
+  return part ? <RuntimeWarningBlock warning={part.data} /> : null
+}
+MessageRuntimeWarningPartById.displayName = 'MessageRuntimeWarningPartById'
