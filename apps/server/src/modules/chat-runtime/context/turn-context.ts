@@ -7,8 +7,6 @@ import { readTrustedAgentRuntimeConfig } from '../../../helpers/agent-runtime-co
 import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { getSystemWorkflow } from '../../../helpers/system-workflow'
 import { db } from '../../../infra'
-import * as PullRequest from '../../pull-request/service'
-import * as SessionAwait from '../../session-await/service'
 import type { CradleTurnTranscript } from '../transcript'
 import { resolveCradleTurnTranscript } from '../transcript'
 
@@ -70,7 +68,6 @@ function resolvePrimaryWorkPrompt(session: Session): string | undefined {
   const work = db()
     .select({
       id: works.id,
-      objective: works.objective,
     })
     .from(workThreads)
     .innerJoin(works, eq(works.id, workThreads.workId))
@@ -80,37 +77,8 @@ function resolvePrimaryWorkPrompt(session: Session): string | undefined {
     return undefined
   }
 
-  const pullRequest = PullRequest.getBoundPullRequest(session.id)
-  const awaits = SessionAwait.listBySession(session.id)
-
-  const lines = [
+  return [
     '## Cradle Work',
-    `Work ID: ${work.id}`,
-    `Title: ${session.title || work.id}`,
-    `Objective data: ${JSON.stringify(work.objective)}`,
-  ]
-
-  if (pullRequest) {
-    lines.push(
-      '',
-      `Draft PR: #${pullRequest.number} (${pullRequest.state}) ${pullRequest.url}`,
-      `PR Branch: ${pullRequest.headRef} -> ${pullRequest.baseRef}`,
-    )
-  }
-
-  if (awaits.length > 0) {
-    const pendingAwaits = awaits.filter(a => a.status === 'pending')
-    const triggeredAwaits = awaits.filter(a => a.status === 'triggered')
-    lines.push('')
-    if (pendingAwaits.length > 0) {
-      lines.push(`Session Awaits (pending): ${pendingAwaits.map(a => `${a.source}(${a.reason ?? 'no reason'})`).join(', ')}`)
-    }
-    if (triggeredAwaits.length > 0) {
-      lines.push(`Session Awaits (triggered): ${triggeredAwaits.map(a => a.source).join(', ')}`)
-    }
-  }
-
-  lines.push(
     '',
     '## CRITICAL',
     '',
@@ -127,14 +95,14 @@ function resolvePrimaryWorkPrompt(session: Session): string | undefined {
     '3. After `work_prepare` succeeds, wait for the user to review. Do NOT automatically submit.',
     '4. When the user requests submission, call `work submit` to create/update the Draft PR.',
     '5. After Draft PR creation, Cradle automatically registers Session Awaits for CI and review.',
-    '6. You will see the PR and Await status in your Work context above.',
+    '6. When current Work, PR, or Await state matters, inspect it on demand with `cradle work get <Work ID>`.',
     '7. Wait for CI and review results. Do NOT poll or manually check GitHub.',
     '8. When Session Awaits trigger (CI passed, review approved), the results will be delivered to this session.',
     '',
     'Do not run work submit, push, create or update a pull request, mark ready, or merge unless the user explicitly requests that action.',
-  )
-
-  return lines.join('\n')
+    '',
+    `Active Work ID: ${work.id}`,
+  ].join('\n')
 }
 
 export function resolveSessionSystemPrompt(session: Session | null | undefined): string | undefined {

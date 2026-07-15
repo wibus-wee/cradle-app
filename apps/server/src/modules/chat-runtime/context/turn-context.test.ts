@@ -1,4 +1,4 @@
-import { sessionGroups, sessions, works, workspaces, workThreads } from '@cradle/db'
+import { sessionAwaits, sessionGroups, sessions, works, workspaces, workThreads } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -49,6 +49,74 @@ describe('resolveSessionSystemPrompt Work context', () => {
     expect(prompt).toContain('Work Lifecycle')
     expect(prompt).toContain('After Draft PR creation, Cradle automatically registers Session Awaits')
     expect(prompt).not.toContain('/tmp/turn-context')
+    expect(prompt).not.toContain('Primary Work thread')
+    expect(prompt).not.toContain('Make checkout retries deterministic.')
+  })
+
+  it('keeps the Work system prompt stable when presentation and lifecycle state changes', () => {
+    db().insert(workspaces).values({
+      id: WORKSPACE_ID,
+      name: 'Turn Context Workspace',
+      locatorJson: serializeWorkspaceLocator(localWorkspaceLocator('/tmp/turn-context')),
+      identifier: 'TCT',
+    }).run()
+    db().insert(sessions).values({
+      id: 'stable-work-session',
+      workspaceId: WORKSPACE_ID,
+      title: 'Initial title',
+    }).run()
+    db().insert(works).values({
+      id: 'stable-work',
+      title: 'Initial title',
+      objective: 'Keep the prompt cacheable.',
+    }).run()
+    db().insert(workThreads).values({
+      workId: 'stable-work',
+      sessionId: 'stable-work-session',
+      role: 'primary',
+    }).run()
+
+    const initialSession = db().select().from(sessions).where(eq(sessions.id, 'stable-work-session')).get()!
+    const initialPrompt = resolveSessionSystemPrompt(initialSession)
+
+    db().update(sessions).set({
+      title: 'Provider-generated title',
+      titleSource: 'provider',
+      configJson: JSON.stringify({
+        github: {
+          pullRequest: {
+            owner: 'cradle',
+            repo: 'app',
+            number: 42,
+            url: 'https://github.com/cradle/app/pull/42',
+            title: 'Draft PR title',
+            isDraft: true,
+            state: 'open',
+            merged: false,
+            headRef: 'work/cache-stability',
+            baseRef: 'main',
+            headSha: 'abc123',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      }),
+    }).where(eq(sessions.id, 'stable-work-session')).run()
+    db().insert(sessionAwaits).values({
+      id: 'stable-work-await',
+      chatSessionId: 'stable-work-session',
+      workspaceId: WORKSPACE_ID,
+      source: 'github-ci',
+      filterJson: '{}',
+      status: 'pending',
+      reason: 'Waiting for CI',
+    }).run()
+
+    const changedSession = db().select().from(sessions).where(eq(sessions.id, 'stable-work-session')).get()!
+    expect(resolveSessionSystemPrompt(changedSession)).toBe(initialPrompt)
+
+    db().update(sessionAwaits).set({ status: 'triggered', triggeredAt: 2 }).where(eq(sessionAwaits.id, 'stable-work-await')).run()
+    expect(resolveSessionSystemPrompt(changedSession)).toBe(initialPrompt)
   })
 
   it('does not add Work guidance to an ordinary Session', () => {
