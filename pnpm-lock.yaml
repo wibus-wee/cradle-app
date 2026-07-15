@@ -522,6 +522,9 @@ importers:
       '@cradle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@cradle/download-center':
+        specifier: workspace:*
+        version: link:../../packages/download-center
       '@cradle/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
