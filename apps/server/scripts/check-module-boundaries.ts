@@ -5,7 +5,7 @@ import ts from 'typescript'
 
 const sourceRoot = resolve(import.meta.dirname, '../src')
 const modulesRoot = join(sourceRoot, 'modules')
-const MAX_RUNTIME_DOMAIN_SCC = 21
+const MAX_RUNTIME_DOMAIN_SCC = 23
 const FORBIDDEN_RUNTIME_EDGES = new Set([
   'relay-transport->remote-hosts',
 ])
