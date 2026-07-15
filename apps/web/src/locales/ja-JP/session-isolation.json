@@ -23,7 +23,7 @@
   "chrome.siblingHint": "共有環境",
   "chrome.unhealthyBadge": "隔離の問題",
   "chrome.unknownBranch": "不明なブランチ",
-  "delegate.runInIsolation": "隔離環境で実行",
+  "delegate.runInIsolation": "Work として実行（隔離 + 交付）",
   "missing.abandon": "放棄してクリーンアップ",
   "missing.description": "このセッションの git ワークツリーが見つからないか、同期されていません。続行する前に回復方法を選択してください。",
   "missing.errorTitle": "隔離を回復できませんでした",

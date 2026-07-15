@@ -10,6 +10,7 @@ import * as ChatRuntime from '../chat-runtime/runtime'
 import * as Issue from '../issue/service'
 import * as Session from '../session/service'
 import * as WorkflowRules from '../workflow-rules/service'
+import * as Work from '../work/service'
 import * as Worktree from '../worktree/service'
 
 // ── types ──
@@ -18,6 +19,7 @@ interface ActiveAgentRun {
   runId: string
   chatSessionId: string | null
   aborted: boolean
+  workId?: string
 }
 
 interface IssueAgentSessionView extends AgentSession {
@@ -214,6 +216,9 @@ function settleTrackedRunCompletion(
       body: 'Completed work on issue',
       signal: 'run.completed',
     })
+    if (tracked.workId) {
+      void prepareWorkAfterCompletion(tracked.workId, agentSessionId)
+    }
     return true
   }
 
@@ -238,6 +243,34 @@ function settleTrackedRunCompletion(
     })
   }
   return true
+}
+
+
+async function prepareWorkAfterCompletion(workId: string, agentSessionId: string): Promise<void> {
+  try {
+    await Work.prepare({
+      id: workId,
+      title: 'Completed issue work',
+      summary: 'Automatically prepared after issue agent completion.',
+      testPlan: 'Reviewed by issue agent.',
+    })
+    AgentInteraction.createActivity({
+      agentSessionId,
+      type: 'response',
+      body: 'Work prepared for review',
+      signal: 'work.prepared',
+    })
+  }
+  catch {
+    // prepare can fail if the checkout is clean with no commits ahead —
+    // that is fine; the Work is still available for manual preparation.
+    AgentInteraction.createActivity({
+      agentSessionId,
+      type: 'thought',
+      body: 'Work auto-prepare skipped (no deliverable changes or already prepared).',
+      signal: 'work.prepare.skipped',
+    })
+  }
 }
 
 function hasQueuedContinuationWork(chatSessionId: string): boolean {
@@ -392,30 +425,45 @@ async function runSession(
       return
     }
 
-    const chatSession = await Session.create({
-      workspaceId: issue.workspaceId,
-      title: `Issue: ${issue.title}`,
-      origin: 'cradle-issue',
-      providerTargetId: session.providerTargetId,
-      modelId: agent.modelId,
-      thinkingEffort: agent.thinkingEffort,
-      agentId: session.agentId,
-      linkedIssueId: issue.id,
-      configJson: JSON.stringify({ permissionMode: 'bypassPermissions' }),
-    })
-
-    AgentInteraction.attachChatSession({ agentSessionId, chatSessionId: chatSession.id })
-    updateActiveRunChatSession(agentSessionId, chatSession.id)
+    let chatSessionId: string
 
     if (options.runInIsolation) {
-      await Worktree.startSessionIsolation({
-        sessionId: chatSession.id,
-        slug: issue.title,
+      const workDetail = await Work.create({
+        workspaceId: issue.workspaceId,
+        title: `Issue: ${issue.title}`,
+        objective: buildIssuePrompt(issue, workflowRules),
+        linkedIssueId: issue.id,
+        providerTargetId: session.providerTargetId,
+        modelId: agent.modelId,
+        thinkingEffort: agent.thinkingEffort,
+        agentId: session.agentId,
+        configJson: JSON.stringify({ permissionMode: 'bypassPermissions' }),
+      })
+      chatSessionId = workDetail.primaryThread.id
+      activeRuns.set(agentSessionId, {
+        ...activeRuns.get(agentSessionId)!,
+        workId: workDetail.work.id,
       })
       if (consumePendingRunAbort(agentSessionId)) {
         return
       }
+    } else {
+      const created = await Session.create({
+        workspaceId: issue.workspaceId,
+        title: `Issue: ${issue.title}`,
+        origin: 'cradle-issue',
+        providerTargetId: session.providerTargetId,
+        modelId: agent.modelId,
+        thinkingEffort: agent.thinkingEffort,
+        agentId: session.agentId,
+        linkedIssueId: issue.id,
+        configJson: JSON.stringify({ permissionMode: 'bypassPermissions' }),
+      })
+      chatSessionId = created.id
     }
+
+    AgentInteraction.attachChatSession({ agentSessionId, chatSessionId })
+    updateActiveRunChatSession(agentSessionId, chatSessionId)
 
     AgentInteraction.updateSessionStatus(agentSessionId, 'active')
     AgentInteraction.createActivity({
@@ -426,7 +474,7 @@ async function runSession(
     })
 
     const run = await ChatRuntime.createRun({
-      sessionId: chatSession.id,
+      sessionId: chatSessionId,
       text: buildIssuePrompt(issue, workflowRules),
     })
     trackedRunId = run.runId
@@ -443,7 +491,7 @@ async function runSession(
 
     activeRuns.set(agentSessionId, {
       runId: run.runId,
-      chatSessionId: chatSession.id,
+      chatSessionId: chatSessionId,
       aborted: false,
     })
 

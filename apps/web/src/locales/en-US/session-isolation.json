@@ -23,7 +23,7 @@
   "chrome.siblingHint": "Shared environment",
   "chrome.unhealthyBadge": "Isolation issue",
   "chrome.unknownBranch": "unknown branch",
-  "delegate.runInIsolation": "Run in isolated environment",
+  "delegate.runInIsolation": "Run as Work (isolated + deliverable)",
   "missing.abandon": "Abandon and clean up",
   "missing.description": "The git worktree for this session is missing or out of sync. Choose how to recover before continuing.",
   "missing.errorTitle": "Could not recover isolation",

@@ -39,5 +39,5 @@
   "newChat.cancel": "取消",
   "newChat.sessionCount": "{{count}} 个关联会话",
   "newChat.isolatedAction": "新建隔离环境",
-  "delegate.runInIsolation": "在隔离环境里运行"
+  "delegate.runInIsolation": "作为 Work 执行（隔离 + 交付）"
 }

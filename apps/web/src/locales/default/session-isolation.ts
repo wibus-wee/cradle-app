@@ -43,5 +43,5 @@ export default {
   'newChat.cancel': 'Cancel',
   'newChat.sessionCount': '{{count}} linked sessions',
   'newChat.isolatedAction': 'New isolated chat',
-  'delegate.runInIsolation': 'Run in isolated environment',
+  'delegate.runInIsolation': 'Run as Work (isolated + deliverable)',
 } as const

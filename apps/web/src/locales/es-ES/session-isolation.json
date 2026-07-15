@@ -23,7 +23,7 @@
   "chrome.siblingHint": "Entorno compartido",
   "chrome.unhealthyBadge": "Problema de aislamiento",
   "chrome.unknownBranch": "rama desconocida",
-  "delegate.runInIsolation": "Ejecutar en entorno aislado",
+  "delegate.runInIsolation": "Ejecutar como Work (aislado + entregable)",
   "missing.abandon": "Abandonar y limpiar",
   "missing.description": "El worktree git de esta sesión falta o no está sincronizado. Elige cómo recuperarte antes de continuar.",
   "missing.errorTitle": "No se pudo recuperar el aislamiento",
