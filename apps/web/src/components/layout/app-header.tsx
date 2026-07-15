@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { CHROME_COLLAPSED_SIDEBAR_WIDTH } from '~/components/layout/layout-responsive'
 import { useChatSessionLayoutRecord } from '~/components/layout/use-layout-query-records'
 import { Button } from '~/components/ui/button'
+import { DownloadCenterChrome } from '~/features/download-center/download-center-chrome'
 import { SessionExecutionChrome } from '~/features/remote-hosts/session-execution-chrome'
 import { SessionIsolationChrome } from '~/features/session/session-isolation-chrome'
 import { SessionPullRequestChrome } from '~/features/session/session-pull-request-chrome'
@@ -180,6 +181,7 @@ export function AppHeader({
       {/* Right: panel toggles */}
       <div className="ml-auto flex shrink-0 items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {headerActions}
+        <DownloadCenterChrome className="text-muted-foreground" />
         {activeWorkId && <WorkHeaderChrome workId={activeWorkId} />}
         {!isSettingsActive && hasBrowserPanel && (
           <Button

@@ -113,6 +113,9 @@ import { register as registerChronicleSpeakerProfilesList } from './chronicle/sp
 import { register as registerChronicleSpeakerProfilesUpsert } from './chronicle/speaker-profiles/upsert'
 import { register as registerChronicleStatus } from './chronicle/status'
 import { register as registerChronicleTimeline } from './chronicle/timeline'
+import { register as registerDownloadCenterCancel } from './download-center/cancel'
+import { register as registerDownloadCenterGet } from './download-center/get'
+import { register as registerDownloadCenterList } from './download-center/list'
 import { register as registerExternalIssueSourceBind } from './external-issue-source/bind'
 import { register as registerExternalIssueSourceBindingDelete } from './external-issue-source/binding/delete'
 import { register as registerExternalIssueSourceBindingList } from './external-issue-source/binding/list'
@@ -171,6 +174,7 @@ import { register as registerPluginSetEnabled } from './plugin/set-enabled'
 import { register as registerPluginSourceAdd } from './plugin/source/add'
 import { register as registerPluginSourceGet } from './plugin/source/get'
 import { register as registerPluginSourceList } from './plugin/source/list'
+import { register as registerPluginSourceRefresh } from './plugin/source/refresh'
 import { register as registerPluginSourceRemove } from './plugin/source/remove'
 import { register as registerPreferencesAppGet } from './preferences/app/get'
 import { register as registerPreferencesAppSet } from './preferences/app/set'
@@ -189,6 +193,10 @@ import { register as registerProfileGet } from './profile/get'
 import { register as registerProfileList } from './profile/list'
 import { register as registerProfileSet } from './profile/set'
 import { register as registerProviderModels } from './provider/models'
+import { register as registerPullRequestAuthored } from './pull-request/authored'
+import { register as registerPullRequestDetail } from './pull-request/detail'
+import { register as registerPullRequestReviewing } from './pull-request/reviewing'
+import { register as registerPullRequestViewer } from './pull-request/viewer'
 import { register as registerRelayServerCreate } from './relay-server/create'
 import { register as registerRelayServerDelete } from './relay-server/delete'
 import { register as registerRelayServerList } from './relay-server/list'
@@ -221,6 +229,7 @@ import { register as registerSessionAwaitTrigger } from './session/await-trigger
 import { register as registerSessionCreate } from './session/create'
 import { register as registerSessionDelete } from './session/delete'
 import { register as registerSessionExportMarkdown } from './session/export/markdown'
+import { register as registerSessionExportZip } from './session/export/zip'
 import { register as registerSessionGet } from './session/get'
 import { register as registerSessionIsolationActivate } from './session/isolation/activate'
 import { register as registerSessionIsolationCancel } from './session/isolation/cancel'
@@ -232,6 +241,7 @@ import { register as registerSessionLinkedIssueLink } from './session/linked-iss
 import { register as registerSessionLinkedIssueUnlink } from './session/linked-issue/unlink'
 import { register as registerSessionList } from './session/list'
 import { register as registerSessionPullRequestCreate } from './session/pull-request/create'
+import { register as registerSessionPullRequestDetail } from './session/pull-request/detail'
 import { register as registerSessionPullRequestGet } from './session/pull-request/get'
 import { register as registerSessionPullRequestReady } from './session/pull-request/ready'
 import { register as registerSessionUpdate } from './session/update'
@@ -440,6 +450,9 @@ export function registerGeneratedCommands(program: Command): void {
   registerChronicleSpeakerProfilesUpsert(program)
   registerChronicleStatus(program)
   registerChronicleTimeline(program)
+  registerDownloadCenterCancel(program)
+  registerDownloadCenterGet(program)
+  registerDownloadCenterList(program)
   registerExternalIssueSourceBind(program)
   registerExternalIssueSourceBindingDelete(program)
   registerExternalIssueSourceBindingList(program)
@@ -498,6 +511,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerPluginSourceAdd(program)
   registerPluginSourceGet(program)
   registerPluginSourceList(program)
+  registerPluginSourceRefresh(program)
   registerPluginSourceRemove(program)
   registerPreferencesAppGet(program)
   registerPreferencesAppSet(program)
@@ -516,6 +530,10 @@ export function registerGeneratedCommands(program: Command): void {
   registerProfileList(program)
   registerProfileSet(program)
   registerProviderModels(program)
+  registerPullRequestAuthored(program)
+  registerPullRequestDetail(program)
+  registerPullRequestReviewing(program)
+  registerPullRequestViewer(program)
   registerRelayServerCreate(program)
   registerRelayServerDelete(program)
   registerRelayServerList(program)
@@ -548,6 +566,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerSessionCreate(program)
   registerSessionDelete(program)
   registerSessionExportMarkdown(program)
+  registerSessionExportZip(program)
   registerSessionGet(program)
   registerSessionIsolationActivate(program)
   registerSessionIsolationCancel(program)
@@ -559,6 +578,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerSessionLinkedIssueUnlink(program)
   registerSessionList(program)
   registerSessionPullRequestCreate(program)
+  registerSessionPullRequestDetail(program)
   registerSessionPullRequestGet(program)
   registerSessionPullRequestReady(program)
   registerSessionUpdate(program)

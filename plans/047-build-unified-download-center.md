@@ -767,6 +767,28 @@ Stop and report instead of improvising if any of these occurs:
 
 ## Maintenance notes
 
+### Execution record — 2026-07-14
+
+All implementation milestones were completed and their focused verification
+commands passed. The plan remains `TODO` in `plans/README.md` rather than being
+marked `DONE`, because two final gates are blocked by pre-existing local
+baseline state that must be resolved independently:
+
+- The default local SQLite data directory already contains `download_center_tasks`
+  while its migration journal has no `0032` entry. Consequently default
+  `pnpm generate:web`/`pnpm gen:cli` fail while applying migrations. Both
+  generators pass when run with a fresh temporary `CRADLE_DATA_DIR`; do not
+  hand-edit migration history or the journal to make the existing local database
+  appear current.
+- The full Server suite retains three unrelated
+  `session-await-github.test.ts` review-head matching failures. Focused Download
+  Center/owner suites and Server typecheck pass.
+
+The generated migration is append-only and intentionally retained. It also
+includes two session-table rebuilds that Drizzle emits from the pre-existing
+schema snapshot drift; regenerating from the previous snapshot produces the
+same output. Do not manually trim that generated migration.
+
 - Download Center's `completed` means a verified/downloaded artifact is available to the current owner call. It never means the resource is installed or enabled.
 - Expected checksum is an owner trust input. An actual checksum computed by the center is useful for diagnostics and corruption detection but is not publisher authenticity by itself.
 - Future Runtime/resource owners should call the internal host service and keep their install state in their own namespace. Do not add owner-specific columns to `download_tasks`.

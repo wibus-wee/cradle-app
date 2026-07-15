@@ -1,14 +1,18 @@
 {
   "compilerOptions": {
+    "composite": true,
     "target": "ES2022",
+    "rootDir": "./src",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node", "vitest/globals"],
+    "declaration": true,
+    "outDir": "./dist",
+    "types": ["node"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": ["src/**/*"]
 }

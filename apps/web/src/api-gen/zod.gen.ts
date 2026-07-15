@@ -12,7 +12,8 @@ export const zPutPreferencesAppBody = z.object({
         localAuthForDangerousActions: z.boolean().optional().default(false),
         continueBlockedCodexGoals: z.boolean().optional().default(false),
         blockCodexAppServerLogInserts: z.boolean().optional().default(false),
-        nativeProviderSkillProjection: z.boolean().optional().default(false)
+        nativeProviderSkillProjection: z.boolean().optional().default(false),
+        turnCheckpoints: z.boolean().optional().default(false)
     }),
     worktreeCleanup: z.object({
         maxWorktrees: z.number().gte(0).default(25),
@@ -2121,6 +2122,10 @@ export const zGetPluginsSourcesByIdPath = z.object({
     id: z.string().min(1)
 });
 
+export const zPostPluginsSourcesByIdRefreshPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zGetPluginsByRouteSegmentIconPath = z.object({
     routeSegment: z.string().min(1)
 });
@@ -4186,6 +4191,32 @@ export const zGetAgentSessionsByAgentSessionIdPath = z.object({
 
 export const zGetAgentSessionsByAgentSessionIdActivitiesPath = z.object({
     agentSessionId: z.string()
+});
+
+export const zGetDownloadCenterTasksQuery = z.object({
+    status: z.enum([
+        'queued',
+        'downloading',
+        'verifying',
+        'completed',
+        'failed',
+        'cancelled'
+    ]).optional(),
+    ownerNamespace: z.string().min(1).optional(),
+    ownerResourceType: z.string().min(1).optional(),
+    ownerResourceId: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(100)
+    ]).optional()
+});
+
+export const zGetDownloadCenterTasksByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostDownloadCenterTasksByIdCancelPath = z.object({
+    id: z.string().min(1)
 });
 
 export const zPostTerminalSessionsBySessionIdStartOrAttachBody = z.object({

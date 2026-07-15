@@ -514,6 +514,61 @@ describe('httpArtifactDownloader', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('never promotes a partial response whose declared range does not match its body', async () => {
+    await seedPartial(rootDir, 'truncated-range', 'abc')
+    const downloader = new HttpArtifactDownloader({
+      rootDir,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(streamResponse([new TextEncoder().encode('de')], {
+        status: 206,
+        headers: { 'content-range': 'bytes 3-5/6', 'etag': '"v1"' },
+      })),
+    })
+
+    await expect(downloader.download({
+      taskId: 'truncated-range',
+      request: request(),
+      prior: { sourceId: 'fixture-v1:origin', etag: '"v1"' },
+    })).rejects.toMatchObject({ code: 'invalid_response', retryable: false })
+    expect(existsSync(path.join(rootDir, 'artifacts', 'truncated-range', 'fixture.bin'))).toBe(false)
+  })
+
+  it('never promotes a short 200 response with a Content-Length', async () => {
+    const downloader = new HttpArtifactDownloader({
+      rootDir,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(streamResponse([new TextEncoder().encode('ab')], {
+        headers: { 'content-length': '3' },
+      })),
+    })
+
+    await expect(downloader.download({
+      taskId: 'short-200',
+      request: request(),
+    })).rejects.toMatchObject({ code: 'invalid_response', retryable: false })
+    expect(existsSync(path.join(rootDir, 'artifacts', 'short-200', 'fixture.bin'))).toBe(false)
+  })
+
+  it('rejects a 206 response with inconsistent Content-Range and Content-Length before appending', async () => {
+    await seedPartial(rootDir, 'inconsistent-range', 'abc')
+    const downloader = new HttpArtifactDownloader({
+      rootDir,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(streamResponse([new TextEncoder().encode('de')], {
+        status: 206,
+        headers: {
+          'content-length': '2',
+          'content-range': 'bytes 3-5/6',
+          'etag': '"v1"',
+        },
+      })),
+    })
+
+    await expect(downloader.download({
+      taskId: 'inconsistent-range',
+      request: request(),
+      prior: { sourceId: 'fixture-v1:origin', etag: '"v1"' },
+    })).rejects.toMatchObject({ code: 'invalid_response', retryable: false })
+    expect(await readFile(path.join(rootDir, 'partial', 'inconsistent-range.part'), 'utf8')).toBe('abc')
+  })
+
   it('clears partial bytes and validators before switching fallback source', async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(failingBodyResponse(new TextEncoder().encode('first-source')))

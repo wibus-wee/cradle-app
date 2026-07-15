@@ -61,6 +61,12 @@ interface Window {
     desktopUpdate: {
       onStatusChanged: (handler: (status: unknown) => void) => () => void
     }
+    downloadCenter?: {
+      list: () => Promise<import('@cradle/download-center').DownloadTaskView[]>
+      get: (taskId: string) => Promise<import('@cradle/download-center').DownloadTaskView | null>
+      cancel: (taskId: string) => Promise<import('@cradle/download-center').DownloadTaskView | null>
+      onTaskChanged: (handler: (task: import('@cradle/download-center').DownloadTaskView) => void) => () => void
+    }
     serverRuntime?: {
       getStatus: () => Promise<DesktopServerStatus>
       onStatusChanged: (handler: (status: DesktopServerStatus) => void) => () => void

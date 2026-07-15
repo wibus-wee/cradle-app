@@ -107,6 +107,19 @@ export class DesktopUpdateInstaller {
     })
     child.unref()
   }
+
+  /** Removes update staging that is no longer actionable in this app session. */
+  async discard(plan: DesktopUpdateInstallerPlan): Promise<void> {
+    await Promise.all([
+      removeStagingRoot(plan.stagingRoot),
+      rm(plan.scriptPath, { force: true }),
+    ])
+  }
+
+  /** Clears stale staging left by a previous desktop session. */
+  async discardStaleStaging(): Promise<void> {
+    await rm(join(this.updatesDir, 'staging'), { recursive: true, force: true })
+  }
 }
 
 function readCurrentAppPath(): string {

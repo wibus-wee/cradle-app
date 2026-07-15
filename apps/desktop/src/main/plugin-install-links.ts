@@ -2,6 +2,7 @@
 import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 
+import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import type { CradlePluginMeta, PluginDeclaredCapabilityRecord, PluginDeclaredPermissionRecord } from '@cradle/plugin-sdk'
 import {
   projectCradlePluginContributions,
@@ -28,6 +29,7 @@ const SUPPORTED_PARAMS = new Set([
 ])
 const REQUIRED_PARAMS = ['source', 'repository', 'path', 'package', 'version', 'channel'] as const
 const DEFAULT_GITHUB_REF = 'main'
+const MAX_PLUGIN_TARBALL_BYTES = 64 * 1024 * 1024
 
 export interface PluginInstallRequest {
   source: 'github'
@@ -66,9 +68,12 @@ export interface PluginInstallResult {
 
 export interface PluginInstallOptions {
   availablePluginsDir?: string
-  fetchImpl?: typeof fetch
   now?: () => Date
   confirmInstall?: (summary: PluginInstallSummary) => Promise<boolean>
+  downloadCenter: {
+    execute: (request: DownloadRequest) => Promise<DownloadedArtifact>
+    release: (taskId: string) => Promise<unknown>
+  }
   userDataPath: string
 }
 
@@ -237,19 +242,30 @@ function createGitHubTarballUrl(request: PluginInstallRequest): string {
   return `https://api.github.com/repos/${owner}/${repo}/tarball/${encodeURIComponent(request.ref)}`
 }
 
-async function downloadTarball(request: PluginInstallRequest, archivePath: string, fetchImpl: typeof fetch): Promise<void> {
-  const response = await fetchImpl(createGitHubTarballUrl(request), {
-    headers: {
-      'accept': 'application/vnd.github+json',
-      'user-agent': 'Cradle-Desktop-Plugin-Installer',
+async function downloadPluginArchive(
+  request: PluginInstallRequest,
+  fileName: string,
+  options: PluginInstallOptions,
+): Promise<{ archivePath: string, taskId: string }> {
+  const artifact = await options.downloadCenter.execute({
+    owner: {
+      namespace: 'marketplace',
+      resourceType: 'plugin-tarball',
+      resourceId: `${request.repository}@${request.ref}:${request.path}`,
+      displayName: request.packageName,
     },
+    fileName,
+    sources: [{
+      id: 'github-tarball',
+      url: createGitHubTarballUrl(request),
+      headers: {
+        'accept': 'application/vnd.github+json',
+        'user-agent': 'Cradle-Desktop-Plugin-Installer',
+      },
+    }],
+    maxBytes: MAX_PLUGIN_TARBALL_BYTES,
   })
-  if (!response.ok || !response.body) {
-    throw new Error(`GitHub tarball download failed with status ${response.status}`)
-  }
-
-  const buffer = Buffer.from(await response.arrayBuffer())
-  await writeFile(archivePath, buffer)
+  return { archivePath: artifact.filePath, taskId: artifact.taskId }
 }
 
 async function extractPluginPath(archivePath: string, request: PluginInstallRequest, stagingDir: string): Promise<void> {
@@ -459,21 +475,22 @@ export async function installPluginFromRequest(
     }
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch
   const installRoot = resolveDesktopInstalledPluginsDir(options.userDataPath)
   const packageDir = resolve(installRoot, createInstalledPluginPackageDirName(request.packageName))
   const tempRoot = resolve(options.userDataPath, TEMP_INSTALL_DIR)
   const installId = `${process.pid}-${now.getTime()}-${basename(packageDir)}`
   const stagingDir = resolve(tempRoot, `${installId}.staging`)
-  const archivePath = resolve(tempRoot, `${installId}.tar.gz`)
+  const archiveFileName = `${installId}.tar.gz`
   const receiptPath = resolve(packageDir, INSTALL_RECEIPT_FILE)
 
   await mkdir(dirname(packageDir), { recursive: true })
   await mkdir(stagingDir, { recursive: true })
+  let downloadTaskId: string | null = null
 
   try {
-    await downloadTarball(request, archivePath, fetchImpl)
-    await extractPluginPath(archivePath, request, stagingDir)
+    const downloaded = await downloadPluginArchive(request, archiveFileName, options)
+    downloadTaskId = downloaded.taskId
+    await extractPluginPath(downloaded.archivePath, request, stagingDir)
     const pkg = await validateExtractedPlugin(request, stagingDir, { requireRunnableEntries: true })
     const summary = createPluginInstallSummary(request, packageDir, 'downloaded', pkg)
     if (!await acceptPluginInstall(summary, options)) {
@@ -497,8 +514,10 @@ export async function installPluginFromRequest(
       receiptPath,
     }
   }
- finally {
-    await rm(archivePath, { force: true })
+  finally {
+    if (downloadTaskId) {
+      await options.downloadCenter.release(downloadTaskId)
+    }
     await rm(stagingDir, { recursive: true, force: true })
   }
 }

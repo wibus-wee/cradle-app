@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, readdir, rename, rm } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import type { PluginSource } from '@cradle/db'
+import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import * as tar from 'tar'
 
 import { getServerConfig } from '../infra'
@@ -13,12 +14,20 @@ const execFileAsync = promisify(execFile)
 const DEFAULT_GITHUB_REF = 'main'
 const DEFAULT_NPM_REF = 'latest'
 const CACHE_DIR_NAME = 'plugin-sources-cache'
+const MAX_GITHUB_TARBALL_BYTES = 64 * 1024 * 1024
 
 export interface PluginSourceInstallerOptions {
-  fetchFn?: typeof fetch
+  downloadCenter?: PluginSourceDownloadCenter
 }
 
-function sourceCacheKey(source: PluginSource): string {
+export interface PluginSourceDownloadCenter {
+  execute: (request: DownloadRequest) => Promise<DownloadedArtifact>
+  release: (taskId: string) => Promise<unknown>
+}
+
+const sourceOperations = new Map<string, Promise<void>>()
+
+export function sourceCacheKey(source: PluginSource): string {
   return createHash('sha256')
     .update(JSON.stringify({
       kind: source.kind,
@@ -122,25 +131,39 @@ async function normalizeDiscoveryRoot(contentDir: string, source: PluginSource):
   return packagesDir
 }
 
-async function downloadGitHubTarball(
-  source: PluginSource,
-  archivePath: string,
-  options: PluginSourceInstallerOptions,
-): Promise<void> {
+function githubTarballDownloadRequest(source: PluginSource): DownloadRequest {
   validateGitHubRepository(source.location)
   const [owner, repo] = source.location.split('/')
   const ref = source.ref?.trim() || DEFAULT_GITHUB_REF
-  const url = `https://api.github.com/repos/${owner}/${repo}/tarball/${encodeURIComponent(ref)}`
-  const response = await (options.fetchFn ?? fetch)(url, {
-    headers: {
-      'accept': 'application/vnd.github+json',
-      'user-agent': 'Cradle-Server-Plugin-Source-Installer',
+  const cacheKey = sourceCacheKey(source)
+  return {
+    owner: {
+      namespace: 'plugins',
+      resourceType: 'source-archive',
+      resourceId: cacheKey,
+      displayName: `GitHub plugin source ${source.location}`,
     },
-  })
-  if (!response.ok || !response.body) {
-    throw new Error(`GitHub tarball download failed with status ${response.status}.`)
+    fileName: `plugin-source-${cacheKey}.tar.gz`,
+    sources: [{
+      id: `github:${source.location}@${ref}`,
+      url: `https://api.github.com/repos/${owner}/${repo}/tarball/${encodeURIComponent(ref)}`,
+      headers: {
+        'accept': 'application/vnd.github+json',
+        'user-agent': 'Cradle-Server-Plugin-Source-Installer',
+      },
+    }],
+    maxBytes: MAX_GITHUB_TARBALL_BYTES,
   }
-  await writeFile(archivePath, Buffer.from(await response.arrayBuffer()))
+}
+
+async function downloadGitHubTarball(
+  source: PluginSource,
+  options: PluginSourceInstallerOptions,
+): Promise<DownloadedArtifact> {
+  if (!options.downloadCenter) {
+    throw new Error('Plugin source resolution requires the server Download Center.')
+  }
+  return options.downloadCenter.execute(githubTarballDownloadRequest(source))
 }
 
 async function extractGitSource(source: PluginSource, archivePath: string, contentDir: string): Promise<void> {
@@ -203,9 +226,13 @@ async function installGitOrNpmSource(source: PluginSource, options: PluginSource
 
   try {
     if (source.kind === 'git') {
-      const archivePath = resolve(archiveDir, 'source.tar.gz')
-      await downloadGitHubTarball(source, archivePath, options)
-      await extractGitSource(source, archivePath, contentDir)
+      const artifact = await downloadGitHubTarball(source, options)
+      try {
+        await extractGitSource(source, artifact.filePath, contentDir)
+      }
+      finally {
+        await options.downloadCenter!.release(artifact.taskId)
+      }
     }
     else {
       const archivePath = await packNpmSource(source, archiveDir)
@@ -227,6 +254,45 @@ async function installGitOrNpmSource(source: PluginSource, options: PluginSource
   }
 }
 
+async function withSourceOperation<T>(source: PluginSource, operation: () => Promise<T>): Promise<T> {
+  const key = sourceCacheKey(source)
+  const prior = sourceOperations.get(key)
+  let release!: () => void
+  const current = new Promise<void>((resolve) => { release = resolve })
+  sourceOperations.set(key, current)
+  await prior?.catch(() => undefined)
+  try {
+    return await operation()
+  }
+  finally {
+    release()
+    if (sourceOperations.get(key) === current) {
+      sourceOperations.delete(key)
+    }
+  }
+}
+
+/**
+ * Reads the local source cache only. It never downloads, extracts, publishes,
+ * or invokes npm, so it is safe for GET projections and startup discovery.
+ */
+export async function inspectPluginSourceDirectory(source: PluginSource): Promise<string | null> {
+  if (source.kind === 'localPath') {
+    const localPath = resolve(source.location)
+    if (localPath !== source.location) {
+      throw new Error('Local plugin source location must be an absolute path.')
+    }
+    return await pathExists(localPath) ? localPath : null
+  }
+
+  const existingPackageRoot = resolve(cacheDirForSource(source), 'packages')
+  if (await pathExists(existingPackageRoot)) {
+    return existingPackageRoot
+  }
+  const existingContentRoot = resolve(cacheDirForSource(source), 'content')
+  return await pathExists(existingContentRoot) ? existingContentRoot : null
+}
+
 export async function resolvePluginSourceDirectory(
   source: PluginSource,
   options: PluginSourceInstallerOptions = {},
@@ -239,15 +305,10 @@ export async function resolvePluginSourceDirectory(
     return localPath
   }
 
-  const existingPackageRoot = resolve(cacheDirForSource(source), 'packages')
-  if (await pathExists(existingPackageRoot)) {
-    return existingPackageRoot
-  }
-  const existingContentRoot = resolve(cacheDirForSource(source), 'content')
-  if (await pathExists(existingContentRoot)) {
-    return existingContentRoot
-  }
-  return installGitOrNpmSource(source, options)
+  return withSourceOperation(source, async () => {
+    const cached = await inspectPluginSourceDirectory(source)
+    return cached ?? installGitOrNpmSource(source, options)
+  })
 }
 
 export async function refreshPluginSourceDirectory(
@@ -257,12 +318,16 @@ export async function refreshPluginSourceDirectory(
   if (source.kind === 'localPath') {
     return resolvePluginSourceDirectory(source, options)
   }
-  await rm(cacheDirForSource(source), { recursive: true, force: true })
-  return installGitOrNpmSource(source, options)
+  return withSourceOperation(source, async () => {
+    await rm(cacheDirForSource(source), { recursive: true, force: true })
+    return installGitOrNpmSource(source, options)
+  })
 }
 
 export async function deletePluginSourceCache(source: PluginSource): Promise<void> {
   if (source.kind !== 'localPath') {
-    await rm(cacheDirForSource(source), { recursive: true, force: true })
+    await withSourceOperation(source, async () => {
+      await rm(cacheDirForSource(source), { recursive: true, force: true })
+    })
   }
 }

@@ -24,8 +24,13 @@ const binaryAgent: RegistryAgent = {
     },
     npx: {
       package: '@example/agent',
-      args: [],
-      env: {},
+      args: ['--stdio'],
+      env: { EXAMPLE_MODE: 'npx' },
+    },
+    uvx: {
+      package: 'example-agent',
+      args: ['serve'],
+      env: { EXAMPLE_MODE: 'uvx' },
     },
   },
 }
@@ -47,7 +52,7 @@ describe('aCP registry integrity policy', () => {
     const agents = await registry.fetchRegistry()
 
     expect(fetchFn).toHaveBeenCalledWith(ACP_REGISTRY_URL)
-    expect(registry.getSupportedDistributionTypes(agents[0])).toEqual(['npx'])
+    expect(registry.getSupportedDistributionTypes(agents[0])).toEqual(['npx', 'uvx'])
   })
 
   it('rejects binary installation before creating an install directory', async () => {
@@ -62,5 +67,14 @@ describe('aCP registry integrity policy', () => {
       status: 409,
       message: 'ACP binary installation requires a trusted publisher checksum, but the registry does not provide one',
     })
+  })
+
+  it.each([
+    ['npx', { installPath: null, cmd: '@example/agent', args: ['--stdio'], env: { EXAMPLE_MODE: 'npx' } }],
+    ['uvx', { installPath: null, cmd: 'example-agent', args: ['serve'], env: { EXAMPLE_MODE: 'uvx' } }],
+  ] as const)('keeps the %s package distribution unchanged', (type, expected) => {
+    const installer = new AcpInstaller()
+
+    expect(installer.installPackageAgent(binaryAgent, type)).toEqual(expected)
   })
 })

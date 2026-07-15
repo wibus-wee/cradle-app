@@ -1,10 +1,12 @@
 import { Elysia, t } from 'elysia'
 
+import type { PluginSourceInstallerOptions } from '../../plugins/source-installer'
 import { pluginMarketplaceRoutes } from '../plugin-marketplace'
 import { PluginsModel } from './model'
 import * as Plugins from './service'
 
-export const plugins = new Elysia({
+export function createPluginsModule(options: PluginSourceInstallerOptions = {}) {
+  return new Elysia({
   prefix: '/plugins',
   detail: { tags: ['plugins'] },
 })
@@ -33,7 +35,7 @@ export const plugins = new Elysia({
     },
     response: { 200: t.Array(PluginsModel.pluginSourceRegistryEntry) },
   })
-  .post('/sources', ({ body }) => Plugins.createSource(body), {
+  .post('/sources', ({ body }) => Plugins.createSource(body, options), {
     detail: {
       'summary': 'Add plugin source',
       'x-cradle-cli': {
@@ -43,7 +45,7 @@ export const plugins = new Elysia({
     body: PluginsModel.addPluginSourceBody,
     response: { 200: PluginsModel.addPluginSourceResult },
   })
-  .post('/sources/preview', ({ body }) => Plugins.previewSource(body), {
+  .post('/sources/preview', ({ body }) => Plugins.previewSource(body, options), {
     detail: {
       summary: 'Preview plugin source (no install)',
     },
@@ -61,6 +63,18 @@ export const plugins = new Elysia({
       id: t.String({ minLength: 1 }),
     }),
     response: { 200: PluginsModel.pluginSourceRegistryEntry },
+  })
+  .post('/sources/:id/refresh', ({ params }) => Plugins.refreshSource(params.id, options), {
+    detail: {
+      'summary': 'Refresh plugin source',
+      'x-cradle-cli': {
+        command: ['plugin', 'source', 'refresh'],
+      },
+    },
+    params: t.Object({
+      id: t.String({ minLength: 1 }),
+    }),
+    response: { 200: PluginsModel.addPluginSourceResult },
   })
   .delete('/sources/:id', ({ params }) => Plugins.removeSource(params.id), {
     detail: {
@@ -120,3 +134,4 @@ export const plugins = new Elysia({
     body: PluginsModel.updatePluginActivationBody,
     response: { 200: PluginsModel.pluginDescriptor },
   })
+}

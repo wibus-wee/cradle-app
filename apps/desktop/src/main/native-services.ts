@@ -2,6 +2,7 @@ import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { extname, isAbsolute, join, relative } from 'node:path'
 
+import type { DownloadTaskView } from '@cradle/download-center'
 import { createServices, getIpcContext, IpcMethod, IpcService } from '@cradle/ipc'
 import { app, BrowserWindow, dialog, nativeImage, screen, shell as nativeLauncher, systemPreferences } from 'electron'
 
@@ -28,6 +29,7 @@ import {
   readDesktopCliStatus,
   removeDesktopCliCommand,
 } from './desktop-cli-manager'
+import type { DesktopDownloadCenterService } from './download-center'
 import type { MacBridgeManager } from './mac-bridge-manager'
 import type {
   MacAppshotAnimationTarget,
@@ -513,6 +515,7 @@ class NativeAuthService extends IpcService {
 interface NativeServicesContext {
   getWindowManager: () => WindowManager | undefined
   getUpdateManager: () => DesktopUpdateManager | null
+  getDesktopDownloadCenter: () => DesktopDownloadCenterService | null
   getMacBridgeManager: () => MacBridgeManager | null
   getChatStreamBroker: () => ChatStreamBroker | null
   getChatEventTailBroker: () => ChatEventTailBroker | null
@@ -527,6 +530,10 @@ function getWindowManager(): WindowManager | undefined {
 
 function getUpdateManager(): DesktopUpdateManager | null {
   return nativeServicesContext?.getUpdateManager() ?? null
+}
+
+function getDesktopDownloadCenter(): DesktopDownloadCenterService | null {
+  return nativeServicesContext?.getDesktopDownloadCenter() ?? null
 }
 
 function getMacBridgeManager(): MacBridgeManager | null {
@@ -806,6 +813,35 @@ class DesktopUpdateService extends IpcService {
       throw new Error('Desktop update manager is not initialized')
     }
     return updateManager
+  }
+}
+
+// ── Desktop Download Center Service ─────────────────────────────────────────
+
+class DesktopDownloadCenterIpcService extends IpcService {
+  static readonly groupName = 'downloadCenter'
+
+  @IpcMethod()
+  async list(): Promise<DownloadTaskView[]> {
+    return this.readCenter().list()
+  }
+
+  @IpcMethod()
+  async get(taskId: string): Promise<DownloadTaskView | null> {
+    return this.readCenter().get(taskId)
+  }
+
+  @IpcMethod()
+  async cancel(taskId: string): Promise<DownloadTaskView | null> {
+    return await this.readCenter().cancel(taskId)
+  }
+
+  private readCenter(): DesktopDownloadCenterService {
+    const center = getDesktopDownloadCenter()
+    if (!center) {
+      throw new Error('Desktop download center is not initialized')
+    }
+    return center
   }
 }
 
@@ -1279,6 +1315,7 @@ export function createNativeServices(context: NativeServicesContext) {
     NativeAuthService,
     WindowService,
     DesktopUpdateService,
+    DesktopDownloadCenterIpcService,
     DesktopChatStreamService,
     DesktopChatEventTailService,
     MacCaptureService,

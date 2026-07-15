@@ -124,7 +124,7 @@ describe('acp capability', () => {
     }
   })
 
-  it('returns structured errors for invalid install input, missing agent, and unsupported distribution', async () => {
+  it('returns structured errors for invalid input, missing agents, and disabled binary installs', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
     process.env.CRADLE_DATA_DIR = dataDir
@@ -169,13 +169,16 @@ describe('acp capability', () => {
       expect(missingAgentRes.status).toBe(404)
       expect((await missingAgentRes.json()).code).toBe('acp_agent_not_found')
 
-      const unsupportedDistributionRes = await app.handle(new Request('http://localhost/acp/agents/demo-agent/installation', {
+      const binaryInstallRes = await app.handle(new Request('http://localhost/acp/agents/demo-agent/installation', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ distributionType: 'binary' }),
       }))
-      expect(unsupportedDistributionRes.status).toBe(409)
-      expect((await unsupportedDistributionRes.json()).code).toBe('acp_distribution_not_supported')
+      expect(binaryInstallRes.status).toBe(409)
+      expect(await binaryInstallRes.json()).toMatchObject({
+        code: 'acp_binary_integrity_metadata_missing',
+        message: 'ACP binary installation requires a trusted publisher checksum, but the registry does not provide one',
+      })
     }
     finally {
       shutdownInfra()

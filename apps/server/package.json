@@ -38,6 +38,7 @@
     "@arcships/light-ocr": "0.1.0",
     "@cradle/chat-runtime-contracts": "workspace:*",
     "@cradle/db": "workspace:*",
+    "@cradle/download-center": "workspace:*",
     "@cradle/plugin-sdk": "workspace:*",
     "@elysia/openapi": "^1.4.15",
     "@elysiajs/cors": "^1.4.2",

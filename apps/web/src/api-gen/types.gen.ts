@@ -95,6 +95,7 @@ export type GetPreferencesAppResponses = {
             continueBlockedCodexGoals?: boolean;
             blockCodexAppServerLogInserts?: boolean;
             nativeProviderSkillProjection?: boolean;
+            turnCheckpoints?: boolean;
         };
         worktreeCleanup?: {
             maxWorktrees: number;
@@ -113,6 +114,7 @@ export type PutPreferencesAppData = {
             continueBlockedCodexGoals?: boolean;
             blockCodexAppServerLogInserts?: boolean;
             nativeProviderSkillProjection?: boolean;
+            turnCheckpoints?: boolean;
         };
         worktreeCleanup?: {
             maxWorktrees: number;
@@ -11154,6 +11156,208 @@ export type GetPluginsSourcesByIdResponses = {
 
 export type GetPluginsSourcesByIdResponse = GetPluginsSourcesByIdResponses[keyof GetPluginsSourcesByIdResponses];
 
+export type PostPluginsSourcesByIdRefreshData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}/refresh';
+};
+
+export type PostPluginsSourcesByIdRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            id: string;
+            kind: 'localPath' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+        discoveredPlugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop' | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+    };
+};
+
+export type PostPluginsSourcesByIdRefreshResponse = PostPluginsSourcesByIdRefreshResponses[keyof PostPluginsSourcesByIdRefreshResponses];
+
 export type GetPluginsByRouteSegmentIconData = {
     body?: never;
     path: {
@@ -21352,13 +21556,6 @@ export type PostChronicleModelResourcesInstallAllResponses = {
 
 export type PostChronicleModelResourcesInstallAllResponse = PostChronicleModelResourcesInstallAllResponses[keyof PostChronicleModelResourcesInstallAllResponses];
 
-export type GetChronicleModelResourcesDownloadProgressData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/chronicle/model-resources/download-progress';
-};
-
 export type PostChronicleModelResourcesByCategoryVerifyData = {
     body?: never;
     path: {
@@ -23867,6 +24064,220 @@ export type GetDesktopUserInputRequestsResponses = {
 };
 
 export type GetDesktopUserInputRequestsResponse = GetDesktopUserInputRequestsResponses[keyof GetDesktopUserInputRequestsResponses];
+
+export type GetDownloadCenterTasksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: 'queued' | 'downloading' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+        ownerNamespace?: string;
+        ownerResourceType?: string;
+        ownerResourceId?: string;
+        limit?: string | number;
+    };
+    url: '/download-center/tasks';
+};
+
+export type GetDownloadCenterTasksResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        taskId: string;
+        scope: string;
+        owner: {
+            namespace: string;
+            resourceType: string;
+            resourceId: string;
+            displayName: string;
+        };
+        fileName: string;
+        sourceId: string | null;
+        status: 'queued' | 'downloading' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+        transferredBytes: number;
+        totalBytes: number | null;
+        attempts: number;
+        maxAttempts: number;
+        error: {
+            code: string;
+            message: string;
+            retryable: boolean;
+        } | null;
+        result: {
+            taskId: string;
+            bytes: number;
+            checksum: {
+                algorithm: 'sha256' | 'sha512';
+                expected: string | null;
+                actual: string;
+                matched: boolean | null;
+            };
+        } | null;
+        createdAt: string;
+        updatedAt: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+    }>;
+};
+
+export type GetDownloadCenterTasksResponse = GetDownloadCenterTasksResponses[keyof GetDownloadCenterTasksResponses];
+
+export type GetDownloadCenterTasksByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/download-center/tasks/{id}';
+};
+
+export type GetDownloadCenterTasksByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        taskId: string;
+        scope: string;
+        owner: {
+            namespace: string;
+            resourceType: string;
+            resourceId: string;
+            displayName: string;
+        };
+        fileName: string;
+        sourceId: string | null;
+        status: 'queued' | 'downloading' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+        transferredBytes: number;
+        totalBytes: number | null;
+        attempts: number;
+        maxAttempts: number;
+        error: {
+            code: string;
+            message: string;
+            retryable: boolean;
+        } | null;
+        result: {
+            taskId: string;
+            bytes: number;
+            checksum: {
+                algorithm: 'sha256' | 'sha512';
+                expected: string | null;
+                actual: string;
+                matched: boolean | null;
+            };
+        } | null;
+        createdAt: string;
+        updatedAt: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+    };
+};
+
+export type GetDownloadCenterTasksByIdResponse = GetDownloadCenterTasksByIdResponses[keyof GetDownloadCenterTasksByIdResponses];
+
+export type PostDownloadCenterTasksByIdCancelData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/download-center/tasks/{id}/cancel';
+};
+
+export type PostDownloadCenterTasksByIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        taskId: string;
+        scope: string;
+        owner: {
+            namespace: string;
+            resourceType: string;
+            resourceId: string;
+            displayName: string;
+        };
+        fileName: string;
+        sourceId: string | null;
+        status: 'queued' | 'downloading' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+        transferredBytes: number;
+        totalBytes: number | null;
+        attempts: number;
+        maxAttempts: number;
+        error: {
+            code: string;
+            message: string;
+            retryable: boolean;
+        } | null;
+        result: {
+            taskId: string;
+            bytes: number;
+            checksum: {
+                algorithm: 'sha256' | 'sha512';
+                expected: string | null;
+                actual: string;
+                matched: boolean | null;
+            };
+        } | null;
+        createdAt: string;
+        updatedAt: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+    };
+};
+
+export type PostDownloadCenterTasksByIdCancelResponse = PostDownloadCenterTasksByIdCancelResponses[keyof PostDownloadCenterTasksByIdCancelResponses];
+
+export type GetDownloadCenterEventsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/download-center/events';
+};
+
+export type GetDownloadCenterEventsResponses = {
+    /**
+     * Task changes only; fetch /download-center/tasks for the initial snapshot.
+     */
+    200: {
+        taskId: string;
+        scope: 'server';
+        owner: {
+            namespace: string;
+            resourceType: string;
+            resourceId: string;
+            displayName: string;
+        };
+        fileName: string;
+        sourceId: string | null;
+        status: 'queued' | 'downloading' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+        transferredBytes: number;
+        totalBytes: number | null;
+        attempts: number;
+        maxAttempts: number;
+        error: {
+            code: string;
+            message: string;
+            retryable: boolean;
+        } | null;
+        result: {
+            taskId: string;
+            bytes: number;
+            checksum: {
+                algorithm: 'sha256' | 'sha512';
+                expected: string | null;
+                actual: string;
+                matched: boolean | null;
+            };
+        } | null;
+        createdAt: string;
+        updatedAt: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+    };
+};
+
+export type GetDownloadCenterEventsResponse = GetDownloadCenterEventsResponses[keyof GetDownloadCenterEventsResponses];
 
 export type GetTerminalSessionsResourcesData = {
     body?: never;

@@ -225,6 +225,13 @@
       "when": 1783865129819,
       "tag": "0031_outstanding_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1784041871538,
+      "tag": "0032_download_center_tasks",
+      "breakpoints": true
     }
   ]
 }

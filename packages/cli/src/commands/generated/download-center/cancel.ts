@@ -3,15 +3,22 @@ import type { CliOperationSpec } from '../../../runtime/types'
 import type { Command } from 'commander'
 
 const spec = {
-  "arguments": [],
-  "command": [
-    "profile",
-    "card"
+  "arguments": [
+    {
+      "name": "id",
+      "required": true,
+      "target": "path.id",
+      "type": "string"
+    }
   ],
-  "description": "Get aggregated profile share-card stats",
+  "command": [
+    "download-center",
+    "cancel"
+  ],
+  "description": "Cancel a download task",
   "flags": [],
-  "method": "get",
-  "path": "/usage/profile-card"
+  "method": "post",
+  "path": "/download-center/tasks/{id}/cancel"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

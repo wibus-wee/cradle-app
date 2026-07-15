@@ -17,6 +17,7 @@ import {
   backendRuns,
   backendSessionBindings,
   backgroundJobs,
+  downloadCenterTasks,
   externalProviderRecords,
   externalProviderSources,
   issueComments,
@@ -44,6 +45,7 @@ import { db, getServerConfig } from '../../infra'
 import { abortAllRuns } from '../chat-runtime/runtime'
 
 const TABLES_IN_DELETION_ORDER = [
+  downloadCenterTasks,
   backgroundJobs,
   automationEvents,
   automationArtifacts,

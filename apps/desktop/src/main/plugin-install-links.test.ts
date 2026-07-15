@@ -97,6 +97,28 @@ async function createRepositoryArchive(): Promise<Buffer> {
   return readFile(archivePath)
 }
 
+async function createDownloadCenter(
+  archive: Buffer,
+  userDataPath: string,
+): Promise<PluginInstallOptions['downloadCenter']> {
+  const artifactPath = resolve(userDataPath, 'download-center-artifact.tar.gz')
+  await writeFile(artifactPath, archive)
+  return {
+    execute: vi.fn(async () => ({
+      taskId: 'plugin-download-task',
+      filePath: artifactPath,
+      bytes: archive.byteLength,
+      checksum: {
+        algorithm: 'sha256' as const,
+        expected: null,
+        actual: 'a'.repeat(64),
+        matched: null,
+      },
+    })),
+    release: vi.fn(async () => undefined),
+  }
+}
+
 afterEach(async () => {
   vi.restoreAllMocks()
   for (const root of tempRoots.splice(0)) {
@@ -155,18 +177,18 @@ describe('installPluginFromRequest', () => {
     const userDataPath = await createTempRoot('cradle-plugin-user-data-')
     const pluginsRoot = await createTempRoot('cradle-plugin-bundled-')
     const availablePackageDir = await writePluginPackage(pluginsRoot, 'system-info', '@cradle/system-info', 'src/server.ts')
-    const fetchImpl = vi.fn<typeof fetch>()
+    const downloadCenter = await createDownloadCenter(Buffer.alloc(0), userDataPath)
 
     const result = await installPluginFromRequest(parsePluginInstallUrl(installUrl), {
       availablePluginsDir: pluginsRoot,
-      fetchImpl,
+      downloadCenter,
       now: () => new Date('2026-05-21T10:00:00.000Z'),
       userDataPath,
     })
 
     expect(result).toBeDefined()
     if (!result) { throw new Error('Expected plugin install result') }
-    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(downloadCenter.execute).not.toHaveBeenCalled()
     expect(result).toMatchObject({
       mode: 'alreadyAvailable',
       packageDir: availablePackageDir,
@@ -189,17 +211,17 @@ describe('installPluginFromRequest', () => {
   it('downloads a plugin into the Cradle-owned installed plugin directory when it is not bundled', async () => {
     const userDataPath = await createTempRoot('cradle-plugin-user-data-')
     const archive = await createRepositoryArchive()
-    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(archive)))
+    const downloadCenter = await createDownloadCenter(archive, userDataPath)
 
     const result = await installPluginFromRequest(parsePluginInstallUrl(`${installUrl}&ref=testref`), {
-      fetchImpl,
+      downloadCenter,
       now: () => new Date('2026-05-21T10:00:00.000Z'),
       userDataPath,
     })
 
     expect(result).toBeDefined()
     if (!result) { throw new Error('Expected plugin install result') }
-    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(downloadCenter.execute).toHaveBeenCalledOnce()
     expect(result).toMatchObject({
       mode: 'downloaded',
       packageDir: resolve(
@@ -235,18 +257,18 @@ describe('installPluginFromRequest', () => {
       ['acme-plugin-pack-testref'],
     )
     const archive = await readFile(archivePath)
-    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(archive)))
+    const downloadCenter = await createDownloadCenter(archive, userDataPath)
     const request = parsePluginInstallUrl('cradle://plugins/install?source=github&repository=acme%2Fplugin-pack&path=.&package=%40acme%2Ftool&version=0.0.1&channel=bundled&ref=testref')
 
     const result = await installPluginFromRequest(request, {
-      fetchImpl,
+      downloadCenter,
       now: () => new Date('2026-05-21T10:00:00.000Z'),
       userDataPath,
     })
 
     expect(result).toBeDefined()
     if (!result) { throw new Error('Expected plugin install result') }
-    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(downloadCenter.execute).toHaveBeenCalledOnce()
     expect(result).toMatchObject({
       mode: 'downloaded',
       packageDir: resolve(
@@ -266,10 +288,12 @@ describe('installPluginFromRequest', () => {
     const pluginsRoot = await createTempRoot('cradle-plugin-bundled-')
     await writePluginPackage(pluginsRoot, 'system-info', '@cradle/system-info', 'src/server.ts')
     const confirmInstall = vi.fn<NonNullable<PluginInstallOptions['confirmInstall']>>(async () => false)
+    const downloadCenter = await createDownloadCenter(Buffer.alloc(0), userDataPath)
 
     const result = await installPluginFromRequest(parsePluginInstallUrl(installUrl), {
       availablePluginsDir: pluginsRoot,
       confirmInstall,
+      downloadCenter,
       now: () => new Date('2026-05-21T10:00:00.000Z'),
       userDataPath,
     })
@@ -286,7 +310,7 @@ describe('installPluginFromRequest', () => {
   it('does not publish a downloaded plugin when install consent is denied', async () => {
     const userDataPath = await createTempRoot('cradle-plugin-user-data-')
     const archive = await createRepositoryArchive()
-    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(archive)))
+    const downloadCenter = await createDownloadCenter(archive, userDataPath)
     const confirmInstall = vi.fn<NonNullable<PluginInstallOptions['confirmInstall']>>(async () => false)
     const packageDir = resolve(
       resolveDesktopInstalledPluginsDir(userDataPath),
@@ -295,13 +319,13 @@ describe('installPluginFromRequest', () => {
 
     const result = await installPluginFromRequest(parsePluginInstallUrl(`${installUrl}&ref=testref`), {
       confirmInstall,
-      fetchImpl,
+      downloadCenter,
       now: () => new Date('2026-05-21T10:00:00.000Z'),
       userDataPath,
     })
 
     expect(result).toBeUndefined()
-    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(downloadCenter.execute).toHaveBeenCalledOnce()
     expect(confirmInstall).toHaveBeenCalledOnce()
     expect(confirmInstall.mock.calls[0]?.[0]).toMatchObject({
       mode: 'downloaded',
@@ -326,10 +350,10 @@ describe('installPluginFromRequest', () => {
       ['wibus-wee-cradle-app-source'],
     )
     const archive = await readFile(archivePath)
-    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(archive)))
+    const downloadCenter = await createDownloadCenter(archive, userDataPath)
 
     await expect(installPluginFromRequest(parsePluginInstallUrl(`${installUrl}&ref=source`), {
-      fetchImpl,
+      downloadCenter,
       userDataPath,
     })).rejects.toThrow('non-runnable server entry')
   })

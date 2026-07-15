@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import {
   chronicleAccessibilityEvents,
@@ -33,11 +33,25 @@ import { z } from 'zod'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
-import { runDreamSchedulerTick, stopActivityPipelineScheduler, stopDreamScheduler, stopSlackBackgroundSync } from '../src/modules/chronicle/service'
+import { installModelResource, runDreamSchedulerTick, stopActivityPipelineScheduler, stopDreamScheduler, stopSlackBackgroundSync } from '../src/modules/chronicle/service'
 
 const runEmbeddingBatchMock = vi.hoisted(() => vi.fn(() => {
   throw new Error('embedding runtime unavailable')
 }))
+const modelPromotionFailureTarget = vi.hoisted(() => ({ value: null as string | null }))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    rename: async (from: string, to: string) => {
+      if (String(from).includes('.staging') && String(to) === modelPromotionFailureTarget.value) {
+        throw new Error('promotion failed')
+      }
+      await actual.rename(from, to)
+    },
+  }
+})
 
 vi.mock('ai', () => ({
   generateText: vi.fn(),
@@ -1218,28 +1232,42 @@ describe('chronicle module', () => {
         }),
       ])
 
-      const speakerManifestFetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response('invalid speaker extractor bytes', { status: 200 }),
-      )
-      const speakerManifestInstallResponse = await requestJson(app, '/chronicle/model-resources/speaker/install', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ source: 'manifest' }),
-      })
-      expect(speakerManifestInstallResponse.status).toBe(200)
-      const speakerManifestInstallBody = await speakerManifestInstallResponse.json() as { status: string, message: string | null }
-      expect(speakerManifestInstallBody.status).toBe('error')
-      expect(speakerManifestInstallBody.message).toContain('Size check failed for speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx')
-      expect(speakerManifestInstallBody.message).not.toContain('Manifest install requires source URL')
-      expect(speakerManifestFetchMock).toHaveBeenCalledWith(
-        'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
-        expect.objectContaining({
-          headers: { 'User-Agent': 'Cradle/1.0' },
-          redirect: 'follow',
-          signal: expect.any(AbortSignal),
+      const speakerArtifactPath = join(storageRoot, 'invalid-speaker.onnx')
+      writeFileSync(speakerArtifactPath, 'invalid speaker extractor bytes')
+      const executeSpeakerDownload = vi.fn(async (_request: {
+        owner: { namespace: string, resourceType: string, resourceId: string }
+        sources: Array<{ id: string, url: string }>
+        maxBytes: number
+      }) => ({
+        taskId: 'speaker-download-task',
+        filePath: speakerArtifactPath,
+        bytes: 31,
+        checksum: { algorithm: 'sha256' as const, expected: 'a'.repeat(64), actual: 'b'.repeat(64), matched: false },
+      }))
+      const releaseSpeakerDownload = vi.fn(async () => ({}))
+      const speakerDownloadCenter = {
+        execute: executeSpeakerDownload,
+        retry: async () => { throw new Error('unexpected retry') },
+        release: releaseSpeakerDownload,
+        findLatestRetryable: () => null,
+      }
+      const speakerManifestInstall = await installModelResource('speaker', { source: 'manifest' }, speakerDownloadCenter)
+      expect(speakerManifestInstall.status).toBe('error')
+      expect(speakerManifestInstall.message).toContain('Size check failed for speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx')
+      expect(speakerManifestInstall.message).not.toContain('Manifest install requires source URL')
+      expect(executeSpeakerDownload).toHaveBeenCalledWith(expect.objectContaining({
+        owner: expect.objectContaining({
+          namespace: 'chronicle',
+          resourceType: 'model-resource-file',
+          resourceId: 'speaker:speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
         }),
-      )
-      speakerManifestFetchMock.mockRestore()
+        sources: [{
+          id: 'chronicle:speaker:speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx:source:0',
+          url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
+        }],
+        maxBytes: 100 * 1024 ** 3,
+      }))
+      expect(releaseSpeakerDownload).toHaveBeenCalledWith('speaker-download-task')
 
       const sourceModelPath = join(storageRoot, 'silero_vad.onnx')
       writeFileSync(sourceModelPath, Buffer.alloc(643_854, 0x41))
@@ -3047,6 +3075,143 @@ describe('chronicle module', () => {
       else {
         process.env.CRADLE_CREDENTIAL_SECRET = previousCredentialSecret
       }
+    }
+  })
+
+  it('single-flights a category and retains completed artifacts until every file is promoted', async () => {
+    const dataDir = makeTempDir('cradle-chronicle-download-center-')
+    const artifactDir = makeTempDir('cradle-chronicle-artifacts-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    shutdownInfra()
+    let releaseFirst!: () => void
+    let releaseSecond!: () => void
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const secondGate = new Promise<void>((resolve) => { releaseSecond = resolve })
+    const execute = vi.fn(async (_request: { fileName: string }) => {
+      const artifactPath = join(artifactDir, request.fileName)
+      writeFileSync(artifactPath, request.fileName)
+      if (request.fileName === 'model.int8.onnx') { await firstGate }
+      else { await secondGate }
+      return {
+        taskId: `task-${request.fileName}`,
+        filePath: artifactPath,
+        bytes: request.fileName.length,
+        checksum: { algorithm: 'sha256' as const, expected: null, actual: 'a'.repeat(64), matched: null },
+      }
+    })
+    const release = vi.fn(async () => ({}))
+    const downloadCenter = { execute, retry: async () => { throw new Error('unexpected retry') }, release, findLatestRetryable: () => null }
+    try {
+      const first = installModelResource('audio-asr', { source: 'manifest' }, downloadCenter)
+      const second = installModelResource('audio-asr', { source: 'manifest' }, downloadCenter)
+      for (let attempt = 0; attempt < 100 && execute.mock.calls.length === 0; attempt += 1) {
+        await new Promise<void>(resolve => setTimeout(resolve, 10))
+      }
+      expect(execute).toHaveBeenCalledTimes(1)
+      releaseFirst()
+      for (let attempt = 0; attempt < 100 && execute.mock.calls.length === 1; attempt += 1) {
+        await new Promise<void>(resolve => setTimeout(resolve, 10))
+      }
+      expect(execute).toHaveBeenCalledTimes(2)
+      expect(release).not.toHaveBeenCalled()
+      releaseSecond()
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        expect.objectContaining({ status: 'available' }),
+        expect.objectContaining({ status: 'available' }),
+      ])
+      expect(release.mock.calls.map(([taskId]) => taskId).sort()).toEqual([
+        'task-model.int8.onnx',
+        'task-tokens.txt',
+      ])
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(artifactDir, { recursive: true, force: true })
+      if (previousDataDir === undefined) { delete process.env.CRADLE_DATA_DIR }
+      else { process.env.CRADLE_DATA_DIR = previousDataDir }
+    }
+  })
+
+  it('rolls back every promoted file and leaves local-file installation available on success', async () => {
+    const dataDir = makeTempDir('cradle-chronicle-rollback-')
+    const sourceRoot = makeTempDir('cradle-chronicle-local-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    shutdownInfra()
+    const modelTarget = join(dataDir, 'chronicle', 'models', 'audio-asr', 'sensevoice', 'model.int8.onnx')
+    const tokensTarget = join(dataDir, 'chronicle', 'models', 'audio-asr', 'sensevoice', 'tokens.txt')
+    const modelSource = join(sourceRoot, 'audio-asr', 'sensevoice', 'model.int8.onnx')
+    const tokensSource = join(sourceRoot, 'audio-asr', 'sensevoice', 'tokens.txt')
+    mkdirSync(dirname(modelTarget), { recursive: true })
+    mkdirSync(dirname(modelSource), { recursive: true })
+    writeFileSync(modelTarget, 'prior model')
+    writeFileSync(tokensTarget, 'prior tokens')
+    writeFileSync(modelSource, 'new model')
+    writeFileSync(tokensSource, 'new tokens')
+    modelPromotionFailureTarget.value = tokensTarget
+    try {
+      const failed = await installModelResource('audio-asr', { source: 'local-files', sourceRoot })
+      expect(failed.status).toBe('error')
+      expect(readFileSync(modelTarget, 'utf8')).toBe('prior model')
+      expect(readFileSync(tokensTarget, 'utf8')).toBe('prior tokens')
+    }
+    finally {
+      modelPromotionFailureTarget.value = null
+      const installed = await installModelResource('audio-asr', { source: 'local-files', sourceRoot })
+      expect(installed.status).toBe('available')
+      expect(readFileSync(modelTarget, 'utf8')).toBe('new model')
+      expect(readFileSync(tokensTarget, 'utf8')).toBe('new tokens')
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(sourceRoot, { recursive: true, force: true })
+      if (previousDataDir === undefined) { delete process.env.CRADLE_DATA_DIR }
+      else { process.env.CRADLE_DATA_DIR = previousDataDir }
+    }
+  })
+
+  it('retries the exact latest interrupted fallback task for a manifest file', async () => {
+    const dataDir = makeTempDir('cradle-chronicle-retry-')
+    const artifactDir = makeTempDir('cradle-chronicle-retry-artifacts-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    shutdownInfra()
+    const retry = vi.fn(async (_taskId: string, request: { fileName: string }) => {
+      const artifactPath = join(artifactDir, request.fileName)
+      writeFileSync(artifactPath, request.fileName)
+      return { taskId: 'interrupted-fallback-task', filePath: artifactPath, bytes: request.fileName.length, checksum: { algorithm: 'sha256' as const, expected: null, actual: 'a'.repeat(64), matched: null } }
+    })
+    const execute = vi.fn(async (_request: { fileName: string }) => {
+      const artifactPath = join(artifactDir, request.fileName)
+      writeFileSync(artifactPath, request.fileName)
+      return { taskId: `new-${request.fileName}`, filePath: artifactPath, bytes: request.fileName.length, checksum: { algorithm: 'sha256' as const, expected: null, actual: 'a'.repeat(64), matched: null } }
+    })
+    const downloadCenter = {
+      execute,
+      retry,
+      release: async () => ({}),
+      findLatestRetryable: (_owner, sourceId) => sourceId.endsWith('model.int8.onnx:source:1')
+        ? { taskId: 'interrupted-fallback-task', updatedAt: '2026-07-14T00:00:00.000Z' }
+        : null,
+    }
+    try {
+      await expect(installModelResource('audio-asr', { source: 'manifest' }, downloadCenter)).resolves.toMatchObject({ status: 'available' })
+      expect(retry).toHaveBeenCalledWith('interrupted-fallback-task', expect.objectContaining({
+        sources: [
+          expect.objectContaining({ id: 'chronicle:audio-asr:audio-asr/sensevoice/model.int8.onnx:source:0' }),
+          expect.objectContaining({ id: 'chronicle:audio-asr:audio-asr/sensevoice/model.int8.onnx:source:1' }),
+        ],
+      }))
+      expect(execute).toHaveBeenCalledTimes(1)
+      expect(execute).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'tokens.txt' }))
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(artifactDir, { recursive: true, force: true })
+      if (previousDataDir === undefined) { delete process.env.CRADLE_DATA_DIR }
+      else { process.env.CRADLE_DATA_DIR = previousDataDir }
     }
   })
 })

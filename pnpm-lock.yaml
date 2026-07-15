@@ -343,6 +343,9 @@ importers:
       '@cradle/browser-use':
         specifier: workspace:*
         version: link:../../plugins/browser-use
+      '@cradle/download-center':
+        specifier: workspace:*
+        version: link:../../packages/download-center
       '@cradle/ipc':
         specifier: workspace:*
         version: link:../../packages/ipc
@@ -736,6 +739,9 @@ importers:
       '@cradle/chat-runtime-contracts':
         specifier: workspace:*
         version: link:../../packages/chat-runtime-contracts
+      '@cradle/download-center':
+        specifier: workspace:*
+        version: link:../../packages/download-center
       '@cradle/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk

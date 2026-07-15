@@ -13,9 +13,10 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
-import { Progress } from '~/components/ui/progress'
 import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
+import { isActiveDownload } from '~/features/download-center/types'
+import { useDownloadCenterOwner } from '~/features/download-center/use-download-center'
 import type { DesktopCliStatus, DesktopUpdateStatus } from '~/lib/electron'
 import { isElectron, nativeIpc, subscribeDesktopUpdateStatus } from '~/lib/electron'
 import { formatCompactBytes } from '~/lib/number-format'
@@ -32,11 +33,8 @@ const EMPTY_UPDATE_STATUS: DesktopUpdateStatus = {
   unsupported: true,
   currentVersion: '0.0.0',
   isCheckingForUpdates: false,
-  isDownloadingUpdate: false,
   isPreparingUpdate: false,
-  downloadingProgress: 0,
   updateDownloaded: false,
-  downloadedFilePath: null,
   updateInfo: null,
   errorMessage: 'Desktop updates are only available in the Electron app',
 }
@@ -92,6 +90,7 @@ export function DesktopUpdateSettings() {
   const [statusReady, setStatusReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [terminalAppDraft, setTerminalAppDraft] = useState('')
+  const downloadTasks = useDownloadCenterOwner({ namespace: 'desktop-update' })
   const {
     prefs: desktopPrefs,
     isSaving: isSavingDesktopPrefs,
@@ -100,7 +99,11 @@ export function DesktopUpdateSettings() {
 
   const targetVersion = readTargetVersion(status)
   const targetSize = readTargetSize(status)
-  const busy = loading || status.isCheckingForUpdates || status.isDownloadingUpdate || status.isPreparingUpdate
+  const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
+    && task.owner.namespace === 'desktop-update'
+    && (task.owner.resourceType === 'macos-update' || task.owner.resourceType === 'windows-update')
+    && isActiveDownload(task))
+  const busy = loading || status.isCheckingForUpdates || !!updateDownload || status.isPreparingUpdate
   const canCheck = isElectron && !!nativeIpc && !status.unsupported && !busy
   const canDownload = canCheck && !!status.updateInfo && !status.updateDownloaded
   const canApply = canCheck && status.updateDownloaded
@@ -112,7 +115,7 @@ export function DesktopUpdateSettings() {
     if (status.isCheckingForUpdates) {
       return t('desktop.updates.status.checking' as SettingsKey)
     }
-    if (status.isDownloadingUpdate) {
+    if (updateDownload) {
       return t('desktop.updates.status.downloading' as SettingsKey)
     }
     if (status.isPreparingUpdate) {
@@ -125,7 +128,7 @@ export function DesktopUpdateSettings() {
       return t('desktop.updates.status.available' as SettingsKey)
     }
     return t('desktop.updates.status.current' as SettingsKey)
-  }, [status, t])
+  }, [status, t, updateDownload])
 
   const cliStatusLabel = useMemo(() => {
     if (!cliStatus.supported) {
@@ -288,6 +291,15 @@ export function DesktopUpdateSettings() {
                 <span className="text-muted-foreground">{t('desktop.updates.currentVersion' as SettingsKey)}</span>
                 <span className="font-mono tabular-nums text-foreground">{status.currentVersion}</span>
               </div>
+              {updateDownload && (
+                <div className="flex items-center justify-between gap-3 text-[12px]">
+                  <span className="text-muted-foreground">{t('desktop.updates.status.downloading' as SettingsKey)}</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {formatCompactBytes(updateDownload.transferredBytes)}
+                    {updateDownload.totalBytes === null ? ' · —' : ` / ${formatCompactBytes(updateDownload.totalBytes)}`}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-3 text-[12px]">
                 <span className="text-muted-foreground">{t('desktop.updates.availableVersion' as SettingsKey)}</span>
                 <div className="flex items-center gap-2">
@@ -309,22 +321,6 @@ export function DesktopUpdateSettings() {
                     <StaticRender content={status.updateInfo.releaseNotes} />
                   </div>
                 </div>
-              )}
-
-              {(status.isDownloadingUpdate || status.isPreparingUpdate || status.updateDownloaded) && (
-                <div className="flex items-center gap-3">
-                  <Progress value={status.downloadingProgress} className="h-1.5 flex-1" />
-                  <span className="w-10 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-                    {Math.round(status.downloadingProgress)}
-                    %
-                  </span>
-                </div>
-              )}
-
-              {status.downloadedFilePath && (
-                <p className="font-mono text-[11px] text-muted-foreground break-all">
-                  {status.downloadedFilePath}
-                </p>
               )}
 
               {status.errorMessage && (

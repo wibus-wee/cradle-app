@@ -34,6 +34,8 @@ import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-mo
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
 import type { ProviderModelOption } from '~/features/composer-toolbar/types'
+import type { DownloadTask } from '~/features/download-center/types'
+import { useDownloadCenterProgressByOwner } from '~/features/download-center/use-download-center-progress'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
@@ -68,7 +70,6 @@ import {
   useChronicleAudioRawSegments,
   useChronicleAudioTranscripts,
   useChronicleConfig,
-  useChronicleDownloadProgress,
   useChronicleDreamActions,
   useChronicleDreamRuns,
   useChronicleKnowledgeCard,
@@ -90,6 +91,17 @@ import {
 const MEMORY_SEARCH_LIMIT = 50
 const PRIVACY_RULE_LINE_SPLIT_RE = /\r?\n/
 type ChronicleTranslate = TFunction<'chronicle'>
+const MODEL_RESOURCE_CATEGORIES: readonly ChronicleModelResource['category'][] = ['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii']
+
+function modelResourceCategoryForDownload(task: DownloadTask): ChronicleModelResource['category'] | null {
+  if (task.scope !== 'server') { return null }
+  const separator = task.owner.resourceId.indexOf(':')
+  if (separator === -1) { return null }
+  const category = task.owner.resourceId.slice(0, separator)
+  return MODEL_RESOURCE_CATEGORIES.includes(category as ChronicleModelResource['category'])
+    ? category as ChronicleModelResource['category']
+    : null
+}
 
 const AccessibilityTreeNodeSchema = z.object({
   role: z.string().nullable().optional().transform(value => value?.trim() || 'AXElement'),
@@ -1375,7 +1387,11 @@ function ResourceGrid({ loading, resources }: { loading: boolean, resources: Chr
     verifying,
     installing,
   } = useChronicleModelResourceActions()
-  const downloadProgress = useChronicleDownloadProgress(installingAll || installing)
+  const downloadProgress = useDownloadCenterProgressByOwner(
+    { namespace: 'chronicle', resourceType: 'model-resource-file' },
+    installingAll || installing,
+    modelResourceCategoryForDownload,
+  )
 
   if (loading) {
     return <EmptyState icon={<CpuIcon className="size-4" />} title={t('resources.loading')} />
@@ -1436,13 +1452,14 @@ function ResourceItem({
   busy: boolean
   installResource: ReturnType<typeof useChronicleModelResourceActions>['installResource']
   verifyResource: ReturnType<typeof useChronicleModelResourceActions>['verifyResource']
-  downloadProgress: ReturnType<typeof useChronicleDownloadProgress>
+  downloadProgress: Partial<Record<ChronicleModelResource['category'], number>>
 }) {
   const { t } = useTranslation('chronicle')
   const tone = getResourceTone(resource)
   const [message, setMessage] = useState<string | null>(null)
   const canInstall = resource.category !== 'ocr'
   const canDownload = canInstall && hasVerifiedManifestDownload(resource)
+  const progress = downloadProgress[resource.category]
 
   return (
     <div className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
@@ -1508,9 +1525,9 @@ function ResourceItem({
             </div>
           )}
           {message && <p className="mt-1 text-[11px] text-muted-foreground">{message}</p>}
-          {downloadProgress[resource.category] && (
+          {progress !== undefined && (
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {t('resources.downloadProgress', { progress: downloadProgress[resource.category] })}
+              {t('resources.downloadProgress', { progress })}
             </p>
           )}
         </div>

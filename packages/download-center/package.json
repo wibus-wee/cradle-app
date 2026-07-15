@@ -9,8 +9,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest --root ../.. run packages/download-center/tests/http-artifact-downloader.test.ts --project node"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.19.1",

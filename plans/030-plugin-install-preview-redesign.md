@@ -245,3 +245,7 @@ Build `plugins-trust-consent-dialog.tsx`; wire into both the `done`-step Enable 
 - Preview does not return icon bytes (icons are served by `GET /plugins/:routeSegment/icon`, which requires a registered routeSegment the preview doesn't create). The review list uses first-letter fallbacks; real icons appear on the `done` step after registration. If preview-time icons become important later, add a `preview/:token/icon` endpoint keyed by packageDir — separate plan.
 - `localPath` remains CLI-only (unchanged from 029).
 - The deep-link (`cradle://plugins/install`) primary install path is untouched; this plan only redesigns the in-Settings manual flow.
+
+## Reconciliation — 2026-07-15
+
+Plan 047 confirmed that the preview/cache foundation described here already exists: plugin source preview/install resolves through the hash-keyed cache, and GitHub archive transfer now runs through the server Download Center rather than an in-memory `arrayBuffer` path. The preview remains stateless: Download Center owns durable redacted transfer state, while plugin source ownership retains discovery, trust evaluation, cache publication, and extraction. This is foundation reconciliation only; it does not mark this plan's consumer-flow criteria complete.

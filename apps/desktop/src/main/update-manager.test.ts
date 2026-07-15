@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
   DesktopUpdateCandidate,
-  DesktopUpdateDownload,
   DesktopUpdateInstallerPlan,
 } from './update-types'
 
@@ -36,38 +35,6 @@ const updateSourceMocks = vi.hoisted(() => {
   }
 })
 
-const updateDownloaderMocks = vi.hoisted(() => {
-  const state = {
-    download: {
-      archivePath: '/tmp/Cradle-1.2.3-universal.zip',
-      artifact: {
-        url: 'https://updates.example.com/cradle/macos/Cradle-1.2.3-universal.zip',
-        size: 10,
-        sha256: 'a'.repeat(64),
-        platform: 'darwin' as const,
-        arch: 'universal' as const,
-      },
-    } satisfies DesktopUpdateDownload,
-    instances: [] as Array<{ download: ReturnType<typeof vi.fn> }>,
-  }
-
-  class DesktopUpdateDownloader {
-    readonly download = vi.fn(async (_candidate: DesktopUpdateCandidate, onProgress?: (progress: { percent: number }) => void) => {
-      onProgress?.({ percent: 42 })
-      return state.download
-    })
-
-    constructor() {
-      state.instances.push(this)
-    }
-  }
-
-  return {
-    DesktopUpdateDownloader,
-    state,
-  }
-})
-
 const updateInstallerMocks = vi.hoisted(() => {
   const state = {
     plan: {
@@ -84,6 +51,8 @@ const updateInstallerMocks = vi.hoisted(() => {
       prepare: ReturnType<typeof vi.fn>
       launch: ReturnType<typeof vi.fn>
       readLastResult: ReturnType<typeof vi.fn>
+      discard: ReturnType<typeof vi.fn>
+      discardStaleStaging: ReturnType<typeof vi.fn>
     }>,
   }
 
@@ -91,6 +60,8 @@ const updateInstallerMocks = vi.hoisted(() => {
     readonly prepare = vi.fn(async () => state.plan)
     readonly launch = vi.fn()
     readonly readLastResult = vi.fn(async () => null)
+    readonly discard = vi.fn(async () => undefined)
+    readonly discardStaleStaging = vi.fn(async () => undefined)
 
     constructor() {
       state.instances.push(this)
@@ -155,13 +126,14 @@ const electronUpdaterMocks = vi.hoisted(() => {
 vi.mock('electron', () => electronMocks)
 vi.mock('electron-updater', () => ({
   autoUpdater: electronUpdaterMocks.autoUpdater,
+  CancellationToken: class {
+    cancelled = false
+    cancel(): void { this.cancelled = true }
+  },
 }))
 vi.mock('./update-source', () => ({
   DesktopUpdateSource: updateSourceMocks.DesktopUpdateSource,
   readUpdateFeedUrl: updateSourceMocks.state.readUpdateFeedUrl,
-}))
-vi.mock('./update-downloader', () => ({
-  DesktopUpdateDownloader: updateDownloaderMocks.DesktopUpdateDownloader,
 }))
 vi.mock('./update-installer', () => ({
   DesktopUpdateInstaller: updateInstallerMocks.DesktopUpdateInstaller,
@@ -222,7 +194,6 @@ describe('desktopUpdateManager', () => {
     updateSourceMocks.state.candidate = createCandidate()
     updateSourceMocks.state.instances.length = 0
     updateSourceMocks.state.readUpdateFeedUrl.mockReturnValue('https://updates.example.com/cradle')
-    updateDownloaderMocks.state.instances.length = 0
     updateInstallerMocks.state.instances.length = 0
     electronUpdaterMocks.autoUpdater.reset()
   })
@@ -242,6 +213,15 @@ describe('desktopUpdateManager', () => {
       requestQuitForUpdate: async () => {
         quitEvents.push('quit')
       },
+      downloadCenter: {
+        execute: vi.fn(async () => ({
+          taskId: 'mac-update-task',
+          filePath: '/tmp/Cradle-1.2.3-universal.zip',
+          bytes: 10,
+          checksum: { algorithm: 'sha256' as const, expected: 'a'.repeat(64), actual: 'a'.repeat(64), matched: true },
+        })),
+        release: vi.fn(async () => ({}) as never),
+      },
     })
 
     await expect(manager.checkForUpdates()).resolves.toMatchObject({
@@ -250,21 +230,14 @@ describe('desktopUpdateManager', () => {
       },
       updateDownloaded: false,
     })
-    expect(updateDownloaderMocks.state.instances[0]?.download).not.toHaveBeenCalled()
-
     await expect(manager.downloadUpdate()).resolves.toMatchObject({
-      downloadingProgress: 100,
       updateDownloaded: true,
-      downloadedFilePath: '/tmp/Cradle-1.2.3-universal.zip',
     })
-    expect(updateDownloaderMocks.state.instances[0]?.download).toHaveBeenCalledWith(
-      updateSourceMocks.state.candidate,
-      expect.any(Function),
-    )
-    expect(updateInstallerMocks.state.instances[0]?.prepare).toHaveBeenCalledWith(
-      updateDownloaderMocks.state.download,
-      '1.2.3',
-    )
+    expect(updateInstallerMocks.state.instances[0]?.prepare).toHaveBeenCalledWith(expect.objectContaining({
+      archivePath: '/tmp/Cradle-1.2.3-universal.zip',
+      artifact: updateSourceMocks.state.candidate?.artifact,
+      taskId: 'mac-update-task',
+    }), '1.2.3')
 
     await manager.applyUpdate()
 
@@ -283,6 +256,95 @@ describe('desktopUpdateManager', () => {
 
     expect(manager.status.errorMessage).toBe('No prepared desktop update is available')
     expect(updateInstallerMocks.state.instances[0]?.launch).not.toHaveBeenCalled()
+  })
+
+  it('requires the Download Center before preparing a macOS update', async () => {
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({ updateFeedUrl: 'https://updates.example.com/cradle' })
+
+    await manager.checkForUpdates()
+    await expect(manager.downloadUpdate()).resolves.toMatchObject({
+      updateDownloaded: false,
+      errorMessage: 'Desktop Download Center is not ready',
+    })
+  })
+
+  it('releases an unapplicable prepared macOS artifact and clears its staging on shutdown', async () => {
+    const release = vi.fn(async () => undefined)
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://updates.example.com/cradle',
+      downloadCenter: {
+        execute: vi.fn(async () => ({
+          taskId: 'mac-update-task',
+          filePath: '/tmp/Cradle-1.2.3-universal.zip',
+          bytes: 10,
+          checksum: { algorithm: 'sha256' as const, expected: 'a'.repeat(64), actual: 'a'.repeat(64), matched: true },
+        })),
+        release,
+      } as never,
+    })
+    await manager.checkForUpdates()
+    await manager.downloadUpdate()
+    await manager.shutdown()
+
+    expect(release).toHaveBeenCalledWith('mac-update-task')
+    expect(updateInstallerMocks.state.instances[0]?.discard).toHaveBeenCalledWith(updateInstallerMocks.state.plan)
+  })
+
+  it('discards the previous prepared update before accepting a newly checked candidate', async () => {
+    const release = vi.fn(async () => undefined)
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://updates.example.com/cradle',
+      downloadCenter: {
+        execute: vi.fn(async () => ({
+          taskId: 'superseded-update-task',
+filePath: '/tmp/Cradle.zip',
+bytes: 10,
+          checksum: { algorithm: 'sha256' as const, expected: 'a'.repeat(64), actual: 'a'.repeat(64), matched: true },
+        })),
+        release,
+      } as never,
+    })
+    await manager.checkForUpdates()
+    await manager.downloadUpdate()
+    await manager.checkForUpdates()
+
+    expect(release).toHaveBeenCalledWith('superseded-update-task')
+    expect(updateInstallerMocks.state.instances[0]?.discard).toHaveBeenCalledWith(updateInstallerMocks.state.plan)
+  })
+
+  it('releases stale macOS update artifacts at the next desktop boot', async () => {
+    const release = vi.fn(async () => undefined)
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({ updateFeedUrl: 'https://updates.example.com/cradle' })
+    await manager.recoverDownloadCenter({
+      execute: vi.fn(),
+      release,
+      beginExternal: vi.fn(),
+      reportExternal: vi.fn(),
+      list: () => [{
+        taskId: 'stale-task',
+scope: 'desktop',
+owner: { namespace: 'desktop-update', resourceType: 'macos-update', resourceId: '1.2.3', displayName: 'Cradle 1.2.3' },
+fileName: 'Cradle.zip',
+sourceId: 'desktop-update',
+status: 'completed',
+transferredBytes: 10,
+totalBytes: 10,
+attempts: 1,
+maxAttempts: 1,
+error: null,
+result: null,
+createdAt: '2026-07-15T00:00:00.000Z',
+updatedAt: '2026-07-15T00:00:00.000Z',
+startedAt: '2026-07-15T00:00:00.000Z',
+finishedAt: '2026-07-15T00:00:00.000Z',
+      }],
+    } as never)
+    expect(release).toHaveBeenCalledWith('stale-task')
+    expect(updateInstallerMocks.state.instances[0]?.discardStaleStaging).toHaveBeenCalledOnce()
   })
 
   it('checks, downloads, and applies Windows NSIS updates through electron-updater', async () => {
@@ -342,14 +404,56 @@ describe('desktopUpdateManager', () => {
     })
 
     await expect(manager.downloadUpdate()).resolves.toMatchObject({
-      downloadingProgress: 100,
       updateDownloaded: true,
-      downloadedFilePath: downloadedFile,
     })
 
     await manager.applyUpdate()
 
     expect(quitEvents).toEqual(['prepare'])
     expect(electronUpdaterMocks.autoUpdater.quitAndInstall).toHaveBeenCalledWith(false, true)
+  })
+
+  it('projects a Windows updater download and propagates Download Center cancellation', async () => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+    const updateInfo = createWindowsUpdateInfo()
+    electronUpdaterMocks.autoUpdater.checkForUpdates.mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo,
+      versionInfo: updateInfo,
+      downloadPromise: null,
+    })
+    let cancelProjection: (() => void) | undefined
+    const reportExternal = vi.fn(async () => null)
+    electronUpdaterMocks.autoUpdater.downloadUpdate.mockImplementation((token: { cancelled: boolean }) => new Promise<string[]>((_, reject) => {
+      const interval = setInterval(() => {
+        if (!token.cancelled) { return }
+        clearInterval(interval)
+        reject(new Error('cancelled'))
+      }, 1)
+    }))
+
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({ updateFeedUrl: 'https://updates.example.com/manifest.json' })
+    manager.setDownloadCenter({
+      execute: vi.fn(),
+      release: vi.fn(),
+      beginExternal: vi.fn(async (_request, cancel) => {
+        cancelProjection = cancel
+        return { taskId: 'windows-update-task' }
+      }),
+      reportExternal,
+    } as never)
+
+    await manager.checkForUpdates()
+    const download = manager.downloadUpdate()
+    await vi.waitFor(() => expect(cancelProjection).toBeTypeOf('function'))
+    cancelProjection?.()
+    await download
+
+    expect(reportExternal).toHaveBeenCalledWith('windows-update-task', expect.objectContaining({
+      status: 'cancelled',
+      error: expect.objectContaining({ code: 'cancelled' }),
+    }))
+    expect(electronUpdaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledTimes(1)
   })
 })

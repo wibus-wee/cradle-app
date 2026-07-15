@@ -452,7 +452,7 @@ async function updateCradleCliSkill(operations: CliOperationSpec[]): Promise<voi
   if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
     const before = content.slice(0, startIndex).trimEnd()
     const after = content.slice(endIndex + generatedSkillEnd.length).trimStart()
-    await writeFile(cradleCliSkillPath, `${before}\n\n${block}\n\n${after}`)
+    await writeFile(cradleCliSkillPath, `${before}\n\n${block}${after ? `\n\n${after}` : '\n'}`)
     return
   }
 

@@ -36,7 +36,12 @@ import {
   unregisterPluginDescriptor,
 } from './runtime-registry'
 import { resetPluginSkillRegistry } from './skill-registry'
-import { deletePluginSourceCache, resolvePluginSourceDirectory } from './source-installer'
+import type { PluginSourceInstallerOptions } from './source-installer'
+import {
+  deletePluginSourceCache,
+  inspectPluginSourceDirectory,
+  resolvePluginSourceDirectory,
+} from './source-installer'
 import { listPluginSources, readPluginSource } from './source-registry'
 import { createPluginStaticServer, rewritePluginWebBundleImports } from './static-server'
 import { grantPluginTrust } from './trust-grants'
@@ -118,7 +123,15 @@ async function getPluginDiscoverySources(defaultPluginsDir: string): Promise<Plu
   }
   for (const source of listPluginSources()) {
     try {
-      const pluginsDir = await resolvePluginSourceDirectory(source)
+      const pluginsDir = await inspectPluginSourceDirectory(source)
+      if (!pluginsDir) {
+        logger.warn('plugin source cache is unresolved', {
+          sourceId: source.id,
+          kind: source.kind,
+          location: source.location,
+        })
+        continue
+      }
       const normalizedDir = resolve(pluginsDir)
       if (sources.some(existing => resolve(existing.pluginsDir) === normalizedDir)) { continue }
       sources.push({
@@ -507,7 +520,10 @@ async function prepareAndActivateManifests(manifests: PluginManifest[]): Promise
   }
 }
 
-export async function discoverAndActivateSource(sourceId: string): Promise<PluginDescriptor[]> {
+export async function discoverAndActivateSource(
+  sourceId: string,
+  options: PluginSourceInstallerOptions = {},
+): Promise<PluginDescriptor[]> {
   const source = readPluginSource(sourceId)
   if (!source) {
     throw new Error(`Plugin source not found: ${sourceId}`)
@@ -515,7 +531,7 @@ export async function discoverAndActivateSource(sourceId: string): Promise<Plugi
   // Use `resolvePluginSourceDirectory` (cache-aware) instead of `refreshPluginSourceDirectory`
   // so a preview->install flow reuses the preview's cached download instead of rm+re-fetching.
   // Operators who need a forced refresh use the per-source Refresh action or the CLI.
-  const pluginsDir = await resolvePluginSourceDirectory(source)
+  const pluginsDir = await resolvePluginSourceDirectory(source, options)
   const packages = await discoverPackagesFromSources([{
     pluginsDir,
     kind: 'externalLocal',
@@ -535,9 +551,10 @@ export async function removeDiscoveredSource(sourceId: string): Promise<void> {
   if (!source) {
     throw new Error(`Plugin source not found: ${sourceId}`)
   }
-  const pluginsDir = await resolvePluginSourceDirectory(source)
-  const descriptors = listPluginDescriptors()
-    .filter(descriptor => isPathWithin(descriptor.source.packageDir, pluginsDir))
+  const pluginsDir = await inspectPluginSourceDirectory(source)
+  const descriptors = pluginsDir
+    ? listPluginDescriptors().filter(descriptor => isPathWithin(descriptor.source.packageDir, pluginsDir))
+    : []
 
   for (const descriptor of descriptors) {
     await deactivatePluginServerLayer(descriptor.identity)

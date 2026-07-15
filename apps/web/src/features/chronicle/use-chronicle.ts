@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
 import { z } from 'zod'
 
 import {
@@ -13,7 +12,7 @@ import {
   getChronicleTimelineQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { postSecrets, putChronicleConfig } from '~/api-gen/sdk.gen'
-import { getAuthenticatedEventSourceUrl, getServerUrl } from '~/lib/electron'
+import { getServerUrl } from '~/lib/electron'
 
 export interface ChronicleConfig {
   profileId: string
@@ -387,6 +386,8 @@ export interface ChronicleSlackSyncResult {
   message: string
 }
 
+const ChronicleModelResourceCategorySchema = z.enum(['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii'])
+
 const CHRONICLE_MODEL_RESOURCE_DEFAULTS: ChronicleModelResource[] = [
   {
     category: 'ocr',
@@ -470,7 +471,7 @@ const CHRONICLE_MODEL_RESOURCE_DEFAULTS: ChronicleModelResource[] = [
 
 const ChronicleModelResourceEntrySchema = z.object({
   id: z.string(),
-  category: z.enum(['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii']),
+  category: ChronicleModelResourceCategorySchema,
   status: z.enum(['available', 'missing', 'installing', 'installed', 'error']),
   displayName: z.string().trim().min(1),
   path: z.string().nullable().optional().default(null),
@@ -545,29 +546,6 @@ const ChronicleMessageSourceSchema = z.object({
 }).passthrough()
 
 const ChronicleMessageSourcesSchema = z.array(ChronicleMessageSourceSchema)
-
-const ChronicleDownloadProgressEntrySchema = z.object({
-  category: z.string(),
-  file: z.string(),
-  totalBytes: z.number().finite().nullable().optional().default(null),
-  downloadedBytes: z.number().finite(),
-  status: z.enum(['downloading', 'done', 'error']),
-  error: z.string().optional(),
-  startedAt: z.number().finite(),
-}).passthrough()
-
-const ChronicleDownloadProgressEventSchema = z.union([
-  z.array(ChronicleDownloadProgressEntrySchema),
-  ChronicleDownloadProgressEntrySchema.transform(entry => [entry]),
-])
-
-const ChronicleDownloadProgressMessageSchema = z.string()
-  .transform(message => JSON.parse(message))
-  .pipe(ChronicleDownloadProgressEventSchema)
-
-export function readChronicleDownloadProgressMessage(message: string): DownloadProgressEntry[] {
-  return ChronicleDownloadProgressMessageSchema.parse(message)
-}
 
 const ChronicleSlackSyncResultSchema = z.object({
   sourceId: z.string(),
@@ -916,7 +894,7 @@ const TimelineEntriesSchema = z.array(TimelineEntrySchema)
 const MemoryEntriesSchema = z.array(MemoryEntrySchema)
 
 const ChronicleModelResourceInstallDraftSchema = z.object({
-  category: z.enum(['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii']),
+  category: ChronicleModelResourceCategorySchema,
   source: z.enum(['manifest', 'local-files']).optional(),
   sourceRoot: z.string().trim().min(1).nullable().optional(),
   files: z.array(z.object({
@@ -1108,66 +1086,6 @@ export function useChronicleModelResourceActions() {
     installing,
     removing,
   }
-}
-
-export interface DownloadProgressEntry {
-  category: string
-  file: string
-  totalBytes: number | null
-  downloadedBytes: number
-  status: 'downloading' | 'done' | 'error'
-  error?: string
-  startedAt: number
-}
-
-export function useChronicleDownloadProgress(active: boolean): Map<string, DownloadProgressEntry> {
-  const [progress, setProgress] = useState<Map<string, DownloadProgressEntry>>(() => new Map())
-
-  useEffect(() => {
-    if (!active) {
-      setProgress(new Map())
-      return
-    }
-    const url = `${getServerUrl()}/chronicle/model-resources/download-progress`
-    let eventSource: EventSource | null = null
-    let cancelled = false
-    let malformedFrameReported = false
-    void getAuthenticatedEventSourceUrl(url).then((authenticatedUrl) => {
-      if (cancelled) {
-        return
-      }
-      eventSource = new EventSource(authenticatedUrl)
-      eventSource.onmessage = (event) => {
-      let entries: DownloadProgressEntry[]
-      try {
-        entries = ChronicleDownloadProgressMessageSchema.parse(event.data)
-      }
- catch (error) {
-        if (!malformedFrameReported) {
-          malformedFrameReported = true
-          console.warn('[chronicle] dropped malformed download progress event', error)
-        }
-        return
-      }
-      setProgress((prev) => {
-        const next = new Map(prev)
-        for (const entry of entries) {
-          next.set(`${entry.category}/${entry.file}`, entry)
-        }
-        return next
-      })
-      }
-      eventSource.onerror = () => {
-        // Reconnect is automatic with EventSource while the ticket remains attached.
-      }
-    }).catch(error => console.warn('[chronicle] failed to open download progress stream', error))
-    return () => {
-      cancelled = true
-      eventSource?.close()
-    }
-  }, [active])
-
-  return progress
 }
 
 export function useChronicleMessageSources() {

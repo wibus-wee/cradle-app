@@ -21,10 +21,12 @@ import {
 } from './modules/chat-runtime/http/events.routes'
 import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked-session-proxy'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
-import { chronicle } from './modules/chronicle'
+import { createChronicleModule } from './modules/chronicle'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
 import { diffReview } from './modules/diff-review'
+import { createDownloadCenterModule } from './modules/download-center'
+import { DownloadCenterService } from './modules/download-center/service'
 import { externalIssueSources } from './modules/external-issue-sources'
 import { externalProviderSources } from './modules/external-provider-sources'
 import { externalWorkImport } from './modules/external-work-import'
@@ -39,7 +41,7 @@ import { linkPreview } from './modules/link-preview'
 import { modelRegistry } from './modules/model-registry'
 import { observability } from './modules/observability'
 import { opencodeServer } from './modules/opencode-server'
-import { plugins as pluginsApi } from './modules/plugins'
+import { createPluginsModule } from './modules/plugins'
 import { preferences } from './modules/preferences'
 import { profiles } from './modules/profiles'
 import { providers } from './modules/provider-catalog'
@@ -76,6 +78,7 @@ interface CreateServerAppOptions {
 
 interface CreateServerContractAppOptions {
   includeRuntimeHttpPlugins?: boolean
+  downloadCenterService?: DownloadCenterService
 }
 
 const HOSTED_WEB_APP_ORIGINS = new Set([
@@ -118,6 +121,8 @@ export async function createServerContractApp(options: CreateServerContractAppOp
     },
   })
   const { includeRuntimeHttpPlugins = false } = options
+  const downloadCenter = createDownloadCenterModule(options.downloadCenterService)
+  const chronicle = createChronicleModule(downloadCenter.service)
   const app = new Elysia({
     name: 'cradle.server.elysia',
     adapter: node(),
@@ -194,7 +199,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(kanban)
   app.use(linkPreview)
   app.use(search)
-  app.use(pluginsApi)
+  app.use(createPluginsModule({ downloadCenter: downloadCenter.service }))
   app.use(skills)
   app.use(workflowRules)
   app.use(git)
@@ -212,6 +217,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(opencodeServer)
   app.use(agentInteractionRuntime)
   app.use(desktop)
+  app.use(downloadCenter.routes)
   registerPtyRoutes(app)
   registerSyncGatewayRoutes(app)
   app.use(observability)
@@ -230,6 +236,8 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     recoverPersistedRunsOnCreate = false,
     startBackgroundTasks = process.env.NODE_ENV !== 'test',
   } = options
+  const downloadCenterService = new DownloadCenterService()
+  await downloadCenterService.boot()
   const [
     { shutdownInfra, getServerConfig },
     { abortAllRuns, flushAllActiveRunSnapshots, recoverPersistedRunProjections },
@@ -271,7 +279,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     recoverPersistedRunProjections()
   }
 
-  const app = await createServerContractApp({ includeRuntimeHttpPlugins: true })
+  const app = await createServerContractApp({ includeRuntimeHttpPlugins: true, downloadCenterService })
   registerAgentToolsMcpServer()
 
   // Initialize the always-on relay host-connector (connects to the host's own
@@ -288,6 +296,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   reconcileExternalIssueSourceRegistrations()
 
   const runtimeResources = new RuntimeResourceRegistry()
+  runtimeResources.register({
+    name: 'download-center',
+    phase: 'cancel',
+    stop: () => downloadCenterService.shutdown(),
+  })
   runtimeResources.register({
     name: 'active-run-snapshots',
     phase: 'drain',

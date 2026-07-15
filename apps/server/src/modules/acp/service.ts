@@ -191,7 +191,7 @@ export async function install(agentId: string, distributionType: AcpDistribution
     })
   }
 
-  if (distributionType === 'binary' && agent.distribution.binary) {
+  if (distributionType === 'binary') {
     throw new AppError({
       code: 'acp_binary_integrity_metadata_missing',
       status: 409,
@@ -224,20 +224,7 @@ export async function install(agentId: string, distributionType: AcpDistribution
   })
 
   try {
-    let result: InstallResult
-    if (distributionType === 'binary') {
-      const controller = new AbortController()
-      installAbortControllers.set(agentId, controller)
-      try {
-        result = await installer.installBinaryAgent(agent, getRuntimeDataDir(), controller.signal)
-      }
-      finally {
-        installAbortControllers.delete(agentId)
-      }
-    }
-    else {
-      result = installer.installPackageAgent(agent, distributionType)
-    }
+    const result: InstallResult = installer.installPackageAgent(agent, distributionType)
 
     saveInstalledToDb({ agent, distributionType, result })
     recordAudit({

@@ -30,6 +30,7 @@ import {
   chronicleSnapshots,
   chronicleSpeakerProfiles,
 } from '@cradle/db'
+import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import type { LanguageModel } from 'ai'
 import { generateText } from 'ai'
 import { count, desc, eq, inArray, sql } from 'drizzle-orm'
@@ -44,7 +45,6 @@ import { createLanguageModel, detectApiFormat } from '../chat-runtime-engine/pro
 import * as ProviderTargets from '../provider-targets/service'
 import { readSecret } from '../secrets/service'
 import * as DaemonManager from './daemon-manager'
-import { downloadModelResourceToFile } from './model-resource-download'
 
 interface ChronicleConfig {
   profileId: string
@@ -530,17 +530,14 @@ const MEMORY_SEMANTIC_SCORE_WEIGHT = 12
 const MEMORY_SEMANTIC_MIN_SCORE = 0.28
 const ACTIVITY_IDLE_BOUNDARY_SECONDS = 10 * 60
 const ACTIVITY_MAX_SEGMENT_SECONDS = 30 * 60
-const MODEL_RESOURCE_FETCH_TIMEOUT_MS = 30_000
+// A fixed owner guard against local disk exhaustion. This is not a claimed source
+// size: manifest `sizeBytes`, when present, remains the precise validation.
+const MODEL_RESOURCE_DOWNLOAD_MAX_BYTES = 100 * 1024 ** 3
 const EMBEDDING_RUNTIME_HEALTH_TIMEOUT_MS = 5_000
 const EMBEDDING_RUNTIME_HEALTH_CACHE_MS = 60_000
 const DREAM_SCHEDULER_MIN_INTERVAL_MS = 3_600_000
 const DREAM_SCHEDULER_MAX_INTERVAL_MS = 7 * 86_400_000
 const ACTIVITY_SESSION_GAP_SECONDS = 6 * 60 * 60
-
-const ModelResourceFetchTimeoutMsSchema = z.string()
-  .transform(value => Number.parseInt(value, 10))
-  .pipe(z.number().int().positive())
-  .default(MODEL_RESOURCE_FETCH_TIMEOUT_MS)
 
 let embeddingRuntimeHealth: {
   checkedAtMs: number
@@ -1117,38 +1114,17 @@ let dreamSchedulerTimer: ReturnType<typeof setInterval> | null = null
 let dreamSchedulerRunning = false
 let memorySearchIndexReconciledDbPath: string | null = null
 const activeSlackSyncs = new Set<string>()
+const modelResourceInstallFlights = new Map<ModelResourceCategory, Promise<ModelResourceEntry>>()
 
-// --- Download progress tracking ---
-export interface DownloadProgressEntry {
-  category: string
-  file: string
-  totalBytes: number | null
-  downloadedBytes: number
-  status: 'downloading' | 'done' | 'error'
-  error?: string
-  startedAt: number
+export interface ModelResourceDownloadCenter {
+  execute: (request: DownloadRequest) => Promise<DownloadedArtifact>
+  retry: (taskId: string, request: DownloadRequest) => Promise<DownloadedArtifact>
+  release: (taskId: string) => Promise<unknown>
+  findLatestRetryable: (
+    owner: DownloadRequest['owner'],
+    sourceId: string,
+  ) => { taskId: string, updatedAt: string } | null
 }
-
-const downloadProgress = new Map<string, DownloadProgressEntry>()
-const downloadProgressListeners = new Set<(entry: DownloadProgressEntry) => void>()
-
-export function getDownloadProgress(): DownloadProgressEntry[] {
-  return [...downloadProgress.values()]
-}
-
-export function subscribeDownloadProgress(listener: (entry: DownloadProgressEntry) => void): () => void {
-  downloadProgressListeners.add(listener)
-  return () => { downloadProgressListeners.delete(listener) }
-}
-
-function emitDownloadProgress(entry: DownloadProgressEntry): void {
-  downloadProgress.set(`${entry.category}/${entry.file}`, entry)
-  for (const listener of downloadProgressListeners) {
-    try { listener(entry) }
- catch {}
-  }
-}
-// --- End download progress tracking ---
 
 const rawBuiltInModelManifests = {
   'ocr': {
@@ -3315,7 +3291,7 @@ export async function reconcileModelResources(): Promise<ModelResourceEntry[]> {
   return listModelResourceRows()
 }
 
-export async function installAllModelResources(): Promise<ModelResourceEntry[]> {
+export async function installAllModelResources(downloadCenter?: ModelResourceDownloadCenter): Promise<ModelResourceEntry[]> {
   seedModelResources()
   const categories = Object.keys(builtInModelManifests) as ModelResourceCategory[]
   for (const category of categories) {
@@ -3324,7 +3300,7 @@ export async function installAllModelResources(): Promise<ModelResourceEntry[]> 
       // Skip categories with no files or missing source URLs
       const hasDownloadableFiles = manifest.files.length > 0 && manifest.files.every(f => !!f.sourceUrl)
       if (hasDownloadableFiles) {
-        await installModelResource(category, { source: 'manifest' })
+        await installModelResource(category, { source: 'manifest' }, downloadCenter)
       }
     }
  catch {
@@ -3335,6 +3311,13 @@ export async function installAllModelResources(): Promise<ModelResourceEntry[]> 
 }
 
 export async function verifyModelResource(
+  category: ModelResourceCategory,
+  options: { recordEventOnSuccess?: boolean } = {},
+): Promise<ModelResourceEntry> {
+  return runModelResourceInstallFlight(category, () => verifyModelResourceInternal(category, options))
+}
+
+async function verifyModelResourceInternal(
   category: ModelResourceCategory,
   options: { recordEventOnSuccess?: boolean } = {},
 ): Promise<ModelResourceEntry> {
@@ -3436,6 +3419,15 @@ export async function verifyModelResource(
 export async function installModelResource(
   category: ModelResourceCategory,
   rawInput: ModelResourceInstallInput,
+  downloadCenter?: ModelResourceDownloadCenter,
+): Promise<ModelResourceEntry> {
+  return runModelResourceInstallFlight(category, () => installModelResourceInternal(category, rawInput, downloadCenter))
+}
+
+async function installModelResourceInternal(
+  category: ModelResourceCategory,
+  rawInput: ModelResourceInstallInput,
+  downloadCenter?: ModelResourceDownloadCenter,
 ): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
     clearEmbeddingRuntimeHealth()
@@ -3443,7 +3435,7 @@ export async function installModelResource(
   const input = ModelResourceInstallInputSchema.parse(rawInput)
   const manifest = getModelResourceManifest(category)
   if (manifest.files.length === 0) {
-    return verifyModelResource(category)
+    return verifyModelResourceInternal(category)
   }
 
   const source = input.source
@@ -3473,33 +3465,52 @@ export async function installModelResource(
     updatedAt: now,
   }).where(eq(chronicleModelResources.id, current.id)).run()
 
-  const tempPaths: string[] = []
+  const operationId = randomUUID()
+  const stagingRoot = resolve(`${getModelResourcesRoot()}.staging`, operationId)
+  const backupRoot = resolve(`${getModelResourcesRoot()}.backups`, operationId)
   const promotedPaths: string[] = []
+  const backupPaths: Array<{ targetPath: string, backupPath: string }> = []
+  const completedArtifacts: DownloadedArtifact[] = []
   try {
-    const stagedFiles: Array<{ tempPath: string, targetPath: string }> = []
+    const stagedFiles: Array<{ stagingPath: string, targetPath: string }> = []
     for (const file of manifest.files) {
       const targetPath = getModelResourceAbsolutePath(file.path)
-      const tempPath = `${targetPath}.tmp-${randomUUID()}`
-      tempPaths.push(tempPath)
-      await mkdir(dirname(targetPath), { recursive: true })
+      const stagingPath = resolve(stagingRoot, file.path)
+      await mkdir(dirname(stagingPath), { recursive: true })
 
       if (source === 'local-files') {
         const resolvedSource = await resolveModelResourceLocalSource(localFiles, sourceRoot, file, manifest.files.length)
-        await copyFile(resolvedSource, tempPath)
+        await copyFile(resolvedSource, stagingPath)
       }
       else {
-        await downloadModelResourceFile(file, tempPath, category)
+        completedArtifacts.push(await stageManifestModelResourceFile(file, category, stagingPath, downloadCenter))
       }
 
-      await verifyStagedModelFile(file, tempPath)
-      stagedFiles.push({ tempPath, targetPath })
+      await verifyStagedModelFile(file, stagingPath)
+      stagedFiles.push({ stagingPath, targetPath })
     }
 
     for (const stagedFile of stagedFiles) {
-      await rename(stagedFile.tempPath, stagedFile.targetPath)
+      const existing = await stat(stagedFile.targetPath).catch(() => null)
+      if (existing) {
+        const backupPath = resolve(backupRoot, rootRelativeModelPath(stagedFile.targetPath))
+        await mkdir(dirname(backupPath), { recursive: true })
+        await rename(stagedFile.targetPath, backupPath)
+        backupPaths.push({ targetPath: stagedFile.targetPath, backupPath })
+      }
+      await mkdir(dirname(stagedFile.targetPath), { recursive: true })
+      await rename(stagedFile.stagingPath, stagedFile.targetPath)
       promotedPaths.push(stagedFile.targetPath)
     }
-    const verified = await verifyModelResource(category)
+    const verified = await verifyModelResourceInternal(category)
+    if (verified.status !== 'available') {
+      throw new Error(verified.message ?? `Model resource verification failed for ${category}`)
+    }
+    await Promise.all([
+      rm(stagingRoot, { recursive: true, force: true }),
+      rm(backupRoot, { recursive: true, force: true }),
+    ])
+    await releaseModelResourceArtifacts(completedArtifacts, downloadCenter)
     recordEvent({
       type: 'model-resource',
       status: 'success',
@@ -3509,12 +3520,18 @@ export async function installModelResource(
     return verified
   }
   catch (error) {
-    for (const tempPath of tempPaths) {
-      await rm(tempPath, { force: true }).catch(() => {})
-    }
     for (const promotedPath of promotedPaths) {
       await rm(promotedPath, { force: true }).catch(() => {})
     }
+    for (const backup of [...backupPaths].reverse()) {
+      await mkdir(dirname(backup.targetPath), { recursive: true }).catch(() => {})
+      await rename(backup.backupPath, backup.targetPath).catch(() => {})
+    }
+    await Promise.all([
+      rm(stagingRoot, { recursive: true, force: true }),
+      rm(backupRoot, { recursive: true, force: true }),
+    ])
+    await releaseModelResourceArtifacts(completedArtifacts, downloadCenter)
     const message = error instanceof Error ? error.message : String(error)
     db().update(chronicleModelResources).set({
       status: 'error',
@@ -8333,47 +8350,85 @@ async function sha256File(path: string): Promise<string> {
   return hash.digest('hex')
 }
 
-async function downloadModelResourceFile(file: ModelResourceFileManifest, targetPath: string, category: string): Promise<void> {
-  const urls = [file.sourceUrl, ...file.fallbackUrls].filter((url): url is string => !!url)
-  let lastError: unknown = null
-  const progressContext = { category, file: file.path }
-  for (const url of urls) {
-    // Retry each URL up to 3 times with exponential backoff
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const completed = await downloadModelResourceToFile(url, targetPath, {
-          timeoutMs: ModelResourceFetchTimeoutMsSchema.parse(process.env.CRADLE_MODEL_RESOURCE_FETCH_TIMEOUT_MS),
-          onProgress: ({ totalBytes, downloadedBytes }) => {
-            emitDownloadProgress({
-              ...progressContext,
-              totalBytes,
-              downloadedBytes,
-              status: 'downloading',
-              startedAt: Date.now(),
-            })
-          },
-        })
-        emitDownloadProgress({
-          ...progressContext,
-          totalBytes: completed.totalBytes,
-          downloadedBytes: completed.downloadedBytes,
-          status: 'done',
-          startedAt: Date.now(),
-        })
-        return
-      }
-      catch (error) {
-        lastError = error
-        await rm(targetPath, { force: true }).catch(() => {})
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 1000 * 2 ** attempt))
-        }
-      }
+function runModelResourceInstallFlight(
+  category: ModelResourceCategory,
+  operation: () => Promise<ModelResourceEntry>,
+): Promise<ModelResourceEntry> {
+  const existing = modelResourceInstallFlights.get(category)
+  if (existing) { return existing }
+  const flight = operation().finally(() => {
+    if (modelResourceInstallFlights.get(category) === flight) {
+      modelResourceInstallFlights.delete(category)
     }
+  })
+  modelResourceInstallFlights.set(category, flight)
+  return flight
+}
+
+function modelResourceDownloadOwner(category: ModelResourceCategory, file: ModelResourceFileManifest) {
+  return {
+    namespace: 'chronicle',
+    resourceType: 'model-resource-file',
+    resourceId: `${category}:${file.path}`,
+    displayName: `${getModelResourceManifest(category).displayName}: ${file.path}`,
   }
-  const message = lastError instanceof Error ? lastError.message : 'no source URL'
-  emitDownloadProgress({ ...progressContext, totalBytes: null, downloadedBytes: 0, status: 'error', error: message, startedAt: Date.now() })
-  throw new Error(`Model resource download failed for ${file.path}: ${message}`)
+}
+
+function modelResourceDownloadRequest(category: ModelResourceCategory, file: ModelResourceFileManifest) {
+  const urls = [file.sourceUrl, ...file.fallbackUrls].filter((url): url is string => !!url)
+  return {
+    owner: modelResourceDownloadOwner(category, file),
+    fileName: basename(file.path),
+    sources: urls.map((url, index) => ({
+      id: `chronicle:${category}:${file.path}:source:${index}`,
+      url,
+    })),
+    integrity: {
+      expectedBytes: file.sizeBytes,
+      checksum: file.sha256 ? { algorithm: 'sha256' as const, value: file.sha256 } : undefined,
+    },
+    maxBytes: MODEL_RESOURCE_DOWNLOAD_MAX_BYTES,
+  }
+}
+
+async function stageManifestModelResourceFile(
+  file: ModelResourceFileManifest,
+  category: ModelResourceCategory,
+  stagingPath: string,
+  service: ModelResourceDownloadCenter | undefined,
+): Promise<DownloadedArtifact> {
+  if (!service) {
+    throw new AppError({ code: 'chronicle_download_center_unavailable', status: 503, message: 'Download Center is not available.' })
+  }
+  const request = modelResourceDownloadRequest(category, file)
+  let artifact: DownloadedArtifact | undefined
+  const retryableTasks = request.sources
+    .map(source => service.findLatestRetryable(request.owner, source.id))
+    .filter((task): task is NonNullable<typeof task> => task !== null)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+  try {
+    artifact = retryableTasks[0]
+      ? await service.retry(retryableTasks[0].taskId, request)
+      : await service.execute(request)
+    await copyFile(artifact.filePath, stagingPath)
+  }
+  catch (error) {
+    if (artifact) {
+      await service.release(artifact.taskId).catch(() => {})
+    }
+    throw error
+  }
+  return artifact
+}
+
+async function releaseModelResourceArtifacts(
+  artifacts: DownloadedArtifact[],
+  service: ModelResourceDownloadCenter | undefined,
+): Promise<void> {
+  if (!service) { return }
+  await Promise.all(artifacts.map(async (artifact) => {
+    await service.release(artifact.taskId).catch(() => {})
+  }))
 }
 
 async function readFrameImage(relativeOrAbsolutePath: string): Promise<Response | null> {

@@ -11,6 +11,8 @@ This module owns host activation APIs. Host activation means Cradle decides whet
 - `PATCH /plugins/:routeSegment/enabled` updates Cradle's activation policy for one plugin and returns the updated descriptor. The request body is `{ enabled: boolean, reason?: string | null }`.
 - `GET /plugins/mentions` lists plugin mention candidates for the chat composer. It reads plugin descriptors and capabilities from Cradle's plugin registry; it does not read from or write to MCP registry state.
 - `GET /plugins/:routeSegment/icon` reads a plugin-owned package-relative icon declared by `cradle.icon`.
+- `GET /plugins/sources` and `GET /plugins/sources/:id` project persisted plugin sources from the local cache only. A missing cache is reported as unresolved; reads never download, run npm, extract, or publish a source cache.
+- `POST /plugins/sources/preview`, `POST /plugins/sources`, and `POST /plugins/sources/:id/refresh` are the resolving commands. GitHub archives are downloaded through the server Download Center; the plugin host owns extraction, package discovery, trust evaluation, and cache publication. Concurrent operations for the same `{ kind, location, ref, subPath }` share one cache-keyed operation.
 
 Enabling an `externalLocal` plugin also records an operator trust grant for the currently discovered package checksum. The grant is host policy, not plugin-owned settings. If the package contents change, the checksum changes and Cradle disables the plugin until the operator enables that exact package revision again. External local plugins remain blocked while relay host enrollments expose the server.
 

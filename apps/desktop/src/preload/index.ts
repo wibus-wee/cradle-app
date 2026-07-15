@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import type { DownloadTaskView } from '@cradle/download-center'
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { browserSessionPartition } from '../shared/browser-session'
@@ -46,6 +47,7 @@ const CHAT_EVENT_TAIL_ERROR_CHANNEL = 'chat-event-tail:error'
 const BROWSER_STATE_CHANNEL = 'desktop:browser-state'
 const BROWSER_PROMPT_REQUESTED_CHANNEL = 'desktop:browser-prompt-requested'
 const BROWSER_ANNOTATION_RUNTIME_EVENTED_CHANNEL = 'desktop:browser-annotation-runtime-evented'
+const DOWNLOAD_CENTER_TASK_CHANGED_CHANNEL = 'download-center:task-changed'
 
 const IPC_DEVTOOL_EVENT_CHANNEL = 'ipc-devtool:event'
 const IPC_DEVTOOL_ACP_EVENT_CHANNEL = 'ipc-devtool:acp-event'
@@ -118,6 +120,15 @@ const cradleElectron = {
         ipcRenderer.removeListener('desktop-update:status-changed', listener)
       }
     },
+  },
+
+  /** Redacted desktop-owned download task status. */
+  downloadCenter: {
+    list: () => ipcRenderer.invoke('downloadCenter.list') as Promise<DownloadTaskView[]>,
+    get: (taskId: string) => ipcRenderer.invoke('downloadCenter.get', taskId) as Promise<DownloadTaskView | null>,
+    cancel: (taskId: string) => ipcRenderer.invoke('downloadCenter.cancel', taskId) as Promise<DownloadTaskView | null>,
+    onTaskChanged: (handler: (task: DownloadTaskView) => void) =>
+      subscribeIpc(DOWNLOAD_CENTER_TASK_CHANGED_CHANNEL, handler),
   },
 
   /** Desktop-owned server lifecycle facts for renderer bootstrap. */

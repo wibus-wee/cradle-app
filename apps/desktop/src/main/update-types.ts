@@ -16,11 +16,8 @@ export type DesktopUpdateStatus = {
   unsupported: boolean
   currentVersion: string
   isCheckingForUpdates: boolean
-  isDownloadingUpdate: boolean
   isPreparingUpdate: boolean
-  downloadingProgress: number
   updateDownloaded: boolean
-  downloadedFilePath: string | null
   updateInfo: DesktopUpdateInfo | null
   errorMessage: string | null
 }

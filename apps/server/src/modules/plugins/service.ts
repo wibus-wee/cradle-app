@@ -19,7 +19,12 @@ import { AppError } from '../../errors/app-error'
 import { discoverPluginPackages } from '../../plugins/discovery'
 import { disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from '../../plugins/loader'
 import { classifyPluginSource, createPluginDescriptor, getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
-import { resolvePluginSourceDirectory } from '../../plugins/source-installer'
+import type { PluginSourceInstallerOptions } from '../../plugins/source-installer'
+import {
+  inspectPluginSourceDirectory,
+  refreshPluginSourceDirectory,
+  resolvePluginSourceDirectory,
+} from '../../plugins/source-installer'
 import type { AddPluginSourceInput } from '../../plugins/source-registry'
 import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource } from '../../plugins/source-registry'
 import { evaluatePluginSourceTrust, readRelayHostExposure } from '../../plugins/trust-policy'
@@ -374,7 +379,10 @@ async function toPluginSourceRegistryEntryView(source: PluginSource): Promise<Pl
   let resolvedDirectory: string | null = null
   let error: string | null = null
   try {
-    resolvedDirectory = await resolvePluginSourceDirectory(source)
+    resolvedDirectory = await inspectPluginSourceDirectory(source)
+    if (!resolvedDirectory) {
+      error = 'Plugin source cache is unresolved. Preview, add, or refresh the source to resolve it.'
+    }
   }
   catch (err) {
     error = err instanceof Error ? err.message : String(err)
@@ -420,10 +428,13 @@ export async function getSource(sourceId: string): Promise<PluginSourceRegistryE
   return toPluginSourceRegistryEntryView(source)
 }
 
-export async function createSource(input: AddPluginSourceInput): Promise<AddPluginSourceResult> {
+export async function createSource(
+  input: AddPluginSourceInput,
+  options: PluginSourceInstallerOptions = {},
+): Promise<AddPluginSourceResult> {
   const source = addPluginSource(input)
   try {
-    const discovered = await discoverAndActivateSource(source.id)
+    const discovered = await discoverAndActivateSource(source.id, options)
     return {
       source: await toPluginSourceRegistryEntryView(source),
       discoveredPlugins: discovered.map(toPluginDescriptorView),
@@ -443,7 +454,10 @@ export async function createSource(input: AddPluginSourceInput): Promise<AddPlug
  * registration, no activation**. The cache is reused by a subsequent real
  * install (same `{kind,location,ref,subPath}` -> same hash -> no second fetch).
  */
-export async function previewSource(input: AddPluginSourceInput): Promise<PluginSourcePreview> {
+export async function previewSource(
+  input: AddPluginSourceInput,
+  options: PluginSourceInstallerOptions = {},
+): Promise<PluginSourcePreview> {
   if (input.kind !== 'git' && input.kind !== 'npm') {
     throw new AppError({
       code: 'invalid_plugin_source',
@@ -465,7 +479,7 @@ export async function previewSource(input: AddPluginSourceInput): Promise<Plugin
     updatedAt: 0,
   }
 
-  const pluginsDir = await resolvePluginSourceDirectory(tempSource)
+  const pluginsDir = await resolvePluginSourceDirectory(tempSource, options)
   const packages = await discoverPluginPackages(pluginsDir)
   const relayHostExposed = readRelayHostExposure()
 
@@ -526,6 +540,36 @@ export async function previewSource(input: AddPluginSourceInput): Promise<Plugin
     },
     plugins,
     warnings,
+  }
+}
+
+export async function refreshSource(
+  sourceId: string,
+  options: PluginSourceInstallerOptions = {},
+): Promise<AddPluginSourceResult> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new AppError({
+      code: 'plugin_source_not_found',
+      status: 404,
+      message: 'Plugin source not found.',
+      details: { sourceId },
+    })
+  }
+
+  try {
+    await refreshPluginSourceDirectory(source, options)
+    const discovered = await discoverAndActivateSource(source.id, options)
+    return {
+      source: await toPluginSourceRegistryEntryView(source),
+      discoveredPlugins: discovered.map(toPluginDescriptorView),
+    }
+  }
+  catch {
+    return {
+      source: await toPluginSourceRegistryEntryView(source),
+      discoveredPlugins: [],
+    }
   }
 }
 

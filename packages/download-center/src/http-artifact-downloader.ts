@@ -107,6 +107,11 @@ const defaultTimers: DownloadTimerHooks = {
   clearTimeout: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
 }
 
+/**
+ * Host-agnostic HTTPS artifact runner. Hosts own durable task state and invoke
+ * this runner with an opaque task id; it owns streaming, resume, integrity,
+ * cancellation, and throttled progress only.
+ */
 export class HttpArtifactDownloader {
   private readonly fetchImplementation: typeof globalThis.fetch
   private readonly timers: DownloadTimerHooks
@@ -297,6 +302,7 @@ export class HttpArtifactDownloader {
 
       let append = false
       let totalBytes: number | null
+      let expectedBodyBytes: number | null
       if (offset > 0 && resumeEtag !== null && response.status === 206) {
         const range = this.parseContentRange(response.headers.get('content-range'))
         const encoding = response.headers.get('content-encoding')
@@ -316,6 +322,7 @@ export class HttpArtifactDownloader {
         }
         append = true
         totalBytes = range.total
+        expectedBodyBytes = range.end - range.start + 1
         input.observation.etag = resumeEtag
       }
       else if (response.status === 200) {
@@ -325,6 +332,7 @@ export class HttpArtifactDownloader {
           input.observation.transferredBytes = 0
         }
         totalBytes = this.parseContentLength(response.headers.get('content-length'))
+        expectedBodyBytes = totalBytes
         input.observation.etag = isStrongEtag(responseEtag) ? responseEtag : null
       }
       else {
@@ -336,6 +344,10 @@ export class HttpArtifactDownloader {
         throw new DownloadError('invalid_response', false)
       }
       const remainingLength = this.parseContentLength(response.headers.get('content-length'))
+      if (expectedBodyBytes !== null && remainingLength !== null && expectedBodyBytes !== remainingLength) {
+        await response.body.cancel()
+        throw new DownloadError('invalid_response', false)
+      }
       input.observation.totalBytes = totalBytes
       if (remainingLength !== null && offset + remainingLength > input.request.maxBytes) {
         await response.body.cancel()
@@ -347,6 +359,7 @@ export class HttpArtifactDownloader {
         append,
         initialBytes: offset,
         maxBytes: input.request.maxBytes,
+        expectedBodyBytes,
         totalBytes,
         sourceId: input.source.id,
         signal: input.signal,
@@ -424,6 +437,7 @@ export class HttpArtifactDownloader {
     append: boolean
     initialBytes: number
     maxBytes: number
+    expectedBodyBytes: number | null
     totalBytes: number | null
     sourceId: string
     signal: AbortSignal | undefined
@@ -432,8 +446,10 @@ export class HttpArtifactDownloader {
   }): Promise<number> {
     const timeout = this.createInactivityController(input.signal)
     let bytes = input.initialBytes
+    let receivedBytes = 0
     const meter = new Transform({
       transform: (chunk: Buffer, _encoding, callback) => {
+        receivedBytes += chunk.byteLength
         bytes += chunk.byteLength
         if (bytes > input.maxBytes) {
           callback(new DownloadError('byte_limit_exceeded', false))
@@ -458,6 +474,9 @@ export class HttpArtifactDownloader {
       )
       const writer = this.writerBoundary(input.partialPath, input.append ? 'a' : 'w')
       await pipeline(readable, meter, writer, { signal: timeout.signal })
+      if (input.expectedBodyBytes !== null && receivedBytes !== input.expectedBodyBytes) {
+        throw new DownloadError('invalid_response', false)
+      }
       input.observation.transferredBytes = bytes
       return bytes
     }
@@ -730,7 +749,7 @@ export class HttpArtifactDownloader {
     return Number.isSafeInteger(parsed) ? parsed : null
   }
 
-  private parseContentRange(value: string | null): { start: number, total: number | null } | null {
+  private parseContentRange(value: string | null): { start: number, end: number, total: number | null } | null {
     const match = value?.match(/^bytes (\d+)-(\d+)\/(\d+|\*)$/)
     if (!match?.[1] || !match[2] || !match[3]) {
       return null
@@ -741,7 +760,7 @@ export class HttpArtifactDownloader {
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start || (total !== null && (!Number.isSafeInteger(total) || end >= total))) {
       return null
     }
-    return { start, total }
+    return { start, end, total }
   }
 
   private parseUnsatisfiedRange(value: string | null): number | null {

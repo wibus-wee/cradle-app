@@ -1,12 +1,15 @@
 import { EventEmitter } from 'node:events'
+import { basename } from 'node:path'
 
+import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import { app } from 'electron'
 
-import { DesktopUpdateDownloader } from './update-downloader'
+import type { DesktopDownloadCenterService } from './download-center'
 import { DesktopUpdateInstaller } from './update-installer'
 import { DesktopUpdateSource, readUpdateFeedUrl } from './update-source'
 import type {
   DesktopUpdateCandidate,
+  DesktopUpdateDownload,
   DesktopUpdateInstallerPlan,
   DesktopUpdatePreferences,
   DesktopUpdateStatus,
@@ -36,6 +39,7 @@ export type DesktopUpdateManagerOptions = {
   preferences?: Partial<DesktopUpdatePreferences>
   prepareQuitForUpdate?: () => void | Promise<void>
   requestQuitForUpdate?: () => void | Promise<void>
+  downloadCenter?: Pick<DesktopDownloadCenterService, 'execute' | 'release'>
 }
 
 type CheckForUpdatesOptions = {
@@ -70,15 +74,18 @@ export class DesktopUpdateManager {
   private readonly prepareQuitForUpdate: (() => void | Promise<void>) | null
   private readonly requestQuitForUpdate: (() => void | Promise<void>) | null
   private readonly source: DesktopUpdateSource | null
-  private readonly downloader: DesktopUpdateDownloader | null
   private readonly installer: DesktopUpdateInstaller | null
   private readonly windowsUpdater: WindowsDesktopUpdateAdapter | null
   private preferences: DesktopUpdatePreferences
   private statusSnapshot: DesktopUpdateStatus
   private backgroundTimer: NodeJS.Timeout | null = null
   private backgroundCheckRunning = false
+  private downloadInProgress = false
   private availableUpdate: DesktopUpdateCandidate | null = null
   private installerPlan: DesktopUpdateInstallerPlan | null = null
+  private preparedDownloadTaskId: string | null = null
+  private downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release'> | null
+  private applyLaunched = false
 
   constructor(options: DesktopUpdateManagerOptions = {}) {
     const currentVersion = app.getVersion()
@@ -88,13 +95,13 @@ export class DesktopUpdateManager {
 
     this.prepareQuitForUpdate = options.prepareQuitForUpdate ?? null
     this.requestQuitForUpdate = options.requestQuitForUpdate ?? null
+    this.downloadCenter = options.downloadCenter ?? null
     this.source = updatePlatform === 'darwin'
       ? new DesktopUpdateSource({
           updateFeedUrl,
           currentVersion,
         })
       : null
-    this.downloader = updatePlatform === 'darwin' ? new DesktopUpdateDownloader() : null
     this.installer = updatePlatform === 'darwin' ? new DesktopUpdateInstaller() : null
     this.windowsUpdater = updatePlatform === 'win32'
       ? new WindowsDesktopUpdateAdapter({
@@ -110,11 +117,8 @@ export class DesktopUpdateManager {
       unsupported: unsupportedReason !== null,
       currentVersion,
       isCheckingForUpdates: false,
-      isDownloadingUpdate: false,
       isPreparingUpdate: false,
-      downloadingProgress: 0,
       updateDownloaded: false,
-      downloadedFilePath: null,
       updateInfo: null,
       errorMessage: unsupportedReason,
     }
@@ -126,6 +130,33 @@ export class DesktopUpdateManager {
 
   get status(): DesktopUpdateStatus {
     return this.statusSnapshot
+  }
+
+  setDownloadCenter(downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release' | 'beginExternal' | 'reportExternal'>): void {
+    this.downloadCenter = downloadCenter
+    this.windowsUpdater?.setDownloadCenter(downloadCenter)
+  }
+
+  /**
+   * Prepared macOS updates are intentionally session-scoped. An app restart
+   * cannot safely recover the in-memory installer plan, so release its durable
+   * artifact and staging rather than presenting an unusable update.
+   */
+  async recoverDownloadCenter(downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release' | 'beginExternal' | 'reportExternal' | 'list'>): Promise<void> {
+    this.setDownloadCenter(downloadCenter)
+    if (!this.installer) { return }
+    const staleTasks = downloadCenter.list().filter(task =>
+      task.status === 'completed'
+      && task.owner.namespace === 'desktop-update'
+      && task.owner.resourceType === 'macos-update')
+    await Promise.all(staleTasks.map(task => downloadCenter.release(task.taskId)))
+    await this.installer.discardStaleStaging()
+  }
+
+  async shutdown(): Promise<void> {
+    this.stopBackgroundChecks()
+    if (this.applyLaunched) { return }
+    await this.discardPreparedUpdate()
   }
 
   on<K extends DesktopUpdateEventName>(
@@ -198,7 +229,7 @@ export class DesktopUpdateManager {
       return await this.checkForWindowsUpdates(options)
     }
 
-    if (!this.source || this.statusSnapshot.isCheckingForUpdates || this.statusSnapshot.isDownloadingUpdate || this.statusSnapshot.isPreparingUpdate) {
+    if (!this.source || this.statusSnapshot.isCheckingForUpdates || this.downloadInProgress || this.statusSnapshot.isPreparingUpdate) {
       return this.statusSnapshot
     }
 
@@ -209,14 +240,12 @@ export class DesktopUpdateManager {
 
     try {
       const candidate = await retryWithBackoff(() => this.source!.checkForUpdates())
+      await this.discardPreparedUpdate()
       this.availableUpdate = candidate
-      this.installerPlan = null
       this.setStatus({
         isCheckingForUpdates: false,
         updateInfo: candidate?.info ?? null,
         updateDownloaded: false,
-        downloadedFilePath: null,
-        downloadingProgress: 0,
       })
     }
     catch (error) {
@@ -226,8 +255,6 @@ export class DesktopUpdateManager {
         isCheckingForUpdates: false,
         updateInfo: null,
         updateDownloaded: false,
-        downloadedFilePath: null,
-        downloadingProgress: 0,
         errorMessage: options.quiet ? this.statusSnapshot.errorMessage : readErrorMessage(error),
       })
     }
@@ -241,58 +268,42 @@ export class DesktopUpdateManager {
     }
 
     if (
-      !this.downloader
-      || !this.installer
-      || this.statusSnapshot.isDownloadingUpdate
+      !this.installer
+      || this.downloadInProgress
       || !this.availableUpdate
     ) {
       return this.statusSnapshot
     }
-    const downloader = this.downloader
     const installer = this.installer
     const availableUpdate = this.availableUpdate
 
-    this.setStatus({
-      isDownloadingUpdate: true,
-      isPreparingUpdate: false,
-      updateDownloaded: false,
-      downloadedFilePath: null,
-      downloadingProgress: 0,
-      errorMessage: null,
-    })
+    this.downloadInProgress = true
+    this.setStatus({ isPreparingUpdate: false, updateDownloaded: false, errorMessage: null })
 
     try {
-      const download = await retryWithBackoff(() => downloader.download(availableUpdate, (progress) => {
-        this.setStatus({
-          isDownloadingUpdate: true,
-          isPreparingUpdate: false,
-          downloadingProgress: progress.percent,
-        })
-      }))
+      const download = await this.downloadCandidate(availableUpdate)
+      this.preparedDownloadTaskId = download.taskId
       this.setStatus({
-        isDownloadingUpdate: false,
         isPreparingUpdate: true,
-        downloadingProgress: 100,
       })
       const plan = await installer.prepare(download, availableUpdate.info.version)
       this.installerPlan = plan
       this.setStatus({
-        isDownloadingUpdate: false,
         isPreparingUpdate: false,
-        downloadingProgress: 100,
         updateDownloaded: true,
-        downloadedFilePath: plan.archivePath,
       })
     }
     catch (error) {
+      await this.releasePreparedArtifact()
       this.installerPlan = null
       this.setStatus({
-        isDownloadingUpdate: false,
         isPreparingUpdate: false,
         updateDownloaded: false,
-        downloadedFilePath: null,
         errorMessage: readErrorMessage(error),
       })
+    }
+    finally {
+      this.downloadInProgress = false
     }
 
     return this.statusSnapshot
@@ -319,6 +330,8 @@ export class DesktopUpdateManager {
 
     try {
       this.installer!.launch(this.installerPlan)
+      this.applyLaunched = true
+      await this.releasePreparedArtifact()
       await this.requestQuitForUpdate()
     }
     catch (error) {
@@ -339,6 +352,32 @@ export class DesktopUpdateManager {
     })
   }
 
+  private async downloadCandidate(
+    candidate: DesktopUpdateCandidate,
+  ): Promise<DesktopUpdateDownload & { taskId: string }> {
+    if (!this.downloadCenter) {
+      throw new Error('Desktop Download Center is not ready')
+    }
+    const artifact = await this.downloadCenter.execute(toUpdateDownloadRequest(candidate))
+    return toDesktopUpdateDownload(candidate, artifact)
+  }
+
+  private async releasePreparedArtifact(): Promise<void> {
+    const taskId = this.preparedDownloadTaskId
+    this.preparedDownloadTaskId = null
+    if (taskId && this.downloadCenter) {
+      await this.downloadCenter.release(taskId)
+    }
+  }
+
+  private async discardPreparedUpdate(): Promise<void> {
+    if (this.applyLaunched) { return }
+    const plan = this.installerPlan
+    this.installerPlan = null
+    await this.releasePreparedArtifact()
+    if (plan) { await this.installer?.discard(plan) }
+  }
+
   private setStatus(patch: Partial<DesktopUpdateStatus>): void {
     this.statusSnapshot = {
       ...this.statusSnapshot,
@@ -348,7 +387,7 @@ export class DesktopUpdateManager {
   }
 
   private async checkForWindowsUpdates(options: CheckForUpdatesOptions): Promise<DesktopUpdateStatus> {
-    if (this.statusSnapshot.isCheckingForUpdates || this.statusSnapshot.isDownloadingUpdate || this.statusSnapshot.isPreparingUpdate) {
+    if (this.statusSnapshot.isCheckingForUpdates || this.downloadInProgress || this.statusSnapshot.isPreparingUpdate) {
       return this.statusSnapshot
     }
 
@@ -365,8 +404,6 @@ export class DesktopUpdateManager {
         isCheckingForUpdates: false,
         updateInfo,
         updateDownloaded: false,
-        downloadedFilePath: null,
-        downloadingProgress: 0,
       })
     }
     catch (error) {
@@ -374,8 +411,6 @@ export class DesktopUpdateManager {
         isCheckingForUpdates: false,
         updateInfo: null,
         updateDownloaded: false,
-        downloadedFilePath: null,
-        downloadingProgress: 0,
         errorMessage: options.quiet ? this.statusSnapshot.errorMessage : readErrorMessage(error),
       })
     }
@@ -384,37 +419,29 @@ export class DesktopUpdateManager {
   }
 
   private async downloadWindowsUpdate(): Promise<DesktopUpdateStatus> {
-    if (this.statusSnapshot.isDownloadingUpdate || !this.statusSnapshot.updateInfo) {
+    if (this.downloadInProgress || !this.statusSnapshot.updateInfo) {
       return this.statusSnapshot
     }
 
-    this.setStatus({
-      isDownloadingUpdate: true,
-      isPreparingUpdate: false,
-      updateDownloaded: false,
-      downloadedFilePath: null,
-      downloadingProgress: 0,
-      errorMessage: null,
-    })
+    this.downloadInProgress = true
+    this.setStatus({ isPreparingUpdate: false, updateDownloaded: false, errorMessage: null })
 
     try {
-      const downloadedFilePath = await retryWithBackoff(() => this.windowsUpdater!.downloadUpdate())
+      await this.windowsUpdater!.downloadUpdate()
       this.setStatus({
-        isDownloadingUpdate: false,
         isPreparingUpdate: false,
-        downloadingProgress: 100,
         updateDownloaded: true,
-        downloadedFilePath,
       })
     }
     catch (error) {
       this.setStatus({
-        isDownloadingUpdate: false,
         isPreparingUpdate: false,
         updateDownloaded: false,
-        downloadedFilePath: null,
         errorMessage: readErrorMessage(error),
       })
+    }
+    finally {
+      this.downloadInProgress = false
     }
 
     return this.statusSnapshot
@@ -464,4 +491,37 @@ function readUpdatePlatform(): 'darwin' | 'win32' | null {
     return process.platform
   }
   return null
+}
+
+function toUpdateDownloadRequest(candidate: DesktopUpdateCandidate): DownloadRequest {
+  if (candidate.artifact.size === null || candidate.artifact.sha256 === null) {
+    throw new Error('Update artifact size and SHA-256 are required')
+  }
+  const fileName = basename(new URL(candidate.artifact.url).pathname) || `Cradle-${candidate.info.version}.zip`
+  return {
+    owner: {
+      namespace: 'desktop-update',
+      resourceType: 'macos-update',
+      resourceId: candidate.info.version,
+      displayName: `Cradle ${candidate.info.version}`,
+    },
+    fileName,
+    sources: [{ id: 'desktop-update', url: candidate.artifact.url }],
+    integrity: {
+      expectedBytes: candidate.artifact.size,
+      checksum: { algorithm: 'sha256', value: candidate.artifact.sha256 },
+    },
+    maxBytes: candidate.artifact.size,
+  }
+}
+
+function toDesktopUpdateDownload(
+  candidate: DesktopUpdateCandidate,
+  artifact: DownloadedArtifact,
+): DesktopUpdateDownload & { taskId: string } {
+  return {
+    artifact: candidate.artifact,
+    archivePath: artifact.filePath,
+    taskId: artifact.taskId,
+  }
 }

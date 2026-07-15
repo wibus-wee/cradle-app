@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@cradle/browser-use": "workspace:*",
+    "@cradle/download-center": "workspace:*",
     "@cradle/ipc": "workspace:*",
     "@cradle/plugin-sdk": "workspace:*",
     "electron-updater": "^6.8.9",

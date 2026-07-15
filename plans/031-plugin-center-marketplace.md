@@ -300,3 +300,7 @@ Inline 030's paste→preview→install page using the shared wizard.
 - **Icons**: catalog `icon` is a remote URL the frontend loads directly. Bundled plugins can reuse their in-repo `assets/icon.*` via the GitHub raw URL. No new icon endpoint needed.
 - **`localPath`** remains CLI-only (unchanged from 029/030).
 - **Deep-link `cradle://plugins/install`** primary path is untouched; the center's Import tab is the manual equivalent.
+
+## Reconciliation — 2026-07-15
+
+Plan 047 confirmed the transport/cache foundation assumed by this plan: server plugin preview and install share the source cache, and GitHub archives are durable Download Center tasks with redacted public progress. Marketplace catalog freshness remains a separate concern; no stale-cache map or marketplace semantics were introduced by the Download Center migration. This records existing foundation only and does not mark the Marketplace UI, catalog, or remaining Plan 031 criteria complete.

@@ -10,6 +10,8 @@ import { ResizeHandle } from '~/components/layout/resize-handle'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
+import { isActiveDownload } from '~/features/download-center/types'
+import { useDownloadCenterOwner } from '~/features/download-center/use-download-center'
 import { SettingsSidebar } from '~/features/settings/settings-sidebar'
 import { WorkspaceSidebar } from '~/features/workspace'
 import { useShortcut } from '~/hooks/use-shortcut'
@@ -37,11 +39,8 @@ const EMPTY_UPDATE_STATUS: DesktopUpdateStatus = {
   unsupported: true,
   currentVersion: '0.0.0',
   isCheckingForUpdates: false,
-  isDownloadingUpdate: false,
   isPreparingUpdate: false,
-  downloadingProgress: 0,
   updateDownloaded: false,
-  downloadedFilePath: null,
   updateInfo: null,
   errorMessage: null,
 }
@@ -127,6 +126,7 @@ AppSidebarContent.displayName = 'AppSidebarContent'
 function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation('chrome')
   const [status, setStatus] = useState<DesktopUpdateStatus>(EMPTY_UPDATE_STATUS)
+  const downloadTasks = useDownloadCenterOwner({ namespace: 'desktop-update' })
   const notifiedVersionRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -165,7 +165,11 @@ function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
     })
   }, [status.updateInfo?.version, t])
 
-  const hasUpdateNotice = !!status.updateInfo || status.isDownloadingUpdate || status.isPreparingUpdate || status.updateDownloaded
+  const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
+    && task.owner.namespace === 'desktop-update'
+    && (task.owner.resourceType === 'macos-update' || task.owner.resourceType === 'windows-update')
+    && isActiveDownload(task))
+  const hasUpdateNotice = !!status.updateInfo || !!updateDownload || status.isPreparingUpdate || status.updateDownloaded
 
   if (!isElectron || !hasUpdateNotice) {
     return null
@@ -175,8 +179,8 @@ function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
     ? t('update.status.unavailable')
     : status.isCheckingForUpdates
       ? t('update.status.checking')
-      : status.isDownloadingUpdate
-        ? t('update.status.downloading', { progress: Math.round(status.downloadingProgress) })
+      : updateDownload
+        ? t('update.status.downloading', { progress: updateDownload.totalBytes && updateDownload.totalBytes > 0 ? Math.round((updateDownload.transferredBytes / updateDownload.totalBytes) * 100) : '—' })
         : status.isPreparingUpdate
           ? t('update.status.preparing')
           : status.updateDownloaded
@@ -185,7 +189,7 @@ function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
               ? t('update.status.available', { version: status.updateInfo.version })
               : t('update.status.current')
 
-  const Icon = status.updateDownloaded || status.isDownloadingUpdate || status.isPreparingUpdate ? DownloadIcon : SparklesIcon
+  const Icon = status.updateDownloaded || updateDownload || status.isPreparingUpdate ? DownloadIcon : SparklesIcon
 
   return (
     <TooltipProvider delayDuration={collapsed ? 0 : 500}>

@@ -8,7 +8,8 @@ function encodeSseEvent(event: Chronicle.ChronicleRealtimeEventEntry): Uint8Arra
   return new TextEncoder().encode(`id: ${event.createdAtUnix}\nevent: ${event.event}\ndata: ${JSON.stringify(event)}\n\n`)
 }
 
-export const chronicle = new Elysia({ prefix: '/chronicle' })
+export function createChronicleModule(downloadCenter?: Chronicle.ModelResourceDownloadCenter) {
+  return new Elysia({ prefix: '/chronicle' })
   .get('/config', () => Chronicle.getConfig(), {
     detail: {
       'summary': 'Get Chronicle daemon configuration',
@@ -72,57 +73,13 @@ export const chronicle = new Elysia({ prefix: '/chronicle' })
     },
     response: { 200: t.Array(ChronicleModel.modelResource) },
   })
-  .post('/model-resources/install-all', () => Chronicle.installAllModelResources(), {
+  .post('/model-resources/install-all', () => Chronicle.installAllModelResources(downloadCenter), {
     detail: {
       'summary': 'Install all Chronicle model resources from manifests',
       'tags': ['chronicle'],
       'x-cradle-cli': { command: ['chronicle', 'model-resources', 'install-all'] },
     },
     response: { 200: t.Array(ChronicleModel.modelResource) },
-  })
-  .get('/model-resources/download-progress', () => {
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      start(controller) {
-        // Send current state
-        const current = Chronicle.getDownloadProgress()
-        if (current.length > 0) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(current)}\n\n`))
-        }
-        // Subscribe to updates
-        const unsubscribe = Chronicle.subscribeDownloadProgress((entry) => {
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(entry)}\n\n`))
-          }
- catch {
-            unsubscribe()
-          }
-        })
-        // Keep alive every 15s
-        const keepAlive = setInterval(() => {
-          try { controller.enqueue(encoder.encode(': keepalive\n\n')) }
- catch { clearInterval(keepAlive) }
-        }, 15000)
-        // Clean up when client disconnects (controller closed)
-        const checkClosed = setInterval(() => {
-          try { controller.enqueue(encoder.encode('')) }
- catch {
-            clearInterval(checkClosed)
-            clearInterval(keepAlive)
-            unsubscribe()
-          }
-        }, 5000)
-      },
-    })
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    })
-  }, {
-    detail: { summary: 'SSE stream of model resource download progress', tags: ['chronicle'] },
   })
   .post('/model-resources/:category/verify', ({ params }) => Chronicle.verifyModelResource(params.category), {
     detail: {
@@ -133,7 +90,7 @@ export const chronicle = new Elysia({ prefix: '/chronicle' })
     params: ChronicleModel.modelResourceCategoryParams,
     response: { 200: ChronicleModel.modelResource },
   })
-  .post('/model-resources/:category/install', ({ params, body }) => Chronicle.installModelResource(params.category, body), {
+  .post('/model-resources/:category/install', ({ params, body }) => Chronicle.installModelResource(params.category, body, downloadCenter), {
     detail: {
       'summary': 'Install a Chronicle local model resource',
       'tags': ['chronicle'],
@@ -688,3 +645,6 @@ export const chronicle = new Elysia({ prefix: '/chronicle' })
     body: ChronicleModel.embeddingRequestBody,
     response: { 200: ChronicleModel.embeddingResponse },
   })
+}
+
+export const chronicle = createChronicleModule()

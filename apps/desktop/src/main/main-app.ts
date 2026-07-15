@@ -24,6 +24,7 @@ import { ChatEventTailBroker } from './chat-event-tail-broker'
 import { ChatStreamBroker } from './chat-stream-broker'
 import { DesktopAppBadgeManager } from './desktop-app-badge-manager'
 import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath } from './desktop-assets'
+import { DesktopDownloadCenterService } from './download-center'
 import { installExternalLinkPolicy } from './external-link-policy'
 import {
   initializeIpcDevtool,
@@ -65,6 +66,7 @@ import { readStoredWindowBounds, resolveVisibleWindowBounds } from './window-sta
 let mainWindow: BrowserWindow | null = null
 let windowManager: WindowManager | undefined
 let updateManager: DesktopUpdateManager | null = null
+let desktopDownloadCenter: DesktopDownloadCenterService | null = null
 let trayManager: TrayManager | null = null
 let desktopAppBadgeManager: DesktopAppBadgeManager | null = null
 let macBridgeManager: MacBridgeManager | null = null
@@ -363,11 +365,16 @@ async function installPluginFromDeepLink(rawUrl: string): Promise<void> {
   showMainWindow()
   try {
     const request = parsePluginInstallUrl(rawUrl)
+    const downloadCenter = desktopDownloadCenter
+    if (!downloadCenter) {
+      throw new Error('Desktop Download Center is not ready')
+    }
 
     const isDev = !!process.env.ELECTRON_RENDERER_URL
     const result = await installPluginFromRequest(request, {
       availablePluginsDir: resolveDesktopPrimaryPluginsDir({ isDev, moduleDir: __dirname }),
       confirmInstall: askPluginInstallConsent,
+      downloadCenter,
       userDataPath: app.getPath('userData'),
     })
     if (!result) {
@@ -403,7 +410,9 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   }
 
   browserManager.dispose()
-  updateManager?.stopBackgroundChecks()
+  await updateManager?.shutdown()
+  await desktopDownloadCenter?.shutdown()
+  desktopDownloadCenter = null
   notificationCenterManager?.stop()
   notificationCenterManager = null
   chatStreamBroker?.stop()
@@ -643,6 +652,7 @@ export async function startDesktopApp(): Promise<void> {
   createNativeServices({
     getWindowManager: () => windowManager,
     getUpdateManager: () => updateManager,
+    getDesktopDownloadCenter: () => desktopDownloadCenter,
     getMacBridgeManager: () => macBridgeManager,
     getChatStreamBroker: () => chatStreamBroker,
     getChatEventTailBroker: () => chatEventTailBroker,
@@ -658,6 +668,16 @@ export async function startDesktopApp(): Promise<void> {
   })
 
   app.whenReady().then(async () => {
+    desktopDownloadCenter = new DesktopDownloadCenterService({ userDataPath: app.getPath('userData') })
+    await desktopDownloadCenter.boot()
+    await updateManager?.recoverDownloadCenter(desktopDownloadCenter)
+    desktopDownloadCenter.onTaskChange((task) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+          window.webContents.send('download-center:task-changed', task)
+        }
+      }
+    })
     appBadgeManager.initialize()
     mainWindow = await createMainWindow()
     setMainWindow(mainWindow)

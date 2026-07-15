@@ -1,6 +1,6 @@
 # Desktop Main Process
 
-这个目录拥有 Electron main process 的启动、窗口生命周期、server 子进程、native IPC service、desktop updater runtime，以及 desktop plugin runtime。
+这个目录拥有 Electron main process 的启动、窗口生命周期、server 子进程、native IPC service、desktop Download Center、desktop updater runtime，以及 desktop plugin runtime。
 
 ## 文件清单
 
@@ -35,8 +35,6 @@
 - `windows-update-adapter.ts`：拥有 Windows `electron-updater` adapter，把 GitHub release feed 中的 `latest.yml`、NSIS installer 和 blockmap 投影到统一的 desktop update 状态模型。
 - `update-source.ts`：拥有 desktop update manifest 读取、schema 校验、版本比较和 artifact 选择。
 - `update-source.test.ts`：覆盖 desktop update manifest URL 解析、renderer-visible 状态投影、版本比较，以及非 numeric dot version 的拒绝行为。
-- `update-downloader.ts`：拥有 update artifact 流式下载、进度投影和 SHA-256 校验。
-- `update-downloader.test.ts`：覆盖 update artifact 下载落盘、SHA-256 校验、进度收敛，以及 digest mismatch 时清理临时 archive。
 - `update-installer.ts`：拥有 macOS `.app` bundle staging、bundle version 校验、detached installer script 生成、替换和 relaunch 触发。
 - `update-installer.test.ts`：覆盖 update staging plan 生成、bundle version 校验、detached installer script 关键命令、临时 `.app` bundle 替换 smoke，以及版本不匹配时拒绝安装。
 - `mac-bridge-manager.ts`：拥有 desktop-owned `cradle-mac-bridge` 子进程生命周期、NDJSON request/response 协议、hotkey event 投影、显式 parity-test synthetic hotkey helper、dev/packaged binary 路径解析，以及缺少 binary 时的非阻塞状态。
@@ -50,6 +48,7 @@
 - `plugin-loader.test.ts`：覆盖 desktop plugin deactivation 时清理 subscriptions、shared config projection 和 capability records。
 - `plugin-install-links.test.ts`：覆盖 Marketplace install URL parsing、link rejection、bundled receipt recording 和 Cradle-owned plugin install writes。
 - `plugin-paths.ts`：拥有 desktop dev/bundled runtime 的 primary plugin directory 解析，并把同一路径投影给 forked server。
+- `download-center/`：拥有 desktop-scoped durable download task state、main-process IPC projection、artifact release 和 shared HTTP runner 的调度；它不向 renderer 暴露 source URL、headers 或 filesystem artifact path。
 
 ## Browser-use backend ownership
 
@@ -63,11 +62,15 @@
 
 ## Desktop update ownership
 
-`update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart. Check reads the platform update feed and updates status; it does not implicitly download in the manual flow. When desktop preferences enable automatic checks, the main process checks every 5 minutes in the background; when automatic download is also enabled, an available update starts downloading and broadcasts progress through `desktop-update:status-changed`.
+`update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart. Check reads the platform update feed and updates status; it does not implicitly download in the manual flow. When desktop preferences enable automatic checks, the main process checks every 5 minutes in the background; when automatic download is also enabled, an available update starts downloading and broadcasts progress through Download Center task changes.
 
-Updates are available only in packaged macOS and Windows builds with `CRADLE_DESKTOP_UPDATE_URL` configured. macOS uses the Cradle-owned JSON manifest and zip replacement path; the feed URL can point directly at `manifest.json` or at a feed root that contains `macos/manifest.json`. Restart spawns the detached installer script first, shuts down the desktop-owned server runtime, replaces the current `.app` bundle, and relaunches Cradle with `open -n`. If the target app directory is not writable, the installer uses macOS administrator privileges for the replacement step.
+Updates are available only in packaged macOS and Windows builds with `CRADLE_DESKTOP_UPDATE_URL` configured. macOS uses the Cradle-owned JSON manifest and zip replacement path; the manifest artifact is downloaded through the desktop Download Center, which performs streaming, integrity verification, task persistence, and renderer progress projection. Restart spawns the detached installer script first, shuts down the desktop-owned server runtime, replaces the current `.app` bundle, and relaunches Cradle with `open -n`. If the target app directory is not writable, the installer uses macOS administrator privileges for the replacement step.
 
 Windows uses `electron-updater` with the NSIS target. The same `CRADLE_DESKTOP_UPDATE_URL` may point at the macOS `manifest.json`; Windows strips that filename and reads `latest.yml` from the feed directory. Restart prepares the desktop runtime shutdown, then delegates quit/install/relaunch to the downloaded NSIS installer through `quitAndInstall`.
+
+## Desktop Download Center ownership
+
+`download-center/` is the only Electron-main owner for ordinary desktop artifact transfer state. It persists a compact, redacted task record under Electron user data, keeps URLs/headers and artifact paths private to the main process, broadcasts task views through `download-center:task-changed`, and exposes only list/get/cancel to preload. The web Download Center feature subscribes to that projection and to the server projection; it does not create another downloader or updater-progress bridge. Windows `electron-updater` remains the transport owner for NSIS, but reports its lifecycle into this task model.
 
 ## Mac Bridge ownership
 
