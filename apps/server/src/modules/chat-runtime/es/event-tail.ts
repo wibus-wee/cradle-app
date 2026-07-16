@@ -3,6 +3,7 @@ import { sessionEvents, sessions } from '@cradle/db'
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm'
 
 import { db } from '../../../infra'
+import { readMessagePayload } from '../message-payload-store'
 import type { StoredChatSessionEvent } from './events'
 import {
   isLegacyAssistantMessageSnapshottedRow,
@@ -95,7 +96,10 @@ function readSessionTailReplay(input: ChatSessionTailQuery): ChatTailReplay<Chat
 
   const events = rows
     .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
-    .map(row => toChatSessionTailEvent(parseStoredChatSessionEvent(row)))
+    .map(row => toChatSessionTailEvent(parseStoredChatSessionEvent(
+      row,
+      payloadId => readMessagePayload(db(), payloadId),
+    )))
   return {
     events,
     cursor: events.at(-1)?.version ?? input.afterVersion,
@@ -159,7 +163,10 @@ function readGlobalSessionTailReplay(
   const events: ChatGlobalSessionTailEvent[] = rows
     .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
     .map((row) => {
-      const event = toChatSessionTailEvent(parseStoredChatSessionEvent(row))
+      const event = toChatSessionTailEvent(parseStoredChatSessionEvent(
+        row,
+        payloadId => readMessagePayload(db(), payloadId),
+      ))
       return { ...event, scope: 'sessions' as const }
     })
   return {

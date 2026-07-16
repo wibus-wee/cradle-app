@@ -14,6 +14,7 @@ import type {
 import type { Event as OpencodeEvent, QuestionV2Info, QuestionV2Request, SessionMessage } from '@opencode-ai/sdk/v2'
 import type { UIMessage, UIMessageChunk } from 'ai'
 
+import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness/projection'
 import type {
   CancelTurnInput,
   ChatRuntime,
@@ -1128,7 +1129,7 @@ export class OpencodeProvider implements ChatRuntime {
         agent: readOpencodeTurnAgent(input),
         useAsyncPrompt: true,
         thinkingEffort: input.providerOptions?.thinkingEffort ?? null,
-        systemPrompt: input.systemPrompt,
+        systemPrompt: appendHarnessFragmentsToSystemPrompt(input.systemPrompt, input.harness),
         message: input.message,
       })
       const { operation, result } = submission

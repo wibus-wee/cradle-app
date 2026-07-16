@@ -7,6 +7,10 @@ import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
+import {
+  putMessagePayload,
+  toMessageProjectionValues,
+} from '../chat-runtime/message-payload-store'
 import * as SessionEnvironment from './service'
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -20,16 +24,23 @@ function seedSessionMessage(): void {
     createdAt: now,
     updatedAt: now,
   }).run()
-  db().insert(messages).values({
+  const message = {
     id: 'message-1',
     sessionId: 'session-1',
+    parentMessageId: null,
+    parentToolCallId: null,
+    taskId: null,
+    depth: 0,
     role: 'user',
     status: 'complete',
     content: '  exact rendered text  ',
     messageJson: JSON.stringify({ id: 'message-1', role: 'user', parts: [] }),
+    errorText: null,
     createdAt: now,
     updatedAt: now,
-  }).run()
+  } as const
+  putMessagePayload(db(), message)
+  db().insert(messages).values(toMessageProjectionValues(message)).run()
 }
 
 describe('session environment markers', () => {

@@ -1,5 +1,6 @@
 import type { UIMessageChunk } from 'ai'
 
+import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness/projection'
 import type {
   CancelTurnInput,
   ChatRuntime,
@@ -136,7 +137,7 @@ export class OpenAICompatibleProvider implements ChatRuntime {
           ? { id: input.responseMessageId, role: 'assistant', parts: [] }
           : undefined,
         originalMessages: input.originalMessages,
-        system: input.systemPrompt,
+        system: appendHarnessFragmentsToSystemPrompt(input.systemPrompt, input.harness),
         maxSteps: 1, // single-turn for openai-compatible (no tool execution)
         abortSignal: abortController.signal,
         providerOptions,

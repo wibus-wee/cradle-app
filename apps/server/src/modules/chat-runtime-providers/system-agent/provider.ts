@@ -2,6 +2,7 @@ import type { DefaultRuntimeConfigOptions, MessageIngressCommand, MessageIngress
 import { defaultRuntimeConfig, executeIngressCommand } from '@hijarvis/core'
 import type { UIMessageChunk } from 'ai'
 
+import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness/projection'
 import type {
   CancelTurnInput,
   ChatRuntime,
@@ -124,7 +125,8 @@ export class SystemAgentProvider implements ChatRuntime {
       (jarvisPrefs.thinkingLevel ?? config.thinkingLevel) as JarvisThinkingLevel,
       runtimeRegistryModel,
     )
-    const systemPrompt = input.systemPrompt ?? 'You are Jarvis, a helpful system assistant.'
+    const systemPrompt = appendHarnessFragmentsToSystemPrompt(input.systemPrompt, input.harness)
+      ?? 'You are Jarvis, a helpful system assistant.'
     const sessionId = input.runtimeSession.chatSessionId
 
     const runtimeContext = resolveSystemAgentRuntimeContext()

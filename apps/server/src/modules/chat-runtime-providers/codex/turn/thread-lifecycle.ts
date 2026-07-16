@@ -6,7 +6,10 @@
 
 import type { UIMessage } from 'ai'
 
-import type { RuntimeSession } from '../../../chat-runtime/runtime-provider-types'
+import type {
+  RuntimeHarnessFragment,
+  RuntimeSession,
+} from '../../../chat-runtime/runtime-provider-types'
 import type { CodexConfig } from '../../../provider-contracts/provider-base'
 import { isCodexAppServerUnknownMethodError } from '../app-server/client'
 import type { ThreadInjectItemsParams } from '../app-server-protocol/v2/ThreadInjectItemsParams'
@@ -179,6 +182,26 @@ export async function injectCradleTranscriptHistory(
   const params: ThreadInjectItemsParams = {
     threadId,
     items: items as ThreadInjectItemsParams['items'],
+  }
+  await client.request('thread/inject_items', params)
+}
+
+export async function injectCodexHarnessFragments(
+  client: CodexAppServerClientLike,
+  threadId: string,
+  fragments: RuntimeHarnessFragment[],
+): Promise<void> {
+  if (fragments.length === 0) {
+    return
+  }
+
+  const params: ThreadInjectItemsParams = {
+    threadId,
+    items: fragments.map(fragment => ({
+      type: 'message',
+      role: 'developer',
+      content: [{ type: 'input_text', text: fragment.content }],
+    })) as ThreadInjectItemsParams['items'],
   }
   await client.request('thread/inject_items', params)
 }

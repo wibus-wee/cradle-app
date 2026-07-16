@@ -1,7 +1,8 @@
-import type { BackendRun, ChatSessionQueueItem, Message, RunStreamCheckpoint } from '@cradle/db'
+import type { BackendRun, ChatSessionQueueItem, RunStreamCheckpoint } from '@cradle/db'
 import {
   backendRuns,
   backendRunSnapshots,
+  chatMessagePayloads,
   chatSessionQueueItems,
   messages,
   runStreamCheckpoints,
@@ -11,6 +12,12 @@ import { and, desc, eq, or, sql } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
+import type { HydratedMessage } from '../message-payload-store'
+import {
+  hydrateMessage,
+  messagePayloadJoinCondition,
+  readMessagePayload,
+} from '../message-payload-store'
 import {
   deleteRunStreamCheckpoint,
   readRunStreamCheckpoint,
@@ -330,7 +337,7 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
 function readInterruptedAssistantMessage(input: {
   sessionId: string
   run: BackendRun
-  message: Message | null | undefined
+  message: HydratedMessage | null | undefined
   checkpoint: RunStreamCheckpoint | undefined
   finishedAt: number
 }): {
@@ -424,7 +431,7 @@ function deleteStaleTerminalRunCheckpoints(sessionId?: string): void {
 
 function readMissingRunBootstrapEvents(input: {
   run: BackendRun
-  message: Message | null | undefined
+  message: HydratedMessage | null | undefined
   queueItemId: string | null
 }): ChatSessionEvent[] {
   if (hasRunStartedFact(input.run.chatSessionId, input.run.id)) {
@@ -700,7 +707,7 @@ function readTerminalRunFact(
     .limit(1)
     .get()
   return row
-    ? (parseStoredChatSessionEvent(row) as Extract<
+    ? (parseStoredChatSessionEvent(row, payloadId => readMessagePayload(db(), payloadId)) as Extract<
         StoredChatSessionEvent,
         { type: TerminalRunEventType }
       >)
@@ -727,19 +734,21 @@ function readAssistantMessageCompletedFact(
     .limit(1)
     .get()
   return row
-    ? (parseStoredChatSessionEvent(row) as Extract<
+    ? (parseStoredChatSessionEvent(row, payloadId => readMessagePayload(db(), payloadId)) as Extract<
         StoredChatSessionEvent,
         { type: 'AssistantMessageCompleted' }
       >)
     : undefined
 }
 
-function readMessage(sessionId: string, messageId: string): Message | undefined {
-  return db()
-    .select()
+function readMessage(sessionId: string, messageId: string): HydratedMessage | undefined {
+  const row = db()
+    .select({ message: messages, payload: chatMessagePayloads })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(and(eq(messages.id, messageId), eq(messages.sessionId, sessionId)))
     .get()
+  return row ? hydrateMessage(row.message, row.payload) : undefined
 }
 
 function readRunQueueItemId(sessionId: string, runId: string): string | null {
@@ -776,7 +785,7 @@ function readQueueItem(
     .get()
 }
 
-function normalizeTerminalMessageJson(message: Message): string {
+function normalizeTerminalMessageJson(message: HydratedMessage): string {
   try {
     const parsed = parseStoredMessageSnapshot(message.messageJson)
     return JSON.stringify(parsed)

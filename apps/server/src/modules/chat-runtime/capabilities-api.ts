@@ -2,7 +2,7 @@ import { AppError } from '../../errors/app-error'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-snapshot'
 import type { RuntimeKind } from '../provider-contracts/types'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
-import { resolveSessionSystemPrompt } from './context/turn-context'
+import { resolveSessionSystemPrompt } from './harness/turn-context'
 import { appendPendingRuntimeUserInputSlotStates } from './pending-user-input'
 import { runRegistry } from './run-registry'
 import type {

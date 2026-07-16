@@ -6,6 +6,10 @@ import type { ProviderMetadata, UIMessage, UIMessageChunk } from 'ai'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'
 import { aiTelemetryEnabled } from '../../../telemetry/config'
+import {
+  markHarnessFragmentsProjected,
+  resolvePendingHarnessFragments,
+} from '../../chat-runtime/harness/provider-state'
 import type {
   BackgroundTerminalListResult,
   BackgroundTerminalTerminateResult,
@@ -167,6 +171,7 @@ import {
 } from './turn/stream-turn-context'
 import {
   hydrateCodexNativeHistory,
+  injectCodexHarnessFragments,
   injectCodexNativeHistory,
   injectCodexSideBoundary,
   injectCradleTranscriptHistory,
@@ -1099,6 +1104,7 @@ export class CodexProvider implements ChatRuntime {
       const runTitleGeneration = this.createCodexThreadTitleScheduler(input, context, client, threadContext)
 
       await this.syncCodexStreamHistory(input, context, client, threadContext.threadId)
+      await this.syncCodexHarnessContext(input, client, threadContext.threadId)
       const dispatch = await this.dispatchCodexStreamTurn(
         input,
         context,
@@ -1255,6 +1261,19 @@ export class CodexProvider implements ChatRuntime {
     if (!context.isLiveSideFork) {
       await hydrateCodexNativeHistory(client, input.runtimeSession, threadId)
     }
+  }
+
+  private async syncCodexHarnessContext(
+    input: StreamTurnInput,
+    client: CodexAppServerClientLike,
+    threadId: string,
+  ): Promise<void> {
+    const fragments = resolvePendingHarnessFragments(
+      input.runtimeSession,
+      input.harness?.fragments,
+    )
+    await injectCodexHarnessFragments(client, threadId, fragments)
+    markHarnessFragmentsProjected(input.runtimeSession, fragments)
   }
 
   private async dispatchCodexStreamTurn(

@@ -1,10 +1,15 @@
-import { backendRuns, messages, sessions } from '@cradle/db'
+import { backendRuns, chatMessagePayloads, messages, sessions } from '@cradle/db'
 import type { UIMessage } from 'ai'
 import { and, desc, eq, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import { readCurrentSessionEventVersion } from './es/event-store'
+import type { HydratedMessage } from './message-payload-store'
+import {
+  hydrateMessage,
+  messagePayloadJoinCondition,
+} from './message-payload-store'
 import { compactStoredMessageSnapshotForRead } from './message-snapshot-compaction'
 import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
@@ -61,13 +66,14 @@ export function listCompletedRuns(input: {
       sessionId: backendRuns.chatSessionId,
       sessionTitle: sessions.title,
       messageId: backendRuns.messageId,
-      messageContent: messages.content,
+      messageContent: chatMessagePayloads.content,
       startedAt: backendRuns.startedAt,
       finishedAt: backendRuns.finishedAt,
     })
     .from(backendRuns)
     .innerJoin(sessions, eq(sessions.id, backendRuns.chatSessionId))
     .leftJoin(messages, eq(messages.id, backendRuns.messageId))
+    .leftJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(
       and(
         eq(backendRuns.status, 'complete'),
@@ -99,8 +105,9 @@ export async function getMessageGroups(sessionId: string): Promise<ChatMessageSn
   assertStoredSession(sessionId)
 
   const rows = db()
-    .select()
+    .select({ message: messages, payload: chatMessagePayloads })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(eq(messages.sessionId, sessionId))
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()
@@ -115,7 +122,8 @@ export async function getMessageGroups(sessionId: string): Promise<ChatMessageSn
     ]),
   )
 
-  return rows.map((row) => {
+  return rows.map(({ message: projected, payload }) => {
+    const row = hydrateMessage(projected, payload)
     const role = row.role as 'user' | 'assistant'
     const checkpoint
       = row.status === 'streaming' ? checkpointByMessageId.get(row.id) : undefined
@@ -168,7 +176,7 @@ export async function getMessageSnapshot(sessionId: string): Promise<ChatMessage
 }
 
 function parseStoredMessageSnapshot(
-  row: typeof messages.$inferSelect,
+  row: HydratedMessage,
   role: 'user' | 'assistant',
 ): ChatMessageSnapshotRow['message'] {
   try {

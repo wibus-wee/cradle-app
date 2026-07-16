@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { ConversationBridgeChannelBinding, ConversationBridgeConnection, ConversationBridgeDeliveryAttempt, ConversationBridgeThreadBinding } from '@cradle/db'
 import {
+  chatMessagePayloads,
   conversationBridgeChannelBindings,
   conversationBridgeConnections,
   conversationBridgeDeliveryAttempts,
@@ -27,6 +28,7 @@ import { db } from '../../infra'
 import { listConversationBridgeAdapters } from '../../plugins/conversation-adapter-registry'
 import * as Agents from '../agent-identity/service'
 import { listRuntimeCatalog } from '../chat-runtime/chat-runtime-provider-registry'
+import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { extractMessageText, parseStoredMessageSnapshot } from '../chat-runtime/ui-message'
 import { getCachedModelsForTarget } from '../provider-catalog/model-cache'
@@ -1340,7 +1342,12 @@ function markInboundEvent(
 }
 
 function readAssistantText(messageId: string): string {
-  const row = db().select().from(messages).where(eq(messages.id, messageId)).get()
+  const row = db()
+    .select({ messageJson: chatMessagePayloads.messageJson })
+    .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
+    .where(eq(messages.id, messageId))
+    .get()
   if (!row) {
     return ''
   }

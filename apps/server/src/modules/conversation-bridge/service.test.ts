@@ -26,6 +26,10 @@ import {
   resetConversationBridgeAdapterRegistry,
 } from '../../plugins/conversation-adapter-registry'
 import { resetPluginRuntimeRegistry } from '../../plugins/runtime-registry'
+import {
+  putMessagePayload,
+  toMessageProjectionValues,
+} from '../chat-runtime/message-payload-store'
 import { localWorkspaceLocator, serializeWorkspaceLocator } from '../workspace/workspace-locator'
 import { stopAllConversationBridgeConnections } from './runtime-supervisor'
 import * as ConversationBridge from './service'
@@ -133,11 +137,13 @@ describe('conversation bridge service', () => {
     chatRuntimeMock.streamResponse.mockImplementation(
       async ({ sessionId }: { sessionId: string }) => {
         const timestamp = Math.floor(Date.now() / 1000)
-        db()
-          .insert(messages)
-          .values({
+        const message = {
             id: 'assistant-message-1',
             sessionId,
+            parentMessageId: null,
+            parentToolCallId: null,
+            taskId: null,
+            depth: 0,
             role: 'assistant',
             status: 'complete',
             content: 'Bridge response',
@@ -146,10 +152,12 @@ describe('conversation bridge service', () => {
               role: 'assistant',
               parts: [{ type: 'text', text: 'Bridge response' }],
             }),
+            errorText: null,
             createdAt: timestamp,
             updatedAt: timestamp,
-          })
-          .run()
+          } as const
+        putMessagePayload(db(), message)
+        db().insert(messages).values(toMessageProjectionValues(message)).run()
         return {
           runId: 'run-1',
           assistantMessageId: 'assistant-message-1',

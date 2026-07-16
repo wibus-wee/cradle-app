@@ -21,6 +21,7 @@ import {
 } from '../es/events'
 import { finalizeInterruptedRun } from '../es/recovery'
 import { getMessageGroups, getMessageSnapshot } from '../history-api'
+import { readMessagePayload } from '../message-payload-store'
 import {
   deleteRunStreamCheckpoint,
   readRunStreamCheckpoint,
@@ -181,9 +182,10 @@ describe('run stream checkpoints', () => {
 
       expect(await finalizeInterruptedRun(sessionId, runId)).toBe(true)
       expect(readRunStreamCheckpoint(runId)).toBeUndefined()
-      expect(
-        db().select().from(messages).where(eq(messages.id, messageId)).get(),
-      ).toMatchObject({
+      expect({
+        ...db().select().from(messages).where(eq(messages.id, messageId)).get(),
+        ...readMessagePayload(db(), messageId),
+      }).toMatchObject({
         status: 'failed',
         content: 'checkpoint partial',
         messageJson: checkpointJson,
@@ -231,7 +233,7 @@ describe('run stream checkpoints', () => {
         ]),
       )
       expect(
-        db().select().from(messages).where(eq(messages.id, messageId)).get()?.content,
+        readMessagePayload(db(), messageId)?.content,
       ).toBe('')
       await expect(getMessageSnapshot(sessionId)).resolves.toMatchObject({
         revision: 1,

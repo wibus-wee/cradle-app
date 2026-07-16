@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { backendRuns, messages, providerTargets, sessions, workspaces } from '@cradle/db'
+import { backendRuns, providerTargets, sessions, workspaces } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
@@ -13,6 +13,7 @@ import {
   recordChatStreamTrace,
   resolveChatStreamTracePath,
 } from '../src/modules/chat-runtime/stream-trace'
+import { insertMessageFixtures } from './helpers/message-fixture'
 import { workspaceFixture } from './helpers/workspace-fixture'
 
 describe('chat stream trace', () => {
@@ -241,7 +242,7 @@ describe('chat stream trace', () => {
       createdAt: now,
       updatedAt: now,
     }).run()
-    db().insert(messages).values({
+    insertMessageFixtures(db(), {
       id: 'message-trace-route',
       sessionId: 'session-trace-route',
       parentMessageId: null,
@@ -255,7 +256,7 @@ describe('chat stream trace', () => {
       errorText: null,
       createdAt: now,
       updatedAt: now,
-    }).run()
+    })
     db().insert(backendRuns).values({
       id: 'run-trace-route',
       bindingId: null,

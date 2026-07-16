@@ -3,12 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { backendRuns, backendSessionBindings, messages, workspaces } from '@cradle/db'
+import { backendRuns, backendSessionBindings, workspaces } from '@cradle/db'
 import { sql } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import { insertMessageFixtures } from './helpers/message-fixture'
 import { workspaceFixture } from './helpers/workspace-fixture'
 
 function createTempDir(prefix: string): string {
@@ -45,7 +46,7 @@ describe('chat runtime completed runs projection', () => {
         chatSessionId: sessionId,
         runtimeKind: 'codex',
       }).run()
-      store.insert(messages).values({
+      insertMessageFixtures(store, {
         id: 'message-complete',
         sessionId,
         role: 'assistant',
@@ -58,7 +59,7 @@ describe('chat runtime completed runs projection', () => {
         }),
         createdAt: 104,
         updatedAt: 105,
-      }).run()
+      })
       store.insert(backendRuns).values([
         {
           id: 'run-old',

@@ -6,6 +6,10 @@ import { messages, providerTargets, sessions, threadHandoffs } from '@cradle/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
+import {
+  putMessagePayload,
+  toMessageProjectionValues,
+} from '../chat-runtime/message-payload-store'
 import * as ThreadHandoff from './service'
 
 const importedMessagesMock = vi.hoisted(() => vi.fn())
@@ -87,16 +91,23 @@ describe('thread handoff service', () => {
   it('removes the destination session when transcript import fails', async () => {
     const now = Math.floor(Date.now() / 1000)
     seedSession('source-session')
-    db().insert(messages).values({
+    const message = {
       id: 'source-message',
       sessionId: 'source-session',
+      parentMessageId: null,
+      parentToolCallId: null,
+      taskId: null,
+      depth: 0,
       role: 'user',
       status: 'complete',
       content: 'Continue this work',
       messageJson: JSON.stringify({ id: 'source-message', role: 'user', parts: [] }),
+      errorText: null,
       createdAt: now,
       updatedAt: now,
-    }).run()
+    } as const
+    putMessagePayload(db(), message)
+    db().insert(messages).values(toMessageProjectionValues(message)).run()
     sessionMock.get.mockReturnValue(sourceSession)
     sessionMock.create.mockResolvedValue(destinationSession)
     sessionMock.remove.mockResolvedValue({ ok: true })

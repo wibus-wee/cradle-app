@@ -1,4 +1,3 @@
-import type { messages } from '@cradle/db'
 import type { UIMessage } from 'ai'
 
 import { AppError } from '../../../errors/app-error'
@@ -9,7 +8,7 @@ import {
 export type StoredChatMessageSnapshot = Omit<UIMessage, 'role'> & { role: 'user' | 'assistant' }
 
 export function parseStoredMessageSnapshot(
-  row: typeof messages.$inferSelect,
+  row: { id: string, messageJson: string },
   role: 'user' | 'assistant',
 ): StoredChatMessageSnapshot {
   try {

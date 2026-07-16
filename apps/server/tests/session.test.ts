@@ -21,6 +21,7 @@ import { db, shutdownInfra } from '../src/infra'
 import { ptyTimeline } from '../src/modules/pty/pty.timeline'
 import { startOrAttach } from '../src/modules/pty/service'
 import { indexMessage, searchThreads } from '../src/modules/search/service'
+import { insertMessageFixtures } from './helpers/message-fixture'
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
@@ -261,8 +262,7 @@ describe('session capability', () => {
       const userMessageId = randomUUID()
       const assistantMessageId = randomUUID()
       const now = Math.floor(Date.now() / 1000)
-      d.insert(messages)
-        .values([
+      insertMessageFixtures(d, [
           {
             id: userMessageId,
             sessionId,
@@ -291,8 +291,7 @@ describe('session capability', () => {
             createdAt: now + 1,
             updatedAt: now + 1,
           },
-        ])
-        .run()
+      ])
 
       const legacyMessagesRes = await app.handle(
         new Request(`http://localhost/sessions/${sessionId}/messages`),
@@ -956,8 +955,7 @@ describe('session capability', () => {
           updatedAt: now,
         })
         .run()
-      d.insert(messages)
-        .values({
+      insertMessageFixtures(d, {
           id: assistantMessageId,
           sessionId,
           role: 'assistant',
@@ -970,8 +968,7 @@ describe('session capability', () => {
           }),
           createdAt: now,
           updatedAt: now,
-        })
-        .run()
+      })
       d.insert(backendSessionBindings)
         .values({
           id: bindingId,
@@ -1334,8 +1331,7 @@ describe('session capability', () => {
 
       const messageId = randomUUID()
       const now = Math.floor(Date.now() / 1000)
-      d.insert(messages)
-        .values({
+      insertMessageFixtures(d, {
           id: messageId,
           sessionId,
           role: 'assistant',
@@ -1348,8 +1344,7 @@ describe('session capability', () => {
           }),
           createdAt: now,
           updatedAt: now,
-        })
-        .run()
+      })
       indexMessage(sessionId, 'CLI Cleanup Session', messageId, 'cleanup sentinel text')
       expect(searchThreads({ query: 'cleanup sentinel' })).toEqual([
         expect.objectContaining({ sessionId }),

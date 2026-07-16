@@ -31,6 +31,8 @@ export class ClaudeAgentInputStream implements AsyncIterable<SDKUserMessage> {
       /** Defaults to `next` so mid-turn follow-ups queue instead of competing with interrupt semantics. */
       priority?: ClaudeAgentInputPriority
       uuid?: ClaudeAgentMessageUuid
+      isSynthetic?: boolean
+      shouldQuery?: boolean
     } = {},
   ): ClaudeAgentMessageUuid {
     const uuid = options.uuid ?? randomUUID()
@@ -39,6 +41,8 @@ export class ClaudeAgentInputStream implements AsyncIterable<SDKUserMessage> {
       message: { role: 'user', content },
       parent_tool_use_id: options.parentToolUseId ?? null,
       ...(options.toolUseResult !== undefined ? { tool_use_result: options.toolUseResult } : {}),
+      ...(options.isSynthetic !== undefined ? { isSynthetic: options.isSynthetic } : {}),
+      ...(options.shouldQuery !== undefined ? { shouldQuery: options.shouldQuery } : {}),
       priority: options.priority ?? 'next',
       uuid,
     })

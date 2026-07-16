@@ -31,6 +31,7 @@ import {
   commitSessionEventsInTransaction,
 } from '../src/modules/chat-runtime/es/commands'
 import type { ChatSessionEvent } from '../src/modules/chat-runtime/es/events'
+import { readMessagePayload } from '../src/modules/chat-runtime/message-payload-store'
 import {
   flushAllActiveRunSnapshots,
   getActiveRunReplayBufferSummary,
@@ -77,6 +78,7 @@ import {
   clearSideConversations,
   readSideConversation,
 } from '../src/modules/provider-runtime/side-conversation-registry'
+import { insertMessageFixtures } from './helpers/message-fixture'
 
 interface ChatMessageRow {
   messageId: string
@@ -1509,9 +1511,7 @@ describe('chat runtime capability', () => {
         role: 'assistant',
         parts: [{ type: 'text', text: 'This will be removed.' }],
       }
-      db()
-        .insert(messages)
-        .values([
+      insertMessageFixtures(db(), [
           {
             id: userMessage.id,
             sessionId: 'session-codex-rollback',
@@ -1532,8 +1532,7 @@ describe('chat runtime capability', () => {
             createdAt: 1_700_000_011,
             updatedAt: 1_700_000_011,
           },
-        ])
-        .run()
+      ])
 
       const response = await app.handle(
         new Request('http://localhost/chat/sessions/session-codex-rollback/rollback-last-turn', {
@@ -2526,9 +2525,7 @@ describe('chat runtime capability', () => {
         role: 'assistant',
         parts: [{ type: 'text', text: 'Parent context answer', state: 'done' }],
       }
-      db()
-        .insert(messages)
-        .values([
+      insertMessageFixtures(db(), [
           {
             id: parentUserMessage.id,
             sessionId: 'session-fallback-side-parent',
@@ -2557,8 +2554,7 @@ describe('chat runtime capability', () => {
             createdAt: 1_700_000_001,
             updatedAt: 1_700_000_001,
           },
-        ])
-        .run()
+      ])
 
       const sideResponse = await app.handle(
         new Request('http://localhost/chat/sessions/session-fallback-side-parent/side-chat', {
@@ -4144,9 +4140,7 @@ describe('chat runtime capability', () => {
         parts: [{ type: 'text', text: 'History remains available.' }],
       }
 
-      db()
-        .insert(messages)
-        .values([
+      insertMessageFixtures(db(), [
           {
             id: userMessage.id,
             sessionId: 'session-chat-provider-deleted',
@@ -4167,8 +4161,7 @@ describe('chat runtime capability', () => {
             createdAt: now + 1,
             updatedAt: now + 1,
           },
-        ])
-        .run()
+      ])
       db()
         .insert(chatSessionQueueItems)
         .values({
@@ -4312,9 +4305,7 @@ describe('chat runtime capability', () => {
           { type: 'text', text: 'Old large snapshot text should not be parsed.' },
         ],
       })
-      db()
-        .insert(messages)
-        .values([
+      insertMessageFixtures(db(), [
           {
             id: 'message-bounded-history-old',
             sessionId: 'session-chat-bounded-history',
@@ -4360,8 +4351,7 @@ describe('chat runtime capability', () => {
             createdAt: 1700000002,
             updatedAt: 1700000002,
           },
-        ])
-        .run()
+      ])
 
       const runRes = await app.handle(
         new Request('http://localhost/chat/sessions/session-chat-bounded-history/response', {
@@ -4446,9 +4436,7 @@ describe('chat runtime capability', () => {
         role: 'assistant',
         parts: [{ type: 'text', text: `oversized assistant text ${'x'.repeat(2_000)}` }],
       })
-      db()
-        .insert(messages)
-        .values({
+      insertMessageFixtures(db(), {
           id: 'message-repair-snapshot-assistant',
           sessionId: 'session-chat-repair-snapshot',
           parentMessageId: null,
@@ -4462,8 +4450,7 @@ describe('chat runtime capability', () => {
           errorText: null,
           createdAt: 1700000000,
           updatedAt: 1700000000,
-        })
-        .run()
+      })
 
       const messageRows = await getChatMessages(app, 'session-chat-repair-snapshot')
       expect(messageRows[0]?.message.parts.find(part => part.type === 'text')?.text).toBe(
@@ -4471,11 +4458,7 @@ describe('chat runtime capability', () => {
       )
       expect(messageRows[0]?.content).toBe('oversized assistant text')
 
-      const storedRow = db()
-        .select()
-        .from(messages)
-        .where(eq(messages.id, 'message-repair-snapshot-assistant'))
-        .get()
+      const storedRow = readMessagePayload(db(), 'message-repair-snapshot-assistant')
       expect(storedRow?.messageJson).toBe(originalSnapshot)
       expect(storedRow?.content).toBe(`oversized assistant text ${'x'.repeat(2_000)}`)
     }
@@ -5663,9 +5646,7 @@ describe('chat runtime capability', () => {
         })
         .run()
 
-      db()
-        .insert(messages)
-        .values({
+      insertMessageFixtures(db(), {
           id: 'message-orphan-assistant',
           sessionId: 'session-chat-orphan',
           parentMessageId: null,
@@ -5683,8 +5664,7 @@ describe('chat runtime capability', () => {
           errorText: null,
           createdAt: 1700000000,
           updatedAt: 1700000000,
-        })
-        .run()
+      })
       db()
         .insert(backendRuns)
         .values({
@@ -5719,9 +5699,7 @@ describe('chat runtime capability', () => {
           updatedAt: 1700000000,
         })
         .run()
-      db()
-        .insert(messages)
-        .values({
+      insertMessageFixtures(db(), {
           id: 'message-terminal-projection-assistant',
           sessionId: 'session-chat-orphan',
           parentMessageId: null,
@@ -5739,8 +5717,7 @@ describe('chat runtime capability', () => {
           errorText: null,
           createdAt: 1700000001,
           updatedAt: 1700000001,
-        })
-        .run()
+      })
       db()
         .insert(backendRuns)
         .values({
@@ -6529,9 +6506,7 @@ describe('chat runtime capability', () => {
         sessionId: 'session-chat-invalid-snapshot',
       })
 
-      db()
-        .insert(messages)
-        .values({
+      insertMessageFixtures(db(), {
           id: 'message-invalid-snapshot',
           sessionId: 'session-chat-invalid-snapshot',
           parentMessageId: null,
@@ -6545,8 +6520,7 @@ describe('chat runtime capability', () => {
           errorText: null,
           createdAt: 1700000000,
           updatedAt: 1700000000,
-        })
-        .run()
+      })
 
       const response = await app.handle(
         new Request('http://localhost/chat/sessions/session-chat-invalid-snapshot/messages'),
@@ -6625,9 +6599,7 @@ describe('chat runtime capability', () => {
         })
         .run()
 
-      db()
-        .insert(messages)
-        .values({
+      insertMessageFixtures(db(), {
           id: 'message-bang-command-metadata',
           sessionId: 'session-chat-message-metadata',
           parentMessageId: null,
@@ -6650,8 +6622,7 @@ describe('chat runtime capability', () => {
           errorText: null,
           createdAt: 1700000000,
           updatedAt: 1700000000,
-        })
-        .run()
+      })
 
       const response = await app.handle(
         new Request('http://localhost/chat/sessions/session-chat-message-metadata/messages'),
@@ -7361,9 +7332,7 @@ describe('chat runtime capability', () => {
       })
 
       const now = 1_700_000_000
-      db()
-        .insert(messages)
-        .values([
+      insertMessageFixtures(db(), [
           {
             id: 'message-codex-goal-status-user',
             sessionId: 'session-codex-goal-status-wake',
@@ -7402,8 +7371,7 @@ describe('chat runtime capability', () => {
             createdAt: now + 1,
             updatedAt: now + 1,
           },
-        ])
-        .run()
+      ])
       db()
         .insert(backendSessionBindings)
         .values({

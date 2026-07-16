@@ -13,6 +13,13 @@ import { asc, eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
+import {
+  hydrateMessage,
+  putMessagePayload,
+  readMessagePayload,
+  toMessageProjectionValues,
+  updateMessagePayload,
+} from '../message-payload-store'
 import { commitSessionEventsInTransaction } from './commands'
 import type { ChatSessionEvent, UserMessageAppendedPayload } from './events'
 import {
@@ -268,6 +275,18 @@ function readEventTypes(sessionId: string): string[] {
     .map(row => row.eventType)
 }
 
+function readHydratedMessage(messageId: string) {
+  const message = db().select().from(messages).where(eq(messages.id, messageId)).get()
+  if (!message) {
+    return undefined
+  }
+  const payload = readMessagePayload(db(), message.payloadId)
+  if (!payload) {
+    return undefined
+  }
+  return hydrateMessage(message, payload)
+}
+
 function appendV1EventAndProject(
   sessionId: string,
   version: number,
@@ -286,7 +305,28 @@ function appendV1EventAndProject(
       })
       .returning()
       .get()
-    projectSessionEvent(tx, parseStoredChatSessionEvent(row))
+    const parsed = parseStoredChatSessionEvent(row)
+    switch (parsed.type) {
+      case 'UserMessageAppended':
+      case 'MessageImported':
+      case 'SteerApplied':
+        putMessagePayload(tx, parsed.payload.message)
+        break
+      case 'RunStarted':
+        if (parsed.payload.assistantMessage) {
+          putMessagePayload(tx, parsed.payload.assistantMessage)
+        }
+        break
+      case 'AssistantMessageCompleted':
+        putMessagePayload(tx, {
+          ...parsed.payload.message,
+          createdAt: parsed.payload.message.updatedAt,
+        })
+        break
+      default:
+        break
+    }
+    projectSessionEvent(tx, parsed)
   })
 }
 
@@ -479,13 +519,7 @@ describe('checkChatSessionProjectionParity', () => {
         'AssistantMessageCompleted',
         'RunAborted',
       ])
-      expect(
-        db()
-          .select()
-          .from(messages)
-          .where(eq(messages.id, 'assistant-abort'))
-          .get(),
-      ).toMatchObject({
+      expect(readHydratedMessage('assistant-abort')).toMatchObject({
         status: 'aborted',
         errorText: null,
       })
@@ -524,13 +558,7 @@ describe('checkChatSessionProjectionParity', () => {
         'AssistantMessageCompleted',
         'RunFailed',
       ])
-      expect(
-        db()
-          .select()
-          .from(messages)
-          .where(eq(messages.id, 'assistant-interrupted'))
-          .get(),
-      ).toMatchObject({
+      expect(readHydratedMessage('assistant-interrupted')).toMatchObject({
         status: 'failed',
         errorText: expect.stringContaining('server process exited'),
       })
@@ -601,13 +629,7 @@ describe('checkChatSessionProjectionParity', () => {
         }),
       ])
 
-      expect(
-        db()
-          .select()
-          .from(messages)
-          .where(eq(messages.id, 'assistant-streaming-snapshot'))
-          .get(),
-      ).toMatchObject({
+      expect(readHydratedMessage('assistant-streaming-snapshot')).toMatchObject({
         status: 'streaming',
         content: '',
       })
@@ -619,7 +641,7 @@ describe('checkChatSessionProjectionParity', () => {
     })
   })
 
-  it('reports logless streaming message updates as unexplained drift', async () => {
+  it('does not classify authoritative streaming payload updates as projection drift', async () => {
     await withTempDataDir(() => {
       const sessionId = 'session-parity-streaming'
       seedSession(sessionId)
@@ -632,35 +654,26 @@ describe('checkChatSessionProjectionParity', () => {
         }),
       ])
 
-      db()
-        .update(messages)
-        .set({
-          content: 'partial',
-          messageJson: JSON.stringify({
-            id: 'assistant-streaming',
-            role: 'assistant',
-            parts: [{ type: 'text', text: 'partial' }],
-          }),
-          updatedAt: 105,
-        })
-        .where(eq(messages.id, 'assistant-streaming'))
-        .run()
+      updateMessagePayload(db(), {
+        id: 'assistant-streaming',
+        sessionId,
+        content: 'partial',
+        messageJson: JSON.stringify({
+          id: 'assistant-streaming',
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'partial' }],
+        }),
+        errorText: null,
+        updatedAt: 105,
+      })
 
       const report = checkChatSessionProjectionParity(sessionId)
       expect(report.expectedLoglessDiffs).toEqual([])
-      expect(report.unexplainedDiffs).toEqual([
-        expect.objectContaining({
-          table: 'messages',
-          rowId: 'assistant-streaming',
-          kind: 'changed_projection_row',
-          category: 'unexplained_projection_drift',
-          changedFields: ['content', 'messageJson', 'updatedAt'],
-        }),
-      ])
+      expect(report.unexplainedDiffs).toEqual([])
     })
   })
 
-  it('reports non-streaming message mutations as unexplained drift', async () => {
+  it('does not duplicate completed payloads into projection parity rows', async () => {
     await withTempDataDir(() => {
       const sessionId = 'session-parity-complete-drift'
       seedSession(sessionId)
@@ -668,31 +681,22 @@ describe('checkChatSessionProjectionParity', () => {
         userMessageEvent('user-complete', sessionId, 'original', 101),
       ])
 
-      db()
-        .update(messages)
-        .set({
-          content: 'mutated',
-          messageJson: JSON.stringify({
-            id: 'user-complete',
-            role: 'user',
-            parts: [{ type: 'text', text: 'mutated' }],
-          }),
-          updatedAt: 105,
-        })
-        .where(eq(messages.id, 'user-complete'))
-        .run()
+      updateMessagePayload(db(), {
+        id: 'user-complete',
+        sessionId,
+        content: 'mutated',
+        messageJson: JSON.stringify({
+          id: 'user-complete',
+          role: 'user',
+          parts: [{ type: 'text', text: 'mutated' }],
+        }),
+        errorText: null,
+        updatedAt: 105,
+      })
 
       const report = checkChatSessionProjectionParity(sessionId)
       expect(report.expectedLoglessDiffs).toEqual([])
-      expect(report.unexplainedDiffs).toEqual([
-        expect.objectContaining({
-          table: 'messages',
-          rowId: 'user-complete',
-          kind: 'changed_projection_row',
-          category: 'unexplained_projection_drift',
-          changedFields: ['content', 'messageJson', 'updatedAt'],
-        }),
-      ])
+      expect(report.unexplainedDiffs).toEqual([])
     })
   })
 
@@ -700,11 +704,13 @@ describe('checkChatSessionProjectionParity', () => {
     await withTempDataDir(() => {
       const sessionId = 'session-parity-import'
       seedSession(sessionId)
-      db()
-        .insert(messages)
-        .values({
+      const imported = {
           id: 'imported-message-1',
           sessionId,
+          parentMessageId: null,
+          parentToolCallId: null,
+          taskId: null,
+          depth: 0,
           role: 'user',
           status: 'complete',
           content: 'imported',
@@ -713,10 +719,12 @@ describe('checkChatSessionProjectionParity', () => {
             role: 'user',
             parts: [{ type: 'text', text: 'imported' }],
           }),
+          errorText: null,
           createdAt: 101,
           updatedAt: 101,
-        })
-        .run()
+        } as const
+      putMessagePayload(db(), imported)
+      db().insert(messages).values(toMessageProjectionValues(imported)).run()
 
       const report = checkChatSessionProjectionParity(sessionId)
       expect(report.expectedLoglessDiffs).toEqual([])

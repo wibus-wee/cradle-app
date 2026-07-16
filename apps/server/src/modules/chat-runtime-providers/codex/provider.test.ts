@@ -5788,6 +5788,176 @@ describe('codexProvider app-server integration', () => {
     ])
   })
 
+  it('injects Work harness context once as a developer item', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const provider = createProvider(client)
+    const runtimeSession = createRuntimeSession()
+    const harness = {
+      fragments: [{
+        key: 'cradle-work',
+        revision: 'cradle-work:work-1:primary:v1',
+        content: '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+      }],
+    }
+    const stream = provider.streamTurn({
+      runId: 'run-codex-harness',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Implement the Work objective'),
+      harness,
+      workspaceId: 'workspace-1',
+    })
+    const firstChunkPromise = stream.next()
+
+    await vi.waitFor(() => {
+      expect(client.requests.map(request => request.method)).toEqual([
+        'thread/start',
+        'thread/inject_items',
+        'turn/start',
+      ])
+    })
+    expect(client.requests[1]).toEqual({
+      method: 'thread/inject_items',
+      params: {
+        threadId: 'codex-thread-1',
+        items: [{
+          type: 'message',
+          role: 'developer',
+          content: [{
+            type: 'input_text',
+            text: '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+          }],
+        }],
+      },
+    })
+
+    client.pushNotification({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        itemId: 'assistant-message-1',
+        delta: 'Working',
+      },
+    })
+    await firstChunkPromise
+    client.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-turn-1', status: 'completed' },
+      },
+    })
+    for await (const _chunk of stream) {
+      // Drain stream.
+    }
+
+    expect(JSON.parse(runtimeSession.providerStateSnapshot ?? '{}')).toMatchObject({
+      harness: {
+        providerSessionId: 'codex-thread-1',
+        revisions: { 'cradle-work': 'cradle-work:work-1:primary:v1' },
+      },
+    })
+  })
+
+  it('reinjects Work harness context after Codex compaction completes', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const provider = createProvider(client)
+    const runtimeSession = createRuntimeSession()
+    const harness = {
+      fragments: [{
+        key: 'cradle-work',
+        revision: 'cradle-work:work-1:primary:v1',
+        content: '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+      }],
+    }
+    const firstStream = provider.streamTurn({
+      runId: 'run-codex-harness-before-compact',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Implement the Work objective'),
+      harness,
+      workspaceId: 'workspace-1',
+    })
+    const firstChunkPromise = firstStream.next()
+
+    await vi.waitFor(() => {
+      expect(client.requests.map(request => request.method)).toEqual([
+        'thread/start',
+        'thread/inject_items',
+        'turn/start',
+      ])
+    })
+    client.pushNotification({
+      method: 'item/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        completedAtMs: 50,
+        item: { id: 'compact-1', type: 'contextCompaction', status: 'completed' },
+      },
+    })
+    client.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-turn-1', status: 'completed' },
+      },
+    })
+
+    await firstChunkPromise
+    await drainStream(firstStream)
+    expect(JSON.parse(runtimeSession.providerStateSnapshot ?? '{}')).toMatchObject({
+      harness: {
+        providerSessionId: 'codex-thread-1',
+        revisions: {},
+      },
+    })
+
+    const secondStream = provider.streamTurn({
+      runId: 'run-codex-harness-after-compact',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Continue after compaction'),
+      harness,
+      workspaceId: 'workspace-1',
+    })
+    const secondChunkPromise = secondStream.next()
+
+    await vi.waitFor(() => {
+      expect(client.requests.filter(request => request.method === 'thread/inject_items')).toHaveLength(2)
+      expect(client.requests.filter(request => request.method === 'turn/start')).toHaveLength(2)
+    })
+    const harnessInjections = client.requests.filter(request => request.method === 'thread/inject_items')
+    expect(harnessInjections[1]).toEqual(harnessInjections[0])
+
+    client.pushNotification({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        itemId: 'assistant-message-2',
+        delta: 'Continuing',
+      },
+    })
+    await secondChunkPromise
+    client.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-turn-1', status: 'completed' },
+      },
+    })
+    await drainStream(secondStream)
+
+    expect(JSON.parse(runtimeSession.providerStateSnapshot ?? '{}')).toMatchObject({
+      harness: {
+        providerSessionId: 'codex-thread-1',
+        revisions: { 'cradle-work': 'cradle-work:work-1:primary:v1' },
+      },
+    })
+  })
+
   it('keeps separate agent message items as separate text segments', async () => {
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)

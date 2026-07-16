@@ -1,4 +1,4 @@
-import { messages } from '@cradle/db'
+import { chatMessagePayloads, messages } from '@cradle/db'
 import type { UIMessage } from 'ai'
 import { and, eq } from 'drizzle-orm'
 
@@ -8,6 +8,7 @@ import { db } from '../../../infra'
 import { appendDecidedSessionEvents } from '../es/commands'
 import { publishSessionTailEvents } from '../es/event-tail'
 import { runSessionActorTask } from '../es/session-actor'
+import { hydrateMessage, messagePayloadJoinCondition } from '../message-payload-store'
 import { submitRuntimeToolApprovalIfPending } from '../pending-tool-approval'
 import { assertStoredSession } from '../runtime-session-context'
 import { parseStoredMessageSnapshot } from '../stream/projection'
@@ -27,8 +28,9 @@ export async function resolvePlanImplementationApproval(input: {
 
   const result = await runSessionActorTask(input.sessionId, () => db().transaction((tx) => {
     const row = tx
-      .select()
+      .select({ message: messages, payload: chatMessagePayloads })
       .from(messages)
+      .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
       .where(and(eq(messages.id, input.messageId), eq(messages.sessionId, input.sessionId)))
       .get()
     if (!row) {
@@ -42,7 +44,8 @@ export async function resolvePlanImplementationApproval(input: {
         },
       })
     }
-    if (row.role !== 'assistant') {
+    const hydrated = hydrateMessage(row.message, row.payload)
+    if (hydrated.role !== 'assistant') {
       throw new AppError({
         code: 'chat_plan_implementation_approval_invalid',
         status: 400,
@@ -50,13 +53,13 @@ export async function resolvePlanImplementationApproval(input: {
         details: {
           sessionId: input.sessionId,
           messageId: input.messageId,
-          role: row.role,
+          role: hydrated.role,
         },
       })
     }
 
     const message = applyPlanImplementationApprovalResponse({
-      message: parseStoredMessageSnapshot(row, 'assistant'),
+      message: parseStoredMessageSnapshot(hydrated, 'assistant'),
       sessionId: input.sessionId,
       messageId: input.messageId,
       approvalId: input.approvalId,

@@ -7,13 +7,13 @@ import {
   SessionRuntimeConfigJsonSchema,
   writeCodexCliSessionBindingToSessionConfig,
 } from '../../helpers/agent-runtime-config'
-import { getSystemWorkflow } from '../../helpers/system-workflow'
 import { db } from '../../infra'
 import type { ResolvedRootBoundary } from '../../security/path-boundary'
 import {
   assertWithinAllowedRoots,
   resolveDirectoryBoundarySync,
 } from '../../security/path-boundary'
+import { getCradleHarnessSystemInstructions } from '../chat-runtime/harness/system-instructions'
 import { reportRuntimeSessionTitle } from '../chat-runtime/title-service'
 import { runtimeUsesAgentTerminalLaunch } from '../provider-contracts/runtime-compatibility'
 import * as SessionService from '../session/service'
@@ -283,7 +283,7 @@ export function startOrAttach(input: { sessionId: string, cols: number, rows: nu
       args.push('--session-id', input.sessionId)
     }
 
-    const workflow = getSystemWorkflow()
+    const workflow = getCradleHarnessSystemInstructions()
     if (workflow) {
       args.push('--append-system-prompt', workflow)
     }

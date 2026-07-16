@@ -8,6 +8,12 @@ import type { UIMessage, UIMessageChunk } from 'ai'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'
 import { aiTelemetryEnabled } from '../../../telemetry/config'
+import {
+  bindHarnessProjectionToProviderSession,
+  invalidateHarnessProjection,
+  markHarnessFragmentsProjected,
+  resolvePendingHarnessFragments,
+} from '../../chat-runtime/harness/provider-state'
 import { liveRuntimeSessionRegistry } from '../../chat-runtime/runtime-live-session-registry'
 import type {
   CancelTurnInput,
@@ -690,6 +696,18 @@ export class ClaudeAgentProvider implements ChatRuntime {
         }
       }
       else {
+        const pendingHarnessFragments = resolvePendingHarnessFragments(
+          input.runtimeSession,
+          input.harness?.fragments,
+        )
+        for (const fragment of pendingHarnessFragments) {
+          activeEntry.inputStream.push(fragment.content, {
+            isSynthetic: true,
+            shouldQuery: false,
+            priority: 'next',
+          })
+        }
+        markHarnessFragmentsProjected(input.runtimeSession, pendingHarnessFragments)
         activeEntry.inputStream.push(userContent, { priority: 'next' })
       }
 
@@ -1158,6 +1176,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     entry.runtimeSession.providerSessionId = nextProviderSessionId
     turn.input.runtimeSession.providerSessionId = nextProviderSessionId
+    bindHarnessProjectionToProviderSession(entry.runtimeSession, nextProviderSessionId)
     await this.reportClaudeSessionTitle({
       sessionId: nextProviderSessionId,
       runtimeSession: entry.runtimeSession,
@@ -1580,6 +1599,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
   }
 
   private projectClaudeAgentRuntimeState(runtimeSession: RuntimeSession, message: SDKMessage): void {
+    if (message.type === 'system' && message.subtype === 'compact_boundary') {
+      invalidateHarnessProjection(runtimeSession)
+      return
+    }
     if (message.type === 'auth_status') {
       writeClaudeAgentAuthStatusSnapshot(runtimeSession, message as SDKAuthStatusMessage)
       return

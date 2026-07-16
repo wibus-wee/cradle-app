@@ -7,6 +7,7 @@
 import { Buffer } from 'node:buffer'
 
 import { readObjectRecord as readRecord } from '../../../../helpers/json-record'
+import { invalidateHarnessProjection } from '../../../chat-runtime/harness/provider-state'
 import type {
   RuntimeApprovalStatus,
   RuntimeCompactUiSlotState,
@@ -383,6 +384,7 @@ function projectCodexCompactSnapshot(
   }
 
   if (notification.method === 'thread/compacted') {
+    invalidateHarnessProjection(runtimeSession)
     const params = notification.params as ContextCompactedNotificationParams | undefined
     mergeCodexCompactSnapshot(runtimeSession, {
       threadId: params?.threadId ?? fallbackThreadId,
@@ -413,6 +415,7 @@ function projectCodexCompactSnapshot(
     if (params?.item?.type !== 'contextCompaction') {
       return
     }
+    invalidateHarnessProjection(runtimeSession)
     const compactionItemId = params.item.id ?? null
     const existing = readCodexCompactSnapshot(runtimeSession.providerStateSnapshot)
     mergeCodexCompactSnapshot(runtimeSession, {

@@ -4,6 +4,7 @@ import { desc, eq } from 'drizzle-orm'
 import { AppError } from '../../../errors/app-error'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
+import { putMessagePayload, readMessagePayload } from '../message-payload-store'
 import type { ChatSessionEvent, StoredChatSessionEvent } from './events'
 import {
   CHAT_SESSION_AGGREGATE_TYPE,
@@ -45,7 +46,7 @@ export function readNextSessionEventVersion(
 }
 
 export function appendSessionEvent(
-  d: Pick<ChatRuntimeWriteDb, 'select' | 'insert'>,
+  d: Pick<ChatRuntimeWriteDb, 'select' | 'insert' | 'update'>,
   input: AppendSessionEventInput,
 ): StoredChatSessionEvent {
   const currentVersion = readCurrentSessionEventVersion(d, input.aggregateId)
@@ -54,6 +55,7 @@ export function appendSessionEvent(
   }
 
   const version = currentVersion + 1
+  persistEventMessagePayloads(d, input.event)
   let row
   try {
     row = d
@@ -72,7 +74,7 @@ export function appendSessionEvent(
  catch {
     throwConcurrencyConflict(input.aggregateId, input.expectedVersion ?? currentVersion, currentVersion)
   }
-  return parseStoredChatSessionEvent(row)
+  return parseStoredChatSessionEvent(row, payloadId => readMessagePayload(d, payloadId))
 }
 
 export function readSessionEvents(
@@ -89,7 +91,33 @@ export function readSessionEvents(
     .orderBy(sessionEvents.version)
     .all()
     .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
-    .map(parseStoredChatSessionEvent)
+    .map(row => parseStoredChatSessionEvent(row, payloadId => readMessagePayload(d, payloadId)))
+}
+
+function persistEventMessagePayloads(
+  d: Pick<ChatRuntimeWriteDb, 'insert' | 'select' | 'update'>,
+  event: ChatSessionEvent,
+): void {
+  switch (event.type) {
+    case 'UserMessageAppended':
+    case 'MessageImported':
+    case 'SteerApplied':
+      putMessagePayload(d, event.payload.message)
+      break
+    case 'RunStarted':
+      if (event.payload.assistantMessage) {
+        putMessagePayload(d, event.payload.assistantMessage)
+      }
+      break
+    case 'AssistantMessageCompleted':
+      putMessagePayload(d, {
+        ...event.payload.message,
+        createdAt: event.payload.message.updatedAt,
+      })
+      break
+    default:
+      break
+  }
 }
 
 function throwConcurrencyConflict(

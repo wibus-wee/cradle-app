@@ -1,6 +1,7 @@
 import {
   backendRuns,
   backendRunSnapshots,
+  chatMessagePayloads,
   chatSessionQueueItems,
   messages,
   sessions,
@@ -8,6 +9,11 @@ import {
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
 import { applyPlanImplementationApprovalResponse } from '../interaction/plan-implementation-message'
+import {
+  messagePayloadJoinCondition,
+  toMessageProjectionValues,
+  updateMessagePayload,
+} from '../message-payload-store'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import { normalizeQueueItemRuntimeSettingsJson } from '../queue/session-queue'
 import type { ChatMessageStatus } from '../run/stream-chunks'
@@ -43,7 +49,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
   switch (event.type) {
     case 'UserMessageAppended':
     case 'MessageImported':
-      d.insert(messages).values(event.payload.message).run()
+      d.insert(messages).values(toMessageProjectionValues(event.payload.message)).run()
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'RunStarted':
@@ -58,9 +64,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           d.update(messages)
             .set({
               status: event.payload.assistantMessage.status,
-              errorText: event.payload.assistantMessage.errorText ?? null,
-              content: event.payload.assistantMessage.content,
-              messageJson: event.payload.assistantMessage.messageJson,
+              payloadId: event.payload.assistantMessage.id,
               updatedAt: event.payload.assistantMessage.updatedAt,
             })
             .where(
@@ -73,7 +77,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
             .run()
         }
  else {
-          d.insert(messages).values(event.payload.assistantMessage).run()
+          d.insert(messages).values(toMessageProjectionValues(event.payload.assistantMessage)).run()
         }
       }
       d.insert(backendRuns).values(event.payload.run).run()
@@ -90,10 +94,8 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
     case 'AssistantMessageCompleted':
       d.update(messages)
         .set({
-          content: event.payload.message.content,
-          messageJson: event.payload.message.messageJson,
+          payloadId: event.payload.message.id,
           status: event.payload.message.status,
-          errorText: event.payload.message.errorText,
           updatedAt: event.payload.message.updatedAt,
         })
         .where(
@@ -147,7 +149,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       projectQueueItemCancelled(d, event.payload)
       break
     case 'SteerApplied':
-      d.insert(messages).values(event.payload.message).run()
+      d.insert(messages).values(toMessageProjectionValues(event.payload.message)).run()
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'LastTurnRolledBack':
@@ -195,8 +197,12 @@ function projectPlanImplementationResponded(
   payload: PlanImplementationRespondedPayload,
 ): void {
   const row = d
-    .select()
+    .select({
+      message: messages,
+      payload: chatMessagePayloads,
+    })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(
       and(
         eq(messages.id, payload.messageId),
@@ -212,7 +218,7 @@ function projectPlanImplementationResponded(
   const message = compactStoredMessageSnapshot(
     normalizeMessageSnapshot(
       applyPlanImplementationApprovalResponse({
-        message: parseStoredMessageSnapshot(row, 'assistant'),
+        message: parseStoredMessageSnapshot({ ...row.message, ...row.payload }, 'assistant'),
         sessionId: payload.sessionId,
         messageId: payload.messageId,
         approvalId: payload.approvalId,
@@ -221,14 +227,16 @@ function projectPlanImplementationResponded(
     ),
   )
   const messageJson = JSON.stringify(message)
+  updateMessagePayload(d, {
+    id: row.message.id,
+    sessionId: row.message.sessionId,
+    content: extractMessageText(message),
+    messageJson,
+    errorText: row.payload.errorText,
+    updatedAt: payload.updatedAt,
+  })
   d.update(messages)
-    .set({
-      content: extractMessageText(message),
-      messageJson,
-      status: row.status as ChatMessageStatus,
-      errorText: row.errorText,
-      updatedAt: payload.updatedAt,
-    })
+    .set({ status: row.message.status as ChatMessageStatus, updatedAt: payload.updatedAt })
     .where(and(eq(messages.id, payload.messageId), eq(messages.sessionId, payload.sessionId)))
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)

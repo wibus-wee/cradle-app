@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { messages, sessions, usageLogs } from '@cradle/db'
+import { sessions, usageLogs } from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -14,6 +14,7 @@ import { executeRun } from '../src/modules/chat-runtime/run/turn-executor'
 import type { ActiveRun } from '../src/modules/chat-runtime/run-registry'
 import type { ChatRuntime } from '../src/modules/chat-runtime/runtime-provider-types'
 import { createRunChunkLog } from '../src/modules/chat-runtime/stream/run-chunk-log'
+import { insertMessageFixtures } from './helpers/message-fixture'
 
 async function withTempDataDir<T>(callback: () => Promise<T> | T): Promise<T> {
   const dataDir = mkdtempSync(join(tmpdir(), 'cradle-data-'))
@@ -116,13 +117,13 @@ describe('executeRun provider usage events', () => {
       const sessionId = `session-${randomUUID()}`
       const runId = `run-${randomUUID()}`
       db().insert(sessions).values({ id: sessionId, title: 'Session', runtimeKind: 'codex' }).run()
-      db().insert(messages).values({
+      insertMessageFixtures(db(), {
         id: `${runId}-message`,
         sessionId,
         role: 'assistant',
         content: '',
         messageJson: JSON.stringify({ id: `${runId}-message`, role: 'assistant', parts: [] }),
-      }).run()
+      })
       const runtime = {
         ...createStreamingRuntime([]),
         runtimeKind: 'codex',

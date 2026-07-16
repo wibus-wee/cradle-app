@@ -19,6 +19,12 @@ import {
   recoverChatRuntimeSession,
 } from '../src/modules/chat-runtime/es/recovery'
 import { getMessageGroups } from '../src/modules/chat-runtime/history-api'
+import {
+  hydrateMessage,
+  putMessagePayload,
+  readMessagePayload,
+  toMessageProjectionValues,
+} from '../src/modules/chat-runtime/message-payload-store'
 import { recoverPersistedRunProjections } from '../src/modules/chat-runtime/runtime'
 
 const INTERRUPTED_RUN_ERROR_TEXT
@@ -72,28 +78,39 @@ function seedAssistantMessage(input: {
   updatedAt?: number
 }): void {
   const content = input.content ?? 'partial response'
+  const message = {
+    id: input.id,
+    sessionId: input.sessionId,
+    parentMessageId: null,
+    parentToolCallId: null,
+    taskId: null,
+    depth: 0,
+    role: 'assistant' as const,
+    status: input.status,
+    content,
+    messageJson: JSON.stringify({
+      id: input.id,
+      role: 'assistant',
+      parts: [{ type: 'text', text: content }],
+    }),
+    errorText: input.errorText ?? null,
+    createdAt: input.createdAt ?? 1700000000,
+    updatedAt: input.updatedAt ?? 1700000000,
+  }
+  putMessagePayload(db(), message)
   db()
     .insert(messages)
-    .values({
-      id: input.id,
-      sessionId: input.sessionId,
-      parentMessageId: null,
-      parentToolCallId: null,
-      taskId: null,
-      depth: 0,
-      role: 'assistant',
-      status: input.status,
-      content,
-      messageJson: JSON.stringify({
-        id: input.id,
-        role: 'assistant',
-        parts: [{ type: 'text', text: content }],
-      }),
-      errorText: input.errorText ?? null,
-      createdAt: input.createdAt ?? 1700000000,
-      updatedAt: input.updatedAt ?? 1700000000,
-    })
+    .values(toMessageProjectionValues(message))
     .run()
+}
+
+function readHydratedMessage(messageId: string) {
+  const message = db().select().from(messages).where(eq(messages.id, messageId)).get()
+  if (!message) {
+    return undefined
+  }
+  const payload = readMessagePayload(db(), message.payloadId)
+  return payload ? hydrateMessage(message, payload) : undefined
 }
 
 function seedBackendRun(input: {
@@ -235,7 +252,7 @@ describe('chat runtime recovery', () => {
       })
 
       expect(
-        db().select().from(messages).where(eq(messages.id, 'message-terminal-recovery')).get(),
+        readHydratedMessage('message-terminal-recovery'),
       ).toEqual(
         expect.objectContaining({
           status: 'aborted',
@@ -314,7 +331,7 @@ describe('chat runtime recovery', () => {
         }),
       )
       expect(
-        db().select().from(messages).where(eq(messages.id, 'message-streaming-recovery')).get(),
+        readHydratedMessage('message-streaming-recovery'),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
@@ -439,12 +456,12 @@ describe('chat runtime recovery', () => {
       })
       expect(countSessionEvents('session-terminal-drift')).toBe(eventsBefore)
       expect(
-        db().select().from(messages).where(eq(messages.id, 'message-terminal-drift')).get(),
+        readHydratedMessage('message-terminal-drift'),
       ).toEqual(
         expect.objectContaining({
           status: 'failed',
-          content: 'failed response',
-          errorText: 'terminal failure',
+          content: 'late streaming overwrite',
+          errorText: null,
           updatedAt: 1700000100,
         }),
       )

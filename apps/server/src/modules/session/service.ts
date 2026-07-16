@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 
-import type { Message, Session } from '@cradle/db'
+import type { Session } from '@cradle/db'
 import {
   agents,
   backendRuns,
   backendSessionBindings,
+  chatMessagePayloads,
   messages,
   runStreamCheckpoints,
   sessionEvents,
@@ -23,6 +24,11 @@ import {
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
 import { commitSessionEventsWithProjection } from '../chat-runtime/es/commands'
+import type { HydratedMessage } from '../chat-runtime/message-payload-store'
+import {
+  hydrateMessage,
+  messagePayloadJoinCondition,
+} from '../chat-runtime/message-payload-store'
 import type {
   ChatThinkingEffort,
   RuntimeSettingsValue,
@@ -1185,16 +1191,18 @@ export function deleteByAgentIdsInDb(agentIds: string[], d: SessionDeleteDb): vo
 
 export function getMessagesWithRunIds(
   sessionId: string,
-): Array<Message & { runId: string | null }> {
+): Array<HydratedMessage & { runId: string | null }> {
   const d = db()
   const rows = d
-    .select()
+    .select({ message: messages, payload: chatMessagePayloads })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(eq(messages.sessionId, sessionId))
     .orderBy(messages.createdAt)
     .all()
 
-  const assistantIds = rows.filter(row => row.role === 'assistant').map(row => row.id)
+  const hydratedRows = rows.map(row => hydrateMessage(row.message, row.payload))
+  const assistantIds = hydratedRows.filter(row => row.role === 'assistant').map(row => row.id)
   const latestRunByMessageId = new Map<string, string>()
 
   if (assistantIds.length > 0) {
@@ -1217,7 +1225,7 @@ export function getMessagesWithRunIds(
     }
   }
 
-  return rows.map(row => ({
+  return hydratedRows.map(row => ({
     ...row,
     runId: row.role === 'assistant' ? (latestRunByMessageId.get(row.id) ?? null) : null,
   }))
@@ -1231,10 +1239,11 @@ export function getRunMessageContents(runIds: string[]): { runId: string, conten
   const rows = db()
     .select({
       runId: backendRuns.id,
-      content: messages.content,
+      content: chatMessagePayloads.content,
     })
     .from(backendRuns)
     .innerJoin(messages, eq(backendRuns.messageId, messages.id))
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(inArray(backendRuns.id, runIds))
     .all()
 
@@ -1249,8 +1258,13 @@ export function exportMarkdown(sessionId: string): string {
   }
 
   const msgs = d
-    .select()
+    .select({
+      role: messages.role,
+      content: chatMessagePayloads.content,
+      createdAt: messages.createdAt,
+    })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(eq(messages.sessionId, sessionId))
     .orderBy(messages.createdAt)
     .all()
@@ -1301,11 +1315,12 @@ export function exportArchive(sessionId: string): { archive: SessionArchive, fil
       id: messages.id,
       role: messages.role,
       status: messages.status,
-      content: messages.content,
+      content: chatMessagePayloads.content,
       createdAt: messages.createdAt,
       updatedAt: messages.updatedAt,
     })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(eq(messages.sessionId, sessionId))
     .orderBy(messages.createdAt)
     .all()

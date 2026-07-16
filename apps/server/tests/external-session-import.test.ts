@@ -36,6 +36,7 @@ import type {
 } from '../src/modules/external-session-import/types'
 import * as Workspace from '../src/modules/workspace/service'
 import { localWorkspaceLocator } from '../src/modules/workspace/workspace-locator'
+import { insertMessageFixtures } from './helpers/message-fixture'
 
 const previous = {
   dataDir: process.env.CRADLE_DATA_DIR,
@@ -288,7 +289,7 @@ describe('external session import', () => {
       createdAt: now,
       updatedAt: now,
     }).run()
-    db().insert(messages).values({
+    insertMessageFixtures(db(), {
       id: 'legacy-message',
       sessionId: 'legacy-cradle-session',
       role: 'user',
@@ -298,7 +299,7 @@ describe('external session import', () => {
       messageJson: '{}',
       createdAt: now,
       updatedAt: now,
-    }).run()
+    })
     db().insert(externalWorkImportItems).values({
       id: 'legacy-import',
       sourceApp: 'codex',

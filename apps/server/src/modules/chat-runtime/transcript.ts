@@ -1,8 +1,9 @@
-import { messages } from '@cradle/db'
+import { chatMessagePayloads, messages } from '@cradle/db'
 import type { UIMessage } from 'ai'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
+import { messagePayloadJoinCondition } from './message-payload-store'
 import { parseStoredMessageSnapshot } from './ui-message'
 
 export interface CradleTurnTranscript {
@@ -34,11 +35,12 @@ export function resolveCradleTurnTranscript(input: ResolveCradleTurnTranscriptIn
     .select({
       id: messages.id,
       role: messages.role,
-      content: messages.content,
-      messageJson: messages.messageJson,
+      content: chatMessagePayloads.content,
+      messageJson: chatMessagePayloads.messageJson,
       createdAt: messages.createdAt,
     })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(
       and(
         eq(messages.sessionId, input.sessionId),
@@ -61,9 +63,10 @@ export function resolveCradleTurnTranscript(input: ResolveCradleTurnTranscriptIn
 export async function readFullSessionTranscript(sessionId: string): Promise<UIMessage[]> {
   const rows = db()
     .select({
-      messageJson: messages.messageJson,
+      messageJson: chatMessagePayloads.messageJson,
     })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(eq(messages.sessionId, sessionId))
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()

@@ -1,4 +1,5 @@
 import {
+  chatMessagePayloads,
   messages,
   sessions,
   workspaces,
@@ -9,6 +10,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '../../infra'
+import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 
 export interface MatchRange {
   start: number
@@ -177,7 +179,16 @@ export class ThreadSearchEngine {
 
     const sessionRows = d.select().from(sessions).all()
     const sessionTitleById = new Map(sessionRows.map(session => [session.id, session.title]))
-    const messageRows = d.select().from(messages).where(eq(messages.status, 'complete')).all()
+    const messageRows = d
+      .select({
+        id: messages.id,
+        sessionId: messages.sessionId,
+        content: chatMessagePayloads.content,
+      })
+      .from(messages)
+      .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
+      .where(eq(messages.status, 'complete'))
+      .all()
 
     for (const message of messageRows) {
       const title = sessionTitleById.get(message.sessionId) ?? ''
@@ -326,7 +337,18 @@ function searchLegacy(params: ParsedThreadSearchParams): ThreadSearchHit[] {
     : []
   const workspaceNameById = new Map(workspaceRows.map(workspace => [workspace.id, workspace.name]))
   const sessionIds = sessionRows.map(session => session.id)
-  const messageRows = d.select().from(messages).where(inArray(messages.sessionId, sessionIds)).all()
+  const messageRows = d
+    .select({
+      id: messages.id,
+      sessionId: messages.sessionId,
+      role: messages.role,
+      createdAt: messages.createdAt,
+      content: chatMessagePayloads.content,
+    })
+    .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
+    .where(inArray(messages.sessionId, sessionIds))
+    .all()
 
   const messagesBySession = new Map<string, typeof messageRows>()
   for (const row of messageRows) {

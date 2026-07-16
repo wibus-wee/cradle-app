@@ -175,9 +175,10 @@ function createControllableQuery(contextUsage: SDKControlGetContextUsageResponse
 }
 
 function createPromptDrivenQuery(
-  prompt: AsyncIterable<{ message: { content: unknown } }>,
+  prompt: AsyncIterable<{ message: { content: unknown }, shouldQuery?: boolean }>,
   responsesByTurn: unknown[][],
   prompts: unknown[],
+  inputMessages: unknown[] = [],
 ) {
   const promptIterator = prompt[Symbol.asyncIterator]()
   const responseQueue: unknown[] = []
@@ -192,10 +193,14 @@ function createPromptDrivenQuery(
       if (closed) {
         return { done: true as const, value: undefined }
       }
-      if (responseQueue.length === 0) {
+      while (responseQueue.length === 0) {
         const input = await promptIterator.next()
         if (closed || input.done) {
           return { done: true as const, value: undefined }
+        }
+        inputMessages.push(input.value)
+        if (input.value.shouldQuery === false) {
+          continue
         }
         prompts.push(input.value.message.content)
         responseQueue.push(...(responsesByTurn[turnIndex] ?? []))
@@ -1478,6 +1483,194 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         updatedInput: { command: 'echo now allowed' },
       })
       expect(prompts).toEqual(['Start in plan mode', 'Implement now'])
+    }
+    finally {
+      await provider.dispose()
+    }
+  })
+
+  it('appends Work harness context once as a synthetic non-query message', async () => {
+    const prompts: unknown[] = []
+    const inputMessages: Array<{
+      isSynthetic?: boolean
+      shouldQuery?: boolean
+      message: { content: unknown }
+    }> = []
+    sdkMocks.query.mockImplementation((call: {
+      prompt?: AsyncIterable<{
+        isSynthetic?: boolean
+        shouldQuery?: boolean
+        message: { content: unknown }
+      }>
+    }) => {
+      expect(call.prompt).toBeDefined()
+      return createPromptDrivenQuery(call.prompt!, [
+        [{
+          type: 'result',
+          session_id: 'claude-session-harness',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }],
+        [{
+          type: 'result',
+          session_id: 'claude-session-harness',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }],
+      ], prompts, inputMessages)
+    })
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const harness = {
+      fragments: [{
+        key: 'cradle-work',
+        revision: 'cradle-work:work-1:primary:v1',
+        content: '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+      }],
+    }
+
+    try {
+      for await (const _chunk of provider.streamTurn({
+        runId: 'run-claude-agent-harness-1',
+        runtimeSession,
+        profile: createProfile(),
+        message: createUserMessage('Implement the Work objective'),
+        harness,
+        workspaceId: 'workspace-1',
+      })) {
+        // Drain stream.
+      }
+
+      for await (const _chunk of provider.streamTurn({
+        runId: 'run-claude-agent-harness-2',
+        runtimeSession,
+        profile: createProfile(),
+        message: createUserMessage('Continue'),
+        harness,
+        workspaceId: 'workspace-1',
+      })) {
+        // Drain stream.
+      }
+
+      expect(inputMessages).toHaveLength(3)
+      expect(inputMessages[0]).toEqual(expect.objectContaining({
+        isSynthetic: true,
+        shouldQuery: false,
+        message: expect.objectContaining({
+          content: '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+        }),
+      }))
+      expect(prompts).toEqual(['Implement the Work objective', 'Continue'])
+      expect(JSON.parse(runtimeSession.providerStateSnapshot ?? '{}')).toMatchObject({
+        harness: {
+          providerSessionId: 'claude-session-harness',
+          revisions: { 'cradle-work': 'cradle-work:work-1:primary:v1' },
+        },
+      })
+    }
+    finally {
+      await provider.dispose()
+    }
+  })
+
+  it('reinjects Work harness context after a Claude compact boundary', async () => {
+    const prompts: unknown[] = []
+    const inputMessages: Array<{
+      isSynthetic?: boolean
+      shouldQuery?: boolean
+      message: { content: unknown }
+    }> = []
+    sdkMocks.query.mockImplementation((call: {
+      prompt?: AsyncIterable<{
+        isSynthetic?: boolean
+        shouldQuery?: boolean
+        message: { content: unknown }
+      }>
+    }) => {
+      expect(call.prompt).toBeDefined()
+      return createPromptDrivenQuery(call.prompt!, [
+        [
+          {
+            type: 'system',
+            subtype: 'compact_boundary',
+            compact_metadata: {
+              trigger: 'auto',
+              pre_tokens: 180_000,
+              post_tokens: 24_000,
+            },
+            uuid: 'compact-boundary-1',
+            session_id: 'claude-session-harness-compact',
+          },
+          {
+            type: 'result',
+            session_id: 'claude-session-harness-compact',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          },
+        ],
+        [{
+          type: 'result',
+          session_id: 'claude-session-harness-compact',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }],
+      ], prompts, inputMessages)
+    })
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const harness = {
+      fragments: [{
+        key: 'cradle-work',
+        revision: 'cradle-work:work-1:primary:v1',
+        content: '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+      }],
+    }
+
+    try {
+      for await (const _chunk of provider.streamTurn({
+        runId: 'run-claude-agent-harness-before-compact',
+        runtimeSession,
+        profile: createProfile(),
+        message: createUserMessage('Implement the Work objective'),
+        harness,
+        workspaceId: 'workspace-1',
+      })) {
+        // Drain stream.
+      }
+
+      expect(JSON.parse(runtimeSession.providerStateSnapshot ?? '{}')).toMatchObject({
+        harness: {
+          providerSessionId: 'claude-session-harness-compact',
+          revisions: {},
+        },
+      })
+
+      for await (const _chunk of provider.streamTurn({
+        runId: 'run-claude-agent-harness-after-compact',
+        runtimeSession,
+        profile: createProfile(),
+        message: createUserMessage('Continue after compaction'),
+        harness,
+        workspaceId: 'workspace-1',
+      })) {
+        // Drain stream.
+      }
+
+      expect(inputMessages).toHaveLength(4)
+      expect(inputMessages[0]).toEqual(expect.objectContaining({
+        isSynthetic: true,
+        shouldQuery: false,
+      }))
+      expect(inputMessages[2]).toEqual(expect.objectContaining({
+        isSynthetic: true,
+        shouldQuery: false,
+        message: inputMessages[0]?.message,
+      }))
+      expect(prompts).toEqual(['Implement the Work objective', 'Continue after compaction'])
+      expect(JSON.parse(runtimeSession.providerStateSnapshot ?? '{}')).toMatchObject({
+        harness: {
+          providerSessionId: 'claude-session-harness-compact',
+          revisions: { 'cradle-work': 'cradle-work:work-1:primary:v1' },
+        },
+      })
     }
     finally {
       await provider.dispose()

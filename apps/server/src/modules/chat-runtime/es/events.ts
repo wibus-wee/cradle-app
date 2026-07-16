@@ -3,7 +3,7 @@ import type { ChatMessageStatus } from '../run/stream-chunks'
 import type { RuntimeSettings } from '../runtime-provider-types'
 
 export const CHAT_SESSION_AGGREGATE_TYPE = 'ChatSession'
-export const CHAT_SESSION_EVENT_SCHEMA_VERSION = 3
+export const CHAT_SESSION_EVENT_SCHEMA_VERSION = 4
 
 /**
  * Aggregate event versions are monotonically increasing but NOT contiguous.
@@ -283,20 +283,73 @@ type V1RunStartedPayload = Omit<RunStartedPayload, 'v'> & {
   assistantMessageProjection?: 'insert' | 'update' | null
 }
 
+type StoredMessageReference<TMessage extends MessageRecordedFact = MessageRecordedFact>
+  = Omit<TMessage, 'content' | 'messageJson' | 'errorText'> & {
+  payloadId: string
+}
+
+type StoredAssistantMessageCompletedPayload = Omit<AssistantMessageCompletedPayload, 'message'> & {
+  message: Omit<AssistantMessageCompletedPayload['message'], 'content' | 'messageJson' | 'errorText'> & {
+    payloadId: string
+  }
+}
+
+type StoredRunStartedPayload = Omit<RunStartedPayload, 'assistantMessage'> & {
+  assistantMessage?: StoredMessageReference<
+    MessageRecordedFact & { role: 'assistant', status: 'streaming' }
+  > | null
+}
+
+type StoredUserMessageAppendedPayload = Omit<UserMessageAppendedPayload, 'message'> & {
+  message: StoredMessageReference<UserMessageAppendedPayload['message']>
+}
+
+type StoredMessageImportedPayload = Omit<MessageImportedPayload, 'message'> & {
+  message: StoredMessageReference<MessageImportedPayload['message']>
+}
+
+type StoredSteerAppliedPayload = Omit<SteerAppliedPayload, 'message'> & {
+  message: StoredMessageReference<SteerAppliedPayload['message']>
+}
+
+type StoredChatSessionPayloadV4
+  = | StoredUserMessageAppendedPayload
+    | StoredMessageImportedPayload
+    | StoredSteerAppliedPayload
+    | StoredRunStartedPayload
+    | StoredAssistantMessageCompletedPayload
+    | ChatSessionEvent['payload']
+
+export interface ResolvedMessagePayload {
+  id: string
+  sessionId: string
+  content: string
+  messageJson: string
+  errorText: string | null
+}
+
+export type MessagePayloadResolver = (payloadId: string) => ResolvedMessagePayload | undefined
+
 export function isLegacyAssistantMessageSnapshottedRow(row: ChatSessionEventRow): boolean {
   return row.eventType === LEGACY_ASSISTANT_MESSAGE_SNAPSHOTTED_EVENT_TYPE
 }
 
 export function serializeChatSessionEventPayload(event: ChatSessionEvent): string {
-  return JSON.stringify(addCurrentPayloadVersion(event.payload))
+  return JSON.stringify(toStoredChatSessionPayload(event))
 }
 
-export function parseStoredChatSessionEvent(row: ChatSessionEventRow): StoredChatSessionEvent {
+export function parseStoredChatSessionEvent(
+  row: ChatSessionEventRow,
+  resolveMessagePayload?: MessagePayloadResolver,
+): StoredChatSessionEvent {
   const type = row.eventType as ChatSessionEventType
+  const rawPayload = JSON.parse(row.payload) as StoredChatSessionPayloadV4
   return {
     ...row,
     type,
-    payload: upcastChatSessionEventPayload(type, JSON.parse(row.payload)),
+    payload: rawPayload.v === CHAT_SESSION_EVENT_SCHEMA_VERSION
+      ? hydrateStoredChatSessionPayload(type, rawPayload, resolveMessagePayload)
+      : upcastChatSessionEventPayload(type, rawPayload as ChatSessionEvent['payload']),
   } as StoredChatSessionEvent
 }
 
@@ -312,8 +365,9 @@ export function upcastChatSessionEventPayload(
   if (rawPayload.v === CHAT_SESSION_EVENT_SCHEMA_VERSION) {
     return rawPayload
   }
-  // v2 payloads are structurally compatible with v3 (snapshot event removed from the union).
-  if (rawPayload.v === 2) {
+  // v2 and v3 payloads are structurally compatible with the runtime event shape.
+  // v4 changes only the stored representation of message-bearing events.
+  if (rawPayload.v === 2 || rawPayload.v === 3) {
     return addCurrentPayloadVersion(rawPayload)
   }
   if (rawPayload.v !== undefined) {
@@ -321,6 +375,148 @@ export function upcastChatSessionEventPayload(
   }
 
   return upcastV1ChatSessionEventPayload(eventType, rawPayload)
+}
+
+function toStoredChatSessionPayload(event: ChatSessionEvent): StoredChatSessionPayloadV4 {
+  switch (event.type) {
+    case 'UserMessageAppended':
+      return {
+        ...event.payload,
+        message: toStoredMessageReference(event.payload.message),
+        v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
+      } satisfies StoredUserMessageAppendedPayload
+    case 'MessageImported':
+      return {
+        ...event.payload,
+        message: toStoredMessageReference(event.payload.message),
+        v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
+      } satisfies StoredMessageImportedPayload
+    case 'SteerApplied':
+      return {
+        ...event.payload,
+        message: toStoredMessageReference(event.payload.message),
+        v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
+      } satisfies StoredSteerAppliedPayload
+    case 'RunStarted':
+      return {
+        ...event.payload,
+        assistantMessage: event.payload.assistantMessage
+          ? toStoredMessageReference(event.payload.assistantMessage)
+          : event.payload.assistantMessage,
+        v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
+      } satisfies StoredRunStartedPayload
+    case 'AssistantMessageCompleted':
+      return {
+        ...event.payload,
+        message: {
+          id: event.payload.message.id,
+          sessionId: event.payload.message.sessionId,
+          payloadId: event.payload.message.id,
+          status: event.payload.message.status,
+          updatedAt: event.payload.message.updatedAt,
+        },
+        v: CHAT_SESSION_EVENT_SCHEMA_VERSION,
+      } satisfies StoredAssistantMessageCompletedPayload
+    default:
+      return addCurrentPayloadVersion(event.payload)
+  }
+}
+
+function hydrateStoredChatSessionPayload(
+  eventType: ChatSessionEventType,
+  payload: StoredChatSessionPayloadV4,
+  resolveMessagePayload: MessagePayloadResolver | undefined,
+): ChatSessionEvent['payload'] {
+  switch (eventType) {
+    case 'UserMessageAppended': {
+      const stored = payload as StoredUserMessageAppendedPayload
+      return {
+        ...stored,
+        message: hydrateStoredMessageReference(stored.message, resolveMessagePayload),
+      } as UserMessageAppendedPayload
+    }
+    case 'MessageImported': {
+      const stored = payload as StoredMessageImportedPayload
+      return {
+        ...stored,
+        message: hydrateStoredMessageReference(stored.message, resolveMessagePayload),
+      } as MessageImportedPayload
+    }
+    case 'SteerApplied': {
+      const stored = payload as StoredSteerAppliedPayload
+      return {
+        ...stored,
+        message: hydrateStoredMessageReference(stored.message, resolveMessagePayload),
+      } as SteerAppliedPayload
+    }
+    case 'RunStarted': {
+      const stored = payload as StoredRunStartedPayload
+      return {
+        ...stored,
+        assistantMessage: stored.assistantMessage
+          ? hydrateStoredMessageReference(stored.assistantMessage, resolveMessagePayload)
+          : stored.assistantMessage,
+      } as RunStartedPayload
+    }
+    case 'AssistantMessageCompleted': {
+      const stored = payload as StoredAssistantMessageCompletedPayload
+      const resolved = requireResolvedMessagePayload(stored.message.payloadId, resolveMessagePayload)
+      return {
+        ...stored,
+        message: {
+          id: stored.message.id,
+          sessionId: stored.message.sessionId,
+          content: resolved.content,
+          messageJson: resolved.messageJson,
+          status: stored.message.status,
+          errorText: resolved.errorText,
+          updatedAt: stored.message.updatedAt,
+        },
+      } as AssistantMessageCompletedPayload
+    }
+    default:
+      return payload as ChatSessionEvent['payload']
+  }
+}
+
+function toStoredMessageReference<TMessage extends MessageRecordedFact>(
+  message: TMessage,
+): StoredMessageReference<TMessage> {
+  const {
+    content: _content,
+    messageJson: _messageJson,
+    errorText: _errorText,
+    ...structural
+  } = message
+  return {
+    ...structural,
+    payloadId: message.id,
+  } as StoredMessageReference<TMessage>
+}
+
+function hydrateStoredMessageReference(
+  message: StoredMessageReference,
+  resolveMessagePayload: MessagePayloadResolver | undefined,
+): MessageRecordedFact {
+  const resolved = requireResolvedMessagePayload(message.payloadId, resolveMessagePayload)
+  const { payloadId: _payloadId, ...structural } = message
+  return {
+    ...structural,
+    content: resolved.content,
+    messageJson: resolved.messageJson,
+    errorText: resolved.errorText,
+  }
+}
+
+function requireResolvedMessagePayload(
+  payloadId: string,
+  resolveMessagePayload: MessagePayloadResolver | undefined,
+): ResolvedMessagePayload {
+  const resolved = resolveMessagePayload?.(payloadId)
+  if (!resolved) {
+    throw new Error(`Chat message payload not found: ${payloadId}`)
+  }
+  return resolved
 }
 
 function upcastV1ChatSessionEventPayload(

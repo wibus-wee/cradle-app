@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import {
   chronicleKnowledgeCards,
   chronicleMemories,
-  messages,
   providerTargets,
   sessions,
   workspaces,
@@ -15,6 +14,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import { insertMessageFixtures } from './helpers/message-fixture'
 import { workspaceFixture } from './helpers/workspace-fixture'
 
 function makeTempDir(prefix: string): string {
@@ -58,7 +58,7 @@ describe('search capability', () => {
         { id: sessionOneId, workspaceId: workspaceOneId, title: 'Alpha deployment', providerTargetId },
         { id: sessionTwoId, workspaceId: workspaceTwoId, title: 'Beta planning', providerTargetId },
       ]).run()
-      d.insert(messages).values([
+      insertMessageFixtures(d, [
         {
           id: userMessageOneId,
           sessionId: sessionOneId,
@@ -101,7 +101,7 @@ describe('search capability', () => {
           createdAt: now + 2,
           updatedAt: now + 2,
         },
-      ]).run()
+      ])
 
       const assistantSearch = await app.handle(new Request('http://localhost/search/threads?query=assistant%20solved'))
       expect(assistantSearch.status).toBe(200)
@@ -200,7 +200,7 @@ describe('search capability', () => {
           providerTargetId,
         },
       ]).run()
-      d.insert(messages).values([
+      insertMessageFixtures(d, [
         {
           id: reviewMessageId,
           sessionId: reviewSessionId,
@@ -229,7 +229,7 @@ describe('search capability', () => {
           createdAt: now + 1,
           updatedAt: now + 1,
         },
-      ]).run()
+      ])
 
       const reviewSearch = await app.handle(
         new Request('http://localhost/search/threads?query=shared%20origin%20sentinel&origin=cradle-review'),

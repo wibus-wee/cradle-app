@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { chatSessionQueueItems, messages, threadHandoffs } from '@cradle/db'
+import { chatMessagePayloads, chatSessionQueueItems, messages, threadHandoffs } from '@cradle/db'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
@@ -8,6 +8,7 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { recordImportedSessionMessages } from '../chat-runtime/es/commands'
 import type { MessageRecordedFact } from '../chat-runtime/es/events'
+import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 import { runRegistry } from '../chat-runtime/run-registry'
 import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
 import * as ProviderTargets from '../provider-targets/service'
@@ -140,11 +141,21 @@ function assertSourceIdle(sessionId: string): void {
 }
 
 function buildImportedMessages(sourceSessionId: string): Array<MessageRecordedFact & { status: 'complete' }> {
-  const rows = db().select().from(messages).where(and(
-    eq(messages.sessionId, sourceSessionId),
-    eq(messages.status, 'complete'),
-    isNull(messages.parentToolCallId),
-  )).orderBy(asc(messages.createdAt)).all()
+  const rows = db()
+    .select({
+      message: messages,
+      content: chatMessagePayloads.content,
+      messageJson: chatMessagePayloads.messageJson,
+    })
+    .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
+    .where(and(
+      eq(messages.sessionId, sourceSessionId),
+      eq(messages.status, 'complete'),
+      isNull(messages.parentToolCallId),
+    ))
+    .orderBy(asc(messages.createdAt))
+    .all()
 
   return rows.map((row) => {
     const id = randomUUID()
@@ -156,13 +167,13 @@ function buildImportedMessages(sourceSessionId: string): Array<MessageRecordedFa
       parentToolCallId: null,
       taskId: null,
       depth: 0,
-      role: row.role,
+      role: row.message.role,
       status: 'complete',
       content: row.content,
-      messageJson: JSON.stringify({ ...snapshot, id, role: row.role }),
+      messageJson: JSON.stringify({ ...snapshot, id, role: row.message.role }),
       errorText: null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
+      createdAt: row.message.createdAt,
+      updatedAt: row.message.updatedAt,
     }
   })
 }

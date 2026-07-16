@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { ExternalSessionImport } from '@cradle/db'
 import {
+  chatMessagePayloads,
   externalSessionImports,
   externalWorkImportItems,
   messages,
@@ -13,6 +14,7 @@ import { z } from 'zod'
 import { db } from '../../infra'
 import { recordImportedSessionMessagesInTransaction } from '../chat-runtime/es/commands'
 import type { MessageRecordedFact } from '../chat-runtime/es/events'
+import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 import { listDurableProviderRuntimeBindingsByProviderSession } from '../provider-runtime/service'
 import * as Session from '../session/service'
 import * as Workspace from '../workspace/service'
@@ -473,9 +475,10 @@ function mapLegacyMessagesToSource(
     .select({
       id: messages.id,
       role: messages.role,
-      content: messages.content,
+      content: chatMessagePayloads.content,
     })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(eq(messages.sessionId, legacy.sessionId))
     .orderBy(asc(messages.createdAt))
     .all()

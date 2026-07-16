@@ -2,11 +2,15 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { messages } from '@cradle/db'
 import { messages as messageTable, sessions } from '@cradle/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
+import type { HydratedMessage } from '../message-payload-store'
+import {
+  putMessagePayload,
+  toMessageProjectionValues,
+} from '../message-payload-store'
 import { runRegistry } from '../run-registry'
 import {
   countProviderTurns,
@@ -32,7 +36,7 @@ vi.mock('../run/runtime-goal-continuation', () => ({
   cancelPendingRuntimeGoalContinuation: cancelPendingRuntimeGoalContinuationMock,
 }))
 
-type MessageRow = typeof messages.$inferSelect
+type MessageRow = HydratedMessage
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
 const previousDbPath = process.env.CRADLE_DB_PATH
@@ -84,6 +88,7 @@ function message(input: {
     depth: 0,
     role: input.role,
     status: input.status,
+    payloadId: input.id,
     content: input.content ?? '',
     messageJson: JSON.stringify({
       id: input.id,
@@ -103,10 +108,14 @@ function seedRollbackTail(): void {
     createdAt: 1,
     updatedAt: 1,
   }).run()
-  db().insert(messageTable).values([
+  const rows = [
     message({ id: 'user-1', role: 'user', status: 'complete', content: 'retry' }),
     message({ id: 'assistant-1', role: 'assistant', status: 'complete', content: 'done' }),
-  ]).run()
+  ]
+  for (const row of rows) {
+    putMessagePayload(db(), row)
+  }
+  db().insert(messageTable).values(rows.map(row => toMessageProjectionValues(row))).run()
 }
 
 function seedRollbackHistory(): void {
@@ -116,14 +125,18 @@ function seedRollbackHistory(): void {
     createdAt: 1,
     updatedAt: 1,
   }).run()
-  db().insert(messageTable).values([
+  const rows = [
     message({ id: 'user-1', role: 'user', status: 'complete', content: 'first' }),
     message({ id: 'assistant-1', role: 'assistant', status: 'complete', content: 'first response' }),
     message({ id: 'user-2', role: 'user', status: 'complete', content: 'second' }),
     message({ id: 'assistant-2', role: 'assistant', status: 'failed' }),
     message({ id: 'user-3', role: 'user', status: 'complete', content: 'third' }),
     message({ id: 'assistant-3', role: 'assistant', status: 'complete', content: 'third response' }),
-  ]).run()
+  ]
+  for (const row of rows) {
+    putMessagePayload(db(), row)
+  }
+  db().insert(messageTable).values(rows.map(row => toMessageProjectionValues(row))).run()
 }
 
 function setResolvedRuntime(input: {

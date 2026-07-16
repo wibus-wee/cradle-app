@@ -22,6 +22,7 @@ import { z } from 'zod'
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
 import { setCodexChatgptModelListClientFactoryForTests } from '../src/modules/chat-runtime-providers/codex/app-server/model-list'
+import { insertMessageFixtures } from './helpers/message-fixture'
 
 const MODELS_DEV_URL = 'https://models.dev/api.json'
 const ProfileResponseSchema = z.object({
@@ -521,16 +522,13 @@ describe('profiles capability', () => {
           configJson: '{}',
         })
         .run()
-      db()
-        .insert(messages)
-        .values({
+      insertMessageFixtures(db(), {
           id: 'message-cleanup-user',
           sessionId: 'session-agent-only-cleanup',
           role: 'user',
           content: 'keep this chat',
           messageJson: JSON.stringify({ id: 'message-cleanup-user', role: 'user', parts: [] }),
-        })
-        .run()
+      })
       db()
         .insert(backendSessionBindings)
         .values({

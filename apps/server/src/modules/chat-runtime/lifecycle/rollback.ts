@@ -1,9 +1,14 @@
-import { chatSessionQueueItems, messages } from '@cradle/db'
+import { chatMessagePayloads, chatSessionQueueItems, messages } from '@cradle/db'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 
 import { AppError } from '../../../errors/app-error'
 import { db } from '../../../infra'
 import { commitLastTurnRolledBack } from '../es/commands'
+import type { HydratedMessage } from '../message-payload-store'
+import {
+  hydrateMessage,
+  messagePayloadJoinCondition,
+} from '../message-payload-store'
 import { cancelPendingRuntimeGoalContinuation } from '../run/runtime-goal-continuation'
 import { runRegistry } from '../run-registry'
 import {
@@ -245,7 +250,7 @@ function readProviderRollback(
   return resolved.runtime.rollbackLastTurn
 }
 
-export function shouldRollbackProviderTurn(tailRows: (typeof messages.$inferSelect)[]): boolean {
+export function shouldRollbackProviderTurn(tailRows: HydratedMessage[]): boolean {
   return tailRows.some(row =>
     row.role === 'assistant'
     && (
@@ -255,7 +260,7 @@ export function shouldRollbackProviderTurn(tailRows: (typeof messages.$inferSele
     ))
 }
 
-export function countProviderTurns(tailRows: (typeof messages.$inferSelect)[]): number {
+export function countProviderTurns(tailRows: HydratedMessage[]): number {
   let count = 0
   let turnStart = 0
   for (let index = 1; index <= tailRows.length; index += 1) {
@@ -308,14 +313,16 @@ function readBlockingQueueCounts(sessionId: string): { pending: number, running:
 function readTopLevelUserTurnTail(
   sessionId: string,
   numTurns: number,
-): (typeof messages.$inferSelect)[] {
+): HydratedMessage[] {
   assertStoredSession(sessionId)
   const rows = db()
-    .select()
+    .select({ message: messages, payload: chatMessagePayloads })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(and(eq(messages.sessionId, sessionId), isNull(messages.parentToolCallId)))
     .orderBy(messages.createdAt, messageInsertOrder)
     .all()
+    .map(row => hydrateMessage(row.message, row.payload))
 
   const userIndices: number[] = []
   for (let index = 0; index < rows.length; index += 1) {

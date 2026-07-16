@@ -1,4 +1,4 @@
-import { messages, sessions } from '@cradle/db'
+import { chatMessagePayloads, messages, sessions } from '@cradle/db'
 import { and, eq, isNull, or, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
@@ -8,6 +8,7 @@ import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-s
 import * as SessionService from '../session/service'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { commitSessionEvents } from './es/commands'
+import { messagePayloadJoinCondition } from './message-payload-store'
 import { createSessionTitleGenerationError } from './run/errors'
 import { runRegistry } from './run-registry'
 import type { GenerateSessionTitleInput } from './runtime-provider-types'
@@ -209,10 +210,11 @@ function isTrivialContinuationTitle(title: string): boolean {
 function readFirstUserPromptText(sessionId: string): string | null {
   const rows = db()
     .select({
-      messageJson: messages.messageJson,
-      content: messages.content,
+      messageJson: chatMessagePayloads.messageJson,
+      content: chatMessagePayloads.content,
     })
     .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(
       and(
         eq(messages.sessionId, sessionId),
