@@ -22,6 +22,12 @@ import type {
   DesktopChatStreamHandle,
   DesktopChatSubscribeSessionRequest,
 } from './chat-stream-broker'
+import {
+  getDesktopDataDirectoryState,
+  getDesktopDataMigrationStatus,
+  scheduleDesktopDataDirectoryMigration,
+  validateDesktopDataDirectoryTarget,
+} from './data-directory'
 import type { DesktopCliStatus } from './desktop-cli-manager'
 import {
   installDesktopCliCommand,
@@ -116,7 +122,7 @@ export interface AvailableEditor {
  * so it always reflects the latest value written by the server.
  */
 async function readExternalTerminalApp(): Promise<string | undefined> {
-  const filePath = join(app.getPath('userData'), 'data', 'preferences', 'desktop.json')
+  const filePath = join(getDesktopDataDirectoryState().serverDataRoot, 'preferences', 'desktop.json')
   try {
     const raw = await readFile(filePath, 'utf8')
     const value = (JSON.parse(raw) as { externalTerminalApp?: unknown }).externalTerminalApp
@@ -247,15 +253,54 @@ class NativeService extends IpcService {
     serverDataPath: string
     databasePath: string
     serverLogPath: string
+    serverDataSource: 'default' | 'custom'
+    migration: ReturnType<typeof getDesktopDataMigrationStatus>
   }> {
     const userDataPath = app.getPath('userData')
-    const serverDataPath = join(userDataPath, 'data')
+    const state = getDesktopDataDirectoryState()
+    const serverDataPath = state.serverDataRoot
     return {
       userDataPath,
       serverDataPath,
       databasePath: join(serverDataPath, 'cradle.db'),
       serverLogPath: join(serverDataPath, 'server.log'),
+      serverDataSource: state.source,
+      migration: getDesktopDataMigrationStatus(),
     }
+  }
+
+  @IpcMethod()
+  async chooseCradleDataDirectory(): Promise<{ canceled: boolean, filePath?: string }> {
+    const state = getDesktopDataDirectoryState()
+    const result = await dialog.showOpenDialog({
+      title: 'Choose Cradle data directory',
+      defaultPath: state.serverDataRoot,
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true }
+    }
+    return { canceled: false, filePath: await validateDesktopDataDirectoryTarget(result.filePaths[0]) }
+  }
+
+  @IpcMethod()
+  async scheduleCradleDataDirectoryMigration(targetPath: string): Promise<{
+    scheduled: boolean
+    targetPath: string
+    restartRequired: true
+  }> {
+    const requestRestart = nativeServicesContext?.requestDataDirectoryRestart
+    if (!requestRestart) {
+      throw new Error('Desktop restart service is not initialized')
+    }
+    const migration = await scheduleDesktopDataDirectoryMigration(targetPath)
+    requestRestart()
+    return { scheduled: true, targetPath: migration.targetRoot, restartRequired: true }
+  }
+
+  @IpcMethod()
+  async getCradleDataMigrationStatus(): Promise<ReturnType<typeof getDesktopDataMigrationStatus>> {
+    return getDesktopDataMigrationStatus()
   }
 
   @IpcMethod()
@@ -395,6 +440,7 @@ interface NativeServicesContext {
   getChatStreamBroker: () => ChatStreamBroker | null
   getChatEventTailBroker: () => ChatEventTailBroker | null
   getQuitGuard: () => QuitGuard
+  requestDataDirectoryRestart: () => void
 }
 
 let nativeServicesContext: NativeServicesContext | null = null

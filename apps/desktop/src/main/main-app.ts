@@ -22,6 +22,13 @@ import {
 import { DesktopBrowserManager } from './browser-manager'
 import { ChatEventTailBroker } from './chat-event-tail-broker'
 import { ChatStreamBroker } from './chat-stream-broker'
+import {
+  completeDesktopDataMigrationAfterHealthyStart,
+  getDesktopDataDirectoryState,
+  initializeDesktopDataDirectory,
+  rollbackDesktopDataMigrationAfterHealthFailure,
+  runPendingDesktopDataMigration,
+} from './data-directory'
 import { DesktopAppBadgeManager } from './desktop-app-badge-manager'
 import {
   resolveDesktopBrowserPanelPreloadUrl,
@@ -668,6 +675,17 @@ export async function startDesktopApp(): Promise<void> {
     getChatStreamBroker: () => chatStreamBroker,
     getChatEventTailBroker: () => chatEventTailBroker,
     getQuitGuard: () => quitGuard,
+    requestDataDirectoryRestart: () => {
+      setTimeout(() => {
+        quitGuard.allowNextQuit()
+        app.relaunch()
+        requestDesktopExit({
+          reason: 'data directory migration',
+          exitCode: 0,
+          stopServerRuntime: true,
+        })
+      }, 100).unref()
+    },
   })
   registerPluginSourceSyncIpcHandlers()
   updateManager.on('statusChanged', broadcastUpdateStatus)
@@ -679,6 +697,7 @@ export async function startDesktopApp(): Promise<void> {
   })
 
   app.whenReady().then(async () => {
+    await initializeDesktopDataDirectory()
     desktopDownloadCenter = new DesktopDownloadCenterService({ userDataPath: app.getPath('userData') })
     await desktopDownloadCenter.boot()
     await updateManager?.recoverDownloadCenter(desktopDownloadCenter)
@@ -712,8 +731,35 @@ export async function startDesktopApp(): Promise<void> {
         processPendingPluginInstallUrls()
         handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
 
-        const serverUrl = await startServer()
+        const pendingDataMigration = getDesktopDataDirectoryState().pendingMigration
+        if (pendingDataMigration && !['completed', 'failed'].includes(pendingDataMigration.phase)) {
+          // A previous process may have survived a desktop crash. Stop its
+          // located server before copying the filesystem tree.
+          await stopServer()
+        }
+        const migration = await runPendingDesktopDataMigration((phase) => {
+          publishDesktopServerStatus({ state: 'migrating', phase })
+        })
+        if (migration.failed) {
+          console.error('[desktop] data migration failed:', migration.message)
+        }
+
+        let serverUrl: string
+        try {
+          serverUrl = await startServer()
+        }
+        catch (error) {
+          await rollbackDesktopDataMigrationAfterHealthFailure(error instanceof Error ? error.message : String(error))
+          if (migration.migrated) {
+            console.error('[desktop] new data root failed health check; restored previous root')
+            serverUrl = await startServer()
+          }
+          else {
+            throw error
+          }
+        }
         initializeDesktopServicesForServer(serverUrl)
+        await completeDesktopDataMigrationAfterHealthyStart()
         publishDesktopServerStatus({ state: 'ready', serverUrl })
       }
       catch (error) {

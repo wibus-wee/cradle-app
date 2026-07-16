@@ -3,5 +3,6 @@ export const DESKTOP_SERVER_STATUS_CHANGED_CHANNEL = 'desktop-server:status-chan
 
 export type DesktopServerStatus
   = | { state: 'starting' }
+    | { state: 'migrating', phase: string }
     | { state: 'ready', serverUrl: string }
     | { state: 'failed', message: string }

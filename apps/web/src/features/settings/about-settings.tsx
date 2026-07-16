@@ -23,6 +23,8 @@ interface CradleDataPaths {
   serverDataPath: string
   databasePath: string
   serverLogPath: string
+  serverDataSource: 'default' | 'custom'
+  migration: { phase: string, sourceRoot: string | null, targetRoot: string | null, backupRoot: string | null, errorMessage: string | null }
 }
 
 const EXTERNAL_ACCESS_ROWS: Array<{
@@ -127,7 +129,10 @@ export function AboutSettings() {
           label={t('about.storage.applicationSupport.label')}
           description={t('about.storage.applicationSupport.description')}
         >
-          <PathValue value={paths?.serverDataPath ?? t('about.storage.applicationSupport.fallback')} />
+          <div className="flex max-w-[60%] flex-col items-end gap-0.5">
+            <PathValue value={paths?.serverDataPath ?? t('about.storage.applicationSupport.fallback')} />
+            {paths && <span className="text-[11px] text-muted-foreground">{t(paths.serverDataSource === 'custom' ? 'about.storage.applicationSupport.custom' : 'about.storage.applicationSupport.default')}</span>}
+          </div>
         </SettingsRow>
 
         <SettingsRow

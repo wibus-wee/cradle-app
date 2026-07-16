@@ -5,13 +5,23 @@ import {
   LifebuoyLine as LifeBuoyIcon,
   Share2Line as Share2Icon,
 } from '@mingcute/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { getObservabilityExport, postObservabilityFlush } from '~/api-gen/sdk.gen'
 import type { GetObservabilityExportResponses } from '~/api-gen/types.gen'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
@@ -147,6 +157,9 @@ export function SupportSettings() {
   const [status, setStatus] = useState<SupportStatus>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [dataPath, setDataPath] = useState<string | null>(null)
+  const [dataSource, setDataSource] = useState<'default' | 'custom' | null>(null)
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null)
+  const [migrationBusy, setMigrationBusy] = useState(false)
 
   const template = createSupportTemplate({
     title: t('support.template.title'),
@@ -170,6 +183,17 @@ export function SupportSettings() {
   ].join('\n')
   const canOpenDataPath = isElectron && !!nativeIpc
   const settingsSupportReady = template.length > 0
+
+  useEffect(() => {
+    if (!nativeIpc) { return }
+    void nativeIpc.native.getCradleDataPaths().then((paths) => {
+      setDataPath(paths.serverDataPath)
+      setDataSource(paths.serverDataSource)
+      if (paths.migration.phase === 'failed' && paths.migration.errorMessage) {
+        setMessage(paths.migration.errorMessage)
+      }
+    }).catch(() => {})
+  }, [])
 
   const exportDiagnostics = async () => {
     setStatus('working')
@@ -236,7 +260,38 @@ export function SupportSettings() {
     }
     const paths = await nativeIpc.native.getCradleDataPaths()
     setDataPath(paths.serverDataPath)
+    setDataSource(paths.serverDataSource)
     await nativeIpc.native.showItemInFolder(paths.serverDataPath)
+  }
+
+  const chooseDataDirectory = async () => {
+    if (!nativeIpc) { return }
+    setMigrationBusy(true)
+    setMessage(null)
+    try {
+      const result = await nativeIpc.native.chooseCradleDataDirectory()
+      if (!result.canceled && result.filePath) { setPendingTarget(result.filePath) }
+    }
+    catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+    finally {
+      setMigrationBusy(false)
+    }
+  }
+
+  const confirmDataDirectoryChange = async () => {
+    if (!nativeIpc || !pendingTarget) { return }
+    setMigrationBusy(true)
+    try {
+      await nativeIpc.native.scheduleCradleDataDirectoryMigration(pendingTarget)
+      setPendingTarget(null)
+      setMessage(t('support.dataDirectory.restart'))
+    }
+    catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+      setMigrationBusy(false)
+    }
   }
 
   return (
@@ -306,18 +361,17 @@ export function SupportSettings() {
 
         <SettingsRow
           label={t('support.dataDirectory.label')}
-          description={dataPath ?? t('support.dataDirectory.description')}
+          description={dataPath ? `${dataPath}${dataSource ? ` (${dataSource})` : ''}` : t('support.dataDirectory.description')}
         >
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void openDataDirectory()}
-            disabled={!canOpenDataPath}
-          >
-            <FolderOpenIcon className="size-3.5" aria-hidden="true" />
-            {t('support.action.reveal')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => void openDataDirectory()} disabled={!canOpenDataPath || migrationBusy}>
+              <FolderOpenIcon className="size-3.5" aria-hidden="true" />
+              {t('support.action.reveal')}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => void chooseDataDirectory()} disabled={!canOpenDataPath || migrationBusy}>
+              {t('support.dataDirectory.change')}
+            </Button>
+          </div>
         </SettingsRow>
 
         <SettingsRow
@@ -348,6 +402,21 @@ export function SupportSettings() {
           {message}
         </p>
       )}
+
+      <AlertDialog open={pendingTarget !== null} onOpenChange={open => !open && setPendingTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('support.dataDirectory.confirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('support.dataDirectory.confirmDescription', { path: pendingTarget ?? '' })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('support.dataDirectory.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmDataDirectoryChange()} disabled={migrationBusy}>
+              {t('support.dataDirectory.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsPage>
   )
 }

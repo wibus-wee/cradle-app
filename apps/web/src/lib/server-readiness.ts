@@ -3,6 +3,7 @@ import { getConfiguredServerUrl, setRuntimeServerUrl } from './server-endpoint-p
 
 type DesktopServerStatus
   = | { state: 'starting' }
+    | { state: 'migrating', phase: string }
     | { state: 'ready', serverUrl: string }
     | { state: 'failed', message: string }
 
@@ -44,7 +45,7 @@ function waitForDesktopServer(): Promise<string> {
     let unsubscribe = () => {}
 
     const handleStatus = (status: DesktopServerStatus) => {
-      if (settled || status.state === 'starting') {
+      if (settled || status.state === 'starting' || status.state === 'migrating') {
         return
       }
       settled = true

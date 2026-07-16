@@ -316,6 +316,27 @@ interface NativeServiceMethods {
     serverDataPath: string
     databasePath: string
     serverLogPath: string
+    serverDataSource: 'default' | 'custom'
+    migration: {
+      phase: string
+      sourceRoot: string | null
+      targetRoot: string | null
+      backupRoot: string | null
+      errorMessage: string | null
+    }
+  }>
+  chooseCradleDataDirectory: () => Promise<{ canceled: boolean, filePath?: string }>
+  scheduleCradleDataDirectoryMigration: (targetPath: string) => Promise<{
+    scheduled: boolean
+    targetPath: string
+    restartRequired: true
+  }>
+  getCradleDataMigrationStatus: () => Promise<{
+    phase: string
+    sourceRoot: string | null
+    targetRoot: string | null
+    backupRoot: string | null
+    errorMessage: string | null
   }>
   getDesktopCliStatus: () => Promise<DesktopCliStatus>
   installDesktopCliCommand: () => Promise<DesktopCliStatus>

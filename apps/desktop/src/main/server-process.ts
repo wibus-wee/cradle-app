@@ -9,6 +9,7 @@ import { app, dialog } from 'electron'
 import getPort from 'get-port'
 import { z } from 'zod'
 
+import { getDesktopDataDirectoryState } from './data-directory'
 import type { ManagedChildProcess } from './managed-process'
 import { spawnManagedProcess } from './managed-process'
 import { resolveDesktopInstalledPluginsDir } from './plugin-install-links'
@@ -147,7 +148,7 @@ export async function startServer(): Promise<string> {
   lastServerSignalBeforeExit = null
   restartCount = 0
 
-  const dataDir = join(app.getPath('userData'), 'data')
+  const dataDir = getDesktopDataDirectoryState().serverDataRoot
   const credentialSecret = resolveDesktopCredentialSecret(dataDir)
   currentServerAuthToken = getDesktopServerAuthToken()
   const existingServer = await readHealthyLocatedServerUrl(app.getPath('userData'))
@@ -400,7 +401,7 @@ function writeServerExitDiagnostic(input: {
   classification: DesktopServerExitClassification
   expectation: DesktopServerExitExpectation | null
 }): string | null {
-  const diagnosticsPath = join(app.getPath('userData'), 'data', SERVER_EXIT_DIAGNOSTICS_FILE)
+  const diagnosticsPath = join(getDesktopDataDirectoryState().serverDataRoot, SERVER_EXIT_DIAGNOSTICS_FILE)
   try {
     mkdirSync(dirname(diagnosticsPath), { recursive: true })
     appendFileSync(
@@ -654,7 +655,7 @@ function resolveDesktopServerAuthToken(dataDir: string): string {
 
 export function getDesktopServerAuthToken(): string {
   if (!currentServerAuthToken) {
-    currentServerAuthToken = resolveDesktopServerAuthToken(join(app.getPath('userData'), 'data'))
+    currentServerAuthToken = resolveDesktopServerAuthToken(getDesktopDataDirectoryState().serverDataRoot)
   }
   return currentServerAuthToken
 }
