@@ -13,7 +13,7 @@ Used across features and components in the renderer.
 - **ipc.ts**: Typed IPC proxy for renderer-to-main communication; 默认只在 devtool route 上启用昂贵的 caller stack 捕获
 - **ipc-options.ts**: IPC instrumentation policy helper，决定何时允许捕获调用栈
 - **asset-precache.ts**: Production asset precache service worker registration helper，启动后在 shell 可见之后注册 Vite 生成的静态资源缓存。
-- **plugin-host.ts**: Web plugin host，读取 server 返回的 governed plugin descriptors，按 `routeSegment` 和 `layers.web.status` 加载 web bundle，提供 plugin-scoped route client / notification bridge，投影 renderer-local web layer lifecycle，并在 deactivation 时清理 web plugin subscriptions
+- **plugin-host.ts**: Web plugin host，读取 server 返回的 governed plugin descriptors，按 `routeSegment` 和 `layers.web.status` 加载 web bundle，提供 plugin-scoped route client / notification bridge，订阅临时 development session SSE 并使用 revision URL 热替换 web layer，投影 renderer-local lifecycle，并在 deactivation 时清理 subscriptions 与 Vite 注入的开发样式
 - **observability-client.ts**: Renderer private-preview observability producer，捕获 React/window 未处理错误并 fire-and-forget 写入 server-owned observability API；失败静默，避免错误上报影响 UI。
 - **number-format.ts**: Renderer-owned numeric display helpers for compact token counts, bounded percentages, byte/megabyte/gigabyte memory labels, uptime labels, and short duration labels; uses third-party clamp/byte/duration packages instead of component-local math.
 - **plugin-store.ts**: Plugin panel / command 的 Zustand store，记录 contribution ids、panel URL route keys、command handler metadata 和 renderer-local web layer state

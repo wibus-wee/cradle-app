@@ -23,7 +23,11 @@ import { DesktopBrowserManager } from './browser-manager'
 import { ChatEventTailBroker } from './chat-event-tail-broker'
 import { ChatStreamBroker } from './chat-stream-broker'
 import { DesktopAppBadgeManager } from './desktop-app-badge-manager'
-import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath } from './desktop-assets'
+import {
+  resolveDesktopBrowserPanelPreloadUrl,
+  resolveDesktopPreloadPath,
+  resolveDesktopRendererIndexPath,
+} from './desktop-assets'
 import { DesktopDownloadCenterService } from './download-center'
 import { installExternalLinkPolicy } from './external-link-policy'
 import {
@@ -54,6 +58,7 @@ import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import {
   registerPluginSourceSyncIpcHandlers,
   setPluginSourceSyncServerUrl,
+  startPluginDevSessionSync,
   syncAllDesktopLayerSources,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
@@ -72,6 +77,7 @@ let desktopAppBadgeManager: DesktopAppBadgeManager | null = null
 let macBridgeManager: MacBridgeManager | null = null
 let chatStreamBroker: ChatStreamBroker | null = null
 let chatEventTailBroker: ChatEventTailBroker | null = null
+let stopPluginDevSessionSync: (() => void) | null = null
 
 let notificationCenterManager: NotificationCenterManager | null = null
 let isQuitting = false
@@ -190,6 +196,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
       webviewTag: true,
       additionalArguments: [
         `--server-auth-token=${getDesktopServerAuthToken()}`,
+        `--browser-panel-preload-url=${resolveDesktopBrowserPanelPreloadUrl(__dirname)}`,
       ],
     },
     show: false,
@@ -419,6 +426,8 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   chatStreamBroker = null
   chatEventTailBroker?.stop()
   chatEventTailBroker = null
+  stopPluginDevSessionSync?.()
+  stopPluginDevSessionSync = null
   trayManager?.destroy()
   trayManager = null
   desktopAppBadgeManager?.destroy()
@@ -580,6 +589,8 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
   void syncAllDesktopLayerSources().catch((error) => {
     console.error('[plugins] desktop source catch-up failed:', error)
   })
+  stopPluginDevSessionSync?.()
+  stopPluginDevSessionSync = startPluginDevSessionSync()
 }
 
 export async function startDesktopApp(): Promise<void> {

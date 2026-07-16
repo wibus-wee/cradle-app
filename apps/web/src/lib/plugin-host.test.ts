@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { isWebLayerLoadable } from './plugin-host'
+import { activateWebPluginModule, deactivateWebPlugin, isWebLayerLoadable } from './plugin-host'
 
 function createLayers(webStatus: 'discovered' | 'failed') {
   return {
@@ -44,5 +44,20 @@ describe('plugin host web layer filtering', () => {
       hasWeb: true,
       layers: createLayers('discovered'),
     })).toBe(true)
+  })
+
+  it('disposes Vite-injected development styles when the web layer deactivates', async () => {
+    const deactivate = vi.fn()
+    const disposeDevelopmentStyles = vi.fn()
+    await activateWebPluginModule('@cradle/dev-style', {
+      activate: () => undefined,
+      deactivate,
+      __cradleDevDispose: disposeDevelopmentStyles,
+    })
+
+    await deactivateWebPlugin('@cradle/dev-style')
+
+    expect(deactivate).toHaveBeenCalledOnce()
+    expect(disposeDevelopmentStyles).toHaveBeenCalledOnce()
   })
 })

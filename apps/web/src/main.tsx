@@ -85,6 +85,7 @@ async function startApp(): Promise<void> {
         rendererDiagnostics.installRendererDiagnostics()
         await authPromise
         await pluginHost.loadWebPlugins()
+        await pluginHost.startPluginDevSessionWatcher()
       })
       .catch((error) => {
         console.error('[bootstrap] post-render startup failed:', error)

@@ -11,8 +11,9 @@ import type {
 import { z } from 'zod'
 
 import { toastManager } from '~/components/ui/toast'
+import { readPluginDevSessions } from '~/features/plugins/api/plugin-dev'
 
-import { getServerUrl } from './electron'
+import { getAuthenticatedEventSourceUrl, getServerUrl } from './electron'
 import { usePluginStore } from './plugin-store'
 
 type WebPluginDescriptor = Pick<PluginDescriptor, 'name' | 'version' | 'displayName' | 'hasWeb'>
@@ -26,6 +27,7 @@ const WebPluginDeactivateSchema = z.function()
 const WebPluginModuleSchema = z.object({
   activate: WebPluginActivateSchema,
   deactivate: WebPluginDeactivateSchema.optional(),
+  __cradleDevDispose: z.function().transform(fn => fn as () => void).optional(),
 }).passthrough()
 
 const WebPluginModuleWithDefaultSchema = z.union([
@@ -33,7 +35,27 @@ const WebPluginModuleWithDefaultSchema = z.union([
   z.object({ default: WebPluginModuleSchema }).passthrough().transform(mod => mod.default),
 ])
 
-const activeWebPlugins = new Map<string, { deactivate?: () => void | Promise<void>, subscriptions: Disposable[] }>()
+const activeWebPlugins = new Map<string, {
+  deactivate?: () => void | Promise<void>
+  devDispose?: () => void
+  subscriptions: Disposable[]
+}>()
+
+const PluginDevSessionSchema = z.object({
+  id: z.string().min(1),
+  pluginName: z.string().min(1),
+  routeSegment: z.string().min(1),
+  entries: z.object({ web: z.string().nullable() }).passthrough(),
+  revisions: z.object({ web: z.number().int().nonnegative() }).passthrough(),
+}).passthrough()
+
+const PluginDevSessionEventSchema = z.object({
+  type: z.enum(['started', 'reloaded', 'stopped']),
+  layer: z.enum(['server', 'web', 'desktop']).nullable(),
+  session: PluginDevSessionSchema,
+})
+
+type PluginDevSession = z.infer<typeof PluginDevSessionSchema>
 
 interface WebRuntimeCapabilityRegistration {
   type: string
@@ -226,6 +248,7 @@ export async function activateWebPluginModule(
 
   activeWebPlugins.set(owner, {
     deactivate: mod.deactivate,
+    devDispose: mod.__cradleDevDispose,
     subscriptions: ctx.subscriptions,
   })
   setWebLayerState(owner, 'active')
@@ -241,8 +264,9 @@ export async function deactivateWebPlugin(owner: string): Promise<void> {
  catch (err) {
     console.error(`[plugin-host] failed to deactivate ${owner}:`, err)
   }
- finally {
+  finally {
     disposeSubscriptions(owner, plugin.subscriptions)
+    plugin.devDispose?.()
     setWebLayerState(owner, 'discovered')
   }
 }
@@ -268,8 +292,7 @@ export function isWebLayerLoadable(plugin: WebPluginDescriptor): boolean {
  */
 export async function loadWebPlugins(): Promise<void> {
   const baseUrl = getServerUrl()
-  const response = await fetch(`${baseUrl}/api/plugins`)
-  const plugins: PluginDescriptor[] = await response.json()
+  const plugins = await readPluginDescriptors()
   const webPlugins = plugins.filter(isWebLayerLoadable)
 
   await Promise.all(
@@ -289,4 +312,74 @@ export async function loadWebPlugins(): Promise<void> {
       }
     }),
   )
+}
+
+async function readPluginDescriptors(): Promise<PluginDescriptor[]> {
+  const response = await fetch(`${getServerUrl()}/api/plugins`)
+  if (!response.ok) {
+    throw new Error(`Failed to read plugin descriptors: HTTP ${response.status}`)
+  }
+  return z.array(z.custom<PluginDescriptor>()).parse(await response.json())
+}
+
+async function reloadDevelopmentWebPlugin(session: PluginDevSession): Promise<void> {
+  if (!session.entries.web || session.revisions.web === 0) { return }
+  const descriptor = (await readPluginDescriptors())
+    .find(plugin => plugin.identity === session.pluginName)
+  if (!descriptor || !isWebLayerLoadable(descriptor)) { return }
+
+  const moduleUrl = new URL(
+    `/api/plugins/${session.routeSegment}/web.mjs`,
+    getServerUrl(),
+  )
+  moduleUrl.searchParams.set('cradleDevRevision', String(session.revisions.web))
+  setWebLayerState(session.pluginName, 'activating')
+  const mod = await import(/* @vite-ignore */ moduleUrl.toString())
+  await activateWebPluginModule(session.pluginName, mod, descriptor)
+  console.log(`[plugin-host] development web reloaded: ${session.pluginName}@${session.revisions.web}`)
+}
+
+export async function startPluginDevSessionWatcher(): Promise<() => void> {
+  let source: EventSource | null = null
+  let disposed = false
+  const appliedRevisions = new Map<string, number>()
+  let reconcileQueue = Promise.resolve()
+
+  const reconcile = (session: PluginDevSession): void => {
+    if (!session.entries.web || appliedRevisions.get(session.id) === session.revisions.web) { return }
+    appliedRevisions.set(session.id, session.revisions.web)
+    reconcileQueue = reconcileQueue
+      .then(() => reloadDevelopmentWebPlugin(session))
+      .catch((error: unknown) => {
+        appliedRevisions.delete(session.id)
+        setWebLayerState(session.pluginName, 'failed', error instanceof Error ? error.message : String(error))
+        console.error(`[plugin-host] development reload failed for ${session.pluginName}:`, error)
+      })
+  }
+
+  const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
+  for (const session of sessions) { reconcile(session) }
+
+  const eventsUrl = await getAuthenticatedEventSourceUrl('/plugins/dev-sessions/events')
+  if (disposed) { return () => undefined }
+  source = new EventSource(eventsUrl)
+  source.onmessage = (message) => {
+    const event = PluginDevSessionEventSchema.parse(JSON.parse(message.data))
+    if (event.type === 'stopped') {
+      appliedRevisions.delete(event.session.id)
+      void deactivateWebPlugin(event.session.pluginName)
+      return
+    }
+    if (event.type === 'started' || event.layer === 'web') {
+      reconcile(event.session)
+    }
+  }
+  source.onerror = () => {
+    console.warn('[plugin-host] plugin development event stream disconnected; EventSource will retry')
+  }
+
+  return () => {
+    disposed = true
+    source?.close()
+  }
 }

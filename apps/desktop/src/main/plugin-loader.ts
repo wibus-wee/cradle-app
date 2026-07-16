@@ -1,14 +1,16 @@
+import { readFile } from 'node:fs/promises'
 import { delimiter, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import type { Disposable, PluginCapabilityRecord, PluginDescriptor, PluginManifest } from '@cradle/plugin-sdk'
 import type { DesktopPluginContext, DesktopWebview } from '@cradle/plugin-sdk/desktop'
+import { parseCradlePluginPackageJsonText } from '@cradle/plugin-sdk/manifest'
 import { evaluatePluginPermissionPolicy, evaluatePluginRuntimeCapabilityPolicy } from '@cradle/plugin-sdk/permissions'
 import { app, BrowserWindow } from 'electron'
 import { z } from 'zod'
 
 import type { DesktopPluginSource } from './plugin-discovery'
-import { discoverDesktopPlugins } from './plugin-discovery'
+import { createDesktopPluginDescriptor, discoverDesktopPlugins } from './plugin-discovery'
 import { resolveDesktopInstalledPluginsDir } from './plugin-install-links'
 import { resolveDesktopPrimaryPluginsDir, resolveDesktopPrimaryPluginsSourceKind } from './plugin-paths'
 
@@ -23,6 +25,11 @@ const webviewListeners: Array<(webview: DesktopWebview, tabId: string) => void> 
 
 /** Governed desktop plugin projection */
 const desktopPluginDescriptors = new Map<string, PluginDescriptor>()
+const desktopPluginManifests = new Map<string, PluginManifest>()
+const shadowedDevelopmentDesktopPlugins = new Map<string, {
+  descriptor: PluginDescriptor
+  manifest: PluginManifest
+}>()
 const invalidDesktopPluginDescriptors: PluginDescriptor[] = []
 const ExternalPluginDirsSchema = z.array(z.string().default(''))
   .transform(values => values.flatMap(value => value.split(delimiter).map(dir => dir.trim()).filter(Boolean)))
@@ -437,7 +444,7 @@ function registerDesktopPluginDescriptor(descriptor: PluginDescriptor): void {
   desktopPluginDescriptors.set(descriptor.identity, descriptor)
 }
 
-export async function activateOneDesktopPlugin(manifest: PluginManifest): Promise<void> {
+export async function activateOneDesktopPlugin(manifest: PluginManifest, moduleRevision?: number): Promise<void> {
   if (!manifest.cradle.desktop) { return }
   if (activePlugins.has(manifest.name)) { return }
 
@@ -458,7 +465,11 @@ export async function activateOneDesktopPlugin(manifest: PluginManifest): Promis
   }
 
   try {
-    const mod = await import(pathToFileURL(entryPath).href)
+    const moduleUrl = new URL(pathToFileURL(entryPath).href)
+    if (moduleRevision !== undefined) {
+      moduleUrl.searchParams.set('cradleDevRevision', String(moduleRevision))
+    }
+    const mod = await import(moduleUrl.href)
     validatePluginModule(mod, manifest.name)
 
     const ctx = createDesktopPluginContext(manifest)
@@ -481,6 +492,57 @@ export async function activateOneDesktopPlugin(manifest: PluginManifest): Promis
     }
     console.error(`[plugins] failed to activate desktop plugin ${manifest.name}:`, err)
   }
+}
+
+export async function activateDevelopmentDesktopPlugin(input: {
+  packageDir: string
+  desktopEntry: string
+  revision: number
+}): Promise<void> {
+  const packageDir = resolve(input.packageDir)
+  const parsed = parseCradlePluginPackageJsonText(
+    await readFile(resolve(packageDir, 'package.json'), 'utf8'),
+  )
+  const manifest: PluginManifest = {
+    name: parsed.name,
+    version: parsed.version,
+    packageDir,
+    cradle: {
+      ...parsed.cradle,
+      desktop: input.desktopEntry,
+    },
+  }
+
+  const currentDescriptor = desktopPluginDescriptors.get(manifest.name)
+  const currentManifest = desktopPluginManifests.get(manifest.name)
+  if (currentDescriptor && currentManifest && !shadowedDevelopmentDesktopPlugins.has(manifest.name)) {
+    shadowedDevelopmentDesktopPlugins.set(manifest.name, {
+      descriptor: currentDescriptor,
+      manifest: currentManifest,
+    })
+  }
+
+  await deactivateOneDesktopPlugin(manifest.name, { removeDescriptor: false })
+  const source: DesktopPluginSource = {
+    pluginsDir: packageDir,
+    kind: 'workspaceDev',
+    trusted: true,
+    reason: 'Temporary plugin development session.',
+  }
+  registerDesktopPluginDescriptor(createDesktopPluginDescriptor(manifest, source))
+  desktopPluginManifests.set(manifest.name, manifest)
+  await activateOneDesktopPlugin(manifest, input.revision)
+}
+
+export async function deactivateDevelopmentDesktopPlugin(pluginName: string): Promise<void> {
+  await deactivateOneDesktopPlugin(pluginName)
+  desktopPluginManifests.delete(pluginName)
+  const shadowed = shadowedDevelopmentDesktopPlugins.get(pluginName)
+  shadowedDevelopmentDesktopPlugins.delete(pluginName)
+  if (!shadowed) { return }
+  registerDesktopPluginDescriptor(shadowed.descriptor)
+  desktopPluginManifests.set(pluginName, shadowed.manifest)
+  await activateOneDesktopPlugin(shadowed.manifest)
 }
 
 export async function deactivateOneDesktopPlugin(
@@ -517,6 +579,7 @@ export async function discoverAndActivateDesktopPluginSource(
 
   for (const manifest of manifests) {
     if (pluginIdentities && !pluginIdentities.has(manifest.name)) { continue }
+    desktopPluginManifests.set(manifest.name, manifest)
     await activateOneDesktopPlugin(manifest)
   }
 }
@@ -530,6 +593,7 @@ export async function activateDesktopPlugins(): Promise<void> {
   const sources = createDesktopPluginSources(isDev)
 
   desktopPluginDescriptors.clear()
+  desktopPluginManifests.clear()
   invalidDesktopPluginDescriptors.length = 0
 
   const { manifests, descriptors } = await discoverDesktopPlugins(sources)
@@ -540,6 +604,7 @@ export async function activateDesktopPlugins(): Promise<void> {
   const desktopPlugins = manifests.filter(m => m.cradle.desktop)
 
   for (const manifest of desktopPlugins) {
+    desktopPluginManifests.set(manifest.name, manifest)
     await activateOneDesktopPlugin(manifest)
   }
 }
@@ -550,4 +615,5 @@ export async function deactivateDesktopPlugins(): Promise<void> {
     await deactivateOneDesktopPlugin(name, { removeDescriptor: false })
   }
   activePlugins.clear()
+  shadowedDevelopmentDesktopPlugins.clear()
 }

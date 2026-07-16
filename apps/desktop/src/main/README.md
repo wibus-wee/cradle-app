@@ -44,7 +44,8 @@
 - `plugin-install-receipt.ts`：读取 plugin package 内的 Marketplace install receipt，并投影为 descriptor source provenance。
 - `plugin-discovery.ts`：拥有 desktop plugin discovery 和 manifest validation。
 - `plugin-discovery.test.ts`：覆盖 desktop discovery 对 Marketplace install receipt provenance 的 descriptor 投影。
-- `plugin-loader.ts`：拥有 desktop plugin activation、Marketplace installed plugin discovery、shared config projection、webview listener registry，以及 renderer browser tab bridge。
+- `plugin-loader.ts`：拥有 desktop plugin activation、Marketplace installed plugin discovery、临时 development layer 的 revision import 与正式插件恢复、shared config projection、webview listener registry，以及 renderer browser tab bridge。
+- `plugin-source-sync.ts`：同步 server-owned persisted plugin sources 的 desktop layer，并通过 development session SSE 及时加载、替换或卸载临时 desktop layer。
 - `plugin-loader.test.ts`：覆盖 desktop plugin deactivation 时清理 subscriptions、shared config projection 和 capability records。
 - `plugin-install-links.test.ts`：覆盖 Marketplace install URL parsing、link rejection、bundled receipt recording 和 Cradle-owned plugin install writes。
 - `plugin-paths.ts`：拥有 desktop dev/bundled runtime 的 primary plugin directory 解析，并把同一路径投影给 forked server。

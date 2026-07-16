@@ -73,7 +73,7 @@ function createSourceDescriptor(
   }
 }
 
-function createDescriptor(
+export function createDesktopPluginDescriptor(
   manifest: PluginManifest,
   source: DesktopPluginSource,
   provenance?: PluginSourceProvenance,
@@ -251,7 +251,7 @@ async function discoverDesktopPluginsFromSource(
       })
       discovered.push({
         manifest,
-        descriptor: createDescriptor(manifest, source, provenance),
+        descriptor: createDesktopPluginDescriptor(manifest, source, provenance),
       })
     }
  catch (err) {
