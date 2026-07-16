@@ -82,7 +82,9 @@ After connect, callers reach the remote Cradle Server through:
     ALL /remote-hosts/:hostId/upstream/*
 
 This forwards method, query string, headers (minus hop-by-hop), and body to the
-connected `localBaseUrl`. Examples:
+connected `localBaseUrl`. Upstream CORS response headers are removed because
+the controller Cradle Server owns the browser-facing origin and credential
+policy. Examples:
 
 - `GET /remote-hosts/:hostId/upstream/health`
 - `GET /remote-hosts/:hostId/upstream/workspaces`

@@ -12,7 +12,7 @@
     <br />
     <br />
     <b>Download for </b>
-		<a href="https://github.com/wibus-wee/Cradle-app/releases">macOS</a> · Windows · Linux · <a href="https://app.cradle.wibus.ren/">Web</a>
+		<a href="https://github.com/wibus-wee/Cradle-app/releases">macOS</a> · <a href="https://github.com/wibus-wee/Cradle-app/releases">Windows</a> · Linux · <a href="https://app.cradle.wibus.ren/">Web</a>
     <br />
   </p>
 </p>

@@ -77,6 +77,16 @@ const HOP_BY_HOP_HEADERS = new Set([
   'host',
 ])
 
+const CONTROLLER_OWNED_RESPONSE_HEADERS = new Set([
+  'access-control-allow-credentials',
+  'access-control-allow-headers',
+  'access-control-allow-methods',
+  'access-control-allow-origin',
+  'access-control-allow-private-network',
+  'access-control-expose-headers',
+  'access-control-max-age',
+])
+
 const UPSTREAM_REQUEST_HEADERS = new Set([
   'accept',
   'accept-encoding',
@@ -148,10 +158,14 @@ export function buildUpstreamRequestHeaders(headers: Headers, upstreamHost: stri
   return filtered
 }
 
-export function filterHopByHopResponseHeaders(headers: Headers): Headers {
+export function buildUpstreamResponseHeaders(headers: Headers): Headers {
   const filtered = new Headers()
   headers.forEach((value, key) => {
-    if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+    const normalizedKey = key.toLowerCase()
+    if (
+      !HOP_BY_HOP_HEADERS.has(normalizedKey)
+      && !CONTROLLER_OWNED_RESPONSE_HEADERS.has(normalizedKey)
+    ) {
       filtered.set(key, value)
     }
   })
@@ -194,6 +208,6 @@ export async function proxyUpstreamRequestByBaseUrl(
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
     statusText: upstreamResponse.statusText,
-    headers: filterHopByHopResponseHeaders(upstreamResponse.headers),
+    headers: buildUpstreamResponseHeaders(upstreamResponse.headers),
   })
 }
