@@ -83,6 +83,7 @@ function installTestBrowserBridge() {
     setBounds: vi.fn(),
     captureScreenshot: vi.fn(),
     copyScreenshotToClipboard: vi.fn(),
+    clearAnnotationDesign: vi.fn(async () => {}),
     executeCdp: vi.fn(),
     discoverLocalServers: vi.fn(async () => []),
     navigate: vi.fn(async (input: { threadId: string, url: string }) => {
@@ -122,6 +123,12 @@ function installTestBrowserBridge() {
         listeners.delete(handler)
       }
     }),
+    emitState: (state: ThreadBrowserState) => {
+      states.set(state.threadId, state)
+      for (const listener of listeners) {
+        listener(state)
+      }
+    },
   }
 
   window.cradle = {
@@ -366,6 +373,49 @@ describe('browserPanel rendering', () => {
     finally {
       createElementSpy.mockRestore()
     }
+  })
+
+  it('does not restore the previous browser tab from stale state while selection is pending', async () => {
+    const firstState = createTestThreadState(
+      DEFAULT_BROWSER_PANEL_OWNER_ID,
+      'https://one.test/',
+    )
+    const secondTab = {
+      ...firstState.tabs[0]!,
+      id: 'native-tab-2',
+      url: 'https://two.test/',
+      title: 'two.test',
+      lastCommittedUrl: 'https://two.test/',
+    }
+    const twoTabState: ThreadBrowserState = {
+      ...firstState,
+      tabs: [...firstState.tabs, secondTab],
+    }
+    browserBridge.emitState(twoTabState)
+
+    let resolveSelection: ((state: ThreadBrowserState) => void) | undefined
+    browserBridge.selectTab.mockImplementation(() => new Promise((resolve) => {
+      resolveSelection = resolve
+    }))
+
+    render(<BrowserPanel />)
+    const secondTabButton = await screen.findByRole('button', { name: 'two.test' })
+    act(() => {
+      secondTabButton.click()
+    })
+
+    browserBridge.emitState({ ...twoTabState, version: 2, activeTabId: 'native-tab-1' })
+    expect(secondTabButton.getAttribute('aria-current')).toBe('page')
+
+    const selectedState = { ...twoTabState, version: 3, activeTabId: 'native-tab-2' }
+    act(() => {
+      browserBridge.emitState(selectedState)
+      resolveSelection?.(selectedState)
+    })
+
+    await waitFor(() => {
+      expect(useBrowserPanelStore.getState().activeTabId).toBe('native-tab-2')
+    })
   })
 
   it('hides the native browser surface while a global suppressor is active', async () => {

@@ -3,6 +3,7 @@ import type { AddressInfo, Server, Socket } from 'node:net'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 
+import type { Disposable } from '@cradle/plugin-sdk'
 import type { DesktopPluginContext, DesktopWebview } from '@cradle/plugin-sdk/desktop'
 
 import {
@@ -46,6 +47,7 @@ let backendEndpoint = ''
 interface WebviewEntry {
   webview: DesktopWebview
   attached: boolean
+  subscriptions: Disposable[]
 }
 
 interface CdpValueResult<T> {
@@ -70,6 +72,20 @@ const webviewRegistry = new Map<string, WebviewEntry>()
 const pendingWebviewResolvers = new Map<string, Array<(tabId: string) => void>>()
 
 let desktopContext: DesktopPluginContext | null = null
+
+function disposeWebviewEntry(entry: WebviewEntry): void {
+  for (const subscription of entry.subscriptions.splice(0).reverse()) {
+    subscription.dispose()
+  }
+}
+
+function removeWebviewEntry(id: string, entry: WebviewEntry): void {
+  if (webviewRegistry.get(id) !== entry) {
+    return
+  }
+  webviewRegistry.delete(id)
+  disposeWebviewEntry(entry)
+}
 
 async function waitForDocumentReady(entry: WebviewEntry): Promise<void> {
   ensureDebugger(entry)
@@ -121,7 +137,7 @@ async function getActiveWebview(): Promise<WebviewEntry | undefined> {
       const activeEntry = webviewRegistry.get(rendererTabId)
       if (activeEntry) {
         if (activeEntry.webview.isDestroyed()) {
-          webviewRegistry.delete(rendererTabId)
+          removeWebviewEntry(rendererTabId, activeEntry)
         }
         else {
           return activeEntry
@@ -143,7 +159,9 @@ async function getWebview(tabId?: string): Promise<WebviewEntry | undefined> {
     if (entry && !entry.webview.isDestroyed()) {
       return entry
     }
-    webviewRegistry.delete(tabId)
+    if (entry) {
+      removeWebviewEntry(tabId, entry)
+    }
     return undefined
   }
   return getActiveWebview()
@@ -151,6 +169,11 @@ async function getWebview(tabId?: string): Promise<WebviewEntry | undefined> {
 
 function registerWebview(webview: DesktopWebview): string {
   const id = webview.tabId
+  const previousEntry = webviewRegistry.get(id)
+  if (previousEntry) {
+    disposeWebviewEntry(previousEntry)
+  }
+
   let attached = false
   try {
     webview.cdp.attach('1.3')
@@ -160,17 +183,17 @@ function registerWebview(webview: DesktopWebview): string {
     console.error('[browser-use] Failed to attach debugger:', err)
   }
 
-  const entry: WebviewEntry = { webview, attached }
+  const entry: WebviewEntry = { webview, attached, subscriptions: [] }
   webviewRegistry.set(id, entry)
 
-  webview.cdp.onDetached((reason) => {
+  entry.subscriptions.push(webview.cdp.onDetached((reason) => {
     console.warn(`[browser-use] Debugger detached from ${id}: ${reason}`)
     entry.attached = false
-  })
+  }))
 
-  webview.onDestroyed(() => {
-    webviewRegistry.delete(id)
-  })
+  entry.subscriptions.push(webview.onDestroyed(() => {
+    removeWebviewEntry(id, entry)
+  }))
 
   const resolvers = pendingWebviewResolvers.get(id)
   if (resolvers) {
@@ -434,7 +457,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
         const tabs: TabInfo[] = []
         for (const [id, entry] of webviewRegistry) {
           if (entry.webview.isDestroyed()) {
-            webviewRegistry.delete(id)
+            removeWebviewEntry(id, entry)
             continue
           }
           tabs.push({ id, url: entry.webview.getUrl(), title: entry.webview.getTitle() })
@@ -462,15 +485,17 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       case 'tabs_close': {
         const entry = webviewRegistry.get(cmd.tabId)
         if (!entry || entry.webview.isDestroyed()) {
-          webviewRegistry.delete(cmd.tabId)
+          if (entry) {
+            removeWebviewEntry(cmd.tabId, entry)
+          }
           return { id: cmd.id, ok: false, error: `Tab ${cmd.tabId} not found` }
         }
+        removeWebviewEntry(cmd.tabId, entry)
         try {
           entry.webview.cdp.detach()
         }
         catch { /* already detached */ }
         entry.webview.close()
-        webviewRegistry.delete(cmd.tabId)
         const data: TabsCloseResult = { success: true }
         return { id: cmd.id, ok: true, data }
       }
@@ -615,6 +640,7 @@ export function deactivate(): void {
   pendingWebviewResolvers.clear()
   // Detach all debuggers
   for (const [, entry] of webviewRegistry) {
+    disposeWebviewEntry(entry)
     if (entry.attached && !entry.webview.isDestroyed()) {
       try {
         entry.webview.cdp.detach()

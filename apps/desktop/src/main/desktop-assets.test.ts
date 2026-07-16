@@ -3,6 +3,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -65,6 +66,14 @@ describe('resolveDesktopPreloadPath', () => {
     const { resolveDesktopBrowserPanelPreloadPath } = await import('./desktop-assets')
 
     expect(resolveDesktopBrowserPanelPreloadPath(chunkDir)).toBe(browserPanelPreloadPath)
+  })
+
+  it('converts the browser panel preload path to a file URL for sandboxed preloads', async () => {
+    const { browserPanelPreloadPath, chunkDir } = createDesktopDistFixture()
+    process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
+    const { resolveDesktopBrowserPanelPreloadUrl } = await import('./desktop-assets')
+
+    expect(resolveDesktopBrowserPanelPreloadUrl(chunkDir)).toBe(pathToFileURL(browserPanelPreloadPath).toString())
   })
 
   it('uses the packaged browser panel preload output under app path outside development', async () => {

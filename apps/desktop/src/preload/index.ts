@@ -1,6 +1,3 @@
-// eslint-disable-next-line import-sort/imports, unicorn/prefer-node-protocol -- Electron sandbox preload only permits the unprefixed url module.
-import { pathToFileURL } from 'url'
-
 import type { DownloadTaskView } from '@cradle/download-center'
 import { contextBridge, ipcRenderer } from 'electron'
 
@@ -17,6 +14,14 @@ function getArg(name: string): string | null {
   const prefix = `--${name}=`
   const arg = process.argv.find(a => a.startsWith(prefix))
   return arg ? arg.slice(prefix.length) : null
+}
+
+function getRequiredArg(name: string): string {
+  const value = getArg(name)
+  if (value === null) {
+    throw new Error(`Missing required Electron preload argument: --${name}`)
+  }
+  return value
 }
 
 function parseSurfaceRoute(raw: string | null): unknown | null {
@@ -37,6 +42,7 @@ const sessionId = getArg('session-id')
 const isTearoff = getArg('tearoff') === 'true'
 const surface = getArg('surface')
 const surfaceRoute = parseSurfaceRoute(getArg('surface-route'))
+const browserPanelPreloadUrl = getRequiredArg('browser-panel-preload-url')
 
 const CHAT_STREAM_CHUNK_CHANNEL = 'chat-stream:chunk'
 const CHAT_STREAM_CLOSED_CHANNEL = 'chat-stream:closed'
@@ -184,8 +190,7 @@ const cradleElectron = {
   browser: {
     getWebviewConfig: (input: { threadId: string }) => ({
       partition: browserSessionPartition(input.threadId),
-      // eslint-disable-next-line node/no-path-concat -- Importing node:path is unavailable in Electron sandbox preload.
-      preloadUrl: pathToFileURL(`${__dirname}/browser-panel.js`).toString(),
+      preloadUrl: browserPanelPreloadUrl,
     }),
     open: (input: unknown) => ipcRenderer.invoke('desktop:browser-open', input),
     close: (input: unknown) => ipcRenderer.invoke('desktop:browser-close', input),

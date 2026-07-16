@@ -7,7 +7,12 @@ import {
   resolveWindowControlsOverlay,
   resolveWindowControlsSafeArea,
 } from '../shared/window-controls-safe-area'
-import { resolveDesktopPreloadPath, resolveDesktopRendererIndexPath, resolveDesktopRendererTearoffPath } from './desktop-assets'
+import {
+  resolveDesktopBrowserPanelPreloadUrl,
+  resolveDesktopPreloadPath,
+  resolveDesktopRendererIndexPath,
+  resolveDesktopRendererTearoffPath,
+} from './desktop-assets'
 import { installExternalLinkPolicy } from './external-link-policy'
 import { subscribeAcpDevtool, subscribeIpcDevtool } from './ipc-devtool'
 import { getDesktopServerAuthToken } from './server-process'
@@ -112,6 +117,7 @@ export class WindowManager {
           `--surface=${surfaceId}`,
           `--surface-route=${JSON.stringify(route)}`,
           '--tearoff=true',
+          `--browser-panel-preload-url=${resolveDesktopBrowserPanelPreloadUrl(__dirname)}`,
         ],
       },
       show: false,
@@ -251,6 +257,7 @@ export class WindowManager {
           `--server-url=${this.serverUrl}`,
           `--server-auth-token=${getDesktopServerAuthToken()}`,
           '--devtool=true',
+          `--browser-panel-preload-url=${resolveDesktopBrowserPanelPreloadUrl(__dirname)}`,
         ],
       },
       show: false,

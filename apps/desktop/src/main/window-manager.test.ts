@@ -120,6 +120,7 @@ const electronMocks = vi.hoisted(() => {
 
 vi.mock('electron', () => electronMocks)
 vi.mock('./desktop-assets', () => ({
+  resolveDesktopBrowserPanelPreloadUrl: vi.fn(() => 'file:///tmp/browser-panel.js'),
   resolveDesktopPreloadPath: vi.fn(() => '/tmp/preload.js'),
   resolveDesktopRendererIndexPath: vi.fn(() => '/tmp/index.html'),
   resolveDesktopRendererTearoffPath: vi.fn(() => '/tmp/tearoff.html'),

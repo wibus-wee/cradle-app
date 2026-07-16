@@ -63,6 +63,7 @@ import type {
   BrowserPanelTab,
   BrowserTabState,
   BrowserWebTab,
+  ThreadBrowserState,
 } from '~/store/browser-panel'
 import {
   DEFAULT_BROWSER_PANEL_OWNER_ID,
@@ -1329,6 +1330,7 @@ export function BrowserPanel({
   const animationFrameRef = useRef<number | null>(null)
   const lastNativeBoundsSignatureRef = useRef<string | null>(null)
   const newTabRequestInFlightRef = useRef(false)
+  const pendingBrowserTabSelectionRef = useRef<string | null>(null)
   const [addressValue, setAddressValue] = useState('')
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -1390,6 +1392,20 @@ export function BrowserPanel({
   const chromeStatusLabel = chromeStatus?.label ?? null
   const chromeStatusTone = chromeStatus?.tone ?? null
 
+  const applyBrowserState = useCallback(
+    (state: ThreadBrowserState) => {
+      const pendingTabId = pendingBrowserTabSelectionRef.current
+      if (pendingTabId && state.activeTabId !== pendingTabId) {
+        return
+      }
+      if (pendingTabId === state.activeTabId) {
+        pendingBrowserTabSelectionRef.current = null
+      }
+      upsertOwnerState(state)
+    },
+    [upsertOwnerState],
+  )
+
   useEffect(() => {
     if (resolvedActivePanelTabId && resolvedActivePanelTabId !== activePanelTabId) {
       setActiveTab(resolvedActivePanelTabId, resolvedOwnerId)
@@ -1409,13 +1425,11 @@ export function BrowserPanel({
       return
     }
 
-    const unsubscribe = bridge.onState((state) => {
-      upsertOwnerState(state)
-    })
+    const unsubscribe = bridge.onState(applyBrowserState)
 
     void bridge
       .getState({ threadId: resolvedOwnerId })
-      .then(upsertOwnerState)
+      .then(applyBrowserState)
       .catch((error) => {
         setLocalError(formatBrowserActionError(error))
       })
@@ -1426,7 +1440,7 @@ export function BrowserPanel({
       unsubscribe()
       void bridge.hide({ threadId: resolvedOwnerId }).catch(() => {})
     }
-  }, [resolvedOwnerId, upsertOwnerState])
+  }, [applyBrowserState, resolvedOwnerId])
 
   useEffect(() => {
     if (!requestedTab) {
@@ -1729,9 +1743,15 @@ export function BrowserPanel({
           tabId: activeBrowserTabId,
           webContentsId,
         })
-        .then(upsertOwnerState)
+        .then((nextState) => {
+          if (browserWebviewAttachKeyRef.current === attachKey) {
+            applyBrowserState(nextState)
+          }
+        })
         .catch((error) => {
-          browserWebviewAttachKeyRef.current = null
+          if (browserWebviewAttachKeyRef.current === attachKey) {
+            browserWebviewAttachKeyRef.current = null
+          }
           setLocalError(formatBrowserActionError(error))
         })
     }
@@ -1753,12 +1773,12 @@ export function BrowserPanel({
     activeBrowserTabIsBlank,
     activeBrowserTabUrl,
     activePanelTab?.kind,
+    applyBrowserState,
     browserState?.open,
     detachRendererBrowserWebview,
     nativeSurfaceVisible,
     resolvedOwnerId,
     scheduleStableBoundsSync,
-    upsertOwnerState,
   ])
 
   useEffect(() => {
@@ -2176,6 +2196,7 @@ export function BrowserPanel({
       return
     }
     if (tab.kind !== 'browser') {
+      pendingBrowserTabSelectionRef.current = null
       hideNativeBrowserSurface()
       setActiveTab(tabId, resolvedOwnerId)
       return
@@ -2186,9 +2207,19 @@ export function BrowserPanel({
       setActiveTab(tabId, resolvedOwnerId)
       return
     }
+    pendingBrowserTabSelectionRef.current = tabId
     setActiveTab(tabId, resolvedOwnerId)
     void runBrowserAction(async () => {
-      upsertOwnerState(await bridge.selectTab({ threadId: resolvedOwnerId, tabId }))
+      applyBrowserState(await bridge.selectTab({ threadId: resolvedOwnerId, tabId }))
+    }).finally(() => {
+      if (pendingBrowserTabSelectionRef.current !== tabId) {
+        return
+      }
+      pendingBrowserTabSelectionRef.current = null
+      void bridge
+        .getState({ threadId: resolvedOwnerId })
+        .then(applyBrowserState)
+        .catch(() => {})
     })
   }
 

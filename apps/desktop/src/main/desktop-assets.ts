@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { app } from 'electron'
 
@@ -23,6 +24,10 @@ export function resolveDesktopBrowserPanelPreloadPath(moduleDir: string): string
     return candidates.find(candidate => existsSync(candidate)) ?? candidates[0]!
   }
   return join(app.getAppPath(), 'dist/preload/browser-panel.js')
+}
+
+export function resolveDesktopBrowserPanelPreloadUrl(moduleDir: string): string {
+  return pathToFileURL(resolveDesktopBrowserPanelPreloadPath(moduleDir)).toString()
 }
 
 export function resolveDesktopRendererIndexPath(): string {
