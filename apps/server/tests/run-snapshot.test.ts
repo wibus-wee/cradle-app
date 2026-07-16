@@ -3,10 +3,21 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { backendRuns, backendRunSnapshotEvents, messages, sessions } from '@cradle/db'
+import {
+  backendRuns,
+  backendRunSnapshotEvents,
+  backendRunSnapshots,
+  messages,
+  sessions,
+} from '@cradle/db'
+import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../src/infra'
+import {
+  putMessagePayload,
+  toMessageProjectionValues,
+} from '../src/modules/chat-runtime/message-payload-store'
 import {
   finalizeActiveRunSnapshot,
   recordActiveRunSnapshotEvent,
@@ -14,7 +25,12 @@ import {
 } from '../src/modules/chat-runtime/run/active-run-snapshot'
 import { createFinalMessageProjectionState } from '../src/modules/chat-runtime/run/final-message-projection'
 import type { ActiveRun } from '../src/modules/chat-runtime/run-registry'
-import { getRunSnapshot, getRunSnapshots } from '../src/modules/chat-runtime/run-snapshot'
+import {
+  COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
+  getRunSnapshot,
+  getRunSnapshots,
+  maintainRunSnapshots,
+} from '../src/modules/chat-runtime/run-snapshot'
 import { createRunChunkLog } from '../src/modules/chat-runtime/stream/run-chunk-log'
 
 function restoreEnv(name: string, previousValue: string | undefined): void {
@@ -67,23 +83,25 @@ function seedSession(sessionId: string): void {
 }
 
 function seedMessage(input: { id: string, sessionId: string }): void {
+  const message = {
+    id: input.id,
+    sessionId: input.sessionId,
+    parentMessageId: null,
+    parentToolCallId: null,
+    taskId: null,
+    depth: 0,
+    role: 'assistant' as const,
+    status: 'streaming' as const,
+    content: '',
+    messageJson: JSON.stringify({ id: input.id, role: 'assistant', parts: [] }),
+    errorText: null,
+    createdAt: 1700000000,
+    updatedAt: 1700000000,
+  }
+  putMessagePayload(db(), message)
   db()
     .insert(messages)
-    .values({
-      id: input.id,
-      sessionId: input.sessionId,
-      parentMessageId: null,
-      parentToolCallId: null,
-      taskId: null,
-      depth: 0,
-      role: 'assistant',
-      status: 'streaming',
-      content: '',
-      messageJson: JSON.stringify({ id: input.id, role: 'assistant', parts: [] }),
-      errorText: null,
-      createdAt: 1700000000,
-      updatedAt: 1700000000,
-    })
+    .values(toMessageProjectionValues(message))
     .run()
 }
 
@@ -237,6 +255,138 @@ describe('run snapshot recording', () => {
         expect(activeRun.runSnapshotDroppedEventCount).toBe(18)
         expect(snapshot!.status).toBe('complete')
       })
+    })
+  })
+
+  it('compacts runtime chunk payloads after successful finalization while retaining event metadata', async () => {
+    await withTempDataDir(() => {
+      const sessionId = `session-${randomUUID()}`
+      const runId = `run-${randomUUID()}`
+      const activeRun = setUpRun(sessionId, runId)
+
+      recordActiveRunSnapshotEvent(activeRun, {
+        phase: 'tool_call_output_available',
+        chunk: {
+          type: 'tool-output-available',
+          toolCallId: 'toolu_success',
+          output: { stdout: 'large successful output' },
+        },
+      })
+
+      finalizeActiveRunSnapshot(
+        activeRun,
+        { type: 'finish', finishReason: 'stop' },
+        {
+          modelId: 'gpt-4o-mini',
+          diagnostics: {
+            emittedEventCount: 1,
+            assistantBoundaryCount: 0,
+            assistantTextCharCount: 0,
+            reasoningTextCharCount: 0,
+            toolInputDeltaCharCount: 0,
+            toolEventCount: 1,
+            otherOutputEventCount: 0,
+          },
+          profile: {
+            enabled: false,
+            streamStartedAtMs: 0,
+            streamFinishedAtMs: null,
+            finalizeStartedAtMs: null,
+            finalizeFinishedAtMs: null,
+            finalMessageJsonBytes: null,
+          },
+        },
+      )
+
+      const snapshot = getRunSnapshot(runId)
+      const toolEvent = snapshot?.events.find(event => event.toolCallId === 'toolu_success')
+      expect(snapshot?.status).toBe('complete')
+      expect(toolEvent).toEqual(expect.objectContaining({
+        phase: 'tool_call_output_available',
+        chunkType: 'tool-output-available',
+        toolCallId: 'toolu_success',
+      }))
+      expect(toolEvent?.payload).toEqual(expect.objectContaining({
+        schema: COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
+        originalLength: expect.any(Number),
+        coalescedCount: 1,
+      }))
+      expect(JSON.stringify(toolEvent?.payload)).not.toContain('large successful output')
+    })
+  })
+
+  it('retains runtime chunk payloads after failed finalization', async () => {
+    await withTempDataDir(() => {
+      const sessionId = `session-${randomUUID()}`
+      const runId = `run-${randomUUID()}`
+      const activeRun = setUpRun(sessionId, runId)
+
+      recordActiveRunSnapshotEvent(activeRun, {
+        phase: 'tool_call_output_available',
+        chunk: {
+          type: 'tool-output-available',
+          toolCallId: 'toolu_failed',
+          output: { stderr: 'diagnostic output' },
+        },
+      })
+      finalizeActiveRunSnapshot(
+        activeRun,
+        { type: 'error', errorText: 'provider failed' },
+        {
+          modelId: 'gpt-4o-mini',
+          diagnostics: {
+            emittedEventCount: 1,
+            assistantBoundaryCount: 0,
+            assistantTextCharCount: 0,
+            reasoningTextCharCount: 0,
+            toolInputDeltaCharCount: 0,
+            toolEventCount: 1,
+            otherOutputEventCount: 0,
+          },
+          profile: {
+            enabled: false,
+            streamStartedAtMs: 0,
+            streamFinishedAtMs: null,
+            finalizeStartedAtMs: null,
+            finalizeFinishedAtMs: null,
+            finalMessageJsonBytes: null,
+          },
+        },
+      )
+
+      const snapshot = getRunSnapshot(runId)
+      const toolEvent = snapshot?.events.find(event => event.toolCallId === 'toolu_failed')
+      expect(snapshot?.status).toBe('failed')
+      expect(toolEvent?.payload).toEqual(expect.objectContaining({
+        output: { stderr: 'diagnostic output' },
+      }))
+    })
+  })
+})
+
+describe('run snapshot maintenance', () => {
+  it('uses separate success and failure retention windows without pruning running snapshots', async () => {
+    await withTempDataDir(() => {
+      const now = Date.UTC(2026, 6, 16)
+      const oldCompletedAt = now - 31 * 24 * 60 * 60 * 1000
+      const oldFailureAt = now - 8 * 24 * 60 * 60 * 1000
+
+      for (const [suffix, status, completedAt] of [
+        ['success', 'complete', oldCompletedAt],
+        ['failure', 'failed', oldFailureAt],
+        ['running', 'running', null],
+      ] as const) {
+        const sessionId = `session-${suffix}-${randomUUID()}`
+        const runId = `run-${suffix}-${randomUUID()}`
+        setUpRun(sessionId, runId)
+        db().update(backendRunSnapshots).set({ status, completedAt }).where(eq(backendRunSnapshots.runId, runId)).run()
+      }
+
+      const result = maintainRunSnapshots(now)
+      expect(result.prunedSnapshots).toBe(2)
+      expect(db().select().from(backendRunSnapshots).all()).toEqual([
+        expect.objectContaining({ status: 'running' }),
+      ])
     })
   })
 })

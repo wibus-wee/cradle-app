@@ -271,6 +271,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     { shutdownRemoteHostConnections },
     { shutdownImageOcr },
     { CodexUsageReconciliationScheduler },
+    { RunSnapshotMaintenanceScheduler },
   ] = await Promise.all([
     import('./infra'),
     import('./modules/chat-runtime/runtime'),
@@ -290,6 +291,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/remote-hosts/service'),
     import('./modules/image-ocr/service'),
     import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
+    import('./modules/chat-runtime/run-snapshot-maintenance'),
   ])
   if (recoverPersistedRunsOnCreate) {
     recoverPersistedRunProjections()
@@ -323,6 +325,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
 
   const runtimeResources = new RuntimeResourceRegistry()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()
+  const runSnapshotMaintenance = new RunSnapshotMaintenanceScheduler()
   runtimeResources.register({
     name: 'download-center',
     phase: 'cancel',
@@ -334,6 +337,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     stop: flushAllActiveRunSnapshots,
   })
   runtimeResources.register({ name: 'active-chat-runs', phase: 'drain', stop: abortAllRuns })
+  runtimeResources.register({
+    name: 'run-snapshot-maintenance',
+    phase: 'cancel',
+    stop: () => runSnapshotMaintenance.stop(),
+  })
   runtimeResources.register({
     name: 'opencode-runtime-installation',
     phase: 'drain',
@@ -405,6 +413,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   // Start chronicle daemon if enabled
   if (startBackgroundTasks) {
     codexUsageReconciliation.start()
+    runSnapshotMaintenance.start()
     BackgroundJobPoller.start()
     const chronicleRuntimeAllowed = chronicleService.isChronicleRuntimeAllowed()
     void refreshAllExternalProviderSources()

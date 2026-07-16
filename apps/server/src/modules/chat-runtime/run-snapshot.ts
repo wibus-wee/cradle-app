@@ -9,7 +9,7 @@ import type {
 } from '@cradle/db'
 import { backendRunSnapshotEvents, backendRunSnapshots } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
-import { and, asc, desc, eq, gte, lt, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lt, ne, notLike, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { readNonNegativeIntegerEnv, readPositiveIntegerEnv } from '../../helpers/env'
@@ -136,10 +136,15 @@ export interface RunSnapshotFilter {
 
 const SCHEMA_VERSION = 1
 const DEFAULT_PAYLOAD_LIMIT = 64_000
-const DEFAULT_RETENTION_DAYS = 30
+const DEFAULT_SUCCESS_RETENTION_DAYS = 30
+const DEFAULT_FAILURE_RETENTION_DAYS = 7
 const RETENTION_PRUNE_INTERVAL_MS = 60 * 60 * 1000
 const DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT = 2_000
 const DEFAULT_SNAPSHOT_EVENTS_MAX = 2_000
+const DEFAULT_RETENTION_BATCH_SIZE = 250
+const DEFAULT_COMPACTION_SNAPSHOT_BATCH_SIZE = 25
+export const COMPACTED_SUCCESS_PAYLOAD_SCHEMA = 'cradle.run-snapshot-success-metadata.v1'
+const COMPACTED_SUCCESS_PAYLOAD_PREFIX = `{"schema":"${COMPACTED_SUCCESS_PAYLOAD_SCHEMA}"`
 
 /**
  * Hard cap on how many event rows a single run snapshot may accumulate.
@@ -265,19 +270,28 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
   }
 
   try {
-    const previous = db()
-      .select()
-      .from(backendRunSnapshots)
-      .where(eq(backendRunSnapshots.id, input.snapshotId))
-      .get()
-    const result = db()
-      .update(backendRunSnapshots)
-      .set(values)
-      .where(
-        and(eq(backendRunSnapshots.id, input.snapshotId), eq(backendRunSnapshots.status, 'running')),
-      )
-      .run()
-    if (result.changes === 0 && previous && previous.status !== 'running') {
+    const d = db()
+    const { previous, changes } = d.transaction((tx) => {
+      const previous = tx
+        .select()
+        .from(backendRunSnapshots)
+        .where(eq(backendRunSnapshots.id, input.snapshotId))
+        .get()
+      const result = tx
+        .update(backendRunSnapshots)
+        .set(values)
+        .where(
+          and(eq(backendRunSnapshots.id, input.snapshotId), eq(backendRunSnapshots.status, 'running')),
+        )
+        .run()
+
+      if (result.changes > 0 && input.status === 'complete') {
+        compactSuccessfulRunSnapshotEventPayloads(tx, input.snapshotId)
+      }
+
+      return { previous, changes: result.changes }
+    })
+    if (changes === 0 && previous && previous.status !== 'running') {
       Observability.record({
         source: 'chat-engine',
         code: OBSERVABILITY_CODES.chatLateRunFinalizationIgnored,
@@ -431,6 +445,50 @@ function stringifySnapshotRecord(payload: Record<string, unknown>): string {
   })
 }
 
+interface RunSnapshotMaintenanceResult {
+  compactedEventPayloads: number
+  prunedSnapshots: number
+}
+
+export function maintainRunSnapshots(now = Date.now()): RunSnapshotMaintenanceResult {
+  const d = db()
+  return d.transaction((tx) => {
+    const completedSnapshotIds = tx
+      .select({ id: backendRunSnapshots.id })
+      .from(backendRunSnapshots)
+      .innerJoin(
+        backendRunSnapshotEvents,
+        eq(backendRunSnapshotEvents.snapshotId, backendRunSnapshots.id),
+      )
+      .where(and(
+        eq(backendRunSnapshots.status, 'complete'),
+        sql`${backendRunSnapshotEvents.chunkType} is not null`,
+        notLike(backendRunSnapshotEvents.payloadJson, `${COMPACTED_SUCCESS_PAYLOAD_PREFIX}%`),
+      ))
+      .groupBy(backendRunSnapshots.id)
+      .orderBy(backendRunSnapshots.completedAt, backendRunSnapshots.id)
+      .limit(DEFAULT_COMPACTION_SNAPSHOT_BATCH_SIZE)
+      .all()
+      .map(row => row.id)
+
+    let compactedEventPayloads = 0
+    for (const snapshotId of completedSnapshotIds) {
+      compactedEventPayloads += compactSuccessfulRunSnapshotEventPayloads(tx, snapshotId)
+    }
+
+    const expiredSnapshotIds = readExpiredRunSnapshotIds(tx, now)
+    const prunedSnapshots = expiredSnapshotIds.length === 0
+      ? 0
+      : tx
+          .delete(backendRunSnapshots)
+          .where(inArray(backendRunSnapshots.id, expiredSnapshotIds))
+          .run()
+          .changes
+
+    return { compactedEventPayloads, prunedSnapshots }
+  })
+}
+
 function pruneExpiredRunSnapshots(): void {
   const now = Date.now()
   if (now - lastRetentionPruneAt < RETENTION_PRUNE_INTERVAL_MS) {
@@ -438,27 +496,105 @@ function pruneExpiredRunSnapshots(): void {
   }
   lastRetentionPruneAt = now
 
-  const retentionDays = readNonNegativeIntegerEnv(
-    'CRADLE_CHAT_RUN_SNAPSHOT_RETENTION_DAYS',
-    DEFAULT_RETENTION_DAYS,
-  )
-  if (retentionDays === 0) {
-    return
-  }
-
-  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000
   try {
-    db()
-      .delete(backendRunSnapshots)
-      .where(and(
-        lt(backendRunSnapshots.startedAt, cutoff),
-        ne(backendRunSnapshots.status, 'running'),
-      ))
-      .run()
+    maintainRunSnapshots(now)
   }
   catch (error) {
     logger.error('failed to prune expired run snapshots', { error })
   }
+}
+
+type RunSnapshotMaintenanceDb = Pick<ChatRuntimeSnapshotDb, 'select' | 'update' | 'delete'>
+type ChatRuntimeSnapshotDb = ReturnType<typeof db>
+
+function compactSuccessfulRunSnapshotEventPayloads(
+  d: Pick<ChatRuntimeSnapshotDb, 'select' | 'update'>,
+  snapshotId: string,
+): number {
+  const rows = d
+    .select({
+      id: backendRunSnapshotEvents.id,
+      chunkType: backendRunSnapshotEvents.chunkType,
+      payloadJson: backendRunSnapshotEvents.payloadJson,
+    })
+    .from(backendRunSnapshotEvents)
+    .where(eq(backendRunSnapshotEvents.snapshotId, snapshotId))
+    .all()
+
+  let compacted = 0
+  for (const row of rows) {
+    if (row.chunkType === null || isCompactedSuccessPayload(row.payloadJson)) {
+      continue
+    }
+    d.update(backendRunSnapshotEvents)
+      .set({ payloadJson: compactSuccessfulPayload(row.payloadJson) })
+      .where(eq(backendRunSnapshotEvents.id, row.id))
+      .run()
+    compacted += 1
+  }
+  return compacted
+}
+
+function compactSuccessfulPayload(payloadJson: string): string {
+  const parsed = SnapshotRecordSchema.safeParse(payloadJson)
+  const coalescedCount = parsed.success && typeof parsed.data.coalescedCount === 'number'
+    ? parsed.data.coalescedCount
+    : undefined
+  return JSON.stringify({
+    schema: COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
+    originalLength: payloadJson.length,
+    ...(coalescedCount !== undefined ? { coalescedCount } : {}),
+  })
+}
+
+function isCompactedSuccessPayload(payloadJson: string): boolean {
+  const parsed = SnapshotRecordSchema.safeParse(payloadJson)
+  return parsed.success && parsed.data.schema === COMPACTED_SUCCESS_PAYLOAD_SCHEMA
+}
+
+function readExpiredRunSnapshotIds(
+  d: RunSnapshotMaintenanceDb,
+  now: number,
+): string[] {
+  const successRetentionDays = readNonNegativeIntegerEnv(
+    'CRADLE_CHAT_RUN_SNAPSHOT_SUCCESS_RETENTION_DAYS',
+    DEFAULT_SUCCESS_RETENTION_DAYS,
+  )
+  const failureRetentionDays = readNonNegativeIntegerEnv(
+    'CRADLE_CHAT_RUN_SNAPSHOT_FAILURE_RETENTION_DAYS',
+    DEFAULT_FAILURE_RETENTION_DAYS,
+  )
+  const predicates: SQL[] = []
+
+  if (successRetentionDays > 0) {
+    const cutoff = now - successRetentionDays * 24 * 60 * 60 * 1000
+    predicates.push(and(
+      eq(backendRunSnapshots.status, 'complete'),
+      lt(sql`coalesce(${backendRunSnapshots.completedAt}, ${backendRunSnapshots.startedAt})`, cutoff),
+    )!)
+  }
+  if (failureRetentionDays > 0) {
+    const cutoff = now - failureRetentionDays * 24 * 60 * 60 * 1000
+    predicates.push(and(
+      or(
+        eq(backendRunSnapshots.status, 'failed'),
+        eq(backendRunSnapshots.status, 'aborted'),
+      ),
+      lt(sql`coalesce(${backendRunSnapshots.completedAt}, ${backendRunSnapshots.startedAt})`, cutoff),
+    )!)
+  }
+  if (predicates.length === 0) {
+    return []
+  }
+
+  return d
+    .select({ id: backendRunSnapshots.id })
+    .from(backendRunSnapshots)
+    .where(and(ne(backendRunSnapshots.status, 'running'), or(...predicates)))
+    .orderBy(backendRunSnapshots.completedAt, backendRunSnapshots.id)
+    .limit(DEFAULT_RETENTION_BATCH_SIZE)
+    .all()
+    .map(row => row.id)
 }
 
 function clampSnapshotLimit(limit: number | undefined): number {
