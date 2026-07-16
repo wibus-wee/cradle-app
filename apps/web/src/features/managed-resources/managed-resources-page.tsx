@@ -1,34 +1,23 @@
 import {
   DeleteLine as DeleteIcon,
   DownloadLine as DownloadIcon,
+  DriveLine as ModelIcon,
   Refresh1Line as UpdateIcon,
+  TerminalBoxLine as RuntimeIcon,
 } from '@mingcute/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '~/components/ui/empty'
 import { Skeleton } from '~/components/ui/skeleton'
-import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
-import { TruncatedText } from '~/components/ui/truncated-text'
 import { DownloadTaskRow } from '~/features/download-center/download-center-chrome'
 import type { DownloadTask } from '~/features/download-center/types'
 import { isActiveDownload } from '~/features/download-center/types'
@@ -48,32 +37,33 @@ type PageFace = 'library' | 'activity'
 type TransferStatusFilter = 'all' | 'active' | 'completed' | 'failed' | 'cancelled'
 type TransferScopeFilter = 'all' | DownloadTask['scope']
 
+const STATE_BADGE_CLASS: Record<ManagedResource['state'], string> = {
+  'installed': 'bg-success/10 text-success',
+  'update-available': 'bg-warning/10 text-warning',
+  'installing': 'bg-primary/10 text-primary',
+  'not-installed': 'bg-fill text-muted-foreground',
+  'error': 'bg-destructive/10 text-destructive',
+  'unavailable': 'bg-fill text-muted-foreground/60',
+}
+
 function stateKey(state: ManagedResource['state']) {
   return `state.${state}` as const
 }
 
-function MetaCell({ label, value }: { label: string, value: string }) {
-  return (
-    <div className="w-full min-w-0">
-      <p className="text-[10px] uppercase tracking-[0.04em] text-muted-foreground">{label}</p>
-      <TruncatedText
-        maxLines={1}
-        className="mt-0.5 block w-full font-mono text-xs font-medium tabular-nums text-foreground/85"
-      >
-        {value}
-      </TruncatedText>
-    </div>
-  )
+function KindGlyph({ kind }: { kind: string }) {
+  if (kind === 'runtime') {
+    return <RuntimeIcon className="size-4" aria-hidden="true" />
+  }
+  if (kind === 'model') {
+    return <ModelIcon className="size-4" aria-hidden="true" />
+  }
+  return <DownloadIcon className="size-4" aria-hidden="true" />
 }
-
-/** Shared track so Installed / Available / Size / Source / Actions line up across rows. */
-const RESOURCE_ROW_GRID
-  = 'grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-[minmax(0,1fr)_9rem_9rem_4.5rem_5.5rem_9rem] md:items-start'
 
 function ProgressLine({ percent }: { percent: number | null }) {
   return (
     <div
-      className="mt-2.5 h-0.5 overflow-hidden rounded-full bg-muted"
+      className="h-[3px] overflow-hidden rounded-full bg-border/60"
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
@@ -81,7 +71,7 @@ function ProgressLine({ percent }: { percent: number | null }) {
     >
       <div
         className={cn(
-          'h-full rounded-full bg-primary transition-[width] duration-150 ease-out',
+          'h-full rounded-full bg-primary transition-[width] duration-150',
           percent === null && 'w-1/3',
         )}
         style={percent === null ? undefined : { width: `${percent}%` }}
@@ -90,12 +80,13 @@ function ProgressLine({ percent }: { percent: number | null }) {
   )
 }
 
-function ResourceRow({ resource }: { resource: ManagedResource }) {
+function ResourceCard({ resource }: { resource: ManagedResource }) {
   const { t } = useTranslation('resources')
   const queryClient = useQueryClient()
   const tasks = useDownloadCenterOwner(resource.key)
   const progress = projectResourceTransferProgress(tasks)
   const action = useManagedResourceAction(resource)
+  const [confirming, setConfirming] = useState(false)
   const terminalRevision = tasks
     .filter(task => !isActiveDownload(task))
     .map(task => `${task.taskId}:${task.status}:${task.updatedAt}`)
@@ -117,123 +108,159 @@ function ResourceRow({ resource }: { resource: ManagedResource }) {
   }, [queryClient, terminalRevision])
 
   return (
-    <article
-      className="border-b border-border/60 py-4 first:pt-3 last:border-b-0"
+    <div
+      className="overflow-hidden rounded-xl border border-border/60 bg-card"
       data-testid={`managed-resource-${managedResourceKey(resource)}`}
     >
-      <div className={RESOURCE_ROW_GRID}>
-        <div className="col-span-2 min-w-0 md:col-span-1">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1">
-            <TruncatedText maxLines={1} className="min-w-0 text-sm font-semibold text-foreground">
-              {resource.displayName}
-            </TruncatedText>
-            <span className="shrink-0 text-xs text-muted-foreground">{t(stateKey(resource.state))}</span>
-            {resource.required
-              ? <span className="shrink-0 text-[11px] text-muted-foreground/80">{t('required')}</span>
-              : null}
-            <span className="shrink-0 text-[11px] capitalize text-muted-foreground/70">{resource.kind}</span>
-          </div>
-          {resource.description
-            ? (
-                <TruncatedText maxLines={2} className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {resource.description}
-                </TruncatedText>
-              )
-            : null}
-          {installing ? <ProgressLine percent={progress.percent} /> : null}
-          {installing && progress.activeTasks.length > 0
-            ? (
-                <p className="mt-1.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-                  {formatCompactBytes(progress.transferredBytes)}
-                  {progress.totalBytes === null ? '' : ` / ${formatCompactBytes(progress.totalBytes)}`}
-                </p>
-              )
-            : null}
+      {/* Main row */}
+      <div className="flex items-start gap-3 px-3.5 py-3">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-muted-foreground">
+          <KindGlyph kind={resource.kind} />
         </div>
 
-        <MetaCell label={t('version.installed')} value={resource.installedVersion ?? '—'} />
-        <MetaCell label={t('version.available')} value={resource.availableVersion ?? '—'} />
-        <MetaCell
-          label={t('size')}
-          value={resource.installedSizeBytes === null
-            ? '—'
-            : formatCompactBytes(resource.installedSizeBytes)}
-        />
-        <MetaCell
-          label={t('meta.source')}
-          value={resource.installationSource
-            ? t(`source.${resource.installationSource}`)
-            : '—'}
-        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate text-[13px] font-medium text-foreground">
+              {resource.displayName}
+            </span>
+            <span className={cn('shrink-0 rounded-md px-1.5 py-px text-[10.5px]', STATE_BADGE_CLASS[resource.state])}>
+              {t(stateKey(resource.state))}
+            </span>
+            {resource.required && (
+              <span className="shrink-0 rounded-md bg-fill px-1.5 py-px text-[10.5px] text-muted-foreground">
+                {t('required')}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 capitalize text-[10.5px] text-muted-foreground/70">
+            {resource.kind}
+            {resource.installationSource && (
+              <>
+{' '}
+·
+{t(`source.${resource.installationSource}`)}
+              </>
+            )}
+          </p>
+          {resource.description && (
+            <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
+              {resource.description}
+            </p>
+          )}
+        </div>
 
-        <div className="col-span-2 flex items-center justify-end gap-1 md:col-span-1 md:w-full">
-          {primaryAction
+        {/* Actions */}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {confirming
             ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={primaryAction === 'update' ? 'default' : 'outline'}
-                  className="transition-transform active:scale-[0.96]"
-                  disabled={action.isPending || progress.activeTasks.length > 0}
-                  onClick={() => action.mutate(primaryAction)}
-                >
-                  {primaryAction === 'update'
-                    ? <UpdateIcon data-icon="inline-start" />
-                    : <DownloadIcon data-icon="inline-start" />}
-                  {resource.installationSource === 'external' && primaryAction === 'install'
-                    ? t('action.installManaged')
-                    : t(`action.${primaryAction}`)}
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    className="h-7 px-2.5 text-[12px] active:scale-[0.96]"
+                    onClick={() => { action.mutate('uninstall'); setConfirming(false) }}
+                  >
+                    {t('action.uninstall')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[12px] text-muted-foreground active:scale-[0.96]"
+                    onClick={() => setConfirming(false)}
+                  >
+                    {t('action.cancel')}
+                  </Button>
+                </div>
               )
-            : installing && progress.percent !== null
+            : primaryAction
               ? (
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    {progress.percent}
-                    %
-                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={primaryAction === 'update' ? 'default' : 'outline'}
+                    className="h-7 gap-1.5 px-2.5 text-[12px] active:scale-[0.96]"
+                    disabled={action.isPending || progress.activeTasks.length > 0}
+                    onClick={() => action.mutate(primaryAction)}
+                  >
+                    {primaryAction === 'update'
+                      ? <UpdateIcon data-icon="inline-start" />
+                      : <DownloadIcon data-icon="inline-start" />}
+                    {resource.installationSource === 'external' && primaryAction === 'install'
+                      ? t('action.installManaged')
+                      : t(`action.${primaryAction}`)}
+                  </Button>
                 )
-              : null}
-          {resource.actions.uninstall.available
-            ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-10 text-muted-foreground transition-transform active:scale-[0.96]"
-                      aria-label={t('action.uninstall')}
-                    >
-                      <DeleteIcon />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{t('uninstall.title', { name: resource.displayName })}</AlertDialogTitle>
-                      <AlertDialogDescription>{t('uninstall.description')}</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>{t('action.cancel')}</AlertDialogCancel>
-                      <AlertDialogAction variant="destructive" onClick={() => action.mutate('uninstall')}>
-                        {t('action.uninstall')}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )
-            : null}
+              : installing && progress.percent !== null
+                ? (
+                    <span className="px-1 font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {progress.percent}
+%
+                    </span>
+                  )
+                : null}
+          {resource.actions.uninstall.available && !confirming && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-destructive"
+              aria-label={t('action.uninstall')}
+              onClick={() => setConfirming(true)}
+            >
+              <DeleteIcon className="size-3.5" aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </div>
 
-      {action.isError ? <p className="mt-3 text-xs text-destructive">{t('action.failed')}</p> : null}
-      {!action.isError && progress.failedTask && resource.state !== 'installed'
-        ? <p className="mt-3 text-xs text-destructive">{t('transfer.failed')}</p>
-        : null}
-    </article>
+      {/* Meta footer */}
+      <div className="flex items-center gap-3 border-t border-border/40 bg-muted/20 px-3.5 py-2">
+        <span className="text-[10.5px] text-muted-foreground/60">
+          {t('version.installed')}
+          {' '}
+          <span className="font-mono text-foreground/70">{resource.installedVersion ?? '—'}</span>
+        </span>
+        {resource.availableVersion && resource.availableVersion !== resource.installedVersion && (
+          <span className="flex items-center gap-1 text-[10.5px]">
+            <span className="text-muted-foreground/40">→</span>
+            <span className="font-mono text-warning">{resource.availableVersion}</span>
+          </span>
+        )}
+        {resource.installedSizeBytes !== null && (
+          <span className="ml-auto font-mono text-[10.5px] tabular-nums text-muted-foreground/60">
+            {formatCompactBytes(resource.installedSizeBytes)}
+          </span>
+        )}
+      </div>
+
+      {/* Progress (only when installing) */}
+      {installing && (
+        <div className="border-t border-border/40 px-3.5 py-2.5">
+          <ProgressLine percent={progress.percent} />
+          {progress.activeTasks.length > 0 && (
+            <p className="mt-1 font-mono text-[10px] tabular-nums text-muted-foreground">
+              {formatCompactBytes(progress.transferredBytes)}
+              {progress.totalBytes === null ? '' : ` / ${formatCompactBytes(progress.totalBytes)}`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Error messages */}
+      {(action.isError || (!action.isError && progress.failedTask && resource.state !== 'installed')) && (
+        <div className="border-t border-border/40 px-3.5 py-2">
+          <p className="text-[11px] text-destructive">
+            {action.isError ? t('action.failed') : t('transfer.failed')}
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 
-const MemoizedResourceRow = memo(ResourceRow)
+const MemoizedResourceCard = memo(ResourceCard)
 
 function LibraryFace() {
   const { t } = useTranslation('resources')
@@ -241,40 +268,94 @@ function LibraryFace() {
 
   if (isLoading && resources.length === 0) {
     return (
-      <div className="space-y-0 divide-y divide-border/60">
+      <div className="grid gap-2 sm:grid-cols-2">
         {[0, 1, 2, 3].map(index => (
-          <Skeleton key={index} className="h-20 w-full rounded-none bg-muted/40" />
+          <div
+            key={index}
+            className="overflow-hidden rounded-xl border border-border/60 bg-card"
+          >
+            <div className="flex items-start gap-3 px-3.5 py-3">
+              <Skeleton className="size-8 shrink-0 rounded-lg" />
+              <div className="flex-1 space-y-2 pt-0.5">
+                <Skeleton className="h-3 w-3/5" />
+                <Skeleton className="h-2.5 w-2/5" />
+                <Skeleton className="h-2.5 w-4/5" />
+              </div>
+            </div>
+            <div className="border-t border-border/40 bg-muted/20 px-3.5 py-2">
+              <Skeleton className="h-2.5 w-1/3" />
+            </div>
+          </div>
         ))}
       </div>
     )
   }
+
   if (isError) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-sm text-muted-foreground">{t('loadError')}</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-4 transition-transform active:scale-[0.96]"
-          onClick={() => void refetch()}
-        >
-          <UpdateIcon data-icon="inline-start" />
-          {t('action.retry')}
-        </Button>
-      </div>
+      <Empty className="border-0 py-24">
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><DownloadIcon /></EmptyMedia>
+          <EmptyTitle>{t('loadError')}</EmptyTitle>
+          <EmptyDescription>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 transition-transform active:scale-[0.96]"
+              onClick={() => void refetch()}
+            >
+              <UpdateIcon data-icon="inline-start" />
+              {t('action.retry')}
+            </Button>
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
+
   if (resources.length === 0) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">{t('empty.resources')}</p>
+    return (
+      <Empty className="border-0 py-24">
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><DownloadIcon /></EmptyMedia>
+          <EmptyTitle>{t('empty.resources')}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    )
   }
 
   return (
-    <div>
+    <div className="grid gap-2 sm:grid-cols-2">
       {resources.map(resource => (
-        <MemoizedResourceRow key={managedResourceKey(resource)} resource={resource} />
+        <MemoizedResourceCard key={managedResourceKey(resource)} resource={resource} />
       ))}
     </div>
+  )
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'h-6 rounded-md px-2.5 text-[11px] font-medium transition-colors',
+        active
+          ? 'bg-foreground text-background'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -286,12 +367,8 @@ function ActivityFace() {
   const visibleTasks = useMemo(() => tasks
     .filter(task => scope === 'all' || task.scope === scope)
     .filter((task) => {
-      if (status === 'all') {
-        return true
-      }
-      if (status === 'active') {
-        return isActiveDownload(task)
-      }
+      if (status === 'all') { return true }
+      if (status === 'active') { return isActiveDownload(task) }
       return task.status === status
     })
     .toSorted((left, right) =>
@@ -300,54 +377,49 @@ function ActivityFace() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">{t('filter.channel')}</span>
-          <ToggleGroup
-            type="single"
-            value={scope}
-            onValueChange={(value) => {
-              if (value === 'all' || value === 'server' || value === 'desktop') {
-                setScope(value)
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="h-8 gap-px rounded-lg bg-muted/50 p-0.5"
-            aria-label={t('filter.channel')}
-          >
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground/70">{t('filter.channel')}</span>
+          <div className="flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5">
             {(['all', 'server', 'desktop'] as const).map(value => (
-              <ToggleGroupItem
+              <FilterChip
                 key={value}
-                value={value}
-                className="h-7 rounded-md px-2.5 text-xs data-[state=on]:bg-background data-[state=on]:shadow-none"
+                active={scope === value}
+                onClick={() => setScope(value)}
               >
                 {t(`filter.scope.${value}`)}
-              </ToggleGroupItem>
+              </FilterChip>
             ))}
-          </ToggleGroup>
+          </div>
         </div>
-        <Select value={status} onValueChange={value => setStatus(value as TransferStatusFilter)}>
-          <SelectTrigger size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(['all', 'active', 'completed', 'failed', 'cancelled'] as const).map(value => (
-              <SelectItem key={value} value={value}>{t(`filter.status.${value}`)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5">
+          {(['all', 'active', 'completed', 'failed', 'cancelled'] as const).map(value => (
+            <FilterChip
+              key={value}
+              active={status === value}
+              onClick={() => setStatus(value)}
+            >
+              {t(`filter.status.${value}`)}
+            </FilterChip>
+          ))}
+        </div>
       </div>
+
       {visibleTasks.length === 0
         ? (
-            <p className="py-16 text-center text-sm text-muted-foreground">{t('empty.transfers')}</p>
+            <Empty className="border-0 py-24">
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><DownloadIcon /></EmptyMedia>
+                <EmptyTitle>{t('empty.transfers')}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           )
         : (
-            <div className="divide-y divide-border/60 border-t border-border/60">
+            <div className="grid gap-2 sm:grid-cols-2">
               {visibleTasks.map(task => (
                 <div
                   key={`${task.scope}:${task.taskId}`}
-                  className="py-3 [contain-intrinsic-size:0_88px] [content-visibility:auto]"
+                  className="rounded-xl bg-muted/35 p-1 [contain-intrinsic-size:0_88px] [content-visibility:auto]"
                 >
                   <DownloadTaskRow task={task} showFileName />
                 </div>
@@ -372,34 +444,34 @@ function FaceSwitch({
   const { t } = useTranslation('resources')
 
   return (
-    <ToggleGroup
-      type="single"
-      value={face}
-      onValueChange={(value) => {
-        if (value === 'library' || value === 'activity') {
-          onChange(value)
-        }
-      }}
-      variant="outline"
-      size="sm"
-      className="h-9 gap-px rounded-[10px] bg-muted/55 p-[3px]"
-      aria-label={t('face.switch')}
-    >
-      <ToggleGroupItem
-        value="library"
-        className="h-8 gap-2 rounded-lg px-3.5 text-[13px] data-[state=on]:bg-background data-[state=on]:font-semibold data-[state=on]:shadow-none"
-      >
-        {t('tab.library')}
-        <span className="font-normal tabular-nums text-muted-foreground">{libraryCount}</span>
-      </ToggleGroupItem>
-      <ToggleGroupItem
-        value="activity"
-        className="h-8 gap-2 rounded-lg px-3.5 text-[13px] data-[state=on]:bg-background data-[state=on]:font-semibold data-[state=on]:shadow-none"
-      >
-        {t('tab.activity')}
-        <span className="font-normal tabular-nums text-muted-foreground">{activeTransferCount}</span>
-      </ToggleGroupItem>
-    </ToggleGroup>
+    <div className="flex items-end gap-4" role="group" aria-label={t('face.switch')}>
+      {([
+        { id: 'library' as const, count: libraryCount },
+        { id: 'activity' as const, count: activeTransferCount },
+      ]).map(({ id, count }) => {
+        const isActive = face === id
+        return (
+          <Button
+            key={id}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange(id)}
+            aria-pressed={isActive}
+            className={cn(
+              'relative h-9 gap-1.5 rounded-none px-0 text-[13px] hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ring/40',
+              isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {t(`tab.${id}`)}
+            <span className="tabular-nums text-muted-foreground/60">{count}</span>
+            {isActive && (
+              <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-[1.5px] bg-foreground" />
+            )}
+          </Button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -423,47 +495,44 @@ export function ManagedResourcesPage() {
   )
 
   return (
-    <div className="h-full overflow-y-auto" data-testid="managed-resources-page">
-      <div className="mx-auto max-w-[58rem] px-6 py-8 sm:px-8 sm:py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="max-w-xl">
-            <h1 className="text-balance text-[1.375rem] font-semibold tracking-tight text-foreground">
-              {t('title')}
-            </h1>
-            <p className="mt-1.5 text-pretty text-[13px] leading-5 text-muted-foreground">
-              {t('description')}
-            </p>
+    <div className="flex h-full min-h-0 flex-col" data-testid="managed-resources-page">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">{t('title')}</h1>
+            <span className="text-[12px] tabular-nums text-muted-foreground">{resources.length}</span>
           </div>
-          <p className="text-right text-[11px] tabular-nums text-muted-foreground">
-            {t('summary.live', {
-              transferring: active.length,
-              updates: updateCount,
+          <p className="mt-1 text-pretty text-[13px] text-muted-foreground">{t('description')}</p>
+        </div>
+
+        <p className="self-start text-[11px] tabular-nums text-muted-foreground/70">
+          {t('summary.live', {
+            transferring: active.length,
+            updates: updateCount,
+          })}
+        </p>
+      </header>
+
+      <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-4">
+        <FaceSwitch
+          face={face}
+          onChange={setFace}
+          libraryCount={resources.length}
+          activeTransferCount={active.length}
+        />
+        {face === 'library' && (
+          <p className="text-[11px] tabular-nums text-muted-foreground/70">
+            {t('summary.library', {
+              declared: resources.length,
+              installed: installedCount,
+              installing: installingCount,
             })}
           </p>
-        </div>
+        )}
+      </div>
 
-        <div className="mt-7 flex flex-wrap items-center gap-3">
-          <FaceSwitch
-            face={face}
-            onChange={setFace}
-            libraryCount={resources.length}
-            activeTransferCount={active.length}
-          />
-          <div className="flex-1" />
-          {face === 'library'
-            ? (
-                <p className="text-xs tabular-nums text-muted-foreground">
-                  {t('summary.library', {
-                    declared: resources.length,
-                    installed: installedCount,
-                    installing: installingCount,
-                  })}
-                </p>
-              )
-            : null}
-        </div>
-
-        <div className="mt-4 border-t border-border/70 pt-1">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-5xl px-5 py-6">
           {face === 'library' ? <LibraryFace /> : <ActivityFace />}
         </div>
       </div>

@@ -22,6 +22,8 @@
   "pastedText.chars_one": "{{count}} 个字符",
   "pastedText.chars_other": "{{count}} 个字符",
   "pastedText.collapse": "收起粘贴文本",
+  "pastedText.copy": "复制粘贴文本",
+  "pastedText.copied": "已复制",
   "pastedText.expand": "展开粘贴文本",
   "pastedText.label": "粘贴文本",
   "pastedText.lines_many": "{{count}} 行",

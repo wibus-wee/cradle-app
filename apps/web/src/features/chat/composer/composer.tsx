@@ -1,5 +1,6 @@
 import { TerminalBoxLine as SquareTerminalIcon } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
+import { AnimatePresence } from 'motion/react'
 import type { ChangeEvent } from 'react'
 import {
   useCallback,
@@ -1086,22 +1087,24 @@ export function Composer({
           </div>
 
           {!inputCollapsed && pastedTexts.length > 0 && (
-            <div className="border-t border-[var(--color-border-content)] px-3 py-2">
-              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {pastedTexts.map(pastedText => (
-                  <ComposerPastedTextCard
-                    key={pastedText.id}
-                    pastedText={pastedText}
-                    onRemove={() =>
-                      setPastedTexts(current =>
-                        current.filter(item => item.id !== pastedText.id))}
-                    onRestore={() => {
-                      promptEditorRef.current?.insertText(pastedText.text)
-                      setPastedTexts(current =>
-                        current.filter(item => item.id !== pastedText.id))
-                    }}
-                  />
-                ))}
+            <div className="border-t border-border/40 px-3 py-2">
+              <div className="flex gap-2">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {pastedTexts.map(pastedText => (
+                    <ComposerPastedTextCard
+                      key={pastedText.id}
+                      pastedText={pastedText}
+                      onRemove={() =>
+                        setPastedTexts(current =>
+                          current.filter(item => item.id !== pastedText.id))}
+                      onRestore={() => {
+                        promptEditorRef.current?.insertText(pastedText.text)
+                        setPastedTexts(current =>
+                          current.filter(item => item.id !== pastedText.id))
+                      }}
+                    />
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
           )}

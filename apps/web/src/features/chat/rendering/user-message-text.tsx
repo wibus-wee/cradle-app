@@ -1,3 +1,5 @@
+import { AnimatePresence } from 'motion/react'
+
 import { HistoryPastedTextCard } from '../pasted-text/pasted-text-card'
 import { readUserTextDisplay } from './message-bubble-selectors'
 
@@ -11,9 +13,11 @@ export function UserMessageText({ text }: { text: string }) {
       )}
       {projection.pastedTexts.length > 0 && (
         <div>
-          {projection.pastedTexts.map(pastedText => (
-            <HistoryPastedTextCard key={pastedText.id} pastedText={pastedText} />
-          ))}
+          <AnimatePresence initial={false}>
+            {projection.pastedTexts.map(pastedText => (
+              <HistoryPastedTextCard key={pastedText.id} pastedText={pastedText} />
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </>

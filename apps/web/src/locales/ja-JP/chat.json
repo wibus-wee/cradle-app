@@ -22,6 +22,8 @@
   "pastedText.chars_one": "{{count}} 文字",
   "pastedText.chars_other": "{{count}} 文字",
   "pastedText.collapse": "貼り付けたテキストを折りたたむ",
+  "pastedText.copy": "貼り付けたテキストをコピー",
+  "pastedText.copied": "コピーしました",
   "pastedText.expand": "貼り付けたテキストを展開",
   "pastedText.label": "貼り付けたテキスト",
   "pastedText.lines_many": "{{count}} 行",

@@ -22,6 +22,8 @@
   "pastedText.chars_one": "{{count}} carácter",
   "pastedText.chars_other": "{{count}} caracteres",
   "pastedText.collapse": "Contraer texto pegado",
+  "pastedText.copy": "Copiar texto pegado",
+  "pastedText.copied": "Copiado",
   "pastedText.expand": "Expandir texto pegado",
   "pastedText.label": "Texto pegado",
   "pastedText.lines_many": "{{count}} líneas",
