@@ -15,6 +15,8 @@ const runtimeGoalContinuationLogger = createChildLogger({
 
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const failureCounts = new Map<string, number>()
+const inFlightContinuations = new Set<string>()
+const blockedGoalResumeAttempts = new Set<string>()
 
 export interface RuntimeGoalContinuationRunContext {
   sessionId: string
@@ -40,6 +42,11 @@ export interface RuntimeGoalContinuationSchedulerDeps {
   readRuntime: (runtimeKind: string) => ChatRuntime | undefined
   isProviderTargetAvailable: (providerTargetId: string | null | undefined) => boolean
   createContinuationRun: (input: {
+    sessionId: string
+    providerTargetId?: string
+    modelId?: string
+  }) => Promise<void>
+  resumeBlockedGoal: (input: {
     sessionId: string
     providerTargetId?: string
     modelId?: string
@@ -122,7 +129,7 @@ export function scheduleRuntimeGoalContinuation(
   input: RuntimeGoalContinuationScheduleInput,
   deps: RuntimeGoalContinuationSchedulerDeps,
 ): void {
-  if (pendingTimers.has(input.sessionId)) {
+  if (pendingTimers.has(input.sessionId) || inFlightContinuations.has(input.sessionId)) {
     return
   }
 
@@ -143,6 +150,9 @@ async function startScheduledRuntimeGoalContinuation(
   input: RuntimeGoalContinuationScheduleInput,
   deps: RuntimeGoalContinuationSchedulerDeps,
 ): Promise<void> {
+  if (inFlightContinuations.has(input.sessionId)) {
+    return
+  }
   if (deps.hasActiveOrPendingRun(input.sessionId)) {
     return
   }
@@ -163,12 +173,39 @@ async function startScheduledRuntimeGoalContinuation(
     return
   }
 
+  const continuableGoal = runtime?.goalContinuation?.readContinuableGoal({
+    providerStateSnapshot: binding?.backendStateSnapshot,
+    options: input.options,
+  })
+  if (!continuableGoal) {
+    return
+  }
+
+  if (continuableGoal.status !== 'blocked') {
+    blockedGoalResumeAttempts.delete(input.sessionId)
+  }
+  if (continuableGoal.status === 'blocked' && blockedGoalResumeAttempts.has(input.sessionId)) {
+    return
+  }
+
+  inFlightContinuations.add(input.sessionId)
   try {
-    await deps.createContinuationRun({
-      sessionId: input.sessionId,
-      providerTargetId: input.providerTargetId,
-      modelId: input.modelId,
-    })
+    if (continuableGoal.status === 'blocked' && input.options?.includeBlockedGoals === true) {
+      blockedGoalResumeAttempts.add(input.sessionId)
+      await deps.resumeBlockedGoal({
+        sessionId: input.sessionId,
+        providerTargetId: input.providerTargetId,
+        modelId: input.modelId,
+      })
+    }
+    else {
+      await deps.createContinuationRun({
+        sessionId: input.sessionId,
+        providerTargetId: input.providerTargetId,
+        modelId: input.modelId,
+      })
+    }
+    failureCounts.delete(input.sessionId)
   }
   catch (error) {
     failureCounts.set(input.sessionId, (failureCounts.get(input.sessionId) ?? 0) + 1)
@@ -190,5 +227,8 @@ async function startScheduledRuntimeGoalContinuation(
     ) {
       scheduleRuntimeGoalContinuation(input, deps)
     }
+  }
+  finally {
+    inFlightContinuations.delete(input.sessionId)
   }
 }
