@@ -1,7 +1,7 @@
 # Agent Identity Module
 
 Agent CRUD, filtered list queries, local Claude/Codex/Gemini/Pi/Kimi import, agent-profile ownership, and avatar URL policy.
-Agent rows are the user-visible AI persona boundary; agent profiles are provider/runtime configuration and must not be used as authors. Provider-backed agents persist canonical thinking effort values `low`, `medium`, `high`, or `xhigh`; local-config import normalizes legacy `none` / `minimal` to `low` and `max` to `xhigh`.
+Agent rows are the user-visible AI persona boundary; agent profiles are provider/runtime configuration and must not be used as authors. Provider-backed agents preserve the canonical Chat Runtime thinking effort values `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`; the selected runtime translates only values it does not natively support at execution time.
 Agent runtime validation follows provider binding and session launch descriptors: provider-required runtimes need a provider target, runtime-owned runtimes may run without one, and agent-terminal runtimes require launch configuration instead of a provider target.
 Route metadata includes `x-cradle-cli` descriptors for generated CLI commands.
 

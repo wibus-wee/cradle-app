@@ -25,70 +25,95 @@ const OptionalStringSchema = z.preprocess((value) => {
   return value
 }, z.string().trim().min(1).optional())
 
-const ClaudeEnvSchema = z.object({
-  ANTHROPIC_BASE_URL: OptionalStringSchema,
-  ANTHROPIC_AUTH_TOKEN: OptionalStringSchema,
-  ANTHROPIC_API_KEY: OptionalStringSchema,
-  ANTHROPIC_MODEL: OptionalStringSchema,
-  ANTHROPIC_DEFAULT_HAIKU_MODEL: OptionalStringSchema,
-  ANTHROPIC_DEFAULT_SONNET_MODEL: OptionalStringSchema,
-  ANTHROPIC_DEFAULT_OPUS_MODEL: OptionalStringSchema,
-}).catchall(z.unknown())
+const ClaudeEnvSchema = z
+  .object({
+    ANTHROPIC_BASE_URL: OptionalStringSchema,
+    ANTHROPIC_AUTH_TOKEN: OptionalStringSchema,
+    ANTHROPIC_API_KEY: OptionalStringSchema,
+    ANTHROPIC_MODEL: OptionalStringSchema,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: OptionalStringSchema,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: OptionalStringSchema,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: OptionalStringSchema,
+  })
+  .catchall(z.unknown())
 
-const ClaudeSettingsSchema = z.object({
-  env: ClaudeEnvSchema.optional().default({}),
-}).passthrough()
+const ClaudeSettingsSchema = z
+  .object({
+    env: ClaudeEnvSchema.optional().default({}),
+  })
+  .passthrough()
 
-const CodexAuthSchema = z.object({
-  OPENAI_API_KEY: OptionalStringSchema,
-  apiKey: OptionalStringSchema,
-  api_key: OptionalStringSchema,
-}).catchall(z.unknown())
+const CodexAuthSchema = z
+  .object({
+    OPENAI_API_KEY: OptionalStringSchema,
+    apiKey: OptionalStringSchema,
+    api_key: OptionalStringSchema,
+  })
+  .catchall(z.unknown())
 
-const CodexModelProviderSchema = z.object({
-  base_url: OptionalStringSchema,
-  wire_api: OptionalStringSchema,
-}).passthrough()
+const CodexModelProviderSchema = z
+  .object({
+    base_url: OptionalStringSchema,
+    wire_api: OptionalStringSchema,
+  })
+  .passthrough()
 
-const CodexTomlSchema = z.object({
-  model_provider: OptionalStringSchema,
-  model: OptionalStringSchema,
-  model_reasoning_effort: OptionalStringSchema,
-  approval_policy: OptionalStringSchema,
-  sandbox_mode: OptionalStringSchema,
-  openai_base_url: OptionalStringSchema,
-  model_providers: z.record(z.string(), CodexModelProviderSchema).default({}),
-}).passthrough()
+const CodexTomlSchema = z
+  .object({
+    model_provider: OptionalStringSchema,
+    model: OptionalStringSchema,
+    model_reasoning_effort: OptionalStringSchema,
+    approval_policy: OptionalStringSchema,
+    sandbox_mode: OptionalStringSchema,
+    openai_base_url: OptionalStringSchema,
+    model_providers: z.record(z.string(), CodexModelProviderSchema).default({}),
+  })
+  .passthrough()
 
-const GeminiSettingsSchema = z.object({
-  apiKey: OptionalStringSchema,
-  api_key: OptionalStringSchema,
-  model: OptionalStringSchema,
-  endpoint: OptionalStringSchema,
-  baseUrl: OptionalStringSchema,
-  base_url: OptionalStringSchema,
-  theme: OptionalStringSchema,
-}).catchall(z.unknown())
+const GeminiSettingsSchema = z
+  .object({
+    apiKey: OptionalStringSchema,
+    api_key: OptionalStringSchema,
+    model: OptionalStringSchema,
+    endpoint: OptionalStringSchema,
+    baseUrl: OptionalStringSchema,
+    base_url: OptionalStringSchema,
+    theme: OptionalStringSchema,
+  })
+  .catchall(z.unknown())
 
-const PiSettingsSchema = z.object({
-  apiKey: OptionalStringSchema,
-  api_key: OptionalStringSchema,
-  model: OptionalStringSchema,
-  endpoint: OptionalStringSchema,
-  baseUrl: OptionalStringSchema,
-  base_url: OptionalStringSchema,
-}).catchall(z.unknown())
+const PiSettingsSchema = z
+  .object({
+    apiKey: OptionalStringSchema,
+    api_key: OptionalStringSchema,
+    model: OptionalStringSchema,
+    endpoint: OptionalStringSchema,
+    baseUrl: OptionalStringSchema,
+    base_url: OptionalStringSchema,
+  })
+  .catchall(z.unknown())
 
-const KimiSettingsSchema = z.object({
-  apiKey: OptionalStringSchema,
-  api_key: OptionalStringSchema,
-  model: OptionalStringSchema,
-  endpoint: OptionalStringSchema,
-  baseUrl: OptionalStringSchema,
-  base_url: OptionalStringSchema,
-}).catchall(z.unknown())
+const KimiSettingsSchema = z
+  .object({
+    apiKey: OptionalStringSchema,
+    api_key: OptionalStringSchema,
+    model: OptionalStringSchema,
+    endpoint: OptionalStringSchema,
+    baseUrl: OptionalStringSchema,
+    base_url: OptionalStringSchema,
+  })
+  .catchall(z.unknown())
 
-const ReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high', 'xhigh'])
+const ReasoningEffortSchema = z.enum([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+])
 const ApprovalPolicySchema = z.enum(['never', 'on-request', 'untrusted'])
 const SandboxModeSchema = z.enum(['read-only', 'workspace-write', 'danger-full-access'])
 
@@ -138,11 +163,19 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function sourceConfigValue(ctx: ExternalProviderSourceReadContext | null, key: string, fallback: string): string {
+function sourceConfigValue(
+  ctx: ExternalProviderSourceReadContext | null,
+  key: string,
+  fallback: string,
+): string {
   return ctx?.sharedConfig.get(key) ?? process.env[`CRADLE_${key}`] ?? process.env[key] ?? fallback
 }
 
-function sourceConfigFlag(ctx: ExternalProviderSourceReadContext | null, key: string, fallback: boolean): boolean {
+function sourceConfigFlag(
+  ctx: ExternalProviderSourceReadContext | null,
+  key: string,
+  fallback: boolean,
+): boolean {
   const value = ctx?.sharedConfig.get(key) ?? process.env[`CRADLE_${key}`] ?? process.env[key]
   if (value === undefined) {
     return fallback
@@ -150,21 +183,48 @@ function sourceConfigFlag(ctx: ExternalProviderSourceReadContext | null, key: st
   return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
 }
 
-export function resolveLocalAgentConfigSourceConfig(ctx: ExternalProviderSourceReadContext | null = null): LocalAgentConfigSourceConfig {
-  const claudeDir = sourceConfigValue(ctx, 'LOCAL_AGENT_CONFIG_CLAUDE_DIR', join(homedir(), '.claude'))
+export function resolveLocalAgentConfigSourceConfig(
+  ctx: ExternalProviderSourceReadContext | null = null,
+): LocalAgentConfigSourceConfig {
+  const claudeDir = sourceConfigValue(
+    ctx,
+    'LOCAL_AGENT_CONFIG_CLAUDE_DIR',
+    join(homedir(), '.claude'),
+  )
   const codexDir = sourceConfigValue(ctx, 'LOCAL_AGENT_CONFIG_CODEX_DIR', join(homedir(), '.codex'))
   return {
     claudeDir,
-    claudeSettingsPath: sourceConfigValue(ctx, 'LOCAL_AGENT_CONFIG_CLAUDE_SETTINGS_PATH', join(claudeDir, 'settings.json')),
-    claudeLocalSettingsPath: sourceConfigValue(ctx, 'LOCAL_AGENT_CONFIG_CLAUDE_LOCAL_SETTINGS_PATH', join(claudeDir, 'settings.local.json')),
+    claudeSettingsPath: sourceConfigValue(
+      ctx,
+      'LOCAL_AGENT_CONFIG_CLAUDE_SETTINGS_PATH',
+      join(claudeDir, 'settings.json'),
+    ),
+    claudeLocalSettingsPath: sourceConfigValue(
+      ctx,
+      'LOCAL_AGENT_CONFIG_CLAUDE_LOCAL_SETTINGS_PATH',
+      join(claudeDir, 'settings.local.json'),
+    ),
     codexDir,
-    codexConfigPath: sourceConfigValue(ctx, 'LOCAL_AGENT_CONFIG_CODEX_CONFIG_PATH', join(codexDir, 'config.toml')),
-    codexAuthPath: sourceConfigValue(ctx, 'LOCAL_AGENT_CONFIG_CODEX_AUTH_PATH', join(codexDir, 'auth.json')),
+    codexConfigPath: sourceConfigValue(
+      ctx,
+      'LOCAL_AGENT_CONFIG_CODEX_CONFIG_PATH',
+      join(codexDir, 'config.toml'),
+    ),
+    codexAuthPath: sourceConfigValue(
+      ctx,
+      'LOCAL_AGENT_CONFIG_CODEX_AUTH_PATH',
+      join(codexDir, 'auth.json'),
+    ),
     includeProcessEnv: sourceConfigFlag(ctx, 'LOCAL_AGENT_CONFIG_INCLUDE_PROCESS_ENV', true),
   }
 }
 
-function readJsonFile<T>(path: string, schema: z.ZodType<T>, warningCode: string, label: string): ReadJsonResult<T> {
+function readJsonFile<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  warningCode: string,
+  label: string,
+): ReadJsonResult<T> {
   if (!existsSync(path)) {
     return { found: false, value: null, warning: null }
   }
@@ -172,7 +232,8 @@ function readJsonFile<T>(path: string, schema: z.ZodType<T>, warningCode: string
   try {
     return {
       found: true,
-      value: z.string()
+      value: z
+        .string()
         .transform(raw => JSON.parse(raw))
         .pipe(schema)
         .parse(readFileSync(path, 'utf8')),
@@ -192,7 +253,12 @@ function readJsonFile<T>(path: string, schema: z.ZodType<T>, warningCode: string
   }
 }
 
-function readTomlFile<T>(path: string, schema: z.ZodType<T>, warningCode: string, label: string): ReadJsonResult<T> {
+function readTomlFile<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  warningCode: string,
+  label: string,
+): ReadJsonResult<T> {
   if (!existsSync(path)) {
     return { found: false, value: null, warning: null }
   }
@@ -218,7 +284,12 @@ function readTomlFile<T>(path: string, schema: z.ZodType<T>, warningCode: string
 }
 
 function readClaudeConfig(config: LocalAgentConfigSourceConfig): ClaudeConfigReadResult {
-  const settings = readJsonFile(config.claudeSettingsPath, ClaudeSettingsSchema, 'local-claude-settings-invalid', 'Claude settings')
+  const settings = readJsonFile(
+    config.claudeSettingsPath,
+    ClaudeSettingsSchema,
+    'local-claude-settings-invalid',
+    'Claude settings',
+  )
   const localSettings = readJsonFile(
     config.claudeLocalSettingsPath,
     ClaudeSettingsSchema,
@@ -226,15 +297,15 @@ function readClaudeConfig(config: LocalAgentConfigSourceConfig): ClaudeConfigRea
     'Claude local settings',
   )
 
-  const processEnv = config.includeProcessEnv
-    ? ClaudeEnvSchema.parse(process.env)
-    : {}
+  const processEnv = config.includeProcessEnv ? ClaudeEnvSchema.parse(process.env) : {}
   const env = ClaudeEnvSchema.parse({
     ...settings.value?.env,
     ...localSettings.value?.env,
     ...processEnv,
   })
-  const warnings = [settings.warning, localSettings.warning].filter((warning): warning is ExternalProviderWarning => Boolean(warning))
+  const warnings = [settings.warning, localSettings.warning].filter(
+    (warning): warning is ExternalProviderWarning => Boolean(warning),
+  )
 
   return {
     settingsPath: config.claudeSettingsPath,
@@ -247,12 +318,22 @@ function readClaudeConfig(config: LocalAgentConfigSourceConfig): ClaudeConfigRea
 }
 
 function readCodexConfig(config: LocalAgentConfigSourceConfig): CodexConfigReadResult {
-  const codexConfig = readTomlFile(config.codexConfigPath, CodexTomlSchema, 'local-codex-config-invalid', 'Codex config')
-  const codexAuth = readJsonFile(config.codexAuthPath, CodexAuthSchema, 'local-codex-auth-invalid', 'Codex auth')
-  const processAuth = config.includeProcessEnv
-    ? CodexAuthSchema.parse(process.env)
-    : {}
-  const warnings = [codexConfig.warning, codexAuth.warning].filter((warning): warning is ExternalProviderWarning => Boolean(warning))
+  const codexConfig = readTomlFile(
+    config.codexConfigPath,
+    CodexTomlSchema,
+    'local-codex-config-invalid',
+    'Codex config',
+  )
+  const codexAuth = readJsonFile(
+    config.codexAuthPath,
+    CodexAuthSchema,
+    'local-codex-auth-invalid',
+    'Codex auth',
+  )
+  const processAuth = config.includeProcessEnv ? CodexAuthSchema.parse(process.env) : {}
+  const warnings = [codexConfig.warning, codexAuth.warning].filter(
+    (warning): warning is ExternalProviderWarning => Boolean(warning),
+  )
 
   return {
     configPath: config.codexConfigPath,
@@ -370,9 +451,10 @@ const WIN_EXECUTABLE_EXTENSIONS = ['.cmd', '.exe', '.ps1', '.bat']
 
 function detectCliExecutable(command: string): string | null {
   const pathEntries = process.env.PATH?.split(PATH_DELIMITER).filter(Boolean) ?? []
-  const names = process.platform === 'win32'
-    ? [command, ...WIN_EXECUTABLE_EXTENSIONS.map(ext => `${command}${ext}`)]
-    : [command]
+  const names
+    = process.platform === 'win32'
+      ? [command, ...WIN_EXECUTABLE_EXTENSIONS.map(ext => `${command}${ext}`)]
+      : [command]
   for (const pathEntry of pathEntries) {
     for (const name of names) {
       const candidate = join(pathEntry, name)
@@ -380,7 +462,7 @@ function detectCliExecutable(command: string): string | null {
         accessSync(candidate, constants.X_OK)
         return candidate
       }
-      catch {
+ catch {
         continue
       }
     }
@@ -388,7 +470,9 @@ function detectCliExecutable(command: string): string | null {
   return null
 }
 
-function detectFirstCliExecutable(commands: string[]): { command: string, executablePath: string } | null {
+function detectFirstCliExecutable(
+  commands: string[],
+): { command: string, executablePath: string } | null {
   for (const command of commands) {
     const executablePath = detectCliExecutable(command)
     if (executablePath) {
@@ -406,8 +490,13 @@ function detectCliTools(config: LocalAgentConfigSourceConfig): DetectedCliTool[]
       continue
     }
 
-    const settingsResult = readJsonFile(cliToolSettingsFile(tool, config), tool.settingsSchema, `local-${tool.command}-settings-invalid`, `${tool.command} settings`)
-    const settings = settingsResult.found ? (settingsResult.value as JsonObject ?? {}) : {}
+    const settingsResult = readJsonFile(
+      cliToolSettingsFile(tool, config),
+      tool.settingsSchema,
+      `local-${tool.command}-settings-invalid`,
+      `${tool.command} settings`,
+    )
+    const settings = settingsResult.found ? ((settingsResult.value as JsonObject) ?? {}) : {}
     const warnings = settingsResult.warning ? [settingsResult.warning] : []
 
     results.push({
@@ -425,16 +514,18 @@ function firstEnvValue(keys: string[], includeProcessEnv: boolean): string | und
   if (!includeProcessEnv) {
     return undefined
   }
-  return keys
-    .map(key => process.env[key])
-    .find(val => val && val.trim().length > 0)
+  return keys.map(key => process.env[key]).find(val => val && val.trim().length > 0)
 }
 
-function cliToolRecord(detected: DetectedCliTool, includeProcessEnv: boolean): ExternalProviderRecord | null {
+function cliToolRecord(
+  detected: DetectedCliTool,
+  includeProcessEnv: boolean,
+): ExternalProviderRecord | null {
   const envApiKey = firstEnvValue(detected.tool.envKeyVars, includeProcessEnv)
 
   const settingsApiKey = detected.settings
-    ? ((detected.settings.apiKey as string | undefined) ?? (detected.settings.api_key as string | undefined))
+    ? ((detected.settings.apiKey as string | undefined)
+      ?? (detected.settings.api_key as string | undefined))
     : undefined
   const apiKey = settingsApiKey ?? envApiKey
 
@@ -447,15 +538,18 @@ function cliToolRecord(detected: DetectedCliTool, includeProcessEnv: boolean): E
   const model = settingsModel ?? envModel
 
   const settingsEndpoint = detected.settings
-    ? (
-        (detected.settings.endpoint as string | undefined)
-        ?? (detected.settings.baseUrl as string | undefined)
-        ?? (detected.settings.base_url as string | undefined)
-      )
+    ? ((detected.settings.endpoint as string | undefined)
+      ?? (detected.settings.baseUrl as string | undefined)
+      ?? (detected.settings.base_url as string | undefined))
     : undefined
   const baseUrl = settingsEndpoint ?? envBaseUrl
 
-  const hasSignal = detected.settingsFound || Boolean(apiKey) || Boolean(baseUrl) || Boolean(model) || Boolean(detected.executablePath)
+  const hasSignal
+    = detected.settingsFound
+      || Boolean(apiKey)
+      || Boolean(baseUrl)
+      || Boolean(model)
+      || Boolean(detected.executablePath)
   if (!hasSignal) {
     return null
   }
@@ -470,7 +564,9 @@ function cliToolRecord(detected: DetectedCliTool, includeProcessEnv: boolean): E
       baseUrl,
       model,
     }),
-    credential: apiKey ? { kind: 'api-key', value: apiKey, label: `Local ${detected.tool.displayName}` } : undefined,
+    credential: apiKey
+      ? { kind: 'api-key', value: apiKey, label: `Local ${detected.tool.displayName}` }
+      : undefined,
     current: true,
     metadata: compactRecord({
       executable: detected.executablePath,
@@ -489,11 +585,13 @@ function cliToolRecord(detected: DetectedCliTool, includeProcessEnv: boolean): E
     }),
     warnings: apiKey
       ? []
-      : [{
-          code: `local-${detected.tool.command}-credential-missing`,
-          message: `No ${detected.tool.command} API key was found in local config or environment.`,
-          severity: 'info' as const,
-        }],
+      : [
+          {
+            code: `local-${detected.tool.command}-credential-missing`,
+            message: `No ${detected.tool.command} API key was found in local config or environment.`,
+            severity: 'info' as const,
+          },
+        ],
   }
 }
 
@@ -501,26 +599,31 @@ function compactRecord(value: JsonObject): JsonObject {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined))
 }
 
-function maybeEnum<T extends z.ZodEnum>(schema: T, value: string | undefined): z.infer<T> | undefined {
+function maybeEnum<T extends z.ZodEnum>(
+  schema: T,
+  value: string | undefined,
+): z.infer<T> | undefined {
   const parsed = schema.safeParse(value)
   return parsed.success ? parsed.data : undefined
 }
 
 function claudeRecord(input: ClaudeConfigReadResult): ExternalProviderRecord | null {
   const apiKey = input.env.ANTHROPIC_AUTH_TOKEN ?? input.env.ANTHROPIC_API_KEY
-  const authMode = !apiKey && (input.settingsFound || input.localSettingsFound) ? 'claudeAi' : undefined
+  const authMode
+    = !apiKey && (input.settingsFound || input.localSettingsFound) ? 'claudeAi' : undefined
   const modelAliases = compactRecord({
     haiku: input.env.ANTHROPIC_DEFAULT_HAIKU_MODEL,
     sonnet: input.env.ANTHROPIC_DEFAULT_SONNET_MODEL,
     opus: input.env.ANTHROPIC_DEFAULT_OPUS_MODEL,
   })
   const hasAlias = Object.keys(modelAliases).length > 0
-  const hasSignal = input.settingsFound
-    || input.localSettingsFound
-    || Boolean(input.env.ANTHROPIC_BASE_URL)
-    || Boolean(input.env.ANTHROPIC_MODEL)
-    || Boolean(apiKey)
-    || hasAlias
+  const hasSignal
+    = input.settingsFound
+      || input.localSettingsFound
+      || Boolean(input.env.ANTHROPIC_BASE_URL)
+      || Boolean(input.env.ANTHROPIC_MODEL)
+      || Boolean(apiKey)
+      || hasAlias
 
   if (!hasSignal) {
     return null
@@ -556,11 +659,14 @@ function claudeRecord(input: ClaudeConfigReadResult): ExternalProviderRecord | n
     }),
     warnings: apiKey
       ? []
-      : [{
-          code: 'local-claude-credential-missing',
-          message: 'No Claude API key was found in the allowlisted local config or process environment.',
-          severity: 'info',
-        }],
+      : [
+          {
+            code: 'local-claude-credential-missing',
+            message:
+              'No Claude API key was found in the allowlisted local config or process environment.',
+            severity: 'info',
+          },
+        ],
   }
 }
 
@@ -569,17 +675,15 @@ function codexRecord(input: CodexConfigReadResult): ExternalProviderRecord | nul
   const activeProvider = providerId ? input.config.model_providers[providerId] : undefined
   const baseUrl = activeProvider?.base_url ?? input.config.openai_base_url
   const wireApi = activeProvider?.wire_api
-  const apiMode = wireApi === 'chat'
-    ? 'chat-completions'
-    : wireApi === 'responses'
-      ? 'responses'
-      : undefined
+  const apiMode
+    = wireApi === 'chat' ? 'chat-completions' : wireApi === 'responses' ? 'responses' : undefined
   const apiKey = input.auth.OPENAI_API_KEY ?? input.auth.apiKey ?? input.auth.api_key
-  const hasSignal = input.configFound
-    || input.authFound
-    || Boolean(input.config.model)
-    || Boolean(baseUrl)
-    || Boolean(apiKey)
+  const hasSignal
+    = input.configFound
+      || input.authFound
+      || Boolean(input.config.model)
+      || Boolean(baseUrl)
+      || Boolean(apiKey)
 
   if (!hasSignal) {
     return null
@@ -619,11 +723,14 @@ function codexRecord(input: CodexConfigReadResult): ExternalProviderRecord | nul
     }),
     warnings: apiKey
       ? []
-      : [{
-          code: 'local-codex-credential-missing',
-          message: 'No Codex API key was found in the allowlisted local config or process environment.',
-          severity: 'info',
-        }],
+      : [
+          {
+            code: 'local-codex-credential-missing',
+            message:
+              'No Codex API key was found in the allowlisted local config or process environment.',
+            severity: 'info',
+          },
+        ],
   }
 }
 
@@ -637,17 +744,10 @@ export function readLocalAgentConfigExternalProviderSnapshot(
     .map(detected => cliToolRecord(detected, config.includeProcessEnv))
     .filter((record): record is ExternalProviderRecord => Boolean(record))
 
-  const providers = [
-    claudeRecord(claude),
-    codexRecord(codex),
-    ...cliRecords,
-  ]
-    .filter((record): record is ExternalProviderRecord => Boolean(record))
-  const warnings = [
-    ...claude.warnings,
-    ...codex.warnings,
-    ...cliTools.flatMap(t => t.warnings),
-  ]
+  const providers = [claudeRecord(claude), codexRecord(codex), ...cliRecords].filter(
+    (record): record is ExternalProviderRecord => Boolean(record),
+  )
+  const warnings = [...claude.warnings, ...codex.warnings, ...cliTools.flatMap(t => t.warnings)]
 
   return {
     source: {
@@ -656,9 +756,10 @@ export function readLocalAgentConfigExternalProviderSnapshot(
         : warnings.length > 0
           ? 'warning'
           : 'ok',
-      message: providers.length > 0
-        ? `Detected ${providers.length} local agent config ${providers.length === 1 ? 'record' : 'records'}.`
-        : 'No local agent config records were detected.',
+      message:
+        providers.length > 0
+          ? `Detected ${providers.length} local agent config ${providers.length === 1 ? 'record' : 'records'}.`
+          : 'No local agent config records were detected.',
       observedAt: new Date().toISOString(),
     },
     providers,

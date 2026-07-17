@@ -11,12 +11,21 @@ import { useTranslation } from 'react-i18next'
 import { ProviderIcon } from '~/components/common/provider-icons'
 import { Input } from '~/components/ui/input'
 import type { MenuPortalProps } from '~/components/ui/menu'
-import { MenuItem, MenuSeparator, MenuSub, MenuSubPopup, MenuSubTrigger } from '~/components/ui/menu'
+import {
+  MenuItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubPopup,
+  MenuSubTrigger,
+} from '~/components/ui/menu'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS } from '~/features/browser/native-surface-occlusion'
 import { cn } from '~/lib/cn'
 
-import { presetForProviderKind, providerTargetDisplayIconSlug } from '../agent-management/provider-settings-utils'
+import {
+  presetForProviderKind,
+  providerTargetDisplayIconSlug,
+} from '../agent-management/provider-settings-utils'
 import { filterModelsBySearch } from './provider-model-filter'
 import type { ProviderModelOption } from './types'
 
@@ -164,9 +173,7 @@ export function CurrentProviderModelList<TThinking extends string | null>({
           )
         })}
       </div>
-      {renderCount < filteredModels.length && (
-        <MenuItem disabled>{t('status.loading')}</MenuItem>
-      )}
+      {renderCount < filteredModels.length && <MenuItem disabled>{t('status.loading')}</MenuItem>}
       {filteredModels.length === 0 && models.length > 0 && (
         <MenuItem disabled>{t('model.noMatchingModels')}</MenuItem>
       )}
@@ -206,7 +213,9 @@ function ProviderTargetGroup<TThinking extends string | null>({
         }}
         className={cn(isActive && 'font-medium')}
       >
-        <CheckIcon className={cn('size-3.5 shrink-0', isActive ? '!text-primary' : '!text-transparent')} />
+        <CheckIcon
+          className={cn('size-3.5 shrink-0', isActive ? '!text-primary' : '!text-transparent')}
+        />
         <ProviderIcon
           iconSlug={providerTargetDisplayIconSlug(providerTarget)}
           presetId={preset.id}
@@ -266,12 +275,22 @@ function ModelSubmenu<TThinking extends string | null>({
   const hasAdjustableThinking = thinkingOptions.some(option => option.value !== null)
   const content = (
     <>
-      <CheckIcon className={cn('size-3.5 shrink-0 self-start mt-0.5', isModelSelected ? '!text-primary' : '!text-transparent')} />
+      <CheckIcon
+        className={cn(
+          'size-3.5 shrink-0 self-start mt-0.5',
+          isModelSelected ? '!text-primary' : '!text-transparent',
+        )}
+      />
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-1.5">
           <span className="truncate font-medium">{model.label}</span>
           {registryMatch === 'fuzzy' && (
-            <span className="shrink-0 text-[9px] text-muted-foreground/50" title={t('model.fuzzyMatchTitle')}>≈</span>
+            <span
+              className="shrink-0 text-[9px] text-muted-foreground/50"
+              title={t('model.fuzzyMatchTitle')}
+            >
+              ≈
+            </span>
           )}
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 leading-tight">
@@ -330,11 +349,26 @@ function ModelSubmenu<TThinking extends string | null>({
               onSelectModel()
               onSelectThinking(option.value)
             }}
-            className={cn('flex-col items-start', thinkingValue === option.value && 'text-primary font-medium')}
+            className={cn(
+              'flex-col items-start',
+              thinkingValue === option.value
+              && (option.value === 'ultra'
+                  ? 'bg-rose-500/10 text-rose-800 dark:text-rose-200'
+                  : 'text-primary font-medium'),
+            )}
           >
             <div className="flex w-full items-center gap-2">
               <span className="font-medium">{option.label}</span>
-              <CheckIcon className={cn('ml-auto size-3.5 shrink-0', thinkingValue === option.value ? '!text-primary' : '!text-transparent')} />
+              <CheckIcon
+                className={cn(
+                  'ml-auto size-3.5 shrink-0',
+                  thinkingValue === option.value
+                    ? option.value === 'ultra'
+                      ? '!text-rose-600 dark:!text-rose-300'
+                      : '!text-primary'
+                    : '!text-transparent',
+                )}
+              />
             </div>
             <span className="text-[11px] text-muted-foreground/60">{option.description}</span>
           </MenuItem>
@@ -375,11 +409,18 @@ export function ProviderModelMenu<TThinking extends string | null>({
             onClick={leadingSelection.onSelect}
             className={cn('items-start', leadingSelection.active && 'text-primary font-medium')}
           >
-            <CheckIcon className={cn('mt-0.5 size-3.5 shrink-0', leadingSelection.active ? '!text-primary' : '!text-transparent')} />
+            <CheckIcon
+              className={cn(
+                'mt-0.5 size-3.5 shrink-0',
+                leadingSelection.active ? '!text-primary' : '!text-transparent',
+              )}
+            />
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate font-medium">{leadingSelection.label}</span>
               {leadingSelection.description && (
-                <span className="text-[11px] text-muted-foreground/60">{leadingSelection.description}</span>
+                <span className="text-[11px] text-muted-foreground/60">
+                  {leadingSelection.description}
+                </span>
               )}
             </div>
           </MenuItem>

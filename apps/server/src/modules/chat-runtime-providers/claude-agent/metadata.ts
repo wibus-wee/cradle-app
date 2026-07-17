@@ -31,7 +31,7 @@ export const CLAUDE_AGENT_RUNTIME_METADATA = {
     inputMode: 'rich',
     modelSelection: 'alias-matrix',
     thinking: {
-      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
     },
   },
 } satisfies ChatRuntimeMetadata
@@ -154,7 +154,9 @@ const CLAUDE_AGENT_USAGE_SLOT: RuntimeUiSlot = {
   surfaces: ['slashCommand', 'runtimePanel'],
 }
 
-export function projectClaudeAgentPresentation(slashCommands: SlashCommand[]): RuntimePresentationCapabilities {
+export function projectClaudeAgentPresentation(
+  slashCommands: SlashCommand[],
+): RuntimePresentationCapabilities {
   return {
     runtimeKind: CLAUDE_AGENT_RUNTIME_KIND,
     slashCommands: slashCommands.map(toRuntimeSlashCommand),

@@ -900,10 +900,14 @@ export const zPostAgentsBody = z.object({
     providerTargetId: z.string().nullish(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max',
+        'ultra'
     ]).optional(),
     runtimeKind: z.string().min(1).optional(),
     configJson: z.string().optional()
@@ -925,10 +929,14 @@ export const zPatchAgentsByIdBody = z.object({
     providerTargetId: z.string().nullish(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max',
+        'ultra'
     ]).optional(),
     runtimeKind: z.string().min(1).optional(),
     configJson: z.string().optional(),
