@@ -274,6 +274,13 @@
       "when": 1784197116499,
       "tag": "0038_sharp_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1784272205388,
+      "tag": "0039_amusing_stryfe",
+      "breakpoints": true
     }
   ]
 }
