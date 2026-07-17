@@ -2,13 +2,13 @@ import { GitCompareLine as FileDiffIcon } from '@mingcute/react'
 import type { CodeViewItem } from '@pierre/diffs'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
+import type { DiffData } from '~/components/common/diff/diff-data'
+import { buildDiffData, emptyDiffData } from '~/components/common/diff/diff-data'
 import { ResizeHandle } from '~/components/layout/resize-handle'
 import { Spinner } from '~/components/ui/spinner'
 
-import type { CodeViewLineSelection, DiffData, ThreadAnnotation } from '../shared/diff-items'
+import type { CodeViewLineSelection, ThreadAnnotation } from '../shared/diff-items'
 import {
-  buildItemsFromPatch,
-  EMPTY_DIFF_DATA,
   formatSelectedReviewRange,
   getSelectedReviewRange,
 } from '../shared/diff-items'
@@ -83,8 +83,10 @@ export function ReviewDetailPage({
   const patch = review?.currentRevision?.patch ?? ''
   const deferredPatch = useDeferredValue(patch)
 
-  const diffData: DiffData = useMemo(
-    () => (deferredPatch.trim().length === 0 ? EMPTY_DIFF_DATA : buildItemsFromPatch(deferredPatch)),
+  const diffData: DiffData<ThreadAnnotation> = useMemo(
+    () => (deferredPatch.trim().length === 0
+      ? emptyDiffData<ThreadAnnotation>()
+      : buildDiffData<ThreadAnnotation>(deferredPatch)),
     [deferredPatch],
   )
 

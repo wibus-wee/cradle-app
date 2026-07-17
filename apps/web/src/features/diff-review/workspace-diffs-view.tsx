@@ -1,14 +1,13 @@
-import { WorkerPoolContextProvider } from '@pierre/diffs/react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BetaNotice } from '~/components/common/beta-notice'
+import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { CommitPlanPage } from '~/features/diff-review/commit-plan-page'
 import { GuideView } from '~/features/diff-review/review-detail/guide-view'
 import { ReviewDetailPage } from '~/features/diff-review/review-detail/review-detail-page'
 import { ReviewsListPage } from '~/features/diff-review/reviews-list-page'
-import { WORKER_HIGHLIGHTER_OPTIONS, WORKER_POOL_OPTIONS } from '~/features/diff-review/shared/diff-items'
 import { navigateToReview, WORKING_TREE_REVIEW_ID } from '~/features/diff-review/shared/navigation'
 
 export interface WorkspaceDiffsViewProps {
@@ -52,7 +51,7 @@ export function WorkspaceDiffsView({
   }), [workspaceId]))
 
   return (
-    <WorkerPoolContextProvider poolOptions={WORKER_POOL_OPTIONS} highlighterOptions={WORKER_HIGHLIGHTER_OPTIONS}>
+    <DiffWorkerProvider>
       <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
         <BetaNotice title={t('beta.title')} description={t('beta.description')} />
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -67,7 +66,7 @@ export function WorkspaceDiffsView({
           />
         </div>
       </div>
-    </WorkerPoolContextProvider>
+    </DiffWorkerProvider>
   )
 }
 

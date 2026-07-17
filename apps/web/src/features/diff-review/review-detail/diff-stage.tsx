@@ -3,10 +3,12 @@ import type { CodeViewHandle } from '@pierre/diffs/react'
 import { CodeView, useStableCallback } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef } from 'react'
 
-import type { CodeViewLineSelection, DiffData, ThreadAnnotation } from '../shared/diff-items'
+import type { DiffData } from '~/components/common/diff/diff-data'
+import { buildDiffOptions } from '~/components/common/diff/diff-options'
+
+import type { CodeViewLineSelection, ThreadAnnotation } from '../shared/diff-items'
 import {
   anchorSideToSelectionSide,
-  buildCodeViewOptions,
   buildThreadAnnotations,
   getSelectedReviewRange,
 } from '../shared/diff-items'
@@ -22,7 +24,7 @@ export interface DiffStageHandle {
 
 interface DiffStageProps {
   review: CradleDiffReview
-  diffData: DiffData
+  diffData: DiffData<ThreadAnnotation>
   visibleItems: CodeViewItem<ThreadAnnotation>[]
   visiblePathToItemId: Map<string, string>
   diffStyle: DiffStyle
@@ -106,7 +108,12 @@ export function DiffStage({
   })
 
   const options = useMemo(
-    () => buildCodeViewOptions(diffStyle, handleGutterUtilityClick),
+    () => buildDiffOptions<ThreadAnnotation>(diffStyle, {
+      controlledSelection: true,
+      enableGutterUtility: true,
+      enableLineSelection: true,
+      onGutterUtilityClick: handleGutterUtilityClick,
+    }),
     [diffStyle, handleGutterUtilityClick],
   )
 

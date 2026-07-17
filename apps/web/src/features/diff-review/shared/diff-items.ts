@@ -1,29 +1,16 @@
 import type {
-  CodeViewItem,
-  CodeViewOptions,
   DiffLineAnnotation,
   SelectedLineRange,
   SelectionSide,
 } from '@pierre/diffs'
-import { parsePatchFiles } from '@pierre/diffs'
-import type { WorkerInitializationRenderOptions, WorkerPoolOptions } from '@pierre/diffs/react'
-import WorkerUrl from '@pierre/diffs/worker/worker.js?worker&url'
 
 import type {
   CradleDiffReview,
-  DiffStyle,
   ReviewFile,
   ReviewGuideAnchor,
   ReviewSourceKind,
   ReviewThread,
 } from './types'
-
-export interface DiffData {
-  items: CodeViewItem<ThreadAnnotation>[]
-  itemIdToPath: Map<string, string>
-  pathToItemId: Map<string, string>
-  whitespaceOnlyPaths: Set<string>
-}
 
 /** Per-thread annotation metadata carried on a CodeView line. */
 export type ThreadAnnotation
@@ -40,98 +27,6 @@ export interface SelectedReviewRange {
   side: 'base' | 'head'
   startLine: number
   endLine: number
-}
-
-export const WORKER_POOL_OPTIONS = {
-  workerFactory: () => new Worker(WorkerUrl, { type: 'module' }),
-  poolSize: 3,
-} satisfies WorkerPoolOptions
-
-export const WORKER_HIGHLIGHTER_OPTIONS = {
-  lineDiffType: 'word',
-  theme: { dark: 'pierre-dark', light: 'pierre-light' },
-  useTokenTransformer: false,
-} satisfies WorkerInitializationRenderOptions
-
-function hashPatchVersion(patch: string): number {
-  let hash = 2166136261
-  for (let index = 0; index < patch.length; index++) {
-    hash ^= patch.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  return hash >>> 0
-}
-
-function createItemId(
-  path: string,
-  itemIds: Set<string>,
-  nextCollisionSuffixByBase: Map<string, number>,
-): string {
-  if (!itemIds.has(path)) {
-    return path
-  }
-
-  let suffix = nextCollisionSuffixByBase.get(path) ?? 2
-  let itemId = `${path}?${suffix}`
-  while (itemIds.has(itemId)) {
-    suffix++
-    itemId = `${path}?${suffix}`
-  }
-  nextCollisionSuffixByBase.set(path, suffix + 1)
-  return itemId
-}
-
-function normalizeWhitespaceForStructuralDiff(line: string): string {
-  return line.replace(/\s+/g, '')
-}
-
-function isWhitespaceOnlyFileDiff(fileDiff: Extract<CodeViewItem, { type: 'diff' }>['fileDiff']): boolean {
-  if (fileDiff.type === 'rename-pure') {
-    return false
-  }
-  const oldContent = fileDiff.deletionLines.map(normalizeWhitespaceForStructuralDiff).join('\n')
-  const newContent = fileDiff.additionLines.map(normalizeWhitespaceForStructuralDiff).join('\n')
-  return oldContent === newContent
-}
-
-export function buildItemsFromPatch(patch: string): DiffData {
-  const patchVersion = hashPatchVersion(patch)
-  const parsed = parsePatchFiles(
-    patch,
-    `cradle-diffs-${patch.length.toString(36)}-${patchVersion.toString(36)}`,
-  )
-  const items: CodeViewItem<ThreadAnnotation>[] = []
-  const itemIdToPath = new Map<string, string>()
-  const pathToItemId = new Map<string, string>()
-  const whitespaceOnlyPaths = new Set<string>()
-  const itemIds = new Set<string>()
-  const nextCollisionSuffixByBase = new Map<string, number>()
-  for (const p of parsed) {
-    for (const fileDiff of p.files) {
-      const itemId = createItemId(fileDiff.name, itemIds, nextCollisionSuffixByBase)
-      itemIds.add(itemId)
-      items.push({ id: itemId, type: 'diff', fileDiff, version: patchVersion })
-      itemIdToPath.set(itemId, fileDiff.name)
-      pathToItemId.set(fileDiff.name, itemId)
-      if (isWhitespaceOnlyFileDiff(fileDiff)) {
-        whitespaceOnlyPaths.add(fileDiff.name)
-      }
-      if (fileDiff.prevName) {
-        pathToItemId.set(fileDiff.prevName, itemId)
-        if (isWhitespaceOnlyFileDiff(fileDiff)) {
-          whitespaceOnlyPaths.add(fileDiff.prevName)
-        }
-      }
-    }
-  }
-  return { items, itemIdToPath, pathToItemId, whitespaceOnlyPaths }
-}
-
-export const EMPTY_DIFF_DATA: DiffData = {
-  items: [],
-  itemIdToPath: new Map(),
-  pathToItemId: new Map(),
-  whitespaceOnlyPaths: new Set(),
 }
 
 /**
@@ -320,32 +215,6 @@ export function reviewParticipatedByLocalUser(review: CradleDiffReview): boolean
 /** Linear-style "For me" (involved/responsible) vs "Created" (authored). */
 export function reviewForMe(review: CradleDiffReview): boolean {
   return reviewNeedsAttention(review) || reviewParticipatedByLocalUser(review)
-}
-
-export function buildCodeViewOptions(
-  diffStyle: DiffStyle,
-  onGutterUtilityClick?: CodeViewOptions<ThreadAnnotation>['onGutterUtilityClick'],
-): CodeViewOptions<ThreadAnnotation> {
-  return {
-    theme: { dark: 'pierre-dark', light: 'pierre-light' },
-    themeType: 'system',
-    diffStyle,
-    diffIndicators: 'bars',
-    overflow: 'scroll',
-    lineDiffType: 'word',
-    hunkSeparators: 'line-info-basic',
-    enableLineSelection: true,
-    controlledSelection: true,
-    // Hover any line → a "+" appears in the gutter → click opens the composer.
-    enableGutterUtility: true,
-    onGutterUtilityClick,
-    stickyHeaders: true,
-    pointerEventsOnScroll: false,
-    itemMetrics: {
-      hunkLineCount: 1,
-      lineHeight: 18,
-    },
-  }
 }
 
 export { WORKING_TREE_REVIEW_ID } from './types'

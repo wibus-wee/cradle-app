@@ -16,6 +16,11 @@ import { m } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { buildDiffData } from '~/components/common/diff/diff-data'
+import { DiffLayoutToggle } from '~/components/common/diff/diff-layout-toggle'
+import type { DiffStyle } from '~/components/common/diff/diff-options'
+import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
+import { PatchDiffView } from '~/components/common/diff/patch-diff-view'
 import { Button } from '~/components/ui/button'
 import { Skeleton } from '~/components/ui/skeleton'
 import { AssetMarkdown } from '~/features/assets/asset-markdown'
@@ -409,64 +414,95 @@ function reviewLabel(state: string | null, t: TFunction<'pull-requests'>): strin
 
 function CodeTab({ files }: { files: PullRequestFile[] }) {
   const { t } = useTranslation('pull-requests')
+  const [diffStyle, setDiffStyle] = useState<DiffStyle>('unified')
   if (files.length === 0) {
     return <p className="pt-6 text-[13px] text-muted-foreground/70">{t('code.noFiles')}</p>
   }
 
   return (
-    <div className="space-y-2 pt-6">
-      {files.map(file => (
-        <details
-          key={file.filename}
-          className="group overflow-hidden rounded-lg border border-border/60 [content-visibility:auto]"
-        >
-          <summary className="flex min-h-9 cursor-default list-none items-center gap-2.5 px-3 py-1.5 text-[11.5px] hover:bg-muted/40">
-            <span className="min-w-0 flex-1 truncate font-mono text-foreground/80">{file.filename}</span>
-            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-              {file.status}
-            </span>
-            <span className="shrink-0 font-mono tabular-nums text-success">
-              +
-              {file.additions}
-            </span>
-            <span className="shrink-0 font-mono tabular-nums text-destructive">
-              −
-              {file.deletions}
-            </span>
-          </summary>
-          {file.patch
-            ? <Patch patch={file.patch} />
-            : (
-                <div className="border-t border-border/60 px-3 py-3 text-[11px] text-muted-foreground">
-                  {t('code.patchUnavailable')}
-                </div>
-              )}
-        </details>
-      ))}
-    </div>
+    <DiffWorkerProvider>
+      <div className="space-y-2 pt-6">
+        <div className="flex justify-end pb-1">
+          <DiffLayoutToggle value={diffStyle} onValueChange={setDiffStyle} />
+        </div>
+        {files.map(file => (
+          <PullRequestFileSection
+            key={file.filename}
+            file={file}
+            diffStyle={diffStyle}
+            patchUnavailableLabel={t('code.patchUnavailable')}
+          />
+        ))}
+      </div>
+    </DiffWorkerProvider>
   )
 }
 
-function Patch({ patch }: { patch: string }) {
+function PullRequestFileSection({
+  file,
+  diffStyle,
+  patchUnavailableLabel,
+}: {
+  file: PullRequestFile
+  diffStyle: DiffStyle
+  patchUnavailableLabel: string
+}) {
+  const [hasOpened, setHasOpened] = useState(false)
   return (
-    <pre className="overflow-x-auto border-t border-border/60 bg-muted/30 py-2 font-mono text-[10px] leading-5">
-      {patch.split('\n').map((line, index) => (
-        <code
-          // The immutable GitHub patch line number is the stable identity, even when text repeats.
-          // eslint-disable-next-line react/no-array-index-key
-          key={`${index}:${line}`}
-          className={cn(
-            'block min-w-max px-3 text-foreground/70',
-            line.startsWith('+') && !line.startsWith('+++') && 'bg-success/10 text-success',
-            line.startsWith('-') && !line.startsWith('---') && 'bg-destructive/10 text-destructive',
-            line.startsWith('@@') && 'bg-info/10 text-info',
+    <details
+      className="group overflow-hidden rounded-lg border border-border/60 [content-visibility:auto]"
+      onToggle={(event) => {
+        if (event.currentTarget.open) {
+          setHasOpened(true)
+        }
+      }}
+    >
+      <summary className="flex min-h-9 cursor-default list-none items-center gap-2.5 px-3 py-1.5 text-[11.5px] hover:bg-muted/40">
+        <span className="min-w-0 flex-1 truncate font-mono text-foreground/80">{file.filename}</span>
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+          {file.status}
+        </span>
+        <span className="shrink-0 font-mono tabular-nums text-success">
+          +
+          {file.additions}
+        </span>
+        <span className="shrink-0 font-mono tabular-nums text-destructive">
+          −
+          {file.deletions}
+        </span>
+      </summary>
+      {file.patch
+        ? (hasOpened ? <PullRequestFileDiff file={file} diffStyle={diffStyle} /> : null)
+        : (
+            <div className="border-t border-border/60 px-3 py-3 text-[11px] text-muted-foreground">
+              {patchUnavailableLabel}
+            </div>
           )}
-        >
-          {line || ' '}
-        </code>
-      ))}
-    </pre>
+    </details>
   )
+}
+
+function PullRequestFileDiff({ file, diffStyle }: { file: PullRequestFile, diffStyle: DiffStyle }) {
+  const data = useMemo(() => buildDiffData(buildPullRequestFilePatch(file)), [file])
+  return (
+    <PatchDiffView
+      data={data}
+      diffStyle={diffStyle}
+      className="max-h-128 border-t border-border/60"
+    />
+  )
+}
+
+function buildPullRequestFilePatch(file: PullRequestFile): string {
+  const oldPath = file.previousFilename ?? file.filename
+  const oldMarker = file.status === 'added' ? '/dev/null' : `a/${oldPath}`
+  const newMarker = file.status === 'removed' ? '/dev/null' : `b/${file.filename}`
+  return [
+    `diff --git a/${oldPath} b/${file.filename}`,
+    `--- ${oldMarker}`,
+    `+++ ${newMarker}`,
+    file.patch ?? '',
+  ].join('\n')
 }
 
 function ChecksValue({ state, count }: { state: string, count: number }) {
