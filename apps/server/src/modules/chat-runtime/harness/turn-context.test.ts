@@ -48,8 +48,8 @@ describe('resolveSessionHarness Work context', () => {
     const session = db().select().from(sessions).where(eq(sessions.id, 'work-session')).get()!
     const harness = resolveSessionHarness(session)
 
-    expect(harness.systemPrompt).toContain('YOU ARE OPERATING INSIDE CRADLE')
-    expect(harness.systemPrompt).toContain('# Cradle CLI')
+    expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
+    expect(harness.systemPrompt).toContain('cradle-cli')
     expect(harness.systemPrompt).not.toContain('## Cradle Work')
     expect(harness.systemPrompt).not.toContain('work-1')
     expect(harness.harness?.fragments).toEqual([{
@@ -148,8 +148,8 @@ describe('resolveSessionHarness Work context', () => {
     const session = db().select().from(sessions).where(eq(sessions.id, 'ordinary-session')).get()!
     const harness = resolveSessionHarness(session)
 
-    expect(harness.systemPrompt).toContain('YOU ARE OPERATING INSIDE CRADLE')
-    expect(harness.systemPrompt).toContain('# Cradle CLI')
+    expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
+    expect(harness.systemPrompt).toContain('cradle-cli')
     expect(harness.harness).toBeUndefined()
   })
 })

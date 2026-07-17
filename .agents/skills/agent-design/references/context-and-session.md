@@ -56,3 +56,54 @@ Things that maintain context quality:
 - Selective retention: keeping only results that bear on what comes next
 - Ambient task pressure: ensuring the core goal remains present and alive in context, even as history grows
 - Clean handoffs: when resuming a task, reconstructing context as a coherent narrative, not a data dump
+
+---
+
+## Cache-Friendly Context Architecture
+
+Most agent systems get context assembly wrong. They rebuild the entire system prompt each turn—concatenating stable instructions with volatile state (mode, goal, progress, timestamps). This is the **append-system-prompt** anti-pattern: treating the system prompt as a mutable buffer that gets reconstructed from scratch every turn.
+
+The result: every state change invalidates the entire KV cache prefix. The model recomputes attention over tokens it has already seen, burning latency and compute for no reason.
+
+### How KV Cache Works
+
+Transformer inference caches computed key-value pairs for each token in the prefix. On the next request, if the first N tokens are identical, those cached states are reused—skipping N tokens of computation. Cache hit is strictly left-to-right: any change at position K invalidates everything from K onward.
+
+This makes **prefix stability** the single most important optimization lever for agent context design.
+
+### The Anti-Pattern: Rebuilt System Prompt
+
+```
+Turn 1: [system: base_instructions + mode=A + goal=G1 + ts=100]
+Turn 2: [system: base_instructions + mode=B + goal=G2 + ts=101]
+```
+
+Every turn, the runtime regenerates the system prompt with current state. Even if only `mode` changed, the entire prefix shifts—timestamps, goal text, field ordering—and the cache is fully invalidated. Cost grows linearly with prefix length.
+
+### The Correct Pattern: Append-Only State Transitions
+
+Design context as an immutable, append-only sequence. Stable content lives in a fixed prefix. State changes are appended as new messages, not used to rewrite existing ones.
+
+```
+[system: tools + base instructions]     ← fixed, always cached
+[developer: mode=A, goal=G1]            ← state snapshot
+[user / assistant / tool: conversation] ← grows at tail
+...
+[developer: mode=B, goal=G2]            ← appended on change
+```
+
+The prefix up to the state change is still cached. Only from the new developer message onward does the model recompute. The latest message of a given type supersedes earlier ones—supersession by recency, not by deletion.
+
+### Design Rules
+
+1. **Order by volatility.** Most stable content first: tool definitions → base instructions → rarely-changing config → per-session state → per-turn state.
+2. **Never rewrite what can be appended.** If the system prompt is identical across turns, it caches. If it changes every turn, it doesn't. It's that simple.
+3. **State transitions are append-only.** New state message goes after the old one. The model reads the latest as authoritative. Do not delete or rewrite the old state message.
+4. **Don't inject nonces into stable positions.** Timestamps, random IDs, run hashes—anything that changes every turn—must not appear in the prefix. They destroy cache locality.
+5. **Keep the system prompt boring.** If the system prompt varies per-request (per-user, per-goal, per-mode), it can't cache. Move volatile content to developer or user messages where it naturally belongs at the tail.
+
+### Compaction as Context Epoch
+
+Compaction—summarizing history into a shorter form—creates a new context epoch. The prefix changes; cache is expected to miss once. This is acceptable if compaction is infrequent. Design compaction to produce a stable result so subsequent turns benefit from cache again.
+
+The mistake is compacting too aggressively or too frequently, turning every few turns into a cache miss. The goal is long stretches of identical prefix punctuated by intentional, infrequent resets.

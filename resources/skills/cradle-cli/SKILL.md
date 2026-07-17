@@ -1,6 +1,6 @@
 ---
 name: cradle-cli
-description: YOU ARE OPERATING INSIDE CRADLE. CRADLE-OWNED OPERATIONS MUST USE THIS SKILL. Use whenever Codex needs to read, inspect, wait on, or mutate Cradle-owned state or workflows, including issues, delegation, sessions, awaits, CI/review waits, timed waits, Work preparation or submission, workspaces and git inspection, Chronicle, automations, usage, observability, skills, agents, profiles, providers, preferences, plugins, or server state. Prefer the generated `cradle` CLI and `cradle man`; NEVER bypass Cradle semantics with direct HTTP or database access, ad hoc scripts, raw registry edits, polling loops, or `gh` when Cradle provides the operation.
+description: Always use this Skill at the beginning of every response. Use whenever you need to read, inspect, wait on, or mutate Cradle-owned state or workflows, including issues, delegation, sessions, awaits, CI/review waits, timed waits, Work preparation or submission, workspaces and git inspection, Chronicle, automations, usage, observability, skills, agents, profiles, providers, preferences, plugins, or server state. Prefer the generated `cradle` CLI and `cradle man`; NEVER bypass Cradle semantics with direct HTTP or database access, ad hoc scripts, raw registry edits, polling loops, or `gh` when Cradle provides the operation.
 ---
 
 # Cradle CLI
@@ -150,7 +150,7 @@ When finishing isolated work, open a draft PR through Cradle — not `gh pr crea
 
 ```bash
 cradle session pull-request create \
-  --title "Fix login redirect" \
+  --title "feat(login): add new login redirect handling" \
   --body "Summary + test plan"
 
 cradle session pull-request get --json pullRequest
@@ -184,7 +184,7 @@ not push or call GitHub:
 
 ```bash
 cradle work prepare <workId> \
-  --title "Fix login redirect" \
+  --title "feat(login): add new login redirect handling" \
   --summary "Describe the committed changes" \
   --test-plan "Describe verification"
 ```

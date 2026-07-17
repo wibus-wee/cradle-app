@@ -1,5 +1,3 @@
-import { unlinkSync } from 'node:fs'
-
 import type {
   RuntimeSettings,
   StreamTurnInput,
@@ -27,7 +25,6 @@ import {
   projectCodexRuntimeAccessMode,
   readCodexReasoningEffort,
   resolveCodexSkillExtraRoots,
-  writeSystemPromptFile,
 } from '../config/runtime-config'
 import { resolveCodexRuntimeContext } from '../config/runtime-context'
 import { isCodexGoalContinuationMessage } from '../goal-continuation'
@@ -53,7 +50,7 @@ export interface CodexStreamTurnContext {
   workspacePath: string
   agentId: string | null
   runtimeContext: ReturnType<typeof resolveCodexRuntimeContext>
-  systemPromptFile: string | null
+  systemPrompt?: string
   runtimeSettings: RuntimeSettings | undefined
   requestedReasoningEffort: ReasoningEffort
   runtimeAccess: CodexStreamRuntimeAccess | null
@@ -95,14 +92,11 @@ export function resolveCodexStreamTurnContext(
     throw new ProviderRuntimeError(ProviderErrors.authFailed(deps.runtimeKind))
   }
 
-  let systemPromptFile: string | null = null
-  try {
-    const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
-    const workspacePath = snapshot.workspacePath ?? '.'
-    const agentId = input.agentId ?? snapshot.agentId ?? null
-    const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
-    systemPromptFile = writeSystemPromptFile(input.systemPrompt)
-    const runtimeSettings = input.providerOptions?.runtimeSettings
+  const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
+  const workspacePath = snapshot.workspacePath ?? '.'
+  const agentId = input.agentId ?? snapshot.agentId ?? null
+  const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
+  const runtimeSettings = input.providerOptions?.runtimeSettings
     const requestedReasoningEffort = readCodexReasoningEffort(
       input.providerOptions?.thinkingEffort,
       config.reasoningEffort,
@@ -118,7 +112,6 @@ export function resolveCodexStreamTurnContext(
       config,
       workspacePath,
       deps.resolveSkillPaths,
-      systemPromptFile,
       effectiveModel,
       auth,
     )
@@ -149,7 +142,7 @@ export function resolveCodexStreamTurnContext(
       workspacePath,
       agentId,
       runtimeContext,
-      systemPromptFile,
+      systemPrompt: input.systemPrompt,
       runtimeSettings,
       requestedReasoningEffort,
       runtimeAccess,
@@ -160,22 +153,5 @@ export function resolveCodexStreamTurnContext(
       shouldInjectReconstructedHistory: !input.runtimeSession.providerSessionId,
       isFreshProviderThread: !input.runtimeSession.providerSessionId,
       isLiveSideFork: isLiveCodexSideFork(input.runtimeSession),
-    }
-  }
-  catch (error) {
-    disposeCodexSystemPromptFile(systemPromptFile)
-    throw error
-  }
-}
-
-export function disposeCodexSystemPromptFile(filePath: string | null): void {
-  if (!filePath) {
-    return
-  }
-  try {
-    unlinkSync(filePath)
-  }
-  catch {
-    // Best-effort cleanup for per-turn temporary prompt files.
   }
 }

@@ -1,8 +1,3 @@
-import { randomUUID } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-
 import type { RegisteredMcpServer } from '../../../../plugins/mcp-registry'
 import { getRegisteredMcpServers } from '../../../../plugins/mcp-registry'
 import type {
@@ -153,7 +148,6 @@ export function buildCodexConfig(
   config: CodexConfig,
   _workspacePath: string,
   _resolveSkillPaths: (workspacePath: string) => string[],
-  systemPromptFile: string | null,
   effectiveModel: string | null | undefined,
   auth: CodexAppServerAuthResolution,
 ): NonNullable<ThreadForkParams['config']> {
@@ -168,9 +162,6 @@ export function buildCodexConfig(
   if (Object.keys(mcpServers).length > 0) {
     codexConfig.mcp_servers = mcpServers
   }
-  if (systemPromptFile) {
-    codexConfig.instructions_paths = [systemPromptFile]
-  }
   const authMode = resolveCodexAuthMode(config, auth)
   const externalBaseUrl = resolveCodexExternalModelProviderBaseUrl(config)
   if (externalBaseUrl) {
@@ -183,15 +174,6 @@ export function buildCodexConfig(
     codexConfig.model = effectiveModel
   }
   return codexConfig
-}
-
-export function writeSystemPromptFile(systemPrompt: string | undefined): string | null {
-  if (!systemPrompt) {
-    return null
-  }
-  const filePath = join(tmpdir(), `cradle-codex-prompt-${randomUUID()}.md`)
-  writeFileSync(filePath, systemPrompt, 'utf-8')
-  return filePath
 }
 
 export function projectCodexRuntimeAccessMode(
