@@ -24,7 +24,9 @@ function createAgent(overrides: Partial<Agent>): Agent {
   }
 }
 
-function createRuntimeCatalogItem(overrides: Partial<RuntimeCatalogItem> & { runtimeKind: string }): RuntimeCatalogItem {
+function createRuntimeCatalogItem(
+  overrides: Partial<RuntimeCatalogItem> & { runtimeKind: string },
+): RuntimeCatalogItem {
   return {
     runtimeKind: overrides.runtimeKind,
     label: overrides.label ?? overrides.runtimeKind,
@@ -157,10 +159,26 @@ describe('buildAgentProviderBatchPatches', () => {
       RUNTIME_CATALOG,
     )
 
-    expect(result.patches[0]?.patch).toEqual(expect.objectContaining({
-      providerTargetId: 'external-target-new',
-      modelId: 'model-new',
-      thinkingEffort: 'medium',
-    }))
+    expect(result.patches[0]?.patch).toEqual(
+      expect.objectContaining({
+        providerTargetId: 'external-target-new',
+        modelId: 'model-new',
+        thinkingEffort: 'medium',
+      }),
+    )
+  })
+
+  it('preserves ultra for a model that declares it', () => {
+    const result = buildAgentProviderBatchPatches(
+      [createAgent({ id: 'agent-ultra', thinkingEffort: 'ultra' })],
+      {
+        providerTarget: { kind: 'manual', id: 'profile-new' },
+        modelId: 'codex-ultra',
+        thinkingEffort: 'ultra',
+      },
+      RUNTIME_CATALOG,
+    )
+
+    expect(result.patches[0]?.patch.thinkingEffort).toBe('ultra')
   })
 })

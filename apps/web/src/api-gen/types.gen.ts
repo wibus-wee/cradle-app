@@ -4309,7 +4309,7 @@ export type GetAgentsResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4328,7 +4328,7 @@ export type PostAgentsData = {
         avatarSeed: string;
         providerTargetId?: string | null;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind?: string;
         configJson?: string;
     };
@@ -4350,7 +4350,7 @@ export type PostAgentsResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4403,7 +4403,7 @@ export type GetAgentsByIdResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4422,7 +4422,7 @@ export type PatchAgentsByIdData = {
         avatarSeed?: string;
         providerTargetId?: string | null;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind?: string;
         configJson?: string;
         enabled?: boolean;
@@ -4447,7 +4447,7 @@ export type PatchAgentsByIdResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4503,7 +4503,7 @@ export type PostAgentsImportLocalConfigResponses = {
                     avatarSeed: string;
                     providerTargetId: string | null;
                     modelId: string | null;
-                    thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+                    thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
                     runtimeKind: string;
                     configJson: string;
                     enabled: boolean;
@@ -4542,7 +4542,7 @@ export type PostAgentsImportLocalConfigResponses = {
                 avatarSeed: string;
                 providerTargetId: string | null;
                 modelId: string | null;
-                thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+                thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
                 runtimeKind: string;
                 configJson: string;
                 enabled: boolean;
@@ -4599,7 +4599,7 @@ export type PostAgentsImportLocalConfigPreviewResponses = {
                 avatarSeed: string;
                 providerTargetId: string | null;
                 modelId: string | null;
-                thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+                thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
                 runtimeKind: string;
                 configJson: string;
                 enabled: boolean;

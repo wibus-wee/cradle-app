@@ -97,8 +97,11 @@ export default {
   'detail.thinking.high.label': 'High',
   'detail.thinking.xhigh.description': 'Maximum reasoning budget for hard tasks.',
   'detail.thinking.xhigh.label': 'Extra High',
-  'detail.thinking.max.description': 'Maximum Claude Agent effort on supported models.',
+  'detail.thinking.max.description': 'Maximum reasoning effort supported by the selected runtime.',
   'detail.thinking.max.label': 'Max',
+  'detail.thinking.ultra.description':
+    'Enable the runtime\'s highest reasoning and orchestration mode on supported models.',
+  'detail.thinking.ultra.label': 'Ultra',
   'detail.thinking.low.description': 'Fast responses with light reasoning.',
   'detail.thinking.low.label': 'Low',
   'detail.thinking.medium.description': 'Balanced reasoning for everyday work.',

@@ -60,10 +60,11 @@ import { cn } from '~/lib/cn'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { SettingsMasterDetail } from '../settings/settings-container'
-import type { AgentBatchThinkingEffort, AgentProviderBatchSelection } from './agent-batch-configuration'
-import {
-  buildAgentProviderBatchPatches,
+import type {
+  AgentBatchThinkingEffort,
+  AgentProviderBatchSelection,
 } from './agent-batch-configuration'
+import { buildAgentProviderBatchPatches } from './agent-batch-configuration'
 import { AgentDetailPage } from './agent-detail'
 import { StatusDot } from './agent-status-dot'
 import { CreateAgentDialog } from './create-agent-dialog'
@@ -79,26 +80,38 @@ import {
 import { useSettingsSelectionShortcuts } from './settings-selection-shortcuts'
 
 const AGENT_THINKING_EFFORTS: Array<{ value: AgentBatchThinkingEffort }> = [
+  { value: 'none' },
+  { value: 'minimal' },
   { value: 'low' },
   { value: 'medium' },
   { value: 'high' },
   { value: 'xhigh' },
+  { value: 'max' },
+  { value: 'ultra' },
 ]
 
 type AgentManagementKey = keyof typeof import('~/locales/default').default.agentManagement
 
 const thinkingLabelKeys = {
+  none: 'detail.thinking.none.label',
+  minimal: 'detail.thinking.minimal.label',
   low: 'detail.thinking.low.label',
   medium: 'detail.thinking.medium.label',
   high: 'detail.thinking.high.label',
   xhigh: 'detail.thinking.xhigh.label',
+  max: 'detail.thinking.max.label',
+  ultra: 'detail.thinking.ultra.label',
 } satisfies Record<AgentBatchThinkingEffort, AgentManagementKey>
 
 const thinkingDescriptionKeys = {
+  none: 'detail.thinking.none.description',
+  minimal: 'detail.thinking.minimal.description',
   low: 'detail.thinking.low.description',
   medium: 'detail.thinking.medium.description',
   high: 'detail.thinking.high.description',
   xhigh: 'detail.thinking.xhigh.description',
+  max: 'detail.thinking.max.description',
+  ultra: 'detail.thinking.ultra.description',
 } satisfies Record<AgentBatchThinkingEffort, AgentManagementKey>
 
 function commonString(values: Array<string | null>): string | null {
@@ -123,9 +136,11 @@ function providerTargetCompatibleWithAgents(
   agents: Agent[],
   runtimeCatalog: RuntimeCatalogItem[],
 ): boolean {
-  return agents.every(agent =>
-    !agentUsesProviderTarget(agent, runtimeCatalog)
-    || runtimeSupportsProviderKind(agent.runtimeKind, target.providerKind, runtimeCatalog))
+  return agents.every(
+    agent =>
+      !agentUsesProviderTarget(agent, runtimeCatalog)
+      || runtimeSupportsProviderKind(agent.runtimeKind, target.providerKind, runtimeCatalog),
+  )
 }
 
 function defaultBatchProviderTarget(
@@ -134,11 +149,13 @@ function defaultBatchProviderTarget(
   runtimeCatalog: RuntimeCatalogItem[],
 ): ProviderTarget | null {
   const providerAgents = agents.filter(agent => agentUsesProviderTarget(agent, runtimeCatalog))
-  const enabledTargets = providerTargets.filter(target =>
-    target.enabled && providerTargetCompatibleWithAgents(target, providerAgents, runtimeCatalog))
+  const enabledTargets = providerTargets.filter(
+    target =>
+      target.enabled && providerTargetCompatibleWithAgents(target, providerAgents, runtimeCatalog),
+  )
   const commonTargetId = commonString(providerAgents.map(agent => agent.providerTargetId))
   const commonTarget = commonTargetId
-    ? enabledTargets.find(target => target.id === commonTargetId) ?? null
+    ? (enabledTargets.find(target => target.id === commonTargetId) ?? null)
     : null
   if (commonTarget) {
     return providerTargetFromOption(commonTarget)
@@ -157,25 +174,22 @@ function defaultBatchModelId(
   }
   const matchingAgents = agents.filter(
     agent =>
-      agentUsesProviderTarget(agent, runtimeCatalog)
-      && agent.providerTargetId === providerTarget.id,
+      agentUsesProviderTarget(agent, runtimeCatalog) && agent.providerTargetId === providerTarget.id,
   )
   return commonString(matchingAgents.map(agent => agent.modelId))
 }
 
 function readAgentBatchThinkingEffort(value: unknown): AgentBatchThinkingEffort {
   switch (value) {
+    case 'none':
+    case 'minimal':
     case 'low':
     case 'medium':
     case 'high':
     case 'xhigh':
-      return value
     case 'max':
     case 'ultra':
-      return 'xhigh'
-    case 'none':
-    case 'minimal':
-      return 'low'
+      return value
     default:
       return 'high'
   }
@@ -190,7 +204,11 @@ function defaultBatchThinkingEffort(
     return 'high'
   }
   const first = readAgentBatchThinkingEffort(providerAgents[0]?.thinkingEffort)
-  return providerAgents.every(agent => readAgentBatchThinkingEffort(agent.thinkingEffort) === first) ? first : 'high'
+  return providerAgents.every(
+    agent => readAgentBatchThinkingEffort(agent.thinkingEffort) === first,
+  )
+    ? first
+    : 'high'
 }
 
 function AgentSidebarRow({
@@ -214,23 +232,21 @@ function AgentSidebarRow({
   const avatarUrl = agent.avatarUrl || buildAvatarUrl(agent.avatarStyle, agent.avatarSeed)
   const lobeIconSlug = agent.avatarStyle === 'lobehub-icon' ? agent.avatarSeed : null
   const providerTarget = agent.providerTargetId
-    ? providerTargets.find(target => target.id === agent.providerTargetId) ?? null
+    ? (providerTargets.find(target => target.id === agent.providerTargetId) ?? null)
     : null
   const runtime = runtimeCatalog.find(item => item.runtimeKind === agent.runtimeKind)
   const runtimeConfig = AgentRuntimeConfigJsonSchema.parse(agent.configJson)
   const usesCliLaunchConfig = runtime
     ? runtimeCatalogItemUsesCliLaunchConfig(runtime)
     : runtimeConfig.cliTui !== null
-  const cliTuiLaunch
-    = usesCliLaunchConfig
-      ? runtimeConfig.cliTui
-      : null
-  const subtitle
-    = usesCliLaunchConfig
-      ? [runtime?.label ?? agent.runtimeKind, cliTuiLaunch?.preset ?? cliTuiLaunch?.executable]
-          .filter(Boolean)
-          .join(' ·\n') || runtime?.label || agent.runtimeKind
-      : [providerTarget?.name, agent.modelId].filter(Boolean).join(' ·\n') || undefined
+  const cliTuiLaunch = usesCliLaunchConfig ? runtimeConfig.cliTui : null
+  const subtitle = usesCliLaunchConfig
+    ? [runtime?.label ?? agent.runtimeKind, cliTuiLaunch?.preset ?? cliTuiLaunch?.executable]
+        .filter(Boolean)
+        .join(' ·\n')
+        || runtime?.label
+        || agent.runtimeKind
+    : [providerTarget?.name, agent.modelId].filter(Boolean).join(' ·\n') || undefined
 
   return (
     <div
@@ -262,15 +278,19 @@ function AgentSidebarRow({
       >
         <div className="size-7 shrink-0 overflow-hidden rounded-lg bg-foreground/5">
           {lobeIconSlug
-            ? <ProviderIcon iconSlug={lobeIconSlug} presetId={null} className="size-full p-1" />
-            : avatarUrl && (
-                <img
-                  src={avatarUrl}
-                  alt={agent.name}
-                  className="size-full object-cover"
-                  crossOrigin="anonymous"
-                />
-              )}
+? (
+            <ProviderIcon iconSlug={lobeIconSlug} presetId={null} className="size-full p-1" />
+          )
+: (
+            avatarUrl && (
+              <img
+                src={avatarUrl}
+                alt={agent.name}
+                className="size-full object-cover"
+                crossOrigin="anonymous"
+              />
+            )
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -319,21 +339,31 @@ function AgentBatchProviderPanel({
   onClear: () => void
 }) {
   const { t } = useTranslation('agentManagement')
-  const providerAgents = selectedAgents.filter(agent => agentUsesProviderTarget(agent, runtimeCatalog))
+  const providerAgents = selectedAgents.filter(agent =>
+    agentUsesProviderTarget(agent, runtimeCatalog))
   const skippedRuntimeOwnedCount = selectedAgents.length - providerAgents.length
-  const selectableProviderTargets = providerTargets.filter(target =>
-      target.enabled && providerTargetCompatibleWithAgents(target, providerAgents, runtimeCatalog))
-  const thinkingOptions = useMemo<Array<ThinkingOption<AgentBatchThinkingEffort>>>(() =>
-    AGENT_THINKING_EFFORTS.map((option) => {
-      const value = option.value
-      return {
-        value,
-        label: t(thinkingLabelKeys[value]),
-        description: t(thinkingDescriptionKeys[value]),
-      }
-    }), [t])
+  const selectableProviderTargets = providerTargets.filter(
+    target =>
+      target.enabled && providerTargetCompatibleWithAgents(target, providerAgents, runtimeCatalog),
+  )
+  const thinkingOptions = useMemo<Array<ThinkingOption<AgentBatchThinkingEffort>>>(
+    () =>
+      AGENT_THINKING_EFFORTS.map((option) => {
+        const value = option.value
+        return {
+          value,
+          label: t(thinkingLabelKeys[value]),
+          description: t(thinkingDescriptionKeys[value]),
+        }
+      }),
+    [t],
+  )
   const defaultSelection = (() => {
-    const providerTarget = defaultBatchProviderTarget(selectedAgents, providerTargets, runtimeCatalog)
+    const providerTarget = defaultBatchProviderTarget(
+      selectedAgents,
+      providerTargets,
+      runtimeCatalog,
+    )
     if (!providerTarget) {
       return null
     }
@@ -347,20 +377,16 @@ function AgentBatchProviderPanel({
     null,
   )
   const selection = selectionOverride ?? defaultSelection
-  const initialProviderTargetIds = useMemo(() => [selection?.providerTarget.id ?? null], [selection?.providerTarget.id])
-  const {
-    modelsByProviderTargetId,
-    loadingProviderTargetIds,
-    requestProviderTargetModels,
-  } = useProviderTargetModelMap(
-    selectableProviderTargets,
-    initialProviderTargetIds,
+  const initialProviderTargetIds = useMemo(
+    () => [selection?.providerTarget.id ?? null],
+    [selection?.providerTarget.id],
   )
+  const { modelsByProviderTargetId, loadingProviderTargetIds, requestProviderTargetModels }
+    = useProviderTargetModelMap(selectableProviderTargets, initialProviderTargetIds)
   const selectedProviderTargetId = selection?.providerTarget.id ?? null
   const selectedModels = useMemo(
-    () => selectedProviderTargetId
-      ? (modelsByProviderTargetId[selectedProviderTargetId] ?? [])
-      : [],
+    () =>
+      selectedProviderTargetId ? (modelsByProviderTargetId[selectedProviderTargetId] ?? []) : [],
     [modelsByProviderTargetId, selectedProviderTargetId],
   )
   const selectedModel = selectedModels.find(model => model.id === selection?.modelId) ?? null
@@ -368,15 +394,17 @@ function AgentBatchProviderPanel({
     ? loadingProviderTargetIds.has(selectedProviderTargetId)
     : false
 
-  const resolveThinkingForModel = useCallback((
-    model: ModelDescriptor | null,
-    current: AgentBatchThinkingEffort,
-  ): AgentBatchThinkingEffort =>
-    selectSupportedThinkingValue(model, thinkingOptions, current, 'high'), [thinkingOptions])
+  const resolveThinkingForModel = useCallback(
+    (model: ModelDescriptor | null, current: AgentBatchThinkingEffort): AgentBatchThinkingEffort =>
+      selectSupportedThinkingValue(model, thinkingOptions, current, 'high'),
+    [thinkingOptions],
+  )
 
   const applyProviderTargetSelection = (nextProviderTargetId: string) => {
     requestProviderTargetModels(nextProviderTargetId)
-    const nextTarget = selectableProviderTargets.find(target => target.id === nextProviderTargetId)
+    const nextTarget = selectableProviderTargets.find(
+      target => target.id === nextProviderTargetId,
+    )
     const nextModel = (modelsByProviderTargetId[nextProviderTargetId] ?? [])[0] ?? null
     setSelectionOverride({
       providerTarget: nextTarget
@@ -385,14 +413,18 @@ function AgentBatchProviderPanel({
       modelId: nextModel?.id ?? null,
       thinkingEffort: nextModel
         ? resolveThinkingForModel(nextModel, selection?.thinkingEffort ?? 'high')
-        : selection?.thinkingEffort ?? 'high',
+        : (selection?.thinkingEffort ?? 'high'),
     })
   }
 
   const applyModelSelection = (nextModelId: string | null, nextProviderTargetId: string) => {
-    const nextTarget = selectableProviderTargets.find(target => target.id === nextProviderTargetId)
+    const nextTarget = selectableProviderTargets.find(
+      target => target.id === nextProviderTargetId,
+    )
     const nextModel = nextModelId
-      ? ((modelsByProviderTargetId[nextProviderTargetId] ?? []).find(model => model.id === nextModelId) ?? null)
+      ? ((modelsByProviderTargetId[nextProviderTargetId] ?? []).find(
+          model => model.id === nextModelId,
+        ) ?? null)
       : null
     setSelectionOverride({
       providerTarget: nextTarget
@@ -429,8 +461,8 @@ function AgentBatchProviderPanel({
             {t('batch.provider.description')}
             {skippedRuntimeOwnedCount > 0 && (
               <>
-                {' '}
-                {t('batch.provider.skippedRuntimeOwned', { count: skippedRuntimeOwnedCount })}
+{' '}
+{t('batch.provider.skippedRuntimeOwned', { count: skippedRuntimeOwnedCount })}
               </>
             )}
           </p>
@@ -472,7 +504,9 @@ function AgentBatchProviderPanel({
                 onApply(selection)
               }
             }}
-            disabled={busy || !selection || selection.modelId === null || providerAgents.length === 0}
+            disabled={
+              busy || !selection || selection.modelId === null || providerAgents.length === 0
+            }
           >
             {t('batch.provider.apply')}
           </Button>
@@ -505,7 +539,9 @@ function AgentImportDialog({
   onToggleCandidate: (candidateId: string, checked: boolean) => void
   onImport: () => void
 }) {
-  const importableSelectedCount = preview?.candidates.filter(candidate => candidate.importable && selectedIds.has(candidate.id)).length ?? 0
+  const importableSelectedCount
+    = preview?.candidates.filter(candidate => candidate.importable && selectedIds.has(candidate.id))
+      .length ?? 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -513,7 +549,8 @@ function AgentImportDialog({
         <DialogHeader>
           <DialogTitle>Import Agents</DialogTitle>
           <DialogDescription>
-            Review detected Claude, Codex, Gemini, Pi, Kimi, and CC Switch mappings before creating Agents.
+            Review detected Claude, Codex, Gemini, Pi, Kimi, and CC Switch mappings before creating
+            Agents.
           </DialogDescription>
         </DialogHeader>
 
@@ -543,7 +580,9 @@ function AgentImportDialog({
                   key={candidate.id}
                   className={cn(
                     'flex gap-3 border-b border-foreground/6 px-3 py-3 last:border-b-0',
-                    candidate.importable ? 'cursor-pointer hover:bg-foreground/[0.025]' : 'opacity-60',
+                    candidate.importable
+                      ? 'cursor-pointer hover:bg-foreground/[0.025]'
+                      : 'opacity-60',
                   )}
                 >
                   <Checkbox
@@ -554,8 +593,16 @@ function AgentImportDialog({
                   {(candidate.avatarUrl || candidate.iconSlug) && (
                     <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-foreground/8 bg-background">
                       {candidate.avatarUrl
-                        ? <img src={candidate.avatarUrl} alt="" className="size-5 object-contain" />
-                        : <ProviderIcon iconSlug={candidate.iconSlug} presetId={candidate.app} className="size-5" />}
+? (
+                        <img src={candidate.avatarUrl} alt="" className="size-5 object-contain" />
+                      )
+: (
+                        <ProviderIcon
+                          iconSlug={candidate.iconSlug}
+                          presetId={candidate.app}
+                          className="size-5"
+                        />
+                      )}
                     </span>
                   )}
                   <div className="min-w-0 flex-1 space-y-1">
@@ -563,7 +610,10 @@ function AgentImportDialog({
                       <span className="truncate text-[13px] font-medium text-foreground">
                         {candidate.agentName}
                       </span>
-                      <Badge variant={candidate.sourceKind === 'cc-switch' ? 'secondary' : 'outline'} className="font-normal">
+                      <Badge
+                        variant={candidate.sourceKind === 'cc-switch' ? 'secondary' : 'outline'}
+                        className="font-normal"
+                      >
                         {candidate.sourceLabel}
                       </Badge>
                       {candidate.alreadyConfigured && (
@@ -576,8 +626,12 @@ function AgentImportDialog({
                       <span>{candidate.app}</span>
                       <span className="truncate">{candidate.resolvedProviderName}</span>
                       {candidate.modelId && <span className="truncate">{candidate.modelId}</span>}
-                      {candidate.endpoint && <span className="truncate font-mono">{candidate.endpoint}</span>}
-                      {candidate.executable && <span className="truncate font-mono">{candidate.executable}</span>}
+                      {candidate.endpoint && (
+                        <span className="truncate font-mono">{candidate.endpoint}</span>
+                      )}
+                      {candidate.executable && (
+                        <span className="truncate font-mono">{candidate.executable}</span>
+                      )}
                     </div>
                     {candidate.notes.map(note => (
                       <p key={note} className="text-[11.5px] leading-relaxed text-muted-foreground">
@@ -630,7 +684,9 @@ export function AgentList() {
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importPreview, setImportPreview] = useState<PreviewLocalConfigImportResult | null>(null)
-  const [selectedImportCandidateIds, setSelectedImportCandidateIds] = useState<Set<string>>(() => new Set())
+  const [selectedImportCandidateIds, setSelectedImportCandidateIds] = useState<Set<string>>(
+    () => new Set(),
+  )
   const [importError, setImportError] = useState<string | null>(null)
   const [batchBusy, setBatchBusy] = useState(false)
   const agentFocusTargetId = useSettingsOverlayStore(state => state.agentFocusTarget?.id ?? null)
@@ -648,7 +704,7 @@ export function AgentList() {
   })()
 
   const selectedAgentId = selectedIdFromSet(selectedIds)
-  const selectedAgent = (selectedAgentId ? agents.find(a => a.id === selectedAgentId) : undefined)
+  const selectedAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : undefined
   const selectedAgents = selectedRecords(agents, selectedIds)
   const allVisibleSelected = visibleRecordsAreSelected(visibleAgents, selectedIds)
 
@@ -704,9 +760,15 @@ export function AgentList() {
     try {
       const preview = await previewLocalConfigImport.mutateAsync({ body: {} })
       setImportPreview(preview)
-      setSelectedImportCandidateIds(new Set(preview.candidates.filter(candidate => candidate.importable).map(candidate => candidate.id)))
+      setSelectedImportCandidateIds(
+        new Set(
+          preview.candidates
+            .filter(candidate => candidate.importable)
+            .map(candidate => candidate.id),
+        ),
+      )
     }
-    catch (error) {
+ catch (error) {
       setImportError(error instanceof Error ? error.message : 'Import preview failed')
     }
   }
@@ -717,7 +779,7 @@ export function AgentList() {
       if (checked) {
         next.add(candidateId)
       }
-      else {
+ else {
         next.delete(candidateId)
       }
       return next
@@ -732,8 +794,9 @@ export function AgentList() {
           candidateIds: Array.from(selectedImportCandidateIds),
         },
       })
-      const selectedImport = result.agents.find(imported => imported.status === 'created' && imported.agent)
-        ?? result.agents.find(imported => imported.status === 'existing' && imported.agent)
+      const selectedImport
+        = result.agents.find(imported => imported.status === 'created' && imported.agent)
+          ?? result.agents.find(imported => imported.status === 'existing' && imported.agent)
       if (selectedImport?.agent) {
         setCreateDialogOpen(false)
         setSelectedIds(new Set([selectedImport.agent.id]))
@@ -748,7 +811,7 @@ export function AgentList() {
       setImportMessage(parts.join(' · ') || 'No changes')
       setImportDialogOpen(false)
     }
-    catch (error) {
+ catch (error) {
       setImportError(error instanceof Error ? error.message : 'Import failed')
     }
   }
@@ -773,73 +836,73 @@ export function AgentList() {
   }
 
   const selectAgent = (agentId: string, selected: boolean, shiftKey: boolean) => {
-      setCreateDialogOpen(false)
-      setSelectedIds((prev) => {
-        if (shiftKey) {
-          return applyVisibleRangeSelection(
-            prev,
-            visibleAgents,
-            selectionAnchorIdRef.current,
-            agentId,
-            selected,
-          )
-        }
+    setCreateDialogOpen(false)
+    setSelectedIds((prev) => {
+      if (shiftKey) {
+        return applyVisibleRangeSelection(
+          prev,
+          visibleAgents,
+          selectionAnchorIdRef.current,
+          agentId,
+          selected,
+        )
+      }
 
-        const next = new Set(prev)
-        if (selected) {
-          next.add(agentId)
-        }
+      const next = new Set(prev)
+      if (selected) {
+        next.add(agentId)
+      }
  else {
-          next.delete(agentId)
-        }
-        return next
-      })
-      selectionAnchorIdRef.current = agentId
-    }
+        next.delete(agentId)
+      }
+      return next
+    })
+    selectionAnchorIdRef.current = agentId
+  }
 
   const openAgent = (agentId: string, shiftKey: boolean) => {
-      if (shiftKey) {
-        selectAgent(agentId, true, true)
-        return
-      }
-
-      setSelectedIds(new Set([agentId]))
-      selectionAnchorIdRef.current = agentId
-      setCreateDialogOpen(false)
+    if (shiftKey) {
+      selectAgent(agentId, true, true)
+      return
     }
+
+    setSelectedIds(new Set([agentId]))
+    selectionAnchorIdRef.current = agentId
+    setCreateDialogOpen(false)
+  }
 
   const handleBatchToggle = async (enabled: boolean) => {
-      if (selectedAgents.length === 0) {
-        return
-      }
-      setBatchBusy(true)
-      try {
-        await Promise.all(
-          selectedAgents.map(async (agent) => {
-            await updateAgent.mutateAsync({
-              path: { id: agent.id },
-              body: {
-                name: agent.name,
-                description: agent.description,
-                avatarStyle: agent.avatarStyle,
-                avatarSeed: agent.avatarSeed,
-                providerTargetId: agent.providerTargetId,
-                modelId: agent.modelId,
-                thinkingEffort: agent.thinkingEffort,
-                runtimeKind: agent.runtimeKind,
-                configJson: agent.configJson,
-                enabled,
-              },
-            })
-          }),
-        )
-        setSelectedIds(new Set())
-        selectionAnchorIdRef.current = null
-      }
- finally {
-        setBatchBusy(false)
-      }
+    if (selectedAgents.length === 0) {
+      return
     }
+    setBatchBusy(true)
+    try {
+      await Promise.all(
+        selectedAgents.map(async (agent) => {
+          await updateAgent.mutateAsync({
+            path: { id: agent.id },
+            body: {
+              name: agent.name,
+              description: agent.description,
+              avatarStyle: agent.avatarStyle,
+              avatarSeed: agent.avatarSeed,
+              providerTargetId: agent.providerTargetId,
+              modelId: agent.modelId,
+              thinkingEffort: agent.thinkingEffort,
+              runtimeKind: agent.runtimeKind,
+              configJson: agent.configJson,
+              enabled,
+            },
+          })
+        }),
+      )
+      setSelectedIds(new Set())
+      selectionAnchorIdRef.current = null
+    }
+ finally {
+      setBatchBusy(false)
+    }
+  }
 
   const handleBatchDelete = async () => {
     if (selectedAgents.length === 0) {
@@ -847,7 +910,9 @@ export function AgentList() {
     }
     setBatchBusy(true)
     try {
-      await Promise.all(selectedAgents.map(agent => removeAgent.mutateAsync({ path: { id: agent.id } })))
+      await Promise.all(
+        selectedAgents.map(agent => removeAgent.mutateAsync({ path: { id: agent.id } })),
+      )
       setSelectedIds(new Set())
       selectionAnchorIdRef.current = null
     }
@@ -857,27 +922,27 @@ export function AgentList() {
   }
 
   const handleBatchConfigureProvider = async (selection: AgentProviderBatchSelection) => {
-      const { patches } = buildAgentProviderBatchPatches(selectedAgents, selection, runtimeCatalog)
-      if (patches.length === 0) {
-        return
-      }
-
-      setBatchBusy(true)
-      try {
-        await Promise.all(
-          patches.map(({ id, patch }) =>
-            updateAgent.mutateAsync({
-              path: { id },
-              body: patch,
-            })),
-        )
-        setSelectedIds(new Set())
-        selectionAnchorIdRef.current = null
-      }
- finally {
-        setBatchBusy(false)
-      }
+    const { patches } = buildAgentProviderBatchPatches(selectedAgents, selection, runtimeCatalog)
+    if (patches.length === 0) {
+      return
     }
+
+    setBatchBusy(true)
+    try {
+      await Promise.all(
+        patches.map(({ id, patch }) =>
+          updateAgent.mutateAsync({
+            path: { id },
+            body: patch,
+          })),
+      )
+      setSelectedIds(new Set())
+      selectionAnchorIdRef.current = null
+    }
+ finally {
+      setBatchBusy(false)
+    }
+  }
 
   const selectionShortcutScopeRef = useSettingsSelectionShortcuts({
     hasVisibleRecords: visibleAgents.length > 0,
@@ -908,75 +973,82 @@ export function AgentList() {
         <DownloadIcon />
         {previewLocalConfigImport.isPending ? 'Scanning' : 'Import'}
       </Button>
-      <Button data-testid="new-agent-btn" size="sm" onClick={openCreateDialog} disabled={createDialogOpen}>
+      <Button
+        data-testid="new-agent-btn"
+        size="sm"
+        onClick={openCreateDialog}
+        disabled={createDialogOpen}
+      >
         <PlusIcon />
         Add agent
       </Button>
     </div>
   )
 
-  const toolbar = selectedIds.size > 0
-    ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <button
-              type="button"
-              onClick={toggleVisibleSelected}
-              className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-foreground/[0.035]"
-            >
-              {allVisibleSelected
-                ? <SquareCheckIcon className="size-3.5" />
-                : <SquareIcon className="size-3.5" />}
-              <span>
-                {selectedIds.size}
-                {' '}
-                selected
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="text-muted-foreground/70 hover:text-foreground"
-            >
-              Clear
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => void handleBatchToggle(true)}
-              disabled={batchBusy || selectedAgents.length === 0}
-            >
-              Enable
-            </Button>
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => void handleBatchToggle(false)}
-              disabled={batchBusy || selectedAgents.length === 0}
-            >
-              Disable
-            </Button>
-            <Button
-              size="xs"
-              variant="destructive"
-              onClick={() => void handleBatchDelete()}
-              disabled={batchBusy || selectedAgents.length === 0}
-            >
-              <Trash2Icon className="size-3" />
-              Delete
-            </Button>
-          </div>
+  const toolbar
+    = selectedIds.size > 0
+? (
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+        <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+          <button
+            type="button"
+            onClick={toggleVisibleSelected}
+            className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-foreground/[0.035]"
+          >
+            {allVisibleSelected
+? (
+              <SquareCheckIcon className="size-3.5" />
+            )
+: (
+              <SquareIcon className="size-3.5" />
+            )}
+            <span>
+{selectedIds.size}
+{' '}
+selected
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="text-muted-foreground/70 hover:text-foreground"
+          >
+            Clear
+          </button>
         </div>
-      )
-    : null
+        <div className="flex items-center gap-2">
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => void handleBatchToggle(true)}
+            disabled={batchBusy || selectedAgents.length === 0}
+          >
+            Enable
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => void handleBatchToggle(false)}
+            disabled={batchBusy || selectedAgents.length === 0}
+          >
+            Disable
+          </Button>
+          <Button
+            size="xs"
+            variant="destructive"
+            onClick={() => void handleBatchDelete()}
+            disabled={batchBusy || selectedAgents.length === 0}
+          >
+            <Trash2Icon className="size-3" />
+            Delete
+          </Button>
+        </div>
+      </div>
+    )
+: null
 
   const listPane = (
-    <div
-      ref={selectionShortcutScopeRef}
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3"
-    >
+    <div ref={selectionShortcutScopeRef} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3">
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 !text-muted-foreground/60" />
         <Input
@@ -992,9 +1064,9 @@ export function AgentList() {
           {visibleAgents.length > 0 && (
             <div className="mb-1 flex items-center justify-between gap-2 px-2 py-0.5 text-[10.5px] text-muted-foreground/60">
               <span>
-                {visibleAgents.length}
-                {' '}
-                visible
+{visibleAgents.length}
+{' '}
+visible
               </span>
               <button
                 type="button"
@@ -1016,8 +1088,7 @@ export function AgentList() {
                 active={selectedAgentId === agent.id}
                 selected={selectedIds.has(agent.id)}
                 onClick={shiftKey => openAgent(agent.id, shiftKey)}
-                onToggleSelected={(checked, shiftKey) =>
-                  selectAgent(agent.id, checked, shiftKey)}
+                onToggleSelected={(checked, shiftKey) => selectAgent(agent.id, checked, shiftKey)}
               />
             ))}
 
@@ -1034,14 +1105,14 @@ export function AgentList() {
       {agents.length > 0 && (
         <div className="px-1 pb-1 pt-1 text-[10.5px] tabular-nums text-muted-foreground/60">
           {agents.length}
-          {' '}
-          agent
-          {agents.length === 1 ? '' : 's'}
-          {' '}
-          ·
-          {agents.filter(a => a.enabled).length}
-          {' '}
-          active
+{' '}
+agent
+{agents.length === 1 ? '' : 's'}
+{' '}
+·
+{agents.filter(a => a.enabled).length}
+{' '}
+active
         </div>
       )}
     </div>
@@ -1050,48 +1121,45 @@ export function AgentList() {
   const detailPane = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col py-5 pl-6 pr-5">
       {selectedAgents.length > 1
-          ? (
-              <AgentBatchProviderPanel
-                key={selectedAgents.map(agent => agent.id).join('|')}
-                selectedAgents={selectedAgents}
-                providerTargets={providerOptions}
-                runtimeCatalog={runtimeCatalog}
-                busy={batchBusy}
-                onApply={selection => void handleBatchConfigureProvider(selection)}
-                onClear={clearSelection}
-              />
-            )
-          : selectedAgent
-            ? (
-                <div key={selectedAgent.id} className="flex-1">
-                  <AgentDetailPage
-                    agent={selectedAgent}
-                    onDeleted={handleDeleted}
-                  />
-                </div>
-              )
-            : (
-                <div className="flex flex-1 items-center justify-center">
-                  <Empty className="border-none">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <BotIcon />
-                      </EmptyMedia>
-                      <EmptyTitle>No agent selected</EmptyTitle>
-                      <EmptyDescription>
-                        Pick an agent on the left to view its configuration, or add a new one to get
-                        started.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                      <Button size="sm" variant="outline" onClick={openCreateDialog}>
-                        <PlusIcon />
-                        Add agent
-                      </Button>
-                    </EmptyContent>
-                  </Empty>
-                </div>
-              )}
+? (
+        <AgentBatchProviderPanel
+          key={selectedAgents.map(agent => agent.id).join('|')}
+          selectedAgents={selectedAgents}
+          providerTargets={providerOptions}
+          runtimeCatalog={runtimeCatalog}
+          busy={batchBusy}
+          onApply={selection => void handleBatchConfigureProvider(selection)}
+          onClear={clearSelection}
+        />
+      )
+: selectedAgent
+? (
+        <div key={selectedAgent.id} className="flex-1">
+          <AgentDetailPage agent={selectedAgent} onDeleted={handleDeleted} />
+        </div>
+      )
+: (
+        <div className="flex flex-1 items-center justify-center">
+          <Empty className="border-none">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <BotIcon />
+              </EmptyMedia>
+              <EmptyTitle>No agent selected</EmptyTitle>
+              <EmptyDescription>
+                Pick an agent on the left to view its configuration, or add a new one to get
+                started.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button size="sm" variant="outline" onClick={openCreateDialog}>
+                <PlusIcon />
+                Add agent
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
+      )}
     </div>
   )
 

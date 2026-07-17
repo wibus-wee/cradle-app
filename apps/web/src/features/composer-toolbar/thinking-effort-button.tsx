@@ -34,7 +34,9 @@ export function ThinkingEffortButton({
   occludeNativeBrowserSurface?: boolean
 }) {
   const reduceMotion = useReducedMotion()
-  const tiers = thinkingOptions.filter((option): option is ThinkingOption<ConcreteEffort> => option.value !== null)
+  const tiers = thinkingOptions.filter(
+    (option): option is ThinkingOption<ConcreteEffort> => option.value !== null,
+  )
 
   const selectedIndex = tiers.findIndex(option => option.value === thinkingEffort)
   const currentIndex = selectedIndex === -1 ? 0 : selectedIndex
@@ -44,10 +46,12 @@ export function ThinkingEffortButton({
 
   const active = tiers[activeIndex] ?? tiers[0]
   const activeLabel = active?.label ?? 'unknown'
+  const isUltra = active?.value === 'ultra'
   const isDisabled = tiers.length === 0
-  const activeDepthBarCount = isDisabled || active?.value === 'none'
-    ? 0
-    : Math.max(1, Math.round(((activeIndex + 1) / tiers.length) * DEPTH_BAR_HEIGHTS.length))
+  const activeDepthBarCount
+    = isDisabled || active?.value === 'none'
+      ? 0
+      : Math.max(1, Math.round(((activeIndex + 1) / tiers.length) * DEPTH_BAR_HEIGHTS.length))
   const surfaceProps = occludeNativeBrowserSurface ? BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS : {}
   const pointerStartXRef = useRef<number | null>(null)
   const pointerStartIndexRef = useRef(currentIndex)
@@ -152,7 +156,7 @@ export function ThinkingEffortButton({
     try {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    catch {
+ catch {
       // Pointer capture may already be released.
     }
 
@@ -190,11 +194,11 @@ export function ThinkingEffortButton({
       event.preventDefault()
       selectOffset(1)
     }
-    else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
+ else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
       event.preventDefault()
       selectOffset(-1)
     }
-    else if (event.key === 'Enter' || event.key === ' ') {
+ else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       selectOffset(1)
     }
@@ -220,10 +224,14 @@ export function ThinkingEffortButton({
       title={`Thinking effort: ${activeLabel}`}
       className={cn(
         'inline-flex h-6 shrink-0 select-none items-center rounded-[min(var(--radius-md),10px)] px-1.5 text-xs outline-none transition-colors',
-        'bg-foreground/[0.055] text-muted-foreground transition-colors',
-        'hover:bg-foreground/[0.08] hover:text-foreground',
-        'focus-visible:ring-2 focus-visible:ring-primary/35',
-        mode === 'dragging' && 'cursor-grabbing bg-foreground/[0.08] text-foreground',
+        isUltra
+          ? 'bg-rose-500/15 text-rose-800 hover:bg-rose-500/20 hover:text-rose-900 focus-visible:ring-rose-500/35 dark:text-rose-200 dark:hover:text-rose-100'
+          : 'bg-foreground/[0.055] text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-primary/35',
+        'focus-visible:ring-2',
+        mode === 'dragging'
+        && (isUltra
+            ? 'cursor-grabbing bg-rose-500/20 text-rose-900 dark:text-rose-100'
+            : 'cursor-grabbing bg-foreground/[0.08] text-foreground'),
         'disabled:pointer-events-none disabled:opacity-50',
       )}
       style={{ touchAction: 'none' }}
@@ -237,8 +245,14 @@ export function ThinkingEffortButton({
             key={height}
             className={cn(
               'rounded-full transition-colors',
-              index < activeDepthBarCount ? 'bg-muted-foreground/55' : 'bg-muted-foreground/12',
-              mode === 'dragging' && index < activeDepthBarCount && 'bg-foreground/65',
+              index < activeDepthBarCount
+                ? isUltra
+                  ? 'bg-rose-700/70 dark:bg-rose-200/75'
+                  : 'bg-muted-foreground/55'
+                : 'bg-muted-foreground/12',
+              mode === 'dragging'
+              && index < activeDepthBarCount
+              && (isUltra ? 'bg-rose-900/80 dark:bg-rose-100/85' : 'bg-foreground/65'),
             )}
             style={{ width: 1.5, height }}
           />
@@ -274,7 +288,8 @@ export function ThinkingEffortButton({
               style={{ width: SEGMENT_WIDTH }}
               className={cn(
                 'relative z-10 flex h-3 items-center justify-center rounded-[4px] transition-colors',
-                index > 0 && 'before:absolute before:left-0 before:top-1/2 before:h-2 before:w-px before:-translate-y-1/2 before:bg-foreground/10',
+                index > 0
+                && 'before:absolute before:left-0 before:top-1/2 before:h-2 before:w-px before:-translate-y-1/2 before:bg-foreground/10',
                 isSelected && 'before:bg-transparent',
               )}
             >
@@ -288,22 +303,29 @@ export function ThinkingEffortButton({
           )
         })}
       </m.span>
-      <span className="relative inline-flex mt-0.5 min-w-[3ch] shrink-0 items-center overflow-hidden whitespace-nowrap text-[11px] font-medium text-muted-foreground/80">
+      <span
+        className={cn(
+          'relative inline-flex mt-0.5 min-w-[3ch] shrink-0 items-center overflow-hidden whitespace-nowrap text-[11px] font-medium',
+          isUltra ? 'text-rose-800/90 dark:text-rose-200/90' : 'text-muted-foreground/80',
+        )}
+      >
         {mode === 'dragging'
-          ? activeLabel
-          : (
-              <AnimatePresence initial={false} mode="popLayout">
-                <m.span
-                  key={active?.value ?? 'unknown'}
-                  initial={{ opacity: 0, y: labelDirection > 0 ? 8 : -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: labelDirection > 0 ? -8 : 8 }}
-                  transition={labelTransition}
-                >
-                  {activeLabel}
-                </m.span>
-              </AnimatePresence>
-            )}
+? (
+          activeLabel
+        )
+: (
+          <AnimatePresence initial={false} mode="popLayout">
+            <m.span
+              key={active?.value ?? 'unknown'}
+              initial={{ opacity: 0, y: labelDirection > 0 ? 8 : -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: labelDirection > 0 ? -8 : 8 }}
+              transition={labelTransition}
+            >
+              {activeLabel}
+            </m.span>
+          </AnimatePresence>
+        )}
       </span>
     </m.button>
   )

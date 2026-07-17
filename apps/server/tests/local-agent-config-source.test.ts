@@ -56,7 +56,7 @@ afterEach(() => {
   if (previousPath === undefined) {
     delete process.env.PATH
   }
-  else {
+ else {
     process.env.PATH = previousPath
     previousPath = undefined
   }
@@ -66,29 +66,38 @@ describe('local agent config external provider source', () => {
   it('maps local Claude and Codex fixture config into external provider records', () => {
     const root = createTempDir()
     const config = createFixtureConfig(root)
-    writeFileSync(config.claudeSettingsPath, JSON.stringify({
-      env: {
-        ANTHROPIC_BASE_URL: 'https://anthropic.example.test',
-        ANTHROPIC_MODEL: 'claude-sonnet-test',
-        ANTHROPIC_AUTH_TOKEN: 'test-anthropic-secret',
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-test',
-        ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-test',
-      },
-    }))
-    writeFileSync(config.codexConfigPath, [
-      'model_provider = "fixture"',
-      'model = "gpt-test"',
-      'model_reasoning_effort = "high"',
-      'approval_policy = "on-request"',
-      'sandbox_mode = "workspace-write"',
-      '',
-      '[model_providers.fixture]',
-      'base_url = "https://openai.example.test/v1"',
-      'wire_api = "responses"',
-    ].join('\n'))
-    writeFileSync(config.codexAuthPath, JSON.stringify({
-      OPENAI_API_KEY: 'test-openai-secret',
-    }))
+    writeFileSync(
+      config.claudeSettingsPath,
+      JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: 'https://anthropic.example.test',
+          ANTHROPIC_MODEL: 'claude-sonnet-test',
+          ANTHROPIC_AUTH_TOKEN: 'test-anthropic-secret',
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-test',
+          ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-test',
+        },
+      }),
+    )
+    writeFileSync(
+      config.codexConfigPath,
+      [
+        'model_provider = "fixture"',
+        'model = "gpt-test"',
+        'model_reasoning_effort = "ultra"',
+        'approval_policy = "on-request"',
+        'sandbox_mode = "workspace-write"',
+        '',
+        '[model_providers.fixture]',
+        'base_url = "https://openai.example.test/v1"',
+        'wire_api = "responses"',
+      ].join('\n'),
+    )
+    writeFileSync(
+      config.codexAuthPath,
+      JSON.stringify({
+        OPENAI_API_KEY: 'test-openai-secret',
+      }),
+    )
     setPath('')
 
     const snapshot = readLocalAgentConfigExternalProviderSnapshot(config)
@@ -122,7 +131,7 @@ describe('local agent config external provider source', () => {
           baseUrl: 'https://openai.example.test/v1',
           model: 'gpt-test',
           apiMode: 'responses',
-          reasoningEffort: 'high',
+          reasoningEffort: 'ultra',
           approvalPolicy: 'on-request',
           sandboxMode: 'workspace-write',
         },
@@ -130,8 +139,12 @@ describe('local agent config external provider source', () => {
         current: true,
       }),
     ])
-    expect(JSON.stringify(snapshot.providers.map(provider => provider.metadata))).not.toContain('test-anthropic-secret')
-    expect(JSON.stringify(snapshot.providers.map(provider => provider.metadata))).not.toContain('test-openai-secret')
+    expect(JSON.stringify(snapshot.providers.map(provider => provider.metadata))).not.toContain(
+      'test-anthropic-secret',
+    )
+    expect(JSON.stringify(snapshot.providers.map(provider => provider.metadata))).not.toContain(
+      'test-openai-secret',
+    )
   })
 
   it('keeps CLI import records alongside Claude and Codex provider config', () => {
@@ -142,15 +155,15 @@ describe('local agent config external provider source', () => {
     const claudePath = createExecutable(binDir, 'claude')
     const codexPath = createExecutable(binDir, 'codex')
     setPath(binDir)
-    writeFileSync(config.claudeSettingsPath, JSON.stringify({
-      env: {
-        ANTHROPIC_MODEL: 'claude-overlap-test',
-      },
-    }))
-    writeFileSync(config.codexConfigPath, [
-      'model = "gpt-overlap-test"',
-      '',
-    ].join('\n'))
+    writeFileSync(
+      config.claudeSettingsPath,
+      JSON.stringify({
+        env: {
+          ANTHROPIC_MODEL: 'claude-overlap-test',
+        },
+      }),
+    )
+    writeFileSync(config.codexConfigPath, ['model = "gpt-overlap-test"', ''].join('\n'))
 
     const snapshot = readLocalAgentConfigExternalProviderSnapshot(config)
 
@@ -281,20 +294,26 @@ describe('local agent config external provider source', () => {
   it('emits warnings for partial config without credentials', () => {
     const root = createTempDir()
     const config = createFixtureConfig(root)
-    writeFileSync(config.claudeSettingsPath, JSON.stringify({
-      env: {
-        ANTHROPIC_BASE_URL: 'https://anthropic.example.test',
-        ANTHROPIC_MODEL: 'claude-sonnet-test',
-      },
-    }))
-    writeFileSync(config.codexConfigPath, [
-      'model_provider = "fixture"',
-      'model = "gpt-test"',
-      '',
-      '[model_providers.fixture]',
-      'base_url = "https://openai.example.test/v1"',
-      'wire_api = "responses"',
-    ].join('\n'))
+    writeFileSync(
+      config.claudeSettingsPath,
+      JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: 'https://anthropic.example.test',
+          ANTHROPIC_MODEL: 'claude-sonnet-test',
+        },
+      }),
+    )
+    writeFileSync(
+      config.codexConfigPath,
+      [
+        'model_provider = "fixture"',
+        'model = "gpt-test"',
+        '',
+        '[model_providers.fixture]',
+        'base_url = "https://openai.example.test/v1"',
+        'wire_api = "responses"',
+      ].join('\n'),
+    )
     setPath('')
 
     const snapshot = readLocalAgentConfigExternalProviderSnapshot(config)
@@ -304,11 +323,15 @@ describe('local agent config external provider source', () => {
     expect(snapshot.providers).toEqual([
       expect.objectContaining({
         credential: undefined,
-        warnings: [expect.objectContaining({ code: 'local-claude-credential-missing', severity: 'info' })],
+        warnings: [
+          expect.objectContaining({ code: 'local-claude-credential-missing', severity: 'info' }),
+        ],
       }),
       expect.objectContaining({
         credential: undefined,
-        warnings: [expect.objectContaining({ code: 'local-codex-credential-missing', severity: 'info' })],
+        warnings: [
+          expect.objectContaining({ code: 'local-codex-credential-missing', severity: 'info' }),
+        ],
       }),
     ])
   })
@@ -318,7 +341,10 @@ describe('local agent config external provider source', () => {
     const config = createFixtureConfig(root)
     const source = createLocalAgentConfigExternalProviderSource()
     setPath('')
-    writeFileSync(config.codexConfigPath, 'model = "gpt-test"\nopenai_base_url = "https://openai.example.test/v1"\n')
+    writeFileSync(
+      config.codexConfigPath,
+      'model = "gpt-test"\nopenai_base_url = "https://openai.example.test/v1"\n',
+    )
     writeFileSync(config.codexAuthPath, JSON.stringify({ OPENAI_API_KEY: 'test-openai-secret' }))
 
     const resolved = resolveLocalAgentConfigSourceConfig({

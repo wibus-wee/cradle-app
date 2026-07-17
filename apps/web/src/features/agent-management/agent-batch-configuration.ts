@@ -3,7 +3,15 @@ import { runtimeCatalogItemUsesModelSelection } from '~/features/agent-runtime/r
 import type { ProviderTarget } from '~/features/agent-runtime/types'
 import type { Agent, UpdateAgentInput } from '~/features/agent-runtime/use-agents'
 
-export type AgentBatchThinkingEffort = 'low' | 'medium' | 'high' | 'xhigh'
+export type AgentBatchThinkingEffort
+  = | 'none'
+    | 'minimal'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'xhigh'
+    | 'max'
+    | 'ultra'
 
 export interface AgentProviderBatchSelection {
   providerTarget: ProviderTarget
