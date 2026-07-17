@@ -144,6 +144,9 @@ export async function runOnce(): Promise<void> {
         }
         else if (result.permanentError) {
           service.markFailed(result.awaitId, result.permanentError)
+          if (adapter.resumeOnFailure) {
+            await service.resumeFailedAwait(result.awaitId, result.permanentError)
+          }
         }
         else if (result.transientError) {
           service.updateLastChecked(result.awaitId, result.transientError)

@@ -53,5 +53,6 @@ export type CheckResult = MatchedCheckResult | PendingCheckResult
 export interface SessionAwaitSource {
   source: string
   pollIntervalMs?: number
+  resumeOnFailure?: boolean
   checkPending: (awaits: SessionAwait[]) => Promise<CheckResult[]>
 }

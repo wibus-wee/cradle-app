@@ -34,6 +34,7 @@ export const SessionAwaitModel = {
     fireAt: t.Nullable(t.Number()),
     lastCheckedAt: t.Nullable(t.Number()),
     lastErrorText: t.Nullable(t.String()),
+    consecutiveErrorCount: t.Number(),
   }),
 
   summary: t.Object({

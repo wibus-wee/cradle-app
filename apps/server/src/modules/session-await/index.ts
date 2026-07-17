@@ -9,6 +9,7 @@ import { cradleIssueAgentSource } from './sources/cradle-issue-agent'
 import { cradleIssueStatusSource } from './sources/cradle-issue-status'
 import { fetchLiveCIStatus, githubCISource } from './sources/github-ci'
 import { fetchLiveReviewStatus, githubReviewSource } from './sources/github-review'
+import { javascriptAwaitSource } from './sources/javascript'
 
 export const sessionAwait = new Elysia({
   prefix: '/session-awaits',
@@ -19,6 +20,7 @@ export const sessionAwait = new Elysia({
     Poller.registerSource(githubReviewSource)
     Poller.registerSource(cradleIssueAgentSource)
     Poller.registerSource(cradleIssueStatusSource)
+    Poller.registerSource(javascriptAwaitSource)
     Poller.start()
   })
   .onStop(() => { Poller.stop() })
