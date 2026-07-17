@@ -390,6 +390,7 @@ describe('session-await trigger', () => {
             'timer',
             CRADLE_ISSUE_AGENT_AWAIT_SOURCE,
             CRADLE_ISSUE_STATUS_AWAIT_SOURCE,
+            'javascript',
           ],
         },
       }),
