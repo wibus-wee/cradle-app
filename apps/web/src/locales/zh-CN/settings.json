@@ -1175,5 +1175,6 @@
   "worktrees.list.title": "Cradle 管理的 worktree",
   "worktrees.page.description": "统一管理所有 workspace 中由 Cradle 创建的 git worktree，并在旧隔离 checkout 不再需要时释放磁盘空间。",
   "worktrees.page.title": "Worktrees",
-  "nav.editor": "编辑器"
+  "nav.editor": "编辑器",
+  "nav.runtimes": "运行时"
 }

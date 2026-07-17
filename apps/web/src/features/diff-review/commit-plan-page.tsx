@@ -13,6 +13,7 @@ import {
   SparklesLine as SparklesIcon,
 } from '@mingcute/react'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
@@ -341,6 +342,7 @@ function RationaleBlock({
   updating: boolean
   onSave: (value: string) => void
 }) {
+  const { t } = useTranslation('diff-review')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
 
@@ -379,7 +381,7 @@ function RationaleBlock({
   return (
     <div className="group mt-4 flex items-start gap-2">
       <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-foreground/80">
-        {value || <span className="italic text-muted-foreground/60">No rationale yet — add why these commits are split this way.</span>}
+        {value || <span className="italic text-muted-foreground/60">{t('plan.rationale.empty')}</span>}
       </p>
       {editable && (
         <Button
@@ -404,6 +406,7 @@ function ConflictsNotice({
   conflicts: NonNullable<ReviewCommitPlan['conflicts']>
   groups: ReviewCommitPlanGroup[]
 }) {
+  const { t } = useTranslation('diff-review')
   const [open, setOpen] = useState(false)
   const groupIndexById = useMemo(() => new Map(groups.map((g, i) => [g.id, i + 1])), [groups])
   return (
@@ -424,7 +427,7 @@ file
 appear in more than one commit
         </span>
         <span className="text-[11px] font-normal text-amber-600/80 dark:text-amber-400/80">
-          — committed in the earliest one, later groups skip it.
+          {t('plan.conflicts.hint')}
         </span>
       </Button>
       {open && (
@@ -650,15 +653,13 @@ function CommitActionBar({
   onReopen: () => void
   onBack: () => void
 }) {
+  const { t } = useTranslation('diff-review')
   if (status === 'applied') {
     return (
       <div className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-emerald-700 dark:text-emerald-400">
         <CheckCircle2Icon className="size-4" />
         <span className="text-[13px] font-medium">
-Commits applied —
-{groupCount}
-{' '}
-created in your repository
+          {t('plan.appliedBanner', { count: groupCount })}
         </span>
         <Button type="button" variant="outline" size="sm" className="ml-auto text-xs" onClick={onBack}>
           Back to review
@@ -725,6 +726,7 @@ function PlanGenerateGate({
   busy: boolean
   onPlan: (profileId: string | null, runtimeKind: string, modelId: string | null) => Promise<void> | void
 }) {
+  const { t } = useTranslation('diff-review')
   const composer = useComposerState({ context: 'new-chat' })
   const runtimeKind = composer.selection.runtimeKind
   const profileId = composer.selection.profileId
@@ -743,7 +745,7 @@ function PlanGenerateGate({
           </span>
           <h2 className="mt-4 text-base font-semibold text-foreground">Plan your commits</h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            Split this change into a clean sequence of commits — each with a message, its files, and what it depends on. We plan it on demand with the selected runtime and model, and keep the trace in chat.
+            {t('plan.intro')}
           </p>
         </div>
 
@@ -879,6 +881,7 @@ function RegenerateDialog({
   onPlan: (profileId: string | null, runtimeKind: string, modelId: string | null) => Promise<void> | void
   triggerClassName?: string
 }) {
+  const { t } = useTranslation('diff-review')
   const composer = useComposerState({ context: 'new-chat' })
   const runtimeKind = composer.selection.runtimeKind
   const profileId = composer.selection.profileId
@@ -910,7 +913,7 @@ function RegenerateDialog({
         <DialogHeader>
           <DialogTitle>Regenerate commit plan</DialogTitle>
           <DialogDescription>
-            Re-run the selected runtime and model over this review. The new plan replaces the current one as a fresh draft — your edits to the old plan stay in history.
+            {t('plan.regenerate.description')}
           </DialogDescription>
         </DialogHeader>
 

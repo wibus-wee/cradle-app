@@ -37,6 +37,8 @@ import {
   writeSessionRuntimeConfigJson,
 } from '../chat-runtime/runtime-settings'
 import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
+import { getInstalled as getInstalledAcpAgent } from '../acp/service'
+import { ACP_RUNTIME_KIND } from '../chat-runtime-providers/acp/metadata'
 import { normalizeClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
 import {
   readRuntimeOwnedProviderTargetOwner,
@@ -95,6 +97,8 @@ const SessionCreateInputSchema = z.object({
   providerTargetId: z.string().optional(),
   modelId: z.string().nullable().optional(),
   thinkingEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']).nullable().optional(),
+  acpAgentId: z.string().trim().min(1).optional(),
+  acpDraftSessionId: z.string().trim().min(1).optional(),
   runtimeKind: z.string().trim().min(1).optional(),
   runtimeSettings: z.unknown().optional(),
   agentId: z.string().nullable().optional(),
@@ -709,6 +713,8 @@ export async function create(input: {
   runtimeKind?: RuntimeKind
   runtimeSettings?: ChatRuntimeSettingsUpdatePatch
   agentId?: string | null
+  acpAgentId?: string
+  acpDraftSessionId?: string
   linkedIssueId?: string | null
   sessionGroupId?: string | null
   worktreeId?: string | null
@@ -827,6 +833,8 @@ function resolveSessionCreateInput(input: {
   providerTargetId?: string
   runtimeKind?: RuntimeKind
   agentId?: string | null
+  acpAgentId?: string
+  acpDraftSessionId?: string
 }): {
   providerTargetId: string | null
   runtimeKind: RuntimeKind
@@ -930,7 +938,44 @@ function resolveSessionCreateInput(input: {
     }
   }
 
-  const runtimeKind = input.runtimeKind ?? 'standard'
+  if (input.acpAgentId) {
+    const runtimeKind = input.runtimeKind ?? ACP_RUNTIME_KIND
+    if (runtimeKind !== ACP_RUNTIME_KIND) {
+      throw new AppError({
+        code: 'invalid_session_input',
+        status: 400,
+        message: 'ACP agent selection requires the ACP Chat runtime',
+        details: { acpAgentId: input.acpAgentId, runtimeKind },
+      })
+    }
+    if (input.providerTargetId) {
+      throw new AppError({
+        code: 'invalid_session_input',
+        status: 400,
+        message: 'ACP sessions cannot use a provider target',
+        details: { acpAgentId: input.acpAgentId, providerTargetId: input.providerTargetId },
+      })
+    }
+    if (!getInstalledAcpAgent(input.acpAgentId)) {
+      throw new AppError({
+        code: 'invalid_session_input',
+        status: 404,
+        message: 'ACP agent is not installed',
+        details: { acpAgentId: input.acpAgentId },
+      })
+    }
+    return {
+      providerTargetId: null,
+      runtimeKind,
+      agentId: null,
+      configJson: JSON.stringify({
+        acpAgentId: input.acpAgentId,
+        ...(input.acpDraftSessionId ? { acpDraftSessionId: input.acpDraftSessionId } : {}),
+      }),
+    }
+  }
+
+  const runtimeKind = input.runtimeKind ?? 'codex'
   if (runtimeUsesAgentTerminalLaunch(runtimeKind)) {
     throw new AppError({
       code: 'invalid_session_input',
@@ -940,6 +985,13 @@ function resolveSessionCreateInput(input: {
   }
 
   if (!input.providerTargetId) {
+    if (runtimeKind === ACP_RUNTIME_KIND) {
+      throw new AppError({
+        code: 'invalid_session_input',
+        status: 400,
+        message: 'ACP sessions require an installed ACP agent',
+      })
+    }
     if (runtimeSkipsProviderTarget(runtimeKind)) {
       return {
         providerTargetId: null,
@@ -1011,7 +1063,7 @@ export async function update(input: {
   if (input.providerTargetId !== undefined) {
     if (assertRuntimeOwnedProviderTargetForRuntime({
       providerTargetId: input.providerTargetId,
-      runtimeKind: record.runtimeKind ?? 'standard',
+      runtimeKind: record.runtimeKind ?? 'codex',
     })) {
       patch.providerTargetId = null
       if (record.agentId) {

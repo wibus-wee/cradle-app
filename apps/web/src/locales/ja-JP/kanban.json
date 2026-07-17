@@ -163,5 +163,6 @@
   "subIssue.openAria": "サブ Issue {{title}} を開く",
   "subIssue.titleAria": "サブ Issue タイトル",
   "subIssue.titlePlaceholder": "サブ Issue タイトル",
-  "table.title": "タイトル"
+  "table.title": "タイトル",
+  "issueDetail.sessionGroup.sessionCount": "{{count}} セッション"
 }

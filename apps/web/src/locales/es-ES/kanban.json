@@ -163,5 +163,6 @@
   "subIssue.openAria": "Abrir sub-issue {{title}}",
   "subIssue.titleAria": "Título del sub-issue",
   "subIssue.titlePlaceholder": "Título del sub-issue",
-  "table.title": "Título"
+  "table.title": "Título",
+  "issueDetail.sessionGroup.sessionCount": "{{count}} sesiones"
 }

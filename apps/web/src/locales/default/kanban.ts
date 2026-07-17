@@ -164,4 +164,5 @@ export default {
   'aside.comments.title': 'Comments',
   'aside.comments.empty': 'No comments yet',
   'aside.error.linkFailed': 'Issue link update failed.',
+  'issueDetail.sessionGroup.sessionCount': '{{count}} sessions',
 } as const

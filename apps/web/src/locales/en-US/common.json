@@ -13,6 +13,8 @@
   "action.stop": "Stop",
   "agent.empty": "No agents available",
   "agent.selector.label": "Agent",
+  "acpAgent.empty": "No installed ACP agents",
+  "acpAgent.selector.label": "ACP agent",
   "app.name": "Cradle",
   "errorBoundary.description": "The app caught this crash, so you can retry the render or reload the window.",
   "errorBoundary.details": "Error details",

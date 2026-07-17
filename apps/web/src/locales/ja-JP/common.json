@@ -13,6 +13,8 @@
   "action.stop": "停止",
   "agent.empty": "利用可能な Agent はありません",
   "agent.selector.label": "Agent",
+  "acpAgent.empty": "インストール済みの ACP Agent はありません",
+  "acpAgent.selector.label": "ACP Agent",
   "app.name": "Cradle",
   "markdownEditor.placeholder": "書き始める...",
   "errorBoundary.description": "アプリがこのクラッシュを捕捉しました。レンダーを再試行するか、ウィンドウを再読み込みできます。",

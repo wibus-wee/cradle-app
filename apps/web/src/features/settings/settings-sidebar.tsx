@@ -2,6 +2,7 @@ import {
   ArrowLeftLine as ArrowLeftIcon,
   ArrowToDownLine as ArrowDownToLineIcon,
   Box3Line as BoxesIcon,
+  ChipLine as ChipIcon,
   CloseLine as XIcon,
   Cursor2Line as MousePointer2Icon,
   CylinderLine as DatabaseIcon,
@@ -110,6 +111,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     labelKey: 'sidebar.section.agent',
     items: [
       { id: 'agents', labelKey: 'nav.agents', icon: BotIcon },
+      { id: 'runtimes', labelKey: 'nav.runtimes', icon: ChipIcon },
       {
         id: 'chat',
         labelKey: 'nav.chat',

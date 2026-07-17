@@ -15,6 +15,8 @@ export default {
   'markdownEditor.placeholder': 'Start writing...',
   'agent.empty': 'No agents available',
   'agent.selector.label': 'Agent',
+  'acpAgent.empty': 'No installed ACP agents',
+  'acpAgent.selector.label': 'ACP agent',
   'status.empty': 'No items yet',
   'status.error': 'Something went wrong',
   'status.loading': 'Loading...',

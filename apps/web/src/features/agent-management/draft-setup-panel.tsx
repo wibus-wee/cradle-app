@@ -13,6 +13,7 @@ import { AnimatePresence, m } from 'motion/react'
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { postSecrets } from '~/api-gen/sdk.gen'
@@ -172,6 +173,7 @@ function PresetSetupForm({
   onComplete: (newProfileId?: string) => void
   onBack: () => void
 }) {
+  const { t } = useTranslation('agentManagement')
   const Icon = PROVIDER_ICONS[preset.id] ?? PROVIDER_ICONS.custom!
   const { createProfile } = useAgentProfiles()
   const queryClient = useQueryClient()
@@ -537,7 +539,7 @@ function PresetSetupForm({
 
             {claudeAiLogin && (
               <InfoCallout>
-                Uses your Claude.ai subscription login. No API key needed — the Claude Agent SDK manages login state in its own config directory.
+                {t('detail.claudeAgent.subscriptionLoginNotice')}
               </InfoCallout>
             )}
 

@@ -27,6 +27,9 @@ export default {
   'readiness.agent.message':
     'No Agent is available. Enable an Agent in settings to start.',
   'readiness.agent.action': 'Open agents',
+  'readiness.acpAgent.message':
+    'No ACP agent is installed. Install one before starting an ACP Chat.',
+  'readiness.acpAgent.action': 'Open ACP agents',
   'readiness.provider.message':
     'No provider is available. Configure a provider before sending the first message.',
   'readiness.provider.action': 'Open providers',

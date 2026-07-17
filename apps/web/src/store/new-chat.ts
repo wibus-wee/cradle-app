@@ -15,6 +15,7 @@ export interface NewChatClaudeAgentConfig {
 interface NewChatState {
   lastRuntimeKind: RuntimeKind | null
   lastAgentId: string | null
+  lastAcpAgentId: string | null
   lastAgentProfileId: string | null
   /** map of profileId → last selected modelId */
   lastModelByProfile: Record<string, string>
@@ -31,6 +32,7 @@ interface NewChatState {
   lastRuntimeSettingsByKind: Partial<Record<RuntimeKind, RuntimeSettings>>
   setLastRuntimeKind: (kind: RuntimeKind | null) => void
   setLastAgentId: (id: string | null) => void
+  setLastAcpAgentId: (id: string | null) => void
   setLastAgentProfileId: (id: string | null) => void
   setLastModelForProfile: (profileId: string, modelId: string | null) => void
   setLastModelForRuntime: (runtimeKind: RuntimeKind, modelId: string | null) => void
@@ -71,6 +73,7 @@ export const useNewChatStore = create<NewChatState>()(
     (set, get) => ({
       lastRuntimeKind: null,
       lastAgentId: null,
+      lastAcpAgentId: null,
       lastAgentProfileId: null,
       lastModelByProfile: {},
       lastModelByRuntime: {},
@@ -93,6 +96,14 @@ export const useNewChatStore = create<NewChatState>()(
             return state
           }
           return { lastAgentId: id }
+        })
+      },
+      setLastAcpAgentId: (id) => {
+        set((state) => {
+          if (state.lastAcpAgentId === id) {
+            return state
+          }
+          return { lastAcpAgentId: id }
         })
       },
       setLastAgentProfileId: (id) => {
@@ -239,7 +250,7 @@ export const useNewChatStore = create<NewChatState>()(
     {
       name: 'cradle:new-chat:v1',
       storage: persistStorage,
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
         if (version < 2) {
@@ -273,6 +284,12 @@ export const useNewChatStore = create<NewChatState>()(
           return {
             ...state,
             lastThinkingByProviderModel: {},
+          }
+        }
+        if (version < 5) {
+          return {
+            ...state,
+            lastAcpAgentId: null,
           }
         }
         return persisted as NewChatState

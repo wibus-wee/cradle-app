@@ -44,5 +44,8 @@
   "plugins.stats.server": "{{count}} 个服务端",
   "plugins.stats.web": "{{count}} 个 Web 端",
   "plugins.title": "插件",
-  "status.loading": "加载中..."
+  "status.loading": "加载中...",
+  "acp.filter.placeholder": "筛选 代理 / 流 / 输出...（按 / 聚焦）",
+  "events.empty": "（空）",
+  "ipc.filter.placeholder": "筛选 频道 / 参数 / 错误...（按 / 聚焦）"
 }

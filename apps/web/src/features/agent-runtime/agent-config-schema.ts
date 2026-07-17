@@ -19,6 +19,7 @@ export const AgentRuntimeConfigSchema = z.object({
   systemPrompt: z.string().default(''),
   cliTui: CliTuiLaunchConfigSchema.nullable().default(null),
   claudeAgent: ClaudeAgentConfigSchema.default(DEFAULT_CLAUDE_AGENT_CONFIG),
+  acpAgentId: z.string().min(1).optional(),
 }).passthrough()
 
 export const AgentRuntimeConfigJsonSchema = z.union([

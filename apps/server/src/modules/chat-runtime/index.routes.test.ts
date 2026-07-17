@@ -34,20 +34,7 @@ describe('chat runtime route composition', () => {
     }
 
     expect(response.status).toBe(200)
-    expect(body.items.find(item => item.runtimeKind === 'standard')).toEqual(expect.objectContaining({
-      availability: 'stable',
-      icon: { key: 'custom' },
-      composer: expect.objectContaining({
-        inputMode: 'rich',
-        modelSelection: 'provider-model',
-        thinking: 'per-model',
-      }),
-      capabilities: expect.objectContaining({
-        steer: 'queue-fallback',
-        sessionModelSwitch: 'in-session',
-      }),
-      stability: 'stable',
-    }))
+    expect(body.items.find(item => item.runtimeKind === 'standard')).toBeUndefined()
     expect(body.items.find(item => item.runtimeKind === 'acp-chat')).toEqual(expect.objectContaining({
       stability: 'experimental',
       degradations: expect.arrayContaining([
@@ -77,15 +64,15 @@ describe('chat runtime route composition', () => {
     }))
   })
 
-  it('serves draft runtime capabilities routes through the chat prefix', async () => {
+  it('does not serve draft capabilities for the removed Standard runtime', async () => {
     const app = createTestApp()
     const response = await app.handle(
       new Request('http://localhost/chat/draft-runtime-capabilities?runtimeKind=standard'),
     )
-    const body = await response.json() as { runtimeKind: string }
+    const body = await response.text()
 
-    expect(response.status).toBe(200)
-    expect(body.runtimeKind).toBe('standard')
+    expect(response.status).toBe(501)
+    expect(body).toContain('Runtime is not available: standard')
   })
 
   it('serves server-owned composer draft routes through the chat prefix', async () => {

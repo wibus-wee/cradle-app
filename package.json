@@ -37,7 +37,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.19.0",
+    "@agentclientprotocol/sdk": "^1.2.1",
     "@ai-sdk/openai": "^3.0.53",
     "@base-ui/react": "^1.4.0",
     "@cradle/ipc": "workspace:*",

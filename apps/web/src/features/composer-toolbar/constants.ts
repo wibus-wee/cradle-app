@@ -1,6 +1,6 @@
-import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import type { RuntimeCatalogCapabilityDegradation } from '~/features/agent-runtime/runtime-catalog'
-import type { ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
+import type { RuntimeSelectorOption } from '~/features/agent-runtime/runtime-selector'
+import type { ModelDescriptor } from '~/features/agent-runtime/types'
 
 import type { ThinkingOption } from './provider-model-menu'
 import type { ThinkingEffort } from './types'
@@ -18,12 +18,7 @@ export const THINKING_EFFORTS: { value: ConcreteThinkingEffort, label: string, d
   { value: 'ultra', label: '', description: '' },
 ]
 
-export interface RuntimeKindOption {
-  value: RuntimeKind
-  label?: string
-  description?: string
-  icon?: RuntimeIconDescriptor
-  iconKey?: string
+export interface RuntimeKindOption extends RuntimeSelectorOption {
   degradations?: RuntimeCatalogCapabilityDegradation[]
 }
 

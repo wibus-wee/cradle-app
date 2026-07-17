@@ -168,18 +168,32 @@ function normalizeCatalogItem(item: z.infer<typeof RuntimeCatalogSchema>['items'
 
 export async function fetchRuntimeCatalog(): Promise<RuntimeCatalogItem[]> {
   const response = await client.get<unknown>({ url: '/chat/runtimes' })
-  return RuntimeCatalogSchema.parse(response.data).items.map(normalizeCatalogItem).filter(runtime => isUiRuntimeKindEnabled(runtime.runtimeKind))
+  return RuntimeCatalogSchema.parse(response.data).items.map(normalizeCatalogItem)
 }
 
-export function useRuntimeCatalog() {
+export interface UseRuntimeCatalogOptions {
+  /**
+   * Include runtime kinds normally hidden from runtime pickers (e.g. `standard`,
+   * `acp-chat`). Used by the Runtimes settings page, which lists every built-in
+   * runtime. Defaults to the picker behavior (hidden kinds filtered out).
+   */
+  includeHidden?: boolean
+}
+
+export function useRuntimeCatalog(options?: UseRuntimeCatalogOptions) {
+  const includeHidden = options?.includeHidden ?? false
   const query = useQuery({
     queryKey: RUNTIME_CATALOG_QUERY_KEY,
     queryFn: fetchRuntimeCatalog,
     staleTime: 30_000,
   })
 
+  const runtimes = includeHidden
+    ? (query.data ?? [])
+    : (query.data ?? []).filter(runtime => isUiRuntimeKindEnabled(runtime.runtimeKind))
+
   return {
     ...query,
-    runtimes: query.data ?? [],
+    runtimes,
   }
 }

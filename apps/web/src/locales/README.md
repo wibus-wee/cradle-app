@@ -11,10 +11,12 @@
 - **default/agent-management.ts**: Agent Management detail, provider runtime settings, and model visibility copy.
 - **default/common.ts**: Shared UI copy used across feature boundaries.
 - **default/devtool.ts**: Development diagnostics, health, memory, observability, and plugin panel copy.
+- **default/diff-review.ts**: Diff review guide and commit-plan copy.
 - **default/home.ts**: Home dashboard sections, quick actions, relative time labels, and automation copy.
 - **default/kanban.ts**: Kanban board, issue, filter, label, status, detail-panel, and issue Activity timeline copy.
 - **default/new-chat.ts**: New chat composer placeholders, quick prompts, readiness notices, workspace picker, and recent session copy.
 - **default/profile.ts**: Global profile page headings, metric labels, activity graph copy, and Usage-backed ranking labels.
+- **default/runtimes.ts**: Runtimes settings page, ACP Registry install flows, and built-in runtime capability copy.
 - **default/search.ts**: Global search command palette labels, groups, result metadata, and empty states.
 - **default/settings.ts**: Settings navigation, appearance/language controls, chat archive recovery/search copy, and support/import/settings-section labels.
 - **default/skills.ts**: Skill import flow labels, loading states, selection summaries, and completion copy.

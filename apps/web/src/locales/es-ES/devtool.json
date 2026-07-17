@@ -44,5 +44,8 @@
   "plugins.stats.server": "{{count}} server",
   "plugins.stats.web": "{{count}} web",
   "plugins.title": "Plugins",
-  "status.loading": "Cargando..."
+  "status.loading": "Cargando...",
+  "acp.filter.placeholder": "Filtrar agente / flujo / salida... ( / para enfocar )",
+  "events.empty": "(vacío)",
+  "ipc.filter.placeholder": "Filtrar canal / argumentos / error... ( / para enfocar )"
 }

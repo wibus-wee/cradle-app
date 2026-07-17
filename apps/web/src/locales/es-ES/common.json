@@ -13,6 +13,8 @@
   "action.stop": "Detener",
   "agent.empty": "No hay agents disponibles",
   "agent.selector.label": "Agent",
+  "acpAgent.empty": "No hay agentes ACP instalados",
+  "acpAgent.selector.label": "Agente ACP",
   "app.name": "Cradle",
   "markdownEditor.placeholder": "Comenzar a escribir...",
   "errorBoundary.description": "La aplicación capturó este bloqueo, así que puedes reintentar el renderizado o recargar la ventana.",

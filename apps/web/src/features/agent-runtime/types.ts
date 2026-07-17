@@ -17,6 +17,8 @@ export type ProviderTargetKind = ProviderTargetRecord['kind']
 
 export type RuntimeKind = string
 
+export const ACP_CHAT_RUNTIME_KIND = 'acp-chat'
+
 export interface ProviderTarget {
   kind?: ProviderTargetKind
   id: string

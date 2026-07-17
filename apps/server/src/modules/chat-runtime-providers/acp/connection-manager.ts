@@ -1,20 +1,25 @@
 import { promises as fsp } from 'node:fs'
 
 import type {
-  Agent,
-  Client,
+  ClientConnection,
+  ClientContext,
   InitializeResponse,
   LoadSessionResponse,
   McpServer,
   NewSessionResponse,
   PromptResponse,
+  RequestPermissionRequest,
+  RequestPermissionResponse,
   ResumeSessionResponse,
   SessionConfigOption,
-  SessionModelState,
+  SessionModeState,
   SessionNotification,
+  SetSessionConfigOptionRequest,
+  SetSessionConfigOptionResponse,
 } from '@agentclientprotocol/sdk'
 import {
-  ClientSideConnection,
+  client,
+  methods,
   ndJsonStream,
   PROTOCOL_VERSION,
 } from '@agentclientprotocol/sdk'
@@ -28,7 +33,7 @@ import type { AcpProcessManager } from './process-manager'
 import { AcpChunkMapper } from './timeline-mapper'
 
 export interface AcpSessionState {
-  models: SessionModelState | null
+  modes: SessionModeState | null
   configOptions: SessionConfigOption[]
 }
 
@@ -131,7 +136,8 @@ interface SessionChannel {
 
 interface ConnectionEntry {
   agentId: string
-  connection: ClientSideConnection
+  connection: ClientConnection
+  agent: ClientContext
   initResult: InitializeResponse | null
   sessionStates: Map<string, AcpSessionState>
   channels: Map<string, SessionChannel>
@@ -178,10 +184,13 @@ export class AcpConnectionManager {
 
   async newSession(agentId: string, cwd: string): Promise<NewSessionResponse & AcpSessionState> {
     const conn = this.getConnection(agentId)
-    const response = await conn.connection.newSession({ cwd, mcpServers: listRegisteredAcpMcpServers() })
+    const response = await conn.agent.request(methods.agent.session.new, {
+      cwd,
+      mcpServers: listRegisteredAcpMcpServers(),
+    })
     const sessionState = readAcpSessionState(response)
     this.cacheSessionState(conn, response.sessionId, sessionState)
-    return { ...response, models: sessionState.models, configOptions: sessionState.configOptions }
+    return { ...response, modes: sessionState.modes, configOptions: sessionState.configOptions }
   }
 
   supportsLoadSession(agentId: string): boolean {
@@ -200,10 +209,14 @@ export class AcpConnectionManager {
 
     conn.restoringSessionLoads.add(sessionId)
     try {
-      const response = await conn.connection.loadSession({ sessionId, cwd, mcpServers: listRegisteredAcpMcpServers() })
+      const response = await conn.agent.request(methods.agent.session.load, {
+        sessionId,
+        cwd,
+        mcpServers: listRegisteredAcpMcpServers(),
+      })
       const sessionState = readAcpSessionState(response)
       this.cacheSessionState(conn, sessionId, sessionState)
-      return { ...response, models: sessionState.models, configOptions: sessionState.configOptions }
+      return { ...response, modes: sessionState.modes, configOptions: sessionState.configOptions }
     }
     finally {
       conn.restoringSessionLoads.delete(sessionId)
@@ -216,10 +229,14 @@ export class AcpConnectionManager {
       throw new Error(`Agent ${agentId} does not support session/resume`)
     }
 
-    const response = await conn.connection.unstable_resumeSession({ sessionId, cwd, mcpServers: listRegisteredAcpMcpServers() })
+    const response = await conn.agent.request(methods.agent.session.resume, {
+      sessionId,
+      cwd,
+      mcpServers: listRegisteredAcpMcpServers(),
+    })
     const sessionState = readAcpSessionState(response)
     this.cacheSessionState(conn, sessionId, sessionState)
-    return { ...response, models: sessionState.models, configOptions: sessionState.configOptions }
+    return { ...response, modes: sessionState.modes, configOptions: sessionState.configOptions }
   }
 
   getSessionState(agentId: string, sessionId: string): AcpSessionState | null {
@@ -228,17 +245,27 @@ export class AcpConnectionManager {
 
   async setSessionModel(agentId: string, sessionId: string, modelId: string): Promise<void> {
     const conn = this.getConnection(agentId)
-    await conn.connection.unstable_setSessionModel({ sessionId, modelId })
     const state = conn.sessionStates.get(sessionId)
-    if (state?.models) {
-      state.models.currentModelId = modelId
+    if (!state) {
+      throw new Error(`ACP session ${sessionId} does not have cached session configuration`)
     }
+    const modelOption = state.configOptions.find(isModelConfigOption)
+    if (!modelOption || !hasConfigValue(modelOption, modelId)) {
+      throw new Error(`ACP session ${sessionId} does not expose model ${modelId} as a session config option`)
+    }
+
+    const response = await this.requestSessionConfigOption(conn.agent, {
+      sessionId,
+      configId: modelOption.id,
+      value: modelId,
+    })
+    state.configOptions = response.configOptions
   }
 
   async setSessionConfigOption(agentId: string, sessionId: string, configId: string, value: string | boolean): Promise<void> {
     const conn = this.getConnection(agentId)
-    const params = { sessionId, configId, ...formatSessionConfigOptionValue(value) }
-    const response = await conn.connection.setSessionConfigOption(params)
+    const params: SetSessionConfigOptionRequest = { sessionId, configId, ...formatSessionConfigOptionValue(value) }
+    const response = await this.requestSessionConfigOption(conn.agent, params)
     const state = conn.sessionStates.get(sessionId)
     if (state && response?.configOptions) {
       state.configOptions = response.configOptions
@@ -266,7 +293,10 @@ export class AcpConnectionManager {
     let promptResult: PromptResponse | null = null
     let promptError: Error | null = null
 
-    const promptDone = conn.connection.prompt({ sessionId, prompt: [{ type: 'text', text: message }] })
+    const promptDone = conn.agent.request(methods.agent.session.prompt, {
+      sessionId,
+      prompt: [{ type: 'text', text: message }],
+    })
       .then((result) => {
         promptResult = result
         for (const event of mapper.flush()) {
@@ -334,7 +364,7 @@ export class AcpConnectionManager {
     const conn = this.getConnection(agentId)
     this.closeChannel(conn, sessionId, { kind: 'cancelled' })
     this.usageBySessionKey.delete(toUsageKey(agentId, sessionId))
-    await conn.connection.cancel({ sessionId })
+    await conn.agent.notify(methods.agent.session.cancel, { sessionId })
   }
 
   async disconnect(agentId: string): Promise<void> {
@@ -371,12 +401,20 @@ export class AcpConnectionManager {
       installPath: record.installPath,
     })
 
-    const connection = new ClientSideConnection(
-      (agent: Agent): Client => this.createClient(agentId, agent),
-      ndJsonStream(procEntry.stdinWeb, procEntry.stdoutWeb),
-    )
+    const connection = client({ name: 'Cradle Server' })
+      .onRequest(methods.client.session.requestPermission, async ({ params }) => this.handlePermissionRequest(agentId, params))
+      .onNotification(methods.client.session.update, async ({ params }) => {
+        this.handleSessionUpdate(agentId, params)
+      })
+      .onRequest(methods.client.fs.readTextFile, async ({ params }) => this.readClientTextFile(params.path, params.line, params.limit))
+      .onRequest(methods.client.fs.writeTextFile, async ({ params }) => {
+        await this.requestClientFileWriteApproval(agentId, params.sessionId, params.path)
+        await fsp.writeFile(params.path, params.content, 'utf-8')
+        return {}
+      })
+      .connect(ndJsonStream(procEntry.stdinWeb, procEntry.stdoutWeb))
 
-    const initResult = await connection.initialize({
+    const initResult = await connection.agent.request(methods.agent.initialize, {
       protocolVersion: PROTOCOL_VERSION,
       clientInfo: { name: 'Cradle Server', version: '1.0.0' },
       clientCapabilities: {
@@ -390,6 +428,7 @@ export class AcpConnectionManager {
     const entry: ConnectionEntry = {
       agentId,
       connection,
+      agent: connection.agent,
       initResult,
       sessionStates: new Map(),
       channels: new Map(),
@@ -453,86 +492,105 @@ export class AcpConnectionManager {
     conn.sessionStates.set(sessionId, response)
   }
 
-  private createClient(agentId: string, _agent: Agent): Client {
+  private async handlePermissionRequest(
+    agentId: string,
+    params: RequestPermissionRequest,
+  ): Promise<RequestPermissionResponse> {
+    if (!this.permissionHandler) {
+      return { outcome: { outcome: 'cancelled' } }
+    }
+
+    const request: AcpPermissionRequest = {
+      agentId,
+      sessionId: params.sessionId,
+      providerMethod: 'requestPermission',
+      toolTitle: params.toolCall.title ?? 'Unknown operation',
+      options: params.options.map(option => ({
+        optionId: option.optionId,
+        name: option.name,
+        kind: option.kind,
+      })),
+    }
+    const runtimeContext = this.promptRuntimeContexts.get(toUsageKey(agentId, params.sessionId))
+    if (runtimeContext) {
+      request.runtimeContext = runtimeContext
+    }
+
+    const response = await this.permissionHandler(request)
+    if (response.outcome === 'cancelled') {
+      return { outcome: { outcome: 'cancelled' } }
+    }
+
     return {
-      requestPermission: async (params) => {
-        const options = readPermissionOptions(params.options)
-        if (!this.permissionHandler) {
-          return { outcome: { outcome: 'cancelled' as const } }
-        }
-
-        const request: AcpPermissionRequest = {
-          agentId,
-          sessionId: params.sessionId,
-          providerMethod: 'requestPermission',
-          toolTitle: params.toolCall?.title ?? 'Unknown operation',
-          options: options.map(option => ({
-            optionId: option.optionId,
-            name: option.name,
-            kind: option.kind,
-          })),
-        }
-        const runtimeContext = this.promptRuntimeContexts.get(toUsageKey(agentId, params.sessionId))
-        if (runtimeContext) {
-          request.runtimeContext = runtimeContext
-        }
-
-        const response = await this.permissionHandler(request)
-
-        if (response.outcome === 'cancelled') {
-          return { outcome: { outcome: 'cancelled' as const } }
-        }
-
-        return {
-          outcome: {
-            outcome: 'selected' as const,
-            optionId: response.optionId ?? '',
-          },
-        }
-      },
-
-      sessionUpdate: async (params: SessionNotification) => {
-        if (params.update.sessionUpdate === 'session_info_update') {
-          const title = (params.update as { title?: string | null }).title
-          if (title) {
-            for (const handler of [...this.sessionTitleHandlers]) {
-              try {
-                handler(params.sessionId, title)
-              }
-              catch {
-                // handlers must not break ACP session processing
-              }
-            }
-          }
-          return
-        }
-
-        const conn = this.connections.get(agentId)
-        if (conn?.restoringSessionLoads.has(params.sessionId)) {
-          return
-        }
-
-        const channel = conn?.channels.get(params.sessionId)
-        if (!channel) {
-          return
-        }
-
-        for (const event of channel.mapper.convert(params.update)) {
-          channel.queue.push(event)
-        }
-      },
-
-      readTextFile: async (params) => {
-        const content = await fsp.readFile(params.path, 'utf-8')
-        return { content }
-      },
-
-      writeTextFile: async (params) => {
-        await this.requestClientFileWriteApproval(agentId, params.sessionId, params.path)
-        await fsp.writeFile(params.path, params.content, 'utf-8')
-        return {}
+      outcome: {
+        outcome: 'selected',
+        optionId: response.optionId ?? '',
       },
     }
+  }
+
+  private handleSessionUpdate(agentId: string, params: SessionNotification): void {
+    const conn = this.connections.get(agentId)
+    if (params.update.sessionUpdate === 'session_info_update') {
+      if (params.update.title) {
+        for (const handler of [...this.sessionTitleHandlers]) {
+          try {
+            handler(params.sessionId, params.update.title)
+          }
+          catch {
+            // handlers must not break ACP session processing
+          }
+        }
+      }
+      return
+    }
+
+    if (params.update.sessionUpdate === 'config_option_update') {
+      const state = conn?.sessionStates.get(params.sessionId)
+      if (state) {
+        state.configOptions = params.update.configOptions
+      }
+      return
+    }
+
+    if (conn?.restoringSessionLoads.has(params.sessionId)) {
+      return
+    }
+
+    const channel = conn?.channels.get(params.sessionId)
+    if (!channel) {
+      return
+    }
+
+    for (const event of channel.mapper.convert(params.update)) {
+      channel.queue.push(event)
+    }
+  }
+
+  private async readClientTextFile(
+    path: string,
+    line: number | null | undefined,
+    limit: number | null | undefined,
+  ): Promise<{ content: string }> {
+    const content = await fsp.readFile(path, 'utf-8')
+    if (line === undefined || line === null) {
+      return { content }
+    }
+
+    const start = Math.max(0, line - 1)
+    const lines = content.split('\n')
+    const end = limit === undefined || limit === null ? undefined : start + Math.max(0, limit)
+    return { content: lines.slice(start, end).join('\n') }
+  }
+
+  private requestSessionConfigOption(
+    agent: ClientContext,
+    params: SetSessionConfigOptionRequest,
+  ): Promise<SetSessionConfigOptionResponse> {
+    return agent.request<SetSessionConfigOptionResponse, SetSessionConfigOptionRequest>(
+      methods.agent.session.setConfigOption,
+      params,
+    )
   }
 
   private async requestClientFileWriteApproval(agentId: string, sessionId: string, targetPath: string): Promise<void> {
@@ -591,17 +649,23 @@ function readUsage(response: PromptResponse | null): {
   return response?.usage ?? null
 }
 
-function readAcpSessionState(response: { models?: SessionModelState | null, configOptions?: SessionConfigOption[] | null }): AcpSessionState {
+function readAcpSessionState(response: { modes?: SessionModeState | null, configOptions?: SessionConfigOption[] | null }): AcpSessionState {
   return {
-    models: response.models ?? null,
+    modes: response.modes ?? null,
     configOptions: response.configOptions ?? [],
   }
 }
 
-function readPermissionOptions(value: unknown): Array<{ optionId: string, name: string, kind: string }> {
-  return Array.isArray(value)
-    ? value as Array<{ optionId: string, name: string, kind: string }>
-    : []
+type AcpSelectConfigOption = Extract<SessionConfigOption, { type: 'select' }>
+
+function isModelConfigOption(option: SessionConfigOption): option is AcpSelectConfigOption {
+  return option.type === 'select' && option.category === 'model'
+}
+
+function hasConfigValue(option: AcpSelectConfigOption, value: string): boolean {
+  return option.options.some(entry => 'options' in entry
+    ? entry.options.some(item => item.value === value)
+    : entry.value === value)
 }
 
 function formatSessionConfigOptionValue(value: string | boolean): { type: 'boolean', value: boolean } | { value: string } {

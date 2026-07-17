@@ -39,6 +39,7 @@
   "detail.claudeAgent.section.description": "Configure the models used when this agent asks the SDK for model aliases.",
   "detail.claudeAgent.section.title": "Claude Agent SDK",
   "detail.claudeAgent.selectProviderFirst": "Select a provider first",
+  "detail.claudeAgent.subscriptionLoginNotice": "Uses your Claude.ai subscription login. No API key needed — the Claude Agent SDK manages login state in its own config directory.",
   "detail.cliTui.arguments.description": "Optional CLI arguments appended to the executable",
   "detail.cliTui.arguments.label": "Arguments",
   "detail.cliTui.environment.description": "Optional KEY=value lines injected into the launched process",

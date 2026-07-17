@@ -57,6 +57,7 @@ import {
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
 import { cn } from '~/lib/cn'
+import type { AgentCreateIntent } from '~/store/settings-overlay'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { SettingsMasterDetail } from '../settings/settings-container'
@@ -67,7 +68,6 @@ import type {
 import { buildAgentProviderBatchPatches } from './agent-batch-configuration'
 import { AgentDetailPage } from './agent-detail'
 import { StatusDot } from './agent-status-dot'
-import { CreateAgentDialog } from './create-agent-dialog'
 import {
   applyVisibleRangeSelection,
   mergeVisibleSelection,
@@ -679,7 +679,7 @@ export function AgentList() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const selectionAnchorIdRef = useRef<string | null>(null)
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false)
   const [filter, setFilter] = useState('')
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -691,6 +691,9 @@ export function AgentList() {
   const [batchBusy, setBatchBusy] = useState(false)
   const agentFocusTargetId = useSettingsOverlayStore(state => state.agentFocusTarget?.id ?? null)
   const clearAgentFocusTarget = useSettingsOverlayStore(state => state.clearAgentFocusTarget)
+  const agentCreateIntent = useSettingsOverlayStore(state => state.agentCreateIntent)
+  const clearAgentCreateIntent = useSettingsOverlayStore(state => state.clearAgentCreateIntent)
+  const [createPrefill, setCreatePrefill] = useState<AgentCreateIntent | null>(null)
   const settingsAgentsReady = agentsReady && providerTargetsReady
 
   const visibleAgents = (() => {
@@ -725,7 +728,8 @@ export function AgentList() {
     if (focusedAgent) {
       setSelectedIds(new Set([focusedAgent.id]))
       selectionAnchorIdRef.current = focusedAgent.id
-      setCreateDialogOpen(false)
+      setIsCreatingAgent(false)
+      setCreatePrefill(null)
       setFilter('')
       clearAgentFocusTarget()
       return
@@ -736,12 +740,31 @@ export function AgentList() {
     }
   }, [agentFocusTargetId, agents, agentsReady, clearAgentFocusTarget])
 
-  const openCreateDialog = () => {
-    setCreateDialogOpen(true)
+  useEffect(() => {
+    if (!agentCreateIntent) {
+      return
+    }
+    setCreatePrefill(agentCreateIntent)
+    setSelectedIds(new Set())
+    selectionAnchorIdRef.current = null
+    clearAgentCreateIntent()
+    setIsCreatingAgent(true)
+  }, [agentCreateIntent, clearAgentCreateIntent])
+
+  const openCreateDraft = () => {
+    setCreatePrefill(null)
+    setSelectedIds(new Set())
+    selectionAnchorIdRef.current = null
+    setIsCreatingAgent(true)
+  }
+
+  const cancelCreate = () => {
+    setIsCreatingAgent(false)
+    setCreatePrefill(null)
   }
 
   const handleCreated = (newAgentId: string) => {
-    setCreateDialogOpen(false)
+    cancelCreate()
     setSelectedIds(new Set([newAgentId]))
     selectionAnchorIdRef.current = newAgentId
   }
@@ -798,7 +821,7 @@ export function AgentList() {
         = result.agents.find(imported => imported.status === 'created' && imported.agent)
           ?? result.agents.find(imported => imported.status === 'existing' && imported.agent)
       if (selectedImport?.agent) {
-        setCreateDialogOpen(false)
+        cancelCreate()
         setSelectedIds(new Set([selectedImport.agent.id]))
         selectionAnchorIdRef.current = selectedImport.agent.id
       }
@@ -824,19 +847,19 @@ export function AgentList() {
   }
 
   const selectVisibleAgents = () => {
-    setCreateDialogOpen(false)
+    cancelCreate()
     setSelectedIds(prev => mergeVisibleSelection(prev, visibleAgents))
     selectionAnchorIdRef.current = visibleAgents.at(-1)?.id ?? null
   }
 
   const clearSelection = () => {
-    setCreateDialogOpen(false)
+    cancelCreate()
     setSelectedIds(new Set())
     selectionAnchorIdRef.current = null
   }
 
   const selectAgent = (agentId: string, selected: boolean, shiftKey: boolean) => {
-    setCreateDialogOpen(false)
+    cancelCreate()
     setSelectedIds((prev) => {
       if (shiftKey) {
         return applyVisibleRangeSelection(
@@ -868,7 +891,7 @@ export function AgentList() {
 
     setSelectedIds(new Set([agentId]))
     selectionAnchorIdRef.current = agentId
-    setCreateDialogOpen(false)
+    cancelCreate()
   }
 
   const handleBatchToggle = async (enabled: boolean) => {
@@ -947,10 +970,16 @@ export function AgentList() {
   const selectionShortcutScopeRef = useSettingsSelectionShortcuts({
     hasVisibleRecords: visibleAgents.length > 0,
     hasSelection: selectedIds.size > 0,
-    hasDraft: false,
+    hasDraft: isCreatingAgent,
     canDeleteSelection: !batchBusy && selectedAgents.length > 0,
     onSelectVisible: selectVisibleAgents,
-    onClearSelection: clearSelection,
+    onClearSelection: () => {
+      if (isCreatingAgent) {
+        cancelCreate()
+        return
+      }
+      clearSelection()
+    },
     onDeleteSelection: () => {
       void handleBatchDelete()
     },
@@ -976,8 +1005,8 @@ export function AgentList() {
       <Button
         data-testid="new-agent-btn"
         size="sm"
-        onClick={openCreateDialog}
-        disabled={createDialogOpen}
+        onClick={openCreateDraft}
+        disabled={isCreatingAgent}
       >
         <PlusIcon />
         Add agent
@@ -1120,7 +1149,17 @@ active
 
   const detailPane = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col py-5 pl-6 pr-5">
-      {selectedAgents.length > 1
+      {isCreatingAgent
+? (
+        <div className="flex-1">
+          <AgentDetailPage
+            onBack={cancelCreate}
+            onCreated={handleCreated}
+            createPrefill={createPrefill ?? undefined}
+          />
+        </div>
+      )
+: selectedAgents.length > 1
 ? (
         <AgentBatchProviderPanel
           key={selectedAgents.map(agent => agent.id).join('|')}
@@ -1152,7 +1191,7 @@ active
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button size="sm" variant="outline" onClick={openCreateDialog}>
+              <Button size="sm" variant="outline" onClick={openCreateDraft}>
                 <PlusIcon />
                 Add agent
               </Button>
@@ -1174,11 +1213,6 @@ active
       list={listPane}
       detail={detailPane}
     >
-      <CreateAgentDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onCreated={handleCreated}
-      />
       <AgentImportDialog
         open={importDialogOpen}
         preview={importPreview}

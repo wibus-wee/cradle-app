@@ -16,6 +16,8 @@
   "quick.risk.prompt": "请检查这个项目的近期变更，识别高风险区域、可能回归点和最小验证计划。",
   "readiness.agent.action": "打开 Agents",
   "readiness.agent.message": "当前没有可用的 Agent。请在设置中启用一个 Agent 后再开始。",
+  "readiness.acpAgent.action": "打开 ACP Agents",
+  "readiness.acpAgent.message": "当前没有已安装的 ACP Agent。请先安装一个，再开始 ACP Chat。",
   "readiness.provider.action": "打开 Providers",
   "readiness.provider.message": "当前没有可用的 provider。请先配置 provider 再发送第一条消息。",
   "recent.title": "最近对话",

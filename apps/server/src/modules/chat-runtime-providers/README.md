@@ -13,7 +13,7 @@ Runtime provider directories use a shared domain package shape when they own a r
 - `kit/`: shared Provider Kit modules (chunk mapping, input projection, process hosting, permission bridging, state snapshot parsing, provider definition helpers). See `kit/README.md` for the real per-module adoption matrix.
 - `bounded-text-collector.ts`: bounded streaming text accumulator for diagnostics.
 - `async-event-queue.ts`: provider-agnostic async FIFO event queue for runtime streams.
-- `openai-compatible/provider.ts`: OpenAI-compatible AI SDK runtime provider.
+- `openai-compatible/`: parked OpenAI-compatible AI SDK adapter; it is currently not registered as a builtin runtime.
 - `acp/`: ACP process, connection, runtime integration, timeline mapping, and provider adapter.
 - `opencode/`: opencode SDK server runtime adapter with native provider config projection, session lifecycle, prompt result mapping, and tool envelope mapping.
 - `tools/`: Cradle-owned shared provider tool envelope contract.

@@ -39,31 +39,102 @@ const acpMocks = vi.hoisted(() => {
 })
 
 vi.mock('@agentclientprotocol/sdk', () => {
-  class FakeClientSideConnection {
-    closed = new Promise<void>(() => {})
-
-    constructor(createClient: (agent: unknown) => unknown) {
-      acpMocks.setClient(createClient({}) as {
-        requestPermission: (params: unknown) => Promise<unknown>
-        sessionUpdate: (params: unknown) => Promise<void>
-        writeTextFile?: (params: { sessionId: string, path: string, content: string }) => Promise<unknown>
-        readTextFile?: (params: { sessionId: string, path: string }) => Promise<{ content: string }>
-      })
-    }
-
-    initialize = (...args: unknown[]) => acpMocks.initialize(...args)
-    newSession = (...args: unknown[]) => acpMocks.newSession(...args)
-    loadSession = (...args: unknown[]) => acpMocks.loadSession(...args)
-    unstable_resumeSession = (...args: unknown[]) => acpMocks.resumeSession(...args)
-    prompt = (...args: unknown[]) => acpMocks.prompt(...args)
-    cancel = (...args: unknown[]) => acpMocks.cancel(...args)
-    unstable_setSessionModel = (...args: unknown[]) => acpMocks.setSessionModel(...args)
-    setSessionConfigOption = (...args: unknown[]) => acpMocks.setSessionConfigOption(...args)
-  }
+  const methods = {
+    agent: {
+      initialize: 'initialize',
+      session: {
+        new: 'session/new',
+        load: 'session/load',
+        resume: 'session/resume',
+        setConfigOption: 'session/set_config_option',
+        prompt: 'session/prompt',
+        cancel: 'session/cancel',
+      },
+    },
+    client: {
+      session: {
+        requestPermission: 'session/request_permission',
+        update: 'session/update',
+      },
+      fs: {
+        readTextFile: 'fs/read_text_file',
+        writeTextFile: 'fs/write_text_file',
+      },
+    },
+  } as const
 
   return {
-    ClientSideConnection: FakeClientSideConnection,
-    PROTOCOL_VERSION: '2025-draft',
+    client: () => {
+      const requestHandlers = new Map<string, (input: { params: never }) => Promise<unknown>>()
+      const notificationHandlers = new Map<string, (input: { params: never }) => Promise<void>>()
+      const app = {
+        onRequest(method: string, handler: (input: { params: never }) => Promise<unknown>) {
+          requestHandlers.set(method, handler)
+          return app
+        },
+        onNotification(method: string, handler: (input: { params: never }) => Promise<void>) {
+          notificationHandlers.set(method, handler)
+          return app
+        },
+        connect() {
+          const callRequest = async (method: string, params: never) => {
+            const handler = requestHandlers.get(method)
+            if (!handler) {
+              throw new Error(`Missing ACP client request handler for ${method}`)
+            }
+            return handler({ params })
+          }
+          const callNotification = async (method: string, params: never) => {
+            const handler = notificationHandlers.get(method)
+            if (!handler) {
+              throw new Error(`Missing ACP client notification handler for ${method}`)
+            }
+            await handler({ params })
+          }
+
+          acpMocks.setClient({
+            requestPermission: params => callRequest(methods.client.session.requestPermission, params as never),
+            sessionUpdate: params => callNotification(methods.client.session.update, params as never),
+            writeTextFile: params => callRequest(methods.client.fs.writeTextFile, params as never),
+            readTextFile: params => callRequest(methods.client.fs.readTextFile, params as never) as Promise<{ content: string }>,
+          })
+
+          return {
+            closed: new Promise<void>(() => {}),
+            signal: new AbortController().signal,
+            agent: {
+              request(method: string, params: unknown) {
+                switch (method) {
+                  case methods.agent.initialize:
+                    return acpMocks.initialize(params)
+                  case methods.agent.session.new:
+                    return acpMocks.newSession(params)
+                  case methods.agent.session.load:
+                    return acpMocks.loadSession(params)
+                  case methods.agent.session.resume:
+                    return acpMocks.resumeSession(params)
+                  case methods.agent.session.setConfigOption:
+                    return acpMocks.setSessionConfigOption(params)
+                  case methods.agent.session.prompt:
+                    return acpMocks.prompt(params)
+                  default:
+                    throw new Error(`Missing ACP agent request mock for ${method}`)
+                }
+              },
+              notify(method: string, params: unknown) {
+                if (method === methods.agent.session.cancel) {
+                  return acpMocks.cancel(params)
+                }
+                throw new Error(`Missing ACP agent notification mock for ${method}`)
+              },
+            },
+          }
+        },
+      }
+      return app
+    },
+    methods,
+    PROTOCOL_VERSION: 1,
     ndJsonStream: () => ({ readable: new ReadableStream(), writable: new WritableStream() }),
   }
 })
@@ -204,14 +275,11 @@ describe('acp chat runtime capability', () => {
     })
     acpMocks.newSession.mockResolvedValue({
       sessionId: 'acp-session-1',
-      models: {
-        currentModelId: 'acp-model',
-        availableModels: [{ modelId: 'acp-model', name: 'ACP Model' }],
-      },
+      modes: null,
       configOptions: [],
     })
-    acpMocks.loadSession.mockResolvedValue({ models: null, configOptions: [] })
-    acpMocks.resumeSession.mockResolvedValue({ models: null, configOptions: [] })
+    acpMocks.loadSession.mockResolvedValue({ modes: null, configOptions: [] })
+    acpMocks.resumeSession.mockResolvedValue({ modes: null, configOptions: [] })
     acpMocks.cancel.mockResolvedValue(undefined)
     acpMocks.setSessionModel.mockResolvedValue(undefined)
     acpMocks.setSessionConfigOption.mockResolvedValue({ configOptions: [] })
@@ -556,6 +624,56 @@ describe('acp chat runtime capability', () => {
         },
       },
     }))
+  })
+
+  it('selects models through the standard ACP session config option', async () => {
+    const { AcpConnectionManager } = await import('../src/modules/chat-runtime-providers/acp/connection-manager')
+    const manager = new AcpConnectionManager({
+      spawn: () => ({
+        agentId: 'profile-acp',
+        proc: {} as never,
+        startedAt: Date.now(),
+        stderrBuf: [],
+        stdinWeb: new WritableStream<Uint8Array>(),
+        stdoutWeb: new ReadableStream<Uint8Array>(),
+      }),
+      stop: async () => {},
+      getMetrics: () => [],
+      disposeAll: () => {},
+    } as never)
+
+    acpMocks.newSession.mockResolvedValueOnce({
+      sessionId: 'acp-model-session',
+      modes: null,
+      configOptions: [{
+        id: 'model',
+        type: 'select',
+        name: 'Model',
+        category: 'model',
+        currentValue: 'model-a',
+        options: [
+          { value: 'model-a', name: 'Model A' },
+          { value: 'model-b', name: 'Model B' },
+        ],
+      }],
+    })
+    acpMocks.setSessionConfigOption.mockResolvedValueOnce({ configOptions: [] })
+
+    await manager.connect('profile-acp', {
+      distributionType: 'npx',
+      cmd: '@demo/acp-agent',
+      args: '[]',
+      env: '{}',
+      installPath: null,
+    })
+    await manager.newSession('profile-acp', '/tmp/workspace')
+    await manager.setSessionModel('profile-acp', 'acp-model-session', 'model-b')
+
+    expect(acpMocks.setSessionConfigOption).toHaveBeenCalledWith({
+      sessionId: 'acp-model-session',
+      configId: 'model',
+      value: 'model-b',
+    })
   })
 
   it('fails closed before ACP agents write client filesystem paths', async () => {

@@ -1287,6 +1287,8 @@ export const zPostSessionsBody = z.object({
     providerTargetId: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
     agentId: z.string().min(1).optional(),
+    acpAgentId: z.string().min(1).optional(),
+    acpDraftSessionId: z.string().min(1).optional(),
     runtimeKind: z.string().min(1).optional(),
     runtimeSettings: z.object({
         permissionMode: z.enum([
@@ -2736,6 +2738,14 @@ export const zDeleteAcpAgentsByAgentIdPath = z.object({
 });
 
 export const zGetAcpAgentsByAgentIdPath = z.object({
+    agentId: z.string().min(1)
+});
+
+export const zPostAcpAgentsByAgentIdDraftSessionBody = z.object({
+    workspaceId: z.string().min(1).optional()
+});
+
+export const zPostAcpAgentsByAgentIdDraftSessionPath = z.object({
     agentId: z.string().min(1)
 });
 

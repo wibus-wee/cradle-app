@@ -163,5 +163,6 @@
   "subIssue.openAria": "打开子事项 {{title}}",
   "subIssue.titleAria": "子事项标题",
   "subIssue.titlePlaceholder": "子事项标题",
-  "table.title": "标题"
+  "table.title": "标题",
+  "issueDetail.sessionGroup.sessionCount": "{{count}} 个会话"
 }

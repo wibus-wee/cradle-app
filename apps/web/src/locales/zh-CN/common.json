@@ -13,6 +13,8 @@
   "action.stop": "停止",
   "agent.empty": "暂无可用 Agent",
   "agent.selector.label": "Agent",
+  "acpAgent.empty": "暂无已安装的 ACP Agent",
+  "acpAgent.selector.label": "ACP Agent",
   "app.name": "Cradle",
   "markdownEditor.placeholder": "开始编写...",
   "errorBoundary.description": "应用已捕获这次崩溃，你可以重试渲染或重新加载窗口。",

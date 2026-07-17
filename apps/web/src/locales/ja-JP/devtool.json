@@ -44,5 +44,8 @@
   "plugins.stats.server": "{{count}} server",
   "plugins.stats.web": "{{count}} web",
   "plugins.title": "プラグイン",
-  "status.loading": "読み込み中..."
+  "status.loading": "読み込み中...",
+  "acp.filter.placeholder": "エージェント / ストリーム / 出力をフィルタ...（/ でフォーカス）",
+  "events.empty": "（空）",
+  "ipc.filter.placeholder": "チャンネル / 引数 / エラーをフィルタ...（/ でフォーカス）"
 }

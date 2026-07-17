@@ -11,6 +11,7 @@ import { AnimatePresence, m } from 'motion/react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { useCallback, useEffect, useEffectEvent, useReducer, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import {
@@ -1193,6 +1194,7 @@ function ProfileCredentialSettings({
   onChatgptLogin: () => void
   onCancelChatgptLogin: () => void
 }) {
+  const { t } = useTranslation('agentManagement')
   const isCodexProvider = providerKind === 'openai-compatible'
   const isClaudeProvider = providerKind === 'anthropic'
   const isChatgptCredential = isChatgptCredentialMetadata(credentialMetadata)
@@ -1306,7 +1308,7 @@ function ProfileCredentialSettings({
 
         {claudeAiLogin && (
           <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-[11.5px] leading-relaxed text-muted-foreground ring-1 ring-foreground/4">
-            Uses your Claude.ai subscription login. No API key needed — the Claude Agent SDK manages login state in its own config directory.
+            {t('detail.claudeAgent.subscriptionLoginNotice')}
           </div>
         )}
 

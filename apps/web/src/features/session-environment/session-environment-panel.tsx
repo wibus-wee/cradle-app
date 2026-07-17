@@ -12,6 +12,7 @@ import {
 } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   AlertDialog,
@@ -33,6 +34,7 @@ import { useWorkDetail } from '~/features/work/use-work'
 import { apiErrorMessage } from '~/lib/api-error'
 import { openWorkspaceDiffs } from '~/navigation/navigation-commands'
 
+import { PullRequestTabLink } from '../pull-requests/pull-request-tab-link'
 import { sessionEnvironmentApi } from './api/session-environment'
 
 type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>
@@ -46,6 +48,7 @@ export function SessionEnvironmentPanel({
   workspaceId: string | null
   workId: string | null
 }) {
+  const { t } = useTranslation('chrome')
   const queryClient = useQueryClient()
   const turnCheckpointsEnabled = useFeatureFlag('turnCheckpoints')
   const environmentQuery = useQuery({
@@ -127,7 +130,12 @@ export function SessionEnvironmentPanel({
         {environment.pullRequest && (
           <section className="space-y-2">
             <SectionHeader icon={PullRequestIcon} label="Pull request" />
-            <a className="flex min-h-10 items-center gap-2 rounded-lg bg-fill/45 px-2.5 text-[11px] transition-[background-color,scale] duration-150 hover:bg-fill active:scale-[0.96]" href={environment.pullRequest.url} target="_blank" rel="noreferrer">
+            <PullRequestTabLink
+              pullRequest={environment.pullRequest}
+              workId={workId}
+              sessionId={sessionId}
+              className="flex min-h-10 items-center gap-2 rounded-lg bg-fill/45 px-2.5 text-[11px] transition-[background-color,scale] duration-150 hover:bg-fill active:scale-[0.96]"
+            >
               <span className="min-w-0 flex-1 truncate">
 #
 {environment.pullRequest.number}
@@ -135,7 +143,7 @@ export function SessionEnvironmentPanel({
 {environment.pullRequest.title}
               </span>
               <ExternalLinkIcon className="size-3.5 shrink-0 opacity-50" aria-hidden="true" />
-            </a>
+            </PullRequestTabLink>
           </section>
         )}
 
@@ -199,7 +207,7 @@ Review
 
         <section className="space-y-2">
           <SectionHeader icon={NotesIcon} label="Notes" />
-          <textarea value={notesDraft} onChange={event => setNotesDraft(event.target.value)} placeholder="Keep session notes here…" className="min-h-28 w-full resize-y rounded-lg bg-fill/35 px-2.5 py-2 text-[12px] leading-5 outline-none shadow-[0_0_0_1px_rgba(127,127,127,0.14)] transition-[box-shadow] focus:shadow-[0_0_0_1px_var(--color-ring)]" />
+          <textarea value={notesDraft} onChange={event => setNotesDraft(event.target.value)} placeholder={t('aside.notes.placeholder')} className="min-h-28 w-full resize-y rounded-lg bg-fill/35 px-2.5 py-2 text-[12px] leading-5 outline-none shadow-[0_0_0_1px_rgba(127,127,127,0.14)] transition-[box-shadow] focus:shadow-[0_0_0_1px_var(--color-ring)]" />
         </section>
 
         {environment.automationRuns.length > 0 && (
@@ -221,7 +229,7 @@ Review
                 </span>
               </button>
             ))}
-            {localServers.loading && <p className="text-[11px] text-muted-foreground">Scanning localhost…</p>}
+            {localServers.loading && <p className="text-[11px] text-muted-foreground">{t('aside.localServers.scanning')}</p>}
             {!localServers.loading && localServers.error && <p className="text-pretty text-[11px] text-muted-foreground">{localServers.error}</p>}
           </section>
         )}

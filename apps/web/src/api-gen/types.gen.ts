@@ -6202,6 +6202,8 @@ export type PostSessionsData = {
         providerTargetId?: string;
         modelId?: string | null;
         agentId?: string;
+        acpAgentId?: string;
+        acpDraftSessionId?: string;
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
@@ -18015,6 +18017,33 @@ export type GetAcpAgentsByAgentIdResponses = {
 };
 
 export type GetAcpAgentsByAgentIdResponse = GetAcpAgentsByAgentIdResponses[keyof GetAcpAgentsByAgentIdResponses];
+
+export type PostAcpAgentsByAgentIdDraftSessionData = {
+    body: {
+        workspaceId?: string;
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/draft-session';
+};
+
+export type PostAcpAgentsByAgentIdDraftSessionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        selectedModelId: string | null;
+        models: Array<{
+            id: string;
+            label: string;
+        }>;
+    };
+};
+
+export type PostAcpAgentsByAgentIdDraftSessionResponse = PostAcpAgentsByAgentIdDraftSessionResponses[keyof PostAcpAgentsByAgentIdDraftSessionResponses];
 
 export type DeleteAcpAgentsByAgentIdInstallationData = {
     body?: never;

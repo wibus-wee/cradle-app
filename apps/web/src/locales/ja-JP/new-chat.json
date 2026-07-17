@@ -21,6 +21,8 @@
   "quick.risk.prompt": "このプロジェクトの最近の変更を確認し、リスク領域、回帰候補、最小の検証計画を特定してください。",
   "readiness.agent.action": "Agents を開く",
   "readiness.agent.message": "利用可能な Agent がありません。開始するには設定で Agent を有効にしてください。",
+  "readiness.acpAgent.action": "ACP Agent を開く",
+  "readiness.acpAgent.message": "インストール済みの ACP Agent はありません。ACP Chat を開始する前にインストールしてください。",
   "readiness.provider.action": "Providers を開く",
   "readiness.provider.message": "利用可能な provider がありません。最初のメッセージ送信前に provider を設定してください。",
   "recent.title": "最近のチャット",

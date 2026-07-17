@@ -1,13 +1,15 @@
 import type { ModelDescriptor, ProviderKind, ProviderTargetKind, RuntimeKind } from '~/features/agent-runtime/types'
 
 export type ComposerContext = 'new-chat' | 'chat'
-export type ComposerTargetMode = 'provider' | 'agent'
+export type ComposerTargetMode = 'provider' | 'agent' | 'acp-agent'
 export type RuntimeProviderBinding = 'required' | 'runtime-owned' | 'none'
 
 export type ThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null
 
 export interface ComposerSelection {
   agentId: string | null
+  acpAgentId: string | null
+  acpDraftSessionId: string | null
   profileId: string | null
   modelId: string | null
   thinkingEffort: ThinkingEffort

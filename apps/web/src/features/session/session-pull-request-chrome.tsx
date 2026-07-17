@@ -8,6 +8,7 @@ import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
 import { cn } from '~/lib/cn'
 
+import { PullRequestTabLink } from '../pull-requests/pull-request-tab-link'
 import {
   useMarkSessionPullRequestReady,
   useSessionPullRequest,
@@ -58,16 +59,14 @@ export function SessionPullRequestChrome({ sessionId }: SessionPullRequestChrome
       className="flex min-w-0 items-center gap-1.5"
       data-testid="session-pull-request-chrome"
     >
-      <a
-        href={pullRequest.url}
-        target="_blank"
-        rel="noreferrer"
+      <PullRequestTabLink
+        pullRequest={pullRequest}
+        sessionId={sessionId}
         className={cn(
           'inline-flex max-w-[220px] items-center gap-1 rounded-md border border-border/60',
           'bg-fill/40 px-1.5 py-0.5 text-[11px] text-foreground/90',
           'transition-colors duration-150 hover:bg-fill active:scale-[0.98]',
         )}
-        title={pullRequest.title}
       >
         <GitPullRequestIcon className="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
         <span className="truncate font-medium">
@@ -75,7 +74,7 @@ export function SessionPullRequestChrome({ sessionId }: SessionPullRequestChrome
         </span>
         <span className="shrink-0 text-muted-foreground">{statusLabel}</span>
         <ExternalLinkIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
-      </a>
+      </PullRequestTabLink>
       {pullRequest.isDraft && pullRequest.state === 'open' && !pullRequest.merged && (
         <Button
           type="button"

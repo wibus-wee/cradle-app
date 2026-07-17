@@ -1,5 +1,6 @@
 import { AgentList } from '~/features/agent-management/agent-list'
 import { AgentRuntimeSettings } from '~/features/agent-management/agent-runtime-settings'
+import { RuntimesSettings } from '~/features/agent-runtimes/runtimes-settings'
 import { ChronicleSettings } from '~/features/chronicle/chronicle-settings'
 import { cn } from '~/lib/cn'
 
@@ -25,6 +26,7 @@ const SECTION_MAP: Record<string, React.ComponentType> = {
   providers: AgentRuntimeSettings,
   registry: ModelRegistrySettings,
   agents: AgentList,
+  runtimes: RuntimesSettings,
   chat: ChatSettings,
   await: AwaitSettings,
   worktrees: WorktreeSettings,
@@ -43,7 +45,7 @@ const SECTION_MAP: Record<string, React.ComponentType> = {
   about: AboutSettings,
 }
 
-const FIXED_HEIGHT_SECTIONS = new Set(['import', 'providers', 'agents', 'integrations'])
+const FIXED_HEIGHT_SECTIONS = new Set(['import', 'providers', 'agents', 'runtimes', 'integrations'])
 
 interface SettingsContentProps {
   section: string

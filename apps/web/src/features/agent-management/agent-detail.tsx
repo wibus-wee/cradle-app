@@ -2,10 +2,10 @@ import {
   ArrowLeftLine as ArrowLeftIcon,
   CheckLine as CheckIcon,
   CloseLine as XIcon,
+  DownSmallLine as ChevronDownIcon,
   RandomLine as DicesIcon,
 } from '@mingcute/react'
 import { m } from 'motion/react'
-import { Select as RadixSelect } from 'radix-ui'
 import {
   useCallback,
   useEffect,
@@ -18,8 +18,7 @@ import {
 import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
-import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
-import { ProviderIcon, RuntimeIcon } from '~/components/common/provider-icons'
+import { ProviderIcon } from '~/components/common/provider-icons'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,11 +48,16 @@ import {
 } from '~/features/agent-runtime/agent-config-schema'
 import { buildAvatarUrl } from '~/features/agent-runtime/avatar-url'
 import { runtimeSupportsProviderKind } from '~/features/agent-runtime/runtime-compatibility'
+import type { RuntimeSelectorOption } from '~/features/agent-runtime/runtime-selector'
+import {
+  RuntimeSelector,
+} from '~/features/agent-runtime/runtime-selector'
 import type {
   CliTuiLaunchConfig,
   ModelDescriptor,
   RuntimeKind,
 } from '~/features/agent-runtime/types'
+import { ACP_CHAT_RUNTIME_KIND } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import type { Agent, CreateAgentInput } from '~/features/agent-runtime/use-agents'
 import { useAgents } from '~/features/agent-runtime/use-agents'
@@ -67,6 +71,8 @@ import {
   runtimeCatalogItemUsesModelSelection,
   useRuntimeCatalog,
 } from '~/features/agent-runtime/use-runtime-catalog'
+import { AcpAgentIcon } from '~/features/agent-runtimes/acp-agent-icon'
+import { useAcpAgents, useAcpRegistry } from '~/features/agent-runtimes/use-acp-registry'
 import {
   filterThinkingOptionsForModel,
   selectSupportedThinkingValue,
@@ -80,6 +86,7 @@ import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-
 import { SkillManager } from '~/features/skills'
 import { cn } from '~/lib/cn'
 import { authorizeDangerousAction } from '~/lib/electron'
+import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { SettingsDivider, SettingsRow } from '../settings/settings-row'
 import { useFeatureFlag } from '../settings/use-app-preferences'
@@ -90,11 +97,15 @@ const WHITESPACE_RE = /\s+/
 
 // ── Runtime options ───────────────────────────────────────────────────────────
 
-interface AgentRuntimeOption {
-  value: RuntimeKind
+interface AgentRuntimeOption extends RuntimeSelectorOption {
   label: string
-  description?: string
-  icon?: RuntimeIconDescriptor
+  experimental?: boolean
+}
+
+/** Prefill applied when creating an agent from another surface (e.g. the Runtimes page). */
+export interface AgentCreatePrefill {
+  runtimeKind?: RuntimeKind
+  acpAgentId?: string
 }
 
 export const CLI_TUI_PRESETS = [
@@ -165,6 +176,7 @@ interface AgentDetailFormValues {
   thinkingEffort: ThinkingEffort
   runtimeKind: RuntimeKind
   systemPrompt: string
+  acpAgentId: string | null
   claudeAgentHaikuModel: string
   claudeAgentSonnetModel: string
   claudeAgentOpusModel: string
@@ -199,6 +211,7 @@ type AgentCreateDisabledReason
   = | 'detail.create.disabled.nameRequired'
     | 'detail.create.disabled.cliExecutableRequired'
     | 'detail.create.disabled.providerRequired'
+    | 'detail.create.disabled.acpAgentRequired'
     | 'detail.create.disabled.creating'
     | 'detail.create.disabled.noChanges'
 
@@ -291,11 +304,12 @@ function stringifyEnvText(text: string): Record<string, string> | undefined {
 }
 
 function getAgentCreateDisabledReason(input: {
-  draft: Pick<AgentDetailDraft, 'name' | 'providerTargetId' | 'cliTuiExecutable'>
+  draft: Pick<AgentDetailDraft, 'name' | 'providerTargetId' | 'cliTuiExecutable' | 'acpAgentId'>
   isDirty: boolean
   createSaving: boolean
   usesCliLaunchConfig: boolean
   usesProviderTarget: boolean
+  requiresAcpAgent: boolean
 }): AgentCreateDisabledReason | null {
   if (!input.draft.name.trim()) {
     return 'detail.create.disabled.nameRequired'
@@ -305,6 +319,9 @@ function getAgentCreateDisabledReason(input: {
   }
   if (input.usesProviderTarget && !input.draft.providerTargetId) {
     return 'detail.create.disabled.providerRequired'
+  }
+  if (input.requiresAcpAgent && !input.draft.acpAgentId) {
+    return 'detail.create.disabled.acpAgentRequired'
   }
   if (input.createSaving) {
     return 'detail.create.disabled.creating'
@@ -395,10 +412,15 @@ function stringifyConfigJson(input: {
   cliTuiEnvText: string
   usesCliLaunchConfig: boolean
   usesAliasMatrixModelSelection: boolean
+  acpAgentId: string | null
+  usesAcpBinding: boolean
 }): string {
   const config: Record<string, unknown> = { ...input.baseConfig }
   if (input.systemPrompt.trim()) {
     config.systemPrompt = input.systemPrompt
+  }
+  if (input.usesAcpBinding && input.acpAgentId) {
+    config.acpAgentId = input.acpAgentId
   }
   writeClaudeAgentConfig(config, {
     existingConfig: input.claudeAgentConfig,
@@ -453,13 +475,16 @@ function getAgentDetailFormValues(
   agent: Agent | undefined,
   providerTargets: ProviderTargetOption[],
   runtimeCatalog: RuntimeCatalogItem[],
+  createPrefill?: AgentCreatePrefill,
 ): AgentDetailFormValues {
   const initialConfig = AgentRuntimeConfigJsonSchema.parse(agent?.configJson)
   const cliTuiPreset = inferCliPreset(initialConfig.cliTui)
   const presetExecutable
     = CLI_TUI_PRESETS.find(preset => preset.id === cliTuiPreset)?.executable ?? ''
   const runtimeKind
-    = (agent?.runtimeKind as RuntimeKind | undefined) ?? readDefaultAgentRuntimeKind(runtimeCatalog)
+    = (agent?.runtimeKind as RuntimeKind | undefined)
+      ?? createPrefill?.runtimeKind
+      ?? readDefaultAgentRuntimeKind(runtimeCatalog)
   return {
     name: agent?.name ?? '',
     description: agent?.description ?? '',
@@ -470,6 +495,7 @@ function getAgentDetailFormValues(
     thinkingEffort: (agent?.thinkingEffort as ThinkingEffort) ?? 'high',
     runtimeKind,
     systemPrompt: initialConfig.systemPrompt,
+    acpAgentId: initialConfig.acpAgentId ?? createPrefill?.acpAgentId ?? null,
     claudeAgentHaikuModel: initialConfig.claudeAgent.modelAliases.haiku,
     claudeAgentSonnetModel: initialConfig.claudeAgent.modelAliases.sonnet,
     claudeAgentOpusModel: initialConfig.claudeAgent.modelAliases.opus,
@@ -482,27 +508,19 @@ function getAgentDetailFormValues(
 
 function listAgentRuntimeOptions(runtimeCatalog: RuntimeCatalogItem[]): AgentRuntimeOption[] {
   return listRuntimeCatalogForSurface(runtimeCatalog, 'chat')
-    .filter(
-      runtime =>
-        !runtimeCatalogItemUsesModelSelection(runtime)
-        || (runtime.providerBinding ?? 'required') === 'required',
-    )
+    .filter((runtime) => {
+      const providerBinding = runtime.providerBinding ?? 'required'
+      return providerBinding === 'none'
+        || !runtimeCatalogItemUsesModelSelection(runtime)
+        || providerBinding === 'required'
+    })
     .map(runtime => ({
       value: runtime.runtimeKind,
       label: runtime.label,
       description: runtime.description,
       icon: runtime.icon,
+      experimental: runtime.stability === 'experimental',
     }))
-}
-
-export function RuntimeOptionIcon({
-  option,
-  className,
-}: {
-  option: AgentRuntimeOption
-  className?: string
-}) {
-  return <RuntimeIcon icon={option.icon} className={className} />
 }
 
 function serializeAgentDetailFormValues(values: AgentDetailFormValues): string {
@@ -863,6 +881,7 @@ interface AgentDetailDraft {
   thinkingEffort: ThinkingEffort
   runtimeKind: RuntimeKind
   systemPrompt: string
+  acpAgentId: string | null
   claudeAgentHaikuModel: string
   claudeAgentSonnetModel: string
   claudeAgentOpusModel: string
@@ -952,10 +971,100 @@ function AgentDetailHeader({
   )
 }
 
+export function AgentAcpBindingRow() {
+  const { t } = useTranslation('agentManagement')
+  const form = useFormContext<AgentDetailFormValues>()
+  const acpAgentId = useWatch({ control: form.control, name: 'acpAgentId' })
+  const { installedAgents } = useAcpAgents()
+  const { registryAgents } = useAcpRegistry()
+  const setSettingsSection = useSettingsOverlayStore(state => state.setSettingsSection)
+  const registryIconById = new Map(registryAgents.map(agent => [agent.id, agent.icon]))
+  const selectedAgent = installedAgents.find(agent => agent.id === acpAgentId) ?? null
+
+  return (
+    <>
+      <SettingsDivider />
+      <SettingsRow label={t('detail.acpAgent.label')} description={t('detail.acpAgent.description')}>
+        {installedAgents.length === 0
+          ? (
+              <div className="flex flex-col items-end gap-1.5">
+                <p className="text-right text-[11px] text-muted-foreground">
+                  {t('detail.acpAgent.empty')}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSettingsSection('runtimes')}
+                  data-testid="agent-acp-install-from-runtimes"
+                >
+                  {t('detail.acpAgent.installFromRuntimes')}
+                </Button>
+              </div>
+            )
+          : (
+              <Menu>
+                <MenuTrigger
+                  render={(
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-56 justify-between text-[12.5px]"
+                      data-testid="agent-acp-agent-select"
+                    />
+                  )}
+                >
+                  {selectedAgent
+                    ? (
+                        <div className="flex min-w-0 items-center gap-2">
+                          <AcpAgentIcon
+                            iconUrl={registryIconById.get(selectedAgent.id)}
+                            className="size-4 shrink-0 rounded-sm"
+                          />
+                          <span className="truncate">{selectedAgent.name}</span>
+                        </div>
+                      )
+                    : (
+                        <span className="text-muted-foreground">
+                          {t('detail.acpAgent.placeholder')}
+                        </span>
+                      )}
+                  <ChevronDownIcon className="size-3 shrink-0 !text-muted-foreground/50" />
+                </MenuTrigger>
+                <MenuPopup align="end" side="bottom" sideOffset={4} className="w-64">
+                  {installedAgents.map(agent => (
+                    <MenuItem
+                      key={agent.id}
+                      onClick={() => form.setValue('acpAgentId', agent.id, { shouldDirty: true })}
+                      className={cn(acpAgentId === agent.id && 'font-medium')}
+                    >
+                      <AcpAgentIcon
+                        iconUrl={registryIconById.get(agent.id)}
+                        className="size-4 shrink-0 rounded-sm"
+                      />
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">{agent.name}</span>
+                        {agent.version && (
+                          <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                            v
+                            {agent.version}
+                          </span>
+                        )}
+                      </div>
+                    </MenuItem>
+                  ))}
+                </MenuPopup>
+              </Menu>
+            )}
+      </SettingsRow>
+    </>
+  )
+}
+
 function AgentIdentitySection({
   draft,
   runtimeOptions,
   selectableProviderTargets,
+  draftUsesModelSelection,
   draftUsesCliLaunchConfig,
   draftUsesAliasMatrixModelSelection,
   providerDisabledReason,
@@ -967,6 +1076,7 @@ function AgentIdentitySection({
   draft: AgentDetailDraft
   runtimeOptions: AgentRuntimeOption[]
   selectableProviderTargets: ProviderTargetOption[]
+  draftUsesModelSelection: boolean
   draftUsesCliLaunchConfig: boolean
   draftUsesAliasMatrixModelSelection: boolean
   providerDisabledReason: string | null
@@ -979,12 +1089,6 @@ function AgentIdentitySection({
   const form = useFormContext<AgentDetailFormValues>()
   const cliEnvParseResult = parseCliEnvText(draft.cliTuiEnvText)
   const invalidEnvLineSummary = cliEnvParseResult.invalidLineNumbers.join(', ')
-  const selectedRuntimeOption = runtimeOptions.find(
-    option => option.value === draft.runtimeKind,
-  ) ?? {
-    value: draft.runtimeKind,
-    label: draft.runtimeKind,
-  }
 
   return (
     <div className="flex flex-col gap-0">
@@ -1072,55 +1176,16 @@ function AgentIdentitySection({
       {/* Runtime row */}
       <SettingsDivider />
       <SettingsRow label={t('detail.runtime.label')} description={t('detail.runtime.description')}>
-        <Select
+        <RuntimeSelector
+          appearance="settings"
           value={draft.runtimeKind}
-          onValueChange={value =>
-            form.setValue('runtimeKind', value as RuntimeKind, { shouldDirty: true })}
-        >
-          <SelectTrigger
-            size="sm"
-            className="h-8 w-48 text-[12.5px]"
-            data-testid="agent-runtime-select"
-          >
-            <div className="flex items-center gap-2">
-              <RuntimeOptionIcon option={selectedRuntimeOption} className="size-4 shrink-0" />
-              <span className="truncate">{selectedRuntimeOption.label}</span>
-            </div>
-          </SelectTrigger>
-          <SelectContent className="w-64">
-            {runtimeOptions.map(opt => (
-              <RadixSelect.Item
-                key={opt.value}
-                value={opt.value}
-                className={cn(
-                  'relative flex w-full cursor-default items-start gap-2.5 rounded-md py-2 pr-8 pl-2 text-sm outline-hidden select-none',
-                  'focus:bg-accent focus:text-accent-foreground',
-                  'data-disabled:pointer-events-none data-disabled:opacity-50',
-                )}
-              >
-                <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-                  <RadixSelect.ItemIndicator>
-                    <CheckIcon className="pointer-events-none size-3" />
-                  </RadixSelect.ItemIndicator>
-                </span>
-                <span className="mt-0.5 shrink-0">
-                  <RuntimeOptionIcon option={opt} className="size-4" />
-                </span>
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <RadixSelect.ItemText className="text-[12.5px] font-medium">
-                    {opt.label}
-                  </RadixSelect.ItemText>
-                  {opt.description && (
-                    <span className="text-[11px] text-muted-foreground leading-snug">
-                      {opt.description}
-                    </span>
-                  )}
-                </div>
-              </RadixSelect.Item>
-            ))}
-          </SelectContent>
-        </Select>
+          options={runtimeOptions}
+          experimentalLabel={t('detail.runtime.experimentalChip')}
+          onChange={value => form.setValue('runtimeKind', value, { shouldDirty: true })}
+        />
       </SettingsRow>
+
+      {draft.runtimeKind === ACP_CHAT_RUNTIME_KIND && <AgentAcpBindingRow />}
 
       {draftUsesCliLaunchConfig
 ? (
@@ -1223,7 +1288,8 @@ function AgentIdentitySection({
           </SettingsRow>
         </>
       )
-: (
+: draftUsesModelSelection
+? (
         <>
           <SettingsDivider />
           <SettingsRow label={t('detail.model.label')} description={t('detail.model.description')}>
@@ -1253,7 +1319,8 @@ function AgentIdentitySection({
             />
           )}
         </>
-      )}
+      )
+: null}
     </div>
   )
 }
@@ -1347,10 +1414,12 @@ export function useAgentDetailOwner({
   agent,
   onCreated,
   onDeleted,
+  createPrefill,
 }: {
   agent?: Agent
   onCreated?: (agentId: string) => void
   onDeleted?: () => void
+  createPrefill?: AgentCreatePrefill
 }) {
   const { t } = useTranslation('agentManagement')
   const isCreate = agent === undefined
@@ -1365,7 +1434,15 @@ export function useAgentDetailOwner({
   const readRuntimeUsesModelSelection = useCallback(
     (runtimeKind: RuntimeKind) => {
       const runtime = runtimeByKind.get(runtimeKind)
-      return runtime ? runtimeCatalogItemUsesModelSelection(runtime) : true
+      if (!runtime) {
+        return true
+      }
+      // Runtimes that bring their own models and credentials (e.g. ACP) have no
+      // provider/model selection in the agent form at all.
+      if ((runtime.providerBinding ?? 'required') === 'none') {
+        return false
+      }
+      return runtimeCatalogItemUsesModelSelection(runtime)
     },
     [runtimeByKind],
   )
@@ -1391,10 +1468,11 @@ export function useAgentDetailOwner({
     skills: _skills,
     cliTui: _cliTui,
     claudeAgent: _claudeAgent,
+    acpAgentId: _acpAgentId,
     ...baseConfig
   } = persistedConfig
   const form = useForm<AgentDetailFormValues>({
-    defaultValues: getAgentDetailFormValues(agent, providerOptions, runtimes),
+    defaultValues: getAgentDetailFormValues(agent, providerOptions, runtimes, createPrefill),
   })
   const watchedValues = useWatch({ control: form.control }) as Partial<AgentDetailFormValues>
   const draft: AgentDetailDraft = {
@@ -1407,6 +1485,7 @@ export function useAgentDetailOwner({
     thinkingEffort: watchedValues.thinkingEffort ?? 'high',
     runtimeKind: watchedValues.runtimeKind || defaultRuntimeKind,
     systemPrompt: watchedValues.systemPrompt ?? '',
+    acpAgentId: watchedValues.acpAgentId ?? null,
     claudeAgentHaikuModel: watchedValues.claudeAgentHaikuModel ?? '',
     claudeAgentSonnetModel: watchedValues.claudeAgentSonnetModel ?? '',
     claudeAgentOpusModel: watchedValues.claudeAgentOpusModel ?? '',
@@ -1452,9 +1531,9 @@ export function useAgentDetailOwner({
     }
     syncedAgentIdRef.current = nextAgentId
     clearTimers()
-    form.reset(getAgentDetailFormValues(agent, providerOptions, runtimes))
+    form.reset(getAgentDetailFormValues(agent, providerOptions, runtimes, createPrefill))
     dispatch({ type: 'reset' })
-  }, [form, agent, clearTimers, providerOptions, runtimes])
+  }, [form, agent, clearTimers, providerOptions, runtimes, createPrefill])
 
   const selectableProviderTargets = listSelectableProviderTargets(
     providerOptions,
@@ -1503,6 +1582,15 @@ export function useAgentDetailOwner({
     form.setValue('thinkingEffort', 'high', { shouldDirty: true })
   }, [draft.providerTargetId, draftUsesModelSelection, form, selectableProviderTargets])
 
+  useEffect(() => {
+    if (draft.runtimeKind === ACP_CHAT_RUNTIME_KIND) {
+      return
+    }
+    if (form.getValues('acpAgentId')) {
+      form.setValue('acpAgentId', null, { shouldDirty: true })
+    }
+  }, [draft.runtimeKind, form])
+
   const isDirty = form.formState.isDirty
   const createDisabledReason = getAgentCreateDisabledReason({
     draft,
@@ -1510,6 +1598,7 @@ export function useAgentDetailOwner({
     createSaving,
     usesCliLaunchConfig: draftUsesCliLaunchConfig,
     usesProviderTarget: draftUsesModelSelection,
+    requiresAcpAgent: draft.runtimeKind === ACP_CHAT_RUNTIME_KIND,
   })
   const draftSignature = JSON.stringify(draft)
   const saveDraft = useEffectEvent(async () => {
@@ -1526,10 +1615,12 @@ export function useAgentDetailOwner({
       currentValues.runtimeKind,
     )
     const requiresProviderTarget = usesModelSelection
+    const requiresAcpAgent = currentValues.runtimeKind === ACP_CHAT_RUNTIME_KIND
     if (
       !currentValues.name.trim()
       || (requiresProviderTarget && !currentValues.providerTargetId)
       || (usesCliLaunchConfig && !currentValues.cliTuiExecutable.trim())
+      || (requiresAcpAgent && !currentValues.acpAgentId)
     ) {
       return
     }
@@ -1556,6 +1647,8 @@ export function useAgentDetailOwner({
         cliTuiEnvText: currentValues.cliTuiEnvText,
         usesCliLaunchConfig,
         usesAliasMatrixModelSelection,
+        acpAgentId: currentValues.acpAgentId,
+        usesAcpBinding: requiresAcpAgent,
       })
       await updateAgent.mutateAsync({
         path: { id: submittedAgentId },
@@ -1626,10 +1719,12 @@ export function useAgentDetailOwner({
       currentValues.runtimeKind,
     )
     const requiresProviderTarget = usesModelSelection
+    const requiresAcpAgent = currentValues.runtimeKind === ACP_CHAT_RUNTIME_KIND
     if (
       !currentValues.name.trim()
       || (requiresProviderTarget && !currentValues.providerTargetId)
       || (usesCliLaunchConfig && !currentValues.cliTuiExecutable.trim())
+      || (requiresAcpAgent && !currentValues.acpAgentId)
     ) {
       return
     }
@@ -1666,6 +1761,8 @@ export function useAgentDetailOwner({
             cliTuiEnvText: currentValues.cliTuiEnvText,
             usesCliLaunchConfig,
             usesAliasMatrixModelSelection,
+            acpAgentId: currentValues.acpAgentId,
+            usesAcpBinding: requiresAcpAgent,
           }),
         } satisfies CreateAgentInput,
       })
@@ -1732,13 +1829,15 @@ export function AgentDetailPage({
   onBack,
   onCreated,
   onDeleted,
+  createPrefill,
 }: {
   agent?: Agent
   onBack?: () => void
   onCreated?: (agentId: string) => void
   onDeleted?: () => void
+  createPrefill?: AgentCreatePrefill
 }) {
-  const owner = useAgentDetailOwner({ agent, onCreated, onDeleted })
+  const owner = useAgentDetailOwner({ agent, onCreated, onDeleted, createPrefill })
 
   return (
     <FormProvider {...owner.form}>
@@ -1758,6 +1857,7 @@ export function AgentDetailPage({
           draft={owner.draft}
           runtimeOptions={owner.runtimeOptions}
           selectableProviderTargets={owner.selectableProviderTargets}
+          draftUsesModelSelection={owner.draftUsesModelSelection}
           draftUsesCliLaunchConfig={owner.draftUsesCliLaunchConfig}
           draftUsesAliasMatrixModelSelection={owner.draftUsesAliasMatrixModelSelection}
           providerDisabledReason={owner.providerDisabledReason}

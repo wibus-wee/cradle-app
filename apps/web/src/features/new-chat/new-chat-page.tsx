@@ -239,14 +239,17 @@ function useNewChatPageOwner(
         !isRemoteWorkspace
         && !options.providerTargetId
         && !options.agentId
+        && !options.acpAgentId
         && options.providerBinding !== 'runtime-owned'
       ) {
         return false
       }
       const sessionTitle = trimmedText.slice(0, 80)
         || options.agentName
+        || options.acpAgentName
         || options.providerTargetName
         || options.agentId
+        || options.acpAgentId
         || options.providerTargetId
         || 'Untitled'
       // Remote provider ids come from the remote catalog and are forwarded through
@@ -274,6 +277,19 @@ function useNewChatPageOwner(
               ...sessionGroupFields,
               ...worktreeFields,
             }
+          : options.acpAgentId
+            ? {
+                ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
+                title: sessionTitle,
+                acpAgentId: options.acpAgentId,
+                acpDraftSessionId: options.acpDraftSessionId,
+                modelId: options.modelId ?? null,
+                runtimeKind: options.runtimeKind,
+                runtimeSettings: options.runtimeSettings,
+                ...linkedIssueFields,
+                ...sessionGroupFields,
+                ...worktreeFields,
+              }
           : {
               ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
               title: sessionTitle,

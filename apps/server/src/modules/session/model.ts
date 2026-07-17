@@ -103,6 +103,8 @@ export const SessionModel = {
     providerTargetId: t.Optional(t.String({ minLength: 1 })),
     modelId: t.Optional(nullableRequiredString),
     agentId: t.Optional(t.String({ minLength: 1 })),
+    acpAgentId: t.Optional(t.String({ minLength: 1 })),
+    acpDraftSessionId: t.Optional(t.String({ minLength: 1 })),
     runtimeKind: t.Optional(runtimeKindSchema),
     runtimeSettings: t.Optional(sessionRuntimeSettingsPatchSchema),
     thinkingEffort: t.Optional(thinkingEffortSchema),

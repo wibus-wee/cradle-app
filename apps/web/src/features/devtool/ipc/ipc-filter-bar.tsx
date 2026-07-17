@@ -2,6 +2,8 @@
 // Output: IpcFilterBar — search / status / side toggles + pause & clear controls for the devtool
 // Position: Top toolbar inside the IPC devtool page
 
+import { useTranslation } from 'react-i18next'
+
 import { cn } from '~/lib/cn'
 
 import type { IpcObservedSide, IpcObservedStatus } from './use-ipc-events'
@@ -19,6 +21,7 @@ const SIDES: Array<{ key: IpcObservedSide, label: string }> = [
 ]
 
 export function IpcFilterBar() {
+  const { t } = useTranslation('devtool')
   const events = useIpcDevtoolStore(s => s.events)
   const paused = useIpcDevtoolStore(s => s.paused)
   const setPaused = useIpcDevtoolStore(s => s.setPaused)
@@ -36,7 +39,7 @@ export function IpcFilterBar() {
         type="text"
         value={filters.search}
         onChange={e => setSearch(e.target.value)}
-        placeholder="Filter channel / args / error... ( / to focus )"
+        placeholder={t('ipc.filter.placeholder')}
         data-ipc-devtool-search
         className="h-7 w-72 rounded border border-border bg-background px-2 text-[11px] placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
       />

@@ -16,6 +16,7 @@
   "capability.value.restartSession": "Requires restart",
   "capability.value.supported": "Supported",
   "capability.value.unsupported": "Unsupported",
+  "chip.agent": "Agent",
   "chip.builtin": "Built-in",
   "chip.experimental": "Experimental",
   "degradation.capability.lastTurnRollback": "Last-turn rollback",
@@ -61,6 +62,7 @@
   "uninstall.cancel": "Cancel",
   "uninstall.confirm": "Uninstall",
   "uninstall.description": "The ACP agent is removed from this device. Agents bound to it keep their configuration but can no longer run.",
+  "uninstall.inUse_many": "{{count}} agents currently use this runtime.",
   "uninstall.inUse_one": "{{count}} agent currently uses this runtime.",
   "uninstall.inUse_other": "{{count}} agents currently use this runtime.",
   "uninstall.title": "Uninstall {{name}}?"

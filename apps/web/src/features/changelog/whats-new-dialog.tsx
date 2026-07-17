@@ -1,5 +1,6 @@
 // "What's New" dialog shown after a desktop update (i18n-aware).
 import { StaticRender } from '@cradle/streamdown'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import {
@@ -36,6 +37,7 @@ export function WhatsNewDialog({
   title,
   markdown,
 }: WhatsNewDialogProps) {
+  const { t } = useTranslation('chrome')
   // Strip the leading frontmatter if present (should already be stripped by fetch)
   const body = markdown.replace(/^---\n[\s\S]*?\n---\n?/, '').trim()
 
@@ -62,7 +64,7 @@ export function WhatsNewDialog({
             size="sm"
             onClick={() => onOpenChange(false)}
           >
-            Got it!
+            {t('whatsNew.dismiss')}
           </Button>
         </DialogFooter>
       </DialogContent>

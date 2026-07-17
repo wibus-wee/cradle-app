@@ -8,7 +8,7 @@ import { loadServerAuthConfig } from './config/server-config'
 import { createAuthPlugin } from './http/auth'
 import { createOpenApiPlugin, registerOpenApiAlias } from './http/openapi'
 import { createRequestIdPlugin } from './http/request-id'
-import { acp } from './modules/acp'
+import { createAcpModule } from './modules/acp'
 import { agentIdentity } from './modules/agent-identity'
 import { agentInteractionRuntime } from './modules/agent-interaction-runtime'
 import { registerAgentToolsMcpServer } from './modules/agent-tools/runtime-registration'
@@ -222,7 +222,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(git)
   app.use(worktree)
   app.use(diffReview)
-  app.use(acp)
+  app.use(createAcpModule(downloadCenter.service))
   // Projected remote sessions: transparent upstream for all /chat/sessions/:id/* paths
   // (including event routes mounted separately below).
   app.use(linkedChatSessionProxyPlugin)

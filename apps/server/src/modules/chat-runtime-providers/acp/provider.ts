@@ -1,4 +1,5 @@
 import type { UIMessageChunk } from 'ai'
+import type { SessionConfigOption, SessionModeState } from '@agentclientprotocol/sdk'
 
 import type {
   CancelTurnInput,
@@ -16,7 +17,7 @@ import {
 } from '../../chat-runtime/runtime-provider-types'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { projectTextOnlyInput } from '../kit/input-projector'
-import { resolveAcpConnectionRecord } from './config'
+import { readAcpDraftSessionId, resolveAcpConnectionRecord } from './config'
 import { AcpConnectionManager } from './connection-manager'
 import {
   ACP_RUNTIME_CAPABILITIES,
@@ -53,19 +54,35 @@ export class AcpChatProvider implements ChatRuntime {
 
   constructor(private readonly deps: AcpChatProviderDeps) {}
 
+  async openDraftSession(input: { agentId: string, workspacePath: string }): Promise<{
+    sessionId: string
+    models: Array<{ id: string, label: string }>
+    selectedModelId: string | null
+  }> {
+    const profileId = `acp:${input.agentId}`
+    const configJson = JSON.stringify({ acpAgentId: input.agentId })
+    const connectionKey = await this.ensureConnected(profileId, configJson)
+    const response = await this.deps.runtime.newSession(connectionKey, input.workspacePath)
+    const modelOption = response.configOptions.find(isAcpModelConfigOption)
+    if (!modelOption) {
+      return { sessionId: response.sessionId, models: [], selectedModelId: null }
+    }
+    return {
+      sessionId: response.sessionId,
+      models: flattenModelOptions(modelOption.options),
+      selectedModelId: modelOption.currentValue,
+    }
+  }
+
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     const connectionKey = await this.ensureConnected(profile.id, profile.configJson)
-    const response = await this.deps.runtime.newSession(connectionKey, input.workspacePath)
+    const draftSessionId = readAcpDraftSessionId(profile.configJson)
+    const response = draftSessionId
+      ? await this.resumeDraftSession(connectionKey, draftSessionId, input.workspacePath)
+      : await this.deps.runtime.newSession(connectionKey, input.workspacePath)
 
-    if (input.modelId && response.sessionId) {
-      try {
-        await this.deps.runtime.setSessionModel(connectionKey, response.sessionId, input.modelId)
-      }
-      catch {
-        // ACP agents may reject explicit model changes and keep their default.
-      }
-    }
+    await this.applyRequestedModel(connectionKey, response.sessionId, input.modelId)
 
     return {
       id: input.chatSessionId,
@@ -74,7 +91,7 @@ export class AcpChatProvider implements ChatRuntime {
       runtimeKind: this.runtimeKind,
       providerSessionId: response.sessionId,
       providerStateSnapshot: JSON.stringify({
-        models: response.models ?? null,
+        modes: response.modes ?? null,
         configOptions: response.configOptions,
       }),
     }
@@ -97,10 +114,11 @@ export class AcpChatProvider implements ChatRuntime {
     if (this.deps.runtime.supportsResumeSession(connectionKey)) {
       try {
         const response = await this.deps.runtime.resumeSession(connectionKey, storedSessionId, input.workspacePath)
+        await this.applyRequestedModel(connectionKey, storedSessionId, input.modelId)
         return {
           ...input.runtimeSession,
           providerStateSnapshot: JSON.stringify({
-            models: response.models ?? null,
+            modes: response.modes ?? null,
             configOptions: response.configOptions,
           }),
         }
@@ -113,10 +131,11 @@ export class AcpChatProvider implements ChatRuntime {
     if (this.deps.runtime.supportsLoadSession(connectionKey)) {
       try {
         const response = await this.deps.runtime.loadSession(connectionKey, storedSessionId, input.workspacePath)
+        await this.applyRequestedModel(connectionKey, storedSessionId, input.modelId)
         return {
           ...input.runtimeSession,
           providerStateSnapshot: JSON.stringify({
-            models: response.models ?? null,
+            modes: response.modes ?? null,
             configOptions: response.configOptions,
           }),
         }
@@ -180,4 +199,46 @@ export class AcpChatProvider implements ChatRuntime {
     }
     return connectionKey
   }
+
+  private async resumeDraftSession(connectionKey: string, sessionId: string, workspacePath: string): Promise<{
+    sessionId: string
+    modes: SessionModeState | null
+    configOptions: SessionConfigOption[]
+  }> {
+    const state = this.deps.runtime.getSessionState(connectionKey, sessionId)
+    if (state) {
+      return { sessionId, ...state }
+    }
+    if (this.deps.runtime.supportsResumeSession(connectionKey)) {
+      const response = await this.deps.runtime.resumeSession(connectionKey, sessionId, workspacePath)
+      return { sessionId, modes: response.modes, configOptions: response.configOptions }
+    }
+    if (this.deps.runtime.supportsLoadSession(connectionKey)) {
+      const response = await this.deps.runtime.loadSession(connectionKey, sessionId, workspacePath)
+      return { sessionId, modes: response.modes, configOptions: response.configOptions }
+    }
+    return await this.deps.runtime.newSession(connectionKey, workspacePath)
+  }
+
+  private async applyRequestedModel(connectionKey: string, sessionId: string, modelId: string | null | undefined): Promise<void> {
+    if (!modelId) {
+      return
+    }
+    try {
+      await this.deps.runtime.setSessionModel(connectionKey, sessionId, modelId)
+    }
+    catch {
+      // ACP agents may reject explicit model changes and keep their default.
+    }
+  }
+}
+
+function flattenModelOptions(options: Array<{ value: string, name: string } | { name: string, options: Array<{ value: string, name: string }> }>): Array<{ id: string, label: string }> {
+  return options.flatMap(option => 'options' in option
+    ? option.options.map(item => ({ id: item.value, label: item.name }))
+    : [{ id: option.value, label: option.name }])
+}
+
+function isAcpModelConfigOption(option: SessionConfigOption): option is Extract<SessionConfigOption, { type: 'select' }> {
+  return option.type === 'select' && option.category === 'model'
 }

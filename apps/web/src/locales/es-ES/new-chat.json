@@ -21,6 +21,8 @@
   "quick.risk.prompt": "Inspecciona los cambios recientes de este proyecto e identifica áreas riesgosas, regresiones probables y el plan mínimo de verificación.",
   "readiness.agent.action": "Abrir Agents",
   "readiness.agent.message": "No hay ningún Agent disponible. Habilita un Agent en ajustes para empezar.",
+  "readiness.acpAgent.action": "Abrir agentes ACP",
+  "readiness.acpAgent.message": "No hay ningún agente ACP instalado. Instala uno antes de iniciar un chat ACP.",
   "readiness.provider.action": "Abrir Providers",
   "readiness.provider.message": "No provider is available. Configure a provider before sending the first message.",
   "recent.title": "Chats recientes",

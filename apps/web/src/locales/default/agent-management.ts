@@ -19,6 +19,7 @@ export default {
   'detail.claudeAgent.alias.sonnet.label': 'Sonnet alias',
   'detail.claudeAgent.alias.sonnet.name': 'sonnet alias',
   'detail.claudeAgent.mainModel': 'main model',
+  'detail.claudeAgent.subscriptionLoginNotice': 'Uses your Claude.ai subscription login. No API key needed — the Claude Agent SDK manages login state in its own config directory.',
   'detail.claudeAgent.reuseMainModelAria': 'Reuse main model for {{alias}}',
   'detail.claudeAgent.reusedBadge': '(reused)',
   'detail.claudeAgent.reusingMainModel': 'Reusing main model',

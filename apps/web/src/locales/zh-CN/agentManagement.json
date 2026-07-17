@@ -203,5 +203,13 @@
   "runtime.toast.syncFailed": "{{sourceCount}} 个来源同步失败",
   "runtime.visible.count": "{{visibleCount}} visible",
   "runtime.visible.select": "Select visible",
-  "runtime.visible.unselect": "Unselect visible"
+  "runtime.visible.unselect": "Unselect visible",
+  "detail.acpAgent.description": "驱动此代理的已安装 ACP 代理",
+  "detail.acpAgent.empty": "尚未安装任何 ACP 代理。",
+  "detail.acpAgent.installFromRuntimes": "从 Runtimes 安装",
+  "detail.acpAgent.label": "ACP 代理",
+  "detail.acpAgent.placeholder": "选择一个 ACP 代理",
+  "detail.create.disabled.acpAgentRequired": "创建前请选择一个 ACP 代理。",
+  "detail.runtime.experimentalChip": "实验性",
+  "detail.claudeAgent.subscriptionLoginNotice": "使用你的 Claude.ai 订阅登录。无需 API 密钥 — Claude Agent SDK 会在自己的配置目录中管理登录状态。"
 }

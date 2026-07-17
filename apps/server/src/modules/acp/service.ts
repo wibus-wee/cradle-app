@@ -8,7 +8,9 @@ import { z } from 'zod'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db, getServerConfig } from '../../infra'
-import type { InstallResult } from './acp.installer'
+import type { DownloadTaskView } from '@cradle/download-center'
+
+import type { AcpArtifactDownloadCenter, InstallResult } from './acp.installer'
 import { AcpInstaller } from './acp.installer'
 import type { AcpDistributionType, RegistryAgent } from './acp.registry'
 import { AcpRegistry } from './acp.registry'
@@ -19,6 +21,15 @@ const installAbortControllers = new Map<string, AbortController>()
 
 const registry = new AcpRegistry()
 const installer = new AcpInstaller()
+
+export interface AcpDownloadCenter extends AcpArtifactDownloadCenter {
+  list: (filters: {
+    ownerNamespace?: string
+    ownerResourceType?: string
+    ownerResourceId?: string
+  }) => readonly Pick<DownloadTaskView, 'taskId' | 'status'>[]
+  cancel: (taskId: string) => unknown
+}
 
 const AuditInputSchema = z.object({
   agentId: z.string(),
@@ -36,6 +47,15 @@ function stringifyError(error: unknown): string {
 function getRuntimeDataDir(): string {
   const config = getServerConfig()
   return config.dataDir ?? dirname(config.dbPath)
+}
+
+function binaryDownloadOwner(agentId: string, displayName = agentId) {
+  return {
+    namespace: 'acp',
+    resourceType: 'agent',
+    resourceId: agentId,
+    displayName,
+  }
 }
 
 async function findRegistryAgent(agentId: string): Promise<RegistryAgent | undefined> {
@@ -150,13 +170,7 @@ function recordAudit(input: z.input<typeof AuditInputSchema>): void {
 // ── public API ──
 
 export function fetchRegistry(): Promise<RegistryAgent[]> {
-  return registry.fetchRegistry().then(agents => agents.map(agent => ({
-    ...agent,
-    distribution: {
-      npx: agent.distribution.npx,
-      uvx: agent.distribution.uvx,
-    },
-  })))
+  return registry.fetchRegistry()
 }
 
 export async function getDistributionTypes(agentId: string): Promise<{ agentId: string, types: AcpDistributionType[] }> {
@@ -180,7 +194,11 @@ export function getInstalled(agentId: string): AcpAgent | null {
   return getInstalledFromDb(agentId) ?? null
 }
 
-export async function install(agentId: string, distributionType: AcpDistributionType): Promise<AcpAgent> {
+export async function install(
+  agentId: string,
+  distributionType: AcpDistributionType,
+  downloadCenter: AcpDownloadCenter,
+): Promise<AcpAgent> {
   const agent = await findRegistryAgent(agentId)
   if (!agent) {
     throw new AppError({
@@ -188,15 +206,6 @@ export async function install(agentId: string, distributionType: AcpDistribution
       status: 404,
       message: 'ACP agent not found in registry',
       details: { agentId },
-    })
-  }
-
-  if (distributionType === 'binary') {
-    throw new AppError({
-      code: 'acp_binary_integrity_metadata_missing',
-      status: 409,
-      message: 'ACP binary installation requires a trusted publisher checksum, but the registry does not provide one',
-      details: { agentId, distributionType },
     })
   }
 
@@ -222,9 +231,13 @@ export async function install(agentId: string, distributionType: AcpDistribution
     path: null,
     details: { distributionType },
   })
+  const controller = new AbortController()
+  installAbortControllers.set(agentId, controller)
 
   try {
-    const result: InstallResult = installer.installPackageAgent(agent, distributionType)
+    const result: InstallResult = distributionType === 'binary'
+      ? await installer.installBinaryAgent(agent, getRuntimeDataDir(), downloadCenter, controller.signal)
+      : installer.installPackageAgent(agent, distributionType)
 
     saveInstalledToDb({ agent, distributionType, result })
     recordAudit({
@@ -245,13 +258,24 @@ export async function install(agentId: string, distributionType: AcpDistribution
     })
     throw error
   }
+  finally {
+    if (installAbortControllers.get(agentId) === controller) {
+      installAbortControllers.delete(agentId)
+    }
+  }
 }
 
-export function cancelInstall(agentId: string): void {
+export function cancelInstall(agentId: string, downloadCenter: AcpDownloadCenter): void {
   const controller = installAbortControllers.get(agentId)
-  if (controller) {
-    controller.abort()
-    installAbortControllers.delete(agentId)
+  controller?.abort()
+  const owner = binaryDownloadOwner(agentId)
+  const activeDownload = downloadCenter.list({
+    ownerNamespace: owner.namespace,
+    ownerResourceType: owner.resourceType,
+    ownerResourceId: owner.resourceId,
+  }).find(task => task.status === 'queued' || task.status === 'downloading' || task.status === 'verifying')
+  if (activeDownload) {
+    downloadCenter.cancel(activeDownload.taskId)
   }
   markFailed(agentId)
   recordAudit({

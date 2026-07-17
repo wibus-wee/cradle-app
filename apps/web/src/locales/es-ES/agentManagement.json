@@ -203,5 +203,13 @@
   "runtime.toast.syncFailed": "Sync failed for {{sourceCount}} source(s)",
   "runtime.visible.count": "{{visibleCount}} visible",
   "runtime.visible.select": "Select visible",
-  "runtime.visible.unselect": "Unselect visible"
+  "runtime.visible.unselect": "Unselect visible",
+  "detail.acpAgent.description": "Qué agente ACP instalado impulsa a este agente",
+  "detail.acpAgent.empty": "Aún no hay agentes ACP instalados.",
+  "detail.acpAgent.installFromRuntimes": "Instalar desde Runtimes",
+  "detail.acpAgent.label": "Agente ACP",
+  "detail.acpAgent.placeholder": "Selecciona un agente ACP",
+  "detail.create.disabled.acpAgentRequired": "Selecciona un agente ACP antes de crear.",
+  "detail.runtime.experimentalChip": "Experimental",
+  "detail.claudeAgent.subscriptionLoginNotice": "Usa tu sesión de suscripción de Claude.ai. No hace falta una API key: Claude Agent SDK gestiona el estado de sesión en su propio directorio de configuración."
 }

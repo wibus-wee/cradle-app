@@ -2,6 +2,8 @@
 // Output: AcpFilterBar — search, agent select, stream toggles, pause, and clear controls
 // Position: Top toolbar for the ACP runtime pane inside the devtool page
 
+import { useTranslation } from 'react-i18next'
+
 import { cn } from '~/lib/cn'
 
 import {
@@ -18,6 +20,7 @@ const STREAMS = [
 ]
 
 export function AcpFilterBar() {
+  const { t } = useTranslation('devtool')
   const events = useAcpDevtoolStore(s => s.events)
   const paused = useAcpDevtoolStore(s => s.paused)
   const setPaused = useAcpDevtoolStore(s => s.setPaused)
@@ -36,7 +39,7 @@ export function AcpFilterBar() {
         type="text"
         value={filters.search}
         onChange={event => setSearch(event.target.value)}
-        placeholder="Filter agent / stream / output...  ( / to focus )"
+        placeholder={t('acp.filter.placeholder')}
         data-acp-devtool-search
         className="h-7 w-72 rounded border border-border bg-background px-2 text-[11px] placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
       />

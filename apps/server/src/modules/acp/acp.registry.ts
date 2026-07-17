@@ -7,6 +7,7 @@ export interface BinaryTarget {
   cmd: string
   args: string[]
   env: Record<string, string>
+  sha256?: string
 }
 
 export interface PackageDistribution {
@@ -42,6 +43,7 @@ const BinaryTargetSchema = z.object({
   cmd: z.string(),
   args: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).default({}),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
 })
 
 const PackageDistributionSchema = z.object({
@@ -117,6 +119,11 @@ export class AcpRegistry {
     }
     if (agent.distribution.uvx) {
       out.push('uvx')
+    }
+    const platformKey = getPlatformKey()
+    const binaryTarget = platformKey ? agent.distribution.binary?.[platformKey] : undefined
+    if (binaryTarget) {
+      out.push('binary')
     }
     return out
   }

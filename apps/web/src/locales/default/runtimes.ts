@@ -14,6 +14,7 @@ export default {
 
   // Chips
   'chip.builtin': 'Built-in',
+  'chip.agent': 'Agent',
   'chip.experimental': 'Experimental',
 
   // Empty / error states
@@ -47,6 +48,7 @@ export default {
   'uninstall.title': 'Uninstall {{name}}?',
   'uninstall.description': 'The ACP agent is removed from this device. Agents bound to it keep their configuration but can no longer run.',
   'uninstall.inUse_one': '{{count}} agent currently uses this runtime.',
+  'uninstall.inUse_many': '{{count}} agents currently use this runtime.',
   'uninstall.inUse_other': '{{count}} agents currently use this runtime.',
   'uninstall.confirm': 'Uninstall',
   'uninstall.cancel': 'Cancel',

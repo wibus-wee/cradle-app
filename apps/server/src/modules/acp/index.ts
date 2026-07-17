@@ -1,8 +1,12 @@
 import { Elysia, t } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
+import { getRuntimeRegistry } from '../chat-runtime/chat-runtime-provider-registry'
+import { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
+import * as Workspace from '../workspace/service'
 import { AcpModel } from './model'
 import * as Acp from './service'
+import type { AcpDownloadCenter } from './service'
 
 function requireNonBlankString(value: string | undefined, field: string): string {
   const trimmed = value?.trim()
@@ -16,7 +20,8 @@ function requireNonBlankString(value: string | undefined, field: string): string
   return trimmed
 }
 
-export const acp = new Elysia({
+export function createAcpModule(downloadCenter: AcpDownloadCenter) {
+  return new Elysia({
   prefix: '/acp',
   detail: { tags: ['acp'] },
 })
@@ -66,10 +71,37 @@ export const acp = new Elysia({
     params: AcpModel.agentIdParams,
     response: { 200: AcpModel.acpAgent },
   })
+  .post('/agents/:agentId/draft-session', ({ params, body }) => {
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    const agent = Acp.getInstalled(agentId)
+    if (!agent || agent.status !== 'installed') {
+      throw new AppError({ code: 'acp_agent_not_found', status: 404, message: 'Installed ACP agent not found' })
+    }
+    const workspacePath = body.workspaceId ? Workspace.getLocalWorkspacePath(body.workspaceId) : ''
+    if (body.workspaceId && !workspacePath) {
+      throw new AppError({
+        code: 'acp_workspace_not_available',
+        status: 409,
+        message: 'ACP draft sessions require a local workspace',
+        details: { workspaceId: body.workspaceId },
+      })
+    }
+    const runtime = getRuntimeRegistry().get('acp-chat')
+    if (!(runtime instanceof AcpChatProvider)) {
+      throw new AppError({ code: 'acp_runtime_not_available', status: 501, message: 'ACP Chat runtime is not available' })
+    }
+    return runtime.openDraftSession({ agentId, workspacePath: workspacePath ?? '' })
+  }, {
+    detail: { summary: 'Open an ACP draft session and read its native model choices' },
+    params: AcpModel.agentIdParams,
+    body: AcpModel.draftSessionBody,
+    response: { 200: AcpModel.draftSessionResult },
+  })
   .put('/agents/:agentId/installation', ({ params, body }) => {
     return Acp.install(
       requireNonBlankString(params.agentId, 'agentId'),
       body.distributionType,
+      downloadCenter,
     )
   }, {
     detail: {
@@ -83,7 +115,7 @@ export const acp = new Elysia({
     response: { 200: AcpModel.acpAgent },
   })
   .delete('/agents/:agentId/installation', ({ params }) => {
-    Acp.cancelInstall(requireNonBlankString(params.agentId, 'agentId'))
+    Acp.cancelInstall(requireNonBlankString(params.agentId, 'agentId'), downloadCenter)
     return { ok: true as const }
   }, {
     detail: {
@@ -133,3 +165,4 @@ export const acp = new Elysia({
     params: AcpModel.agentIdParams,
     response: { 200: t.Object({ path: t.String() }) },
   })
+}

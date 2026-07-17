@@ -4,9 +4,12 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { AcpArtifactDownloadCenter } from './acp.installer'
 import { AcpInstaller } from './acp.installer'
 import type { RegistryAgent } from './acp.registry'
-import { ACP_REGISTRY_URL, AcpRegistry } from './acp.registry'
+import { ACP_REGISTRY_URL, AcpRegistry, getPlatformKey } from './acp.registry'
+
+const testPlatform = getPlatformKey() ?? 'darwin-aarch64'
 
 const binaryAgent: RegistryAgent = {
   id: 'example-agent',
@@ -15,7 +18,7 @@ const binaryAgent: RegistryAgent = {
   description: 'Example',
   distribution: {
     binary: {
-      'darwin-aarch64': {
+      [testPlatform]: {
         archive: 'https://downloads.example.com/agent.zip',
         cmd: 'agent',
         args: [],
@@ -37,12 +40,21 @@ const binaryAgent: RegistryAgent = {
 
 const tempRoots: string[] = []
 
+function fakeDownloadCenter(): AcpArtifactDownloadCenter {
+  return {
+    execute: vi.fn(),
+    retry: vi.fn(),
+    release: vi.fn(async () => undefined),
+    findLatestRetryable: vi.fn(() => null),
+  }
+}
+
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-describe('aCP registry integrity policy', () => {
-  it('uses the injected fetch boundary and does not advertise checksum-less binaries', async () => {
+describe('ACP registry distributions', () => {
+  it('uses the injected fetch boundary and advertises checksum-less binaries', async () => {
     const fetchFn = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       version: '1',
       agents: [binaryAgent],
@@ -52,21 +64,7 @@ describe('aCP registry integrity policy', () => {
     const agents = await registry.fetchRegistry()
 
     expect(fetchFn).toHaveBeenCalledWith(ACP_REGISTRY_URL)
-    expect(registry.getSupportedDistributionTypes(agents[0])).toEqual(['npx', 'uvx'])
-  })
-
-  it('rejects binary installation before creating an install directory', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'cradle-acp-integrity-'))
-    tempRoots.push(root)
-    const installer = new AcpInstaller()
-
-    const install = installer.installBinaryAgent(binaryAgent, root)
-
-    await expect(install).rejects.toMatchObject({
-      code: 'acp_binary_integrity_metadata_missing',
-      status: 409,
-      message: 'ACP binary installation requires a trusted publisher checksum, but the registry does not provide one',
-    })
+    expect(registry.getSupportedDistributionTypes(agents[0])).toEqual(['npx', 'uvx', 'binary'])
   })
 
   it.each([
@@ -76,5 +74,36 @@ describe('aCP registry integrity policy', () => {
     const installer = new AcpInstaller()
 
     expect(installer.installPackageAgent(binaryAgent, type)).toEqual(expected)
+  })
+
+  it('delegates checksum-less binary archive transfers and cleanup to Download Center', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cradle-acp-download-center-'))
+    tempRoots.push(root)
+    const downloadCenter = fakeDownloadCenter()
+    const artifact = {
+      taskId: 'download-task',
+      filePath: join(root, 'missing.zip'),
+      bytes: 1,
+      checksum: {
+        algorithm: 'sha256' as const,
+        expected: null,
+        actual: 'a'.repeat(64),
+        matched: null,
+      },
+    }
+    vi.mocked(downloadCenter.execute).mockResolvedValue(artifact)
+    await expect(new AcpInstaller().installBinaryAgent(binaryAgent, root, downloadCenter)).rejects.toThrow()
+
+    expect(downloadCenter.execute).toHaveBeenCalledWith(expect.objectContaining({
+      owner: {
+        namespace: 'acp',
+        resourceType: 'agent',
+        resourceId: 'example-agent',
+        displayName: 'Example Agent',
+      },
+      integrity: undefined,
+      maxBytes: 512 * 1024 * 1024,
+    }))
+    expect(downloadCenter.release).toHaveBeenCalledWith('download-task')
   })
 })

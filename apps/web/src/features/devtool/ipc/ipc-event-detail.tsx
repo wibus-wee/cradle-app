@@ -3,6 +3,7 @@
 // Position: Right pane inside the IPC devtool page
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '~/lib/cn'
 
@@ -50,6 +51,7 @@ function formatDelta(ms: number): string {
 }
 
 export function IpcEventDetail() {
+  const { t } = useTranslation('devtool')
   const selectedTraceId = useIpcDevtoolStore(s => s.selectedTraceId)
   const traces = useIpcTraces()
   const trace = useMemo(
@@ -166,7 +168,7 @@ export function IpcEventDetail() {
       </div>
 
       <pre className="flex-1 overflow-auto whitespace-pre-wrap break-all p-3 text-[11px] leading-5">
-        {payloadText || <span className="text-muted-foreground">(empty)</span>}
+        {payloadText || <span className="text-muted-foreground">{t('events.empty')}</span>}
       </pre>
 
       {flowTraces.length > 1 && (

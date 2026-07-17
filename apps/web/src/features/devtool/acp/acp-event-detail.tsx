@@ -3,6 +3,7 @@
 // Position: Right pane of the ACP runtime mode inside the devtool page
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useAcpDevtoolStore } from './use-acp-events'
 
@@ -14,6 +15,7 @@ function formatCommand(command: string | null, args: string[] | null): string {
 }
 
 export function AcpEventDetail() {
+  const { t } = useTranslation('devtool')
   const selectedEventId = useAcpDevtoolStore(s => s.selectedEventId)
   const events = useAcpDevtoolStore(s => s.events)
   const event = useMemo(
@@ -85,7 +87,7 @@ export function AcpEventDetail() {
       </div>
 
       <pre className="flex-1 overflow-auto whitespace-pre-wrap break-all p-3 text-[11px] leading-5">
-        {event.text || <span className="text-muted-foreground">(empty)</span>}
+        {event.text || <span className="text-muted-foreground">{t('events.empty')}</span>}
       </pre>
     </div>
   )

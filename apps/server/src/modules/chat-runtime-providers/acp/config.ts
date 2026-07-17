@@ -19,6 +19,13 @@ export interface ResolvedAcpConnection {
   connectionKey: string
 }
 
+export function readAcpDraftSessionId(configJson: string): string | null {
+  const parsed = JSON.parse(configJson) as { acpDraftSessionId?: unknown }
+  return typeof parsed.acpDraftSessionId === 'string' && parsed.acpDraftSessionId.length > 0
+    ? parsed.acpDraftSessionId
+    : null
+}
+
 export function buildAcpConnectionRecord(configJson: string): AcpConnectionRecord {
   const parsed = readTrustedAcpRuntimeConfig(configJson)
 

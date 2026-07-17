@@ -71,5 +71,8 @@
   "update.toast.availableDescription": "打开桌面端设置，下载并准备安装更新。",
   "update.toast.availableTitle": "Cradle {{version}} 可用",
   "update.tooltip.available": "可用版本：{{version}}",
-  "update.tooltip.title": "Cradle 更新"
+  "update.tooltip.title": "Cradle 更新",
+  "aside.localServers.scanning": "正在扫描 localhost…",
+  "aside.notes.placeholder": "在这里记录会话笔记…",
+  "whatsNew.dismiss": "知道了"
 }

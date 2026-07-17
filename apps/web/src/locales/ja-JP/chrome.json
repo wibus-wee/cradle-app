@@ -71,5 +71,8 @@
   "update.toast.availableDescription": "デスクトップ設定を開いて、インストーラーをデスクトップにダウンロードします。",
   "update.toast.availableTitle": "Cradle {{version}} が利用可能です",
   "update.tooltip.available": "利用可能: {{version}}",
-  "update.tooltip.title": "Cradle の更新"
+  "update.tooltip.title": "Cradle の更新",
+  "aside.localServers.scanning": "localhost をスキャン中…",
+  "aside.notes.placeholder": "ここにセッションメモを残す…",
+  "whatsNew.dismiss": "了解"
 }

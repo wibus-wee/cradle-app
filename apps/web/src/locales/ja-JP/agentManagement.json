@@ -203,5 +203,13 @@
   "runtime.toast.syncFailed": "Sync failed for {{sourceCount}} source(s)",
   "runtime.visible.count": "{{visibleCount}} visible",
   "runtime.visible.select": "Select visible",
-  "runtime.visible.unselect": "Unselect visible"
+  "runtime.visible.unselect": "Unselect visible",
+  "detail.acpAgent.description": "このエージェントを動かす、インストール済みの ACP エージェント",
+  "detail.acpAgent.empty": "まだ ACP エージェントがインストールされていません。",
+  "detail.acpAgent.installFromRuntimes": "Runtimes からインストール",
+  "detail.acpAgent.label": "ACP エージェント",
+  "detail.acpAgent.placeholder": "ACP エージェントを選択",
+  "detail.create.disabled.acpAgentRequired": "作成する前に ACP エージェントを選択してください。",
+  "detail.runtime.experimentalChip": "実験的",
+  "detail.claudeAgent.subscriptionLoginNotice": "Claude.ai サブスクリプションのログインを使用します。API キーは不要です — Claude Agent SDK が独自の設定ディレクトリでログイン状態を管理します。"
 }

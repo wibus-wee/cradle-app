@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { RuntimeSelector } from '~/features/agent-runtime/runtime-selector'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
 import {
@@ -10,12 +11,13 @@ import {
 } from '~/features/agent-runtime/use-runtime-catalog'
 import type { ClaudeAgentModelAliasesSlot } from '~/features/chat/runtime/claude-session-model-matrix-control'
 
+import { AcpAgentSelector } from './acp-agent-selector'
+import { AcpModelSelector } from './acp-model-selector'
 import { AgentSelector } from './agent-selector'
 import { ChatAgentIdentity } from './chat-agent-identity'
 import { filterThinkingOptionsForModel } from './constants'
 import type { ThinkingOption } from './provider-model-menu'
 import { ProviderModelSelector, useProviderThinkingOptions } from './provider-model-selector'
-import { RuntimeSelector } from './runtime-selector'
 import { ThinkingEffortButton } from './thinking-effort-button'
 import type { ComposerContext, ThinkingEffort } from './types'
 import type { ComposerStateResult } from './use-composer-state'
@@ -57,6 +59,7 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
   const {
     selection,
     setAgentId,
+    setAcpAgentId,
     setProfileId,
     setModelId,
     setThinkingEffort,
@@ -64,6 +67,8 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
     setTargetMode,
     runtimeOptions,
     agents,
+    acpAgents,
+    acpModels,
     profiles,
     models,
     modelsByProfileId,
@@ -136,6 +141,27 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
         />
       )
     : null
+  const acpAgentSelector = context === 'new-chat' && selection.targetMode === 'acp-agent'
+    ? (
+        <AcpAgentSelector
+          agents={acpAgents}
+          selectedAgentId={selection.acpAgentId}
+          onSelectAgent={setAcpAgentId}
+          occludeNativeBrowserSurface
+        />
+      )
+    : null
+  const acpModelSelector = context === 'new-chat' && selection.targetMode === 'acp-agent'
+    ? (
+        <AcpModelSelector
+          models={acpModels}
+          selectedModelId={selection.modelId}
+          loading={state.isLoadingModels}
+          onSelectModel={id => setModelId(id)}
+          occludeNativeBrowserSurface
+        />
+      )
+    : null
   const providerSelector = selection.targetMode === 'provider' && runtimeComposerUsesModelSelection(state.runtimeComposer)
     ? (
         <ProviderModelSelector
@@ -166,7 +192,12 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
         />
       )
     : null
-  const targetControl = agentIdentity ?? agentSelector ?? providerSelector
+  const targetControl = agentIdentity ?? agentSelector ?? (acpAgentSelector && (
+    <>
+      {acpAgentSelector}
+      {acpModelSelector}
+    </>
+  )) ?? providerSelector
 
   return (
     <div className="flex min-w-0 items-center gap-1">

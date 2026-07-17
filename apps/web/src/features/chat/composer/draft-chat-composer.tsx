@@ -95,6 +95,9 @@ export interface DraftChatComposerSubmitOptions {
   runtimeComposer: RuntimeCatalogComposer
   agentId?: string
   agentName?: string
+  acpAgentId?: string
+  acpAgentName?: string
+  acpDraftSessionId?: string
   providerTargetId?: string
   providerTargetName?: string
   modelId?: string | null
@@ -206,6 +209,7 @@ function DraftChatComposerContent({
     }
     if (
       composerState.isLoadingAgents
+      || composerState.isLoadingAcpAgents
       || composerState.isLoadingProfiles
       || composerState.isLoadingModels
     ) {
@@ -217,6 +221,15 @@ function DraftChatComposerContent({
         icon: SettingsIcon,
         message: t('readiness.agent.message'),
         actionLabel: t('readiness.agent.action'),
+        disabled: false,
+      }
+    }
+    if (selection.targetMode === 'acp-agent' && composerState.acpAgents.length === 0) {
+      return {
+        key: 'acp-agent',
+        icon: SettingsIcon,
+        message: t('readiness.acpAgent.message'),
+        actionLabel: t('readiness.acpAgent.action'),
         disabled: false,
       }
     }
@@ -271,8 +284,9 @@ function DraftChatComposerContent({
   }
 
   const openSettingsSection = (section: string) => {
-    setSettingsSection(section)
-    openSettingsRouteSection(section)
+    const settingsSection = section === 'acp-agent' ? 'runtimes' : section
+    setSettingsSection(settingsSection)
+    openSettingsRouteSection(settingsSection)
   }
 
   const updateRuntimeSettings = (patch: RuntimeSettingsPatch) => {
@@ -352,7 +366,11 @@ function DraftChatComposerContent({
   )
   const sendDisabled
     = remoteConnectionBlocked
-      || (selection.targetMode === 'agent' ? !effectiveAgent || sending : !effectiveProfile || sending)
+      || (selection.targetMode === 'agent'
+        ? !effectiveAgent || sending
+        : selection.targetMode === 'acp-agent'
+          ? !composerState.effectiveAcpAgent || sending
+          : !effectiveProfile || sending)
 
   const toolbar = (
     <div className="flex min-w-0 items-center gap-1">
@@ -390,8 +408,10 @@ function DraftChatComposerContent({
     const canSubmit
       = !remoteConnectionBlocked
         && (selection.targetMode === 'agent'
-        ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
-        : !!effectiveProfile && hasDraft && !sending)
+          ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
+          : selection.targetMode === 'acp-agent'
+            ? !!composerState.effectiveAcpAgent && hasDraft && !sending
+            : !!effectiveProfile && hasDraft && !sending)
 
     if (!canSubmit) {
       return false
@@ -413,6 +433,13 @@ function DraftChatComposerContent({
             agentId: effectiveAgent.id,
             agentName: effectiveAgent.name,
           }
+        : composerState.effectiveAcpAgent
+          ? {
+              acpAgentId: composerState.effectiveAcpAgent.id,
+              acpAgentName: composerState.effectiveAcpAgent.name,
+              acpDraftSessionId: selection.acpDraftSessionId ?? undefined,
+              modelId: selection.modelId ?? undefined,
+            }
         : {
             providerTargetId: effectiveProfile?.id,
             providerTargetName: effectiveProfile?.name,

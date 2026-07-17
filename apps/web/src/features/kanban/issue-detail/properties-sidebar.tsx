@@ -320,6 +320,7 @@ function AgentSessionPanel({
   issue: KanbanIssue
   readOnly?: boolean
 }) {
+  const { t } = useTranslation('kanban')
   const { data: sessions = [] } = useIssueAgentSessions(issue.id)
   const { data: linkedSessions = [] } = useIssueLinkedSessions(issue.id)
   const { data: linkedSessionGroups = [] } = useIssueSessionGroups(issue.id)
@@ -421,9 +422,9 @@ function AgentSessionPanel({
                   {group.title}
                 </div>
                 <div className="mt-0.5 text-[12px] text-muted-foreground">
-                  {group.sessionCount}
+                  {t('issueDetail.sessionGroup.sessionCount', { count: group.sessionCount })}
                   {' '}
-                  sessions ·
+                  ·
                   {' '}
                   {linkedSessionGroupStatusText[group.statusAggregate]}
                 </div>

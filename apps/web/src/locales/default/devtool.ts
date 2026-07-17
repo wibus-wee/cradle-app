@@ -45,4 +45,7 @@ export default {
   'plugins.none': 'None',
   'plugins.executeAria': 'Execute {{title}}',
   'plugins.executeTitle': 'Execute command',
+  'events.empty': '(empty)',
+  'acp.filter.placeholder': 'Filter agent / stream / output...  ( / to focus )',
+  'ipc.filter.placeholder': 'Filter channel / args / error... ( / to focus )',
 } as const

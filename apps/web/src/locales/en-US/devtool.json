@@ -1,4 +1,6 @@
 {
+  "acp.filter.placeholder": "Filter agent / stream / output...  ( / to focus )",
+  "events.empty": "(empty)",
   "health.external": "External",
   "health.fetchError": "Failed to fetch server health:",
   "health.heapTotal": "Heap Total",
@@ -7,6 +9,7 @@
   "health.status": "Status",
   "health.timestamp": "Timestamp",
   "health.uptime": "Uptime",
+  "ipc.filter.placeholder": "Filter channel / args / error... ( / to focus )",
   "memory.currentHeapUsage": "Current Heap Usage",
   "memory.empty": "No performance data collected yet",
   "memory.heapLimit": "Heap Limit",

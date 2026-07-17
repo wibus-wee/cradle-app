@@ -14,11 +14,12 @@ export const DEFAULT_RUNTIME_CATALOG_COMPOSER: RuntimeCatalogComposer = {
   thinking: 'per-model',
 }
 
-export interface RuntimeCatalogItem extends Omit<ChatRuntimeCatalogItem, 'providerKinds' | 'surfaces'> {
+export interface RuntimeCatalogItem extends Omit<ChatRuntimeCatalogItem, 'providerKinds' | 'surfaces' | 'providerBinding'> {
   runtimeKind: RuntimeKind
   label: string
   description?: string
   providerKinds: ProviderKind[]
+  providerBinding?: 'required' | 'runtime-owned' | 'none'
   iconKey?: string
   surfaces: RuntimeCatalogSurface[]
 }

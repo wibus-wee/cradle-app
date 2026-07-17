@@ -71,5 +71,8 @@
   "update.toast.availableDescription": "Abre la configuración de Escritorio para descargar el instalador en el escritorio.",
   "update.toast.availableTitle": "Cradle {{version}} está disponible",
   "update.tooltip.available": "Disponible: {{version}}",
-  "update.tooltip.title": "Actualizaciones de Cradle"
+  "update.tooltip.title": "Actualizaciones de Cradle",
+  "aside.localServers.scanning": "Analizando localhost…",
+  "aside.notes.placeholder": "Escribe notas de la sesión aquí…",
+  "whatsNew.dismiss": "¡Entendido!"
 }

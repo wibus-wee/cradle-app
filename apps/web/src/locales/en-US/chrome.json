@@ -1,4 +1,6 @@
 {
+  "aside.localServers.scanning": "Scanning localhost…",
+  "aside.notes.placeholder": "Keep session notes here…",
   "browser.annotation.cancel": "Cancel annotation",
   "browser.annotation.comment": "Comment",
   "browser.annotation.toggleTitle": "Toggle browser comments (Command/Ctrl Shift F)",
@@ -71,5 +73,6 @@
   "update.toast.availableDescription": "Open Desktop settings to download the installer to your Desktop.",
   "update.toast.availableTitle": "Cradle {{version}} is available",
   "update.tooltip.available": "Available: {{version}}",
-  "update.tooltip.title": "Cradle updates"
+  "update.tooltip.title": "Cradle updates",
+  "whatsNew.dismiss": "Got it!"
 }

@@ -46,6 +46,19 @@ export const AcpModel = {
     types: t.Array(t.String()),
   }),
 
+  draftSessionBody: t.Object({
+    workspaceId: t.Optional(t.String({ minLength: 1 })),
+  }),
+
+  draftSessionResult: t.Object({
+    sessionId: t.String(),
+    selectedModelId: t.Nullable(t.String()),
+    models: t.Array(t.Object({
+      id: t.String(),
+      label: t.String(),
+    })),
+  }),
+
   installBody: t.Object({
     distributionType: t.Union([
       t.Literal('binary'),
