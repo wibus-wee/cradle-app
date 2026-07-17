@@ -1,4 +1,7 @@
 import { Command } from 'commander'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { registerSessionAwaitCommand } from './session-await'
@@ -113,6 +116,89 @@ describe('registerSessionAwaitCommand', () => {
         reason: 'Waiting for deploy approval',
       }),
     }))
+  })
+
+  it('registers a javascript await with an inline program', async () => {
+    const request = await runCommand([
+      'session',
+      'await',
+      'javascript',
+      '--program',
+      'export default async () => false',
+    ], {
+      CRADLE_CHAT_SESSION_ID: 'session-1',
+      CRADLE_WORKSPACE_ID: WORKSPACE_ID,
+    })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.objectContaining({
+        source: 'javascript',
+        filterJson: '{"program":"export default async () => false"}',
+      }),
+    }))
+  })
+
+  it('wraps a bare function expression as a default export for javascript awaits', async () => {
+    const request = await runCommand([
+      'session',
+      'await',
+      'javascript',
+      '--program',
+      'async () => false',
+    ], {
+      CRADLE_CHAT_SESSION_ID: 'session-1',
+      CRADLE_WORKSPACE_ID: WORKSPACE_ID,
+    })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.objectContaining({
+        filterJson: '{"program":"export default async () => false"}',
+      }),
+    }))
+  })
+
+  it('reads the javascript await program from a file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cradle-cli-await-'))
+    const programFile = join(dir, 'cell.mjs')
+    writeFileSync(programFile, 'export default async () => false\n')
+
+    try {
+      const request = await runCommand([
+        'session',
+        'await',
+        'javascript',
+        '--program-file',
+        programFile,
+      ], {
+        CRADLE_CHAT_SESSION_ID: 'session-1',
+        CRADLE_WORKSPACE_ID: WORKSPACE_ID,
+      })
+
+      expect(request).toHaveBeenCalledWith(expect.objectContaining({
+        body: expect.objectContaining({
+          source: 'javascript',
+          filterJson: '{"program":"export default async () => false\\n"}',
+        }),
+      }))
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('requires exactly one of --program and --program-file for javascript awaits', async () => {
+    await expect(runCommand([
+      'session',
+      'await',
+      'javascript',
+      '--program',
+      'export default async () => false',
+      '--program-file',
+      '/tmp/cell.mjs',
+    ], {
+      CRADLE_CHAT_SESSION_ID: 'session-1',
+      CRADLE_WORKSPACE_ID: WORKSPACE_ID,
+    })).rejects.toThrow('exactly one')
   })
 
   it('resolves an explicit --workspace name by listing workspaces', async () => {

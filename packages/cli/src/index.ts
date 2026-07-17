@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 
 import { registerGeneratedCommands } from './commands/generated/index.generated'
+import { registerJavascriptCommand } from './commands/javascript'
 import { registerSessionAwaitCommand } from './commands/session-await'
 import { registerPluginDevCommand } from './commands/plugin-dev'
 import { createCommandContext } from './runtime/context'
@@ -15,6 +16,7 @@ const program = new Command()
 
 registerGeneratedCommands(program)
 registerSessionAwaitCommand(program)
+registerJavascriptCommand(program)
 registerPluginDevCommand(program)
 registerManualCommand(program)
 

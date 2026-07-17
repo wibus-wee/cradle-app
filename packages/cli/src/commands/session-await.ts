@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 
 import { getCommandContext } from '../runtime/context'
@@ -54,6 +55,11 @@ interface IssueStatusAwaitOptions extends AwaitCommandOptions {
   category?: string[]
   statusId?: string[]
   statusName?: string[]
+}
+
+interface JavascriptAwaitOptions extends AwaitCommandOptions {
+  program?: string
+  programFile?: string
 }
 
 interface RetryDeliveryOptions {
@@ -151,6 +157,30 @@ function buildOutputOptions(options: { format?: string, json?: boolean | string 
     format: OutputFormatSchema.parse(options.format ?? 'auto'),
     jsonFields: JsonFieldsOptionSchema.parse(options.json),
   }
+}
+
+// Reads the cell source from --program or --program-file (exactly one) and
+// wraps bare function expressions as a default-exporting ES module, which is
+// the contract the server enforces.
+function readJavaScriptProgramSource(options: { program?: string, programFile?: string }): string {
+  const hasProgram = options.program !== undefined
+  const hasProgramFile = options.programFile !== undefined
+  if (hasProgram === hasProgramFile) {
+    throw new Error('Pass exactly one program input: --program or --program-file.')
+  }
+  let source: string
+  if (hasProgramFile) {
+    try {
+      source = readFileSync(options.programFile!, 'utf8')
+    }
+    catch (err) {
+      throw new Error(`Could not read --program-file ${options.programFile}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  else {
+    source = options.program!
+  }
+  return source.includes('export default') ? source : `export default ${source}`
 }
 
 async function createAwait(command: Command, body: Record<string, unknown>, outputOptions: AwaitCommandOptions): Promise<void> {
@@ -289,6 +319,26 @@ export function registerSessionAwaitCommand(root: Command): void {
           ...(statusIds && statusIds.length > 0 ? { statusIds } : {}),
           ...(statusNames && statusNames.length > 0 ? { statusNames } : {}),
         }),
+      }, options)
+    })
+
+  awaitCommand
+    .command('javascript')
+    .description('Wait on a JavaScript cell that is re-evaluated until it completes')
+    .option('--program <source>', 'JavaScript cell source (an ES module with a default export, or a bare async function expression)')
+    .option('--program-file <path>', 'Read the JavaScript cell source from a file')
+    .option('--chat-session-id <id>', 'Chat session ID. Defaults to CRADLE_CHAT_SESSION_ID')
+    .option('--workspace <name-or-id>', 'Workspace name or id. Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.')
+    .option('--reason <text>', 'Visible wait reason')
+    .option('--expires-at <unixSeconds>', 'Unix timestamp when this await expires')
+    .option('--format <format>', 'Output format: agent, auto, json, pretty, table, ndjson', 'auto')
+    .option('--json [fields]', 'Print JSON, optionally selecting comma-separated fields')
+    .action(async (options: JavascriptAwaitOptions, command: Command) => {
+      const program = readJavaScriptProgramSource(options)
+      await createAwait(command, {
+        ...(await buildCommonCreateBody(getCommandContext(command), options)),
+        source: 'javascript',
+        filterJson: JSON.stringify({ program }),
       }, options)
     })
 
