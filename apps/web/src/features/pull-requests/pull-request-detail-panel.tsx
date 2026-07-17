@@ -88,8 +88,6 @@ export function PullRequestDetailPanel({
   }
 
   const pullRequest = detail.pullRequest
-  const status = statusKind(pullRequest)
-  const StatusIcon = STATUS_ICON[status]
   const tabs: Array<{ id: Tab, label: string }> = [
     { id: 'summary', label: t('detail.tab.summary') },
     { id: 'timeline', label: t('detail.tab.timeline') },
@@ -98,121 +96,58 @@ export function PullRequestDetailPanel({
 
   return (
     <div className="absolute inset-0 flex min-h-0 flex-col overflow-hidden bg-background" data-testid="pull-request-detail-panel">
-      {/* Minimal top chrome - just actions. The page identity lives in the
-          document body below, Notion-style, not in a header band. */}
-      <div className="flex shrink-0 items-center justify-end gap-1 px-4 py-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => void detailQuery.refetch()}
-          aria-label={t('detail.refresh')}
-        >
-          <RefreshIcon className={cn('size-3.5', detailQuery.isFetching && 'animate-spin')} />
-        </Button>
-        {workId && (
-          <Button type="button" variant="outline" size="sm" onClick={() => openWork(workId)}>
-            {t('detail.openWork')}
+      <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border/50 px-2">
+        <div className="flex min-w-0 items-center gap-0.5" role="tablist">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'relative z-10 flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] whitespace-nowrap transition-colors select-none',
+                activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {activeTab === tab.id && (
+                <m.span
+                  layoutId={`pr-detail-tab-${owner}/${repo}#${number}`}
+                  className="absolute inset-0 rounded-md bg-accent"
+                  transition={{ type: 'spring', stiffness: 600, damping: 40 }}
+                  style={{ zIndex: -1 }}
+                />
+              )}
+              <span className="relative">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void detailQuery.refetch()}
+            aria-label={t('detail.refresh')}
+          >
+            <RefreshIcon className={cn('size-3.5', detailQuery.isFetching && 'animate-spin')} />
           </Button>
-        )}
-        <Button variant="outline" size="icon-sm" asChild aria-label={t('detail.openGithub')}>
-          <a href={pullRequest.url} target="_blank" rel="noreferrer">
-            <ExternalLinkIcon className="size-3.5" />
-          </a>
-        </Button>
+          {workId && (
+            <Button type="button" variant="outline" size="sm" onClick={() => openWork(workId)}>
+              {t('detail.openWork')}
+            </Button>
+          )}
+          <Button variant="outline" size="icon-xs" asChild aria-label={t('detail.openGithub')}>
+            <a href={pullRequest.url} target="_blank" rel="noreferrer">
+              <ExternalLinkIcon className="size-3.5" />
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pb-20">
-          {/* Breadcrumb-style identity line */}
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <span className={cn('shrink-0', STATUS_ICON_CLASS[status])}>
-              <StatusIcon className="size-3.5" aria-hidden="true" />
-            </span>
-            <span className="truncate font-mono">
-              {pullRequest.owner}
-              /
-              {pullRequest.repo}
-              {' #'}
-              {pullRequest.number}
-            </span>
-            <span className="shrink-0 font-medium text-foreground/70">
-              {t(`status.${status}`)}
-            </span>
-          </div>
-
-          {/* Page title - confident, the anchor of the page */}
-          <h1 className="mt-2 text-balance text-2xl font-semibold leading-tight tracking-tight text-foreground">
-            {pullRequest.title}
-          </h1>
-
-          {/* Meta row - author, branches, recency. Calm, small, icon-led. */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-muted-foreground">
-            {pullRequest.author && (
-              <span className="flex items-center gap-1.5">
-                <img
-                  src={pullRequest.author.avatarUrl}
-                  alt=""
-                  className="size-4 rounded-full outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-                />
-                <span className="text-foreground/80">{pullRequest.author.login}</span>
-              </span>
-            )}
-            <span className="flex min-w-0 items-center gap-1.5 font-mono">
-              <GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
-              <span className="truncate">{pullRequest.headRef}</span>
-              <span aria-hidden="true">{'->'}</span>
-              <span className="truncate">{pullRequest.baseRef}</span>
-            </span>
-            <span className="font-mono tabular-nums">
-              {t('detail.updated', { ago: formatRelativeFromIso(pullRequest.updatedAtIso) })}
-            </span>
-          </div>
-
-          {pullRequest.labels.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {pullRequest.labels.map(label => (
-                <span
-                  key={label.name}
-                  className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[10.5px] text-foreground/70"
-                >
-                  <span
-                    className="size-1.5 rounded-full"
-                    style={{ backgroundColor: `#${label.color}` }}
-                    aria-hidden="true"
-                  />
-                  {label.name}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Pill tabs - same idiom as workspace-detail-page (animated
-              bg-accent pill via layoutId), not underline tabs. */}
-          <div className="mt-6 flex items-center gap-0.5">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] whitespace-nowrap transition-colors select-none',
-                  activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {activeTab === tab.id && (
-                  <m.span
-                    layoutId={`pr-detail-tab-${owner}/${repo}#${number}`}
-                    className="absolute inset-0 rounded-md bg-accent"
-                    transition={{ type: 'spring', stiffness: 600, damping: 40 }}
-                    style={{ zIndex: -1 }}
-                  />
-                )}
-                <span className="relative">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
           <div className={activeTab === 'summary' ? undefined : 'hidden'}>
             <SummaryTab detail={detail} />
           </div>
@@ -233,67 +168,145 @@ function SummaryTab({ detail }: { detail: PullRequestDetail }) {
   const pullRequest = detail.pullRequest
 
   return (
-    <div className="space-y-8 pt-6">
-      {/* Page properties - clean label/value rows, Notion page-property style. */}
-      <dl>
-        <PropRow icon={GitCommitIcon} label={t('summary.commits')}>
-          <span className="tabular-nums">{pullRequest.commits}</span>
-        </PropRow>
-        <PropRow icon={CommentIcon} label={t('summary.comments')}>
-          <span className="tabular-nums">{pullRequest.comments + pullRequest.reviewComments}</span>
-        </PropRow>
-        <PropRow icon={FileDiffIcon} label={t('summary.changedFiles')}>
-          <span className="tabular-nums">{pullRequest.changedFiles}</span>
-          <span className="ml-2 font-mono text-[11px] text-success">
-            +
-            {pullRequest.additions}
-          </span>
-          <span className="font-mono text-[11px] text-destructive">
-            −
-            {pullRequest.deletions}
-          </span>
-        </PropRow>
-        <PropRow icon={CheckCircleIcon} label={t('summary.checks')}>
-          <ChecksValue state={pullRequest.checksState} count={pullRequest.checks.length} />
-        </PropRow>
-        <PropRow icon={UserAssignIcon} label={t('summary.assignees')}>
-          <PeopleValue people={pullRequest.assignees} empty={t('summary.noAssignees')} />
-        </PropRow>
-        <PropRow icon={ReviewIcon} label={t('summary.reviewers')}>
-          <PeopleValue people={pullRequest.reviewers} empty={t('summary.noReviewers')} />
-        </PropRow>
-      </dl>
+    <div className="pt-5">
+      <PullRequestSummaryHeader pullRequest={pullRequest} />
 
-      <section>
-        <SectionHeading>{t('summary.description')}</SectionHeading>
-        {pullRequest.body
-          ? <AssetMarkdown content={pullRequest.body} className="text-pretty text-[14px] leading-7 text-foreground/85" />
-          : <p className="text-[13px] italic text-muted-foreground/70">{t('summary.noDescription')}</p>}
-      </section>
+      <div className="space-y-8 pt-6">
+        {/* Page properties - clean label/value rows, Notion page-property style. */}
+        <dl>
+          <PropRow icon={GitCommitIcon} label={t('summary.commits')}>
+            <span className="tabular-nums">{pullRequest.commits}</span>
+          </PropRow>
+          <PropRow icon={CommentIcon} label={t('summary.comments')}>
+            <span className="tabular-nums">{pullRequest.comments + pullRequest.reviewComments}</span>
+          </PropRow>
+          <PropRow icon={FileDiffIcon} label={t('summary.changedFiles')}>
+            <span className="tabular-nums">{pullRequest.changedFiles}</span>
+            <span className="ml-2 font-mono text-[11px] text-success">
+              +
+              {pullRequest.additions}
+            </span>
+            <span className="font-mono text-[11px] text-destructive">
+              −
+              {pullRequest.deletions}
+            </span>
+          </PropRow>
+          <PropRow icon={CheckCircleIcon} label={t('summary.checks')}>
+            <ChecksValue state={pullRequest.checksState} count={pullRequest.checks.length} />
+          </PropRow>
+          <PropRow icon={UserAssignIcon} label={t('summary.assignees')}>
+            <PeopleValue people={pullRequest.assignees} empty={t('summary.noAssignees')} />
+          </PropRow>
+          <PropRow icon={ReviewIcon} label={t('summary.reviewers')}>
+            <PeopleValue people={pullRequest.reviewers} empty={t('summary.noReviewers')} />
+          </PropRow>
+        </dl>
 
-      {pullRequest.checks.length > 0 && (
         <section>
-          <SectionHeading>{t('summary.checks')}</SectionHeading>
-          <div className="divide-y divide-border/40">
-            {pullRequest.checks.map(check => (
-              <a
-                key={check.id}
-                href={check.url ?? undefined}
-                target={check.url ? '_blank' : undefined}
-                rel={check.url ? 'noreferrer' : undefined}
-                className={cn(
-                  'flex min-h-9 items-center justify-between gap-3 py-2 text-[12.5px] transition-colors',
-                  check.url && 'hover:text-foreground',
-                )}
-              >
-                <span className="truncate text-foreground/80">{check.name}</span>
-                <CheckBadge status={check.status} conclusion={check.conclusion} />
-              </a>
-            ))}
-          </div>
+          <SectionHeading>{t('summary.description')}</SectionHeading>
+          {pullRequest.body
+            ? <AssetMarkdown content={pullRequest.body} className="text-pretty text-[14px] leading-7 text-foreground/85" />
+            : <p className="text-[13px] italic text-muted-foreground/70">{t('summary.noDescription')}</p>}
         </section>
-      )}
+
+        {pullRequest.checks.length > 0 && (
+          <section>
+            <SectionHeading>{t('summary.checks')}</SectionHeading>
+            <div className="divide-y divide-border/40">
+              {pullRequest.checks.map(check => (
+                <a
+                  key={check.id}
+                  href={check.url ?? undefined}
+                  target={check.url ? '_blank' : undefined}
+                  rel={check.url ? 'noreferrer' : undefined}
+                  className={cn(
+                    'flex min-h-9 items-center justify-between gap-3 py-2 text-[12.5px] transition-colors',
+                    check.url && 'hover:text-foreground',
+                  )}
+                >
+                  <span className="truncate text-foreground/80">{check.name}</span>
+                  <CheckBadge status={check.status} conclusion={check.conclusion} />
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
+  )
+}
+
+function PullRequestSummaryHeader({
+  pullRequest,
+}: {
+  pullRequest: PullRequestDetail['pullRequest']
+}) {
+  const { t } = useTranslation('pull-requests')
+  const status = statusKind(pullRequest)
+  const StatusIcon = STATUS_ICON[status]
+
+  return (
+    <header>
+      <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+        <span className={cn('shrink-0', STATUS_ICON_CLASS[status])}>
+          <StatusIcon className="size-3.5" aria-hidden="true" />
+        </span>
+        <span className="truncate font-mono">
+          {pullRequest.owner}
+          /
+          {pullRequest.repo}
+          {' #'}
+          {pullRequest.number}
+        </span>
+        <span className="shrink-0 font-medium text-foreground/70">
+          {t(`status.${status}`)}
+        </span>
+      </div>
+
+      <h1 className="mt-2 text-balance text-2xl font-semibold leading-tight tracking-tight text-foreground">
+        {pullRequest.title}
+      </h1>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-muted-foreground">
+        {pullRequest.author && (
+          <span className="flex items-center gap-1.5">
+            <img
+              src={pullRequest.author.avatarUrl}
+              alt=""
+              className="size-4 rounded-full outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+            />
+            <span className="text-foreground/80">{pullRequest.author.login}</span>
+          </span>
+        )}
+        <span className="flex min-w-0 items-center gap-1.5 font-mono">
+          <GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
+          <span className="truncate">{pullRequest.headRef}</span>
+          <span aria-hidden="true">{'->'}</span>
+          <span className="truncate">{pullRequest.baseRef}</span>
+        </span>
+        <span className="font-mono tabular-nums">
+          {t('detail.updated', { ago: formatRelativeFromIso(pullRequest.updatedAtIso) })}
+        </span>
+      </div>
+
+      {pullRequest.labels.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {pullRequest.labels.map(label => (
+            <span
+              key={label.name}
+              className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[10.5px] text-foreground/70"
+            >
+              <span
+                className="size-1.5 rounded-full"
+                style={{ backgroundColor: `#${label.color}` }}
+                aria-hidden="true"
+              />
+              {label.name}
+            </span>
+          ))}
+        </div>
+      )}
+    </header>
   )
 }
 
