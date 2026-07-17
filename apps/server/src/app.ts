@@ -1,3 +1,5 @@
+import { dirname } from 'node:path'
+
 import { cors } from '@elysiajs/cors'
 import { node } from '@elysiajs/node'
 import { Elysia } from 'elysia'
@@ -303,9 +305,15 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
   await opencodeRuntimeInstallationService.boot()
 
+  const managedResourceService = new ManagedResourceService([
+    createChronicleManagedResourceAdapter(downloadCenterService),
+    createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
+  ])
+
   const app = await createServerContractApp({
     includeRuntimeHttpPlugins: true,
     downloadCenterService,
+    managedResourceService,
     opencodeRuntimeInstallationService,
   })
   registerAgentToolsMcpServer()
@@ -320,7 +328,13 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
 
   // Plugin system — discover and activate server plugins
-  await activateServerPlugins(app)
+  await activateServerPlugins(app, {
+    hostServices: {
+      downloadCenter: downloadCenterService,
+      managedResources: managedResourceService,
+      dataDir: serverConfig.dataDir ?? dirname(serverConfig.dbPath),
+    },
+  })
   reconcileExternalIssueSourceRegistrations()
 
   const runtimeResources = new RuntimeResourceRegistry()

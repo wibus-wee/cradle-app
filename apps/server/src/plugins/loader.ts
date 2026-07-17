@@ -8,12 +8,15 @@ import { evaluatePluginPermissionPolicy } from '@cradle/plugin-sdk/permissions'
 import type { ServerPluginRouteContext } from '@cradle/plugin-sdk/server'
 import { Elysia } from 'elysia'
 
+import { AppError } from '../errors/app-error'
 import { createChildLogger } from '../logging/logger'
 import {
   stopAllConversationBridgeConnections,
   stopConversationBridgeConnectionsForOwner,
 } from '../modules/conversation-bridge/runtime-supervisor'
+import type { ManagedResourceDescriptor } from '../modules/managed-resources/service'
 import { readPluginActivationPolicy, setPluginActivationPolicy } from './activation-policy'
+import type { PluginHostServices } from './context'
 import { createServerPluginContext } from './context'
 import { resetConversationBridgeAdapterRegistry } from './conversation-adapter-registry'
 import type { DiscoveredPluginPackage } from './discovery'
@@ -21,6 +24,7 @@ import { discoverPluginPackages } from './discovery'
 import { resetExternalIssueSourceRegistry } from './external-issue-source-registry'
 import { resetExternalProviderSourceRegistry } from './external-provider-source-registry'
 import { calculatePluginPackageChecksum } from './package-checksum'
+import { listPluginProcesses, stopAllPluginProcesses, stopPluginProcesses } from './process-registry'
 import { clearPluginRoutes, dispatchPluginRoute, resetPluginRouteRegistry } from './route-registry'
 import {
   classifyPluginSource,
@@ -46,6 +50,12 @@ import { listPluginSources, readPluginSource } from './source-registry'
 import { createPluginStaticServer, rewritePluginWebBundleImports } from './static-server'
 import { grantPluginTrust } from './trust-grants'
 import { evaluatePluginSourceTrust, isExternalLocalCodeSource, readRelayHostExposure } from './trust-policy'
+import {
+  executePluginUninstall,
+  hasPluginUninstallHandler,
+  inspectPluginUninstall,
+  resetPluginUninstallRegistry,
+} from './uninstall-registry'
 import { validatePluginModule } from './validation'
 
 interface ActivePlugin {
@@ -61,6 +71,7 @@ const shadowedDevelopmentPlugins = new Map<string, {
   source: PluginSourceDescriptor
 }>()
 const logger = createChildLogger({ module: 'plugins' })
+let pluginHostServices: PluginHostServices | undefined
 
 interface PluginRouteDispatcherContext {
   params: {
@@ -333,6 +344,12 @@ async function deactivatePluginServerLayer(pluginName: string): Promise<void> {
       logger.error('plugin deactivation failed', { plugin: pluginName, err })
     }
  finally {
+      try {
+        await stopPluginProcesses(pluginName)
+      }
+      catch (err) {
+        logger.error('plugin managed process stop failed', { plugin: pluginName, err })
+      }
       disposeSubscriptions(pluginName, plugin.subscriptions)
     }
   }
@@ -375,7 +392,10 @@ async function activatePluginServerLayer(manifest: PluginManifest, moduleRevisio
     const mod = await import(moduleUrl.href)
     validatePluginModule(mod, manifest.name, 'server')
 
-    const ctx = createServerPluginContext(manifest, { routeSegment: descriptor.routeSegment })
+    const ctx = createServerPluginContext(manifest, {
+      routeSegment: descriptor.routeSegment,
+      hostServices: pluginHostServices,
+    })
     subscriptions = ctx.subscriptions
     await mod.activate(ctx)
 
@@ -448,7 +468,11 @@ export async function deactivateDevelopmentPlugin(pluginName: string): Promise<v
   await prepareAndActivateManifests([shadowed.manifest])
 }
 
-export async function activateServerPlugins(app: Elysia): Promise<void> {
+export async function activateServerPlugins(
+  app: Elysia,
+  options: { hostServices?: PluginHostServices } = {},
+): Promise<void> {
+  pluginHostServices = options.hostServices
   for (const pluginName of [...activePlugins.keys()]) {
     await deactivatePluginServerLayer(pluginName)
   }
@@ -607,15 +631,114 @@ export async function discoverAndActivateSource(
     .filter((descriptor): descriptor is PluginDescriptor => !!descriptor)
 }
 
+export interface PluginSourceRemovalPluginPlan {
+  identity: string
+  displayName: string
+  processes: ReturnType<typeof listPluginProcesses>
+  resources: ManagedResourceDescriptor[]
+  lifecycle: Awaited<ReturnType<typeof inspectPluginUninstall>>
+  blockedReasons: string[]
+}
+
+export interface PluginSourceRemovalPlan {
+  sourceId: string
+  plugins: PluginSourceRemovalPluginPlan[]
+  blocked: boolean
+}
+
+async function sourceDescriptors(sourceId: string): Promise<PluginDescriptor[]> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new AppError({ code: 'plugin_source_not_found', status: 404, message: `Plugin source not found: ${sourceId}` })
+  }
+  const pluginsDir = await inspectPluginSourceDirectory(source)
+  return pluginsDir
+    ? listPluginDescriptors().filter(descriptor => isPathWithin(descriptor.source.packageDir, pluginsDir))
+    : []
+}
+
+function retainedManagedResources(resources: ManagedResourceDescriptor[]): ManagedResourceDescriptor[] {
+  return resources.filter(resource => resource.installationSource === 'managed' && resource.state !== 'not-installed')
+}
+
+export async function inspectDiscoveredSourceRemoval(sourceId: string): Promise<PluginSourceRemovalPlan> {
+  const descriptors = await sourceDescriptors(sourceId)
+  const plugins = await Promise.all(descriptors.map(async (descriptor): Promise<PluginSourceRemovalPluginPlan> => {
+    const processes = listPluginProcesses(descriptor.identity)
+    const namespace = pluginResourceNamespaceForDescriptor(descriptor)
+    const resources = pluginHostServices
+      ? retainedManagedResources(await pluginHostServices.managedResources.listNamespace(namespace))
+      : []
+    const hasLifecycle = hasPluginUninstallHandler(descriptor.identity)
+    const declaresManagedLifecycle = descriptor.declaredCapabilities.some(capability =>
+      capability.type === 'managed-resource'
+      || capability.type === 'managed-process'
+      || capability.type === 'lifecycle-uninstall')
+    const hasPluginData = pluginHostServices
+      ? existsSync(resolve(pluginHostServices.dataDir, 'plugins', descriptor.routeSegment))
+      : false
+    const hasRetainedState = processes.length > 0
+      || resources.length > 0
+      || (declaresManagedLifecycle && hasPluginData)
+    const blockedReasons: string[] = []
+    if (hasRetainedState && !hasLifecycle) {
+      blockedReasons.push('The plugin declares a managed lifecycle but its uninstall handler is not active. Enable the plugin before removing it.')
+    }
+    for (const resource of resources) {
+      if (!resource.actions.uninstall.available) {
+        blockedReasons.push(`Managed resource ${resource.displayName} cannot be uninstalled: ${resource.actions.uninstall.reasonCode ?? 'unavailable'}.`)
+      }
+    }
+    return {
+      identity: descriptor.identity,
+      displayName: descriptor.displayName,
+      processes,
+      resources,
+      lifecycle: hasLifecycle ? await inspectPluginUninstall(descriptor.identity) : null,
+      blockedReasons,
+    }
+  }))
+  return {
+    sourceId,
+    plugins,
+    blocked: plugins.some(plugin => plugin.blockedReasons.length > 0),
+  }
+}
+
+function pluginResourceNamespaceForDescriptor(descriptor: PluginDescriptor): string {
+  return `plugin.${descriptor.routeSegment}`
+}
+
+async function executeDiscoveredSourceCleanup(plan: PluginSourceRemovalPlan): Promise<void> {
+  if (plan.blocked) {
+    throw new AppError({
+      code: 'plugin_uninstall_blocked',
+      status: 409,
+      message: 'The plugin source cannot be removed until its uninstall blockers are resolved.',
+      details: { plan },
+    })
+  }
+  for (const plugin of plan.plugins) {
+    await stopPluginProcesses(plugin.identity)
+    if (!pluginHostServices && plugin.resources.length > 0) {
+      throw new Error('Plugin managed resources are unavailable in this host.')
+    }
+    for (const resource of plugin.resources) {
+      await pluginHostServices!.managedResources.execute(resource.key, 'uninstall')
+    }
+    if (plugin.lifecycle) {
+      await executePluginUninstall(plugin.identity)
+    }
+  }
+}
+
 export async function removeDiscoveredSource(sourceId: string): Promise<void> {
   const source = readPluginSource(sourceId)
   if (!source) {
     throw new Error(`Plugin source not found: ${sourceId}`)
   }
-  const pluginsDir = await inspectPluginSourceDirectory(source)
-  const descriptors = pluginsDir
-    ? listPluginDescriptors().filter(descriptor => isPathWithin(descriptor.source.packageDir, pluginsDir))
-    : []
+  const descriptors = await sourceDescriptors(sourceId)
+  await executeDiscoveredSourceCleanup(await inspectDiscoveredSourceRemoval(sourceId))
 
   for (const descriptor of descriptors) {
     await deactivatePluginServerLayer(descriptor.identity)
@@ -720,6 +843,7 @@ export async function deactivateAllPlugins(): Promise<void> {
   for (const name of [...activePlugins.keys()]) {
     await deactivatePluginServerLayer(name)
   }
+  await stopAllPluginProcesses()
   activePlugins.clear()
   shadowedDevelopmentPlugins.clear()
   resetPluginSkillRegistry()
@@ -727,4 +851,6 @@ export async function deactivateAllPlugins(): Promise<void> {
   resetExternalProviderSourceRegistry()
   resetExternalIssueSourceRegistry()
   resetConversationBridgeAdapterRegistry()
+  resetPluginUninstallRegistry()
+  pluginHostServices = undefined
 }

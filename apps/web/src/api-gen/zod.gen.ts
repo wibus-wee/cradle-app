@@ -2124,6 +2124,10 @@ export const zPostPluginsSourcesPreviewBody = z.object({
     subPath: z.string().nullish()
 });
 
+export const zDeletePluginsSourcesByIdBody = z.object({
+    confirmationToken: z.string().min(1)
+});
+
 export const zDeletePluginsSourcesByIdPath = z.object({
     id: z.string().min(1)
 });
@@ -2133,6 +2137,10 @@ export const zGetPluginsSourcesByIdPath = z.object({
 });
 
 export const zPostPluginsSourcesByIdRefreshPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zGetPluginsSourcesByIdUninstallPlanPath = z.object({
     id: z.string().min(1)
 });
 

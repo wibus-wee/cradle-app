@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 interface BaseManagedProcessOptions {
   cwd?: string
   env?: Record<string, string | undefined>
+  inheritEnv?: boolean
   shutdownGraceMs?: number
 }
 

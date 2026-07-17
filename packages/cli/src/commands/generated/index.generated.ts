@@ -186,6 +186,7 @@ import { register as registerPluginSourceGet } from './plugin/source/get'
 import { register as registerPluginSourceList } from './plugin/source/list'
 import { register as registerPluginSourceRefresh } from './plugin/source/refresh'
 import { register as registerPluginSourceRemove } from './plugin/source/remove'
+import { register as registerPluginSourceUninstallPlan } from './plugin/source/uninstall-plan'
 import { register as registerPreferencesAppGet } from './preferences/app/get'
 import { register as registerPreferencesAppSet } from './preferences/app/set'
 import { register as registerPreferencesChatGet } from './preferences/chat/get'
@@ -534,6 +535,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerPluginSourceList(program)
   registerPluginSourceRefresh(program)
   registerPluginSourceRemove(program)
+  registerPluginSourceUninstallPlan(program)
   registerPreferencesAppGet(program)
   registerPreferencesAppSet(program)
   registerPreferencesChatGet(program)

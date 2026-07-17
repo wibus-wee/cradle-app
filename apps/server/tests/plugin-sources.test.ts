@@ -181,4 +181,39 @@ describe('plugin source HTTP operations', () => {
     expect(downloader.executions).toHaveLength(1)
     expect(downloadCenter.list()).toHaveLength(1)
   })
+
+  it('requires a fresh uninstall plan token before deleting a plugin source', async () => {
+    const archivePath = await createPluginArchive(archiveRoot)
+    const downloadsRoot = join(dataDir, 'downloads')
+    const downloader = new PluginArchiveDownloader(downloadsRoot, archivePath)
+    const downloadCenter = new DownloadCenterService({ downloader, rootDir: downloadsRoot })
+    const app = await createServerContractApp({ includeRuntimeHttpPlugins: true, downloadCenterService: downloadCenter })
+    const createResponse = await app.handle(requestJson('/plugins/sources', sourceInput()))
+    const created = await createResponse.json() as { source: { id: string } }
+
+    const unconfirmedResponse = await app.handle(new Request(`http://localhost/plugins/sources/${created.source.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmationToken: 'not-inspected' }),
+    }))
+
+    expect(unconfirmedResponse.status).toBe(409)
+
+    const planResponse = await app.handle(new Request(
+      `http://localhost/plugins/sources/${created.source.id}/uninstall-plan`,
+    ))
+    expect(planResponse.status).toBe(200)
+    const plan = await planResponse.json() as { blocked: boolean, confirmationToken: string, expiresAt: string }
+    expect(plan).toMatchObject({ blocked: false })
+    expect(Date.parse(plan.expiresAt)).toBeGreaterThan(Date.now())
+
+    const confirmedResponse = await app.handle(new Request(`http://localhost/plugins/sources/${created.source.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmationToken: plan.confirmationToken }),
+    }))
+
+    expect(confirmedResponse.status).toBe(200)
+    await expect(confirmedResponse.json()).resolves.toEqual({ removed: true })
+  })
 })

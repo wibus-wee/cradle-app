@@ -1,0 +1,132 @@
+{
+  "name": "@cradle/cli-proxy-api",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "cradle": {
+    "apiVersion": "1",
+    "displayName": "CLIProxyAPI",
+    "description": "Runs CLIProxyAPI as a Cradle-managed sidecar and projects its models as a provider target.",
+    "server": "dist/server.mjs",
+    "web": "dist/web.mjs",
+    "deployments": ["desktop"],
+    "contributes": {
+      "capabilities": [
+        {
+          "id": "resources",
+          "type": "managed-resource",
+          "layer": "server",
+          "label": "CLIProxyAPI runtime",
+          "permissions": ["filesystem.plugin-data", "network.github"]
+        },
+        {
+          "id": "process.sidecar",
+          "type": "managed-process",
+          "layer": "server",
+          "label": "CLIProxyAPI sidecar",
+          "permissions": ["process.sidecar", "filesystem.plugin-data"]
+        },
+        {
+          "id": "lifecycle.uninstall",
+          "type": "lifecycle-uninstall",
+          "layer": "server",
+          "label": "CLIProxyAPI uninstall cleanup",
+          "permissions": ["filesystem.plugin-data", "process.sidecar"]
+        },
+        {
+          "id": "external-provider-source.cli-proxy-api",
+          "type": "external-provider-source",
+          "layer": "server",
+          "label": "CLIProxyAPI provider source",
+          "permissions": ["network.loopback"]
+        },
+        {
+          "id": "route.status",
+          "type": "server-route",
+          "layer": "server",
+          "label": "CLIProxyAPI status",
+          "permissions": ["network.loopback"]
+        },
+        {
+          "id": "route.start",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Start CLIProxyAPI",
+          "permissions": ["network.loopback", "process.sidecar"]
+        },
+        {
+          "id": "route.stop",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Stop CLIProxyAPI",
+          "permissions": ["process.sidecar"]
+        },
+        {
+          "id": "route.config",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Configure CLIProxyAPI",
+          "permissions": ["filesystem.plugin-data"]
+        },
+        {
+          "id": "route.auth.:provider",
+          "type": "server-route",
+          "layer": "server",
+          "label": "Authenticate a CLIProxyAPI account",
+          "permissions": ["process.sidecar", "filesystem.plugin-data"]
+        },
+        {
+          "id": "panel.cli-proxy-api",
+          "type": "web-panel",
+          "layer": "web",
+          "label": "CLIProxyAPI",
+          "permissions": []
+        }
+      ],
+      "permissions": [
+        {
+          "id": "filesystem.plugin-data",
+          "label": "Manage CLIProxyAPI files in its Cradle data directory",
+          "required": true
+        },
+        {
+          "id": "network.github",
+          "label": "Download verified CLIProxyAPI releases from GitHub",
+          "required": true
+        },
+        {
+          "id": "network.loopback",
+          "label": "Connect to the local CLIProxyAPI sidecar",
+          "required": true
+        },
+        {
+          "id": "process.sidecar",
+          "label": "Run the installed CLIProxyAPI executable",
+          "required": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "extract-zip": "^2.0.1",
+    "tar": "^7.5.13",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cradle/plugin-sdk": "workspace:*",
+    "@mingcute/react": "^1.4.1",
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.2.14",
+    "@vitejs/plugin-react": "^5.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.11",
+    "vitest": "^4.1.4"
+  }
+}

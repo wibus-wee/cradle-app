@@ -1,24 +1,77 @@
+import { mkdirSync } from 'node:fs'
+import path from 'node:path'
+
 import type { Disposable, PluginManifest } from '@cradle/plugin-sdk'
 import { derivePluginRouteSegment } from '@cradle/plugin-sdk'
-import type { McpServerConfig, ServerPluginContext, ServerPluginRouteRegistration } from '@cradle/plugin-sdk/server'
+import type {
+  McpServerConfig,
+  PluginManagedResourceAdapter,
+  ServerPluginContext,
+  ServerPluginRouteRegistration,
+} from '@cradle/plugin-sdk/server'
 
+import { AppError } from '../errors/app-error'
 import { createChildLogger } from '../logging/logger'
 import { assertChatRuntime, registerRuntime, unregisterRuntime } from '../modules/chat-runtime/chat-runtime-provider-registry'
 import type { ChatRuntimeMetadata } from '../modules/chat-runtime/runtime-provider-types'
+import type { DownloadCenterService } from '../modules/download-center/service'
+import type { ManagedResourceAdapter, ManagedResourceKey, ManagedResourceProjection, ManagedResourceService } from '../modules/managed-resources/service'
 import type { ProviderKind } from '../modules/provider-contracts/types'
+import { readSecret, removeSecret, upsertSecret } from '../modules/secrets/service'
 import { registerConversationBridgeAdapter } from './conversation-adapter-registry'
 import { createPluginEventBus } from './event-bus'
 import { registerExternalIssueSource } from './external-issue-source-registry'
 import { registerExternalProviderSource } from './external-provider-source-registry'
 import { registerOwnedAfterResponseHook, registerOwnedBeforeQueryHook } from './hooks'
 import { registerPluginMcpServer } from './mcp-registry'
+import { createPluginProcessService } from './process-registry'
 import { normalizePluginRoutePath, registerPluginRoute, unregisterPluginRoute } from './route-registry'
 import { registerPluginCapability, unregisterPluginCapability } from './runtime-registry'
 import { registerOwnedPluginSkill } from './skill-registry'
 import { createPluginStorage } from './storage'
+import { registerPluginUninstallHandler } from './uninstall-registry'
+
+export interface PluginHostServices {
+  downloadCenter: Pick<DownloadCenterService, 'execute' | 'release'>
+  managedResources: ManagedResourceService
+  dataDir: string
+}
 
 interface ServerPluginContextOptions {
   routeSegment?: string
+  hostServices?: PluginHostServices
+}
+
+function pluginResourceNamespace(routeSegment: string): string {
+  return `plugin.${routeSegment}`
+}
+
+function pluginSecretId(owner: string, key: string): string {
+  if (!/^[a-z0-9][\w.-]{0,127}$/i.test(key)) {
+    throw new Error('Plugin secret key must use 1-128 letters, numbers, dots, underscores, or hyphens.')
+  }
+  return `plugin:${Buffer.from(owner).toString('base64url')}:${key}`
+}
+
+function toHostManagedResourceAdapter(
+  namespace: string,
+  adapter: PluginManagedResourceAdapter,
+): ManagedResourceAdapter {
+  function pluginKey(key: ManagedResourceKey) {
+    return { resourceType: key.resourceType, resourceId: key.resourceId }
+  }
+  function hostProjection(projection: Awaited<ReturnType<PluginManagedResourceAdapter['project']>>): ManagedResourceProjection {
+    return projection
+  }
+  return {
+    namespace,
+    declarations: () => adapter.declarations().map(declaration => ({
+      ...declaration,
+      key: { ...declaration.key, namespace },
+    })),
+    project: async key => hostProjection(await adapter.project(pluginKey(key))),
+    execute: async (key, action) => hostProjection(await adapter.execute(pluginKey(key), action)),
+  }
 }
 
 export function createServerPluginContext(
@@ -44,6 +97,13 @@ export function createServerPluginContext(
 
   const eventBus = createPluginEventBus()
   const subscriptions: Disposable[] = []
+  const hostServices = options.hostServices
+  const resourceNamespace = pluginResourceNamespace(routeSegment)
+  const dataDir = hostServices
+    ? path.resolve(hostServices.dataDir, 'plugins', routeSegment)
+    : path.resolve(process.cwd(), '.cradle-plugin-data-unavailable', routeSegment)
+  const processService = createPluginProcessService(manifest.name, dataDir)
+  const processCapabilities = new Map<string, string>()
 
   function track(disposable: Disposable): Disposable {
     subscriptions.push(disposable)
@@ -193,6 +253,126 @@ export function createServerPluginContext(
     },
   } satisfies ServerPluginContext['hooks']['chat']
 
+  const resources = {
+    register(adapter) {
+      if (!hostServices) { throw new Error('Plugin managed resources are unavailable in this host.') }
+      const capability = registerPluginCapability(
+        manifest.name,
+        'managed-resource',
+        'server',
+        'resources',
+        `${manifest.name} managed resources`,
+        { namespace: resourceNamespace },
+        ['resource.runtime', 'resources'],
+      )
+      const registration = hostServices.managedResources.registerAdapter(
+        toHostManagedResourceAdapter(resourceNamespace, adapter),
+      )
+      return track({
+        dispose() {
+          registration.dispose()
+          unregisterPluginCapability(manifest.name, capability.id)
+        },
+      })
+    },
+  } satisfies ServerPluginContext['resources']
+
+  const downloads = {
+    async execute(request) {
+      if (!hostServices) { throw new Error('Plugin downloads are unavailable in this host.') }
+      for (const source of request.sources) {
+        const url = new URL(source.url)
+        if (url.protocol !== 'https:') {
+          throw new Error('Plugin downloads require HTTPS sources.')
+        }
+      }
+      return await hostServices.downloadCenter.execute({
+        ...request,
+        owner: {
+          ...request.owner,
+          namespace: resourceNamespace,
+        },
+      })
+    },
+    async release(taskId) {
+      if (!hostServices) { throw new Error('Plugin downloads are unavailable in this host.') }
+      await hostServices.downloadCenter.release(taskId)
+    },
+  } satisfies ServerPluginContext['downloads']
+
+  const secrets = {
+    get(key) {
+      try {
+        return readSecret(pluginSecretId(manifest.name, key))
+      }
+      catch (error) {
+        if (error instanceof AppError && error.code === 'secret_not_found') { return null }
+        throw error
+      }
+    },
+    set(key, value) {
+      upsertSecret({
+        id: pluginSecretId(manifest.name, key),
+        kind: `system:plugin:${routeSegment}`,
+        label: `${manifest.name} ${key}`,
+        secret: value,
+      })
+    },
+    delete(key) {
+      removeSecret(pluginSecretId(manifest.name, key))
+    },
+  } satisfies ServerPluginContext['secrets']
+
+  const processes = {
+    ...processService,
+    async spawn(spec) {
+      if (!hostServices) { throw new Error('Plugin managed processes are unavailable in this host.') }
+      if (!processCapabilities.has(spec.id)) {
+        const capability = registerPluginCapability(
+          manifest.name,
+          'managed-process',
+          'server',
+          spec.id,
+          spec.displayName,
+          undefined,
+          [`process.${spec.id}`, 'process.sidecar'],
+        )
+        processCapabilities.set(spec.id, capability.id)
+        track({
+          dispose() {
+            unregisterPluginCapability(manifest.name, capability.id)
+          },
+        })
+      }
+      return await processService.spawn(spec)
+    },
+  } satisfies ServerPluginContext['processes']
+
+  const lifecycle = {
+    registerUninstall(handler) {
+      const capability = registerPluginCapability(
+        manifest.name,
+        'lifecycle-uninstall',
+        'server',
+        'uninstall',
+        `${manifest.name} uninstall lifecycle`,
+        undefined,
+        ['lifecycle.uninstall', 'uninstall'],
+      )
+      const registration = registerPluginUninstallHandler(manifest.name, handler)
+      return track({
+        dispose() {
+          registration.dispose()
+          unregisterPluginCapability(manifest.name, capability.id)
+        },
+      })
+    },
+  } satisfies ServerPluginContext['lifecycle']
+
+  if (hostServices) {
+    mkdirSync(dataDir, { recursive: true })
+  }
+
   return {
     subscriptions,
     routes: {
@@ -205,6 +385,12 @@ export function createServerPluginContext(
     conversation,
     runtimes,
     storage: createPluginStorage(manifest.name),
+    resources,
+    downloads,
+    paths: { dataDir },
+    secrets,
+    processes,
+    lifecycle,
     logger,
     sharedConfig,
     manifest,

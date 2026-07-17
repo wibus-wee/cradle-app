@@ -1,4 +1,5 @@
 import type { DownloadOwner } from '@cradle/download-center'
+import type { Disposable } from '@cradle/plugin-sdk'
 
 import { AppError } from '../../errors/app-error'
 
@@ -98,23 +99,50 @@ export class ManagedResourceService {
 
   constructor(adapters: readonly ManagedResourceAdapter[]) {
     for (const adapter of adapters) {
-      if (this.adapterByNamespace.has(adapter.namespace)) {
-        throw new Error(`Managed resource namespace is already registered: ${adapter.namespace}`)
+      this.registerAdapter(adapter)
+    }
+  }
+
+  registerAdapter(adapter: ManagedResourceAdapter): Disposable {
+    if (this.adapterByNamespace.has(adapter.namespace)) {
+      throw new Error(`Managed resource namespace is already registered: ${adapter.namespace}`)
+    }
+
+    const adapterKeys = new Set<string>()
+    const declarations = adapter.declarations().map((declaration) => {
+      if (declaration.key.namespace !== adapter.namespace) {
+        throw new Error(`Managed resource declaration namespace does not match adapter: ${declaration.key.namespace}`)
       }
-      this.adapterByNamespace.set(adapter.namespace, adapter)
-      for (const declaration of adapter.declarations()) {
-        if (declaration.key.namespace !== adapter.namespace) {
-          throw new Error(`Managed resource declaration namespace does not match adapter: ${declaration.key.namespace}`)
-        }
-        const key = resourceKey(declaration.key)
-        if (this.declarationByKey.has(key)) {
-          throw new Error(`Managed resource is already declared: ${key}`)
-        }
-        this.declarationByKey.set(key, {
+      const key = resourceKey(declaration.key)
+      if (this.declarationByKey.has(key) || adapterKeys.has(key)) {
+        throw new Error(`Managed resource is already declared: ${key}`)
+      }
+      adapterKeys.add(key)
+      return {
+        storageKey: key,
+        declaration: {
           ...declaration,
           key: { ...declaration.key },
-        })
+        },
       }
+    })
+
+    this.adapterByNamespace.set(adapter.namespace, adapter)
+    for (const entry of declarations) {
+      this.declarationByKey.set(entry.storageKey, entry.declaration)
+    }
+
+    let disposed = false
+    return {
+      dispose: () => {
+        if (disposed) { return }
+        disposed = true
+        if (this.adapterByNamespace.get(adapter.namespace) !== adapter) { return }
+        this.adapterByNamespace.delete(adapter.namespace)
+        for (const entry of declarations) {
+          this.declarationByKey.delete(entry.storageKey)
+        }
+      },
     }
   }
 
@@ -125,6 +153,13 @@ export class ManagedResourceService {
 
   async get(key: ManagedResourceKey): Promise<ManagedResourceDescriptor> {
     return await this.describe(this.requireDeclaration(key))
+  }
+
+  async listNamespace(namespace: string): Promise<ManagedResourceDescriptor[]> {
+    const declarations = Array.from(this.declarationByKey.values())
+      .filter(declaration => declaration.key.namespace === namespace)
+    const descriptors = await Promise.all(declarations.map(declaration => this.describe(declaration)))
+    return descriptors.sort(compareDescriptors)
   }
 
   async execute(key: ManagedResourceKey, action: ManagedResourceActionName): Promise<ManagedResourceDescriptor> {
