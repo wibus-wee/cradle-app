@@ -70,5 +70,11 @@
   "trend.title": "Tendencia de uso",
   "trend.toggleCost": "Costo",
   "trend.toggleTokens": "Tokens",
-  "trend.total": "Total"
+  "trend.total": "Total",
+  "trend.visibleRange": "{{start}} – {{end}}",
+  "trend.interactionHint": "Desplaza para ampliar · arrastra para mover · doble clic para restablecer",
+  "trend.zoomControls": "Controles de zoom del gráfico",
+  "trend.zoomIn": "Ampliar",
+  "trend.zoomOut": "Reducir",
+  "trend.resetZoom": "Restablecer zoom"
 }

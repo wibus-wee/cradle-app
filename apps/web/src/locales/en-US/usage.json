@@ -70,5 +70,11 @@
   "trend.title": "Usage trend",
   "trend.toggleCost": "Cost",
   "trend.toggleTokens": "Tokens",
-  "trend.total": "Total"
+  "trend.total": "Total",
+  "trend.visibleRange": "{{start}} – {{end}}",
+  "trend.interactionHint": "Scroll to zoom · drag to pan · double-click to reset",
+  "trend.zoomControls": "Chart zoom controls",
+  "trend.zoomIn": "Zoom in",
+  "trend.zoomOut": "Zoom out",
+  "trend.resetZoom": "Reset zoom"
 }
