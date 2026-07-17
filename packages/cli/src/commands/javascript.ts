@@ -1,11 +1,10 @@
-import { readFileSync } from 'node:fs'
-
 import { Command } from 'commander'
 import { z } from 'zod'
 
 import { getCommandContext } from '../runtime/context'
 import { printResult } from '../runtime/output'
 import type { CliOutputFormat } from '../runtime/types'
+import { readJavaScriptProgramSource } from './javascript-program'
 
 const OutputFormatSchema = z.enum(['agent', 'auto', 'json', 'pretty', 'table', 'ndjson'])
 
@@ -38,30 +37,6 @@ function buildOutputOptions(options: { format?: string, json?: boolean | string 
   }
 }
 
-// Same source handling as `session await javascript`: exactly one of
-// --program/--program-file, bare function expressions are wrapped as a
-// default-exporting ES module (the server-side contract).
-function readJavaScriptProgramSource(options: { program?: string, programFile?: string }): string {
-  const hasProgram = options.program !== undefined
-  const hasProgramFile = options.programFile !== undefined
-  if (hasProgram === hasProgramFile) {
-    throw new Error('Pass exactly one program input: --program or --program-file.')
-  }
-  let source: string
-  if (hasProgramFile) {
-    try {
-      source = readFileSync(options.programFile!, 'utf8')
-    }
-    catch (err) {
-      throw new Error(`Could not read --program-file ${options.programFile}: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-  else {
-    source = options.program!
-  }
-  return source.includes('export default') ? source : `export default ${source}`
-}
-
 function readTimeoutMs(value: string | undefined): number | undefined {
   if (value === undefined) {
     return undefined
@@ -81,7 +56,7 @@ export function registerJavascriptCommand(root: Command): void {
   javascript
     .command('evaluate')
     .description('Evaluate a JavaScript cell once and print the result')
-    .option('--program <source>', 'JavaScript cell source (an ES module with a default export, or a bare async function expression)')
+    .option('--program <source>', 'Inline JavaScript cell (a bare async function or an ES module with a default export)')
     .option('--program-file <path>', 'Read the JavaScript cell source from a file')
     .option('--cwd <path>', 'Working directory for tools.exec inside the cell')
     .option('--timeout-ms <n>', 'Wall-clock evaluation timeout in milliseconds')

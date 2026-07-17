@@ -197,7 +197,14 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
     GitHubReviewFilterJsonSchema.parse(input.filterJson)
   }
  else if (input.source === JAVASCRIPT_AWAIT_SOURCE) {
-    JavaScriptAwaitFilterJsonSchema.parse(input.filterJson)
+    const filter = JavaScriptAwaitFilterJsonSchema.safeParse(input.filterJson)
+    if (!filter.success) {
+      throw new AppError({
+        code: 'session_await_program_invalid',
+        status: 400,
+        message: `JavaScript await filter is invalid: ${filter.error.message}`,
+      })
+    }
   }
  else {
     SessionAwaitFilterJsonSchema.parse(input.filterJson)
@@ -389,29 +396,28 @@ export async function retryDelivery(
   return updated
 }
 
-export function markFailed(awaitId: string, errorText: string): void {
+export function markFailed(awaitId: string, errorText: string, incrementErrorCount = false): SessionAwait | null {
   const now = Math.floor(Date.now() / 1000)
-  db()
+  return db()
     .update(sessionAwaits)
     .set({
       status: 'failed',
       failureKind: 'source',
       lastErrorText: errorText,
       lastCheckedAt: now,
+      ...(incrementErrorCount
+        ? { consecutiveErrorCount: sql`${sessionAwaits.consecutiveErrorCount} + 1` }
+        : {}),
     })
     .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
-    .run()
+    .returning()
+    .get() ?? null
 }
 
 // Wakes the chat session when a source adapter opts into resumeOnFailure and the
 // await reaches a terminal source failure. Best-effort: a delivery failure is
 // recorded on the row but never retried (unlike success delivery).
-export async function resumeFailedAwait(awaitId: string, errorText: string): Promise<void> {
-  const row = db().select().from(sessionAwaits).where(eq(sessionAwaits.id, awaitId)).get()
-  if (!row) {
-    return
-  }
-
+export async function resumeFailedAwait(row: SessionAwait, errorText: string): Promise<void> {
   const text = `Session await (${row.source}) failed: ${errorText}\n\nDecide how to proceed: fix the condition and register a new await, or continue without it.`
   try {
     await enqueueResume(row, text)
@@ -422,7 +428,11 @@ export async function resumeFailedAwait(awaitId: string, errorText: string): Pro
       .set({
         lastErrorText: `${row.lastErrorText ?? errorText} (failure resume delivery failed: ${readDeliveryErrorText(err)})`,
       })
-      .where(eq(sessionAwaits.id, awaitId))
+      .where(and(
+        eq(sessionAwaits.id, row.id),
+        eq(sessionAwaits.status, 'failed'),
+        eq(sessionAwaits.failureKind, 'source'),
+      ))
       .run()
   }
 }
@@ -439,7 +449,7 @@ export function updateLastChecked(awaitId: string, errorText?: string): void {
         ? 0
         : sql`${sessionAwaits.consecutiveErrorCount} + 1`,
     })
-    .where(eq(sessionAwaits.id, awaitId))
+    .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
     .run()
 }
 

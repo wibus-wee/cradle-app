@@ -3,7 +3,7 @@
 // resume-on-terminal-failure delivery.
 
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -18,7 +18,7 @@ import {
   runOnce,
   unregisterSource,
 } from '../src/modules/session-await/poller'
-import { register } from '../src/modules/session-await/service'
+import { cancel, register } from '../src/modules/session-await/service'
 import {
   JAVASCRIPT_AWAIT_SOURCE,
   javascriptAwaitSource,
@@ -30,7 +30,7 @@ vi.mock('../src/modules/chat-runtime/runtime', () => ({
 
 const mockedEnqueueSessionQueueItem = vi.mocked(enqueueSessionQueueItem)
 
-const PENDING_PROGRAM = 'export default async () => false'
+const PENDING_PROGRAM = 'async () => false'
 const BROKEN_PROGRAM = `export default async () => { throw new Error('always broken') }`
 
 describe('javascript session await', () => {
@@ -118,6 +118,20 @@ describe('javascript session await', () => {
     expect(db().select().from(sessionAwaits).all()).toHaveLength(0)
   })
 
+  it('enforces the program limit in UTF-8 bytes', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    const program = `${'// 😀\n'.repeat(9_000)}async () => false`
+    expect(program.length).toBeLessThan(64 * 1024)
+    expect(Buffer.byteLength(program, 'utf8')).toBeGreaterThan(64 * 1024)
+
+    await expect(register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({ program }),
+    })).rejects.toEqual(expect.objectContaining({ code: 'session_await_program_invalid' }))
+  })
+
   it('keeps the await pending and the error counter at zero while the cell returns false', async () => {
     const { workspaceId, sessionId } = seedSession()
     const row = await register({
@@ -193,7 +207,7 @@ describe('javascript session await', () => {
       expect.objectContaining({
         status: 'failed',
         failureKind: 'source',
-        consecutiveErrorCount: 4,
+        consecutiveErrorCount: 5,
       }),
     )
     expect(failed?.lastErrorText).toContain('Evaluation failed 5 times consecutively')
@@ -226,6 +240,57 @@ describe('javascript session await', () => {
       sessionId,
       text: expect.stringContaining('Session await (javascript) failed'),
     })
+  })
+
+  it('fails a stored program error immediately instead of retrying it', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    const row = await register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({ program: PENDING_PROGRAM }),
+    })
+    updateProgram(row.id, 'export default 42')
+
+    await runOnce()
+
+    expect(readAwait(row.id)).toEqual(expect.objectContaining({
+      status: 'failed',
+      failureKind: 'source',
+      consecutiveErrorCount: 0,
+    }))
+    expect(readAwait(row.id)?.lastErrorText).toContain('Program must export a default function')
+    expect(mockedEnqueueSessionQueueItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not resume a terminal failure when cancellation wins the race', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    const markerName = 'evaluation-started'
+    const row = await register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({
+        program: `
+          import { writeFileSync } from 'node:fs'
+          export default async () => {
+            writeFileSync(${JSON.stringify(markerName)}, 'started')
+            await new Promise(resolve => setTimeout(resolve, 300))
+            return true
+          }
+        `,
+      }),
+    })
+    const workspacePath = db().select({ locatorJson: workspaces.locatorJson }).from(workspaces).where(eq(workspaces.id, workspaceId)).get()!
+    const markerPath = join(JSON.parse(workspacePath.locatorJson).path, markerName)
+
+    const polling = runOnce()
+    await vi.waitFor(() => expect(existsSync(markerPath)).toBe(true))
+    expect(cancel(row.id)?.status).toBe('cancelled')
+    await polling
+
+    expect(readAwait(row.id)?.status).toBe('cancelled')
+    expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
   })
 
   it('resets the consecutive error counter after a clean evaluation', async () => {

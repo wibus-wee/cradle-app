@@ -1,4 +1,4 @@
-# Plan 059: Programmable JavaScript Session Awaits via worker-thread cell evaluation
+# Plan 059: Programmable JavaScript Session Awaits via managed-process cell evaluation
 
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
@@ -35,20 +35,27 @@ directly as a small deterministic program instead of asking Cradle for an
 ever-growing collection of semantic wrappers.
 
 This plan adds two things: (1) a reusable, bounded **JavaScript cell evaluator**
-(new server module `javascript-eval`) that executes Agent-authored ES modules inside
-a `worker_threads` worker with memory limits and a wall-clock kill switch, and (2) a
+(new server module `javascript-eval`) that executes Agent-authored inline async functions
+or complete ES modules inside a disposable managed Node process, and (2) a
 new `javascript` Session Await source that periodically re-evaluates an immutable
 stored cell until it reports completion, resuming the chat session on both success
 and terminal failure.
 
-**Deliberate design decision (do not second-guess it):** v1 runs cells as real Node
-code in a `worker_threads` worker — **not** in a QuickJS/WASM isolate, and **not**
-in `node:vm` on the main thread. The worker is a *reliability* boundary (memory cap
-via `resourceLimits`, infinite-loop kill via `terminate()`), not a security boundary:
+**Deliberate design decision:** cells run as real Node code in a child process managed
+by `apps/server/src/infra/managed-process.ts` — **not** in a QuickJS/WASM isolate,
+`node:vm`, or a worker thread. The process is a *reliability* boundary (V8 old-space
+setting plus wall-clock process-group termination), not a security boundary:
 Cradle is a local, user-owned agent environment and the cell inherits the same
 authority the Agent's shell already has. Do not add permission prompts, command
-allowlists, or network restrictions to the cell. Do not swap in `node:vm`
-(it cannot interrupt `while(true){}` and would freeze the whole server).
+allowlists, or network restrictions to the cell. Process isolation is required because
+`process.exit()`, OOM, or native crashes inside a worker still share the server process.
+
+The preferred Agent-facing contract is the bare expression
+`async ({ tools, cwd }) => false`. Complete modules using `export default` remain
+available for advanced file-based cells. The server detects real default exports with
+`es-module-lexer` and normalizes bare expressions; CLI code does not use substring
+heuristics. Registration invokes Node's static `--check` mode without importing the
+module, so top-level code cannot run as a validation side effect.
 
 ## Current state
 
@@ -147,15 +154,15 @@ Conventions to follow:
   `.agents/skills/server-app-development` (module/route/TypeBox/x-cradle-cli
   conventions) and `.agents/skills/cli-app-development` (manual CLI command
   conventions) — both document rules this plan already encodes.
-- Node docs for `worker_threads` (`new Worker(code, { eval, resourceLimits })`,
-  `worker.terminate()`): <https://nodejs.org/api/worker_threads.html>.
+- Existing managed process implementation:
+  `apps/server/src/infra/managed-process.ts` and `managed-process-runner.ts`.
 
 ## Scope
 
 **In scope** (the only files you should modify):
 
 - `apps/server/src/modules/javascript-eval/` — **new module**: `index.ts`, `model.ts`,
-  `evaluator.ts`, `shim.ts`, `README.md`, `evaluator.test.ts`
+  `program.ts`, `runner.ts`, `evaluator.ts`, `README.md`, `evaluator.test.ts`
 - `apps/server/src/modules/session-await/sources/javascript.ts` — **new** source adapter
 - `apps/server/src/modules/session-await/index.ts` — register the source
 - `apps/server/src/modules/session-await/service.ts` — source enum + registration
@@ -220,70 +227,38 @@ to recreate or alter other tables, STOP (schema drift).
 **Verify**: `pnpm --filter @cradle/db generate` → one new migration file whose SQL
 touches only `session_awaits`.
 
-### Step 2: Create the `javascript-eval` module — shim and evaluator
+### Step 2: Create the `javascript-eval` managed-process evaluator
 
-Create `apps/server/src/modules/javascript-eval/` with four files.
+Create `apps/server/src/modules/javascript-eval/` with `program.ts`, `runner.ts`,
+`evaluator.ts`, `model.ts`, `index.ts`, tests, and a README. Remove the original
+worker-source shim.
 
-**`shim.ts`** — exports a single `WORKER_SHIM_SOURCE: string` containing CommonJS
-worker code (template literal; it runs via `new Worker(source, { eval: true })`,
-which evaluates as CJS). Required behavior:
+`program.ts` initializes `es-module-lexer`, detects a real default export from lexer
+records, and otherwise wraps the complete input as `export default (<source>)`.
+This makes `async ({ tools, cwd }) => false` the compact recommended form while
+preserving complete modules. Do not inspect the source with `includes()` or a regex.
 
-1. Reads `workerData`: `{ program: string, mode: 'check' | 'run', cwd?: string,
-   execTimeoutMs: number }`.
-2. Builds `tools.exec({ argv, cwd })`: validates `argv` is a non-empty string array;
-   runs `execFile(argv[0], argv.slice(1), { cwd: cwd ?? workerData.cwd, encoding:
-   'utf8', maxBuffer: EXEC_MAX_OUTPUT_BYTES, timeout: workerData.execTimeoutMs })`;
-   resolves `{ exitCode, stdout, stderr }` where `exitCode` is the numeric code on
-   non-zero exit (execFile delivers it as `error.code`), stdout/stderr each truncated
-   to 256 KiB with a trailing `…[truncated]` marker; rejects when the process could
-   not be spawned at all or was killed by timeout (`error.killed`).
-3. Loads the cell: `await import('data:text/javascript;base64,' +
-   Buffer.from(workerData.program, 'utf8').toString('base64'))`. ES module semantics;
-   `node:` builtin imports work from `data:` URLs; relative/npm specifiers do not
-   resolve (that is intended — v1 allows no package imports).
-   Note (verified Node 24 semantics): on maxBuffer overflow `execFile` calls back with
-   `error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'` and truncated output — treat
-   this as a *resolve* case (exitCode 1, output capped with the truncation marker),
-   not a reject case; Node reports no exit code there.
-4. Requires `mod.default` to be a function; otherwise throws
-   `'Program must export a default async function'`.
-5. `mode === 'check'`: post `{ ok: true }` and return (import + shape check only,
-   never call the function).
-6. `mode === 'run'`: `const result = await mod.default({ tools })`, then
-   `parentPort.postMessage({ ok: true, result })`. A non-cloneable result (function,
-   circular ref) makes `postMessage` throw — that surfaces through step 7.
-7. Any thrown error: `parentPort.postMessage({ ok: false, error: <message string> })`.
+Check mode starts a managed Node child with `--input-type=module --check` and sends
+the normalized program over stdin. It never imports the program. Run mode starts
+the separately built `runner.ts` with the workspace as the child process cwd and
+`--max-old-space-size=128`. The host sends the normalized program over stdin. The
+runner imports it from a data URL, verifies the default export is a function, calls
+it with `{ tools, cwd: process.cwd() }`, and writes its result protocol to a private
+temporary file. A file protocol is used so normal cell stdout cannot corrupt it.
 
-**`evaluator.ts`** — the host-side primitive:
+Start both children through `spawnManagedProcess`. On evaluation timeout call the
+managed child's `stop()` method so the target process group and command descendants
+are terminated. A missing result after exit is `crashed`; syntax/module-shape issues
+are `program-error`; a thrown cell or tool failure is `execution-error`.
 
-```ts
-export interface EvaluateCellInput {
-  program: string
-  mode?: 'check' | 'run'          // default 'run'
-  cwd?: string
-  timeoutMs?: number              // default EVAL_DEFAULT_TIMEOUT_MS
-}
-export type EvaluateCellResult =
-  | { kind: 'completed', result: unknown }
-  | { kind: 'check-passed' }
-  | { kind: 'error', error: string }     // cell threw, bad module, spawn error
-  | { kind: 'timeout' }                  // wall-clock kill
-  | { kind: 'crashed', error: string }   // worker error event (incl. memory cap)
-```
+The stable result union is `completed`, `check-passed`, `program-error`,
+`execution-error`, `timeout`, or `crashed`. Keep the 64 KiB source limit, 256 KiB
+per-stream command output limit, 30 s defaults, and 120 s route clamp. Describe the
+128 MiB setting accurately as a V8 old-space setting, not a system memory quota.
 
-Implementation: create `new Worker(WORKER_SHIM_SOURCE, { eval: true, workerData,
-resourceLimits: { maxOldGenerationSizeMb: WORKER_MAX_OLD_SPACE_MB,
-maxYoungGenerationSizeMb: 16 }, env: process.env })`. Listen once for `message`,
-`error`, and a wall-clock `setTimeout`; whichever fires first resolves the promise;
-always `await worker.terminate()` in a `finally`. Timeout → `{ kind: 'timeout' }`.
-Worker `error` event → `{ kind: 'crashed', error: err.message }`.
-
-Constants (exported from `evaluator.ts`, used everywhere — no magic numbers):
-`MAX_PROGRAM_BYTES = 64 * 1024`, `EXEC_MAX_OUTPUT_BYTES = 256 * 1024`,
-`EVAL_DEFAULT_TIMEOUT_MS = 30_000`, `EVAL_MAX_TIMEOUT_MS = 120_000`,
-`EXEC_DEFAULT_TIMEOUT_MS = 30_000`, `WORKER_MAX_OLD_SPACE_MB = 128`.
-(128 MB is generous on purpose — a bare Node worker baseline is ~10-20 MB; tighten
-later with evidence, do not lower it now.)
+Add `javascript-eval-runner` as an explicit Vite server build entry next to
+`managed-process-runner`. Verify both source-mode tests and the production server
+build, because the evaluator resolves different runner paths in those two layouts.
 
 **`model.ts`** — TypeBox for the HTTP boundary:
 
@@ -334,8 +309,7 @@ Create `apps/server/src/modules/session-await/sources/javascript.ts`. Follow the
   anything else (including `undefined`, `null`, `true`, blank `resumeText`) → invalid.
   `payload` is serialized with `JSON.stringify`; reject if the result exceeds
   `MAX_RESUME_PAYLOAD_BYTES = 32 * 1024`.
-- `checkPending(awaits)`: sequential `for...of` loop (v1; the poller caps the batch
-  at 100). Per row:
+- `checkPending(awaits)`: evaluate ordered batches of at most three cells. Per row:
   1. Parse filter (parse failure → `permanentError`, it cannot happen after
      registration validation but must not throw).
   2. Resolve cwd: read the `workspaces` row by `row.workspaceId`, parse
@@ -452,20 +426,19 @@ repo root — the root vitest config covers `packages/**`) → pass.
 
 ## Test plan
 
-**Unit — `apps/server/src/modules/javascript-eval/evaluator.test.ts`** (vitest;
-nested `worker_threads` inside vitest workers is fine):
+**Unit — `apps/server/src/modules/javascript-eval/evaluator.test.ts`** (vitest):
 
 - cell `export default async () => false` → `{ kind: 'completed', result: false }`
 - cell returning `{ resumeText: 'done', payload: { a: 1 } }` → completed with that object
 - cell using `await tools.exec({ argv: [process.execPath, '-e', 'console.log("hi")'] })`
   and returning `result.stdout.trim()` → completed with `'hi'`
-- cell that throws `new Error('boom')` → `{ kind: 'error' }` with `'boom'` in the message
-- cell with a syntax error, `mode: 'check'` → `{ kind: 'error' }`; valid module in
+- cell that throws `new Error('boom')` → `{ kind: 'execution-error' }` with `'boom'` in the message
+- cell with a syntax error, `mode: 'check'` → `{ kind: 'program-error' }`; valid module in
   check mode → `{ kind: 'check-passed' }`
 - cell with no default export (empty module) → error mentioning default export
 - cell `while (true) {}` with `timeoutMs: 500` → `{ kind: 'timeout' }` (test must
   complete in ~1 s, proving `terminate()` interrupts the loop)
-- cell returning a circular object → `{ kind: 'error' }` (structured-clone failure)
+- cell returning a function value → `{ kind: 'execution-error' }` (clone failure)
 
 **Integration — `apps/server/tests/javascript-await.test.ts`** (model after
 `apps/server/tests/session-await.test.ts`: temp `CRADLE_DATA_DIR` via
@@ -495,8 +468,8 @@ temp env vars, `registerSessionAwaitCommand`):
 
 - `session await javascript --program 'export default async () => false'` posts
   `source: 'javascript'` with `filterJson: '{"program":"export default async () => false"}'`
-- bare expression `--program 'async () => false'` is wrapped to
-  `export default async () => false`
+- bare expression `--program 'async () => false'` is forwarded unchanged; the server
+  owns lexer-based normalization
 - `--program-file` reads the file (write a temp `.mjs` in the test)
 - passing both `--program` and `--program-file` → throws "exactly one" error
 - `javascript evaluate --program-file <tmp>` posts to `/javascript/evaluate` with
@@ -535,9 +508,8 @@ Stop and report back (do not improvise) if:
   (means an import direction is wrong — fix the direction only if it is obviously
   inverted; otherwise STOP).
 - A step's verification fails twice after a reasonable fix attempt.
-- You find that `worker.terminate()` does not interrupt the `while (true) {}` test
-  cell on this repo's Node version (`node -v`; requires a reasonably current Node —
-  this is a hard assumption of the whole design).
+- The managed process cannot terminate an infinite-loop cell and its child process
+  group on a supported platform.
 - The fix appears to require touching an out-of-scope file.
 
 ## Maintenance notes
@@ -547,12 +519,10 @@ Stop and report back (do not improvise) if:
   swapped (e.g. to a QuickJS isolate for multi-tenant use) without touching the
   await adapter, CLI, or tests' observable behavior. Review any change to these
   shapes as a breaking protocol change.
-- **Sequential evaluations**: `checkPending` evaluates one cell at a time; with the
-  30 s poller tick and up to 100 pending javascript awaits per cycle, a backlog of
-  slow cells serializes. If real usage shows > a handful of concurrent javascript
-  awaits, add bounded parallelism (the poller's `pLimit` pattern) — do not add it
-  preemptively.
-- **Memory limit is deliberately loose** (128 MB old-space). Tighten only with
+- **Bounded evaluations**: `checkPending` evaluates three cells concurrently and
+  processes larger source batches in chunks. Change the concurrency only with
+  production evidence; never fan out all pending cells at once.
+- **Memory setting is deliberately loose** (128 MB V8 old-space). Tighten only with
   evidence from real cells; flaky OOM kills on innocent cells would be worse.
 - **Failure resume is best-effort**: if enqueueing the failure message fails, the
   row keeps `failureKind: 'source'` with the delivery error appended to
@@ -564,7 +534,12 @@ Stop and report back (do not improvise) if:
   evaluation duration/tool calls; per-await `timeoutMs` in the filter; reducing or
   reimplementing the typed GitHub sources on top of this primitive (only after
   behavioral comparison).
-- Reviewer scrutiny points: the shim's `execFile` argument handling (no shell
-  interpolation anywhere — argv arrays only), the counter increment SQL, and that
-  registration validation really cannot execute the cell (`check` mode never calls
-  the default export).
+- Reviewer scrutiny points: the runner's `execFile` argument handling (no shell
+  interpolation anywhere — argv arrays only), the counter increment SQL, the
+  pending-to-failed race, and that registration validation uses static Node check
+  mode without importing the module.
+
+Revision note (2026-07-17): replaced the worker-thread backend with the existing
+managed-process boundary after review found that worker threads share process cwd
+and fatal process state. The Agent-facing contract now prefers bare inline async
+functions, while complete ES modules remain supported.

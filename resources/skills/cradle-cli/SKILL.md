@@ -238,11 +238,11 @@ cradle session await retry <awaitId>
 
 ### JavaScript awaits (programmable conditions)
 
-When no typed source fits, express the wait condition as a JavaScript cell — an ES module whose default export returns `false` while pending or `{ resumeText, payload? }` once complete. The cell runs with the await workspace's path as cwd and can shell out through `tools.exec` (argv arrays only, no shell):
+When no typed source fits, express the wait condition as a bare async JavaScript function that returns `false` while pending or `{ resumeText, payload? }` once complete. The cell runs with the await workspace as its real cwd and can execute commands through `tools.exec` (argv arrays only, no shell):
 
 ```js
-// await-ci.mjs — wait for the "CI" workflow run on a commit
-export default async ({ tools }) => {
+// await-ci.js — wait for the "CI" workflow run on a commit
+async ({ tools }) => {
   const repo = 'owner/repo'
   const sha = 'abc123def'
   const workflowName = 'CI'
@@ -268,18 +268,18 @@ export default async ({ tools }) => {
 Dry-run the cell once before registering it (prints `{ ok, result }` or the error):
 
 ```bash
-cradle javascript evaluate --program-file ./await-ci.mjs
+cradle javascript evaluate --program-file ./await-ci.js
 ```
 
 Then register it as an await. Cradle re-evaluates the cell every poll cycle and resumes the session when it completes; a thrown cell is retried, five consecutive evaluation errors fail the await (the session is resumed with the failure context either way):
 
 ```bash
 cradle session await javascript \
-  --program-file ./await-ci.mjs \
+  --program-file ./await-ci.js \
   --reason "Waiting for the CI workflow on abc123def"
 ```
 
-Inline programs also work (`--program 'async ({ tools }) => ...'` — a bare function expression is wrapped as `export default ...` automatically). Keep cell logic deterministic and self-contained: cells cannot import npm packages, only `node:` builtins.
+Prefer inline programs for short conditions: `--program 'async ({ tools, cwd }) => false'`. Complete ES modules with `export default` are accepted for advanced file-based cells. Registration checks syntax without running top-level code. Keep cell logic deterministic and self-contained: cells cannot import npm packages, only `node:` builtins.
 
 **Key rules for await usage**:
 - Omit session ids for current-session awaits; Cradle-managed shells inject `CRADLE_CHAT_SESSION_ID` / `CRADLE_WORKSPACE_ID` as ambient defaults. Pass an explicit id only when targeting another session.

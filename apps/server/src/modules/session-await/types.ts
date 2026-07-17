@@ -39,6 +39,7 @@ interface PendingCheckResult {
   matched: false
   transientError?: string
   permanentError?: string
+  incrementErrorCount?: boolean
 }
 
 interface MatchedCheckResult {

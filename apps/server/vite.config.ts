@@ -37,6 +37,7 @@ export default defineConfig({
       },
       input: {
         'agent-tools-mcp': resolve(__dirname, 'src/modules/agent-tools/mcp-entry.ts'),
+        'javascript-eval-runner': resolve(__dirname, 'src/modules/javascript-eval/runner.ts'),
         'main': resolve(__dirname, 'src/index.ts'),
         'managed-process-runner': resolve(__dirname, 'src/infra/managed-process-runner.ts'),
       },

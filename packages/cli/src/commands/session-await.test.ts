@@ -138,7 +138,7 @@ describe('registerSessionAwaitCommand', () => {
     }))
   })
 
-  it('wraps a bare function expression as a default export for javascript awaits', async () => {
+  it('forwards a bare function expression for server-side normalization', async () => {
     const request = await runCommand([
       'session',
       'await',
@@ -152,7 +152,7 @@ describe('registerSessionAwaitCommand', () => {
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       body: expect.objectContaining({
-        filterJson: '{"program":"export default async () => false"}',
+        filterJson: '{"program":"async () => false"}',
       }),
     }))
   })

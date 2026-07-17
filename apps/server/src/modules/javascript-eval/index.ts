@@ -39,7 +39,7 @@ export const javascriptEval = new Elysia({
     }
     return { ok: false, error: outcome.error, kind: outcome.kind }
   }, {
-    detail: { summary: 'Evaluate a JavaScript cell in a bounded worker' },
+    detail: { summary: 'Evaluate a JavaScript cell in an isolated managed process' },
     body: JavaScriptEvalModel.evaluateBody,
     response: { 200: JavaScriptEvalModel.evaluateResponse },
   })

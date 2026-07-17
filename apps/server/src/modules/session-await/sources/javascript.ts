@@ -17,13 +17,18 @@ import type { CheckResult, SessionAwait, SessionAwaitSource } from '../types'
 export const JAVASCRIPT_AWAIT_SOURCE = 'javascript'
 
 export const MAX_RESUME_PAYLOAD_BYTES = 32 * 1024
+export const MAX_RESUME_TEXT_BYTES = 32 * 1024
 export const MAX_CONSECUTIVE_EVALUATION_ERRORS = 5
 
 const JAVASCRIPT_EVAL_TIMEOUT_MS = 45_000
 const VALIDATION_TIMEOUT_MS = 10_000
+const MAX_CONCURRENT_JAVASCRIPT_EVALUATIONS = 3
 
 const JavaScriptAwaitStoredFilterSchema = z.object({
-  program: z.string().min(1).max(MAX_PROGRAM_BYTES),
+  program: z.string().min(1).refine(
+    program => Buffer.byteLength(program, 'utf8') <= MAX_PROGRAM_BYTES,
+    { message: `program exceeds the ${MAX_PROGRAM_BYTES} byte limit` },
+  ),
 })
 
 export const JavaScriptAwaitFilterJsonSchema = z.string()
@@ -47,8 +52,8 @@ export async function validateJavaScriptAwaitFilter(filterJson: string): Promise
     })
   }
 
-  // Check mode imports the module and verifies the default export shape without
-  // ever calling the cell.
+  // Check mode parses the normalized ES module in a disposable Node process. It
+  // does not import the module, so top-level code cannot run during registration.
   const outcome = await evaluateCell({
     program: filter.data.program,
     mode: 'check',
@@ -60,7 +65,7 @@ export async function validateJavaScriptAwaitFilter(filterJson: string): Promise
   const detail = outcome.kind === 'timeout'
     ? `Evaluation timed out after ${VALIDATION_TIMEOUT_MS} ms`
     : outcome.kind === 'completed'
-      ? 'Program ran unexpectedly during validation'
+      ? 'Program validation returned an unexpected result'
       : outcome.error
   throw new AppError({
     code: 'session_await_program_invalid',
@@ -88,6 +93,9 @@ function readAwaitCellResult(result: unknown): ReadCellResult {
   const { resumeText, payload } = result as { resumeText?: unknown, payload?: unknown }
   if (typeof resumeText !== 'string' || resumeText.trim().length === 0) {
     return { ok: false, reason: 'resumeText must be a non-blank string' }
+  }
+  if (Buffer.byteLength(resumeText, 'utf8') > MAX_RESUME_TEXT_BYTES) {
+    return { ok: false, reason: `resumeText exceeds the ${MAX_RESUME_TEXT_BYTES} byte limit` }
   }
 
   let resumePayloadJson: string | undefined
@@ -142,6 +150,7 @@ function evaluationFailureResult(row: SessionAwait, errorText: string): CheckRes
       awaitId: row.id,
       matched: false,
       permanentError: `Evaluation failed ${MAX_CONSECUTIVE_EVALUATION_ERRORS} times consecutively; last error: ${errorText}`,
+      incrementErrorCount: true,
     }
   }
   return { awaitId: row.id, matched: false, transientError: errorText }
@@ -194,6 +203,14 @@ async function checkJavaScriptAwait(row: SessionAwait): Promise<CheckResult> {
     }
   }
 
+  if (outcome.kind === 'program-error') {
+    return {
+      awaitId: row.id,
+      matched: false,
+      permanentError: `Cell program is invalid: ${outcome.error}`,
+    }
+  }
+
   const errorText = outcome.kind === 'timeout'
     ? `Evaluation timed out after ${JAVASCRIPT_EVAL_TIMEOUT_MS} ms`
     : outcome.kind === 'check-passed'
@@ -206,11 +223,10 @@ export const javascriptAwaitSource: SessionAwaitSource = {
   source: JAVASCRIPT_AWAIT_SOURCE,
   resumeOnFailure: true,
   async checkPending(awaits) {
-    // Sequential on purpose (v1): the poller caps the batch at 100 awaits per
-    // cycle and a backlog of slow cells serializes instead of fanning out.
     const results: CheckResult[] = []
-    for (const row of awaits) {
-      results.push(await checkJavaScriptAwait(row))
+    for (let offset = 0; offset < awaits.length; offset += MAX_CONCURRENT_JAVASCRIPT_EVALUATIONS) {
+      const batch = awaits.slice(offset, offset + MAX_CONCURRENT_JAVASCRIPT_EVALUATIONS)
+      results.push(...await Promise.all(batch.map(checkJavaScriptAwait)))
     }
     return results
   },

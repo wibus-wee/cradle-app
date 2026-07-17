@@ -52,7 +52,7 @@ describe('registerJavascriptCommand', () => {
     }
   })
 
-  it('wraps a bare function expression and forwards cwd and timeout', async () => {
+  it('forwards a bare function expression, cwd, and timeout', async () => {
     const request = await runCommand([
       'javascript',
       'evaluate',
@@ -66,7 +66,7 @@ describe('registerJavascriptCommand', () => {
 
     expect(request).toHaveBeenCalledWith({
       body: {
-        program: 'export default async ({ tools }) => false',
+        program: 'async ({ tools }) => false',
         cwd: '/tmp/work',
         timeoutMs: 5000,
       },
