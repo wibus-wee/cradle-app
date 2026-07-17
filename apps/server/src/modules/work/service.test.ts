@@ -111,6 +111,7 @@ function mockSessionAwaitRegister() {
     fireAt: null,
     lastCheckedAt: null,
     lastErrorText: null,
+    consecutiveErrorCount: 0,
   }))
 }
 
