@@ -12,6 +12,19 @@
 - **../../lib/github-api.ts**: Shared GitHub REST API boundary, token resolution, ETag cache, rate-limit tracking, missing-target classification, PR/check/status/review/workflow-run/workflow-job fetch helpers. Session await and external issue source refresh both consume this host-owned GitHub access boundary.
 - **sources/github-ci.ts**: `github-ci` source. Supports `{ repo, pr }`, `{ repo, sha }`, and `{ repo, runs_id }` filters, validates target visibility during registration, resolves PR head SHAs or single check-run head SHAs, aggregates check runs plus legacy commit statuses, and exposes live CI status with optional GitHub Actions job steps. PR filters may pin `headSha` so one await represents one delivery attempt.
 - **sources/github-review.ts**: `github-review` source. Supports `{ repo, pr, mode }` filters, validates PR visibility during registration, and waits for PR review signals on a pinned or current PR head.
+- **sources/javascript.ts**: `javascript` source. Stores an Agent-authored ES module cell in the await filter, re-evaluates it each poll cycle inside the `javascript-eval` worker boundary, and maps the cell result contract to await outcomes. Opts into `resumeOnFailure`.
+
+## JavaScript Source
+
+`javascript` waits on a programmable condition instead of a typed adapter. Registration stores `{ program }` in `filterJson` — the program is immutable for the await's lifetime; a changed condition means a new await. Registration also preflights the program in `check` mode (module parses, default export is a function — the cell is never called), rejecting invalid programs with `session_await_program_invalid`.
+
+Each poll cycle evaluates the cell with the await workspace's local path as `cwd` (non-local or missing workspaces are terminal failures). The cell contract is `false | { resumeText, payload? }`:
+
+- `false` — condition still pending; the await stays pending.
+- `{ resumeText, payload? }` — condition met; the await triggers with the resume text. `payload` must be JSON-serializable and at most `MAX_RESUME_PAYLOAD_BYTES` (32 KiB) when serialized.
+- Anything else (`undefined`, `null`, `true`, blank `resumeText`) is an invalid result and fails the await immediately.
+
+Evaluation failures are classified differently from invalid results. A thrown cell, wall-clock timeout, or worker crash counts as a transient evaluation error and increments the row's `consecutive_error_count` (reset to 0 by any clean evaluation); five consecutive evaluation errors fail the await with the last error attached. The `javascript` source sets `resumeOnFailure`, so terminal failures (invalid results, five consecutive errors, missing workspace) also enqueue a failure-context resume message to the chat session — best-effort, never retried — letting the session decide whether to fix the condition and register a new await or continue without it.
 
 ## GitHub Sources
 
