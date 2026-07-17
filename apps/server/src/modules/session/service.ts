@@ -29,17 +29,14 @@ import {
   hydrateMessage,
   messagePayloadJoinCondition,
 } from '../chat-runtime/message-payload-store'
-import type {
-  ChatThinkingEffort,
-  RuntimeSettingsValue,
-} from '../chat-runtime/runtime-provider-types'
-import type { SessionClaudeAgentConfigPatchInput } from '../chat-runtime/runtime-settings'
+import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
 import {
   mergeRuntimeSettings,
   normalizeRuntimeSettingsPatch,
   readSessionRuntimeSettings,
   writeSessionRuntimeConfigJson,
 } from '../chat-runtime/runtime-settings'
+import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
 import { normalizeClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
 import {
   readRuntimeOwnedProviderTargetOwner,
@@ -86,10 +83,6 @@ export type SessionView = Session & {
   worktreeHealth: 'ok' | 'missing' | 'stale' | null
   pendingWorktreeId: string | null
   isolationBoundaryRequired: boolean
-}
-
-type SessionRuntimeSettingsCreatePatch = Record<string, RuntimeSettingsValue | SessionClaudeAgentConfigPatchInput | null | undefined> & {
-  claudeAgent?: SessionClaudeAgentConfigPatchInput | null
 }
 
 const SessionCreateInputSchema = z.object({
@@ -714,7 +707,7 @@ export async function create(input: {
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort | null
   runtimeKind?: RuntimeKind
-  runtimeSettings?: SessionRuntimeSettingsCreatePatch
+  runtimeSettings?: ChatRuntimeSettingsUpdatePatch
   agentId?: string | null
   linkedIssueId?: string | null
   sessionGroupId?: string | null
@@ -731,7 +724,11 @@ export async function create(input: {
         workspaceId,
         title: parsed.title,
         origin: parsed.origin,
+        providerTargetId: parsed.providerTargetId,
+        modelId: parsed.modelId,
+        thinkingEffort: parsed.thinkingEffort,
         runtimeKind: parsed.runtimeKind as RuntimeKind | undefined,
+        runtimeSettings: parsed.runtimeSettings as ChatRuntimeSettingsUpdatePatch | undefined,
         linkedIssueId: parsed.linkedIssueId,
         sessionGroupId: parsed.sessionGroupId,
       })

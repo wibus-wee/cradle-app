@@ -18,6 +18,7 @@ interface FakeRemoteCradleServer {
   baseUrl: string
   close: () => Promise<void>
   seenHosts: string[]
+  healthRequestCount: () => number
 }
 
 function makeTempDir(prefix: string): string {
@@ -39,6 +40,7 @@ async function createAppWithDataDir(dataDir: string): Promise<ElysiaApp> {
 
 async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   const seenHosts: string[] = []
+  let healthRequestCount = 0
   const workspace = {
     id: 'remote-workspace-1',
     name: 'Remote Project',
@@ -68,6 +70,7 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
     seenHosts.push(request.headers.host ?? '')
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     if (url.pathname === '/health') {
+      healthRequestCount += 1
       writeJson(response, {
         status: 'ok',
         uptime: 42,
@@ -123,6 +126,7 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     seenHosts,
+    healthRequestCount: () => healthRequestCount,
     close: () => closeServer(server),
   }
 }
@@ -235,6 +239,13 @@ describe('remote Cradle Server hosts', () => {
         localBaseUrl: fakeRemote.baseUrl,
         lastError: null,
       })
+      expect(fakeRemote.healthRequestCount()).toBe(1)
+
+      const duplicateConnectRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/connect', {
+        method: 'POST',
+      }))
+      expect(duplicateConnectRes.status).toBe(200)
+      expect(fakeRemote.healthRequestCount()).toBe(1)
 
       const healthRes = await app.handle(new Request('http://localhost/remote-hosts/remote-host-live/cradle-server/health'))
       expect(healthRes.status).toBe(200)

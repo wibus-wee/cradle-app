@@ -268,7 +268,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     localRelaydSupervisor,
     { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
     { initHostConnectorService, getHostConnectorService },
-    { shutdownRemoteHostConnections },
+    { shutdownRemoteHostConnections, startEnabledRelayRemoteHostConnections },
     { shutdownImageOcr },
     { CodexUsageReconciliationScheduler },
     { RunSnapshotMaintenanceScheduler },
@@ -443,6 +443,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     void localRelaydSupervisor.startManagedLocalRelayd().catch((error) => {
       console.error('[relay-servers] managed relayd warm-start failed:', error)
     })
+    void startEnabledRelayRemoteHostConnections()
     // Start the always-on relay host-connector for any existing enrollments.
     // Each enrollment maintains its own /ws/host connection with backoff.
     try {

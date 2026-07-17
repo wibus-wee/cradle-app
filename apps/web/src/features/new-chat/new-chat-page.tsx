@@ -249,12 +249,15 @@ function useNewChatPageOwner(
         || options.agentId
         || options.providerTargetId
         || 'Untitled'
-      // Remote projections are created by workspaceId alone on the server; omit local
-      // providerTargetId / agentId so we never bind a local catalog to a remote session.
+      // Remote provider ids come from the remote catalog and are forwarded through
+      // the local projection endpoint. They are never resolved as local providers.
       const body: CreateSessionBody = isRemoteWorkspace
         ? {
             ...(selectedProjectWorkspaceId ? { workspaceId: selectedProjectWorkspaceId } : {}),
             title: sessionTitle,
+            providerTargetId: options.providerTargetId,
+            modelId: options.modelId ?? null,
+            thinkingEffort: options.thinkingEffort,
             runtimeKind: options.runtimeKind,
             runtimeSettings: options.runtimeSettings,
             ...linkedIssueFields,

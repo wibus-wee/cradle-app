@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 import { AppError } from '../../errors/app-error'
 
 export interface RemoteWorkspaceLocator {
@@ -106,6 +108,28 @@ const UPSTREAM_REQUEST_HEADERS = new Set([
   'user-agent',
 ])
 
+const UpstreamErrorPayloadSchema = z.object({
+  code: z.string().trim().min(1).max(200).optional(),
+  message: z.string().trim().min(1).max(2_000).optional(),
+})
+
+async function readUpstreamErrorPayload(response: Response): Promise<{
+  code?: string
+  message?: string
+}> {
+  const text = await response.text().catch(() => '')
+  if (!text) {
+    return {}
+  }
+  try {
+    const parsed = UpstreamErrorPayloadSchema.safeParse(JSON.parse(text))
+    return parsed.success ? parsed.data : {}
+  }
+  catch {
+    return {}
+  }
+}
+
 export function buildUpstreamUrl(baseUrl: string, pathWithQuery: string): URL {
   return new URL(pathWithQuery.replace(/^\//, ''), `${baseUrl.replace(/\/+$/, '')}/`)
 }
@@ -137,11 +161,20 @@ export async function upstreamJsonByBaseUrl<T>(
 ): Promise<T> {
   const response = await upstreamFetchByBaseUrl(baseUrl, pathWithQuery, init)
   if (!response.ok) {
+    const upstreamError = await readUpstreamErrorPayload(response)
     throw new AppError({
       code: 'remote_cradle_http_error',
       status: response.status === 404 ? 404 : 502,
-      message: `Remote Cradle Server returned HTTP ${response.status} for ${pathWithQuery}.`,
-      details: { path: pathWithQuery, status: response.status },
+      message: [
+        `Remote Cradle Server returned HTTP ${response.status} for ${pathWithQuery}.`,
+        upstreamError.message,
+      ].filter(Boolean).join(' '),
+      details: {
+        path: pathWithQuery,
+        status: response.status,
+        ...(upstreamError.code ? { upstreamCode: upstreamError.code } : {}),
+        ...(upstreamError.message ? { upstreamMessage: upstreamError.message } : {}),
+      },
     })
   }
   return await response.json() as T

@@ -8,6 +8,7 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import { createChildLogger } from '../../logging/logger'
 import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import {
@@ -24,6 +25,7 @@ import {
   buildRemoteCradleSshLaunchConfig,
   startRemoteCradleServerTunnel,
 } from './cradle-server-tunnel'
+import { remoteHostReconnectDelayMs } from './reconnect-policy'
 import type {
   RemoteCradleServerHealthPayload,
   RemoteWorkspaceFileContent,
@@ -32,6 +34,8 @@ import type {
   RemoteWorkspaceView,
 } from './upstream'
 import { proxyUpstreamRequestByBaseUrl, upstreamJsonByBaseUrl } from './upstream'
+
+const logger = createChildLogger({ module: 'remote-hosts' })
 
 export type {
   RemoteCradleServerHealthPayload,
@@ -271,6 +275,8 @@ const capabilitiesSchema = z.object({
 const connections = new Map<string, RemoteHostConnectionRecord>()
 const connectPromises = new Map<string, Promise<RemoteCradleServerConnectionView>>()
 const connectionGenerations = new Map<string, number>()
+const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const reconnectAttempts = new Map<string, number>()
 
 export const connectRemoteHost = connectRemoteHostCradleServer
 export const disconnectRemoteHost = disconnectRemoteHostCradleServer
@@ -343,10 +349,22 @@ export async function deleteRemoteHost(hostId: string): Promise<void> {
 }
 
 export async function connectRemoteHostCradleServer(hostId: string): Promise<RemoteCradleServerConnectionView> {
+  const current = connections.get(hostId)
+  const persistedHost = requireRemoteHost(hostId)
+  if (
+    current
+    && !current.tunnelExited
+    && current.host.enabled === persistedHost.enabled
+    && current.host.connectionConfigJson === persistedHost.connectionConfigJson
+    && current.host.capabilitiesJson === persistedHost.capabilitiesJson
+  ) {
+    return toConnectionView(current)
+  }
   const existingPromise = connectPromises.get(hostId)
   if (existingPromise) {
     return existingPromise
   }
+  clearRemoteHostReconnect(hostId, false)
   const generation = connectionGenerations.get(hostId) ?? 0
   const promise = connectRemoteHostCradleServerInner(hostId, generation).finally(() => {
     connectPromises.delete(hostId)
@@ -357,6 +375,7 @@ export async function connectRemoteHostCradleServer(hostId: string): Promise<Rem
 
 export async function disconnectRemoteHostCradleServer(hostId: string): Promise<void> {
   connectionGenerations.set(hostId, (connectionGenerations.get(hostId) ?? 0) + 1)
+  clearRemoteHostReconnect(hostId)
   await closeRemoteHostConnection(hostId)
 }
 
@@ -367,9 +386,92 @@ async function closeRemoteHostConnection(hostId: string): Promise<void> {
 }
 
 export async function shutdownRemoteHostConnections(): Promise<void> {
-  const hostIds = new Set([...connections.keys(), ...connectPromises.keys()])
+  const hostIds = new Set([
+    ...connections.keys(),
+    ...connectPromises.keys(),
+    ...reconnectTimers.keys(),
+  ])
   await Promise.all(Array.from(hostIds, hostId => disconnectRemoteHostCradleServer(hostId)))
   await Promise.allSettled([...connectPromises.values()])
+}
+
+/** Restore paired relay controller tunnels after a Cradle Server restart. */
+export async function startEnabledRelayRemoteHostConnections(): Promise<void> {
+  const relayHostIds = db()
+    .select()
+    .from(remoteHosts)
+    .where(eq(remoteHosts.enabled, true))
+    .all()
+    .filter((host) => {
+      const config = parseConnectionConfig(host.connectionConfigJson)
+      return config.transport === 'relay'
+        && !!config.relay?.roomId
+        && !!config.relay.pinnedHostPubkey
+        && !!config.relay.controllerKeyRef
+    })
+    .map(host => host.id)
+
+  const results = await Promise.allSettled(
+    relayHostIds.map(hostId => connectRemoteHostCradleServer(hostId)),
+  )
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      logger.warn('remote relay host warm-start failed; reconnect scheduled', {
+        hostId: relayHostIds[index],
+        err: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      })
+    }
+  })
+}
+
+function clearRemoteHostReconnect(hostId: string, resetAttempt = true): void {
+  const timer = reconnectTimers.get(hostId)
+  if (timer) {
+    clearTimeout(timer)
+    reconnectTimers.delete(hostId)
+  }
+  if (resetAttempt) {
+    reconnectAttempts.delete(hostId)
+  }
+}
+
+function shouldReconnectRemoteHost(hostId: string, generation: number): boolean {
+  if ((connectionGenerations.get(hostId) ?? 0) !== generation) {
+    return false
+  }
+  const host = db()
+    .select({ enabled: remoteHosts.enabled })
+    .from(remoteHosts)
+    .where(eq(remoteHosts.id, hostId))
+    .get()
+  return host?.enabled === true
+}
+
+function scheduleRemoteHostReconnect(hostId: string, generation: number): void {
+  if (reconnectTimers.has(hostId) || !shouldReconnectRemoteHost(hostId, generation)) {
+    return
+  }
+  const attempt = reconnectAttempts.get(hostId) ?? 0
+  const delayMs = remoteHostReconnectDelayMs(attempt)
+  reconnectAttempts.set(hostId, attempt + 1)
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(hostId)
+    if (!shouldReconnectRemoteHost(hostId, generation)) {
+      reconnectAttempts.delete(hostId)
+      return
+    }
+    logger.info('reconnecting remote host tunnel', { hostId, attempt: attempt + 1 })
+    void connectRemoteHostCradleServer(hostId).catch((error) => {
+      logger.warn('remote host reconnect attempt failed', {
+        hostId,
+        attempt: attempt + 1,
+        err: error instanceof Error ? error.message : String(error),
+      })
+      scheduleRemoteHostReconnect(hostId, generation)
+    })
+  }, delayMs)
+  timer.unref?.()
+  reconnectTimers.set(hostId, timer)
 }
 
 export async function readRemoteHostCradleServerHealth(hostId: string): Promise<RemoteCradleServerHealthView> {
@@ -525,11 +627,14 @@ async function connectRemoteHostCradleServerInner(hostId: string, generation: nu
       tunnelExited: false,
     }
     tunnel?.onExit((exit) => {
-      if (!record) {
+      if (!record || connections.get(hostId) !== record) {
         return
       }
       record.tunnelExited = true
       record.lastError = `tunnel exited with code ${exit.code ?? 'null'} signal ${exit.signal ?? 'null'}`
+      if (connectionConfig.transport === 'relay') {
+        scheduleRemoteHostReconnect(hostId, generation)
+      }
     })
     if ((connectionGenerations.get(hostId) ?? 0) !== generation) {
       await tunnel?.close()
@@ -543,6 +648,7 @@ async function connectRemoteHostCradleServerInner(hostId: string, generation: nu
     requireRemoteHost(hostId)
     connections.set(hostId, record)
     await fetchRemoteCradleServerHealth(record)
+    clearRemoteHostReconnect(hostId)
     return toConnectionView(record)
   }
   catch (error) {
@@ -556,6 +662,9 @@ async function connectRemoteHostCradleServerInner(hostId: string, generation: nu
         lastError: appError.message,
         tunnelExited: true,
       })
+      if (connectionConfig.transport === 'relay') {
+        scheduleRemoteHostReconnect(hostId, generation)
+      }
     }
     throw appError
   }
