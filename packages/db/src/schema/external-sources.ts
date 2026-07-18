@@ -30,7 +30,7 @@ export const externalProviderRecords = sqliteTable('external_provider_records', 
   app: text('app').notNull(),
   name: text('name').notNull(),
   providerKind: text('provider_kind', {
-    enum: ['openai-compatible', 'anthropic', 'cli-tool'],
+    enum: ['openai-compatible', 'anthropic', 'universal', 'cli-tool'],
   }).notNull(),
   status: text('status', {
     enum: ['active', 'stale', 'missing', 'unsupported', 'error'],

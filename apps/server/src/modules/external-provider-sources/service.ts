@@ -28,6 +28,7 @@ import {
   applyClaudeAgentConfigPatch,
   readClaudeAgentConfig,
 } from '../provider-contracts/claude-agent-config'
+import type { ProviderKind } from '../provider-contracts/types'
 import { upsertSecretInDb } from '../secrets/service'
 
 export interface ExternalProviderSourceView {
@@ -54,7 +55,7 @@ export interface ExternalProviderRecordView {
   externalId: string
   app: string
   name: string
-  providerKind: 'anthropic' | 'openai-compatible' | 'cli-tool'
+  providerKind: ProviderKind | 'cli-tool'
   status: 'active' | 'stale' | 'missing' | 'unsupported' | 'error'
   runtimeTargetEnabled: boolean
   fingerprint: string
@@ -121,11 +122,13 @@ const ExternalProviderCredentialSchema = z.object({
   label: z.string().optional(),
 })
 
+const ExternalProviderRecordKindSchema = z.enum(['anthropic', 'openai-compatible', 'universal', 'cli-tool'])
+
 const ExternalProviderRecordSchema = z.object({
   externalId: z.string(),
   app: z.string(),
   name: z.string(),
-  providerKind: z.enum(['anthropic', 'openai-compatible', 'cli-tool']),
+  providerKind: ExternalProviderRecordKindSchema,
   config: JsonRecordSchema,
   credential: ExternalProviderCredentialSchema.optional(),
   current: z.boolean().default(false),
@@ -157,7 +160,7 @@ type ParsedExternalProviderRecord = z.infer<typeof ExternalProviderRecordSchema>
 const ExternalProviderRecordFingerprintSchema = z.object({
   app: z.string(),
   name: z.string(),
-  providerKind: z.enum(['anthropic', 'openai-compatible', 'cli-tool']),
+  providerKind: ExternalProviderRecordKindSchema,
   config: JsonRecordSchema,
   credential: ExternalProviderCredentialSchema.optional(),
   current: z.boolean(),
@@ -264,8 +267,16 @@ function bootstrapCustomModelsJson(record: ParsedExternalProviderRecord): string
     return null
   }
 
-  const baseUrl = recordConfigString(record, 'baseUrl')
-  const template = baseUrl ? matchProviderEndpoint(baseUrl, record.providerKind) : null
+  const openaiBaseUrl = recordConfigString(record, 'openaiBaseUrl')
+  const baseUrl = record.providerKind === 'universal'
+    ? openaiBaseUrl
+    : recordConfigString(record, 'baseUrl')
+  const template = baseUrl
+    ? matchProviderEndpoint(
+        baseUrl,
+        record.providerKind === 'universal' ? 'openai-compatible' : record.providerKind,
+      )
+    : null
   if (template && template.models.length > 0) {
     return JSON.stringify(template.models.map(model => ({
       id: model.id,
