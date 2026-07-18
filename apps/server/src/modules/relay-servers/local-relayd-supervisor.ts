@@ -18,6 +18,7 @@ const localRelayDisplayName = 'Built-in local relay'
 const defaultRelayHost = '127.0.0.1'
 const networkRelayHost = '0.0.0.0'
 const relaydExecutableName = process.platform === 'win32' ? 'relayd.exe' : 'relayd'
+const managedRelaydForceKillAfterMs = 1_000
 const localModuleDir = dirname(fileURLToPath(import.meta.url))
 const logger = createChildLogger({ module: 'local-relayd-supervisor' })
 
@@ -293,7 +294,54 @@ async function terminateChild(child: ManagedChildProcess): Promise<void> {
     return
   }
   closeChildOwnerPipe(child)
-  await child.stop('SIGTERM')
+
+  let gracefulStopFailed = false
+  const gracefulStop = child.stop('SIGTERM').catch(() => {
+    gracefulStopFailed = true
+  })
+  await Promise.race([gracefulStop, waitForDuration(managedRelaydForceKillAfterMs)])
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return
+  }
+
+  logger.warn('managed local relayd did not stop after SIGTERM; forcing process-group shutdown', {
+    pid: readManagedProcessPid(child),
+    gracefulStopFailed,
+  })
+  signalManagedRelaydTarget(child, 'SIGKILL')
+  try {
+    child.kill('SIGKILL')
+  }
+  catch {
+    // The runner may have exited while the target process group was being killed.
+  }
+  await Promise.race([gracefulStop, waitForDuration(managedRelaydForceKillAfterMs)])
+}
+
+function signalManagedRelaydTarget(child: ManagedChildProcess, signal: NodeJS.Signals): void {
+  const targetPid = child.targetPid
+  if (!targetPid) {
+    return
+  }
+  try {
+    if (process.platform !== 'win32') {
+      process.kill(-targetPid, signal)
+    }
+    else {
+      process.kill(targetPid, signal)
+    }
+  }
+  catch (error) {
+    const processError = error as NodeJS.ErrnoException
+    if (processError.code === 'ESRCH') {
+      return
+    }
+    logger.warn('failed to signal managed local relayd target', { pid: targetPid, signal, err: error })
+  }
+}
+
+async function waitForDuration(durationMs: number): Promise<void> {
+  await new Promise<void>(resolveWait => setTimeout(resolveWait, durationMs))
 }
 
 function closeChildOwnerPipe(child: ManagedChildProcess): void {

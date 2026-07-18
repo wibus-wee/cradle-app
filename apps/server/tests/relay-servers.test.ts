@@ -46,7 +46,11 @@ function shutdown() {
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 1000).unref()
 }
-process.on('SIGTERM', shutdown)
+if (process.env.CRADLE_TEST_RELAYD_IGNORE_SIGTERM === '1') {
+  process.on('SIGTERM', () => {})
+} else {
+  process.on('SIGTERM', shutdown)
+}
 process.on('SIGINT', shutdown)
 `)
   chmodSync(executablePath, 0o755)
@@ -328,6 +332,42 @@ describe('relay servers', () => {
       restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
       restoreEnv('CRADLE_RELAYD_LISTEN', previousRelaydListen)
       restoreEnv('CRADLE_RELAYD_PUBLIC_URL', previousRelaydPublicUrl)
+    }
+  })
+
+  it('force-kills a managed relayd that ignores SIGTERM before reusing its port', async () => {
+    const dataDir = makeTempDir('cradle-managed-local-relayd-force-kill-')
+    const binDir = makeTempDir('cradle-managed-local-relayd-force-kill-bin-')
+    const relayPort = await reserveTcpPort()
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousAutostart = process.env.CRADLE_RELAYD_AUTOSTART
+    const previousRelaydPath = process.env.CRADLE_RELAYD_PATH
+    const previousRelaydListen = process.env.CRADLE_RELAYD_LISTEN
+    const previousIgnoreSigterm = process.env.CRADLE_TEST_RELAYD_IGNORE_SIGTERM
+
+    try {
+      process.env.CRADLE_RELAYD_AUTOSTART = '1'
+      process.env.CRADLE_RELAYD_PATH = writeFakeRelaydExecutable(binDir)
+      process.env.CRADLE_RELAYD_LISTEN = `127.0.0.1:${relayPort}`
+      process.env.CRADLE_TEST_RELAYD_IGNORE_SIGTERM = '1'
+      await createAppWithDataDir(dataDir)
+
+      await startManagedLocalRelayd()
+      await stopManagedLocalRelayd()
+      await startManagedLocalRelayd()
+
+      const readyRes = await fetch(`http://127.0.0.1:${relayPort}/readyz`)
+      expect(readyRes.status).toBe(200)
+    }
+    finally {
+      await stopManagedLocalRelayd()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(binDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_RELAYD_AUTOSTART', previousAutostart)
+      restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
+      restoreEnv('CRADLE_RELAYD_LISTEN', previousRelaydListen)
+      restoreEnv('CRADLE_TEST_RELAYD_IGNORE_SIGTERM', previousIgnoreSigterm)
     }
   })
 
