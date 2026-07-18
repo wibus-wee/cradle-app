@@ -167,6 +167,14 @@ export async function deleteLocalBranch(repoPath: string, branch: string): Promi
   await runGitCommand(repoPath, ['branch', '-D', branch])
 }
 
+export async function renameLocalBranch(
+  repoPath: string,
+  oldBranch: string,
+  newBranch: string,
+): Promise<void> {
+  await runGitCommand(repoPath, ['branch', '-m', oldBranch, newBranch])
+}
+
 export async function mergeBranch(repoPath: string, branch: string): Promise<void> {
   await runGitCommand(repoPath, ['merge', branch])
 }

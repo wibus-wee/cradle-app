@@ -497,6 +497,49 @@ async function registerWorkAwaits(
   }
 }
 
+export async function renameBranch(input: {
+  id: string
+  branch: string
+}): Promise<WorkDetail> {
+  const work = requireWork(input.id)
+  const primaryThread = requirePrimaryThread(work.id)
+
+  // Any stored pull request (even closed/merged) pins the old head ref —
+  // GitHub cannot PATCH a PR's head branch — so rename is pre-PR only.
+  if (PullRequest.getBoundPullRequest(primaryThread.id) !== null) {
+    throw new AppError({
+      code: 'work_pull_request_exists',
+      status: 409,
+      message: 'Branch can only be renamed before the first pull request exists.',
+    })
+  }
+
+  const worktreeRecord = primaryThread.worktreeId
+    ? Worktree.getWorktree(primaryThread.worktreeId)
+    : null
+  if (!worktreeRecord) {
+    throw new AppError({
+      code: 'work_isolation_unavailable',
+      status: 409,
+      message: 'Work requires a healthy isolated checkout before delivery',
+    })
+  }
+
+  if (await PullRequest.isBranchOnRemote(worktreeRecord.path, worktreeRecord.branch)) {
+    throw new AppError({
+      code: 'work_branch_already_pushed',
+      status: 409,
+      message: 'The Work branch already exists on the remote and can no longer be renamed.',
+    })
+  }
+
+  await Worktree.renameWorktreeBranch({
+    worktreeId: worktreeRecord.id,
+    branch: input.branch,
+  })
+  return (await get(work.id))!
+}
+
 export async function submit(input: {
   id: string
   title?: string
