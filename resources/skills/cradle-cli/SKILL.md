@@ -264,7 +264,7 @@ Dry-run the cell once before registering it (prints `{ ok, result }` or the erro
 cradle javascript evaluate --program-file ./await-ci.js
 ```
 
-Then register it as an await. Cradle re-evaluates the cell every poll cycle and resumes the session when it completes; a thrown cell is retried, five consecutive evaluation errors fail the await (the session is resumed with the failure context either way):
+Then register it as an await. Cradle re-evaluates the cell as a **short check** on each due poll (do not sleep or loop inside the cell — return `false` and let Cradle wait). The session resumes when the cell returns `{ resumeText }`; a thrown cell is retried, and five consecutive evaluation errors fail the await (the session is resumed with the failure context either way):
 
 ```bash
 cradle session await javascript \

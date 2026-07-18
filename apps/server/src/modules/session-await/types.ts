@@ -53,7 +53,11 @@ export type CheckResult = MatchedCheckResult | PendingCheckResult
 
 export interface SessionAwaitSource {
   source: string
+  /** Defaults to inline. Queued sources are scheduled off the poller fast path. */
+  execution?: 'inline' | 'queued'
   pollIntervalMs?: number
   resumeOnFailure?: boolean
+  /** When set, consecutiveErrorCount is owned by this source via recordTrackedEvaluationCheck. */
+  tracksConsecutiveErrors?: boolean
   checkPending: (awaits: SessionAwait[]) => Promise<CheckResult[]>
 }

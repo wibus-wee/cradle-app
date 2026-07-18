@@ -49,10 +49,21 @@ function resolveRunnerPath(): string {
   return candidates[0]!
 }
 
+function resolveForkExecArgv(runnerPath: string): string[] {
+  const args = [...process.execArgv]
+  // Source-layout forks resolve the .ts runner; vitest/node may not already
+  // pass type stripping, so ensure the wrapper can boot.
+  if (runnerPath.endsWith('.ts') && !args.includes('--experimental-strip-types')) {
+    args.push('--experimental-strip-types', '--no-warnings')
+  }
+  return args
+}
+
 export function spawnManagedProcess(options: ManagedProcessOptions): ManagedChildProcess {
   let targetPid: number | null = null
-  const child = fork(resolveRunnerPath(), [JSON.stringify(normalizeOptions(options))], {
-    execArgv: process.execArgv,
+  const runnerPath = resolveRunnerPath()
+  const child = fork(runnerPath, [JSON.stringify(normalizeOptions(options))], {
+    execArgv: resolveForkExecArgv(runnerPath),
     stdio: [
       options.kind === 'spawn' && options.stdin === 'pipe' ? 'pipe' : 'ignore',
       'pipe',

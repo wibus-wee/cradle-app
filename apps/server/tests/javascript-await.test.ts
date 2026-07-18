@@ -14,8 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, shutdownInfra } from '../src/infra'
 import { enqueueSessionQueueItem } from '../src/modules/chat-runtime/runtime'
 import {
+  flushHeavyCheckQueue,
   registerSource,
   runOnce,
+  runOnceAndFlush,
   unregisterSource,
 } from '../src/modules/session-await/poller'
 import { cancel, register } from '../src/modules/session-await/service'
@@ -46,8 +48,9 @@ describe('javascript session await', () => {
     registerSource(javascriptAwaitSource)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     unregisterSource(JAVASCRIPT_AWAIT_SOURCE)
+    await flushHeavyCheckQueue()
     shutdownInfra()
     rmSync(dataDir, { recursive: true, force: true })
     for (const dir of workspaceDirs) {
@@ -102,6 +105,16 @@ describe('javascript session await', () => {
       .run()
   }
 
+  // Queued checks honor pollIntervalMs via lastCheckedAt; clear it so the next
+  // cycle is immediately due in tight test loops.
+  function makeDue(awaitId: string) {
+    db()
+      .update(sessionAwaits)
+      .set({ lastCheckedAt: null })
+      .where(eq(sessionAwaits.id, awaitId))
+      .run()
+  }
+
   it('rejects registration of a program with a syntax error', async () => {
     const { workspaceId, sessionId } = seedSession()
 
@@ -141,7 +154,7 @@ describe('javascript session await', () => {
       filterJson: JSON.stringify({ program: PENDING_PROGRAM }),
     })
 
-    await runOnce()
+    await runOnceAndFlush()
 
     expect(readAwait(row.id)).toEqual(
       expect.objectContaining({
@@ -164,7 +177,7 @@ describe('javascript session await', () => {
       }),
     })
 
-    await runOnce()
+    await runOnceAndFlush()
 
     expect(readAwait(row.id)).toEqual(
       expect.objectContaining({
@@ -189,7 +202,8 @@ describe('javascript session await', () => {
     })
 
     for (let cycle = 1; cycle <= 4; cycle++) {
-      await runOnce()
+      makeDue(row.id)
+      await runOnceAndFlush()
       expect(readAwait(row.id)).toEqual(
         expect.objectContaining({
           status: 'pending',
@@ -200,7 +214,8 @@ describe('javascript session await', () => {
       expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
     }
 
-    await runOnce()
+    makeDue(row.id)
+    await runOnceAndFlush()
 
     const failed = readAwait(row.id)
     expect(failed).toEqual(
@@ -227,7 +242,7 @@ describe('javascript session await', () => {
       filterJson: JSON.stringify({ program: 'export default async () => true' }),
     })
 
-    await runOnce()
+    await runOnceAndFlush()
 
     expect(readAwait(row.id)).toEqual(
       expect.objectContaining({
@@ -252,7 +267,7 @@ describe('javascript session await', () => {
     })
     updateProgram(row.id, 'export default 42')
 
-    await runOnce()
+    await runOnceAndFlush()
 
     expect(readAwait(row.id)).toEqual(expect.objectContaining({
       status: 'failed',
@@ -284,10 +299,11 @@ describe('javascript session await', () => {
     const workspacePath = db().select({ locatorJson: workspaces.locatorJson }).from(workspaces).where(eq(workspaces.id, workspaceId)).get()!
     const markerPath = join(JSON.parse(workspacePath.locatorJson).path, markerName)
 
-    const polling = runOnce()
+    // Enqueue without awaiting the heavy check so cancel can win mid-evaluation.
+    await runOnce()
     await vi.waitFor(() => expect(existsSync(markerPath)).toBe(true))
     expect(cancel(row.id)?.status).toBe('cancelled')
-    await polling
+    await flushHeavyCheckQueue()
 
     expect(readAwait(row.id)?.status).toBe('cancelled')
     expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
@@ -302,13 +318,14 @@ describe('javascript session await', () => {
       filterJson: JSON.stringify({ program: BROKEN_PROGRAM }),
     })
 
-    await runOnce()
+    await runOnceAndFlush()
     expect(readAwait(row.id)).toEqual(
       expect.objectContaining({ status: 'pending', consecutiveErrorCount: 1 }),
     )
 
     updateProgram(row.id, PENDING_PROGRAM)
-    await runOnce()
+    makeDue(row.id)
+    await runOnceAndFlush()
 
     expect(readAwait(row.id)).toEqual(
       expect.objectContaining({
@@ -318,5 +335,27 @@ describe('javascript session await', () => {
       }),
     )
     expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
+  })
+
+  it('does not block the poller cycle on javascript evaluation', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    await register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({
+        program: `
+          export default async () => {
+            await new Promise(resolve => setTimeout(resolve, 400))
+            return false
+          }
+        `,
+      }),
+    })
+
+    const startedAt = Date.now()
+    await runOnce()
+    expect(Date.now() - startedAt).toBeLessThan(200)
+    await flushHeavyCheckQueue()
   })
 })

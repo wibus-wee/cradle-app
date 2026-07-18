@@ -139,12 +139,22 @@ async function checkProgram(program: string, timeoutMs: number): Promise<Evaluat
   return { kind: 'program-error', error: readCrashError(execution) }
 }
 
+function buildRunnerArgs(runnerPath: string): string[] {
+  const args = [`--max-old-space-size=${EVALUATOR_MAX_OLD_SPACE_MB}`]
+  // Source-mode tests/dev resolve runner.ts; plain node needs type stripping.
+  if (runnerPath.endsWith('.ts')) {
+    args.push('--experimental-strip-types', '--no-warnings')
+  }
+  args.push(runnerPath)
+  return args
+}
+
 async function runProgram(program: string, input: EvaluateCellInput, timeoutMs: number): Promise<EvaluateCellResult> {
   const tempDir = await mkdtemp(join(tmpdir(), 'cradle-javascript-eval-'))
   const resultPath = join(tempDir, 'result.json')
   try {
     const execution = await runManagedNode({
-      args: [`--max-old-space-size=${EVALUATOR_MAX_OLD_SPACE_MB}`, resolveEvaluatorRunnerPath()],
+      args: buildRunnerArgs(resolveEvaluatorRunnerPath()),
       cwd: input.cwd,
       env: { CRADLE_JAVASCRIPT_EVAL_RESULT_PATH: resultPath },
       stdin: JSON.stringify({ program, execTimeoutMs: EXEC_DEFAULT_TIMEOUT_MS }),

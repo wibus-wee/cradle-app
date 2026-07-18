@@ -445,6 +445,21 @@ export function updateLastChecked(awaitId: string, errorText?: string): void {
     .set({
       lastCheckedAt: now,
       lastErrorText: input.errorText,
+    })
+    .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
+    .run()
+}
+
+// Used by sources that opt into tracksConsecutiveErrors (javascript). Keeps the
+// shared updateLastChecked path free of counter side effects for other sources.
+export function recordTrackedEvaluationCheck(awaitId: string, errorText?: string): void {
+  const input = LastCheckedInputSchema.parse({ errorText })
+  const now = Math.floor(Date.now() / 1000)
+  db()
+    .update(sessionAwaits)
+    .set({
+      lastCheckedAt: now,
+      lastErrorText: input.errorText,
       consecutiveErrorCount: input.errorText === null
         ? 0
         : sql`${sessionAwaits.consecutiveErrorCount} + 1`,
