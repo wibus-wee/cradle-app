@@ -28,7 +28,6 @@ import {
   Refresh1Line as RefreshCwIcon,
   SafeShieldLine as SafeShieldIcon,
   SearchLine as SearchIcon,
-  ServerLine as ServerIcon,
   Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
   UpSmallLine as ChevronUpIcon,
@@ -36,6 +35,7 @@ import {
 } from '@mingcute/react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
+import { FolderSymlink as FolderSymlinkIcon } from 'lucide-react'
 import {
   Fragment,
   memo,
@@ -132,7 +132,7 @@ import { useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import { ensureRemoteWorkspaceForPath } from '~/features/workspace/remote-workspace-import'
 import type { Workspace } from '~/features/workspace/types'
-import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getLocalWorkspacePath, getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
 import { useNow } from '~/hooks/use-now'
 import { cn } from '~/lib/cn'
 import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
@@ -2107,19 +2107,6 @@ const SessionItem = memo(
               {trailingIndicator}
             </button>
             <div className="group/menu relative z-10 mr-0.5 size-6 shrink-0">
-              {session.execution.kind === 'remote-host'
-                ? (
-                    <span
-                      className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground/70 opacity-100 group-hover:opacity-0 group-focus-within/menu:opacity-0"
-                      title={t('session.aria.remote', { hostName: session.execution.hostId })}
-                      aria-label={t('session.aria.remote', { hostName: session.execution.hostId })}
-                      role="img"
-                      data-testid={`session-remote-indicator-${session.id}`}
-                    >
-                      <ServerIcon className="size-3.5" aria-hidden="true" />
-                    </span>
-                  )
-                : null}
               <button
                 type="button"
                 className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
@@ -2245,13 +2232,17 @@ function WorkspaceGroupDisclosure({
         className="-ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 hover:bg-fill/70 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         data-testid={`workspace-toggle-${workspace.id}`}
       >
-        {expanded
-? (
-          <FolderOpenIcon className="size-3.5" aria-hidden="true" />
-        )
-: (
-          <FolderClosedIcon className="size-3.5" aria-hidden="true" />
-        )}
+        {isLocalWorkspace(workspace)
+          ? expanded
+            ? (
+                <FolderOpenIcon className="size-3.5" aria-hidden="true" />
+              )
+            : (
+                <FolderClosedIcon className="size-3.5" aria-hidden="true" />
+              )
+          : (
+              <FolderSymlinkIcon className="size-3.5" aria-hidden="true" />
+            )}
       </button>
 
       <button

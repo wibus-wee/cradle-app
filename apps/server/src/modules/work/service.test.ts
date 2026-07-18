@@ -773,3 +773,81 @@ describe('work delivery control', () => {
     expect(db().select().from(sessions).all()).toHaveLength(0)
   })
 })
+
+describe('work branch rename', () => {
+  const WORKTREE_ID = 'work-service-worktree'
+
+  function seedWorktree(): void {
+    db().insert(worktrees).values({
+      id: WORKTREE_ID,
+      sourceWorkspaceId: WORKSPACE_ID,
+      name: 'work-service-work',
+      path: '/tmp/work-service-worktree',
+      branch: 'cradle/wt/work-service-work',
+      baseRef: 'base-sha',
+      status: 'active',
+      createdBySessionId: SESSION_ID,
+    }).run()
+    db().update(sessions).set({ worktreeId: WORKTREE_ID }).where(eq(sessions.id, SESSION_ID)).run()
+  }
+
+  it('renames the branch before the first pull request exists', async () => {
+    seedWork()
+    seedWorktree()
+    mockHealthyDetailReads()
+    vi.spyOn(PullRequest, 'getBoundPullRequest').mockReturnValue(null)
+    vi.spyOn(PullRequest, 'isBranchOnRemote').mockResolvedValue(false)
+    const renameSpy = vi.spyOn(Worktree, 'renameWorktreeBranch').mockResolvedValue({
+      id: WORKTREE_ID,
+      sourceWorkspaceId: WORKSPACE_ID,
+      name: 'work-service-work',
+      path: '/tmp/work-service-worktree',
+      branch: 'cradle/wt/meaningful-name',
+      baseRef: 'base-sha',
+      status: 'active',
+      createdBySessionId: SESSION_ID,
+      createdAt: 10,
+      updatedAt: 20,
+    })
+
+    const detail = await Work.renameBranch({
+      id: WORK_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })
+
+    expect(renameSpy).toHaveBeenCalledWith({
+      worktreeId: WORKTREE_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })
+    expect(detail.work.id).toBe(WORK_ID)
+  })
+
+  it('rejects the rename once a pull request is bound', async () => {
+    seedWork()
+    seedWorktree()
+    mockHealthyDetailReads()
+    vi.spyOn(PullRequest, 'getBoundPullRequest').mockReturnValue(OPEN_PULL_REQUEST)
+    const renameSpy = vi.spyOn(Worktree, 'renameWorktreeBranch')
+
+    await expect(Work.renameBranch({
+      id: WORK_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })).rejects.toMatchObject({ code: 'work_pull_request_exists' })
+    expect(renameSpy).not.toHaveBeenCalled()
+  })
+
+  it('rejects the rename when the branch is already on the remote', async () => {
+    seedWork()
+    seedWorktree()
+    mockHealthyDetailReads()
+    vi.spyOn(PullRequest, 'getBoundPullRequest').mockReturnValue(null)
+    vi.spyOn(PullRequest, 'isBranchOnRemote').mockResolvedValue(true)
+    const renameSpy = vi.spyOn(Worktree, 'renameWorktreeBranch')
+
+    await expect(Work.renameBranch({
+      id: WORK_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })).rejects.toMatchObject({ code: 'work_branch_already_pushed' })
+    expect(renameSpy).not.toHaveBeenCalled()
+  })
+})

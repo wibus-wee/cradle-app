@@ -2,7 +2,6 @@ packages:
   - packages/*
   - apps/*
   - plugins/*
-  - documentations
 allowBuilds:
   '@google/genai': true
   '@swc/core': true

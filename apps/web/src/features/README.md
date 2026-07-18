@@ -11,10 +11,6 @@ Generated code under `src/api-gen/` is transport infrastructure, not a public AP
 feature components or hooks. Zustand remains limited to ephemeral UI/rendering state;
 React Query gateway projections are authoritative, and IndexedDB snapshots are only
 provisional startup caches ordered by server revisions.
-Feature components and hooks also must not call raw `fetch()` for Cradle Server APIs.
-Streaming, binary, external-origin, and low-level credential transports require an exact
-reviewed exception in `scripts/check-api-gen-boundaries.ts`; the per-file call count may
-only decrease.
 
 ## Directories
 

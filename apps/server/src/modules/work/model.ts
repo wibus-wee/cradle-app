@@ -124,6 +124,10 @@ export const WorkModel = {
     base: t.Optional(t.String({ minLength: 1 })),
   }),
 
+  renameBranchBody: t.Object({
+    branch: t.String({ minLength: 1 }),
+  }),
+
   sessionResolution: t.Object({
     work: t.Nullable(summary),
   }),

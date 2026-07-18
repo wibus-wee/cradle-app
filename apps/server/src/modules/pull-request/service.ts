@@ -327,6 +327,21 @@ async function readRemoteBranchSha(input: {
   return sha && /^[0-9a-f]{7,40}$/i.test(sha) ? sha : null
 }
 
+export async function isBranchOnRemote(rootPath: string, branch: string): Promise<boolean> {
+  let remote: { owner: string, repo: string, remoteName: string }
+  try {
+    remote = await resolveGitHubRemote(rootPath)
+  }
+  catch (error) {
+    if (error instanceof AppError
+      && (error.code === 'github_remote_missing' || error.code === 'github_remote_not_github')) {
+      return false
+    }
+    throw error
+  }
+  return (await readRemoteBranchSha({ rootPath, remoteName: remote.remoteName, branch })) !== null
+}
+
 async function ensureBranchPushed(input: {
   rootPath: string
   branch: string
