@@ -187,3 +187,6 @@ Report success with the release URL. If the workflow failed, report the run URL 
 - Dev builds publish both their own `dev-*` release and the rolling `feed-dev` update feed.
 - The dev feed URL is `https://github.com/wibus-wee/cradle-app/releases/download/feed-dev/`.
 - The dev feed uses `latest-mac.yml`; app-side updater logic does not switch to `dev-mac.yml`.
+- Desktop releases require the repository Actions secret `POSTHOG_PROJECT_TOKEN` so product
+  analytics (`VITE_POSTHOG_*`) is baked into the renderer. Internal channels also bake
+  PostHog AI Observability; the `release` channel keeps AI capture off.
