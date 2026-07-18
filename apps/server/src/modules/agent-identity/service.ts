@@ -18,7 +18,7 @@ import {
   refreshExternalProviderSource,
 } from '../external-provider-sources/service'
 import {
-  runtimeOwnsProviderBinding,
+  runtimeSkipsProviderTarget,
   runtimeUsesAgentTerminalLaunch,
 } from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
@@ -40,7 +40,7 @@ export interface CreateAgentInput {
   avatarSeed: string
   providerTargetId?: string | null
   modelId?: string | null
-  thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh'
+  thinkingEffort?: AgentThinkingEffort
   runtimeKind?: RuntimeKind
   configJson?: string
 }
@@ -52,7 +52,7 @@ export interface UpdateAgentInput {
   avatarSeed?: string
   providerTargetId?: string | null
   modelId?: string | null
-  thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh'
+  thinkingEffort?: AgentThinkingEffort
   runtimeKind?: RuntimeKind
   configJson?: string
   enabled?: boolean
@@ -120,22 +120,27 @@ export interface ImportLocalConfigResult {
 }
 
 const AgentRuntimeKindSchema = z.string().trim().min(1)
-const AgentThinkingEffortSchema = z.enum(['low', 'medium', 'high', 'xhigh'])
-type AgentThinkingEffort = z.infer<typeof AgentThinkingEffortSchema>
+const AgentThinkingEffortSchema = z.enum([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+])
+export type AgentThinkingEffort = z.infer<typeof AgentThinkingEffortSchema>
 
 function normalizeAgentThinkingEffort(effort: unknown): AgentThinkingEffort {
-  if (effort === 'none' || effort === 'minimal') {
-    return 'low'
-  }
-  if (effort === 'max' || effort === 'ultra') {
-    return 'xhigh'
-  }
   return AgentThinkingEffortSchema.safeParse(effort).data ?? 'high'
 }
-const ImportLocalConfigInputSchema = z.object({
-  includeProcessEnv: z.boolean().optional(),
-  candidateIds: z.array(z.string().trim().min(1)).optional(),
-}).default({})
+const ImportLocalConfigInputSchema = z
+  .object({
+    includeProcessEnv: z.boolean().optional(),
+    candidateIds: z.array(z.string().trim().min(1)).optional(),
+  })
+  .default({})
 const AgentDescriptionSchema = z
   .string()
   .trim()
@@ -178,7 +183,7 @@ const CreateAgentInputSchema = z
     }
 
     if (!input.providerTargetId) {
-      if (!runtimeOwnsProviderBinding(input.runtimeKind)) {
+      if (!runtimeSkipsProviderTarget(input.runtimeKind)) {
         ctx.addIssue({
           code: 'custom',
           message: 'Provider-backed agents require a provider target',
@@ -220,7 +225,7 @@ function canRunAgent(input: {
   runtimeKind: ParsedAgentInput['runtimeKind']
   providerTargetId: string | null
 }): boolean {
-  if (runtimeUsesAgentTerminalLaunch(input.runtimeKind) || runtimeOwnsProviderBinding(input.runtimeKind)) {
+  if (runtimeUsesAgentTerminalLaunch(input.runtimeKind) || runtimeSkipsProviderTarget(input.runtimeKind)) {
     return true
   }
   if (!input.providerTargetId) {
@@ -332,41 +337,68 @@ function runtimeKindForLocalApp(
 
 function agentNameForLocalApp(app: ImportedAgentResult['app']): string {
   switch (app) {
-    case 'claude': return 'Local Claude'
-    case 'codex': return 'Local Codex'
-    case 'gemini': return 'Local Gemini'
-    case 'pi': return 'Local Pi'
-    case 'kimi': return 'Local Kimi'
+    case 'claude':
+      return 'Local Claude'
+    case 'codex':
+      return 'Local Codex'
+    case 'gemini':
+      return 'Local Gemini'
+    case 'pi':
+      return 'Local Pi'
+    case 'kimi':
+      return 'Local Kimi'
   }
 }
 
-function agentNameForLocalImport(app: ImportedAgentResult['app'], runtimeKind: ImportedAgentResult['runtimeKind']): string {
-  if (runtimeUsesAgentTerminalLaunch(runtimeKind) && (app === 'claude' || app === 'codex' || app === 'gemini')) {
+function agentNameForLocalImport(
+  app: ImportedAgentResult['app'],
+  runtimeKind: ImportedAgentResult['runtimeKind'],
+): string {
+  if (
+    runtimeUsesAgentTerminalLaunch(runtimeKind)
+    && (app === 'claude' || app === 'codex' || app === 'gemini')
+  ) {
     return `${agentNameForLocalApp(app)} CLI`
   }
   return agentNameForLocalApp(app)
 }
 
-function importedAgentDescription(app: ImportedAgentResult['app'], runtimeKind: ImportedAgentResult['runtimeKind']): string {
+function importedAgentDescription(
+  app: ImportedAgentResult['app'],
+  runtimeKind: ImportedAgentResult['runtimeKind'],
+): string {
   if (runtimeUsesAgentTerminalLaunch(runtimeKind)) {
     switch (app) {
-      case 'claude': return 'Imported from local Claude CLI.'
-      case 'codex': return 'Imported from local Codex CLI.'
-      case 'gemini': return 'Imported from local Gemini CLI.'
-      case 'pi': return 'Imported from local Pi CLI.'
-      case 'kimi': return 'Imported from local Kimi CLI.'
+      case 'claude':
+        return 'Imported from local Claude CLI.'
+      case 'codex':
+        return 'Imported from local Codex CLI.'
+      case 'gemini':
+        return 'Imported from local Gemini CLI.'
+      case 'pi':
+        return 'Imported from local Pi CLI.'
+      case 'kimi':
+        return 'Imported from local Kimi CLI.'
     }
   }
   switch (app) {
-    case 'claude': return 'Imported from local Claude configuration.'
-    case 'codex': return 'Imported from local Codex configuration.'
-    case 'gemini': return 'Imported from local Gemini CLI.'
-    case 'pi': return 'Imported from local Pi CLI.'
-    case 'kimi': return 'Imported from local Kimi CLI.'
+    case 'claude':
+      return 'Imported from local Claude configuration.'
+    case 'codex':
+      return 'Imported from local Codex configuration.'
+    case 'gemini':
+      return 'Imported from local Gemini CLI.'
+    case 'pi':
+      return 'Imported from local Pi CLI.'
+    case 'kimi':
+      return 'Imported from local Kimi CLI.'
   }
 }
 
-function importedAgentAvatar(candidate: LocalConfigImportCandidate): { avatarStyle: string, avatarSeed: string } {
+function importedAgentAvatar(candidate: LocalConfigImportCandidate): {
+  avatarStyle: string
+  avatarSeed: string
+} {
   if (candidate.avatarUrl) {
     return {
       avatarStyle: 'external-url',
@@ -389,12 +421,15 @@ function agentConfigObject(agent: Agent): Record<string, unknown> {
   try {
     return AgentRuntimeConfigJsonSchema.parse(agent.configJson)
   }
-  catch {
+ catch {
     return {}
   }
 }
 
-function findAgentForLocalImport(app: ImportedAgentResult['app'], runtimeKind: ImportedAgentResult['runtimeKind']): Agent | null {
+function findAgentForLocalImport(
+  app: ImportedAgentResult['app'],
+  runtimeKind: ImportedAgentResult['runtimeKind'],
+): Agent | null {
   const agentName = agentNameForLocalImport(app, runtimeKind)
   const markedAgent = db()
     .select()
@@ -413,11 +448,13 @@ function findAgentForLocalImport(app: ImportedAgentResult['app'], runtimeKind: I
     return markedAgent
   }
 
-  return db()
-    .select()
-    .from(agents)
-    .where(and(eq(agents.name, agentName), eq(agents.runtimeKind, runtimeKind)))
-    .get() ?? null
+  return (
+    db()
+      .select()
+      .from(agents)
+      .where(and(eq(agents.name, agentName), eq(agents.runtimeKind, runtimeKind)))
+      .get() ?? null
+  )
 }
 
 function metadataString(metadata: Record<string, unknown>, key: string): string | null {
@@ -444,9 +481,11 @@ function absoluteAvatarUrl(value: string | null): string | null {
   }
   try {
     const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'data:' ? value : null
+    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'data:'
+      ? value
+      : null
   }
-  catch {
+ catch {
     return null
   }
 }
@@ -461,15 +500,22 @@ function metadataIconSlug(metadata: Record<string, unknown>): string | null {
 }
 
 function metadataAvatarUrl(metadata: Record<string, unknown>): string | null {
-  return absoluteAvatarUrl(metadataString(metadata, 'avatarUrl'))
+  return (
+    absoluteAvatarUrl(metadataString(metadata, 'avatarUrl'))
     ?? absoluteAvatarUrl(metadataString(metadata, 'iconUrl'))
+  )
 }
 
-async function refreshOnboardingSources(input: ImportLocalConfigInput): Promise<PreviewLocalConfigImportResult['sourceRefreshes']> {
+async function refreshOnboardingSources(
+  input: ImportLocalConfigInput,
+): Promise<PreviewLocalConfigImportResult['sourceRefreshes']> {
   const parsed = ImportLocalConfigInputSchema.parse(input)
   const sharedConfig = new Map<string, string>()
   if (parsed.includeProcessEnv !== undefined) {
-    sharedConfig.set('LOCAL_AGENT_CONFIG_INCLUDE_PROCESS_ENV', parsed.includeProcessEnv ? 'true' : 'false')
+    sharedConfig.set(
+      'LOCAL_AGENT_CONFIG_INCLUDE_PROCESS_ENV',
+      parsed.includeProcessEnv ? 'true' : 'false',
+    )
   }
 
   const localRefresh = await refreshDirectExternalProviderSource({
@@ -478,17 +524,21 @@ async function refreshOnboardingSources(input: ImportLocalConfigInput): Promise<
     sharedConfig,
   })
 
-  const refreshes: PreviewLocalConfigImportResult['sourceRefreshes'] = [{
-    sourceKey: localRefresh.sourceKey,
-    sourceLabel: 'Local Agent Config',
-    status: localRefresh.status,
-    recordsSeen: localRefresh.recordsSeen,
-    recordsProjected: localRefresh.recordsProjected,
-    recordsMissing: localRefresh.recordsMissing,
-    message: localRefresh.message ?? null,
-  }]
+  const refreshes: PreviewLocalConfigImportResult['sourceRefreshes'] = [
+    {
+      sourceKey: localRefresh.sourceKey,
+      sourceLabel: 'Local Agent Config',
+      status: localRefresh.status,
+      recordsSeen: localRefresh.recordsSeen,
+      recordsProjected: localRefresh.recordsProjected,
+      recordsMissing: localRefresh.recordsMissing,
+      message: localRefresh.message ?? null,
+    },
+  ]
 
-  for (const source of listExternalProviderSources().filter(source => source.sourceId === 'cc-switch')) {
+  for (const source of listExternalProviderSources().filter(
+    source => source.sourceId === 'cc-switch',
+  )) {
     const refresh = await refreshExternalProviderSource(source.id)
     refreshes.push({
       sourceKey: refresh.sourceKey,
@@ -545,7 +595,9 @@ function candidateFromRecord(input: {
   }
 }
 
-export async function previewLocalConfigImport(input: ImportLocalConfigInput = {}): Promise<PreviewLocalConfigImportResult> {
+export async function previewLocalConfigImport(
+  input: ImportLocalConfigInput = {},
+): Promise<PreviewLocalConfigImportResult> {
   const sourceRefreshes = await refreshOnboardingSources(input)
   const localSourceKey = sourceRefreshes[0]?.sourceKey ?? null
   const ccSwitchSourceKeys = new Set(
@@ -557,11 +609,20 @@ export async function previewLocalConfigImport(input: ImportLocalConfigInput = {
   const localRecords = allRecords
     .filter(record => record.sourceKey === localSourceKey)
     .filter(record => record.status === 'active')
-    .filter(record => record.app === 'claude' || record.app === 'codex' || record.app === 'gemini' || record.app === 'pi' || record.app === 'kimi')
+    .filter(
+      record =>
+        record.app === 'claude'
+        || record.app === 'codex'
+        || record.app === 'gemini'
+        || record.app === 'pi'
+        || record.app === 'kimi',
+    )
   const ccSwitchCurrentRecords = listExternalProviderRecords()
     .filter(record => record.status === 'active')
     .filter(record => ccSwitchSourceKeys.has(record.sourceKey))
-    .filter(record => record.app === 'claude' || record.app === 'codex' || record.app === 'gemini')
+    .filter(
+      record => record.app === 'claude' || record.app === 'codex' || record.app === 'gemini',
+    )
     .filter(record => record.metadata.current === true)
 
   const localProxyApps = new Set(
@@ -578,46 +639,58 @@ export async function previewLocalConfigImport(input: ImportLocalConfigInput = {
     }
     const target = getExternalRuntimeTarget(record.sourceKey, record.externalId)
     const agentName = agentNameForLocalImport(app, runtimeKindForLocalApp(app, record.metadata))
-    candidates.push(candidateFromRecord({
-      sourceKind: 'cc-switch',
-      sourceLabel: 'CC Switch',
-      sourceKey: record.sourceKey,
-      app,
-      externalRecordId: record.externalId,
-      name: record.name,
-      metadata: record.metadata,
-      providerTargetId: target?.id ?? record.providerTargetId,
-      reason: target ? null : 'No runtime target was projected for this CC Switch provider.',
-      notes: [`Detected ${app} local config using the CC Switch local proxy; Cradle will import ${agentName} with the resolved CC Switch upstream provider "${record.name}".`],
-    }))
+    candidates.push(
+      candidateFromRecord({
+        sourceKind: 'cc-switch',
+        sourceLabel: 'CC Switch',
+        sourceKey: record.sourceKey,
+        app,
+        externalRecordId: record.externalId,
+        name: record.name,
+        metadata: record.metadata,
+        providerTargetId: target?.id ?? record.providerTargetId,
+        reason: target ? null : 'No runtime target was projected for this CC Switch provider.',
+        notes: [
+          `Detected ${app} local config using the CC Switch local proxy; Cradle will import ${agentName} with the resolved CC Switch upstream provider "${record.name}".`,
+        ],
+      }),
+    )
   }
 
   const ccSwitchApps = new Set(candidates.map(candidate => candidate.app))
   for (const record of localRecords) {
     const app = localAgentApp(record.app)
-    const localProxyRecordSupersededByCcSwitch = app
-      && record.providerKind !== 'cli-tool'
-      && localProxyUrl(metadataString(record.metadata, 'baseUrl'))
-      && ccSwitchApps.has(app)
+    const localProxyRecordSupersededByCcSwitch
+      = app
+        && record.providerKind !== 'cli-tool'
+        && localProxyUrl(metadataString(record.metadata, 'baseUrl'))
+        && ccSwitchApps.has(app)
     if (!app || localProxyRecordSupersededByCcSwitch) {
       continue
     }
     const target = getExternalRuntimeTarget(record.sourceKey, record.externalId)
     const agentName = agentNameForLocalImport(app, runtimeKindForLocalApp(app, record.metadata))
-    candidates.push(candidateFromRecord({
-      sourceKind: 'local-config',
-      sourceLabel: 'Local Agent Config',
-      sourceKey: record.sourceKey,
-      app,
-      externalRecordId: record.externalId,
-      name: record.name,
-      metadata: record.metadata,
-      providerTargetId: target?.id ?? record.providerTargetId,
-      reason: record.providerKind === 'cli-tool' || target ? null : 'No runtime target was projected for this local provider record.',
-      notes: localProxyUrl(metadataString(record.metadata, 'baseUrl'))
-        ? ['Detected a local proxy endpoint, but no matching CC Switch current provider target is available.']
-        : [`Detected direct local ${agentName} configuration.`],
-    }))
+    candidates.push(
+      candidateFromRecord({
+        sourceKind: 'local-config',
+        sourceLabel: 'Local Agent Config',
+        sourceKey: record.sourceKey,
+        app,
+        externalRecordId: record.externalId,
+        name: record.name,
+        metadata: record.metadata,
+        providerTargetId: target?.id ?? record.providerTargetId,
+        reason:
+          record.providerKind === 'cli-tool' || target
+            ? null
+            : 'No runtime target was projected for this local provider record.',
+        notes: localProxyUrl(metadataString(record.metadata, 'baseUrl'))
+          ? [
+              'Detected a local proxy endpoint, but no matching CC Switch current provider target is available.',
+            ]
+          : [`Detected direct local ${agentName} configuration.`],
+      }),
+    )
   }
 
   return { candidates, sourceRefreshes }
@@ -636,7 +709,7 @@ function providerTargetConnectionConfig(providerTargetId: string): Record<string
   try {
     return z.record(z.string(), z.unknown()).parse(JSON.parse(target.connectionConfigJson))
   }
-  catch {
+ catch {
     return {}
   }
 }
@@ -655,31 +728,55 @@ function buildAgentRuntimeConfig(candidate: LocalConfigImportCandidate): string 
   }
 
   if (runtimeUsesAgentTerminalLaunch(candidate.runtimeKind)) {
-    const executable = targetConfig.executable ?? candidate.executable ?? candidate.endpoint ?? candidate.app
-    return JSON.stringify(compactRuntimeConfig({
-      ...common,
-      cliTui: {
-        executable,
-        args: [],
-      },
-    }))
+    const executable
+      = targetConfig.executable ?? candidate.executable ?? candidate.endpoint ?? candidate.app
+    return JSON.stringify(
+      compactRuntimeConfig({
+        ...common,
+        cliTui: {
+          executable,
+          args: [],
+        },
+      }),
+    )
   }
 
   const claudeAgentConfig = targetConfig.claudeAgent
-  return JSON.stringify(compactRuntimeConfig({
-    ...common,
-    model: candidate.modelId ?? targetConfig.model,
-    claudeAgent: claudeAgentConfig && typeof claudeAgentConfig === 'object' ? claudeAgentConfig : undefined,
-    reasoningEffort: targetConfig.reasoningEffort,
-    approvalPolicy: targetConfig.approvalPolicy,
-    sandboxMode: targetConfig.sandboxMode,
-  }))
+  return JSON.stringify(
+    compactRuntimeConfig({
+      ...common,
+      model: candidate.modelId ?? targetConfig.model,
+      claudeAgent:
+        claudeAgentConfig && typeof claudeAgentConfig === 'object' ? claudeAgentConfig : undefined,
+      reasoningEffort: targetConfig.reasoningEffort,
+      approvalPolicy: targetConfig.approvalPolicy,
+      sandboxMode: targetConfig.sandboxMode,
+    }),
+  )
 }
 
-export async function importLocalConfig(input: ImportLocalConfigInput = {}): Promise<ImportLocalConfigResult> {
+function readImportedAgentThinkingEffort(
+  candidate: LocalConfigImportCandidate,
+  fallback: AgentThinkingEffort,
+): AgentThinkingEffort {
+  if (!candidate.providerTargetId) {
+    return fallback
+  }
+  const configured = providerTargetConnectionConfig(candidate.providerTargetId).reasoningEffort
+  return AgentThinkingEffortSchema.safeParse(configured).data ?? fallback
+}
+
+export async function importLocalConfig(
+  input: ImportLocalConfigInput = {},
+): Promise<ImportLocalConfigResult> {
   const parsed = ImportLocalConfigInputSchema.parse(input)
   const preview = await previewLocalConfigImport(parsed)
-  const selectedIds = new Set(parsed.candidateIds ?? preview.candidates.filter(candidate => candidate.importable).map(candidate => candidate.id))
+  const selectedIds = new Set(
+    parsed.candidateIds
+    ?? preview.candidates
+        .filter(candidate => candidate.importable)
+        .map(candidate => candidate.id),
+  )
   const results: ImportedAgentResult[] = []
 
   for (const candidate of preview.candidates.filter(candidate => selectedIds.has(candidate.id))) {
@@ -700,17 +797,21 @@ export async function importLocalConfig(input: ImportLocalConfigInput = {}): Pro
     }
 
     if (candidate.agent) {
-      const updatedAgent = update(candidate.agent.id, {
-        name: candidate.agentName,
-        description: importedAgentDescription(candidate.app, candidate.runtimeKind),
-        avatarStyle: candidate.agent.avatarStyle,
-        avatarSeed: candidate.agent.avatarSeed,
-        providerTargetId: candidate.providerTargetId,
-        modelId: candidate.modelId,
-        thinkingEffort: normalizeAgentThinkingEffort(candidate.agent.thinkingEffort),
-        runtimeKind: candidate.runtimeKind,
-        configJson: buildAgentRuntimeConfig(candidate),
-      }) ?? candidate.agent
+      const updatedAgent
+        = update(candidate.agent.id, {
+          name: candidate.agentName,
+          description: importedAgentDescription(candidate.app, candidate.runtimeKind),
+          avatarStyle: candidate.agent.avatarStyle,
+          avatarSeed: candidate.agent.avatarSeed,
+          providerTargetId: candidate.providerTargetId,
+          modelId: candidate.modelId,
+          thinkingEffort: readImportedAgentThinkingEffort(
+            candidate,
+            normalizeAgentThinkingEffort(candidate.agent.thinkingEffort),
+          ),
+          runtimeKind: candidate.runtimeKind,
+          configJson: buildAgentRuntimeConfig(candidate),
+        }) ?? candidate.agent
       results.push({
         app: candidate.app,
         candidateId: candidate.id,
@@ -733,7 +834,7 @@ export async function importLocalConfig(input: ImportLocalConfigInput = {}): Pro
       avatarSeed: avatar.avatarSeed,
       providerTargetId: candidate.providerTargetId,
       modelId: candidate.modelId,
-      thinkingEffort: 'high',
+      thinkingEffort: readImportedAgentThinkingEffort(candidate, 'high'),
       runtimeKind: candidate.runtimeKind,
       configJson: buildAgentRuntimeConfig(candidate),
     })

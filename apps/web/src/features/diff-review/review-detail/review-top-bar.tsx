@@ -2,11 +2,9 @@ import {
   CheckLine as CheckIcon,
   CloseLine as CloseIcon,
   GitCommitLine as GitCommitHorizontalIcon,
-  GitCommitLine as GitCommitVerticalIcon,
   Message1Line as MessageSquareIcon,
   Refresh1Line as RefreshCwIcon,
   RobotLine as BotIcon,
-  Rows3Line as Rows3Icon,
   SelectorHorizontalLine as SlidersHorizontalIcon,
   SendLine as SendIcon,
   TreeLine as ListTreeIcon,
@@ -14,6 +12,7 @@ import {
 import { useState, useTransition } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DiffLayoutToggle } from '~/components/common/diff/diff-layout-toggle'
 import { Button } from '~/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Textarea } from '~/components/ui/textarea'
@@ -100,24 +99,11 @@ export function ReviewTopBar({
       <div className="flex-1" />
 
       {/* Layout — primary view control, stays visible. */}
-      <div className="flex items-center rounded-md border border-border/60 p-px">
-        <LayoutPill
-          active={diffStyle === 'unified'}
-          onClick={() => startDiffStyleTransition(() => onDiffStyleChange('unified'))}
-          disabled={isDiffStylePending}
-        >
-          <Rows3Icon className="size-3.5" />
-          Unified
-        </LayoutPill>
-        <LayoutPill
-          active={diffStyle === 'split'}
-          onClick={() => startDiffStyleTransition(() => onDiffStyleChange('split'))}
-          disabled={isDiffStylePending}
-        >
-          <GitCommitVerticalIcon className="size-3.5" />
-          Split
-        </LayoutPill>
-      </div>
+      <DiffLayoutToggle
+        value={diffStyle}
+        onValueChange={value => startDiffStyleTransition(() => onDiffStyleChange(value))}
+        disabled={isDiffStylePending}
+      />
 
       {/* Display filters — secondary, icon popover. */}
       <DisplayPopover
@@ -215,34 +201,6 @@ export function ReviewTopBar({
         <RefreshCwIcon className={cn('size-3.5', refreshing && 'animate-spin')} />
       </Button>
     </header>
-  )
-}
-
-function LayoutPill({
-  active,
-  onClick,
-  disabled,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  disabled: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        'h-6 gap-1.5 rounded-[5px] px-2 text-[12px]',
-        active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-      )}
-    >
-      {children}
-    </Button>
   )
 }
 

@@ -158,6 +158,8 @@ export interface DesktopChatStreamHandle {
   streamId: string
   sessionId: string
   runId: string | null
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
 }

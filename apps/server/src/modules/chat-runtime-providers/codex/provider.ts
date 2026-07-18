@@ -165,10 +165,7 @@ import {
   streamCodexMappedTurnEvents,
 } from './turn/stream-handler'
 import type { CodexStreamTurnContext } from './turn/stream-turn-context'
-import {
-  disposeCodexSystemPromptFile,
-  resolveCodexStreamTurnContext,
-} from './turn/stream-turn-context'
+import { resolveCodexStreamTurnContext } from './turn/stream-turn-context'
 import {
   hydrateCodexNativeHistory,
   injectCodexHarnessFragments,
@@ -331,7 +328,7 @@ export class CodexProvider implements ChatRuntime {
     const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
     const effectiveModel = input.modelId ?? snapshot.models.currentModelId ?? config.model
     const skillExtraRoots = resolveCodexSkillExtraRoots(config, workspacePath, this.resolveSkillPaths)
-    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, null, effectiveModel, auth)
+    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     const chatgptAuth = readCodexChatgptAuth(auth)
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
@@ -436,7 +433,7 @@ export class CodexProvider implements ChatRuntime {
 
     // Build minimal codex config for quick question. It still receives the full
     // transcript below, but it must not initialize tool or skill surfaces.
-    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, null, effectiveModel, auth)
+    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     codexConfig.mcp = false
     codexConfig.computer_use = false
     codexConfig.use_bash = false
@@ -619,7 +616,7 @@ export class CodexProvider implements ChatRuntime {
       chatgptAuth,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: buildCodexConfig(config, workspacePath, this.resolveSkillPaths, null, input.modelId ?? snapshot.models.currentModelId, auth),
+        config: buildCodexConfig(config, workspacePath, this.resolveSkillPaths, input.modelId ?? snapshot.models.currentModelId, auth),
         env: buildCodexAppServerEnv({
           chatSessionId: input.runtimeSession.chatSessionId,
           workspaceId: input.workspaceId,
@@ -929,7 +926,7 @@ export class CodexProvider implements ChatRuntime {
       chatgptAuth,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: buildCodexConfig(config, workspacePath, this.resolveSkillPaths, null, input.modelId ?? snapshot.models.currentModelId, auth),
+        config: buildCodexConfig(config, workspacePath, this.resolveSkillPaths, input.modelId ?? snapshot.models.currentModelId, auth),
         env: buildCodexAppServerEnv({
           chatSessionId: input.runtimeSession.chatSessionId,
           workspaceId: input.workspaceId,
@@ -965,7 +962,7 @@ export class CodexProvider implements ChatRuntime {
     const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
     const effectiveModel = input.modelId ?? snapshot.models.currentModelId ?? config.model
     const skillExtraRoots = resolveCodexSkillExtraRoots(config, workspacePath, this.resolveSkillPaths)
-    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, null, effectiveModel, auth)
+    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     const chatgptAuth = readCodexChatgptAuth(auth)
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
@@ -1046,12 +1043,7 @@ export class CodexProvider implements ChatRuntime {
     })
     const hostLease = await this.acquireCodexStreamTurnHost(input, context)
 
-    try {
-      yield* this.streamCodexTurnWithHost(input, context, hostLease)
-    }
-    finally {
-      disposeCodexSystemPromptFile(context.systemPromptFile)
-    }
+    yield* this.streamCodexTurnWithHost(input, context, hostLease)
   }
 
   private async acquireCodexStreamTurnHost(
@@ -1059,23 +1051,17 @@ export class CodexProvider implements ChatRuntime {
     context: CodexStreamTurnContext,
   ): Promise<CodexAppServerHostLease> {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
-    try {
-      return await this.acquireCodexAppServerHost({
-        providerTargetId: profile.providerTargetId,
-        scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
-        chatgptAuth: readCodexChatgptAuth(context.auth),
-        options: {
-          apiKey: readCodexApiKeyAuth(context.auth) ?? undefined,
-          config: context.codexConfig,
-          env: context.codexEnv,
-          serverRequestHandler: context.serverRequestHandler,
-        },
-      })
-    }
-    catch (error) {
-      disposeCodexSystemPromptFile(context.systemPromptFile)
-      throw error
-    }
+    return await this.acquireCodexAppServerHost({
+      providerTargetId: profile.providerTargetId,
+      scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
+      chatgptAuth: readCodexChatgptAuth(context.auth),
+      options: {
+        apiKey: readCodexApiKeyAuth(context.auth) ?? undefined,
+        config: context.codexConfig,
+        env: context.codexEnv,
+        serverRequestHandler: context.serverRequestHandler,
+      },
+    })
   }
 
   private async* streamCodexTurnWithHost(
@@ -1167,6 +1153,7 @@ export class CodexProvider implements ChatRuntime {
           approvalPolicy: context.runtimeAccess?.approvalPolicy ?? context.config.approvalPolicy,
           sandbox: context.runtimeAccess?.sandbox ?? context.config.sandboxMode,
           config: context.codexConfig,
+          developerInstructions: context.systemPrompt,
         })
     const threadId = threadStart.threadId
     input.runtimeSession.providerSessionId = threadId
@@ -1523,7 +1510,7 @@ export class CodexProvider implements ChatRuntime {
         sessionId: input.runtimeSession.chatSessionId,
         runId: input.runId,
         providerRequestId: requestId,
-        providerKind: profile.providerKind,
+        providerKind: profile.providerKind ?? 'universal',
         runtimeKind: RUNTIME_KIND,
         providerMethod: request.method,
         toolCallId: `server-request-${request.id}`,
@@ -1546,7 +1533,7 @@ export class CodexProvider implements ChatRuntime {
       sessionId: input.runtimeSession.chatSessionId,
       runId: input.runId,
       providerRequestId: requestId,
-      providerKind: profile.providerKind,
+      providerKind: profile.providerKind ?? 'universal',
       runtimeKind: RUNTIME_KIND,
       providerMethod: request.method,
       toolCallId: `server-request-${request.id}`,
@@ -1739,7 +1726,7 @@ export class CodexProvider implements ChatRuntime {
     const auth = this.resolveAppServerAuth(profile, config)
     return {
       auth,
-      codexConfig: buildCodexConfig(config, input.workspacePath, this.resolveSkillPaths, null, model, auth),
+      codexConfig: buildCodexConfig(config, input.workspacePath, this.resolveSkillPaths, model, auth),
       model,
       fallbackModel: config.model ?? input.fallbackModel,
       thinkingEffort,
@@ -1823,7 +1810,7 @@ export class CodexProvider implements ChatRuntime {
     const agentId = input.agentId ?? snapshot.agentId ?? null
     const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
     const effectiveModel = input.modelId ?? snapshot.models.currentModelId ?? config.model ?? null
-    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, null, effectiveModel, auth)
+    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     const chatgptAuth = readCodexChatgptAuth(auth)
     const codexEnvInput = {
       chatSessionId: input.runtimeSession.chatSessionId,

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 
-import { workspaces } from '@cradle/db'
+import { acpAgents, workspaces } from '@cradle/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
@@ -377,6 +377,130 @@ describe('acp chat runtime capability', () => {
         process.env.CRADLE_DATA_DIR = previousDataDir
       }
     }
+  })
+
+  it('spawns the installed ACP agent for an agent identity without a provider target', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+
+    let app: Awaited<ReturnType<typeof createServerApp>> | undefined
+
+    try {
+      const { AcpProcessManager } = await import('../src/modules/chat-runtime-providers/acp/process-manager')
+      const spawnSpy = vi.spyOn(AcpProcessManager.prototype, 'spawn')
+
+      app = await createServerApp()
+      db().insert(workspaces).values({
+        id: 'workspace-acp-agent',
+        name: 'Workspace ACP Agent',
+        path: workspaceRoot,
+        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+      }).run()
+      db().insert(acpAgents).values({
+        id: 'kimi-test-agent',
+        name: 'Kimi Test Agent',
+        version: '1.0.0',
+        distributionType: 'npx',
+        installPath: null,
+        cmd: '@kimi/test-acp-agent',
+        args: JSON.stringify(['--stdio']),
+        env: JSON.stringify({ KIMI_TEST_TOKEN: 'secret-token' }),
+        status: 'installed',
+      }).run()
+
+      const agentRes = await app.handle(new Request('http://localhost/agents', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'ACP Agent Identity',
+          avatarStyle: 'bottts',
+          avatarSeed: 'acp-agent-identity',
+          runtimeKind: 'acp-chat',
+          configJson: JSON.stringify({ acpAgentId: 'kimi-test-agent' }),
+        }),
+      }))
+      expect(agentRes.status).toBe(200)
+      const agent = await agentRes.json() as { id: string, providerTargetId: string | null, enabled: boolean }
+      expect(agent.providerTargetId).toBeNull()
+      expect(agent.enabled).toBe(true)
+
+      const sessionRes = await app.handle(new Request('http://localhost/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: 'session-acp-agent',
+          workspaceId: 'workspace-acp-agent',
+          title: 'ACP Agent Session',
+          agentId: agent.id,
+        }),
+      }))
+      expect(sessionRes.status).toBe(200)
+
+      const runRes = await app.handle(new Request('http://localhost/chat/sessions/session-acp-agent/response', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'Hello installed agent' }),
+      }))
+      expect(runRes.status).toBe(200)
+
+      const approvalRequestId = await waitForToolApprovalRequest('session-acp-agent')
+      const approvalRes = await app.handle(new Request(`http://localhost/chat/sessions/session-acp-agent/tool-approval/${approvalRequestId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ approved: true }),
+      }))
+      expect(approvalRes.status).toBe(200)
+
+      const timeline = await waitForMessageStatus(app, 'session-acp-agent', 'complete')
+      expect(timeline.find(message => message.role === 'assistant')).toEqual(
+        expect.objectContaining({ status: 'complete', content: 'Hello from ACP runtime' }),
+      )
+
+      expect(spawnSpy).toHaveBeenCalledWith(expect.objectContaining({
+        agentId: 'acp:kimi-test-agent',
+        distributionType: 'npx',
+        installPath: null,
+        cmd: '@kimi/test-acp-agent',
+        args: ['--stdio'],
+        env: { KIMI_TEST_TOKEN: 'secret-token' },
+      }))
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      if (previousDataDir === undefined) {
+        delete process.env.CRADLE_DATA_DIR
+      }
+      else {
+        process.env.CRADLE_DATA_DIR = previousDataDir
+      }
+    }
+  })
+
+  it('falls back to the provider target launch config when the merged config has no acpAgentId', async () => {
+    const { resolveAcpConnectionRecord } = await import('../src/modules/chat-runtime-providers/acp/config')
+
+    const resolved = resolveAcpConnectionRecord(
+      JSON.stringify({
+        distributionType: 'npx',
+        cmd: '@demo/acp-agent',
+        args: ['--stdio'],
+        env: { LEGACY_FLAG: '1' },
+      }),
+      'provider-target-acp',
+    )
+
+    expect(resolved.connectionKey).toBe('provider-target-acp')
+    expect(resolved.record).toEqual({
+      distributionType: 'npx',
+      installPath: null,
+      cmd: '@demo/acp-agent',
+      args: JSON.stringify(['--stdio']),
+      env: JSON.stringify({ LEGACY_FLAG: '1' }),
+    })
   })
 
   it('passes registered MCP servers when loading and resuming ACP sessions', async () => {

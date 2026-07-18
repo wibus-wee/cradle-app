@@ -8,7 +8,8 @@ Rows live in `remote_hosts`. The remote host module owns connection lifecycle, h
 
 - `index.ts`: Elysia route surface under `/remote-hosts`, including host CRUD, `/cradle-server/connect`, `/cradle-server/disconnect`, `/cradle-server/health`, `/relay/claim`, and the transparent upstream gateway at `/:hostId/upstream/*`.
 - `model.ts`: TypeBox request and response schemas for remote host config, relay claim input, and remote Cradle Server health.
-- `service.ts`: Drizzle-backed host registry, SSH/direct URL/relay connection lifecycle, relay pairing claim, health checks, and upstream-backed workspace/file helpers used by the workspace module.
+- `service.ts`: Drizzle-backed host registry, SSH/direct URL/relay connection lifecycle, relay pairing claim, relay controller recovery, health checks, and upstream-backed workspace/file helpers used by the workspace module.
+- `reconnect-policy.ts`: Bounded exponential retry delay with jitter for relay controller recovery.
 - `upstream.ts`: Transparent HTTP/SSE upstream fetch and proxy helpers that forward to the connected tunnel `localBaseUrl`.
 - `cradle-server-tunnel.ts`: OpenSSH local TCP port-forwarding helper for reaching a target Cradle Server through an SSH profile.
 
@@ -55,6 +56,13 @@ After `POST /remote-hosts/:hostId/relay/claim` succeeds, `service.ts` stores the
 stable `roomId`, `pinnedHostPubkey`, and `controllerKeyRef` under the same
 `relay` object. Future `POST /remote-hosts/:hostId/cradle-server/connect` calls
 use those pinned values and do not require the pairing string again.
+
+Connect is idempotent while the in-memory tunnel is healthy and its stored host
+configuration still matches the current registry row. A relay controller tunnel
+that exits is rebuilt automatically with bounded exponential backoff and jitter;
+explicit Disconnect cancels pending recovery through the connection generation.
+On server startup, enabled hosts with a complete relay pairing are connected in
+the background. Direct URL and SSH hosts remain demand-driven.
 
 `controllerKeyRef` is the controller X25519 encryption key. The controller
 Ed25519 relay assertion signing key is stored separately as the sibling secret

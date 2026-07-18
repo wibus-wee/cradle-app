@@ -139,6 +139,10 @@ export async function executeRun(
   deps: TurnExecutorDeps,
 ): Promise<void> {
   await observeAiGeneration({
+    correlation: {
+      sessionId: activeRun.sessionId,
+      runId: activeRun.runId,
+    },
     runtimeKind: activeRun.runtimeSession.runtimeKind,
     providerKind: input.profile?.providerKind ?? activeRun.runtimeSession.runtimeKind,
     requestedModelId: activeRun.modelId,

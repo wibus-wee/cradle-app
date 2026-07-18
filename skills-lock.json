@@ -10,7 +10,8 @@
     "agent-design": {
       "source": "wibus-wee/SKILL",
       "sourceType": "github",
-      "computedHash": "56c8031313618d2fff80a8331492a54b443e02899ab5beaee60373ddd17d9fa0"
+      "skillPath": "skills/dev/agent-design/SKILL.md",
+      "computedHash": "80e4d95b9a339c82675f8ac80e73c247a59e07ddf4ffb067ac2a96e6561fae8c"
     },
     "ai-sdk": {
       "source": "vercel/ai",

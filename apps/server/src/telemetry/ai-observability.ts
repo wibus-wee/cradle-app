@@ -1,5 +1,9 @@
 import { SpanStatusCode, trace } from '@opentelemetry/api'
 
+import type { AiTelemetryCorrelationContext } from './ai-correlation'
+import {
+  buildAiTelemetryCorrelationAttributes,
+} from './ai-correlation'
 import { getTelemetryConfig } from './config'
 import { POSTHOG_AI_EXPORT_ATTRIBUTE } from './posthog-ai'
 
@@ -13,6 +17,7 @@ interface AiGenerationUsage {
 }
 
 export interface AiGenerationObservationInput {
+  correlation: AiTelemetryCorrelationContext
   runtimeKind: string
   providerKind: string
   requestedModelId: string | null
@@ -52,6 +57,9 @@ export async function observeAiGeneration<T extends AiGenerationObservationResul
   return aiTracer.startActiveSpan('gen_ai.chat', {
     attributes: buildAiGenerationStartAttributes(input, captureMode),
   }, async (span) => {
+    const spanContext = span.spanContext()
+    span.setAttribute('$ai_trace_id', spanContext.traceId)
+    span.setAttribute('$ai_span_id', spanContext.spanId)
     try {
       const result = await execute(captureMode)
       applyAiGenerationResult(span, result, captureMode)
@@ -75,10 +83,11 @@ export function buildAiGenerationStartAttributes(
 ): Record<string, string | number | boolean> {
   return {
     [POSTHOG_AI_EXPORT_ATTRIBUTE]: true,
+    ...buildAiTelemetryCorrelationAttributes(input.correlation),
     'gen_ai.operation.name': 'chat',
     'gen_ai.provider.name': input.providerKind,
     ...(input.requestedModelId ? { 'gen_ai.request.model': input.requestedModelId } : {}),
-    'cradle.ai.schema_version': 1,
+    'cradle.ai.schema_version': 2,
     'cradle.ai.capture_mode': captureMode,
     'cradle.runtime_kind': input.runtimeKind,
     'cradle.internal_continuation': input.internalContinuation,

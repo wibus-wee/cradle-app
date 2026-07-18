@@ -48,6 +48,10 @@ const result = {
 describe('postHog AI generation attributes', () => {
   it('records input messages only in full mode', () => {
     const input = {
+      correlation: {
+        sessionId: 'session-1',
+        runId: 'run-1',
+      },
       runtimeKind: 'codex',
       providerKind: 'openai',
       requestedModelId: 'gpt-5',
@@ -63,6 +67,34 @@ describe('postHog AI generation attributes', () => {
         buildAiGenerationStartAttributes(input, 'full')['gen_ai.input.messages'],
       )),
     ).toEqual(input.inputMessages())
+  })
+
+  it('adds stable opaque session and run correlation without exporting raw ids', () => {
+    const input = {
+      correlation: {
+        sessionId: 'session-1',
+        runId: 'run-1',
+      },
+      runtimeKind: 'codex',
+      providerKind: 'openai',
+      requestedModelId: 'gpt-5',
+      internalContinuation: false,
+      inputMessages: () => [],
+    }
+
+    const attributes = buildAiGenerationStartAttributes(input, 'metadata')
+    const repeatedAttributes = buildAiGenerationStartAttributes(input, 'metadata')
+
+    expect(attributes).toMatchObject({
+      'cradle.ai.schema_version': 2,
+      'cradle.ai.correlation_version': 1,
+    })
+    expect(attributes.session_id).toBe(repeatedAttributes.session_id)
+    expect(attributes.run_id).toBe(repeatedAttributes.run_id)
+    expect(attributes.session_id).toMatch(/^[a-f0-9]{32}$/)
+    expect(attributes.run_id).toMatch(/^[a-f0-9]{32}$/)
+    expect(attributes.session_id).not.toContain(input.correlation.sessionId)
+    expect(attributes.run_id).not.toContain(input.correlation.runId)
   })
 
   it('records cache and reasoning usage without content in metadata mode', () => {

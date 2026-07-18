@@ -374,7 +374,7 @@ async function acquireDiagnosticsHostLease(input: {
     chatgptAuth,
     options: {
       apiKey: readCodexApiKeyAuth(input.auth) ?? undefined,
-      config: buildCodexConfig(input.config, workspacePath, () => [], null, input.config.model, input.auth),
+      config: buildCodexConfig(input.config, workspacePath, () => [], input.config.model, input.auth),
       env: buildCodexAppServerEnv({
         chatSessionId: diagnosticsScopeId,
         workspacePath,

@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 
 import {
   deletePluginsSourcesById,
+  getPluginsSourcesByIdUninstallPlan,
   patchPluginsByRouteSegmentEnabled,
   postPluginsSources,
   postPluginsSourcesPreview,
@@ -226,7 +227,14 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
 
   const undoMutation = useMutation({
     mutationFn: async (sourceId: string) => {
-      const { error } = await deletePluginsSourcesById({ path: { id: sourceId } })
+      const { data: plan, error: planError } = await getPluginsSourcesByIdUninstallPlan({ path: { id: sourceId } })
+      if (planError || !plan || plan.blocked) {
+        throw planError ?? new Error('Plugin uninstall is blocked.')
+      }
+      const { error } = await deletePluginsSourcesById({
+        path: { id: sourceId },
+        body: { confirmationToken: plan.confirmationToken },
+      })
       if (error) {
         throw error
       }

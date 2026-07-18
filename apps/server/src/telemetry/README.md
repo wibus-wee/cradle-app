@@ -8,6 +8,8 @@ PostHog AI Observability is an independent, AI-only OTLP exporter controlled by 
 
 `CRADLE_POSTHOG_AI_CAPTURE_MODE=metadata` records provider/runtime, model, input/output/cache/reasoning token counts, cost, latency, time-to-first-token, outcome, and stop reason without conversation content. `CRADLE_POSTHOG_AI_CAPTURE_MODE=full` additionally records the bounded system prompt, conversation messages, assistant output, and tool names/inputs/outputs. Full capture is intentionally useful for internal debugging and model analysis, and must be treated as sensitive product data.
 
+AI spans use schema version 2 and a versioned correlation contract. Every exported generation carries opaque `session_id` and `run_id` attributes plus `cradle.ai.correlation_version`. These values are deterministic hashes of Cradle-owned identifiers: raw session and run IDs are never exported. The hierarchy is `session_id` (logical chat session) → `run_id` (one assistant turn) → `$ai_span_id` (one model generation); `$ai_trace_id` identifies the technical OpenTelemetry trace. Keep these concepts separate when querying PostHog.
+
 This exporter is internal/dev opt-in until a separate explicit AI-content consent state is synchronized with the server. Product analytics opt-out and AI-content capture are separate controls; do not enable `full` by default in end-user builds.
 
 Auto instrumentation should be initialized before most server modules are imported. `apps/server/src/index.ts` initializes telemetry before dynamically importing the app and feature modules. If future startup code imports HTTP clients, pino loggers, or provider SDKs before telemetry starts, those modules may not be patched for automatic spans.

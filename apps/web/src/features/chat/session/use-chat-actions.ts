@@ -258,6 +258,7 @@ export function useChatActions(input: UseChatActionsInput) {
           },
           signal: controller.signal,
         })
+        handler.setTelemetryCorrelation(readTelemetryCorrelation(transport))
         acceptedByServer = true
 
         scheduleSnapshotRefresh(0)
@@ -484,6 +485,7 @@ export function useChatActions(input: UseChatActionsInput) {
         },
         signal: controller.signal,
       })
+      handler.setTelemetryCorrelation(readTelemetryCorrelation(transport))
 
       scheduleSnapshotRefresh(0)
 
@@ -620,5 +622,18 @@ export function useChatActions(input: UseChatActionsInput) {
     submitPendingUserInput,
     rollbackLastTurn,
     stop,
+  }
+}
+
+function readTelemetryCorrelation(transport: {
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
+}) {
+  if (!transport.telemetrySessionId || !transport.telemetryRunId) {
+    return null
+  }
+  return {
+    session_id: transport.telemetrySessionId,
+    run_id: transport.telemetryRunId,
   }
 }

@@ -116,6 +116,7 @@ export function startOptimisticChatResponse({
         body,
         signal: controller.signal,
       })
+      handler.setTelemetryCorrelation(readTelemetryCorrelation(transport))
 
       const acceptedAtMs = performance.now()
       const store = useChatStore.getState()
@@ -149,6 +150,19 @@ export function startOptimisticChatResponse({
   })()
 
   return controller
+}
+
+function readTelemetryCorrelation(transport: {
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
+}) {
+  if (!transport.telemetrySessionId || !transport.telemetryRunId) {
+    return null
+  }
+  return {
+    session_id: transport.telemetrySessionId,
+    run_id: transport.telemetryRunId,
+  }
 }
 
 function annotateGoalMessage(message: UIMessage, objective: string): UIMessage {

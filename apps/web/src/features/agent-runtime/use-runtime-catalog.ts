@@ -138,7 +138,7 @@ const RuntimeCatalogSchema = z.object({
     label: z.string().min(1),
     description: z.string().optional(),
     providerKinds: z.array(z.string().min(1)),
-    providerBinding: z.enum(['required', 'runtime-owned']).optional(),
+    providerBinding: z.enum(['required', 'runtime-owned', 'none']).optional(),
     sessionLaunchMode: z.enum(['runtime-provider', 'agent-terminal']),
     iconKey: z.string().optional(),
     surfaces: z.array(z.enum(['chat', 'jarvis'])).optional(),

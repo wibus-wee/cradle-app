@@ -4309,7 +4309,7 @@ export type GetAgentsResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4328,7 +4328,7 @@ export type PostAgentsData = {
         avatarSeed: string;
         providerTargetId?: string | null;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind?: string;
         configJson?: string;
     };
@@ -4350,7 +4350,7 @@ export type PostAgentsResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4403,7 +4403,7 @@ export type GetAgentsByIdResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4422,7 +4422,7 @@ export type PatchAgentsByIdData = {
         avatarSeed?: string;
         providerTargetId?: string | null;
         modelId?: string | null;
-        thinkingEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind?: string;
         configJson?: string;
         enabled?: boolean;
@@ -4447,7 +4447,7 @@ export type PatchAgentsByIdResponses = {
         avatarSeed: string;
         providerTargetId: string | null;
         modelId: string | null;
-        thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
         runtimeKind: string;
         configJson: string;
         enabled: boolean;
@@ -4503,7 +4503,7 @@ export type PostAgentsImportLocalConfigResponses = {
                     avatarSeed: string;
                     providerTargetId: string | null;
                     modelId: string | null;
-                    thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+                    thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
                     runtimeKind: string;
                     configJson: string;
                     enabled: boolean;
@@ -4542,7 +4542,7 @@ export type PostAgentsImportLocalConfigResponses = {
                 avatarSeed: string;
                 providerTargetId: string | null;
                 modelId: string | null;
-                thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+                thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
                 runtimeKind: string;
                 configJson: string;
                 enabled: boolean;
@@ -4599,7 +4599,7 @@ export type PostAgentsImportLocalConfigPreviewResponses = {
                 avatarSeed: string;
                 providerTargetId: string | null;
                 modelId: string | null;
-                thinkingEffort: 'low' | 'medium' | 'high' | 'xhigh';
+                thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
                 runtimeKind: string;
                 configJson: string;
                 enabled: boolean;
@@ -7494,7 +7494,8 @@ export type PostWorksData = {
     body: {
         workspaceId: string;
         title: string;
-        objective: string;
+        goal?: string;
+        objective?: string;
         linkedIssueId?: string;
         baseStrategy?: 'source-head' | 'remote-default';
         providerTargetId?: string;
@@ -11301,7 +11302,9 @@ export type PostPluginsSourcesPreviewResponses = {
 export type PostPluginsSourcesPreviewResponse = PostPluginsSourcesPreviewResponses[keyof PostPluginsSourcesPreviewResponses];
 
 export type DeletePluginsSourcesByIdData = {
-    body?: never;
+    body: {
+        confirmationToken: string;
+    };
     path: {
         id: string;
     };
@@ -11636,6 +11639,82 @@ export type PostPluginsSourcesByIdRefreshResponses = {
 };
 
 export type PostPluginsSourcesByIdRefreshResponse = PostPluginsSourcesByIdRefreshResponses[keyof PostPluginsSourcesByIdRefreshResponses];
+
+export type GetPluginsSourcesByIdUninstallPlanData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}/uninstall-plan';
+};
+
+export type GetPluginsSourcesByIdUninstallPlanResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sourceId: string;
+        plugins: Array<{
+            identity: string;
+            displayName: string;
+            processes: Array<{
+                id: string;
+                displayName: string;
+                pid: number | null;
+                state: 'starting' | 'running' | 'stopping';
+                startedAt: string;
+            }>;
+            resources: Array<{
+                key: {
+                    namespace: string;
+                    resourceType: string;
+                    resourceId: string;
+                };
+                displayName: string;
+                description: string | null;
+                kind: string;
+                required: boolean;
+                state: 'not-installed' | 'installing' | 'installed' | 'update-available' | 'error' | 'unavailable';
+                installationSource: 'built-in' | 'managed' | 'external' | null;
+                installedVersion: string | null;
+                availableVersion: string | null;
+                installedSizeBytes: number | null;
+                downloadSizeBytes: number | null;
+                actions: {
+                    install: {
+                        available: boolean;
+                        reasonCode: string | null;
+                    };
+                    update: {
+                        available: boolean;
+                        reasonCode: string | null;
+                    };
+                    uninstall: {
+                        available: boolean;
+                        reasonCode: string | null;
+                    };
+                };
+            }>;
+            lifecycle: {
+                summary: string;
+                data: Array<{
+                    id: string;
+                    label: string;
+                    effect: 'remove' | 'preserve';
+                    description?: string;
+                }>;
+                warnings?: Array<string>;
+            } | null;
+            blockedReasons: Array<string>;
+        }>;
+        blocked: boolean;
+        confirmationToken: string;
+        expiresAt: string;
+    };
+};
+
+export type GetPluginsSourcesByIdUninstallPlanResponse = GetPluginsSourcesByIdUninstallPlanResponses[keyof GetPluginsSourcesByIdUninstallPlanResponses];
 
 export type GetPluginsByRouteSegmentIconData = {
     body?: never;
@@ -18375,7 +18454,7 @@ export type GetChatRuntimesResponses = {
             label: string;
             description?: string;
             providerKinds: Array<string>;
-            providerBinding?: 'required' | 'runtime-owned';
+            providerBinding?: 'required' | 'runtime-owned' | 'none';
             sessionLaunchMode: 'runtime-provider' | 'agent-terminal';
             iconKey?: string;
             surfaces?: Array<'chat' | 'jarvis'>;

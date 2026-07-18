@@ -1722,6 +1722,7 @@ function selectGuideRuntimeKind(input: {
   const runtime = listRuntimeCatalog().find(item =>
     item.providerBinding !== 'runtime-owned'
     && item.surfaces?.includes('chat') === true
+    && input.providerKind !== undefined
     && runtimeSupportsProviderKind(item.runtimeKind, input.providerKind)
     && Boolean(getRuntimeRegistry().get(item.runtimeKind)))
   if (runtime) {
@@ -1755,6 +1756,7 @@ function assertGuideRuntimeSupportsProvider(input: {
   if (
     !runtimeOwnsProviderBinding(input.runtimeKind)
     && catalogItem?.surfaces?.includes('chat') === true
+    && input.providerKind !== undefined
     && runtimeSupportsProviderKind(input.runtimeKind, input.providerKind)
   ) {
     return

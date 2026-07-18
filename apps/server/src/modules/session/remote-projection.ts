@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
+import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
 import type { RuntimeKind } from '../provider-contracts/types'
 import {
   ensureRemoteHostConnected,
@@ -124,7 +126,11 @@ export async function createRemoteProjectedSession(input: {
   workspaceId: string
   title: string
   origin?: string
+  providerTargetId?: string
+  modelId?: string | null
+  thinkingEffort?: ChatThinkingEffort | null
   runtimeKind?: RuntimeKind
+  runtimeSettings?: ChatRuntimeSettingsUpdatePatch
   linkedIssueId?: string | null
   sessionGroupId?: string | null
 }): Promise<{ localSessionId: string }> {
@@ -152,7 +158,11 @@ export async function createRemoteProjectedSession(input: {
         title: input.title,
         workspaceId: remoteWorkspaceId,
         origin: input.origin ?? 'manual',
+        providerTargetId: input.providerTargetId,
+        modelId: input.modelId,
+        thinkingEffort: input.thinkingEffort,
         runtimeKind: input.runtimeKind ?? 'standard',
+        runtimeSettings: input.runtimeSettings,
         linkedIssueId: input.linkedIssueId ?? null,
         sessionGroupId: null,
       }),

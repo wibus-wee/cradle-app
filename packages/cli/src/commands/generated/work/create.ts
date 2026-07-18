@@ -27,8 +27,14 @@ const spec = {
       "type": "string"
     },
     {
+      "name": "goal",
+      "required": false,
+      "target": "body.goal",
+      "type": "string"
+    },
+    {
       "name": "objective",
-      "required": true,
+      "required": false,
       "target": "body.objective",
       "type": "string"
     },

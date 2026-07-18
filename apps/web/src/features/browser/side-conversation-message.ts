@@ -73,6 +73,13 @@ export async function submitSideConversationMessage(input: SubmitSideConversatio
       const body = await response.text().catch(() => '')
       throw new Error(`Failed to start side response: ${response.status} ${body}`)
     }
+    const telemetrySessionId = response.headers.get('x-cradle-telemetry-session-id')
+    const telemetryRunId = response.headers.get('x-cradle-telemetry-run-id')
+    handler.setTelemetryCorrelation(
+      telemetrySessionId && telemetryRunId
+        ? { session_id: telemetrySessionId, run_id: telemetryRunId }
+        : null,
+    )
     const acceptedAtMs = performance.now()
     const store = useRendererChatStore.getState()
     const runId = response.headers.get('x-cradle-run-id')

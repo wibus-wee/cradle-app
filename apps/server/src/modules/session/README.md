@@ -29,7 +29,12 @@ Linked chat traffic for **all** `/chat/sessions/:sessionId/*` paths is intercept
 routes (composer drafts, global catalogs) stay local. See `session/remote-projection.ts`
 and Chat Runtime `http/linked-session-proxy.ts`.
 
-Provider targets for remote projections are owned by the remote server; local create omits `providerTargetId` unless a future UI explicitly supplies a remote target id (plan 034).
+Provider targets for remote projections are owned by the remote server. The web
+composer loads that remote catalog and forwards the selected remote
+`providerTargetId`, `modelId`, `thinkingEffort`, and runtime settings through the
+local projection create call. The target server validates and stores the binding;
+the local projection row keeps `providerTargetId` null so it does not claim a
+foreign provider namespace.
 Provider-backed session creation resolves a stable agent persona and stores `agentId`, so CLI calls carrying the session context can be attributed to an Agent identity.
 Session creation rejects disabled agents and provider-backed agents whose selected provider target is disabled, returning a conflict before any runtime launch is attempted.
 Agent-terminal session creation is driven by runtime session launch descriptors and must start from an agent with terminal launch configuration; provider-launched sessions continue to resolve provider targets through provider compatibility metadata.

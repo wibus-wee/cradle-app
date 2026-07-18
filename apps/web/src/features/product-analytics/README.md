@@ -19,6 +19,15 @@ resource IDs to product analytics properties.
 - `VITE_POSTHOG_AUDIENCE`: set to `internal` for internal packaged builds.
 - `VITE_POSTHOG_INTERNAL_ACTOR`: optional internal-only actor label.
 
+Desktop release builds inject these from the repository Actions secret
+`POSTHOG_PROJECT_TOKEN` in `release-desktop.yml`:
+
+| Channel | `build_channel` | `audience` | Product analytics | AI Observability |
+| --- | --- | --- | --- | --- |
+| `dev` | `development` | `internal` | on | on (`full`) |
+| `bleeding-edge` | `bleeding-edge` | `internal` | on | on (`full`) |
+| `release` | `release` | `external` | on | off |
+
 The user-facing setting is enabled by default and persisted under the
 Cradle-owned `cradle:product-analytics:v1` local-storage namespace. App-open
 lifecycle state uses `cradle:product-analytics:lifecycle:v1` and represents the
@@ -33,6 +42,10 @@ All events include `event_schema_version`; schema version 2 uses:
 - `onboarding_completed`: onboarding success milestone.
 - `task_started`: a typed product-value task began.
 - `task_finished`: the same typed task ended with outcome, duration bucket, and allowlisted failure category.
+
+Chat task events may also include server-issued opaque `session_id` and `run_id`
+properties. These correlate a product task with the matching AI generation without
+uploading Cradle resource IDs.
 
 Tasks use a discriminated `feature_domain + task_kind + task_variant` contract.
 Add new task combinations to `event-model.ts`; never pass arbitrary labels from

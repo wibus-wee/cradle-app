@@ -4,6 +4,7 @@ import type { AnchorHTMLAttributes } from 'react'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
 import { useSessionBinding } from '../session/use-session-binding'
+import { parseGitHubPullRequestFromHref } from './github-pull-request-link'
 
 interface MarkdownFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
@@ -16,6 +17,8 @@ interface MarkdownFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> 
  */
 export function MarkdownFileLink({ href, sessionId, children, ...props }: MarkdownFileLinkProps) {
   const openWorkspaceFileTab = useBrowserPanelStore(state => state.openWorkspaceFileTab)
+  const openPullRequestTab = useBrowserPanelStore(state => state.openPullRequestTab)
+  const browserPanelOwnerId = useBrowserPanelStore(state => state.activeOwnerId)
   const sessionBinding = useSessionBinding(sessionId ?? null, Boolean(sessionId))
   const workspaceId = sessionBinding?.workspaceId ?? null
 
@@ -27,6 +30,17 @@ export function MarkdownFileLink({ href, sessionId, children, ...props }: Markdo
 
     if (!href || !workspaceId) {
       handleExternalMarkdownLinkClick(event, href)
+      return
+    }
+
+    const pullRequest = parseGitHubPullRequestFromHref(href)
+    if (pullRequest) {
+      event.preventDefault()
+      openPullRequestTab({
+        ...pullRequest,
+        title: `#${pullRequest.number}`,
+        ownerId: browserPanelOwnerId,
+      })
       return
     }
 

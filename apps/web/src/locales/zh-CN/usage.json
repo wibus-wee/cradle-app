@@ -70,5 +70,11 @@
   "trend.title": "用量趋势",
   "trend.toggleCost": "成本",
   "trend.toggleTokens": "Tokens",
-  "trend.total": "总计"
+  "trend.total": "总计",
+  "trend.visibleRange": "{{start}} – {{end}}",
+  "trend.interactionHint": "滚动缩放 · 拖拽平移 · 双击复位",
+  "trend.zoomControls": "图表缩放控件",
+  "trend.zoomIn": "放大",
+  "trend.zoomOut": "缩小",
+  "trend.resetZoom": "重置缩放"
 }

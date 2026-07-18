@@ -32,7 +32,10 @@ import type { ProviderInputPart } from '../kit/input-projector'
 import { projectProviderInputParts } from '../kit/input-projector'
 import { readWorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import { CLAUDE_AGENT_RUNTIME_KIND } from './metadata'
-import type { ClaudeAgentPermissionBridgeState, ClaudeAgentToolApprovalRequest } from './permission-bridge'
+import type {
+  ClaudeAgentPermissionBridgeState,
+  ClaudeAgentToolApprovalRequest,
+} from './permission-bridge'
 import {
   createClaudeAgentCanUseTool,
   createClaudeAgentPermissionBridgeState,
@@ -60,11 +63,17 @@ type ProviderFileInputPart = Extract<ProviderInputPart, { type: 'file' }>
 type ProviderPluginInputPart = Extract<ProviderInputPart, { type: 'plugin' }>
 type ProviderSkillInputPart = Extract<ProviderInputPart, { type: 'skill' }>
 
-export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLabel: string): ClaudeAgentUserContent {
+export function projectClaudeAgentInput(
+  message: RuntimeMessageInput,
+  runtimeLabel: string,
+): ClaudeAgentUserContent {
   if (typeof message === 'string') {
     const text = message.trim()
     if (!text) {
-      throw claudeAgentRequestError('projectInput', `${runtimeLabel} requires non-empty text or image input`)
+      throw claudeAgentRequestError(
+        'projectInput',
+        `${runtimeLabel} requires non-empty text or image input`,
+      )
     }
     return text
   }
@@ -84,7 +93,7 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
       if (part.mediaType.startsWith('image/')) {
         blocks.push(toClaudeAgentImageBlock(part, runtimeLabel))
       }
-      else {
+ else {
         unsupportedParts.push(describeUnsupportedFilePart(part))
       }
       continue
@@ -101,7 +110,10 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
   }
 
   if (unsupportedParts.length > 0) {
-    throw claudeAgentRequestError('projectInput', `${runtimeLabel} only supports text, image, skill, and plugin mention input; unsupported parts: ${unsupportedParts.join(', ')}`)
+    throw claudeAgentRequestError(
+      'projectInput',
+      `${runtimeLabel} only supports text, image, skill, and plugin mention input; unsupported parts: ${unsupportedParts.join(', ')}`,
+    )
   }
 
   // Prepend skill slash commands to the beginning so SDK can process them
@@ -110,7 +122,10 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
   }
 
   if (blocks.length === 0) {
-    throw claudeAgentRequestError('projectInput', `${runtimeLabel} requires non-empty text or image input`)
+    throw claudeAgentRequestError(
+      'projectInput',
+      `${runtimeLabel} requires non-empty text or image input`,
+    )
   }
   if (blocks.length === 1 && blocks[0]?.type === 'text') {
     return blocks[0].text
@@ -119,8 +134,11 @@ export function projectClaudeAgentInput(message: RuntimeMessageInput, runtimeLab
 }
 
 function describePluginMentionForText(plugin: ProviderPluginInputPart['plugin']): string {
-  const capabilities = plugin.capabilities.map(capability => `${capability.type}:${capability.layer}`).join(', ')
-  const mcpServers = plugin.mcpServers.length > 0 ? ` MCP servers: ${plugin.mcpServers.join(', ')}.` : ''
+  const capabilities = plugin.capabilities
+    .map(capability => `${capability.type}:${capability.layer}`)
+    .join(', ')
+  const mcpServers
+    = plugin.mcpServers.length > 0 ? ` MCP servers: ${plugin.mcpServers.join(', ')}.` : ''
   const description = plugin.description ? ` ${plugin.description}` : ''
   return `Selected Cradle plugin @${plugin.displayName}.${description}${capabilities ? ` Capabilities: ${capabilities}.` : ''}${mcpServers}`
 }
@@ -150,10 +168,7 @@ export function buildClaudeAgentTurnContent(input: {
     return `${prefix}\n${input.userContent}`
   }
 
-  return [
-    { type: 'text', text: prefix },
-    ...input.userContent,
-  ]
+  return [{ type: 'text', text: prefix }, ...input.userContent]
 }
 
 export function describeClaudeAgentUserContent(content: ClaudeAgentUserContent): string {
@@ -161,7 +176,8 @@ export function describeClaudeAgentUserContent(content: ClaudeAgentUserContent):
     return content
   }
   const text = content
-    .filter((block): block is Extract<ClaudeAgentContentBlock, { type: 'text' }> => isClaudeTextBlock(block))
+    .filter((block): block is Extract<ClaudeAgentContentBlock, { type: 'text' }> =>
+      isClaudeTextBlock(block))
     .map(block => block.text)
     .join('\n')
     .trim()
@@ -183,27 +199,29 @@ export function buildClaudeQueryOptions(input: {
   persistSession?: boolean
   onStderr?: (chunk: string) => void
 }): Options {
-  const profile = requireRuntimeProviderTargetProfile(input.input.profile, CLAUDE_AGENT_RUNTIME_KIND)
+  const profile = requireRuntimeProviderTargetProfile(
+    input.input.profile,
+    CLAUDE_AGENT_RUNTIME_KIND,
+  )
   const config = readTrustedClaudeAgentConfig(profile.configJson)
   const authMode = resolveClaudeAgentAuthMode(config)
   const anthropicCredentialEnvVar = projectAnthropicCredentialEnvVar(config.baseUrl ?? null)
-  const anthropicCredential = authMode === 'apiKey'
-    ? resolveApiKey(
-        profile,
-        config.apiKey,
-        anthropicCredentialEnvVar,
-        input.deps,
-      )
-    : null
+  const anthropicCredential
+    = authMode === 'apiKey'
+      ? resolveApiKey(profile, config.apiKey, anthropicCredentialEnvVar, input.deps)
+      : null
   const effectiveModel = readClaudeAgentModelId(input.input, config)
   const providerOptions = 'providerOptions' in input.input ? input.input.providerOptions : undefined
   const runtimeSettings = providerOptions?.runtimeSettings
   const permissionMode: Options['permissionMode'] = readClaudeAgentPermissionMode(runtimeSettings)
+  const ultracodeEnabled = isClaudeAgentUltracodeEnabled(providerOptions?.thinkingEffort)
   if (authMode === 'apiKey' && !anthropicCredential) {
     throw new ProviderRuntimeError(ProviderErrors.authFailed(CLAUDE_AGENT_RUNTIME_KIND))
   }
 
-  const snapshot = readWorkspaceProviderStateSnapshot(input.input.runtimeSession.providerStateSnapshot)
+  const snapshot = readWorkspaceProviderStateSnapshot(
+    input.input.runtimeSession.providerStateSnapshot,
+  )
   const runtimeContext = resolveClaudeAgentRuntimeContext(
     snapshot.workspacePath ?? input.input.workspacePath,
     input.input.agentId ?? snapshot.agentId ?? null,
@@ -212,7 +230,9 @@ export function buildClaudeQueryOptions(input: {
   const queryOptions: Options = {
     abortController: input.abortController,
     cwd: runtimeContext.cwd,
-    permissionMode,
+    // The SDK process must start in bypass mode so a later live switch back to it works reliably.
+    // streamTurn syncs the user's actual mode immediately after creating the query.
+    permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: readClaudeAgentAllowDangerouslySkipPermissions(runtimeSettings),
     maxTurns: config.maxTurns,
     additionalDirectories: uniquePaths([
@@ -223,9 +243,14 @@ export function buildClaudeQueryOptions(input: {
     forwardSubagentText: true,
     agentProgressSummaries: true,
     effort: readClaudeAgentEffort(providerOptions?.thinkingEffort, config.effort),
+    settings: ultracodeEnabled ? { effortLevel: 'xhigh', ultracode: true } : undefined,
     persistSession: shouldPersistSession,
     systemPrompt: input.input.systemPrompt
-      ? { type: 'preset' as const, preset: 'claude_code' as const, append: input.input.systemPrompt }
+      ? {
+          type: 'preset' as const,
+          preset: 'claude_code' as const,
+          append: input.input.systemPrompt,
+        }
       : permissionMode === 'plan'
         ? { type: 'preset' as const, preset: 'claude_code' as const }
         : undefined,
@@ -245,11 +270,13 @@ export function buildClaudeQueryOptions(input: {
   }
   const disallowedTools = config.disallowedTools ?? []
   queryOptions.disallowedTools = [...new Set(disallowedTools)]
-  const permissionBridgeState = input.permissionBridgeState ?? createClaudeAgentPermissionBridgeState({
-    runtimeInput: input.input,
-    permissionMode,
-    runtimeSettings: providerOptions?.runtimeSettings,
-  })
+  const permissionBridgeState
+    = input.permissionBridgeState
+      ?? createClaudeAgentPermissionBridgeState({
+      runtimeInput: input.input,
+      permissionMode,
+      runtimeSettings: providerOptions?.runtimeSettings,
+    })
   updateClaudeAgentPermissionBridgeState(permissionBridgeState, {
     runtimeInput: input.input,
     permissionMode,
@@ -273,7 +300,10 @@ export function buildClaudeQueryOptions(input: {
 
   const registeredServers = getRegisteredMcpServers()
   if (Object.keys(registeredServers).length > 0) {
-    queryOptions.mcpServers = { ...queryOptions.mcpServers, ...projectClaudeAgentMcpServers(registeredServers) }
+    queryOptions.mcpServers = {
+      ...queryOptions.mcpServers,
+      ...projectClaudeAgentMcpServers(registeredServers),
+    }
   }
 
   queryOptions.settingSources = claudeAgentSettingSourcesForAuthMode(authMode)
@@ -401,7 +431,13 @@ function projectAnthropicCredentialEnvVar(baseUrl: string | null): AnthropicCred
     : 'ANTHROPIC_API_KEY'
 }
 
-function readClaudeAgentEffort(
+export function isClaudeAgentUltracodeEnabled(
+  override: NonNullable<StreamTurnInput['providerOptions']>['thinkingEffort'],
+): boolean {
+  return override === 'ultra'
+}
+
+export function readClaudeAgentEffort(
   override: NonNullable<StreamTurnInput['providerOptions']>['thinkingEffort'],
   configured: NonNullable<ReturnType<typeof readTrustedClaudeAgentConfig>['effort']>,
 ): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
@@ -413,7 +449,7 @@ function readClaudeAgentEffort(
     case 'max':
       return override
     case 'ultra':
-      return 'max'
+      return 'xhigh'
     default:
       return configured
   }
@@ -430,18 +466,23 @@ export function readClaudeAgentModelId(
   return snapshot.models.currentModelId ?? config.model
 }
 
-function formatClaudeAgentHistory(history: UIMessage[] | undefined, scope: 'full' | 'recentCradleLocal'): string | null {
-  const scopedHistory = scope === 'recentCradleLocal'
-    ? readRecentCradleLocalHistory(history)
-    : history
-  const entries = scopedHistory
-    ?.map(message => formatClaudeAgentHistoryMessage(message, scope))
-    .filter((entry): entry is string => Boolean(entry))
-    ?? []
+function formatClaudeAgentHistory(
+  history: UIMessage[] | undefined,
+  scope: 'full' | 'recentCradleLocal',
+): string | null {
+  const scopedHistory
+    = scope === 'recentCradleLocal' ? readRecentCradleLocalHistory(history) : history
+  const entries
+    = scopedHistory
+      ?.map(message => formatClaudeAgentHistoryMessage(message, scope))
+      .filter((entry): entry is string => Boolean(entry)) ?? []
   return entries.length > 0 ? entries.join('\n\n') : null
 }
 
-function formatClaudeAgentHistoryMessage(message: UIMessage, scope: 'full' | 'recentCradleLocal'): string | null {
+function formatClaudeAgentHistoryMessage(
+  message: UIMessage,
+  scope: 'full' | 'recentCradleLocal',
+): string | null {
   const bangCommand = readBangCommandMetadata(message)
   if (bangCommand) {
     return `User ran local shell command: $ ${bangCommand.command}`
@@ -450,7 +491,8 @@ function formatClaudeAgentHistoryMessage(message: UIMessage, scope: 'full' | 're
   const bangResult = readBangResultMetadata(message)
   if (bangResult) {
     const output = bangResult.stdout || bangResult.stderr || '(no output)'
-    const status = bangResult.exitCode === null ? 'unknown exit code' : `exit code ${bangResult.exitCode}`
+    const status
+      = bangResult.exitCode === null ? 'unknown exit code' : `exit code ${bangResult.exitCode}`
     return [
       `Local shell command result for \`$ ${bangResult.command}\` (${status}, ${bangResult.durationMs}ms):`,
       output.trimEnd(),
@@ -473,7 +515,8 @@ function formatClaudeAgentHistoryMessage(message: UIMessage, scope: 'full' | 're
     return null
   }
 
-  const role = message.role === 'assistant' ? 'Assistant' : message.role === 'user' ? 'User' : 'System'
+  const role
+    = message.role === 'assistant' ? 'Assistant' : message.role === 'user' ? 'User' : 'System'
   return `${role}: ${textParts.join('\n')}`
 }
 
@@ -494,19 +537,25 @@ function projectClaudeAgentMcpServers(
   return Object.fromEntries(
     Object.entries(servers).map(([name, config]) => {
       if (config.transport === 'stdio') {
-        return [name, {
-          type: 'stdio',
-          command: config.command,
-          args: config.args,
-          env: config.env,
-        } satisfies McpServerConfig]
+        return [
+          name,
+          {
+            type: 'stdio',
+            command: config.command,
+            args: config.args,
+            env: config.env,
+          } satisfies McpServerConfig,
+        ]
       }
 
-      return [name, {
-        type: 'http',
-        url: config.url,
-        ...(Object.keys(config.headers).length > 0 ? { headers: config.headers } : {}),
-      } satisfies McpServerConfig]
+      return [
+        name,
+        {
+          type: 'http',
+          url: config.url,
+          ...(Object.keys(config.headers).length > 0 ? { headers: config.headers } : {}),
+        } satisfies McpServerConfig,
+      ]
     }),
   )
 }
@@ -543,16 +592,25 @@ function readBangResultMetadata(message: UIMessage): {
   }
 }
 
-function toClaudeAgentImageBlock(part: ProviderFileInputPart, runtimeLabel: string): ClaudeAgentContentBlock {
+function toClaudeAgentImageBlock(
+  part: ProviderFileInputPart,
+  runtimeLabel: string,
+): ClaudeAgentContentBlock {
   const mediaType = toAnthropicImageMediaType(part.mediaType)
   if (!mediaType) {
-    throw claudeAgentRequestError('projectImageInput', `${runtimeLabel} only supports jpeg, png, gif, and webp image input; unsupported file: ${describeUnsupportedFilePart(part)}`)
+    throw claudeAgentRequestError(
+      'projectImageInput',
+      `${runtimeLabel} only supports jpeg, png, gif, and webp image input; unsupported file: ${describeUnsupportedFilePart(part)}`,
+    )
   }
 
   const dataUrl = parseDataUrl(part.url)
   if (dataUrl) {
     if (dataUrl.mediaType && dataUrl.mediaType !== mediaType) {
-      throw claudeAgentRequestError('projectImageInput', `${runtimeLabel} image media type mismatch for ${describeFilePart(part)}: declared ${mediaType}, url ${dataUrl.mediaType}`)
+      throw claudeAgentRequestError(
+        'projectImageInput',
+        `${runtimeLabel} image media type mismatch for ${describeFilePart(part)}: declared ${mediaType}, url ${dataUrl.mediaType}`,
+      )
     }
     return {
       type: 'image',
@@ -574,7 +632,10 @@ function toClaudeAgentImageBlock(part: ProviderFileInputPart, runtimeLabel: stri
     }
   }
 
-  throw claudeAgentRequestError('projectImageInput', `${runtimeLabel} image input requires a data URL or http(s) URL; unsupported file: ${describeUnsupportedFilePart(part)}`)
+  throw claudeAgentRequestError(
+    'projectImageInput',
+    `${runtimeLabel} image input requires a data URL or http(s) URL; unsupported file: ${describeUnsupportedFilePart(part)}`,
+  )
 }
 
 function toAnthropicImageMediaType(mediaType: string): AnthropicImageMediaType | null {
@@ -613,12 +674,20 @@ function describeFilePart(part: ProviderFileInputPart): string {
   return `file${filename}`
 }
 
-function isClaudeTextBlock(block: unknown): block is Extract<ClaudeAgentContentBlock, { type: 'text' }> {
-  return Boolean(block) && typeof block === 'object' && (block as { type?: unknown }).type === 'text'
+function isClaudeTextBlock(
+  block: unknown,
+): block is Extract<ClaudeAgentContentBlock, { type: 'text' }> {
+  return (
+    Boolean(block) && typeof block === 'object' && (block as { type?: unknown }).type === 'text'
+  )
 }
 
-function isClaudeImageBlock(block: unknown): block is Extract<ClaudeAgentContentBlock, { type: 'image' }> {
-  return Boolean(block) && typeof block === 'object' && (block as { type?: unknown }).type === 'image'
+function isClaudeImageBlock(
+  block: unknown,
+): block is Extract<ClaudeAgentContentBlock, { type: 'image' }> {
+  return (
+    Boolean(block) && typeof block === 'object' && (block as { type?: unknown }).type === 'image'
+  )
 }
 
 function uniquePaths(paths: Array<string | null | undefined>): string[] {
@@ -629,7 +698,8 @@ function readSelectedSkillNames(message: RuntimeMessageInput): string[] {
   if (typeof message === 'string') {
     return []
   }
-  return projectProviderInputParts(message).flatMap(part => part.type === 'skill' ? [part.skill.name] : [])
+  return projectProviderInputParts(message).flatMap(part =>
+    part.type === 'skill' ? [part.skill.name] : [])
 }
 
 function resolveAnthropicBaseUrl(
@@ -643,15 +713,19 @@ function resolveAnthropicBaseUrl(
   return config.baseUrl ?? undefined
 }
 
-function buildClaudeAgentModelEnv(config: {
-  model: string | undefined
-  modelAliases?: {
-    haiku?: string
-    sonnet?: string
-    opus?: string
-  }
-  subagentModel?: string
-} | undefined): Record<string, string> {
+function buildClaudeAgentModelEnv(
+  config:
+    | {
+        model: string | undefined
+        modelAliases?: {
+          haiku?: string
+          sonnet?: string
+          opus?: string
+        }
+        subagentModel?: string
+      }
+      | undefined,
+): Record<string, string> {
   const env: Record<string, string> = {}
   const aliases = config?.modelAliases
   const haiku = readNonEmptyEnvValue(aliases?.haiku) || config?.model
@@ -681,5 +755,7 @@ function readNonEmptyEnvValue(value: string | undefined): string | undefined {
 }
 
 function claudeAgentRequestError(method: string, detail: string): ProviderRuntimeError {
-  return new ProviderRuntimeError(ProviderErrors.requestFailed(CLAUDE_AGENT_RUNTIME_KIND, method, detail))
+  return new ProviderRuntimeError(
+    ProviderErrors.requestFailed(CLAUDE_AGENT_RUNTIME_KIND, method, detail),
+  )
 }

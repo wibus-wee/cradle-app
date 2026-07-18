@@ -70,5 +70,11 @@
   "trend.title": "使用トレンド",
   "trend.toggleCost": "コスト",
   "trend.toggleTokens": "Tokens",
-  "trend.total": "合計"
+  "trend.total": "合計",
+  "trend.visibleRange": "{{start}} – {{end}}",
+  "trend.interactionHint": "スクロールでズーム · ドラッグで移動 · ダブルクリックでリセット",
+  "trend.zoomControls": "チャートのズーム操作",
+  "trend.zoomIn": "拡大",
+  "trend.zoomOut": "縮小",
+  "trend.resetZoom": "ズームをリセット"
 }

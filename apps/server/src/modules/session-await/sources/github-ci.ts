@@ -217,22 +217,36 @@ function buildTerminalResult(awaitId: string, target: ResolvedCITarget): CheckRe
     return null
   }
 
+  // headSha mismatch means the await is stale (new push happened).
+  // Mark it superseded so the agent can re-register with the new head.
+  if (target.currentHeadSha !== target.ref) {
+    return {
+      awaitId,
+      matched: true,
+      resumeText: `GitHub PR #${target.prNumber} head changed from ${target.ref} to ${target.currentHeadSha}.`,
+      resumePayloadJson: JSON.stringify({
+        kind: 'github-ci',
+        repo: `${target.owner}/${target.repo}`,
+        pr: target.prNumber,
+        ref: target.ref,
+        currentHeadSha: target.currentHeadSha,
+        outcome: 'superseded',
+      }),
+    }
+  }
+
   const outcome = target.merged
     ? 'merged'
     : target.prState === 'closed'
       ? 'closed'
-      : target.currentHeadSha !== target.ref
-        ? 'superseded'
-        : null
+      : null
   if (!outcome) {
     return null
   }
 
   const resumeText = outcome === 'merged'
     ? `GitHub PR #${target.prNumber} was merged before the CI await matched.`
-    : outcome === 'closed'
-      ? `GitHub PR #${target.prNumber} was closed before the CI await matched.`
-      : `GitHub PR #${target.prNumber} moved to a new head commit before the CI await matched.`
+    : `GitHub PR #${target.prNumber} was closed before the CI await matched.`
 
   return {
     awaitId,

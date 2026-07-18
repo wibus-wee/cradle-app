@@ -1452,6 +1452,9 @@ describe('codexProvider app-server integration', () => {
     await vi.waitFor(() => {
       expect(clients[0]?.requests.map(request => request.method)).toContain('turn/start')
     })
+    expect(clients[0]?.requests.find(request => request.method === 'thread/resume')?.params).toEqual(expect.objectContaining({
+      developerInstructions: 'Use this transient system prompt file.',
+    }))
 
     // UI slot reads during active turn should use the same app-server host
     await expect(provider.getUiSlotStates({

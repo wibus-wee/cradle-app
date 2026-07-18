@@ -48,9 +48,13 @@ describe('resolveSessionHarness Work context', () => {
     const session = db().select().from(sessions).where(eq(sessions.id, 'work-session')).get()!
     const harness = resolveSessionHarness(session)
 
-    expect(harness.systemPrompt).toContain('YOU ARE OPERATING INSIDE CRADLE')
-    expect(harness.systemPrompt).toContain('# Cradle CLI')
-    expect(harness.systemPrompt).not.toContain('## Cradle Work')
+    expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
+    expect(harness.systemPrompt).toContain('cradle-cli')
+    expect(harness.systemPrompt).toContain('CRADLE WORK MODE')
+    expect(harness.systemPrompt).toContain('manage_pull_request')
+    expect(harness.systemPrompt).toContain('create_pr')
+    expect(harness.systemPrompt).toContain('rename_branch')
+    // Dynamic Work id stays in harness fragment for cache stability.
     expect(harness.systemPrompt).not.toContain('work-1')
     expect(harness.harness?.fragments).toEqual([{
       key: 'cradle-work',
@@ -148,8 +152,10 @@ describe('resolveSessionHarness Work context', () => {
     const session = db().select().from(sessions).where(eq(sessions.id, 'ordinary-session')).get()!
     const harness = resolveSessionHarness(session)
 
-    expect(harness.systemPrompt).toContain('YOU ARE OPERATING INSIDE CRADLE')
-    expect(harness.systemPrompt).toContain('# Cradle CLI')
+    expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
+    expect(harness.systemPrompt).toContain('cradle-cli')
+    expect(harness.systemPrompt).not.toContain('CRADLE WORK MODE')
+    expect(harness.systemPrompt).not.toContain('manage_pull_request')
     expect(harness.harness).toBeUndefined()
   })
 })

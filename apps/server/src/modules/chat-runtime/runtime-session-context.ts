@@ -10,7 +10,9 @@ import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-s
 import * as ModelRegistry from '../model-registry/service'
 import {
   readRuntimeOwnedProviderTargetOwner,
+  readRuntimeProviderBinding,
   runtimeOwnsProviderTarget,
+  runtimeSkipsProviderTarget,
   runtimeSupportsProviderKind,
 } from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
@@ -119,16 +121,35 @@ export function getSessionRunContext(
       },
     })
   }
+
+  const agent = session.agentId
+    ? db().select().from(agents).where(eq(agents.id, session.agentId)).get()
+    : null
+  const agentConfig = agent ? parseJsonObject(agent.configJson) : {}
+  const sessionConfig = parseJsonObject(session.configJson)
+
   if (!providerTarget) {
-    if (runtime?.metadata.providerBinding !== 'runtime-owned') {
-      return null
+    if (runtime?.metadata.providerBinding === 'runtime-owned') {
+      return {
+        session,
+        workspacePath: workspacePath ?? '',
+        profile: null,
+        providerTarget: null,
+      }
     }
-    return {
-      session,
-      workspacePath: workspacePath ?? '',
-      profile: null,
-      providerTarget: null,
+    if (runtime?.metadata.providerBinding === 'none') {
+      const profile = buildRuntimeConfigOnlyProfile({ agentConfig, sessionConfig })
+      if (!profile) {
+        return null
+      }
+      return {
+        session,
+        workspacePath: workspacePath ?? '',
+        profile,
+        providerTarget: null,
+      }
     }
+    return null
   }
 
   const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind)
@@ -136,11 +157,6 @@ export function getSessionRunContext(
   const targetModelRegistryConfig = {
     modelRegistryMappings: ModelRegistry.listMappingEntries(),
   }
-  const agent = session.agentId
-    ? db().select().from(agents).where(eq(agents.id, session.agentId)).get()
-    : null
-  const agentConfig = agent ? parseJsonObject(agent.configJson) : {}
-  const sessionConfig = parseJsonObject(session.configJson)
   const effectiveProfile = {
     id: resolvedTarget.target.id,
     name: resolvedTarget.label,
@@ -164,6 +180,34 @@ export function getSessionRunContext(
     workspacePath: workspacePath ?? '',
     profile: effectiveProfile,
     providerTarget: resolvedTarget.target,
+  }
+}
+
+/**
+ * Synthesize the run profile for a runtime whose provider binding is `'none'` (ACP).
+ * The runtime reads its launch config from the merged agent/session config via `acpAgentId`;
+ * the synthetic id `acp:<acpAgentId>` keys one runtime connection per installed ACP agent.
+ * Returns null when the merged config carries no `acpAgentId` (unsupported legacy session).
+ */
+function buildRuntimeConfigOnlyProfile(input: {
+  agentConfig: Record<string, unknown>
+  sessionConfig: Record<string, unknown>
+}): RuntimeProviderTargetProfile | null {
+  const mergedConfig = { ...input.agentConfig, ...input.sessionConfig }
+  const acpAgentId = mergedConfig.acpAgentId
+  if (typeof acpAgentId !== 'string' || acpAgentId.length === 0) {
+    return null
+  }
+  const profileId = `acp:${acpAgentId}`
+  return {
+    id: profileId,
+    name: acpAgentId,
+    enabled: true,
+    configJson: JSON.stringify(mergedConfig),
+    customModels: '[]',
+    iconSlug: null,
+    providerTargetKind: 'manual',
+    providerTargetId: profileId,
   }
 }
 
@@ -413,8 +457,7 @@ export function assertRuntimeCompatibleTarget(
 ): SessionRunContext {
   const runtimeKind = context.session.runtimeKind ?? 'standard'
   if (!context.profile) {
-    const runtime = getRuntimeRegistry().get(runtimeKind)
-    if (runtime?.metadata.providerBinding === 'runtime-owned') {
+    if (runtimeSkipsProviderTarget(runtimeKind)) {
       return context
     }
     throw new AppError({
@@ -427,7 +470,12 @@ export function assertRuntimeCompatibleTarget(
       },
     })
   }
-  if (runtimeSupportsProviderKind(runtimeKind, context.profile.providerKind)) {
+  if (readRuntimeProviderBinding(runtimeKind) === 'none') {
+    // Binding-'none' profiles are synthesized from runtime config or wrap legacy launch
+    // config; there is no provider kind to check compatibility against.
+    return context
+  }
+  if (context.profile.providerKind && runtimeSupportsProviderKind(runtimeKind, context.profile.providerKind)) {
     return context
   }
 

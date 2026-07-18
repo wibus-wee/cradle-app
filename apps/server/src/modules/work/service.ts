@@ -8,6 +8,8 @@ import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import { hasPendingRuntimeToolApproval } from '../chat-runtime/pending-tool-approval'
 import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-user-input'
+import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
+import * as ChatRuntime from '../chat-runtime/runtime'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
@@ -28,6 +30,7 @@ export interface WorkDetail {
   readiness: PullRequest.PullRequestReadiness
   pullRequest: PullRequest.SessionPullRequestView | null
   activity: WorkActivity
+  initialRun?: CreateRunResult
 }
 
 type SessionCreateInput = Parameters<typeof Session.create>[0]
@@ -38,7 +41,8 @@ export type CreateWorkInput = Omit<
 > & {
   workspaceId: string
   title: string
-  objective: string
+  goal?: string
+  objective?: string
   linkedIssueId?: string | null
   /**
    * Isolation base selection. Defaults to `source-head` (clean local HEAD).
@@ -202,12 +206,12 @@ export function getBySessionId(sessionId: string): WorkSummary | null {
 
 export async function create(input: CreateWorkInput): Promise<WorkDetail> {
   const title = input.title.trim()
-  const objective = input.objective.trim()
-  if (!title || !objective) {
+  const goal = (input.goal ?? input.objective ?? '').trim()
+  if (!title || !goal) {
     throw new AppError({
       code: 'invalid_work_input',
       status: 400,
-      message: 'Work title and objective are required',
+      message: 'Work title and goal are required',
     })
   }
 
@@ -228,6 +232,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
     const {
       baseStrategy: _baseStrategy,
       title: _title,
+      goal: _goal,
       objective: _objective,
       linkedIssueId: _linkedIssueId,
       workspaceId: _workspaceId,
@@ -256,7 +261,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       tx.insert(works).values({
         id: workId,
         title,
-        objective,
+        objective: goal,
         linkedIssueId: input.linkedIssueId ?? null,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -270,6 +275,11 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
     })
     workPersisted = true
 
+    const initialRun = await ChatRuntime.createRun({
+      sessionId,
+      text: goal,
+    })
+
     const detail = await get(workId)
     if (!detail) {
       throw new AppError({
@@ -278,7 +288,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
         message: 'Work was not available after creation',
       })
     }
-    return detail
+    return { ...detail, initialRun }
   }
   catch (error) {
     const compensationErrors: string[] = []
@@ -371,13 +381,37 @@ export async function prepare(input: {
   const title = requireHandoffValue(input.title, 'title')
   const summary = requireHandoffValue(input.summary, 'summary')
   const testPlan = requireHandoffValue(input.testPlan, 'testPlan')
-  const timestamp = nextTimestampAfter(work.preparedAt, work.lastSubmittedAt)
+  const body = `## Summary\n${summary}\n\n## Test plan\n${testPlan}`
+
+  const existing = await PullRequest.getPullRequest(primaryThread.id)
+  const hasOpenPR = existing !== null && existing.state === 'open' && !existing.merged
+
+  if (hasOpenPR) {
+    const updated = await PullRequest.updatePullRequest({
+      sessionId: primaryThread.id,
+      title,
+      body,
+    })
+    const pr = {
+      owner: updated.owner,
+      repo: updated.repo,
+      number: updated.number,
+      headSha: requirePullRequestHeadSha(updated),
+    }
+    await registerWorkAwaits(work.id, primaryThread.id, primaryThread.workspaceId!, pr)
+  }
+
+  const preparedAt = nextTimestampAfter(work.preparedAt, work.lastSubmittedAt)
+  const lastSubmittedAt = hasOpenPR
+    ? nextTimestampAfter(preparedAt, work.lastSubmittedAt)
+    : work.lastSubmittedAt
   db().update(works).set({
     handoffTitle: title,
     handoffSummary: summary,
     handoffTestPlan: testPlan,
-    preparedAt: timestamp,
-    updatedAt: timestamp,
+    preparedAt,
+    lastSubmittedAt,
+    updatedAt: preparedAt,
   }).where(eq(works.id, work.id)).run()
   return (await get(work.id))!
 }
@@ -461,6 +495,49 @@ async function registerWorkAwaits(
   for (const awaitId of stale) {
     SessionAwait.cancel(awaitId)
   }
+}
+
+export async function renameBranch(input: {
+  id: string
+  branch: string
+}): Promise<WorkDetail> {
+  const work = requireWork(input.id)
+  const primaryThread = requirePrimaryThread(work.id)
+
+  // Any stored pull request (even closed/merged) pins the old head ref —
+  // GitHub cannot PATCH a PR's head branch — so rename is pre-PR only.
+  if (PullRequest.getBoundPullRequest(primaryThread.id) !== null) {
+    throw new AppError({
+      code: 'work_pull_request_exists',
+      status: 409,
+      message: 'Branch can only be renamed before the first pull request exists.',
+    })
+  }
+
+  const worktreeRecord = primaryThread.worktreeId
+    ? Worktree.getWorktree(primaryThread.worktreeId)
+    : null
+  if (!worktreeRecord) {
+    throw new AppError({
+      code: 'work_isolation_unavailable',
+      status: 409,
+      message: 'Work requires a healthy isolated checkout before delivery',
+    })
+  }
+
+  if (await PullRequest.isBranchOnRemote(worktreeRecord.path, worktreeRecord.branch)) {
+    throw new AppError({
+      code: 'work_branch_already_pushed',
+      status: 409,
+      message: 'The Work branch already exists on the remote and can no longer be renamed.',
+    })
+  }
+
+  await Worktree.renameWorktreeBranch({
+    worktreeId: worktreeRecord.id,
+    branch: input.branch,
+  })
+  return (await get(work.id))!
 }
 
 export async function submit(input: {

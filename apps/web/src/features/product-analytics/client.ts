@@ -3,6 +3,7 @@ import type { PostHog } from 'posthog-js/dist/module.slim'
 import { isElectron, isTearoffWindow, platform } from '~/lib/electron'
 
 import type {
+  ProductAnalyticsCorrelation,
   ProductAnalyticsEventMap,
   ProductAnalyticsFailureCategory,
   ProductAnalyticsOutcome,
@@ -21,6 +22,7 @@ export interface ProductAnalyticsTaskTimer {
   task: ProductAnalyticsTask
   startedAtMs: number
   settled: boolean
+  correlation?: ProductAnalyticsCorrelation
 }
 
 interface CaptureProductEventOptions {
@@ -83,15 +85,17 @@ export function trackProductEvent<Name extends ProductAnalyticsEventName>(
 export function trackProductTaskStarted(
   task: ProductAnalyticsTask,
   startedAtMs = performance.now(),
+  correlation?: ProductAnalyticsCorrelation,
 ): ProductAnalyticsTaskTimer {
   installProductAnalyticsUnloadHooks()
   const timer: ProductAnalyticsTaskTimer = {
     task,
     startedAtMs,
     settled: false,
+    correlation,
   }
   openTaskTimers.add(timer)
-  trackProductEvent('task_started', task)
+  trackProductEvent('task_started', { ...task, ...correlation })
   return timer
 }
 
@@ -108,6 +112,7 @@ export function trackProductTaskFinished(
   openTaskTimers.delete(timer)
   trackProductEvent('task_finished', {
     ...timer.task,
+    ...timer.correlation,
     outcome,
     duration_bucket: bucketProductAnalyticsDuration(performance.now() - timer.startedAtMs),
     failure_category: outcome === 'failed' ? failureCategory ?? 'unknown' : null,

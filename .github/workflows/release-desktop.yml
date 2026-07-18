@@ -49,6 +49,10 @@ jobs:
       source_ref: ${{ steps.params.outputs.source_ref }}
       update_url: ${{ steps.params.outputs.update_url }}
       release_download_url: ${{ steps.params.outputs.release_download_url }}
+      analytics_build_channel: ${{ steps.params.outputs.analytics_build_channel }}
+      analytics_audience: ${{ steps.params.outputs.analytics_audience }}
+      posthog_ai_enabled: ${{ steps.params.outputs.posthog_ai_enabled }}
+      posthog_ai_capture_mode: ${{ steps.params.outputs.posthog_ai_capture_mode }}
     steps:
       - name: Resolve parameters
         id: params
@@ -107,10 +111,24 @@ jobs:
 
           if [ "$CHANNEL" = "release" ]; then
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/manifest.json"
+            ANALYTICS_BUILD_CHANNEL="release"
+            ANALYTICS_AUDIENCE="external"
+            # End-user builds: product analytics only. AI full/metadata capture stays off
+            # until explicit server-side consent exists.
+            POSTHOG_AI_ENABLED="0"
+            POSTHOG_AI_CAPTURE_MODE="metadata"
           elif [ "$CHANNEL" = "bleeding-edge" ]; then
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/manifest.json"
+            ANALYTICS_BUILD_CHANNEL="bleeding-edge"
+            ANALYTICS_AUDIENCE="internal"
+            POSTHOG_AI_ENABLED="1"
+            POSTHOG_AI_CAPTURE_MODE="full"
           else
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/manifest.json"
+            ANALYTICS_BUILD_CHANNEL="development"
+            ANALYTICS_AUDIENCE="internal"
+            POSTHOG_AI_ENABLED="1"
+            POSTHOG_AI_CAPTURE_MODE="full"
           fi
           RELEASE_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}"
 
@@ -128,6 +146,10 @@ jobs:
           echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
           echo "update_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
           echo "release_download_url=$RELEASE_DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
+          echo "analytics_build_channel=$ANALYTICS_BUILD_CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "analytics_audience=$ANALYTICS_AUDIENCE" >> "$GITHUB_OUTPUT"
+          echo "posthog_ai_enabled=$POSTHOG_AI_ENABLED" >> "$GITHUB_OUTPUT"
+          echo "posthog_ai_capture_mode=$POSTHOG_AI_CAPTURE_MODE" >> "$GITHUB_OUTPUT"
 
           echo "Channel: $CHANNEL"
           echo "Desktop version: $DESKTOP_VERSION"
@@ -138,6 +160,9 @@ jobs:
           echo "Source ref: $SOURCE_REF"
           echo "Update URL: $UPDATE_URL"
           echo "Release download URL: $RELEASE_DOWNLOAD_URL"
+          echo "Analytics build channel: $ANALYTICS_BUILD_CHANNEL"
+          echo "Analytics audience: $ANALYTICS_AUDIENCE"
+          echo "PostHog AI observability: $POSTHOG_AI_ENABLED ($POSTHOG_AI_CAPTURE_MODE)"
 
   build-macos:
     name: Build Desktop (mac arm64)
@@ -177,6 +202,38 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+
+      - name: Configure PostHog build env
+        env:
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+          ANALYTICS_BUILD_CHANNEL: ${{ needs.resolve.outputs.analytics_build_channel }}
+          ANALYTICS_AUDIENCE: ${{ needs.resolve.outputs.analytics_audience }}
+          POSTHOG_AI_ENABLED: ${{ needs.resolve.outputs.posthog_ai_enabled }}
+          POSTHOG_AI_CAPTURE_MODE: ${{ needs.resolve.outputs.posthog_ai_capture_mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${POSTHOG_PROJECT_TOKEN:-}" ]; then
+            echo "POSTHOG_PROJECT_TOKEN repository secret is required for desktop releases." >&2
+            echo "Add it under Settings → Secrets and variables → Actions." >&2
+            exit 1
+          fi
+          {
+            echo "VITE_POSTHOG_PROJECT_TOKEN=$POSTHOG_PROJECT_TOKEN"
+            echo "VITE_POSTHOG_HOST=https://us.i.posthog.com"
+            echo "VITE_POSTHOG_BUILD_CHANNEL=$ANALYTICS_BUILD_CHANNEL"
+            echo "VITE_POSTHOG_AUDIENCE=$ANALYTICS_AUDIENCE"
+            if [ "$POSTHOG_AI_ENABLED" = "1" ]; then
+              echo "CRADLE_OTEL_ENABLED=1"
+              echo "CRADLE_OTEL_TRACES_ENABLED=1"
+              echo "CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED=1"
+              echo "CRADLE_POSTHOG_AI_CAPTURE_MODE=$POSTHOG_AI_CAPTURE_MODE"
+              echo "CRADLE_POSTHOG_PROJECT_TOKEN=$POSTHOG_PROJECT_TOKEN"
+              echo "CRADLE_POSTHOG_HOST=https://us.i.posthog.com"
+            fi
+          } >> "$GITHUB_ENV"
+          echo "Product analytics: channel=$ANALYTICS_BUILD_CHANNEL audience=$ANALYTICS_AUDIENCE"
+          echo "PostHog AI observability: enabled=$POSTHOG_AI_ENABLED capture=$POSTHOG_AI_CAPTURE_MODE"
 
       - name: Build relayd (darwin-arm64)
         run: pnpm --filter @cradle/relayd build:desktop-resource -- --target=darwin-arm64
@@ -270,6 +327,38 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+
+      - name: Configure PostHog build env
+        env:
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+          ANALYTICS_BUILD_CHANNEL: ${{ needs.resolve.outputs.analytics_build_channel }}
+          ANALYTICS_AUDIENCE: ${{ needs.resolve.outputs.analytics_audience }}
+          POSTHOG_AI_ENABLED: ${{ needs.resolve.outputs.posthog_ai_enabled }}
+          POSTHOG_AI_CAPTURE_MODE: ${{ needs.resolve.outputs.posthog_ai_capture_mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${POSTHOG_PROJECT_TOKEN:-}" ]; then
+            echo "POSTHOG_PROJECT_TOKEN repository secret is required for desktop releases." >&2
+            echo "Add it under Settings → Secrets and variables → Actions." >&2
+            exit 1
+          fi
+          {
+            echo "VITE_POSTHOG_PROJECT_TOKEN=$POSTHOG_PROJECT_TOKEN"
+            echo "VITE_POSTHOG_HOST=https://us.i.posthog.com"
+            echo "VITE_POSTHOG_BUILD_CHANNEL=$ANALYTICS_BUILD_CHANNEL"
+            echo "VITE_POSTHOG_AUDIENCE=$ANALYTICS_AUDIENCE"
+            if [ "$POSTHOG_AI_ENABLED" = "1" ]; then
+              echo "CRADLE_OTEL_ENABLED=1"
+              echo "CRADLE_OTEL_TRACES_ENABLED=1"
+              echo "CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED=1"
+              echo "CRADLE_POSTHOG_AI_CAPTURE_MODE=$POSTHOG_AI_CAPTURE_MODE"
+              echo "CRADLE_POSTHOG_PROJECT_TOKEN=$POSTHOG_PROJECT_TOKEN"
+              echo "CRADLE_POSTHOG_HOST=https://us.i.posthog.com"
+            fi
+          } >> "$GITHUB_ENV"
+          echo "Product analytics: channel=$ANALYTICS_BUILD_CHANNEL audience=$ANALYTICS_AUDIENCE"
+          echo "PostHog AI observability: enabled=$POSTHOG_AI_ENABLED capture=$POSTHOG_AI_CAPTURE_MODE"
 
       - name: Build relayd (win32-x64)
         run: pnpm --filter @cradle/relayd build:desktop-resource -- --target=win32-x64

@@ -1,7 +1,10 @@
 import type { UIMessageChunk } from 'ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ProductAnalyticsTask } from '~/features/product-analytics/event-model'
+import type {
+  ProductAnalyticsCorrelation,
+  ProductAnalyticsTask,
+} from '~/features/product-analytics/event-model'
 import { chatSelectors, useChatStore } from '~/store/chat'
 import { useRendererChatStore } from '~/store/renderer-chat'
 
@@ -12,7 +15,11 @@ import { buildUIMessageChunkStreamFromResponse, disposeChatRunBroadcast, onChatR
 
 const productAnalyticsMocks = vi.hoisted(() => ({
   trackProductTaskFinished: vi.fn(),
-  trackProductTaskStarted: vi.fn((task: ProductAnalyticsTask) => ({ task, startedAtMs: 0, settled: false })),
+  trackProductTaskStarted: vi.fn((
+    task: ProductAnalyticsTask,
+    startedAtMs = 0,
+    correlation?: ProductAnalyticsCorrelation,
+  ) => ({ task, startedAtMs, settled: false, correlation })),
 }))
 
 vi.mock('~/features/product-analytics/client', () => productAnalyticsMocks)
@@ -124,6 +131,40 @@ describe('chat streaming handler store boundary', () => {
           feature_domain: 'chat',
           task_kind: 'agent_run',
           task_variant: null,
+        },
+      }),
+      'success',
+      null,
+    )
+  })
+
+  it('carries server-issued telemetry correlation into the task lifecycle', () => {
+    const handler = new ChatStreamingHandler('session-1', 'assistant-1', 0)
+
+    handler.start(new AbortController())
+    handler.setTelemetryCorrelation({
+      session_id: 'opaque-session',
+      run_id: 'opaque-run',
+    })
+    handler.finish()
+
+    expect(productAnalyticsMocks.trackProductTaskStarted).toHaveBeenCalledWith(
+      {
+        feature_domain: 'chat',
+        task_kind: 'agent_run',
+        task_variant: null,
+      },
+      0,
+      {
+        session_id: 'opaque-session',
+        run_id: 'opaque-run',
+      },
+    )
+    expect(productAnalyticsMocks.trackProductTaskFinished).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlation: {
+          session_id: 'opaque-session',
+          run_id: 'opaque-run',
         },
       }),
       'success',

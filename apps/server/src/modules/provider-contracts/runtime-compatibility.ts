@@ -35,7 +35,7 @@ import {
 } from '../chat-runtime-providers/system-agent/metadata'
 import type { ProviderKind, RuntimeKind } from './types'
 
-export type RuntimeProviderBinding = 'required' | 'runtime-owned'
+export type RuntimeProviderBinding = 'required' | 'runtime-owned' | 'none'
 export type RuntimeSessionLaunchMode = 'runtime-provider' | 'agent-terminal'
 
 export interface RuntimeDefaultActorDescriptor {
@@ -158,6 +158,11 @@ export function readRuntimeProviderBinding(runtimeKind: RuntimeKind): RuntimePro
 
 export function runtimeOwnsProviderBinding(runtimeKind: RuntimeKind): boolean {
   return readRuntimeProviderBinding(runtimeKind) === 'runtime-owned'
+}
+
+export function runtimeSkipsProviderTarget(runtimeKind: RuntimeKind): boolean {
+  const binding = readRuntimeProviderBinding(runtimeKind)
+  return binding === 'runtime-owned' || binding === 'none'
 }
 
 export function readRuntimeSessionLaunchMode(runtimeKind: RuntimeKind): RuntimeSessionLaunchMode {

@@ -19,12 +19,15 @@ export const agents = sqliteTable('agents', {
   avatarUrl: text('avatar_url'),
   avatarStyle: text('avatar_style').notNull().default('bottts-neutral'),
   avatarSeed: text('avatar_seed').notNull(),
-  providerTargetId: text('provider_target_id')
-    .references(() => providerTargets.id, { onDelete: 'restrict' }),
+  providerTargetId: text('provider_target_id').references(() => providerTargets.id, {
+    onDelete: 'restrict',
+  }),
   modelId: text('model_id'),
   thinkingEffort: text('thinking_effort', {
-    enum: ['low', 'medium', 'high', 'xhigh'],
-  }).notNull().default('high'),
+    enum: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+  })
+    .notNull()
+    .default('high'),
   runtimeKind: text('runtime_kind').notNull().default('standard'),
   configJson: text('config_json').notNull().default('{}'),
   enabled: int('enabled', { mode: 'boolean' }).notNull().default(true),

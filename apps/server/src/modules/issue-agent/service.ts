@@ -393,12 +393,14 @@ async function runSession(
     }
 
     let chatSessionId: string
+    let startedRun: Awaited<ReturnType<typeof ChatRuntime.createRun>> | null = null
 
     if (options.runAsWork) {
+      const prompt = buildIssuePrompt(issue, workflowRules)
       const workDetail = await Work.create({
         workspaceId: issue.workspaceId,
         title: `Issue: ${issue.title}`,
-        objective: buildIssuePrompt(issue, workflowRules),
+        goal: prompt,
         linkedIssueId: issue.id,
         providerTargetId: session.providerTargetId,
         modelId: agent.modelId,
@@ -410,8 +412,11 @@ async function runSession(
       if (consumePendingRunAbort(agentSessionId)) {
         return
       }
+      if (workDetail.initialRun) {
+        startedRun = workDetail.initialRun
+      }
     }
- else {
+    else {
       const created = await Session.create({
         workspaceId: issue.workspaceId,
         title: `Issue: ${issue.title}`,
@@ -437,11 +442,21 @@ async function runSession(
       signal: 'run.started',
     })
 
-    const run = await ChatRuntime.createRun({
-      sessionId: chatSessionId,
-      text: buildIssuePrompt(issue, workflowRules),
-    })
-    trackedRunId = run.runId
+    if (!options.runAsWork) {
+      startedRun = await ChatRuntime.createRun({
+        sessionId: chatSessionId,
+        text: buildIssuePrompt(issue, workflowRules),
+      })
+    }
+    if (!startedRun) {
+      throw new AppError({
+        code: 'issue_agent_run_missing',
+        status: 500,
+        message: 'Issue agent run was not started',
+        details: { agentSessionId, chatSessionId },
+      })
+    }
+    trackedRunId = startedRun.runId
 
     const tracked = activeRuns.get(agentSessionId)
     if (tracked?.runId !== PENDING_RUN_ID) {
@@ -449,19 +464,19 @@ async function runSession(
     }
     if (tracked.aborted) {
       activeRuns.delete(agentSessionId)
-      await ChatRuntime.abortRun(run.runId)
+      await ChatRuntime.abortRun(startedRun.runId)
       return
     }
 
     activeRuns.set(agentSessionId, {
-      runId: run.runId,
+      runId: startedRun.runId,
       chatSessionId,
       aborted: false,
     })
 
-    void watchRunCompletion(agentSessionId, run.runId)
+    void watchRunCompletion(agentSessionId, startedRun.runId)
   }
- catch (error) {
+  catch (error) {
     const tracked = activeRuns.get(agentSessionId)
     if (tracked?.runId === trackedRunId) {
       activeRuns.delete(agentSessionId)

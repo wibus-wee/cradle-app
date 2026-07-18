@@ -36,6 +36,8 @@ export interface DesktopChatStreamHandle {
   streamId: string
   sessionId: string
   runId: string | null
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
 }
@@ -92,6 +94,8 @@ interface ChatStreamBrokerOptions {
 interface UpstreamHandle {
   sessionId: string
   runId: string | null
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
 }
@@ -142,6 +146,8 @@ interface UpstreamEntry {
   replayBuffer: ReplayBuffer
   handlePromise: Promise<UpstreamHandle>
   runId: string | null
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
   keepAliveWithoutSubscribers: boolean
@@ -159,6 +165,8 @@ interface UpstreamRequest {
 }
 
 const HEADER_RUN_ID = 'x-cradle-run-id'
+const HEADER_TELEMETRY_SESSION_ID = 'x-cradle-telemetry-session-id'
+const HEADER_TELEMETRY_RUN_ID = 'x-cradle-telemetry-run-id'
 const HEADER_ASSISTANT_MESSAGE_ID = 'x-cradle-assistant-message-id'
 const HEADER_USER_MESSAGE_ID = 'x-cradle-user-message-id'
 const HEADER_DESKTOP_UPSTREAM_REQUEST_ID = 'x-cradle-desktop-chat-upstream-id'
@@ -286,8 +294,15 @@ export class ChatStreamBroker {
       controller,
       subscribers: new Map(),
       replayBuffer: createReplayBuffer(),
-      handlePromise: Promise.resolve({ sessionId: request.sessionId, runId: null }),
+      handlePromise: Promise.resolve({
+        sessionId: request.sessionId,
+        runId: null,
+        telemetrySessionId: null,
+        telemetryRunId: null,
+      }),
       runId: null,
+      telemetrySessionId: null,
+      telemetryRunId: null,
       keepAliveWithoutSubscribers: request.keepAliveWithoutSubscribers,
       startedAtMs: Date.now(),
       closed: false,
@@ -320,6 +335,8 @@ export class ChatStreamBroker {
         streamId,
         sessionId: handle.sessionId,
         runId: handle.runId,
+        telemetrySessionId: handle.telemetrySessionId,
+        telemetryRunId: handle.telemetryRunId,
         assistantMessageId: handle.assistantMessageId,
         userMessageId: handle.userMessageId,
       }
@@ -331,6 +348,8 @@ export class ChatStreamBroker {
           streamId,
           sessionId: entry.sessionId,
           runId: entry.runId,
+          telemetrySessionId: entry.telemetrySessionId,
+          telemetryRunId: entry.telemetryRunId,
           assistantMessageId: entry.assistantMessageId,
           userMessageId: entry.userMessageId,
         }
@@ -399,12 +418,16 @@ export class ChatStreamBroker {
       }
 
       entry.runId = response.headers.get(HEADER_RUN_ID)
+      entry.telemetrySessionId = response.headers.get(HEADER_TELEMETRY_SESSION_ID)
+      entry.telemetryRunId = response.headers.get(HEADER_TELEMETRY_RUN_ID)
       entry.assistantMessageId = response.headers.get(HEADER_ASSISTANT_MESSAGE_ID) ?? undefined
       entry.userMessageId = response.headers.get(HEADER_USER_MESSAGE_ID) ?? undefined
 
       const handle: UpstreamHandle = {
         sessionId: entry.sessionId,
         runId: entry.runId,
+        telemetrySessionId: entry.telemetrySessionId,
+        telemetryRunId: entry.telemetryRunId,
         assistantMessageId: entry.assistantMessageId,
         userMessageId: entry.userMessageId,
       }

@@ -59,10 +59,14 @@ const spec = {
       "target": "body.thinkingEffort",
       "type": "string",
       "values": [
+        "none",
+        "minimal",
         "low",
         "medium",
         "high",
-        "xhigh"
+        "xhigh",
+        "max",
+        "ultra"
       ]
     },
     {

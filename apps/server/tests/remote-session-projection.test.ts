@@ -17,7 +17,15 @@ import { getRemoteSessionLink } from '../src/modules/session/remote-projection'
 type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 
 interface FakeRemoteState {
-  sessions: Map<string, { workspaceId: string, title: string }>
+  sessions: Map<string, {
+    workspaceId: string
+    title: string
+    providerTargetId?: string
+    modelId?: string | null
+    thinkingEffort?: string | null
+    runtimeKind?: string
+    runtimeSettings?: Record<string, unknown>
+  }>
   deletedSessionIds: string[]
   forwardedPaths: string[]
 }
@@ -85,11 +93,24 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
     }
     if (url.pathname === '/sessions' && request.method === 'POST') {
       readJsonBody(request).then((body) => {
-        const payload = body as { workspaceId?: string, title?: string }
+        const payload = body as {
+          workspaceId?: string
+          title?: string
+          providerTargetId?: string
+          modelId?: string | null
+          thinkingEffort?: string | null
+          runtimeKind?: string
+          runtimeSettings?: Record<string, unknown>
+        }
         const id = `remote-session-${state.sessions.size + 1}`
         state.sessions.set(id, {
           workspaceId: payload.workspaceId ?? workspace.id,
           title: payload.title ?? 'Untitled',
+          providerTargetId: payload.providerTargetId,
+          modelId: payload.modelId,
+          thinkingEffort: payload.thinkingEffort,
+          runtimeKind: payload.runtimeKind,
+          runtimeSettings: payload.runtimeSettings,
         })
         writeJson(response, { id, title: payload.title ?? 'Untitled', workspaceId: payload.workspaceId ?? workspace.id })
       }).catch(() => {
@@ -253,7 +274,11 @@ describe('remote session projection', () => {
         body: JSON.stringify({
           title: 'Remote chat',
           workspaceId,
-          runtimeKind: 'standard',
+          providerTargetId: 'remote-provider-1',
+          modelId: 'remote-model-1',
+          thinkingEffort: 'high',
+          runtimeKind: 'codex',
+          runtimeSettings: { approvalPolicy: 'never' },
         }),
       }))
       expect(createRes.status).toBe(200)
@@ -274,7 +299,13 @@ describe('remote session projection', () => {
       expect(fakeRemote.state.sessions.get('remote-session-1')).toEqual({
         workspaceId: 'remote-workspace-1',
         title: 'Remote chat',
+        providerTargetId: 'remote-provider-1',
+        modelId: 'remote-model-1',
+        thinkingEffort: 'high',
+        runtimeKind: 'codex',
+        runtimeSettings: { approvalPolicy: 'never' },
       })
+      expect(db().select().from(sessions).where(eq(sessions.id, session.id)).get()?.providerTargetId).toBeNull()
     }
     finally {
       rmSync(dataDir, { recursive: true, force: true })

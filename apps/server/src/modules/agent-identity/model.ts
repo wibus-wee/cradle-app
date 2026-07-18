@@ -1,18 +1,19 @@
 import { t } from 'elysia'
 
 const thinkingEffortEnum = t.Union([
+  t.Literal('none'),
+  t.Literal('minimal'),
   t.Literal('low'),
   t.Literal('medium'),
   t.Literal('high'),
   t.Literal('xhigh'),
+  t.Literal('max'),
+  t.Literal('ultra'),
 ])
 
 const runtimeKindSchema = t.String({ minLength: 1 })
 
-const importCandidateSourceKindEnum = t.Union([
-  t.Literal('cc-switch'),
-  t.Literal('local-config'),
-])
+const importCandidateSourceKindEnum = t.Union([t.Literal('cc-switch'), t.Literal('local-config')])
 
 const importedRuntimeKindEnum = t.Union([
   t.Literal('claude-agent'),
@@ -136,10 +137,12 @@ export const AgentIdentityModel = {
     enabled: t.Optional(t.Boolean()),
   }),
 
-  importLocalConfigBody: t.Optional(t.Object({
-    includeProcessEnv: t.Optional(t.Boolean()),
-    candidateIds: t.Optional(t.Array(t.String({ minLength: 1 }))),
-  })),
+  importLocalConfigBody: t.Optional(
+    t.Object({
+      includeProcessEnv: t.Optional(t.Boolean()),
+      candidateIds: t.Optional(t.Array(t.String({ minLength: 1 }))),
+    }),
+  ),
 
   localConfigImportCandidate,
 

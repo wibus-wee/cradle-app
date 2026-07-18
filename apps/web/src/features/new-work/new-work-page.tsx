@@ -17,8 +17,6 @@ import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, Me
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
 import { DraftChatComposerWithState } from '~/features/chat/composer/draft-chat-composer'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
-import { readRunRuntimeSettingsPatch } from '~/features/chat/runtime/runtime-settings-presenter'
-import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
 import { isLocalWorkspace } from '~/features/workspace/types'
@@ -120,15 +118,15 @@ export function NewWorkPage() {
       return false
     }
 
-    const objective = text.trim()
-    const title = objective.slice(0, 80)
+    const goal = text.trim()
+    const title = goal.slice(0, 80)
       || options.agentName
       || options.providerTargetName
       || t('surface.work')
     const body: PostWorksData['body'] = {
       workspaceId: selectedWorkspace.id,
       title,
-      objective,
+      goal,
       linkedIssueId: search.issueId,
       runtimeKind: options.runtimeKind,
       runtimeSettings: options.runtimeSettings,
@@ -168,24 +166,6 @@ export function NewWorkPage() {
     const detail = result.data
     trackProductTaskFinished(analyticsTask, 'success')
     setPendingObjective(null)
-    startOptimisticChatResponse({
-      sessionId: detail.primaryThread.id,
-      queryClient,
-      body: {
-        text: objective,
-        files,
-        contextParts,
-        modelId: options.modelId,
-        thinkingEffort: options.thinkingEffort,
-        runtimeSettings: readRunRuntimeSettingsPatch(options.runtimeSettings),
-      },
-      onAccepted: () => {
-        void queryClient.invalidateQueries({ queryKey: getWorksQueryKey() })
-      },
-      onError: (responseError) => {
-        setError(responseError)
-      },
-    })
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
       queryClient.invalidateQueries({ queryKey: sessionsQueryKey(selectedWorkspace.id) }),

@@ -1,7 +1,7 @@
 /* Verifies server plugin activation and shutdown cleanup behavior. */
 
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -12,10 +12,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { db } from '../infra'
 import { resolveCodexRuntimeContext } from '../modules/chat-runtime-providers/codex/config/runtime-context'
+import { ManagedResourceService } from '../modules/managed-resources/service'
 import { setAppPreferences } from '../modules/preferences/service'
 import { resetNativeSkillProjectionTargets } from '../modules/skills/native-skill-projection'
 import { setPluginActivationPolicy } from './activation-policy'
-import { activateServerPlugins, deactivateAllPlugins, disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from './loader'
+import { activateServerPlugins, deactivateAllPlugins, disablePlugin, discoverAndActivateSource, enablePlugin, inspectDiscoveredSourceRemoval, removeDiscoveredSource } from './loader'
 import { getRegisteredMcpServers } from './mcp-registry'
 import { calculatePluginPackageChecksum } from './package-checksum'
 import { listPluginDescriptors } from './runtime-registry'
@@ -826,5 +827,93 @@ describe('server plugin loader lifecycle', () => {
 
     expect(listPluginDescriptors().some(plugin => plugin.identity === '@acme/live-source')).toBe(false)
     expect(getRegisteredMcpServers()).not.toHaveProperty('live-source')
+  })
+
+  it('inspects and executes managed resource cleanup before plugin uninstall cleanup', async () => {
+    tempPluginsDir = await writePluginPackage({
+      packageName: '@cradle/lifecycle-fixture',
+      contributes: {
+        capabilities: [
+          { id: 'resources', type: 'managed-resource', layer: 'server', permissions: [] },
+          { id: 'lifecycle.uninstall', type: 'lifecycle-uninstall', layer: 'server', permissions: [] },
+        ],
+        permissions: [],
+      },
+      serverSource: [
+        'import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"',
+        'import path from "node:path"',
+        'export function activate(ctx) {',
+        '  const marker = path.join(ctx.paths.dataDir, "runtime-installed")',
+        '  const failureMarker = path.join(ctx.paths.dataDir, "fail-uninstall")',
+        '  const order = path.join(ctx.paths.dataDir, "uninstall-order")',
+        '  ctx.resources.register({',
+        '    declarations: () => [{ key: { resourceType: "runtime", resourceId: "fixture" }, displayName: "Fixture runtime", description: "fixture", kind: "runtime", required: false }],',
+        '    project: async () => ({ state: existsSync(marker) ? "installed" : "not-installed", installationSource: existsSync(marker) ? "managed" : null, installedVersion: existsSync(marker) ? "1.0.0" : null, availableVersion: "1.0.0", installedSizeBytes: null, downloadSizeBytes: null, actions: { install: { available: !existsSync(marker), reasonCode: existsSync(marker) ? "installed" : null }, update: { available: false, reasonCode: "unavailable" }, uninstall: { available: existsSync(marker), reasonCode: existsSync(marker) ? null : "not-installed" } } }),',
+        '    execute: async (_key, action) => {',
+        '      mkdirSync(ctx.paths.dataDir, { recursive: true })',
+        '      if (action === "uninstall" && existsSync(failureMarker)) { throw new Error("fixture uninstall failed") }',
+        '      if (action === "uninstall") { appendFileSync(order, "resource\\n"); rmSync(marker, { force: true }) } else { writeFileSync(marker, "installed") }',
+        '      return { state: existsSync(marker) ? "installed" : "not-installed", installationSource: existsSync(marker) ? "managed" : null, installedVersion: existsSync(marker) ? "1.0.0" : null, availableVersion: "1.0.0", installedSizeBytes: null, downloadSizeBytes: null, actions: { install: { available: !existsSync(marker), reasonCode: null }, update: { available: false, reasonCode: "unavailable" }, uninstall: { available: existsSync(marker), reasonCode: null } } }',
+        '    },',
+        '  })',
+        '  ctx.lifecycle.registerUninstall({',
+        '    inspect: async () => ({ summary: "Remove generated state.", data: [{ id: "generated", label: "Generated state", effect: "remove" }, { id: "account", label: "Account data", effect: "preserve" }] }),',
+        '    execute: async () => appendFileSync(order, "lifecycle\\n"),',
+        '  })',
+        '}',
+      ].join('\n'),
+    })
+    const hostDataDir = await mkdtemp(join(tmpdir(), 'cradle-plugin-host-'))
+    const managedResources = new ManagedResourceService([])
+    process.env.CRADLE_PLUGINS_DIR = tempPluginsDir
+    process.env.CRADLE_PLUGINS_SOURCE_KIND = 'workspaceDev'
+    const source = addPluginSource({ kind: 'localPath', location: tempPluginsDir, addedReason: 'lifecycle test' })
+
+    await activateServerPlugins(new Elysia(), {
+      hostServices: {
+        dataDir: hostDataDir,
+        managedResources,
+        downloadCenter: {
+          execute: async () => { throw new Error('Unexpected download') },
+          release: async () => { throw new Error('Unexpected release') },
+        },
+      },
+    })
+    await managedResources.execute({
+      namespace: 'plugin.lifecycle-fixture',
+      resourceType: 'runtime',
+      resourceId: 'fixture',
+    }, 'install')
+
+    const plan = await inspectDiscoveredSourceRemoval(source.id)
+
+    expect(plan).toMatchObject({
+      blocked: false,
+      plugins: [{
+        identity: '@cradle/lifecycle-fixture',
+        resources: [{ displayName: 'Fixture runtime', installationSource: 'managed' }],
+        lifecycle: { data: [{ effect: 'remove' }, { effect: 'preserve' }] },
+      }],
+    })
+
+    const pluginDataDir = join(hostDataDir, 'plugins', 'lifecycle-fixture')
+    await writeFile(join(pluginDataDir, 'fail-uninstall'), 'fail')
+    await expect(removeDiscoveredSource(source.id)).rejects.toThrow('fixture uninstall failed')
+    expect(listPluginDescriptors().some(plugin => plugin.identity === '@cradle/lifecycle-fixture')).toBe(true)
+    await expect(managedResources.get({
+      namespace: 'plugin.lifecycle-fixture',
+      resourceType: 'runtime',
+      resourceId: 'fixture',
+    })).resolves.toMatchObject({ state: 'installed', installationSource: 'managed' })
+
+    await rm(join(pluginDataDir, 'fail-uninstall'), { force: true })
+    await removeDiscoveredSource(source.id)
+
+    const order = await readFile(
+      join(pluginDataDir, 'uninstall-order'),
+      'utf8',
+    )
+    expect(order).toBe('resource\nlifecycle\n')
+    await rm(hostDataDir, { recursive: true, force: true })
   })
 })

@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { createChildLogger } from '../../../logging/logger'
+import { buildAiTelemetryCorrelationIds } from '../../../telemetry/ai-correlation'
 import { ChatRuntimeModel } from '../model'
 import { bindReadableStreamToAbortSignal } from '../stream/sse'
 import { readChatThinkingEffort, readOptionalModelId } from './request-normalizers'
@@ -65,6 +66,10 @@ export const chatRuntimeResponseRoutes = new Elysia({
           userMessageId: response.userMessageId,
           durationMs: Math.round(performance.now() - startedAtMs),
         })
+        const telemetryCorrelation = buildAiTelemetryCorrelationIds({
+          sessionId: params.sessionId,
+          runId: response.runId,
+        })
         return new Response(bindReadableStreamToAbortSignal(response.stream, request.signal), {
           headers: {
             'content-type': 'text/event-stream',
@@ -73,6 +78,8 @@ export const chatRuntimeResponseRoutes = new Elysia({
             'x-cradle-run-id': response.runId,
             'x-cradle-assistant-message-id': response.assistantMessageId,
             'x-cradle-user-message-id': response.userMessageId,
+            'x-cradle-telemetry-session-id': telemetryCorrelation.sessionId,
+            'x-cradle-telemetry-run-id': telemetryCorrelation.runId,
           },
         })
       }
@@ -124,6 +131,10 @@ export const chatRuntimeResponseRoutes = new Elysia({
         thinkingEffort: readChatThinkingEffort(body.thinkingEffort),
         runtimeSettings: body.runtimeSettings,
       })
+      const telemetryCorrelation = buildAiTelemetryCorrelationIds({
+        sessionId: params.sideConversationId,
+        runId: response.runId,
+      })
       return new Response(response.stream, {
         headers: {
           'content-type': 'text/event-stream',
@@ -132,6 +143,8 @@ export const chatRuntimeResponseRoutes = new Elysia({
           'x-cradle-run-id': response.runId,
           'x-cradle-assistant-message-id': response.assistantMessageId,
           'x-cradle-user-message-id': response.userMessageId,
+          'x-cradle-telemetry-session-id': telemetryCorrelation.sessionId,
+          'x-cradle-telemetry-run-id': telemetryCorrelation.runId,
         },
       })
     },

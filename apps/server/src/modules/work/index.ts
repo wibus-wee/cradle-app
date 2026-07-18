@@ -80,6 +80,18 @@ export const work = new Elysia({
     body: WorkModel.submitBody,
     response: { 200: WorkModel.detail },
   })
+  .post('/:id/branch', async ({ params, body }) => await Work.renameBranch({
+    id: params.id,
+    branch: body.branch,
+  }), {
+    detail: {
+      'summary': 'Rename the Work branch before the first pull request exists',
+      'x-cradle-cli': { command: ['work', 'rename-branch'] },
+    },
+    params: WorkModel.idParams,
+    body: WorkModel.renameBranchBody,
+    response: { 200: WorkModel.detail },
+  })
 
 export const sessionWork = new Elysia({
   prefix: '/sessions',

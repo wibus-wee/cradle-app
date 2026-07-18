@@ -14,17 +14,17 @@ import { CodeView } from '@pierre/diffs/react'
 import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import type { DiffData } from '~/components/common/diff/diff-data'
+import { buildDiffData, emptyDiffData } from '~/components/common/diff/diff-data'
+import { buildDiffOptions } from '~/components/common/diff/diff-options'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
-import type { CodeViewLineSelection, DiffData, ThreadAnnotation } from '../shared/diff-items'
+import type { CodeViewLineSelection, ThreadAnnotation } from '../shared/diff-items'
 import {
   anchorToLineSelection,
-  buildCodeViewOptions,
-  buildItemsFromPatch,
-  EMPTY_DIFF_DATA,
   formatAnchorRange,
   guideAnchorsForPath,
 } from '../shared/diff-items'
@@ -169,8 +169,10 @@ function GuideReading({
   const pathToFile = useMemo(() => new Map(files.map(file => [file.path, file])), [files])
   const threadById = useMemo(() => new Map(review.threads.map(thread => [thread.id, thread])), [review.threads])
 
-  const diffData: DiffData = useMemo(
-    () => (review.currentRevision?.patch?.trim() ? buildItemsFromPatch(review.currentRevision.patch) : EMPTY_DIFF_DATA),
+  const diffData: DiffData<ThreadAnnotation> = useMemo(
+    () => (review.currentRevision?.patch?.trim()
+      ? buildDiffData<ThreadAnnotation>(review.currentRevision.patch)
+      : emptyDiffData<ThreadAnnotation>()),
     [review.currentRevision?.patch],
   )
 
@@ -397,7 +399,7 @@ function GuideSection({
   index: number
   fileById: Map<string, ReviewFile>
   pathToFile: Map<string, ReviewFile>
-  diffData: DiffData
+  diffData: DiffData<ThreadAnnotation>
   preferences: NonNullable<ReturnType<typeof useReview>['review']>['preferences']
   threadById: Map<string, ReviewThread>
   onOpenInReview: (path?: string, line?: number, side?: 'base' | 'head') => void
@@ -442,7 +444,11 @@ function GuideSection({
   })
 
   const options = useMemo(
-    () => buildCodeViewOptions('unified'),
+    () => buildDiffOptions<ThreadAnnotation>('unified', {
+      controlledSelection: true,
+      enableGutterUtility: true,
+      enableLineSelection: true,
+    }),
     [],
   )
 
@@ -603,7 +609,7 @@ function GuideFileCodeView({
 }: {
   item: Extract<CodeViewItem<ThreadAnnotation>, { type: 'diff' }>
   anchors: ReviewGuideAnchor[]
-  options: ReturnType<typeof buildCodeViewOptions>
+  options: ReturnType<typeof buildDiffOptions<ThreadAnnotation>>
   diffStyleVars: CSSProperties
   onOpenInReview: (path?: string, line?: number, side?: 'base' | 'head') => void
 }) {

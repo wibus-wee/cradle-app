@@ -900,10 +900,14 @@ export const zPostAgentsBody = z.object({
     providerTargetId: z.string().nullish(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max',
+        'ultra'
     ]).optional(),
     runtimeKind: z.string().min(1).optional(),
     configJson: z.string().optional()
@@ -925,10 +929,14 @@ export const zPatchAgentsByIdBody = z.object({
     providerTargetId: z.string().nullish(),
     modelId: z.string().nullish(),
     thinkingEffort: z.enum([
+        'none',
+        'minimal',
         'low',
         'medium',
         'high',
-        'xhigh'
+        'xhigh',
+        'max',
+        'ultra'
     ]).optional(),
     runtimeKind: z.string().min(1).optional(),
     configJson: z.string().optional(),
@@ -1536,7 +1544,8 @@ export const zGetWorksQuery = z.object({
 export const zPostWorksBody = z.object({
     workspaceId: z.string().min(1),
     title: z.string().min(1),
-    objective: z.string().min(1),
+    goal: z.string().min(1).optional(),
+    objective: z.string().min(1).optional(),
     linkedIssueId: z.string().min(1).optional(),
     baseStrategy: z.enum(['source-head', 'remote-default']).optional(),
     providerTargetId: z.string().min(1).optional(),
@@ -2115,6 +2124,10 @@ export const zPostPluginsSourcesPreviewBody = z.object({
     subPath: z.string().nullish()
 });
 
+export const zDeletePluginsSourcesByIdBody = z.object({
+    confirmationToken: z.string().min(1)
+});
+
 export const zDeletePluginsSourcesByIdPath = z.object({
     id: z.string().min(1)
 });
@@ -2124,6 +2137,10 @@ export const zGetPluginsSourcesByIdPath = z.object({
 });
 
 export const zPostPluginsSourcesByIdRefreshPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zGetPluginsSourcesByIdUninstallPlanPath = z.object({
     id: z.string().min(1)
 });
 

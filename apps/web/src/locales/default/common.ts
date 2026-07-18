@@ -22,8 +22,7 @@ export default {
   'errorBoundary.description':
     'The app caught this crash, so you can retry the render or reload the window.',
   'errorBoundary.details': 'Error details',
-  'routeError.description':
-    'The rest of Cradle is still running. Retry this route or return home.',
+  'routeError.description': 'The rest of Cradle is still running. Retry this route or return home.',
   'routeError.messageLabel': 'Error',
   'routeError.title': 'This pane hit an error',
   'routeError.unknownMessage': 'Unknown route error',
@@ -72,7 +71,8 @@ export default {
   'thinking.xhigh.label': 'Extra High',
   'thinking.max.description': 'Maximum Claude Agent effort on supported models.',
   'thinking.max.label': 'Max',
-  'thinking.ultra.description': 'Enable proactive Codex multi-agent reasoning on supported models.',
+  'thinking.ultra.description':
+    'Enable the runtime\'s highest reasoning and orchestration mode on supported models.',
   'thinking.ultra.label': 'Ultra',
   'thinking.low.description': 'Fast responses with light reasoning.',
   'thinking.low.label': 'Low',

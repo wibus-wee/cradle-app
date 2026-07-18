@@ -15,7 +15,8 @@ export const ACP_RUNTIME_KIND = 'acp-chat' as const satisfies RuntimeKind
 export const ACP_RUNTIME_METADATA = {
   label: 'ACP Chat',
   description: 'Cloud Agent SDK runtime',
-  providerKinds: ['openai-compatible', 'anthropic', 'universal'],
+  providerKinds: [],
+  providerBinding: 'none',
   iconKey: 'custom',
   surfaces: ['chat', 'jarvis'],
   sortOrder: 40,

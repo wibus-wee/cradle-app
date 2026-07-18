@@ -260,6 +260,36 @@ export function activate(ctx: ServerPluginContext): void {
 }
 ```
 
+### Managed sidecars and uninstall lifecycle
+
+Plugins that own optional executables or other retained artifacts should expose them through `ctx.resources.register(...)`. Cradle assigns the plugin namespace, while the adapter owns declaration, projection, and install/update/uninstall behavior. Use `ctx.downloads` for HTTPS artifacts, `ctx.paths.dataDir` for plugin-owned files, and `ctx.secrets` for encrypted values that must not enter plugin storage or public status responses.
+
+`ctx.processes.spawn(...)` accepts only executables and working directories inside `ctx.paths.dataDir`. Cradle supervises these processes, gives them a minimal environment, and stops them when the plugin deactivates. A plugin with retained state must register `ctx.lifecycle.registerUninstall(...)`; inspection describes removed and preserved data, while execution performs plugin-specific cleanup after Cradle stops its processes and uninstalls its managed resources.
+
+Plugin source removal is a two-step host transaction: inspect the uninstall plan, show it to the operator, then submit its short-lived confirmation token. If resource or lifecycle cleanup fails, Cradle keeps the plugin active and retryable instead of deleting the source.
+
+```ts
+export function activate(ctx: ServerPluginContext): void {
+  ctx.resources.register(runtimeAdapter)
+
+  ctx.lifecycle.registerUninstall({
+    async inspect() {
+      return {
+        summary: 'Remove generated state while retaining account files.',
+        data: [
+          { id: 'config', label: 'Generated configuration', effect: 'remove' },
+          { id: 'accounts', label: 'Account files', effect: 'preserve' },
+        ],
+      }
+    },
+    async execute() {
+      await removeGeneratedConfiguration(ctx.paths.dataDir)
+      ctx.secrets.delete('api-key')
+    },
+  })
+}
+```
+
 ### `ctx.mcp.registerServer(config)` — MCP Server Registration
 
 Register an MCP (Model Context Protocol) server that agents can discover and use:
@@ -1098,6 +1128,12 @@ interface ServerPluginContext {
   skills: ServerPluginSkillRegistry
   providers: ServerPluginProviderRegistries
   runtimes: ServerPluginRuntimeRegistry
+  resources: PluginManagedResourceRegistry
+  downloads: PluginDownloadService
+  paths: PluginPaths
+  secrets: PluginSecrets
+  processes: PluginProcessService
+  lifecycle: PluginLifecycle
   subscriptions: Disposable[]
   storage: PluginStorage
   logger: Logger

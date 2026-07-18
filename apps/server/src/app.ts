@@ -1,3 +1,5 @@
+import { dirname } from 'node:path'
+
 import { cors } from '@elysiajs/cors'
 import { node } from '@elysiajs/node'
 import { Elysia } from 'elysia'
@@ -159,6 +161,8 @@ export async function createServerContractApp(options: CreateServerContractAppOp
         'x-cradle-run-id',
         'x-cradle-assistant-message-id',
         'x-cradle-user-message-id',
+        'x-cradle-telemetry-session-id',
+        'x-cradle-telemetry-run-id',
       ],
     }),
   )
@@ -270,7 +274,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     localRelaydSupervisor,
     { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
     { initHostConnectorService, getHostConnectorService },
-    { shutdownRemoteHostConnections },
+    { shutdownRemoteHostConnections, startEnabledRelayRemoteHostConnections },
     { shutdownImageOcr },
     { CodexUsageReconciliationScheduler },
     { RunSnapshotMaintenanceScheduler },
@@ -305,9 +309,15 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
   await opencodeRuntimeInstallationService.boot()
 
+  const managedResourceService = new ManagedResourceService([
+    createChronicleManagedResourceAdapter(downloadCenterService),
+    createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
+  ])
+
   const app = await createServerContractApp({
     includeRuntimeHttpPlugins: true,
     downloadCenterService,
+    managedResourceService,
     opencodeRuntimeInstallationService,
   })
   registerAgentToolsMcpServer()
@@ -322,7 +332,13 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
 
   // Plugin system — discover and activate server plugins
-  await activateServerPlugins(app)
+  await activateServerPlugins(app, {
+    hostServices: {
+      downloadCenter: downloadCenterService,
+      managedResources: managedResourceService,
+      dataDir: serverConfig.dataDir ?? dirname(serverConfig.dbPath),
+    },
+  })
   reconcileExternalIssueSourceRegistrations()
 
   const runtimeResources = new RuntimeResourceRegistry()
@@ -445,6 +461,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     void localRelaydSupervisor.startManagedLocalRelayd().catch((error) => {
       console.error('[relay-servers] managed relayd warm-start failed:', error)
     })
+    void startEnabledRelayRemoteHostConnections()
     // Start the always-on relay host-connector for any existing enrollments.
     // Each enrollment maintains its own /ws/host connection with backoff.
     try {

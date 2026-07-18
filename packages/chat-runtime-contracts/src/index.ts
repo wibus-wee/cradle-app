@@ -119,10 +119,12 @@ export interface CradleTurnTranscript {
 export interface RuntimeProviderTargetProfile {
   id: string
   name: string
-  providerKind: ProviderKind
+  /** Absent on runtime-synthesized profiles whose provider binding is `'none'`. */
+  providerKind?: ProviderKind
   enabled: boolean
   configJson: string
-  credentialRef: string | null
+  /** Absent on runtime-synthesized profiles whose provider binding is `'none'`. */
+  credentialRef?: string | null
   customModels: string
   iconSlug: string | null
   providerTargetKind: 'manual' | 'external'
@@ -1090,7 +1092,7 @@ export interface ChatRuntimeMetadata {
   label: string
   description?: string
   providerKinds: ProviderKind[]
-  providerBinding?: 'required' | 'runtime-owned'
+  providerBinding?: 'required' | 'runtime-owned' | 'none'
   sessionLaunchMode?: RuntimeSessionLaunchMode
   icon?: RuntimeIconDescriptor
   iconKey?: string

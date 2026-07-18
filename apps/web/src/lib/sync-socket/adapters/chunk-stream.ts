@@ -141,6 +141,8 @@ export function subscribeSyncSessionRunChunks(input: {
     streamId: subId,
     sessionId: input.sessionId,
     runId: null,
+    telemetrySessionId: null,
+    telemetryRunId: null,
     stream,
   })
 }

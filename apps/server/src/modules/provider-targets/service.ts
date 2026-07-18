@@ -35,6 +35,7 @@ import {
   listRuntimeOwnedProviderTargets,
   projectRuntimeOwnedProviderTarget,
   readRuntimeOwnedProviderTargetOwner,
+  readRuntimeProviderBinding,
   readRuntimeUniversalProviderKind,
   runtimeOwnsProviderBinding,
   runtimeSupportsProviderKind,
@@ -546,6 +547,11 @@ export function assertProviderTargetCompatibleWithRuntime(
         owningRuntimeKind,
       },
     })
+  }
+  if (readRuntimeProviderBinding(runtimeKind) === 'none') {
+    // Binding-'none' runtimes never bind to a provider; a stored target only carries legacy
+    // launch configuration, so no provider-kind compatibility applies.
+    return
   }
   if (runtimeOwnsProviderBinding(runtimeKind)) {
     throw new AppError({

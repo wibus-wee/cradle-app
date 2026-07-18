@@ -13,6 +13,12 @@ export type ProductFeatureDomain
 
 export type ProductAnalyticsOutcome = 'success' | 'failed' | 'cancelled'
 
+/** Opaque server-issued IDs used to join product tasks with AI telemetry. */
+export interface ProductAnalyticsCorrelation {
+  session_id: string
+  run_id: string
+}
+
 export type ProductAnalyticsFailureCategory
   = | 'configuration'
     | 'network'
@@ -55,6 +61,8 @@ export type ProductAnalyticsTask
     task_variant: 'local' | 'remote'
   }
 
+type ProductAnalyticsTaskEvent = ProductAnalyticsTask & Partial<ProductAnalyticsCorrelation>
+
 export interface ProductAnalyticsEventMap {
   app_opened: {
     lifecycle_stage: 'first_seen' | 'returning' | 'updated'
@@ -65,8 +73,8 @@ export interface ProductAnalyticsEventMap {
     feature_domain: ProductFeatureDomain | null
   }
   onboarding_completed: Record<string, never>
-  task_started: ProductAnalyticsTask
-  task_finished: ProductAnalyticsTask & {
+  task_started: ProductAnalyticsTaskEvent
+  task_finished: ProductAnalyticsTaskEvent & {
     outcome: ProductAnalyticsOutcome
     duration_bucket: ProductAnalyticsDurationBucket
     failure_category: ProductAnalyticsFailureCategory | null

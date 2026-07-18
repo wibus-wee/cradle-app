@@ -109,7 +109,7 @@ export const runtimeCatalogItemSchema = t.Object({
   label: t.String(),
   description: t.Optional(t.String()),
   providerKinds: t.Array(t.String()),
-  providerBinding: t.Optional(t.Union([t.Literal('required'), t.Literal('runtime-owned')])),
+  providerBinding: t.Optional(t.Union([t.Literal('required'), t.Literal('runtime-owned'), t.Literal('none')])),
   sessionLaunchMode: t.Union([t.Literal('runtime-provider'), t.Literal('agent-terminal')]),
   iconKey: t.Optional(t.String()),
   surfaces: t.Optional(t.Array(t.Union([t.Literal('chat'), t.Literal('jarvis')]))),

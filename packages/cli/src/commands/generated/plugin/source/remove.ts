@@ -17,7 +17,14 @@ const spec = {
     "remove"
   ],
   "description": "Remove plugin source",
-  "flags": [],
+  "flags": [
+    {
+      "name": "confirmationToken",
+      "required": true,
+      "target": "body.confirmationToken",
+      "type": "string"
+    }
+  ],
   "method": "delete",
   "path": "/plugins/sources/{id}"
 } satisfies CliOperationSpec

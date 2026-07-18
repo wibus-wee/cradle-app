@@ -26,6 +26,8 @@ export interface ChatStreamTransportResult {
   streamId: string | null
   sessionId: string
   runId: string | null
+  telemetrySessionId: string | null
+  telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
   stream: ReadableStream<ChatStreamChunk>
@@ -107,6 +109,8 @@ async function startHttpChatResponseStream(
     streamId: null,
     sessionId: args.sessionId,
     runId: response.headers.get('x-cradle-run-id'),
+    telemetrySessionId: response.headers.get('x-cradle-telemetry-session-id'),
+    telemetryRunId: response.headers.get('x-cradle-telemetry-run-id'),
     assistantMessageId: response.headers.get('x-cradle-assistant-message-id') ?? undefined,
     userMessageId: response.headers.get('x-cradle-user-message-id') ?? undefined,
     stream: buildUIMessageChunkStreamFromResponse(response, args.sessionId),
@@ -125,6 +129,8 @@ async function subscribeHttpChatSessionStream(
     streamId: null,
     sessionId: args.sessionId,
     runId: response.headers.get('x-cradle-run-id'),
+    telemetrySessionId: response.headers.get('x-cradle-telemetry-session-id'),
+    telemetryRunId: response.headers.get('x-cradle-telemetry-run-id'),
     stream: buildUIMessageChunkStreamFromResponse(response, args.sessionId, { initialReplay: true }),
   }
 }
@@ -197,6 +203,8 @@ function readDesktopTransportResult(
     streamId: handle.streamId,
     sessionId: handle.sessionId,
     runId: handle.runId,
+    telemetrySessionId: handle.telemetrySessionId,
+    telemetryRunId: handle.telemetryRunId,
     assistantMessageId: handle.assistantMessageId,
     userMessageId: handle.userMessageId,
     stream,

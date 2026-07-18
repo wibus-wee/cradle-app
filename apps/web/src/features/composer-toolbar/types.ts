@@ -2,7 +2,7 @@ import type { ModelDescriptor, ProviderKind, ProviderTargetKind, RuntimeKind } f
 
 export type ComposerContext = 'new-chat' | 'chat'
 export type ComposerTargetMode = 'provider' | 'agent'
-export type RuntimeProviderBinding = 'required' | 'runtime-owned'
+export type RuntimeProviderBinding = 'required' | 'runtime-owned' | 'none'
 
 export type ThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null
 

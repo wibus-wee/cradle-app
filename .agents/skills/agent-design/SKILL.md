@@ -40,6 +40,7 @@ If you see any of these, the design has likely drifted:
 - A coordinator that every agent must ask before doing anything → [Orchestration Gravity](./references/patterns.md)
 - Approval gates on every meaningful action → [Safe Mode Trap](./references/anti-patterns.md)
 - External database treated as the agent's real state → [State Externalization Fallacy](./references/context-and-session.md)
+- System prompt rebuilt every turn with current state → [Append-System-Prompt](./references/context-and-session.md)
 
 ## References
 

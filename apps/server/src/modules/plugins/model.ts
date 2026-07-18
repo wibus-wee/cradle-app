@@ -1,5 +1,7 @@
 import { t } from 'elysia'
 
+import { ManagedResourceModel } from '../managed-resources/model'
+
 const pluginCapabilityLayer = t.Union([
   t.Literal('server'),
   t.Literal('web'),
@@ -235,6 +237,51 @@ const reloadPluginDevSessionBody = t.Object({
   layer: t.Union([t.Literal('server'), t.Literal('web'), t.Literal('desktop')]),
 }, { additionalProperties: false })
 
+const pluginUninstallDataEffect = t.Object({
+  id: t.String({ minLength: 1 }),
+  label: t.String({ minLength: 1 }),
+  effect: t.Union([t.Literal('remove'), t.Literal('preserve')]),
+  description: t.Optional(t.String()),
+}, { additionalProperties: false })
+
+const pluginUninstallLifecycle = t.Union([
+  t.Object({
+    summary: t.String({ minLength: 1 }),
+    data: t.Array(pluginUninstallDataEffect),
+    warnings: t.Optional(t.Array(t.String())),
+  }, { additionalProperties: false }),
+  t.Null(),
+])
+
+const pluginProcessView = t.Object({
+  id: t.String({ minLength: 1 }),
+  displayName: t.String({ minLength: 1 }),
+  pid: t.Union([t.Number(), t.Null()]),
+  state: t.Union([t.Literal('starting'), t.Literal('running'), t.Literal('stopping')]),
+  startedAt: t.String({ minLength: 1 }),
+}, { additionalProperties: false })
+
+const pluginSourceRemovalPluginPlan = t.Object({
+  identity: t.String({ minLength: 1 }),
+  displayName: t.String({ minLength: 1 }),
+  processes: t.Array(pluginProcessView),
+  resources: t.Array(ManagedResourceModel.descriptor),
+  lifecycle: pluginUninstallLifecycle,
+  blockedReasons: t.Array(t.String()),
+}, { additionalProperties: false })
+
+const pluginSourceRemovalPlan = t.Object({
+  sourceId: t.String({ minLength: 1 }),
+  plugins: t.Array(pluginSourceRemovalPluginPlan),
+  blocked: t.Boolean(),
+  confirmationToken: t.String({ minLength: 1 }),
+  expiresAt: t.String({ minLength: 1 }),
+}, { additionalProperties: false })
+
+const removePluginSourceBody = t.Object({
+  confirmationToken: t.String({ minLength: 1 }),
+}, { additionalProperties: false })
+
 export const PluginsModel = {
   addPluginSourceBody,
   addPluginSourceResult,
@@ -249,5 +296,7 @@ export const PluginsModel = {
   pluginDevSession,
   createPluginDevSessionBody,
   reloadPluginDevSessionBody,
+  pluginSourceRemovalPlan,
+  removePluginSourceBody,
   updatePluginActivationBody,
 } as const

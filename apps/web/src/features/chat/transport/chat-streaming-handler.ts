@@ -7,7 +7,10 @@ import {
   trackProductTaskFinished,
   trackProductTaskStarted,
 } from '~/features/product-analytics/client'
-import type { ProductAnalyticsFailureCategory } from '~/features/product-analytics/event-model'
+import type {
+  ProductAnalyticsCorrelation,
+  ProductAnalyticsFailureCategory,
+} from '~/features/product-analytics/event-model'
 import type { MessageReconcileChange } from '~/store/chat'
 import { useChatStore } from '~/store/chat'
 
@@ -38,6 +41,7 @@ export class ChatStreamingHandler {
   private currentChunkReplay = false
   private replayBatchOpen = false
   private analyticsTask: ProductAnalyticsTaskTimer | null = null
+  private analyticsCorrelation: ProductAnalyticsCorrelation | undefined
   private failureCategory: ProductAnalyticsFailureCategory | null = null
 
   constructor(
@@ -71,13 +75,15 @@ export class ChatStreamingHandler {
       })
       return
     }
-    this.analyticsTask = trackProductTaskStarted({
-      feature_domain: 'chat',
-      task_kind: 'agent_run',
-      task_variant: null,
-    }, this.requestStartedAtMs)
     this.appendLocalPlaceholder()
     store.startGeneration(this.sessionId, this.messageId, controller)
+  }
+
+  setTelemetryCorrelation(correlation: ProductAnalyticsCorrelation | null): void {
+    if (this.mode !== 'local' || this.settled || this.analyticsTask) {
+      return
+    }
+    this.analyticsCorrelation = correlation ?? undefined
   }
 
   async consume(stream: ReadableStream<ChatStreamChunk>): Promise<void> {
@@ -305,14 +311,23 @@ export class ChatStreamingHandler {
     }
     this.settled = true
     if (this.mode === 'local') {
+      this.analyticsTask ??= this.analyticsCorrelation
+        ? trackProductTaskStarted({
+            feature_domain: 'chat',
+            task_kind: 'agent_run',
+            task_variant: null,
+          }, this.requestStartedAtMs, this.analyticsCorrelation)
+        : trackProductTaskStarted({
+            feature_domain: 'chat',
+            task_kind: 'agent_run',
+            task_variant: null,
+          }, this.requestStartedAtMs)
       const analyticsTask = this.analyticsTask
-      if (analyticsTask) {
-        trackProductTaskFinished(
-          analyticsTask,
-          status === 'complete' ? 'success' : status === 'aborted' ? 'cancelled' : 'failed',
-          status === 'error' ? this.failureCategory ?? 'unknown' : null,
-        )
-      }
+      trackProductTaskFinished(
+        analyticsTask,
+        status === 'complete' ? 'success' : status === 'aborted' ? 'cancelled' : 'failed',
+        status === 'error' ? this.failureCategory ?? 'unknown' : null,
+      )
     }
     if (!this.emitSettledEvents) {
       return

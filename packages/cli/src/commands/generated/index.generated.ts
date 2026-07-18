@@ -186,6 +186,7 @@ import { register as registerPluginSourceGet } from './plugin/source/get'
 import { register as registerPluginSourceList } from './plugin/source/list'
 import { register as registerPluginSourceRefresh } from './plugin/source/refresh'
 import { register as registerPluginSourceRemove } from './plugin/source/remove'
+import { register as registerPluginSourceUninstallPlan } from './plugin/source/uninstall-plan'
 import { register as registerPreferencesAppGet } from './preferences/app/get'
 import { register as registerPreferencesAppSet } from './preferences/app/set'
 import { register as registerPreferencesChatGet } from './preferences/chat/get'
@@ -287,6 +288,7 @@ import { register as registerWorkCreate } from './work/create'
 import { register as registerWorkGet } from './work/get'
 import { register as registerWorkList } from './work/list'
 import { register as registerWorkPrepare } from './work/prepare'
+import { register as registerWorkRenameBranch } from './work/rename-branch'
 import { register as registerWorkSubmit } from './work/submit'
 import { register as registerWorkflowRuleDelete } from './workflow-rule/delete'
 import { register as registerWorkflowRuleGet } from './workflow-rule/get'
@@ -534,6 +536,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerPluginSourceList(program)
   registerPluginSourceRefresh(program)
   registerPluginSourceRemove(program)
+  registerPluginSourceUninstallPlan(program)
   registerPreferencesAppGet(program)
   registerPreferencesAppSet(program)
   registerPreferencesChatGet(program)
@@ -635,6 +638,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerWorkGet(program)
   registerWorkList(program)
   registerWorkPrepare(program)
+  registerWorkRenameBranch(program)
   registerWorkSubmit(program)
   registerWorkflowRuleDelete(program)
   registerWorkflowRuleGet(program)

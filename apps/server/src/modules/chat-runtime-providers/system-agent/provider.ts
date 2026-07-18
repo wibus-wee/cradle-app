@@ -107,7 +107,7 @@ export class SystemAgentProvider implements ChatRuntime {
     const config = readTrustedSystemAgentConfig(profile.configJson)
     const userPrompt = projectSystemAgentUserPrompt(input.message)
 
-    const provider = config.provider ?? inferSystemAgentProviderFromKind(profile.providerKind)
+    const provider = config.provider ?? inferSystemAgentProviderFromKind(profile.providerKind ?? 'universal')
     const model = jarvisPrefs.model
     const { baseUrl } = config
     if (!model) {
@@ -152,7 +152,7 @@ export class SystemAgentProvider implements ChatRuntime {
     }
     else {
       // Always provide api protocol — jar-core requires it for non-builtin models
-      runtimeConfigOptions.api = inferSystemAgentApiFromKind(profile.providerKind) as DefaultRuntimeConfigOptions['api']
+      runtimeConfigOptions.api = inferSystemAgentApiFromKind(profile.providerKind ?? 'universal') as DefaultRuntimeConfigOptions['api']
     }
 
     applySystemAgentModelRegistryConfig(runtimeConfigOptions, {

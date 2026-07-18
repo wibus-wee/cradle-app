@@ -9,6 +9,7 @@ import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
+import { runGitCommand } from '../git/git-command'
 import {
   addGitWorktree,
   addGitWorktreeExistingBranch,
@@ -19,6 +20,7 @@ import {
   mergeBranch,
   pruneGitWorktrees,
   removeGitWorktree,
+  renameLocalBranch,
   resolveGitRepoRoot,
   resolveRemoteDefaultBaseRef,
   stashAndPopAcrossCheckouts,
@@ -542,6 +544,72 @@ export async function createWorktree(input: {
     }
     throw error
   }
+}
+
+export async function renameWorktreeBranch(input: {
+  worktreeId: string
+  branch: string
+}): Promise<WorktreeView> {
+  const record = getWorktreeRecord(input.worktreeId)
+  if (!record) {
+    throw new AppError({ code: 'worktree_not_found', status: 404, message: 'Worktree not found' })
+  }
+  if (record.status !== 'active') {
+    throw new AppError({
+      code: 'worktree_not_active',
+      status: 409,
+      message: 'Only an active worktree branch can be renamed',
+      details: { worktreeId: record.id, status: record.status },
+    })
+  }
+
+  const branch = input.branch.trim()
+  if (!branch.startsWith(BRANCH_PREFIX) || branch.length <= BRANCH_PREFIX.length) {
+    throw new AppError({
+      code: 'worktree_branch_invalid',
+      status: 400,
+      message: `Worktree branch must use the ${BRANCH_PREFIX} prefix`,
+      details: { branch },
+    })
+  }
+  try {
+    await runGitCommand(record.path, ['check-ref-format', '--branch', branch])
+  }
+  catch {
+    throw new AppError({
+      code: 'worktree_branch_invalid',
+      status: 400,
+      message: 'Worktree branch name is not a valid git branch name',
+      details: { branch },
+    })
+  }
+  // Linked worktrees share refs with the main checkout, so existence checks
+  // and `git branch -m` run from the worktree path see the shared namespace.
+  if (branch === record.branch || await branchExists(record.path, branch)) {
+    throw new AppError({
+      code: 'worktree_branch_exists',
+      status: 409,
+      message: 'A branch with that name already exists',
+      details: { branch },
+    })
+  }
+
+  // Only the branch is renamed; the worktree directory name/path stays as-is.
+  await renameLocalBranch(record.path, record.branch, branch)
+  db().update(worktrees).set({
+    branch,
+    updatedAt: now(),
+  }).where(eq(worktrees.id, record.id)).run()
+
+  const updated = getWorktree(record.id)
+  if (!updated) {
+    throw new AppError({
+      code: 'worktree_not_found',
+      status: 404,
+      message: 'Worktree not found',
+    })
+  }
+  return updated
 }
 
 export function attachSessionToWorktree(input: {

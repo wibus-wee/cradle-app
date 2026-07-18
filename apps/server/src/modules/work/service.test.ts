@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { localWorkspaceLocatorJson } from '../../../tests/helpers/workspace-fixture'
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import * as ChatRuntime from '../chat-runtime/runtime'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
@@ -115,6 +116,14 @@ function mockSessionAwaitRegister() {
   }))
 }
 
+function mockInitialRun() {
+  return vi.spyOn(ChatRuntime, 'createRun').mockResolvedValue({
+    runId: 'initial-work-run',
+    assistantMessageId: 'initial-work-assistant-message',
+    userMessageId: 'initial-work-user-message',
+  })
+}
+
 describe('deriveActivity', () => {
   it('uses blocked, waiting, running, idle precedence', () => {
     expect(Work.deriveActivity({
@@ -173,11 +182,12 @@ describe('work delivery control', () => {
         locatorJson: localWorkspaceLocatorJson(repositoryPath),
         identifier: 'WSW',
       }).run()
+      const createRun = mockInitialRun()
 
       const detail = await Work.create({
         workspaceId: WORKSPACE_ID,
         title: 'Create managed Work',
-        objective: 'Create an isolated local Work container.',
+        goal: 'Create an isolated local Work container.',
         runtimeKind: 'opencode',
       })
 
@@ -185,6 +195,11 @@ describe('work delivery control', () => {
       expect(detail.execution.isIsolated).toBe(true)
       expect(detail.execution.worktreeHealth).toBe('ok')
       expect(detail.readiness.commitsAhead).toBe(0)
+      expect(detail.initialRun?.runId).toBe('initial-work-run')
+      expect(createRun).toHaveBeenCalledWith({
+        sessionId: detail.primaryThread.id,
+        text: 'Create an isolated local Work container.',
+      })
       expect(db().select().from(works).all()).toHaveLength(1)
       expect(db().select().from(workThreads).all()).toHaveLength(1)
 
@@ -229,6 +244,45 @@ describe('work delivery control', () => {
     expect(detail.work.lastSubmittedAt).toBeNull()
     expect(createPullRequest).not.toHaveBeenCalled()
     expect(updatePullRequest).not.toHaveBeenCalled()
+  })
+
+  it('auto-updates the existing open pull request on prepare', async () => {
+    seedWork()
+    const { pullRequest } = mockHealthyDetailReads()
+    pullRequest.mockResolvedValue(OPEN_PULL_REQUEST)
+    db().update(works).set({
+      handoffTitle: 'Draft title',
+      handoffSummary: 'Implemented the flow.',
+      handoffTestPlan: 'Run focused tests.',
+      preparedAt: 10,
+      lastSubmittedAt: 5,
+    }).run()
+    const createPullRequest = vi.spyOn(PullRequest, 'createDraftPullRequest')
+    const updatePullRequest = vi.spyOn(PullRequest, 'updatePullRequest').mockResolvedValue({
+      ...OPEN_PULL_REQUEST,
+      title: 'Updated title',
+      updatedAt: 20,
+    })
+    const registerSpy = mockSessionAwaitRegister()
+
+    const detail = await Work.prepare({
+      id: WORK_ID,
+      title: 'Updated title',
+      summary: 'Updated summary.',
+      testPlan: 'Updated tests.',
+    })
+
+    expect(createPullRequest).not.toHaveBeenCalled()
+    expect(updatePullRequest).toHaveBeenCalledTimes(1)
+    expect(updatePullRequest).toHaveBeenCalledWith({
+      sessionId: SESSION_ID,
+      title: 'Updated title',
+      body: '## Summary\nUpdated summary.\n\n## Test plan\nUpdated tests.',
+    })
+    expect(registerSpy).toHaveBeenCalledTimes(2)
+    expect(detail.work.handoffTitle).toBe('Updated title')
+    expect(detail.work.lastSubmittedAt).not.toBeNull()
+    expect(detail.work.lastSubmittedAt).toBeGreaterThan(detail.work.preparedAt!)
   })
 
   it('keeps delivery timestamps ordered across same-second prepare and submit actions', async () => {
@@ -612,6 +666,7 @@ describe('work delivery control', () => {
     })
     const bind = vi.spyOn(Worktree, 'bindSessionWorktree').mockResolvedValue()
     mockHealthyDetailReads()
+    const createRun = mockInitialRun()
 
     const detail = await Work.create({
       workspaceId: WORKSPACE_ID,
@@ -633,8 +688,65 @@ describe('work delivery control', () => {
       worktreeId: 'worktree-remote-default',
       pending: false,
     })
+    expect(createRun).toHaveBeenCalledWith({
+      sessionId: SESSION_ID,
+      text: 'Start from origin/main despite local WIP.',
+    })
     expect(detail.primaryThread.id).toBe(SESSION_ID)
     expect(db().select().from(works).all()).toHaveLength(1)
+  })
+
+  it('accepts goal as the Work create input and starts the primary Session with it', async () => {
+    db().insert(workspaces).values({
+      id: WORKSPACE_ID,
+      name: 'Work Service Workspace',
+      locatorJson: localWorkspaceLocatorJson('/tmp/work-service'),
+      identifier: 'WSW',
+    }).run()
+    vi.spyOn(Worktree, 'assertWorkspaceCleanForManagedIsolation').mockResolvedValue()
+    vi.spyOn(Session, 'create').mockImplementation(async () => {
+      db().insert(sessions).values({
+        id: SESSION_ID,
+        workspaceId: WORKSPACE_ID,
+        title: 'Goal Work',
+        origin: 'work',
+        runtimeKind: 'opencode',
+      }).run()
+      return Session.get(SESSION_ID)!
+    })
+    vi.spyOn(Worktree, 'createWorktree').mockResolvedValue({
+      id: 'worktree-goal',
+      sourceWorkspaceId: WORKSPACE_ID,
+      name: 'goal-work',
+      path: '/tmp/worktree-goal',
+      branch: 'cradle/wt/goal-work',
+      baseRef: 'base-sha',
+      status: 'active',
+      createdBySessionId: SESSION_ID,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    vi.spyOn(Worktree, 'bindSessionWorktree').mockResolvedValue()
+    mockHealthyDetailReads()
+    const createRun = mockInitialRun()
+
+    const detail = await Work.create({
+      workspaceId: WORKSPACE_ID,
+      title: 'Goal Work',
+      goal: 'Ship the goal-driven Work flow.',
+      runtimeKind: 'opencode',
+    })
+
+    expect(detail.work.objective).toBe('Ship the goal-driven Work flow.')
+    expect(detail.initialRun).toEqual({
+      runId: 'initial-work-run',
+      assistantMessageId: 'initial-work-assistant-message',
+      userMessageId: 'initial-work-user-message',
+    })
+    expect(createRun).toHaveBeenCalledWith({
+      sessionId: SESSION_ID,
+      text: 'Ship the goal-driven Work flow.',
+    })
   })
 
   it('removes the primary Session when managed Worktree creation fails', async () => {
@@ -660,5 +772,83 @@ describe('work delivery control', () => {
 
     expect(db().select().from(works).all()).toHaveLength(0)
     expect(db().select().from(sessions).all()).toHaveLength(0)
+  })
+})
+
+describe('work branch rename', () => {
+  const WORKTREE_ID = 'work-service-worktree'
+
+  function seedWorktree(): void {
+    db().insert(worktrees).values({
+      id: WORKTREE_ID,
+      sourceWorkspaceId: WORKSPACE_ID,
+      name: 'work-service-work',
+      path: '/tmp/work-service-worktree',
+      branch: 'cradle/wt/work-service-work',
+      baseRef: 'base-sha',
+      status: 'active',
+      createdBySessionId: SESSION_ID,
+    }).run()
+    db().update(sessions).set({ worktreeId: WORKTREE_ID }).where(eq(sessions.id, SESSION_ID)).run()
+  }
+
+  it('renames the branch before the first pull request exists', async () => {
+    seedWork()
+    seedWorktree()
+    mockHealthyDetailReads()
+    vi.spyOn(PullRequest, 'getBoundPullRequest').mockReturnValue(null)
+    vi.spyOn(PullRequest, 'isBranchOnRemote').mockResolvedValue(false)
+    const renameSpy = vi.spyOn(Worktree, 'renameWorktreeBranch').mockResolvedValue({
+      id: WORKTREE_ID,
+      sourceWorkspaceId: WORKSPACE_ID,
+      name: 'work-service-work',
+      path: '/tmp/work-service-worktree',
+      branch: 'cradle/wt/meaningful-name',
+      baseRef: 'base-sha',
+      status: 'active',
+      createdBySessionId: SESSION_ID,
+      createdAt: 10,
+      updatedAt: 20,
+    })
+
+    const detail = await Work.renameBranch({
+      id: WORK_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })
+
+    expect(renameSpy).toHaveBeenCalledWith({
+      worktreeId: WORKTREE_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })
+    expect(detail.work.id).toBe(WORK_ID)
+  })
+
+  it('rejects the rename once a pull request is bound', async () => {
+    seedWork()
+    seedWorktree()
+    mockHealthyDetailReads()
+    vi.spyOn(PullRequest, 'getBoundPullRequest').mockReturnValue(OPEN_PULL_REQUEST)
+    const renameSpy = vi.spyOn(Worktree, 'renameWorktreeBranch')
+
+    await expect(Work.renameBranch({
+      id: WORK_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })).rejects.toMatchObject({ code: 'work_pull_request_exists' })
+    expect(renameSpy).not.toHaveBeenCalled()
+  })
+
+  it('rejects the rename when the branch is already on the remote', async () => {
+    seedWork()
+    seedWorktree()
+    mockHealthyDetailReads()
+    vi.spyOn(PullRequest, 'getBoundPullRequest').mockReturnValue(null)
+    vi.spyOn(PullRequest, 'isBranchOnRemote').mockResolvedValue(true)
+    const renameSpy = vi.spyOn(Worktree, 'renameWorktreeBranch')
+
+    await expect(Work.renameBranch({
+      id: WORK_ID,
+      branch: 'cradle/wt/meaningful-name',
+    })).rejects.toMatchObject({ code: 'work_branch_already_pushed' })
+    expect(renameSpy).not.toHaveBeenCalled()
   })
 })

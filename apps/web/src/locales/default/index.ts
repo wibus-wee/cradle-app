@@ -16,6 +16,7 @@ import newChat from './new-chat'
 import onboarding from './onboarding'
 import pullRequests from './pull-requests'
 import resourcesPage from './resources'
+import runtimes from './runtimes'
 import search from './search'
 import sessionIsolation from './session-isolation'
 import sessionPullRequest from './session-pull-request'
@@ -45,6 +46,7 @@ const resources = {
   onboarding,
   'pull-requests': pullRequests,
   'resources': resourcesPage,
+  runtimes,
   search,
   'session-isolation': sessionIsolation,
   'session-pull-request': sessionPullRequest,

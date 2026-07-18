@@ -10,7 +10,13 @@ import { db } from '../../../infra'
 import type { CradleTurnTranscript } from '../transcript'
 import { resolveCradleTurnTranscript } from '../transcript'
 import { resolveHarnessContextFragments } from './context-source-registry'
-import { getCradleHarnessSystemInstructions } from './system-instructions'
+import {
+  getCradleHarnessSystemInstructions,
+  getCradleWorkModeSystemInstructions,
+} from './system-instructions'
+
+/** Matches `modules/work/agent-context` WORK_HARNESS_FRAGMENT_KEY. */
+const CRADLE_WORK_HARNESS_FRAGMENT_KEY = 'cradle-work'
 
 const DEFAULT_TURN_CONTEXT_MAX_MESSAGES = 12
 const DEFAULT_TURN_CONTEXT_MAX_CHARS = 120_000
@@ -85,6 +91,16 @@ export function resolveSessionHarness(session: Session | null | undefined): Pick
   }
 
   const fragments = session ? resolveHarnessContextFragments(session) : []
+  const isPrimaryWorkThread = fragments.some(fragment => fragment.key === CRADLE_WORK_HARNESS_FRAGMENT_KEY)
+  if (isPrimaryWorkThread) {
+    const workModePrompt = getCradleWorkModeSystemInstructions()
+    if (workModePrompt) {
+      systemPrompt = systemPrompt
+        ? `${systemPrompt}\n\n---\n\n${workModePrompt}`
+        : workModePrompt
+    }
+  }
+
   return {
     systemPrompt,
     harness: fragments.length > 0 ? { fragments } : undefined,

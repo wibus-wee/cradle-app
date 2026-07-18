@@ -86,7 +86,8 @@ export const WorkModel = {
   createBody: t.Object({
     workspaceId: t.String({ minLength: 1 }),
     title: t.String({ minLength: 1 }),
-    objective: t.String({ minLength: 1 }),
+    goal: t.Optional(t.String({ minLength: 1 })),
+    objective: t.Optional(t.String({ minLength: 1 })),
     linkedIssueId: t.Optional(t.String({ minLength: 1 })),
     /**
      * How to choose the isolation base commit.
@@ -121,6 +122,10 @@ export const WorkModel = {
     summary: t.Optional(t.String({ minLength: 1 })),
     testPlan: t.Optional(t.String({ minLength: 1 })),
     base: t.Optional(t.String({ minLength: 1 })),
+  }),
+
+  renameBranchBody: t.Object({
+    branch: t.String({ minLength: 1 }),
   }),
 
   sessionResolution: t.Object({

@@ -126,6 +126,7 @@ export async function startOrResumeThread(
     approvalPolicy: CodexConfig['approvalPolicy']
     sandbox: CodexConfig['sandboxMode']
     config: Record<string, unknown>
+    developerInstructions?: string | null
     requestTimeoutMs?: number
   },
 ): Promise<CodexThreadStart> {
@@ -136,6 +137,7 @@ export async function startOrResumeThread(
     approvalPolicy: params.approvalPolicy,
     sandbox: params.sandbox,
     config: params.config,
+    ...(params.developerInstructions ? { developerInstructions: params.developerInstructions } : {}),
   }
   const method = runtimeSession.providerSessionId ? 'thread/resume' : 'thread/start'
   const requestParams = runtimeSession.providerSessionId

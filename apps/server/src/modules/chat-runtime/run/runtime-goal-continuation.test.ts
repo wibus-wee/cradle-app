@@ -1,11 +1,12 @@
 import type { BackendSessionBinding } from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createCodexGoalContinuation } from '../../chat-runtime-providers/codex/goal-continuation'
 import type { ChatRuntime } from '../runtime-provider-types'
 import {
   hasContinuableRuntimeGoal,
+  scheduleRuntimeGoalContinuation,
   shouldScheduleRuntimeGoalContinuation,
 } from './runtime-goal-continuation'
 
@@ -34,6 +35,8 @@ function createGoalSnapshot(status: string, objective = 'Ship the goal'): string
 function createBinding(status: string): BackendSessionBinding {
   return {
     runtimeKind: 'codex',
+    backendSessionId: 'codex-thread-1',
+    providerTargetId: 'provider-target-1',
     backendStateSnapshot: createGoalSnapshot(status),
   } as BackendSessionBinding
 }
@@ -109,5 +112,54 @@ describe('shouldScheduleRuntimeGoalContinuation', () => {
         },
       }),
     ).toBe(true)
+  })
+})
+
+describe('scheduleRuntimeGoalContinuation', () => {
+  it('resumes blocked goals directly without creating an internal run', async () => {
+    vi.useFakeTimers()
+    try {
+      const resumeBlockedGoal = vi.fn().mockResolvedValue(undefined)
+      const createContinuationRun = vi.fn().mockResolvedValue(undefined)
+      const binding = createBinding('blocked')
+      const deps = {
+        hasActiveOrPendingRun: () => false,
+        pendingQueueItemCount: () => 0,
+        scheduleQueueDrain: vi.fn(),
+        readRuntimeBinding: () => binding,
+        readRuntime: () => runtime,
+        isProviderTargetAvailable: () => true,
+        createContinuationRun,
+        resumeBlockedGoal,
+      }
+
+      scheduleRuntimeGoalContinuation({
+        sessionId: 'blocked-direct-session',
+        providerTargetId: 'provider-target-1',
+        modelId: 'model-1',
+        options: { includeBlockedGoals: true },
+      }, deps)
+
+      await vi.advanceTimersByTimeAsync(250)
+
+      expect(resumeBlockedGoal).toHaveBeenCalledWith({
+        sessionId: 'blocked-direct-session',
+        providerTargetId: 'provider-target-1',
+        modelId: 'model-1',
+      })
+      expect(createContinuationRun).not.toHaveBeenCalled()
+
+      scheduleRuntimeGoalContinuation({
+        sessionId: 'blocked-direct-session',
+        providerTargetId: 'provider-target-1',
+        modelId: 'model-1',
+        options: { includeBlockedGoals: true },
+      }, deps)
+      await vi.advanceTimersByTimeAsync(250)
+      expect(resumeBlockedGoal).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -16,7 +16,7 @@ import {
 } from '../../chat-runtime/runtime-provider-types'
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { projectTextOnlyInput } from '../kit/input-projector'
-import { buildAcpConnectionRecord } from './config'
+import { resolveAcpConnectionRecord } from './config'
 import { AcpConnectionManager } from './connection-manager'
 import {
   ACP_RUNTIME_CAPABILITIES,
@@ -55,12 +55,12 @@ export class AcpChatProvider implements ChatRuntime {
 
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
-    await this.ensureConnected(profile.id, profile.configJson)
-    const response = await this.deps.runtime.newSession(profile.id, input.workspacePath)
+    const connectionKey = await this.ensureConnected(profile.id, profile.configJson)
+    const response = await this.deps.runtime.newSession(connectionKey, input.workspacePath)
 
     if (input.modelId && response.sessionId) {
       try {
-        await this.deps.runtime.setSessionModel(profile.id, response.sessionId, input.modelId)
+        await this.deps.runtime.setSessionModel(connectionKey, response.sessionId, input.modelId)
       }
       catch {
         // ACP agents may reject explicit model changes and keep their default.
@@ -92,11 +92,11 @@ export class AcpChatProvider implements ChatRuntime {
       })
     }
 
-    await this.ensureConnected(profile.id, profile.configJson)
+    const connectionKey = await this.ensureConnected(profile.id, profile.configJson)
 
-    if (this.deps.runtime.supportsResumeSession(profile.id)) {
+    if (this.deps.runtime.supportsResumeSession(connectionKey)) {
       try {
-        const response = await this.deps.runtime.resumeSession(profile.id, storedSessionId, input.workspacePath)
+        const response = await this.deps.runtime.resumeSession(connectionKey, storedSessionId, input.workspacePath)
         return {
           ...input.runtimeSession,
           providerStateSnapshot: JSON.stringify({
@@ -110,9 +110,9 @@ export class AcpChatProvider implements ChatRuntime {
       }
     }
 
-    if (this.deps.runtime.supportsLoadSession(profile.id)) {
+    if (this.deps.runtime.supportsLoadSession(connectionKey)) {
       try {
-        const response = await this.deps.runtime.loadSession(profile.id, storedSessionId, input.workspacePath)
+        const response = await this.deps.runtime.loadSession(connectionKey, storedSessionId, input.workspacePath)
         return {
           ...input.runtimeSession,
           providerStateSnapshot: JSON.stringify({
@@ -141,20 +141,20 @@ export class AcpChatProvider implements ChatRuntime {
       throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId))
     }
 
-    await this.ensureConnected(profile.id, profile.configJson)
+    const connectionKey = await this.ensureConnected(profile.id, profile.configJson)
     this._lastUsage = null
     const userPrompt = projectTextOnlyInput(input.message, 'ACP provider')
 
-    for await (const event of this.deps.runtime.prompt(profile.id, acpSessionId, userPrompt, {
+    for await (const event of this.deps.runtime.prompt(connectionKey, acpSessionId, userPrompt, {
       chatSessionId: input.runtimeSession.chatSessionId,
       runId: input.runId,
-      providerKind: profile.providerKind,
+      providerKind: profile.providerKind ?? 'universal',
       runtimeKind: this.runtimeKind,
     })) {
       yield event
     }
 
-    this._lastUsage = this.deps.runtime.getLastUsage(profile.id, acpSessionId)
+    this._lastUsage = this.deps.runtime.getLastUsage(connectionKey, acpSessionId)
   }
 
   async cancelTurn(input: CancelTurnInput): Promise<void> {
@@ -165,17 +165,19 @@ export class AcpChatProvider implements ChatRuntime {
     }
 
     try {
-      await this.deps.runtime.cancel(profile.id, acpSessionId)
+      const { connectionKey } = resolveAcpConnectionRecord(profile.configJson, profile.id)
+      await this.deps.runtime.cancel(connectionKey, acpSessionId)
     }
     catch {
       // ACP cancel failures are non-fatal for the unified chat runtime.
     }
   }
 
-  private async ensureConnected(agentId: string, configJson: string): Promise<void> {
-    if (this.deps.runtime.isConnected(agentId)) {
-      return
+  private async ensureConnected(profileId: string, configJson: string): Promise<string> {
+    const { record, connectionKey } = resolveAcpConnectionRecord(configJson, profileId)
+    if (!this.deps.runtime.isConnected(connectionKey)) {
+      await this.deps.runtime.connect(connectionKey, record)
     }
-    await this.deps.runtime.connect(agentId, buildAcpConnectionRecord(configJson))
+    return connectionKey
   }
 }

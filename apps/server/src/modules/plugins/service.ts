@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 
@@ -17,7 +17,13 @@ import type {
 
 import { AppError } from '../../errors/app-error'
 import { discoverPluginPackages } from '../../plugins/discovery'
-import { disablePlugin, discoverAndActivateSource, enablePlugin, removeDiscoveredSource } from '../../plugins/loader'
+import {
+  disablePlugin,
+  discoverAndActivateSource,
+  enablePlugin,
+  inspectDiscoveredSourceRemoval,
+  removeDiscoveredSource,
+} from '../../plugins/loader'
 import { classifyPluginSource, createPluginDescriptor, getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
 import type { PluginSourceInstallerOptions } from '../../plugins/source-installer'
 import {
@@ -148,6 +154,31 @@ export interface PluginSourceRegistryEntryView {
 export interface AddPluginSourceResult {
   source: PluginSourceRegistryEntryView
   discoveredPlugins: PluginDescriptorView[]
+}
+
+export type PluginSourceRemovalPlanView = Awaited<ReturnType<typeof inspectDiscoveredSourceRemoval>> & {
+  confirmationToken: string
+  expiresAt: string
+}
+
+interface PendingSourceRemoval {
+  sourceId: string
+  digest: string
+  expiresAt: number
+}
+
+const SOURCE_REMOVAL_CONFIRMATION_TTL_MS = 5 * 60 * 1000
+const pendingSourceRemovals = new Map<string, PendingSourceRemoval>()
+const activeSourceRemovals = new Set<string>()
+
+function removalPlanDigest(plan: Awaited<ReturnType<typeof inspectDiscoveredSourceRemoval>>): string {
+  return createHash('sha256').update(JSON.stringify(plan)).digest('hex')
+}
+
+function pruneSourceRemovalConfirmations(now = Date.now()): void {
+  for (const [token, pending] of pendingSourceRemovals) {
+    if (pending.expiresAt <= now) { pendingSourceRemovals.delete(token) }
+  }
 }
 
 export interface PluginPreviewItem {
@@ -573,7 +604,7 @@ export async function refreshSource(
   }
 }
 
-export async function removeSource(sourceId: string): Promise<{ removed: true }> {
+export async function inspectSourceRemoval(sourceId: string): Promise<PluginSourceRemovalPlanView> {
   const source = readPluginSource(sourceId)
   if (!source) {
     throw new AppError({
@@ -583,9 +614,83 @@ export async function removeSource(sourceId: string): Promise<{ removed: true }>
       details: { sourceId },
     })
   }
-  await removeDiscoveredSource(source.id)
-  deletePluginSource(source.id)
-  return { removed: true }
+
+  pruneSourceRemovalConfirmations()
+  const plan = await inspectDiscoveredSourceRemoval(source.id)
+  const confirmationToken = randomUUID()
+  const expiresAt = Date.now() + SOURCE_REMOVAL_CONFIRMATION_TTL_MS
+  pendingSourceRemovals.set(confirmationToken, {
+    sourceId,
+    digest: removalPlanDigest(plan),
+    expiresAt,
+  })
+  return {
+    ...plan,
+    confirmationToken,
+    expiresAt: new Date(expiresAt).toISOString(),
+  }
+}
+
+export async function removeSource(
+  sourceId: string,
+  input: { confirmationToken: string },
+): Promise<{ removed: true }> {
+  const source = readPluginSource(sourceId)
+  if (!source) {
+    throw new AppError({
+      code: 'plugin_source_not_found',
+      status: 404,
+      message: 'Plugin source not found.',
+      details: { sourceId },
+    })
+  }
+
+  pruneSourceRemovalConfirmations()
+  const pending = pendingSourceRemovals.get(input.confirmationToken)
+  pendingSourceRemovals.delete(input.confirmationToken)
+  if (!pending || pending.sourceId !== sourceId) {
+    throw new AppError({
+      code: 'plugin_uninstall_confirmation_required',
+      status: 409,
+      message: 'Inspect the plugin uninstall plan and confirm it before removing this source.',
+      details: { sourceId },
+    })
+  }
+  if (activeSourceRemovals.has(sourceId)) {
+    throw new AppError({
+      code: 'plugin_uninstall_in_progress',
+      status: 409,
+      message: 'This plugin source is already being removed.',
+      details: { sourceId },
+    })
+  }
+
+  activeSourceRemovals.add(sourceId)
+  try {
+    const currentPlan = await inspectDiscoveredSourceRemoval(source.id)
+    if (pending.digest !== removalPlanDigest(currentPlan)) {
+      throw new AppError({
+        code: 'plugin_uninstall_plan_changed',
+        status: 409,
+        message: 'The plugin uninstall plan changed. Inspect and confirm the current plan before retrying.',
+        details: { sourceId },
+      })
+    }
+    if (currentPlan.blocked) {
+      throw new AppError({
+        code: 'plugin_uninstall_blocked',
+        status: 409,
+        message: 'The plugin source cannot be removed until its uninstall blockers are resolved.',
+        details: { plan: currentPlan },
+      })
+    }
+    await removeDiscoveredSource(source.id)
+    deletePluginSource(source.id)
+    return { removed: true }
+  }
+  finally {
+    activeSourceRemovals.delete(sourceId)
+  }
 }
 
 export function getPlugin(routeSegment: string): PluginDescriptorView {

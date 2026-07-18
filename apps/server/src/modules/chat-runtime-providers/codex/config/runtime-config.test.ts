@@ -34,7 +34,6 @@ describe('buildCodexConfig MCP projection', () => {
       createCodexConfig(),
       '/tmp/cradle-workspace',
       () => [],
-      null,
       'gpt-5-codex',
       { kind: 'none' },
     )

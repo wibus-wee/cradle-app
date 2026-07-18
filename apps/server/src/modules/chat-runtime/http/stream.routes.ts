@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 
+import { buildAiTelemetryCorrelationIds } from '../../../telemetry/ai-correlation'
 import { ChatRuntimeModel } from '../model'
 import { bindReadableStreamToAbortSignal } from '../stream/sse'
 import { loadChatRuntime } from './runtime-loader'
@@ -14,12 +15,21 @@ export const chatRuntimeStreamRoutes = new Elysia({
       const runtime = await loadChatRuntime()
       const stream = await runtime.openSessionRunStream(params.sessionId)
       const activeRun = runtime.getActiveSessionRun(params.sessionId)
+      const telemetryCorrelation = activeRun
+        ? buildAiTelemetryCorrelationIds({ sessionId: params.sessionId, runId: activeRun.runId })
+        : null
       return new Response(bindReadableStreamToAbortSignal(stream, request.signal), {
         headers: {
           'content-type': 'text/event-stream',
           'cache-control': 'no-cache',
           'connection': 'keep-alive',
           ...(activeRun ? { 'x-cradle-run-id': activeRun.runId } : {}),
+          ...(telemetryCorrelation
+            ? {
+                'x-cradle-telemetry-session-id': telemetryCorrelation.sessionId,
+                'x-cradle-telemetry-run-id': telemetryCorrelation.runId,
+              }
+            : {}),
         },
       })
     },

@@ -66,7 +66,7 @@
   "thinking.low.label": "快速",
   "thinking.max.description": "在支持的模型上使用 Claude Agent 最高 effort。",
   "thinking.max.label": "最大",
-  "thinking.ultra.description": "在支持的模型上启用 Codex 主动多智能体推理。",
+  "thinking.ultra.description": "在支持的模型上启用运行时最高级别的推理与编排模式。",
   "thinking.ultra.label": "Ultra",
   "thinking.medium.description": "适合日常任务的平衡推理。",
   "thinking.medium.label": "平衡",

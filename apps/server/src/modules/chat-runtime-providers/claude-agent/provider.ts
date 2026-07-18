@@ -1,7 +1,22 @@
 import { randomUUID } from 'node:crypto'
 
-import type { AccountInfo, Options, Query, SDKAuthStatusMessage, SDKMessage, SDKPermissionDeniedMessage, SDKRateLimitEvent, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
-import { getSessionInfo, getSubagentMessages, listSubagents, query, renameSession } from '@anthropic-ai/claude-agent-sdk'
+import type {
+  AccountInfo,
+  Options,
+  Query,
+  SDKAuthStatusMessage,
+  SDKMessage,
+  SDKPermissionDeniedMessage,
+  SDKRateLimitEvent,
+  SessionMessage,
+} from '@anthropic-ai/claude-agent-sdk'
+import {
+  getSessionInfo,
+  getSubagentMessages,
+  listSubagents,
+  query,
+  renameSession,
+} from '@anthropic-ai/claude-agent-sdk'
 import type { LangfuseGeneration } from '@langfuse/tracing'
 import { startObservation } from '@langfuse/tracing'
 import type { UIMessage, UIMessageChunk } from 'ai'
@@ -62,9 +77,21 @@ import { createBoundedTextCollector } from '../bounded-text-collector'
 import { providerChunk } from '../kit/chunk-mapper'
 import { readWorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import { ClaudeAgentInputStream, emptyClaudeAgentInput } from './async-input-stream'
-import { projectClaudeAgentCompactState, projectClaudeAgentContextUsage } from './context-usage-projector'
-import type { ClaudeAgentCapturedCrewCall, ClaudeAgentChunkMapperState, ClaudeCrewLink } from './event-to-chunk-mapper'
-import { createClaudeAgentChunkMapperState, mapClaudeAgentMessageToChunks, mapClaudeAgentMessageToChunksWithoutParentProjection, resetClaudeAgentChunkMapperForTurn } from './event-to-chunk-mapper'
+import {
+  projectClaudeAgentCompactState,
+  projectClaudeAgentContextUsage,
+} from './context-usage-projector'
+import type {
+  ClaudeAgentCapturedCrewCall,
+  ClaudeAgentChunkMapperState,
+  ClaudeCrewLink,
+} from './event-to-chunk-mapper'
+import {
+  createClaudeAgentChunkMapperState,
+  mapClaudeAgentMessageToChunks,
+  mapClaudeAgentMessageToChunksWithoutParentProjection,
+  resetClaudeAgentChunkMapperForTurn,
+} from './event-to-chunk-mapper'
 import type { ClaudeStderrSink } from './input-projector'
 import {
   buildClaudeAgentTurnContent,
@@ -72,6 +99,7 @@ import {
   CLAUDE_AGENT_SDK_PERSIST_SESSION,
   createClaudeStderrSink,
   describeClaudeAgentUserContent,
+  isClaudeAgentUltracodeEnabled,
   projectClaudeAgentInput,
   readClaudeAgentModelId,
   shouldPersistClaudeAgentSdkSession,
@@ -82,16 +110,23 @@ import {
   CLAUDE_AGENT_RUNTIME_METADATA,
   projectClaudeAgentPresentation,
 } from './metadata'
-import type { ClaudeAgentPermissionBridgeState, ClaudeAgentToolApprovalRequest } from './permission-bridge'
+import type {
+  ClaudeAgentPermissionBridgeState,
+  ClaudeAgentToolApprovalRequest,
+} from './permission-bridge'
 import {
   createClaudeAgentPermissionBridgeState,
   updateClaudeAgentPermissionBridgeState,
 } from './permission-bridge'
-import { generateClaudeSessionTitle, shouldGenerateClaudeSessionTitle } from './provider-title-generation'
-import { activateClaudeAgentSdkConfigDir, resolveClaudeAgentRuntimeContext } from './runtime-context'
 import {
-  readClaudeAgentPermissionMode,
-} from './runtime-settings'
+  generateClaudeSessionTitle,
+  shouldGenerateClaudeSessionTitle,
+} from './provider-title-generation'
+import {
+  activateClaudeAgentSdkConfigDir,
+  resolveClaudeAgentRuntimeContext,
+} from './runtime-context'
+import { readClaudeAgentPermissionMode } from './runtime-settings'
 import {
   CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID,
   clearClaudeAgentCapturedPlan,
@@ -117,7 +152,11 @@ import {
 } from './state-projector'
 import { ClaudeCodeToolName } from './tools/identity'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload } from './tools/mapper'
-import type { ClaudeAgentProviderDeps, ClaudeAgentSessionInfo, ClaudeTitleGenerationThinkingEffort } from './types'
+import type {
+  ClaudeAgentProviderDeps,
+  ClaudeAgentSessionInfo,
+  ClaudeTitleGenerationThinkingEffort,
+} from './types'
 
 type ActiveClaudeNativeFollowUp = {
   queueItemId: string
@@ -154,7 +193,7 @@ type ActiveClaudeQuery = {
   closed: boolean
   pumpRunning: boolean
   stderrSink: ClaudeStderrSink
-  allowDangerouslySkipPermissions: boolean
+  ultracodeEnabled: boolean
 }
 
 type ActiveClaudeTurn = {
@@ -238,12 +277,6 @@ interface ClaudeSubagentProjectedEntry {
   rawMessages: ClaudeSubagentSessionMessage[]
 }
 
-function readActiveClaudeQueryPermissionMode(
-  permissionMode: ReturnType<typeof buildClaudeQueryOptions>['permissionMode'],
-): Options['permissionMode'] {
-  return permissionMode ?? 'bypassPermissions'
-}
-
 function closeClaudeQuery(activeQuery: Query): void {
   const close = (activeQuery as { close?: unknown }).close
   if (typeof close === 'function') {
@@ -312,19 +345,24 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
     const agentId = input.agentId ?? snapshot.agentId ?? null
     const runtimeContext = resolveClaudeAgentRuntimeContext(input.workspacePath, agentId)
-    const pendingModelSwitchId = CLAUDE_AGENT_SDK_PERSIST_SESSION && input.modelId !== undefined
-      ? resolveClaudeAgentPendingModelSwitchId(snapshot, input.modelId)
-      : null
-    const nextSnapshot = writeClaudeAgentPendingModelSwitch({
-      ...snapshot,
-      workspacePath: input.workspacePath,
-      agentId,
-      agentHome: runtimeContext.agentHome,
-      models: {
-        ...snapshot.models,
-        currentModelId: input.modelId !== undefined ? input.modelId : snapshot.models.currentModelId,
+    const pendingModelSwitchId
+      = CLAUDE_AGENT_SDK_PERSIST_SESSION && input.modelId !== undefined
+        ? resolveClaudeAgentPendingModelSwitchId(snapshot, input.modelId)
+        : null
+    const nextSnapshot = writeClaudeAgentPendingModelSwitch(
+      {
+        ...snapshot,
+        workspacePath: input.workspacePath,
+        agentId,
+        agentHome: runtimeContext.agentHome,
+        models: {
+          ...snapshot.models,
+          currentModelId:
+            input.modelId !== undefined ? input.modelId : snapshot.models.currentModelId,
+        },
       },
-    }, pendingModelSwitchId)
+      pendingModelSwitchId,
+    )
     return {
       ...input.runtimeSession,
       providerStateSnapshot: JSON.stringify(nextSnapshot),
@@ -349,10 +387,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
       return projectClaudeAgentPresentation(slashCommands)
     }
-    catch (error) {
+ catch (error) {
       throw stderrSink.enrichError(error)
     }
-    finally {
+ finally {
       closeClaudeQuery(activeQuery)
     }
   }
@@ -456,10 +494,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
         }
       }
     }
-    catch (error) {
+ catch (error) {
       throw stderrSink.enrichError(error)
     }
-    finally {
+ finally {
       abortController.abort()
       closeClaudeQuery(activeQuery)
     }
@@ -470,7 +508,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     const config = readTrustedClaudeAgentConfig(profile.configJson)
     const shouldPersistSession = shouldPersistClaudeAgentSdkSession(config.authMode)
-    const resumedProviderSessionId = shouldPersistSession ? input.runtimeSession.providerSessionId : null
+    const resumedProviderSessionId = shouldPersistSession
+      ? input.runtimeSession.providerSessionId
+      : null
     const shouldResumeProviderSession = Boolean(resumedProviderSessionId)
     const projectedUserContent = projectClaudeAgentInput(input.message, 'Claude Agent provider')
     const userContent = buildClaudeAgentTurnContent({
@@ -487,28 +527,22 @@ export class ClaudeAgentProvider implements ChatRuntime {
     let activeEntry = this.activeQueries.get(sessionId)
     if (
       activeEntry
-      && (
-        activeEntry.closed
+      && (activeEntry.closed
         || !activeEntry.pumpRunning
-        || activeEntry.providerTargetId !== profile.providerTargetId
-      )
+        || activeEntry.providerTargetId !== profile.providerTargetId)
     ) {
       this.closeSessionQuery(sessionId, activeEntry)
       activeEntry = undefined
     }
-    const planModeActive = readClaudeAgentPermissionMode(input.providerOptions?.runtimeSettings) === 'plan'
-    // Only recreate when the in-memory query was built with skip=true; new options still resume
-    // the same provider session so prompt cache and thread continuity are preserved.
-    if (activeEntry && planModeActive && (activeEntry.allowDangerouslySkipPermissions ?? true)) {
-      this.closeSessionQuery(sessionId, activeEntry)
-      activeEntry = undefined
-    }
+    const ultracodeEnabled = isClaudeAgentUltracodeEnabled(input.providerOptions?.thinkingEffort)
     const permissionBridgeState = activeEntry?.permissionBridgeState ?? createClaudeAgentPermissionBridgeState({
       runtimeInput: input,
       permissionMode: 'bypassPermissions',
       runtimeSettings: input.providerOptions?.runtimeSettings,
     })
-    let turnPermissionMode: Options['permissionMode'] = 'bypassPermissions'
+    const turnPermissionMode: Options['permissionMode'] = readClaudeAgentPermissionMode(
+      input.providerOptions?.runtimeSettings,
+    )
     // Reuse the long-lived query's stderr sink when the session already exists;
     // otherwise create one for the new query. The sink must outlive the
     // pump loop so it can enrich the surfaced error when the process exits.
@@ -519,19 +553,19 @@ export class ClaudeAgentProvider implements ChatRuntime {
       abortController,
       attachPermissionHandler: true,
       permissionBridgeState,
-      emitToolApprovalRequest: request => this.emitClaudeAgentToolApprovalRequest(sessionId, request),
+      emitToolApprovalRequest: request =>
+        this.emitClaudeAgentToolApprovalRequest(sessionId, request),
       onStderr: stderrSink.onStderr,
     })
-    turnPermissionMode = readActiveClaudeQueryPermissionMode(queryOptions.permissionMode)
-
     if (!activeEntry) {
       this.activePermissionModesBySession.set(sessionId, turnPermissionMode)
       const inputStream = new ClaudeAgentInputStream()
       const activeQuery = query({ prompt: inputStream, options: queryOptions })
-      if (turnPermissionMode === 'plan') {
-        void activeQuery.setPermissionMode('plan').catch((error) => {
-          this.deps.logger?.warn?.('Claude Agent failed to sync SDK plan permission mode after query start', {
+      if (turnPermissionMode !== 'bypassPermissions') {
+        void activeQuery.setPermissionMode(turnPermissionMode).catch((error) => {
+          this.deps.logger?.warn?.('Claude Agent failed to sync SDK permission mode after query start', {
             error,
+            permissionMode: turnPermissionMode,
             sessionId,
             resumed: shouldResumeProviderSession,
           })
@@ -559,7 +593,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         closed: false,
         pumpRunning: true,
         stderrSink,
-        allowDangerouslySkipPermissions: queryOptions.allowDangerouslySkipPermissions ?? true,
+        ultracodeEnabled,
       }
       this.activeQueries.set(sessionId, activeEntry)
       const registeredEntry = activeEntry
@@ -588,13 +622,21 @@ export class ClaudeAgentProvider implements ChatRuntime {
       void this.captureClaudeAgentAccountSnapshot(input.runtimeSession, activeQuery)
       void this.pumpClaudeSessionQuery(sessionId, activeEntry)
     }
-    else if (activeEntry.currentTurn) {
+ else if (activeEntry.currentTurn) {
       throw new ProviderRuntimeError(
-        ProviderErrors.requestFailed(this.runtimeKind, 'streamTurn', `Claude Agent session already has an active turn: ${sessionId}`),
+        ProviderErrors.requestFailed(
+          this.runtimeKind,
+          'streamTurn',
+          `Claude Agent session already has an active turn: ${sessionId}`,
+        ),
       )
     }
-    else {
+ else {
       await this.completeClaudeSyntheticTurns(activeEntry)
+      await this.updateActiveQueryUltracode({
+        runtimeSession: input.runtimeSession,
+        enabled: ultracodeEnabled,
+      })
       await this.updateActiveQueryPermissionMode({
         runtimeSession: input.runtimeSession,
         mode: turnPermissionMode,
@@ -614,12 +656,19 @@ export class ClaudeAgentProvider implements ChatRuntime {
     // Langfuse tracing via @langfuse/tracing SDK
     let generation: LangfuseGeneration | null = null
     if (aiTelemetryEnabled()) {
-      generation = startObservation('claude-agent-generation', {
-        model: effectiveModel,
-        input: input.systemPrompt
-          ? [{ role: 'system', content: input.systemPrompt }, { role: 'user', content: userPromptText }]
-          : [{ role: 'user', content: userPromptText }],
-      }, { asType: 'generation' }) as LangfuseGeneration
+      generation = startObservation(
+        'claude-agent-generation',
+        {
+          model: effectiveModel,
+          input: input.systemPrompt
+            ? [
+                { role: 'system', content: input.systemPrompt },
+                { role: 'user', content: userPromptText },
+              ]
+            : [{ role: 'user', content: userPromptText }],
+        },
+        { asType: 'generation' },
+      ) as LangfuseGeneration
       // Set trace-level attributes for session grouping
       const span = generation.otelSpan
       span.setAttribute('langfuse.session.id', input.runtimeSession.chatSessionId)
@@ -637,7 +686,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
           statusMessage: error instanceof Error ? error.message : String(error),
         })
       }
-      else {
+ else {
         generation.update({
           output: outputTextCollector.read(),
           ...(this._lastUsage && {
@@ -695,7 +744,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
           await this.handleClaudeSessionMessage(activeEntry, bufferedMessage)
         }
       }
-      else {
+ else {
         const pendingHarnessFragments = resolvePendingHarnessFragments(
           input.runtimeSession,
           input.harness?.fragments,
@@ -721,7 +770,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
       endGeneration()
     }
-    catch (error) {
+ catch (error) {
       endGeneration(error)
       if (activeEntry.currentTurn === turn) {
         activeEntry.currentTurn = null
@@ -729,7 +778,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       this.closeSessionQuery(sessionId, activeEntry)
       throw error
     }
-    finally {
+ finally {
       endGeneration()
       if (activeEntry.currentTurn === turn) {
         this.completeClaudeProviderThreadTurns(activeEntry, turn)
@@ -749,7 +798,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         await this.handleClaudeSessionMessage(entry, message)
       }
     }
-    catch (error) {
+ catch (error) {
       const turn = entry.currentTurn
       if (turn) {
         const enriched = entry.stderrSink.enrichError(error)
@@ -758,7 +807,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         turn.queue.fail(failure)
       }
     }
-    finally {
+ finally {
       entry.pumpRunning = false
       const turn = entry.currentTurn
       if (turn) {
@@ -776,7 +825,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
   }
 
-  private async handleClaudeSessionMessage(entry: ActiveClaudeQuery, message: SDKMessage): Promise<void> {
+  private async handleClaudeSessionMessage(
+    entry: ActiveClaudeQuery,
+    message: SDKMessage,
+  ): Promise<void> {
     const turn = entry.currentTurn
     if (!turn && entry.nativeFollowUps.size > 0) {
       entry.preAdoptBuffer.push(message)
@@ -861,14 +913,16 @@ export class ClaudeAgentProvider implements ChatRuntime {
         turn.queue.push(chunk)
       }
     }
-    else {
+ else {
       await this.handleClaudeSyntheticSessionMessage(entry, message)
     }
 
     if (message.type === 'result' && !readClaudeMessageParentToolUseId(message)) {
       if (turn) {
         this.completeClaudeProviderThreadTurns(entry, turn)
-        await this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(() => undefined)
+        await this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(
+          () => undefined,
+        )
         turn.endGeneration()
         entry.currentTurn = null
         turn.queue.close()
@@ -884,7 +938,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     message: SDKMessage,
   ): Promise<void> {
     const providerThreadTurn = this.ensureClaudeProviderThreadTurn(entry, providerThreadId)
-    const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(message, providerThreadTurn.mapperState)
+    const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(
+      message,
+      providerThreadTurn.mapperState,
+    )
     for (const crewCall of result.capturedCrewCalls) {
       writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
     }
@@ -912,7 +969,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const providerThreadTurn: ActiveClaudeProviderThreadTurn = {
       providerThreadId,
       providerTurnId: `claude-subagent-${randomUUID()}`,
-      mapperState: createClaudeAgentChunkMapperState(`provider-thread:${providerThreadId}`, entry.taskLaunchesById),
+      mapperState: createClaudeAgentChunkMapperState(
+        `provider-thread:${providerThreadId}`,
+        entry.taskLaunchesById,
+      ),
       terminal: false,
     }
     entry.providerThreadTurns.set(providerThreadId, providerThreadTurn)
@@ -939,13 +999,19 @@ export class ClaudeAgentProvider implements ChatRuntime {
     turn.input.onProviderThreadEvent?.(event)
   }
 
-  private completeClaudeProviderThreadTurns(entry: ActiveClaudeQuery, turn: ActiveClaudeTurn): void {
+  private completeClaudeProviderThreadTurns(
+    entry: ActiveClaudeQuery,
+    turn: ActiveClaudeTurn,
+  ): void {
     for (const providerThreadTurn of entry.providerThreadTurns.values()) {
-      const chunks: UIMessageChunk[] = [
-        providerChunk.finish('stop'),
-      ]
+      const chunks: UIMessageChunk[] = [providerChunk.finish('stop')]
       this.publishClaudeProviderThreadEvent(turn, providerThreadTurn, chunks)
-      this.emitClaudeProviderThreadParentOutput(entry, turn, providerThreadTurn.providerThreadId, chunks)
+      this.emitClaudeProviderThreadParentOutput(
+        entry,
+        turn,
+        providerThreadTurn.providerThreadId,
+        chunks,
+      )
       providerThreadTurn.terminal = true
     }
     entry.providerThreadTurns.clear()
@@ -994,7 +1060,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     })
   }
 
-  private emitClaudeAgentToolApprovalRequest(sessionId: string, request: ClaudeAgentToolApprovalRequest): void {
+  private emitClaudeAgentToolApprovalRequest(
+    sessionId: string,
+    request: ClaudeAgentToolApprovalRequest,
+  ): void {
     const entry = this.activeQueries.get(sessionId)
     const turn = entry?.currentTurn
     if (!entry || !turn) {
@@ -1024,7 +1093,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return null
     }
 
-    const mappedProviderThreadId = readClaudeAgentCrewProviderThreadIdForAgent(entry.runtimeSession, request.agentId)
+    const mappedProviderThreadId = readClaudeAgentCrewProviderThreadIdForAgent(
+      entry.runtimeSession,
+      request.agentId,
+    )
     if (mappedProviderThreadId) {
       return this.ensureClaudeProviderThreadTurn(entry, mappedProviderThreadId)
     }
@@ -1037,7 +1109,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     return null
   }
 
-  private async handleClaudeSyntheticSessionMessage(entry: ActiveClaudeQuery, message: SDKMessage): Promise<void> {
+  private async handleClaudeSyntheticSessionMessage(
+    entry: ActiveClaudeQuery,
+    message: SDKMessage,
+  ): Promise<void> {
     const providerThreadId = readClaudeMessageParentToolUseId(message)
     if (providerThreadId) {
       const syntheticTurn = this.ensureClaudeProviderThreadSyntheticTurn(entry, providerThreadId)
@@ -1045,7 +1120,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
         return
       }
 
-      const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(message, syntheticTurn.mapperState)
+      const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(
+        message,
+        syntheticTurn.mapperState,
+      )
       await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
       if (message.type === 'result') {
         entry.providerThreadSyntheticTurns.delete(providerThreadId)
@@ -1069,7 +1147,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return
     }
 
-    const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(message, syntheticTurn.mapperState)
+    const result = await mapClaudeAgentMessageToChunksWithoutParentProjection(
+      message,
+      syntheticTurn.mapperState,
+    )
     await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
     if (message.type === 'result') {
       entry.mainSyntheticTurn = null
@@ -1152,7 +1233,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     try {
       await syntheticTurn.onProviderSyntheticTurnEvent(event)
     }
-    catch (error) {
+ catch (error) {
       this.deps.logger?.warn('Claude Agent synthetic turn event failed', {
         error,
         chatSessionId: entry.runtimeSession.chatSessionId,
@@ -1167,9 +1248,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     turn: ActiveClaudeTurn,
     sessionId: string | null,
   ): Promise<void> {
-    const nextProviderSessionId = turn.shouldPersistSession && sessionId && sessionId !== entry.runtimeSession.providerSessionId
-      ? sessionId
-      : null
+    const nextProviderSessionId
+      = turn.shouldPersistSession && sessionId && sessionId !== entry.runtimeSession.providerSessionId
+        ? sessionId
+        : null
     if (!nextProviderSessionId) {
       return
     }
@@ -1217,9 +1299,12 @@ export class ClaudeAgentProvider implements ChatRuntime {
         promptTokens: this._totalUsage.promptTokens + usage.promptTokens,
         completionTokens: this._totalUsage.completionTokens + usage.completionTokens,
         totalTokens: this._totalUsage.totalTokens + usage.totalTokens,
-        cachedInputTokens: (this._totalUsage.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0),
-        cacheWriteInputTokens: (this._totalUsage.cacheWriteInputTokens ?? 0) + (usage.cacheWriteInputTokens ?? 0),
-        reasoningOutputTokens: (this._totalUsage.reasoningOutputTokens ?? 0) + (usage.reasoningOutputTokens ?? 0),
+        cachedInputTokens:
+          (this._totalUsage.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0),
+        cacheWriteInputTokens:
+          (this._totalUsage.cacheWriteInputTokens ?? 0) + (usage.cacheWriteInputTokens ?? 0),
+        reasoningOutputTokens:
+          (this._totalUsage.reasoningOutputTokens ?? 0) + (usage.reasoningOutputTokens ?? 0),
       }
       return
     }
@@ -1280,14 +1365,16 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return false
     }
     entry.nativeFollowUps.delete(queueItemId)
-    const cancelAsyncMessage = (entry.query as {
-      cancelAsyncMessage?: (messageUuid: string) => Promise<unknown>
-    }).cancelAsyncMessage
+    const cancelAsyncMessage = (
+      entry.query as {
+        cancelAsyncMessage?: (messageUuid: string) => Promise<unknown>
+      }
+    ).cancelAsyncMessage
     if (typeof cancelAsyncMessage === 'function') {
       try {
         await cancelAsyncMessage.call(entry.query, pending.messageUuid)
       }
-      catch (error) {
+ catch (error) {
         this.deps.logger?.warn?.('Claude Agent failed to cancel native queued follow-up', {
           error,
           sessionId,
@@ -1342,12 +1429,17 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     const cwd = this.resolveClaudeProviderThreadDir(input)
     const agentIds = await listSubagents(parentSessionId, { dir: cwd })
-    const records = await Promise.all(agentIds.map(async agentId => ({
-      agentId,
-      parentSessionId,
-      cwd,
-      messages: await this.readClaudeSubagentMessages(parentSessionId, agentId, cwd),
-    } satisfies ClaudeSubagentThreadRecord)))
+    const records = await Promise.all(
+      agentIds.map(
+        async agentId =>
+          ({
+            agentId,
+            parentSessionId,
+            cwd,
+            messages: await this.readClaudeSubagentMessages(parentSessionId, agentId, cwd),
+          }) satisfies ClaudeSubagentThreadRecord,
+      ),
+    )
     const sortKey = input.sortKey ?? 'updated_at'
     const sortDirection = input.sortDirection ?? 'desc'
     const searchTerm = normalizeProviderThreadText(input.searchTerm)
@@ -1377,7 +1469,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
   }
 
-  async listProviderThreadTurns(input: ProviderThreadTurnsInput): Promise<ProviderThreadTurnsResult> {
+  async listProviderThreadTurns(
+    input: ProviderThreadTurnsInput,
+  ): Promise<ProviderThreadTurnsResult> {
     const record = await this.resolveClaudeSubagentThreadRecord(input.threadId, input)
     const sortDirection = input.sortDirection ?? 'asc'
     const displayMessages = record.messages.filter(hasClaudeSubagentDisplayParts)
@@ -1397,7 +1491,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
   }
 
-  private async readCompactState(input: GetUiSlotStatesInput): Promise<RuntimeCompactUiSlotState | null> {
+  private async readCompactState(
+    input: GetUiSlotStatesInput,
+  ): Promise<RuntimeCompactUiSlotState | null> {
     const sessionId = input.runtimeSession.chatSessionId
     const cached = this.readFreshCompactState(sessionId)
     if (cached) {
@@ -1405,16 +1501,16 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
 
     try {
-      return await this.refreshCompactState(input)
-        ?? this.compactStates.get(sessionId)
-        ?? null
+      return (await this.refreshCompactState(input)) ?? this.compactStates.get(sessionId) ?? null
     }
-    catch {
+ catch {
       return this.compactStates.get(sessionId) ?? null
     }
   }
 
-  private async readContextUsage(input: ContextUsageRuntimeInput): Promise<RuntimeContextUsage | null> {
+  private async readContextUsage(
+    input: ContextUsageRuntimeInput,
+  ): Promise<RuntimeContextUsage | null> {
     const sessionId = input.runtimeSession.chatSessionId
     const entry = this.activeQueries.get(sessionId)
     if (!entry) {
@@ -1443,7 +1539,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     return Date.now() - sampledAt <= COMPACT_SLOT_CONTEXT_USAGE_TTL_MS ? compactState : null
   }
 
-  private async refreshCompactState(input: ContextUsageRuntimeInput): Promise<RuntimeCompactUiSlotState | null> {
+  private async refreshCompactState(
+    input: ContextUsageRuntimeInput,
+  ): Promise<RuntimeCompactUiSlotState | null> {
     const usage = await this.readContextUsage(input)
     if (!usage) {
       return null
@@ -1489,6 +1587,21 @@ export class ClaudeAgentProvider implements ChatRuntime {
     })
   }
 
+  private async updateActiveQueryUltracode(input: {
+    runtimeSession: RuntimeSession
+    enabled: boolean
+  }): Promise<void> {
+    const entry = this.activeQueries.get(input.runtimeSession.chatSessionId)
+    if (!entry || entry.ultracodeEnabled === input.enabled) {
+      return
+    }
+    await entry.query.applyFlagSettings({
+      effortLevel: input.enabled ? 'xhigh' : null,
+      ultracode: input.enabled,
+    })
+    entry.ultracodeEnabled = input.enabled
+  }
+
   private async requestRuntimePermissionModeUpdate(
     runtimeSession: RuntimeSession,
     permissionMode: 'plan',
@@ -1503,7 +1616,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         patch: { permissionMode },
       })
     }
-    catch (error) {
+ catch (error) {
       this.deps.logger?.warn?.('Claude Agent runtime permission mode update failed', {
         error,
         sessionId: runtimeSession.chatSessionId,
@@ -1553,7 +1666,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       }
       return title
     }
-    finally {
+ finally {
       abortController.abort()
     }
   }
@@ -1583,14 +1696,17 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
   }
 
-  private async captureClaudeAgentAccountSnapshot(runtimeSession: RuntimeSession, activeQuery: Query): Promise<void> {
+  private async captureClaudeAgentAccountSnapshot(
+    runtimeSession: RuntimeSession,
+    activeQuery: Query,
+  ): Promise<void> {
     try {
       const result = await activeQuery.initializationResult()
       if (hasClaudeAgentAccountSignal(result.account)) {
         writeClaudeAgentAccountSnapshot(runtimeSession, result.account)
       }
     }
-    catch (error) {
+ catch (error) {
       this.deps.logger?.debug?.('Claude Agent account initialization probe failed', {
         error,
         sessionId: runtimeSession.chatSessionId,
@@ -1598,7 +1714,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
   }
 
-  private projectClaudeAgentRuntimeState(runtimeSession: RuntimeSession, message: SDKMessage): void {
+  private projectClaudeAgentRuntimeState(
+    runtimeSession: RuntimeSession,
+    message: SDKMessage,
+  ): void {
     if (message.type === 'system' && message.subtype === 'compact_boundary') {
       invalidateHarnessProjection(runtimeSession)
       return
@@ -1608,11 +1727,17 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return
     }
     if (message.type === 'rate_limit_event') {
-      writeClaudeAgentRateLimitSnapshot(runtimeSession, (message as SDKRateLimitEvent).rate_limit_info)
+      writeClaudeAgentRateLimitSnapshot(
+        runtimeSession,
+        (message as SDKRateLimitEvent).rate_limit_info,
+      )
       return
     }
     if (message.type === 'system' && message.subtype === 'permission_denied') {
-      writeClaudeAgentPermissionDeniedSnapshot(runtimeSession, message as SDKPermissionDeniedMessage)
+      writeClaudeAgentPermissionDeniedSnapshot(
+        runtimeSession,
+        message as SDKPermissionDeniedMessage,
+      )
     }
   }
 
@@ -1621,7 +1746,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
     agentId?: string | null
   }): string {
     activateClaudeAgentSdkConfigDir()
-    return resolveClaudeAgentRuntimeContext(input.workspacePath ?? undefined, input.agentId ?? null).cwd
+    return resolveClaudeAgentRuntimeContext(input.workspacePath ?? undefined, input.agentId ?? null)
+      .cwd
   }
 
   private resolveClaudeProviderThreadDir(input: GetCapabilitiesInput): string {
@@ -1647,13 +1773,19 @@ export class ClaudeAgentProvider implements ChatRuntime {
   ): Promise<ClaudeSubagentThreadRecord> {
     const parentSessionId = input.runtimeSession.providerSessionId
     if (!parentSessionId) {
-      throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId))
+      throw new ProviderRuntimeError(
+        ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId),
+      )
     }
 
     const cwd = this.resolveClaudeProviderThreadDir(input)
     const agentIds = await listSubagents(parentSessionId, { dir: cwd })
     if (agentIds.includes(requestedThreadId)) {
-      const messages = await this.readClaudeSubagentMessages(parentSessionId, requestedThreadId, cwd)
+      const messages = await this.readClaudeSubagentMessages(
+        parentSessionId,
+        requestedThreadId,
+        cwd,
+      )
       return { agentId: requestedThreadId, parentSessionId, cwd, messages }
     }
 
@@ -1757,10 +1889,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
             input.reportSessionTitle?.(generatedTitle)
           }
         }
-        catch {
+ catch {
           // Title generation is opportunistic and must not affect the active turn.
         }
-        finally {
+ finally {
           abortController.abort()
         }
       })()
@@ -1856,11 +1988,16 @@ function hasTerminalProviderThreadChunk(chunks: UIMessageChunk[]): boolean {
 }
 
 function readTerminalProviderThreadErrorText(chunks: UIMessageChunk[]): string | null {
-  const error = chunks.find((chunk): chunk is Extract<UIMessageChunk, { type: 'error' }> => chunk.type === 'error')
+  const error = chunks.find(
+    (chunk): chunk is Extract<UIMessageChunk, { type: 'error' }> => chunk.type === 'error',
+  )
   return error?.errorText ?? null
 }
 
-function shouldRouteClaudeMessageToMainSyntheticTurn(entry: ActiveClaudeQuery, message: SDKMessage): boolean {
+function shouldRouteClaudeMessageToMainSyntheticTurn(
+  entry: ActiveClaudeQuery,
+  message: SDKMessage,
+): boolean {
   if (entry.currentTurn) {
     return false
   }
@@ -1900,8 +2037,12 @@ function normalizeClaudeSessionTitle(title: string | null | undefined): string |
   return normalized.length > 0 ? normalized : null
 }
 
-function supportsClaudeSubagentSourceKinds(sourceKinds: ProviderThreadListInput['sourceKinds']): boolean {
-  return !sourceKinds || sourceKinds.length === 0 || sourceKinds.includes(CLAUDE_SUBAGENT_SOURCE_KIND)
+function supportsClaudeSubagentSourceKinds(
+  sourceKinds: ProviderThreadListInput['sourceKinds'],
+): boolean {
+  return (
+    !sourceKinds || sourceKinds.length === 0 || sourceKinds.includes(CLAUDE_SUBAGENT_SOURCE_KIND)
+  )
 }
 
 function readProviderThreadLimit(limit: number | null | undefined): number {
@@ -1996,7 +2137,9 @@ function normalizeProviderThreadText(text: string | null | undefined): string | 
   return normalized.length > 0 ? normalized : null
 }
 
-function readClaudeSubagentParentToolUseId(messages: ClaudeSubagentSessionMessage[]): string | null {
+function readClaudeSubagentParentToolUseId(
+  messages: ClaudeSubagentSessionMessage[],
+): string | null {
   return messages.find(message => message.parent_tool_use_id)?.parent_tool_use_id ?? null
 }
 
@@ -2056,17 +2199,26 @@ function readClaudeSubagentTimestamp(message: ClaudeSubagentSessionMessage): num
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
-function projectClaudeSubagentEntryTurn(entry: Pick<ClaudeSubagentProjectedEntry, 'agentId' | 'providerThreadId' | 'rawMessages' | 'message'>): ProviderThreadTurn {
+function projectClaudeSubagentEntryTurn(
+  entry: Pick<
+    ClaudeSubagentProjectedEntry,
+    'agentId' | 'providerThreadId' | 'rawMessages' | 'message'
+  >,
+): ProviderThreadTurn {
   const metadata = readRecord(entry.message.metadata)
-  const entryId = typeof metadata.providerMessageId === 'string' ? metadata.providerMessageId : entry.message.id
+  const entryId
+    = typeof metadata.providerMessageId === 'string' ? metadata.providerMessageId : entry.message.id
   const startedAt = readClaudeSubagentTimestamp(entry.rawMessages[0]!)
   const completedAt = readClaudeSubagentTimestamp(entry.rawMessages.at(-1)!)
   return {
     id: entryId,
-    status: entry.message.parts.some(part => isClaudeSubagentToolErrorPart(part)) ? 'failed' : 'completed',
+    status: entry.message.parts.some(part => isClaudeSubagentToolErrorPart(part))
+      ? 'failed'
+      : 'completed',
     startedAt,
     completedAt,
-    durationMs: startedAt !== null && completedAt !== null ? Math.max(0, completedAt - startedAt) : null,
+    durationMs:
+      startedAt !== null && completedAt !== null ? Math.max(0, completedAt - startedAt) : null,
     itemsView: 'full',
     items: entry.rawMessages.map(message => ({
       provider: 'claude-agent',
@@ -2143,12 +2295,14 @@ function projectClaudeSubagentEntries(
         completedAt: readClaudeSubagentTimestamp(message),
         durationMs: null,
         itemsView: 'full',
-        items: [{
-          provider: 'claude-agent',
-          providerThreadId,
-          agentId: record.agentId,
-          message,
-        }],
+        items: [
+          {
+            provider: 'claude-agent',
+            providerThreadId,
+            agentId: record.agentId,
+            message,
+          },
+        ],
       },
       message: entryMessage,
       rawMessages: [message],
@@ -2162,7 +2316,9 @@ function projectClaudeSubagentEntries(
   return entries
 }
 
-function projectClaudeSubagentLaunchPromptEntry(record: ClaudeSubagentThreadRecord): ClaudeSubagentProjectedEntry | null {
+function projectClaudeSubagentLaunchPromptEntry(
+  record: ClaudeSubagentThreadRecord,
+): ClaudeSubagentProjectedEntry | null {
   const promptText = readFirstClaudeSubagentString(record.messages, 'task_description')
   if (!promptText) {
     return null
@@ -2219,7 +2375,9 @@ function indexClaudeSubagentToolUseParts(
  * tool_use parts from messages already fully processed — it can never see a tool_use from the
  * message currently being projected.
  */
-function mergeClaudeSubagentToolResultPartsWithinMessage(parts: UIMessage['parts']): UIMessage['parts'] {
+function mergeClaudeSubagentToolResultPartsWithinMessage(
+  parts: UIMessage['parts'],
+): UIMessage['parts'] {
   const merged: UIMessage['parts'] = []
   const toolUseIndexByCallId = new Map<string, number>()
 
@@ -2228,7 +2386,11 @@ function mergeClaudeSubagentToolResultPartsWithinMessage(parts: UIMessage['parts
       const toolUseIndex = toolUseIndexByCallId.get(part.toolCallId)
       const toolUsePart = toolUseIndex !== undefined ? merged[toolUseIndex] : undefined
       if (toolUseIndex !== undefined && toolUsePart && isClaudeSubagentToolUsePart(toolUsePart)) {
-        merged[toolUseIndex] = { ...toolUsePart, ...part, input: toolUsePart.input ?? part.input } as UIMessage['parts'][number]
+        merged[toolUseIndex] = {
+          ...toolUsePart,
+          ...part,
+          input: toolUsePart.input ?? part.input,
+        } as UIMessage['parts'][number]
         continue
       }
     }
@@ -2284,22 +2446,35 @@ function readProviderMessageIds(metadata: UIMessage['metadata']): string[] {
   return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
 }
 
-function isClaudeSubagentToolUsePart(part: UIMessage['parts'][number]): part is ClaudeSubagentProjectedToolPart {
+function isClaudeSubagentToolUsePart(
+  part: UIMessage['parts'][number],
+): part is ClaudeSubagentProjectedToolPart {
   return isClaudeSubagentToolPart(part) && part.state === 'input-available'
 }
 
-function isClaudeSubagentToolResultPart(part: UIMessage['parts'][number]): part is ClaudeSubagentProjectedToolPart {
-  return isClaudeSubagentToolPart(part) && (part.state === 'output-available' || part.state === 'output-error')
+function isClaudeSubagentToolResultPart(
+  part: UIMessage['parts'][number],
+): part is ClaudeSubagentProjectedToolPart {
+  return (
+    isClaudeSubagentToolPart(part)
+    && (part.state === 'output-available' || part.state === 'output-error')
+  )
 }
 
-function isClaudeSubagentToolErrorPart(part: UIMessage['parts'][number]): part is ClaudeSubagentProjectedToolPart {
+function isClaudeSubagentToolErrorPart(
+  part: UIMessage['parts'][number],
+): part is ClaudeSubagentProjectedToolPart {
   return isClaudeSubagentToolPart(part) && part.state === 'output-error'
 }
 
-function isClaudeSubagentToolPart(part: UIMessage['parts'][number]): part is ClaudeSubagentProjectedToolPart {
-  return typeof part.type === 'string'
+function isClaudeSubagentToolPart(
+  part: UIMessage['parts'][number],
+): part is ClaudeSubagentProjectedToolPart {
+  return (
+    typeof part.type === 'string'
     && part.type.startsWith('tool-')
     && typeof (part as { toolCallId?: unknown }).toolCallId === 'string'
+  )
 }
 
 function hasClaudeSubagentDisplayParts(message: ClaudeSubagentSessionMessage): boolean {
@@ -2319,7 +2494,9 @@ function projectClaudeSubagentMessageParts(
 ): UIMessage['parts'] {
   const payload = readClaudeTranscriptPayload(message)
   if (!payload) {
-    return projectClaudeSubagentTextPart(typeof message.message === 'string' ? message.message : null)
+    return projectClaudeSubagentTextPart(
+      typeof message.message === 'string' ? message.message : null,
+    )
   }
   const content = payload.content
   if (typeof content === 'string') {
@@ -2370,10 +2547,12 @@ function projectClaudeSubagentTextPart(text: string | null): UIMessage['parts'] 
 }
 
 function readClaudeMessageText(message: ClaudeSubagentSessionMessage): string | null {
-  return projectClaudeSubagentMessageParts(message, new Map())
-    .flatMap(part => part.type === 'text' || part.type === 'reasoning' ? [part.text] : [])
-    .join('\n')
-    .trim() || null
+  return (
+    projectClaudeSubagentMessageParts(message, new Map())
+      .flatMap(part => (part.type === 'text' || part.type === 'reasoning' ? [part.text] : []))
+      .join('\n')
+      .trim() || null
+  )
 }
 
 function collectClaudeSubagentToolUses(
@@ -2480,7 +2659,7 @@ function normalizeClaudeSubagentToolResultContent(content: unknown): unknown {
     try {
       return JSON.parse(content)
     }
-    catch {
+ catch {
       return content
     }
   }
@@ -2497,12 +2676,14 @@ function normalizeClaudeSubagentToolErrorText(output: unknown): string {
   try {
     return JSON.stringify(output)
   }
-  catch {
+ catch {
     return String(output)
   }
 }
 
-function readClaudeTranscriptPayload(message: ClaudeSubagentSessionMessage): ClaudeTranscriptMessagePayload | null {
+function readClaudeTranscriptPayload(
+  message: ClaudeSubagentSessionMessage,
+): ClaudeTranscriptMessagePayload | null {
   if (typeof message.message === 'string') {
     return null
   }

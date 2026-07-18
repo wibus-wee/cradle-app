@@ -13,6 +13,7 @@ import {
 import { releaseSideConversationsByParentSessionId } from '../provider-runtime/side-conversation-registry'
 import * as SessionService from '../session/service'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
+import { invokeCodexAppServer } from './codex/host'
 import type { ChatContextPart } from './context-parts'
 import type { ChatRuntimeRecoveryResult } from './es/recovery'
 import { recoverChatRuntimeProjections } from './es/recovery'
@@ -296,6 +297,22 @@ const runtimeGoalContinuationDeps: RuntimeGoalContinuationSchedulerDeps = {
       providerTargetId: input.providerTargetId,
       modelId: input.modelId,
       internalContinuation: 'runtimeGoal',
+    })
+  },
+  resumeBlockedGoal: async (input) => {
+    const binding = readDurableProviderRuntimeBinding(input.sessionId)
+    if (!binding?.backendSessionId) {
+      throw new Error('Blocked Codex goal cannot be resumed without a provider session.')
+    }
+    await invokeCodexAppServer({
+      sessionId: input.sessionId,
+      providerTargetId: input.providerTargetId ?? binding.providerTargetId ?? undefined,
+      modelId: input.modelId,
+      method: 'thread/goal/set',
+      params: {
+        threadId: binding.backendSessionId,
+        status: 'active',
+      },
     })
   },
 }

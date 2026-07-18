@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { buildUpstreamRequestHeaders, buildUpstreamResponseHeaders } from './upstream'
+import { buildUpstreamRequestHeaders, buildUpstreamResponseHeaders, upstreamJsonByBaseUrl } from './upstream'
 
 describe('remote-host upstream helpers', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('rebuilds upstream headers from the protocol allowlist', () => {
     const headers = new Headers({
       'authorization': 'Bearer local-control-token',
@@ -47,5 +51,27 @@ describe('remote-host upstream helpers', () => {
     expect(filtered.get('access-control-allow-origin')).toBeNull()
     expect(filtered.get('access-control-expose-headers')).toBeNull()
     expect(filtered.get('access-control-allow-private-network')).toBeNull()
+  })
+
+  it('preserves safe Cradle error identity without forwarding arbitrary details', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: 'invalid_session_input',
+      message: 'Session requires a provider target or an agent',
+      details: { apiKey: 'must-not-leak' },
+    }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    })))
+
+    await expect(upstreamJsonByBaseUrl('http://remote.test', '/sessions')).rejects.toMatchObject({
+      code: 'remote_cradle_http_error',
+      message: 'Remote Cradle Server returned HTTP 400 for /sessions. Session requires a provider target or an agent',
+      details: {
+        path: '/sessions',
+        status: 400,
+        upstreamCode: 'invalid_session_input',
+        upstreamMessage: 'Session requires a provider target or an agent',
+      },
+    })
   })
 })
