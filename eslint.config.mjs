@@ -16,7 +16,6 @@ export default defineConfig(
       '.claude/**',
       '.tools/**',
       'apps/desktop/scripts/**',
-      'documentations/.source/**',
       'docs/design-system/tokens.json',
       '**/dist/**',
       '**/build/**',

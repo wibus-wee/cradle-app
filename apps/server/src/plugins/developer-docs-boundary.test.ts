@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const developerGuidePath = 'packages/plugin-sdk/DEVELOPERS.md'
-const sdkOverviewPath = 'documentations/content/docs/developers/plugins/sdk-overview.mdx'
 
 describe('plugin developer docs boundary', () => {
   it('documents server hooks under the chat namespace', async () => {
@@ -26,7 +25,6 @@ describe('plugin developer docs boundary', () => {
 
   it('documents strict manifest contributions without optional defaults', async () => {
     const developerGuide = await readFile(resolve(repoRoot, developerGuidePath), 'utf8')
-    const sdkOverview = await readFile(resolve(repoRoot, sdkOverviewPath), 'utf8')
 
     expect(developerGuide).toContain('contributes: {')
     expect(developerGuide).toContain('capabilities: Array<{')
@@ -36,10 +34,6 @@ describe('plugin developer docs boundary', () => {
     expect(developerGuide).not.toContain('capabilities?: Array<{')
     expect(developerGuide).not.toContain('permissions?: Array<{')
     expect(developerGuide).not.toContain('permissions?: string[]')
-
-    expect(sdkOverview).toContain('type: "{ capabilities: CapabilityContribution[]; permissions: PermissionContribution[] }"')
-    expect(sdkOverview).not.toContain('default: "{}"')
-    expect(sdkOverview).not.toContain('runtime capability without a declaration is allowed')
   })
 
   it('keeps developer package examples valid under the strict manifest schema', async () => {

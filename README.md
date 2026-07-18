@@ -39,8 +39,6 @@ Cradle currently spans **20 major product areas**, grouped into five workflows:
 - **Knowledge and operations** — Chronicle memory, local activity capture, usage and cost analytics, search, observability, and support diagnostics
 - **Platform and extensions** — Plugin Marketplace, integrations, built-in Browser and Appshot, remote hosts, relay transport, downloads, and desktop updates
 
-See the [Feature Catalog](./documentations/content/docs/features/index.mdx) for the complete inventory and counting method.
-
 ## Details
 
 <table>
