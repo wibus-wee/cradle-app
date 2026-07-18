@@ -38,4 +38,4 @@ Check mode is deliberately different from run mode: it invokes Node with `--inpu
 
 - Cells loaded from data URLs can import `node:` builtins, but relative and npm package specifiers do not resolve.
 - Every evaluation starts with a fresh heap; state does not persist between polls.
-- Scheduling belongs to consumers. The JavaScript await source currently evaluates at most three cells concurrently.
+- Scheduling belongs to consumers. The JavaScript session-await source enqueues evaluations on the session-await heavy-check queue (bounded concurrency, poll-interval due checks) so they never block the poller fast path.

@@ -1,5 +1,13 @@
+import {
+  applyCheckResults,
+  clearHeavyCheckQueue,
+  enqueueHeavyChecks,
+  flushHeavyCheckQueue,
+} from './heavy-check-queue'
 import * as service from './service'
 import type { SessionAwaitSource } from './types'
+
+export { flushHeavyCheckQueue } from './heavy-check-queue'
 
 // ── Simple concurrency limiter ──
 
@@ -43,7 +51,6 @@ export function unregisterSource(source: string) {
 const DEFAULT_INTERVAL_MS = 30_000
 const MAX_CONCURRENT_TRIGGERS = 3
 const MAX_CHECKS_PER_SOURCE = 100
-const EMPTY_RESUME_TEXT_ERROR = 'Source adapter matched without a resume message'
 
 let timer: ReturnType<typeof setInterval> | null = null
 let running = false
@@ -63,6 +70,7 @@ export function stop() {
     clearInterval(timer)
     timer = null
   }
+  clearHeavyCheckQueue()
 }
 
 export function requestRun() {
@@ -113,10 +121,20 @@ export async function runOnce(): Promise<void> {
         service.trigger({ awaitId: row.id, resumeText: 'Timer fired' }))),
     )
 
-    // 3. Source-based checks
+    // 3. Source-based checks — inline sources run on the poller path; queued
+    //    (heavy) sources are only enqueued so they cannot block github-ci etc.
     for (const [sourceName, adapter] of sourceAdapters) {
       const pending = service.listPendingBySource(sourceName).slice(0, MAX_CHECKS_PER_SOURCE)
       if (pending.length === 0) {
+        continue
+      }
+
+      if ((adapter.execution ?? 'inline') === 'queued') {
+        enqueueHeavyChecks(
+          adapter,
+          pending,
+          adapter.pollIntervalMs ?? DEFAULT_INTERVAL_MS,
+        )
         continue
       }
 
@@ -125,45 +143,18 @@ export async function runOnce(): Promise<void> {
         results = await adapter.checkPending(pending)
       }
       catch {
-        // Mark all as checked with transient error
         for (const row of pending) {
-          service.updateLastChecked(row.id, 'Source adapter threw')
+          if (adapter.tracksConsecutiveErrors) {
+            service.recordTrackedEvaluationCheck(row.id, 'Source adapter threw')
+          }
+          else {
+            service.updateLastChecked(row.id, 'Source adapter threw')
+          }
         }
         continue
       }
 
-      const toTrigger: { awaitId: string, resumeText: string, resumePayloadJson?: string }[] = []
-      for (const result of results) {
-        if (result.matched) {
-          if (result.resumeText.trim().length === 0) {
-            service.markFailed(result.awaitId, EMPTY_RESUME_TEXT_ERROR)
-          }
-          else {
-            toTrigger.push({ awaitId: result.awaitId, resumeText: result.resumeText, resumePayloadJson: result.resumePayloadJson })
-          }
-        }
-        else if (result.permanentError) {
-          const failed = service.markFailed(
-            result.awaitId,
-            result.permanentError,
-            result.incrementErrorCount,
-          )
-          if (failed && adapter.resumeOnFailure) {
-            await service.resumeFailedAwait(failed, result.permanentError)
-          }
-        }
-        else if (result.transientError) {
-          service.updateLastChecked(result.awaitId, result.transientError)
-        }
-        else {
-          service.updateLastChecked(result.awaitId)
-        }
-      }
-
-      // Trigger matched awaits with concurrency limit
-      await Promise.all(
-        toTrigger.map(t => limit(() => service.trigger(t))),
-      )
+      await applyCheckResults(adapter, results, { triggerLimit: limit })
     }
   }
   finally {
@@ -173,6 +164,12 @@ export async function runOnce(): Promise<void> {
       requestRun()
     }
   }
+}
+
+/** Test helper: one poller cycle plus drain of any queued heavy checks. */
+export async function runOnceAndFlush(): Promise<void> {
+  await runOnce()
+  await flushHeavyCheckQueue()
 }
 
 async function tick() {

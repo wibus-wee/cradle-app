@@ -20,9 +20,12 @@ export const MAX_RESUME_PAYLOAD_BYTES = 32 * 1024
 export const MAX_RESUME_TEXT_BYTES = 32 * 1024
 export const MAX_CONSECUTIVE_EVALUATION_ERRORS = 5
 
-const JAVASCRIPT_EVAL_TIMEOUT_MS = 45_000
+// Cell evaluations are short checks, not long-running wait loops. The poller
+// owns multi-day waiting by re-checking on its interval; the cell must return
+// quickly with `false` or `{ resumeText }`.
+const JAVASCRIPT_EVAL_TIMEOUT_MS = 15_000
 const VALIDATION_TIMEOUT_MS = 10_000
-const MAX_CONCURRENT_JAVASCRIPT_EVALUATIONS = 3
+const JAVASCRIPT_POLL_INTERVAL_MS = 30_000
 
 const JavaScriptAwaitStoredFilterSchema = z.object({
   program: z.string().min(1).refine(
@@ -221,13 +224,14 @@ async function checkJavaScriptAwait(row: SessionAwait): Promise<CheckResult> {
 
 export const javascriptAwaitSource: SessionAwaitSource = {
   source: JAVASCRIPT_AWAIT_SOURCE,
+  // Heavy managed-process evaluations run on the session-await heavy-check
+  // queue so they never block inline sources (github-ci, cradle-*, …).
+  execution: 'queued',
+  pollIntervalMs: JAVASCRIPT_POLL_INTERVAL_MS,
   resumeOnFailure: true,
+  tracksConsecutiveErrors: true,
   async checkPending(awaits) {
-    const results: CheckResult[] = []
-    for (let offset = 0; offset < awaits.length; offset += MAX_CONCURRENT_JAVASCRIPT_EVALUATIONS) {
-      const batch = awaits.slice(offset, offset + MAX_CONCURRENT_JAVASCRIPT_EVALUATIONS)
-      results.push(...await Promise.all(batch.map(checkJavaScriptAwait)))
-    }
-    return results
+    // The heavy-check queue calls this one row at a time with its own concurrency.
+    return Promise.all(awaits.map(checkJavaScriptAwait))
   },
 }
