@@ -18,7 +18,7 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 - Work stores facts only. Activity labels are derived and no Work status machine
   exists.
 - Preparing a handoff saves metadata locally. When an open Draft PR already exists, prepare also pushes the branch and updates the PR automatically.
-- The builtin `cradle` MCP server exposes `work_submit` as the required
+- The builtin `cradle` MCP server exposes `manage_pull_request` as the required
   Agent-facing closed-loop finalization tool; the tool delegates to this module's
   submit API (push + create/update Draft PR) and does not own Work persistence.
 - Work contributes one deterministic `<cradle_work_state>` harness fragment for
@@ -30,8 +30,11 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
   available through their owning modules, delivered events, and on-demand reads
   (`cradle work get`, `session pull-request get`, or `gh`).
 - Creating or updating the Draft PR for agent delivery goes through submit
-  (`work_submit` MCP / `cradle work submit`). Prepare remains available for
+  (`manage_pull_request` MCP / `cradle work submit`). Prepare remains available for
   local handoff metadata (and auto-updates an existing open Draft PR).
+- The Work branch may be renamed via `POST /works/:id/branch` only while no
+  pull request exists and the branch is not on the remote; the worktree
+  directory name/path never changes.
 - Mark Ready and merge remain user-controlled outside this module.
 
 ## Ownership boundaries

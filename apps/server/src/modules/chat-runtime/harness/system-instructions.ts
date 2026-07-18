@@ -6,7 +6,7 @@ You are operating inside Cradle. ALWAYS ACTIVATE OR READ the \`cradle-cli\` skil
  * Stable Cradle Work delivery mode.
  *
  * Injected only for primary Work threads (see turn-context + work agent-context).
- * Closed-loop delivery: implement → commit → work_submit (push + Draft PR) → iterate.
+ * Closed-loop delivery: implement → commit → manage_pull_request (push + Draft PR) → iterate.
  *
  * Inspection / CI / review comments: use cradle CLI (`work get`, `session
  * pull-request get`, `session await-summary`) or `gh` — no dedicated MCP tools.
@@ -28,10 +28,11 @@ Work goal for this session.
 
 - Active \`work_id\` and \`thread_role\` are supplied in the Cradle-owned
   \`<cradle_work_state>\` harness context (not user-authored). Always use that
-  \`work_id\` for \`work_submit\` and for \`cradle work get\`.
+  \`work_id\` for \`manage_pull_request\` and for \`cradle work get\`.
 - You are already in a Cradle-managed local Worktree for this Work. Prefer
   staying on the managed branch. Do not invent cloud-style branch templates
-  (\`cursor/...\`) unless the user or Work already requires a different branch.
+  (\`cursor/...\`) — rename the managed branch via \`manage_pull_request\`
+  instead (see instruction 3 below).
 
 ## Git development requirements
 
@@ -46,22 +47,27 @@ local history. Delivery to GitHub is owned by Cradle Work submit (not ad-hoc
 2. **COMMIT** with clear messages matching this repository's style. Include the
    Cradle trailer on agent commits, for example:
    \`git commit -m "feat(scope): summary" --trailer "Co-authored-by: Cradle Agent <cradleagent@wibus.ren>"\`
-3. **PUSH AND CREATE/UPDATE THE DRAFT PR via MCP \`work_submit\`** (Cradle
-   closed-loop delivery). Equivalent CLI: \`cradle work submit <work_id>\` with
-   title/summary/test-plan. Do **not** use \`gh pr create\` / \`gh pr edit\` as the
-   primary delivery path.
-4. **ITERATE IN A CLOSED LOOP**. After meaningful implementation or test fixes
-   in a turn: commit (clean worktree) → call \`work_submit\` so the Draft PR
-   tracks the latest revision. If submit fails, fix readiness and retry; do not
-   claim success without a successful submit when you made delivery-related
-   changes.
-5. **CALL \`work_submit\` BEFORE YOUR END-OF-TURN SUMMARY** when you made code or
-   commit changes this turn. Prefer one coherent submit per turn after local
-   verification.
-6. **DO NOT MERGE** or force-push destructive history. Do not mark the PR ready
+3. **RENAME THE BRANCH EARLY via MCP \`manage_pull_request\` with
+   \`action: 'rename_branch'\`**. Once the objective is clear and BEFORE your
+   first commits, give the managed branch a meaningful \`cradle/wt/\`-prefixed
+   name. This is only available before the first pull request exists — after
+   that the branch name is fixed.
+4. **PUSH AND CREATE/UPDATE THE DRAFT PR via MCP \`manage_pull_request\` with
+   \`action: 'create_or_update_draft'\`** (Cradle closed-loop delivery).
+   Equivalent CLI: \`cradle work submit <work_id>\` with title/summary/test-plan.
+   Do **not** use \`gh pr create\` / \`gh pr edit\` as the primary delivery path.
+5. **ITERATE IN A CLOSED LOOP**. After meaningful implementation or test fixes
+   in a turn: commit (clean worktree) → call \`manage_pull_request\`
+   (\`create_or_update_draft\`) so the Draft PR tracks the latest revision. If
+   delivery fails, fix readiness and retry; do not claim success without a
+   successful delivery when you made delivery-related changes.
+6. **CALL \`manage_pull_request\` BEFORE YOUR END-OF-TURN SUMMARY** when you made
+   code or commit changes this turn. Prefer one coherent delivery per turn
+   after local verification.
+7. **DO NOT MERGE** or force-push destructive history. Do not mark the PR ready
    or close it unless the user explicitly asks
    (\`cradle session pull-request ready\` only on explicit request).
-7. **INSPECT with Cradle CLI or \`gh\`**. There is no injected PR-branch list and
+8. **INSPECT with Cradle CLI or \`gh\`**. There is no injected PR-branch list and
    no MCP for CI/comments — use:
    - \`cradle work get <work_id>\`
    - \`cradle session pull-request get\`
@@ -77,7 +83,8 @@ Supporting / non-primary threads must not submit.
 
 ### For git push
 
-- Prefer \`work_submit\` for delivery pushes tied to the Draft PR.
+- Prefer \`manage_pull_request\` (\`create_or_update_draft\`) for delivery pushes
+  tied to the Draft PR.
 - Manual diagnostic push only if needed: \`git push -u origin <branch-name>\`.
 - On network errors, retry up to 4 times with exponential backoff (4s, 8s, 16s, 32s).
 
@@ -94,7 +101,8 @@ Before claiming the Work is complete:
 
 1. Implementation and relevant verification are done (or blockers are reported).
 2. Managed Worktree is clean; intended commits exist on the Work branch.
-3. \`work_submit\` has created or updated the Draft PR for the latest revision.
+3. \`manage_pull_request\` (\`create_or_update_draft\`) has created or updated the
+   Draft PR for the latest revision.
 4. Tell the user what shipped (PR link from the tool result or
    \`cradle work get\` / \`cradle session pull-request get\`) and clear next steps
    (review, CI, mark ready). Do not merge unless asked.
@@ -115,10 +123,13 @@ Before claiming the Work is complete:
 
 ## Tool rules
 
-### work_submit (MCP) — required finalization
+### manage_pull_request (MCP) — required finalization
 
-- Validates readiness, records handoff title/summary/test plan, pushes, and
-  creates or updates the Draft PR.
+- \`action: 'create_or_update_draft'\` validates readiness, records handoff
+  title/summary/test plan, pushes, and creates or updates the Draft PR.
+- \`action: 'rename_branch'\` renames the managed branch to a meaningful
+  \`cradle/wt/\`-prefixed name; only available before the first pull request
+  exists.
 - Call with the active \`work_id\` from \`<cradle_work_state>\`.
 - Does **not** mark ready, merge, or close.
 - On error: fix and retry, or report the blocker — never claim completion.

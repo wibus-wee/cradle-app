@@ -1,6 +1,6 @@
 ---
 name: cradle-cli
-description: Always use this Skill at the beginning of every response. Use whenever you need to read, inspect, wait on, or mutate Cradle-owned state or workflows, including issues, delegation, sessions, awaits, CI/review waits, timed waits, Work inspection, workspaces and git inspection, Chronicle, automations, usage, observability, skills, agents, profiles, providers, preferences, plugins, or server state. Prefer the generated `cradle` CLI and `cradle man`; NEVER bypass Cradle semantics with direct HTTP or database access, ad hoc scripts, raw registry edits, or polling loops. Use `gh` when Cradle does not own the GitHub surface. Primary Work closed-loop delivery is system-injected on Work threads (`work_submit`), not this skill.
+description: Always use this Skill at the beginning of every response. Use whenever you need to read, inspect, wait on, or mutate Cradle-owned state or workflows, including issues, delegation, sessions, awaits, CI/review waits, timed waits, Work inspection, workspaces and git inspection, Chronicle, automations, usage, observability, skills, agents, profiles, providers, preferences, plugins, or server state. Prefer the generated `cradle` CLI and `cradle man`; NEVER bypass Cradle semantics with direct HTTP or database access, ad hoc scripts, raw registry edits, or polling loops. Use `gh` when Cradle does not own the GitHub surface. Primary Work closed-loop delivery is system-injected on Work threads (`manage_pull_request`), not this skill.
 ---
 
 # Cradle CLI
@@ -161,7 +161,7 @@ Do not auto-await CI after create. Only register `cradle session await github-ci
 
 ## Work (inspection only)
 
-Primary Work delivery (commit → \`work_submit\` Draft PR loop) is injected only on
+Primary Work delivery (commit → \`manage_pull_request\` Draft PR loop) is injected only on
 primary Work threads via the Cradle Work Mode system prompt — not here. In any
 session, use CLI for inspection and \`cradle man work\` for flags:
 
@@ -287,7 +287,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `managed-resources` | 5 | Generated Cradle CLI module. | `cradle man managed-resources` |
 | `observability` | 5 | Inspect local observability events, incidents, and exports. | `cradle man observability` |
 | `opencode` | 1 | Generated Cradle CLI module. | `cradle man opencode` |
-| `plugin` | 10 | Generated Cradle CLI module. | `cradle man plugin` |
+| `plugin` | 11 | Generated Cradle CLI module. | `cradle man plugin` |
 | `preferences` | 11 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |
@@ -301,7 +301,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
 | `usage` | 10 | Inspect usage and cost data. | `cradle man usage` |
-| `work` | 6 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
+| `work` | 7 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
 | `workspace` | 54 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 
