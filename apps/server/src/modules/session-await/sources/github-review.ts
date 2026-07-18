@@ -101,9 +101,25 @@ async function resolveTarget(filter: GitHubReviewFilter): Promise<ResolvedReview
 
 function buildTerminalResult(awaitId: string, target: ResolvedReviewTarget): CheckResult | null {
   // headSha mismatch means the await is stale (new push happened).
-  // Skip it — registerWorkAwaits will cancel it and register a fresh one.
+  // Mark it superseded so the agent can re-register with the new head.
   if (target.currentHeadSha !== target.headSha) {
-    return null
+    return {
+      awaitId,
+      matched: true,
+      resumeText: `GitHub PR #${target.prNumber} head changed from ${target.headSha} to ${target.currentHeadSha}.`,
+      resumePayloadJson: JSON.stringify({
+        kind: 'github-review',
+        repo: `${target.owner}/${target.repo}`,
+        pr: target.prNumber,
+        mode: target.mode,
+        headSha: target.headSha,
+        currentHeadSha: target.currentHeadSha,
+        outcome: 'superseded',
+        approvedCount: 0,
+        changesRequestedCount: 0,
+        reviews: [],
+      }),
+    }
   }
 
   const outcome = target.merged
