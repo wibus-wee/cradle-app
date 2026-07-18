@@ -20,7 +20,7 @@ const RuntimeTargetResponseSchema = z.object({
   id: z.string(),
   sourceKey: z.string(),
   externalRecordId: z.string(),
-  providerKind: z.enum(['anthropic', 'openai-compatible']),
+  providerKind: z.enum(['anthropic', 'openai-compatible', 'universal']),
   displayName: z.string(),
   enabled: z.boolean(),
   credentialRef: z.string().nullable(),
@@ -839,6 +839,107 @@ describe('external provider sources capability', () => {
       })
       expect(JSON.parse(volcengineSettings.customModelsJson)).toEqual([
         { id: 'glm-5.2', label: 'GLM 5.2' },
+      ])
+
+      registration.dispose()
+    }
+ finally {
+      shutdownInfra()
+      restoreEnv(previous)
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  })
+
+  it('projects universal external providers with OpenAI and Anthropic endpoints', async () => {
+    const dataDir = makeTempDir('cradle-external-provider-source-universal-')
+    const previous = {
+      dataDir: process.env.CRADLE_DATA_DIR,
+      credentialSecret: process.env.CRADLE_CREDENTIAL_SECRET,
+      pluginsDir: process.env.CRADLE_PLUGINS_DIR,
+      externalPluginsDirs: process.env.CRADLE_EXTERNAL_PLUGINS_DIRS,
+    }
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_CREDENTIAL_SECRET = 'external-provider-source-universal-secret'
+    process.env.CRADLE_PLUGINS_DIR = join(dataDir, 'plugins')
+    process.env.CRADLE_EXTERNAL_PLUGINS_DIRS = ''
+
+    try {
+      const app = await createServerApp({ startBackgroundTasks: false })
+      const registration = registerExternalProviderSource('fixture-universal-plugin', {
+        id: 'fixture-universal-providers',
+        label: 'Fixture Universal Providers',
+        async readSnapshot() {
+          return {
+            source: { status: 'ok' },
+            providers: [
+              {
+                externalId: 'codex:universal-dual-endpoint',
+                app: 'codex',
+                name: 'Universal Dual Endpoint',
+                providerKind: 'universal',
+                config: {
+                  openaiBaseUrl: 'https://api.deepseek.com/v1',
+                  anthropicBaseUrl: 'https://anthropic.example.test',
+                  model: 'deepseek-v4-pro',
+                },
+                credential: {
+                  kind: 'api-key',
+                  value: 'universal-secret-value',
+                  label: 'Universal Dual Endpoint',
+                },
+                metadata: {
+                  openaiBaseUrl: 'https://api.deepseek.com/v1',
+                  anthropicBaseUrl: 'https://anthropic.example.test',
+                  model: 'deepseek-v4-pro',
+                },
+              },
+            ],
+          }
+        },
+      })
+
+      const sources = (await (
+        await app.handle(new Request('http://localhost/external-provider-sources'))
+      ).json()) as Array<{ id: string }>
+      const sourceKey = sources[0].id
+
+      const refresh = await app.handle(
+        new Request(`http://localhost/external-provider-sources/${sourceKey}/refresh`, {
+          method: 'POST',
+        }),
+      )
+      expect(refresh.status).toBe(200)
+
+      const targetRes = await app.handle(
+        new Request(
+          `http://localhost/external-provider-sources/${sourceKey}/records/codex:universal-dual-endpoint/runtime-target`,
+        ),
+      )
+      expect(targetRes.status).toBe(200)
+      const target = RuntimeTargetResponseSchema.parse(await targetRes.json())
+      expect(target.providerKind).toBe('universal')
+
+      const settingsRes = await app.handle(
+        new Request(`http://localhost/provider-targets/${target.id}/model-settings`),
+      )
+      expect(settingsRes.status).toBe(200)
+      const settings = ProviderTargetModelSettingsResponseSchema.parse(await settingsRes.json())
+      expect(JSON.parse(settings.connectionConfigJson)).toEqual({
+        openaiBaseUrl: 'https://api.deepseek.com/v1',
+        anthropicBaseUrl: 'https://anthropic.example.test',
+        model: 'deepseek-v4-pro',
+      })
+      expect(JSON.parse(settings.configJson)).toEqual({
+        openaiBaseUrl: 'https://api.deepseek.com/v1',
+        anthropicBaseUrl: 'https://anthropic.example.test',
+        model: 'deepseek-v4-pro',
+        enabledModels: [],
+      })
+      expect(JSON.parse(settings.customModelsJson)).toEqual([
+        { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+        { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+        { id: 'deepseek-chat', label: 'DeepSeek Chat (Legacy)' },
+        { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner (Legacy)' },
       ])
 
       registration.dispose()

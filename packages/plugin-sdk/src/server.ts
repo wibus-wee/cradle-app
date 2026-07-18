@@ -563,7 +563,7 @@ export interface ExternalProviderRecord {
   externalId: string
   app: string
   name: string
-  providerKind: 'anthropic' | 'openai-compatible' | 'cli-tool'
+  providerKind: 'anthropic' | 'openai-compatible' | 'universal' | 'cli-tool'
   config: Record<string, unknown>
   credential?: ExternalProviderCredential
   current?: boolean
@@ -580,6 +580,8 @@ export interface ExternalProviderCredential {
 
 export interface ExternalProviderRecordMetadata {
   baseUrl?: string
+  openaiBaseUrl?: string
+  anthropicBaseUrl?: string
   model?: string
   apiFormat?: string
   iconSlug?: string

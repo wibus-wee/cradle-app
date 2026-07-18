@@ -30,6 +30,8 @@ const sourceCapabilitiesSchema = t.Object({
 
 const recordMetadataSchema = t.Object({
   baseUrl: t.Optional(t.String()),
+  openaiBaseUrl: t.Optional(t.String()),
+  anthropicBaseUrl: t.Optional(t.String()),
   model: t.Optional(t.String()),
   apiFormat: t.Optional(t.String()),
   iconSlug: t.Optional(t.String()),
