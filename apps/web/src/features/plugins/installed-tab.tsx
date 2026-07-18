@@ -11,8 +11,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { deletePluginsSourcesById, getPlugins, getPluginsSources, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
-import type { GetPluginsResponse, GetPluginsSourcesResponse } from '~/api-gen/types.gen'
+import { deletePluginsSourcesById, getPlugins, getPluginsSources, getPluginsSourcesByIdUninstallPlan, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
+import type { GetPluginsResponse, GetPluginsSourcesByIdUninstallPlanResponse, GetPluginsSourcesResponse } from '~/api-gen/types.gen'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -108,6 +108,21 @@ export function InstalledTab() {
     },
   })
 
+  const uninstallSource = uninstallTarget
+    ? findOwningSource(uninstallTarget, sourcesQuery.data ?? [])
+    : undefined
+  const uninstallPlanQuery = useQuery({
+    queryKey: ['plugins', 'sources', uninstallSource?.id, 'uninstall-plan'],
+    enabled: uninstallSource !== undefined,
+    queryFn: async () => {
+      const { data, error } = await getPluginsSourcesByIdUninstallPlan({ path: { id: uninstallSource!.id } })
+      if (error || !data) {
+        throw new Error(String(error ?? 'Missing uninstall plan'))
+      }
+      return data as GetPluginsSourcesByIdUninstallPlanResponse
+    },
+  })
+
   const toggleMutation = useMutation({
     mutationFn: async ({ routeSegment, enabled }: { routeSegment: string, enabled: boolean }) => {
       const { data, error } = await patchPluginsByRouteSegmentEnabled({ path: { routeSegment }, body: { enabled } })
@@ -142,8 +157,11 @@ export function InstalledTab() {
   })
 
   const uninstallMutation = useMutation({
-    mutationFn: async (sourceId: string) => {
-      const { error } = await deletePluginsSourcesById({ path: { id: sourceId } })
+    mutationFn: async ({ sourceId, confirmationToken }: { sourceId: string, confirmationToken: string }) => {
+      const { error } = await deletePluginsSourcesById({
+        path: { id: sourceId },
+        body: { confirmationToken },
+      })
       if (error) {
         throw new Error(String(error))
       }
@@ -211,8 +229,8 @@ export function InstalledTab() {
     toggleMutation.mutate({ routeSegment: plugin.routeSegment, enabled: next })
   }
 
-  const uninstallSource = uninstallTarget ? findOwningSource(uninstallTarget, sources) : undefined
   const uninstallCount = uninstallSource?.plugins.length ?? 1
+  const uninstallPlan = uninstallPlanQuery.data
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -318,16 +336,61 @@ export function InstalledTab() {
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {uninstallPlanQuery.isLoading && (
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <Spinner className="size-3.5" />
+              {t('plugins.uninstallPlan.loading')}
+            </div>
+          )}
+          {uninstallPlanQuery.isError && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {t('plugins.uninstallPlan.failed')}
+            </div>
+          )}
+          {uninstallPlan && (
+            <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-border/60 bg-muted/15 p-3 text-xs">
+              {uninstallPlan.plugins.map(plugin => (
+                <div key={plugin.identity} className="space-y-2">
+                  <div className="font-medium text-foreground">{plugin.displayName}</div>
+                  {plugin.processes.length > 0 && (
+                    <div className="text-muted-foreground">
+                      {t('plugins.uninstallPlan.stopProcesses', { count: plugin.processes.length })}
+                    </div>
+                  )}
+                  {plugin.resources.map(resource => (
+                    <div key={`${resource.key.namespace}:${resource.key.resourceType}:${resource.key.resourceId}`} className="text-muted-foreground">
+                      {t('plugins.uninstallPlan.removeResource', { name: resource.displayName })}
+                    </div>
+                  ))}
+                  {plugin.lifecycle?.summary && <div className="text-muted-foreground">{plugin.lifecycle.summary}</div>}
+                  {plugin.lifecycle?.data.map(item => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 text-muted-foreground">
+                      <span>{item.label}</span>
+                      <span className={cn('shrink-0 font-medium', item.effect === 'preserve' ? 'text-foreground' : 'text-destructive')}>
+                        {t(item.effect === 'preserve' ? 'plugins.uninstallPlan.preserve' : 'plugins.uninstallPlan.remove')}
+                      </span>
+                    </div>
+                  ))}
+                  {plugin.blockedReasons.map(reason => (
+                    <div key={reason} className="rounded-md bg-destructive/10 px-2 py-1.5 text-destructive">{reason}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>{t('plugins.add.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault()
-                if (uninstallSource) {
-                  uninstallMutation.mutate(uninstallSource.id)
+                if (uninstallSource && uninstallPlan) {
+                  uninstallMutation.mutate({
+                    sourceId: uninstallSource.id,
+                    confirmationToken: uninstallPlan.confirmationToken,
+                  })
                 }
               }}
-              disabled={uninstallMutation.isPending}
+              disabled={uninstallMutation.isPending || !uninstallPlan || uninstallPlan.blocked}
             >
               {uninstallMutation.isPending ? <Spinner className="size-3.5" /> : t('plugins.uninstall')}
             </AlertDialogAction>

@@ -1076,5 +1076,11 @@
   "import.workspace.git": "Coincidencia por repositorio Git",
   "import.workspace.importRecord": "Vinculado a esta sesión importada",
   "import.workspace.offline": "Se creará un Workspace histórico sin conexión",
-  "import.workspace.register": "Se registrará el Workspace"
+  "import.workspace.register": "Se registrará el Workspace",
+  "plugins.uninstallPlan.failed": "No se pudo inspeccionar el plan de desinstalación. No se eliminó nada.",
+  "plugins.uninstallPlan.loading": "Inspeccionando procesos, recursos administrados y datos del plugin…",
+  "plugins.uninstallPlan.preserve": "Conservar",
+  "plugins.uninstallPlan.remove": "Eliminar",
+  "plugins.uninstallPlan.removeResource": "Desinstalar recurso administrado: {{name}}",
+  "plugins.uninstallPlan.stopProcesses": "Detener {{count}} procesos administrados"
 }

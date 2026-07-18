@@ -111,7 +111,19 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
     }),
     response: { 200: PluginsModel.addPluginSourceResult },
   })
-  .delete('/sources/:id', ({ params }) => Plugins.removeSource(params.id), {
+  .get('/sources/:id/uninstall-plan', ({ params }) => Plugins.inspectSourceRemoval(params.id), {
+    detail: {
+      'summary': 'Inspect plugin source uninstall effects',
+      'x-cradle-cli': {
+        command: ['plugin', 'source', 'uninstall-plan'],
+      },
+    },
+    params: t.Object({
+      id: t.String({ minLength: 1 }),
+    }),
+    response: { 200: PluginsModel.pluginSourceRemovalPlan },
+  })
+  .delete('/sources/:id', ({ params, body }) => Plugins.removeSource(params.id, body), {
     detail: {
       'summary': 'Remove plugin source',
       'x-cradle-cli': {
@@ -121,6 +133,7 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
     params: t.Object({
       id: t.String({ minLength: 1 }),
     }),
+    body: PluginsModel.removePluginSourceBody,
     response: { 200: t.Object({ removed: t.Literal(true) }) },
   })
   .get('/:routeSegment/icon', async ({ params }) => {

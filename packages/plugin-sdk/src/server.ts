@@ -32,6 +32,24 @@ export interface ServerPluginContext {
   /** Plugin-scoped persistent KV storage */
   storage: PluginStorage
 
+  /** Plugin-owned retained resources projected through Cradle Managed Resources. */
+  resources: PluginManagedResourceRegistry
+
+  /** Download Center access with the owner namespace forced to this plugin. */
+  downloads: PluginDownloadService
+
+  /** Host-created filesystem paths owned by this plugin. */
+  paths: PluginPaths
+
+  /** Encrypted secret values scoped to this plugin. */
+  secrets: PluginSecrets
+
+  /** Child processes restricted to executables and working directories in this plugin's data directory. */
+  processes: PluginProcessService
+
+  /** Plugin package lifecycle hooks, including confirmed uninstall cleanup. */
+  lifecycle: PluginLifecycle
+
   /** Plugin-scoped logger */
   logger: Logger
 
@@ -46,6 +64,166 @@ export interface ServerPluginContext {
 
   /** Event bus — subscribe to host-emitted events */
   events: PluginEventBus
+}
+
+export type PluginManagedResourceState
+  = | 'not-installed'
+    | 'installing'
+    | 'installed'
+    | 'update-available'
+    | 'error'
+    | 'unavailable'
+
+export type PluginManagedResourceInstallationSource = 'built-in' | 'managed' | 'external' | null
+export type PluginManagedResourceActionName = 'install' | 'update' | 'uninstall'
+
+export interface PluginManagedResourceKey {
+  resourceType: string
+  resourceId: string
+}
+
+export interface PluginManagedResourceAction {
+  available: boolean
+  reasonCode: string | null
+}
+
+export interface PluginManagedResourceProjection {
+  state: PluginManagedResourceState
+  installationSource: PluginManagedResourceInstallationSource
+  installedVersion: string | null
+  availableVersion: string | null
+  installedSizeBytes: number | null
+  downloadSizeBytes: number | null
+  actions: {
+    install: PluginManagedResourceAction
+    update: PluginManagedResourceAction
+    uninstall: PluginManagedResourceAction
+  }
+}
+
+export interface PluginManagedResourceDeclaration {
+  key: PluginManagedResourceKey
+  displayName: string
+  description: string | null
+  kind: string
+  required: boolean
+}
+
+export interface PluginManagedResourceAdapter {
+  declarations: () => readonly PluginManagedResourceDeclaration[]
+  project: (key: PluginManagedResourceKey) => Promise<PluginManagedResourceProjection>
+  execute: (
+    key: PluginManagedResourceKey,
+    action: PluginManagedResourceActionName,
+  ) => Promise<PluginManagedResourceProjection>
+}
+
+export interface PluginManagedResourceRegistry {
+  /** Registers one owner adapter. A plugin may register at most one adapter at a time. */
+  register: (adapter: PluginManagedResourceAdapter) => Disposable
+}
+
+export interface PluginDownloadRequest {
+  owner: {
+    resourceType: string
+    resourceId: string
+    displayName: string
+  }
+  fileName: string
+  sources: ReadonlyArray<{
+    id: string
+    url: string
+    headers?: Readonly<Record<string, string>>
+  }>
+  integrity?: {
+    expectedBytes?: number
+    checksum?: {
+      algorithm: 'sha256' | 'sha512'
+      value: string
+    }
+  }
+  maxBytes: number
+  maxAttempts?: number
+}
+
+export interface PluginDownloadedArtifact {
+  taskId: string
+  filePath: string
+  bytes: number
+  checksum: {
+    algorithm: 'sha256' | 'sha512'
+    expected: string | null
+    actual: string
+    matched: boolean | null
+  }
+}
+
+export interface PluginDownloadService {
+  execute: (request: PluginDownloadRequest) => Promise<PluginDownloadedArtifact>
+  release: (taskId: string) => Promise<void>
+}
+
+export interface PluginPaths {
+  /** Absolute directory below the Cradle data directory reserved for this plugin. */
+  dataDir: string
+}
+
+export interface PluginSecrets {
+  get: (key: string) => string | null
+  set: (key: string, value: string) => void
+  delete: (key: string) => void
+}
+
+export interface PluginProcessSpec {
+  id: string
+  displayName: string
+  command: string
+  args?: readonly string[]
+  cwd?: string
+  env?: Readonly<Record<string, string>>
+}
+
+export interface PluginProcessView {
+  id: string
+  displayName: string
+  pid: number | null
+  state: 'starting' | 'running' | 'stopping'
+  startedAt: string
+}
+
+export interface PluginProcessHandle {
+  readonly id: string
+  status: () => PluginProcessView | null
+  stop: () => Promise<void>
+}
+
+export interface PluginProcessService {
+  spawn: (spec: PluginProcessSpec) => Promise<PluginProcessHandle>
+  list: () => PluginProcessView[]
+  stop: (id: string) => Promise<void>
+  stopAll: () => Promise<void>
+}
+
+export interface PluginUninstallDataEffect {
+  id: string
+  label: string
+  effect: 'remove' | 'preserve'
+  description?: string
+}
+
+export interface PluginUninstallInspection {
+  summary: string
+  data: PluginUninstallDataEffect[]
+  warnings?: string[]
+}
+
+export interface PluginUninstallHandler {
+  inspect: () => PluginUninstallInspection | Promise<PluginUninstallInspection>
+  execute: () => void | Promise<void>
+}
+
+export interface PluginLifecycle {
+  registerUninstall: (handler: PluginUninstallHandler) => Disposable
 }
 
 export type ServerPluginRouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'

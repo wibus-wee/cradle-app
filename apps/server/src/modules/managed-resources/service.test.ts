@@ -89,4 +89,32 @@ describe('managedResourceService', () => {
       ],
     })])).toThrow('already declared')
   })
+
+  it('registers and fully removes plugin-owned adapters at runtime', async () => {
+    const service = new ManagedResourceService([])
+    const owner = adapter({ namespace: 'plugin.cli-proxy-api' })
+    owner.declarations = () => [{
+      key: { namespace: 'plugin.cli-proxy-api', resourceType: 'runtime', resourceId: 'one' },
+      displayName: 'Plugin runtime',
+      description: 'Plugin-owned runtime',
+      kind: 'runtime',
+      required: false,
+    }]
+
+    const registration = service.registerAdapter(owner)
+
+    await expect(service.listNamespace('plugin.cli-proxy-api')).resolves.toMatchObject([{
+      key: { namespace: 'plugin.cli-proxy-api', resourceType: 'runtime', resourceId: 'one' },
+      state: 'not-installed',
+    }])
+
+    registration.dispose()
+
+    await expect(service.listNamespace('plugin.cli-proxy-api')).resolves.toEqual([])
+    await expect(service.get({
+      namespace: 'plugin.cli-proxy-api',
+      resourceType: 'runtime',
+      resourceId: 'one',
+    })).rejects.toMatchObject({ code: 'managed_resource_not_found', status: 404 })
+  })
 })

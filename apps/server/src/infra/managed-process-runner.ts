@@ -4,6 +4,7 @@ import { fork, spawn } from 'node:child_process'
 interface BaseTarget {
   cwd?: string
   env?: Record<string, string | undefined>
+  inheritEnv?: boolean
   shutdownGraceMs?: number
 }
 
@@ -37,9 +38,12 @@ function emitStatus(message: Record<string, unknown>): void {
   }
 }
 
-function targetEnv(env: Record<string, string | undefined> | undefined): NodeJS.ProcessEnv {
+function targetEnv(
+  env: Record<string, string | undefined> | undefined,
+  inheritEnv = true,
+): NodeJS.ProcessEnv {
   return {
-    ...process.env,
+    ...(inheritEnv ? process.env : {}),
     ...env,
   }
 }
@@ -48,7 +52,7 @@ function startTarget(): ChildProcess {
   if (target.kind === 'fork') {
     return fork(target.modulePath, target.args, {
       cwd: target.cwd,
-      env: targetEnv(target.env),
+      env: targetEnv(target.env, target.inheritEnv),
       execPath: target.execPath,
       execArgv: target.execArgv,
       detached: process.platform !== 'win32',
@@ -58,7 +62,7 @@ function startTarget(): ChildProcess {
 
   return spawn(target.command, target.args, {
     cwd: target.cwd,
-    env: targetEnv(target.env),
+    env: targetEnv(target.env, target.inheritEnv),
     detached: process.platform !== 'win32',
     stdio: [target.stdin, 'pipe', 'pipe'],
   })

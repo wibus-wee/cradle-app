@@ -1077,5 +1077,11 @@
   "import.workspace.git": "Git リポジトリで一致",
   "import.workspace.importRecord": "このインポート済みセッションにリンク済み",
   "import.workspace.offline": "オフラインの履歴 Workspace を作成します",
-  "import.workspace.register": "Workspace を自動登録します"
+  "import.workspace.register": "Workspace を自動登録します",
+  "plugins.uninstallPlan.failed": "アンインストール計画を確認できませんでした。何も削除されていません。",
+  "plugins.uninstallPlan.loading": "プロセス、管理対象リソース、プラグインデータを確認しています…",
+  "plugins.uninstallPlan.preserve": "保持",
+  "plugins.uninstallPlan.remove": "削除",
+  "plugins.uninstallPlan.removeResource": "管理対象リソースをアンインストール：{{name}}",
+  "plugins.uninstallPlan.stopProcesses": "管理対象プロセス {{count}} 件を停止"
 }

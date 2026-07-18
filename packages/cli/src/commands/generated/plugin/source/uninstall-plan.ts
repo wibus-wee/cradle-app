@@ -14,19 +14,12 @@ const spec = {
   "command": [
     "plugin",
     "source",
-    "remove"
+    "uninstall-plan"
   ],
-  "description": "Remove plugin source",
-  "flags": [
-    {
-      "name": "confirmationToken",
-      "required": true,
-      "target": "body.confirmationToken",
-      "type": "string"
-    }
-  ],
-  "method": "delete",
-  "path": "/plugins/sources/{id}"
+  "description": "Inspect plugin source uninstall effects",
+  "flags": [],
+  "method": "get",
+  "path": "/plugins/sources/{id}/uninstall-plan"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {
