@@ -437,13 +437,24 @@ function buildRunTree(runs: LiveCheckRun[], workflowRuns: LiveWorkflowRun[]): Tr
   return root
 }
 
-function collectExpandableNodeIds(nodes: TreeNode[]): string[] {
+function isJobNodeInProgress(node: TreeNode): boolean {
+  if (node.run) {
+    return node.run.status !== 'completed'
+  }
+  if (node.workflowJob) {
+    return node.workflowJob.status !== 'completed'
+  }
+  return false
+}
+
+/** Expand job detail rows only while the job is still loading; completed jobs stay collapsed by default. */
+function collectAutoExpandedNodeIds(nodes: TreeNode[]): string[] {
   const ids: string[] = []
   for (const node of nodes) {
-    if (isExpandableJobNode(node)) {
+    if (isExpandableJobNode(node) && isJobNodeInProgress(node)) {
       ids.push(node.id)
     }
-    ids.push(...collectExpandableNodeIds(node.children))
+    ids.push(...collectAutoExpandedNodeIds(node.children))
   }
   return ids
 }
@@ -831,25 +842,37 @@ function SourceCard({ awaitRow, sessionId }: { awaitRow: AwaitRow, sessionId: st
 
 function GitHubCICard({ ci, awaitId, sessionId }: { ci: LiveCIStatus, awaitId: string, sessionId: string | null }) {
   const tree = buildRunTree(ci.checkRuns, ci.workflowRuns)
-  const defaultExpandedNodeIds = collectExpandableNodeIds(tree)
-  const initializedExpandedNodeIdsRef = useRef(new Set(defaultExpandedNodeIds))
-  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => new Set(defaultExpandedNodeIds))
+  const autoExpandedNodeIds = collectAutoExpandedNodeIds(tree)
+  const autoExpandedKey = autoExpandedNodeIds.slice().sort().join('\0')
+  const autoExpandedNodeIdsRef = useRef(autoExpandedNodeIds)
+  autoExpandedNodeIdsRef.current = autoExpandedNodeIds
+  const previousAutoExpandedRef = useRef<Set<string>>(new Set(autoExpandedNodeIds))
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() => new Set(autoExpandedNodeIds))
 
   useEffect(() => {
-    const unseenNodeIds = defaultExpandedNodeIds.filter(nodeId => !initializedExpandedNodeIdsRef.current.has(nodeId))
-    if (unseenNodeIds.length === 0) {
-      return
-    }
+    const nextAutoExpanded = new Set(autoExpandedNodeIdsRef.current)
+    const previousAutoExpanded = previousAutoExpandedRef.current
 
     setExpandedNodeIds((current) => {
       const next = new Set(current)
-      for (const nodeId of unseenNodeIds) {
-        next.add(nodeId)
-        initializedExpandedNodeIdsRef.current.add(nodeId)
+
+      for (const nodeId of previousAutoExpanded) {
+        if (!nextAutoExpanded.has(nodeId)) {
+          next.delete(nodeId)
+        }
       }
+
+      for (const nodeId of nextAutoExpanded) {
+        if (!previousAutoExpanded.has(nodeId)) {
+          next.add(nodeId)
+        }
+      }
+
       return next
     })
-  }, [defaultExpandedNodeIds])
+
+    previousAutoExpandedRef.current = nextAutoExpanded
+  }, [autoExpandedKey])
 
   if (!ci.hasToken) {
     return (
