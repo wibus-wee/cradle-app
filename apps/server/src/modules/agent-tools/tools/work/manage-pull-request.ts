@@ -99,7 +99,7 @@ async function executeDelivery({ workId, action, title, summary, testPlan, base 
           `Pull request delivered for Work ${response.work.id}.`,
           prLine,
           readinessLine.trim(),
-          'Closed-loop delivery complete for this revision. Do not merge or mark ready unless the user explicitly asks.',
+          'Closed-loop delivery complete for this revision. CI and review waits are registered automatically — end your turn; Cradle resumes this session when they fire. Do not merge or mark ready unless the user explicitly asks.',
           'Inspect CI/PR with `cradle work get`, `cradle session pull-request get`, `cradle session await-summary`, or `gh` as needed.',
         ].filter(Boolean).join(' '),
       }],

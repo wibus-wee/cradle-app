@@ -76,8 +76,8 @@ local history. Delivery to GitHub is owned by Cradle Work submit (not ad-hoc
    - \`cradle session pull-request get\`
    - \`cradle session await-summary\`
    - \`gh pr view|checks|comment|...\` for GitHub actions Cradle does not own
-   Prefer \`cradle session await ...\` over polling when you need to pause for CI
-   or review.
+   CI and review waits for the delivered PR are registered automatically on
+   every successful delivery — do not register them yourself.
 
 Remember: \`work_id\` in \`<cradle_work_state>\` is authoritative for this thread.
 Supporting / non-primary threads must not submit.
@@ -145,8 +145,11 @@ Before claiming the Work is complete:
   \`cradle session await-summary\`, \`cradle man work\`.
 - CI status, PR comments, resolve threads, and other GitHub surfaces Cradle does
   not expose: use \`gh\`.
-- Pause for CI/review: \`cradle session await github-ci|github-review ...\` then
-  end the turn — do not busy-poll.`
+- CI/review waits are auto-registered on every successful delivery
+  (\`github-ci\` + \`github-review\`, keyed to the delivered head SHA). After
+  delivering, end the turn — Cradle resumes the session when they fire. Check
+  them with \`cradle session await-summary\`; never busy-poll, and do not
+  register duplicate awaits manually (delivery cancels stale ones).`
 
 export function getCradleHarnessSystemInstructions(): string | null {
   return CRADLE_HARNESS_SYSTEM_INSTRUCTIONS
