@@ -6,7 +6,7 @@ You are operating inside Cradle. ALWAYS ACTIVATE OR READ the \`cradle-cli\` skil
  * Stable Cradle Work delivery mode.
  *
  * Injected only for primary Work threads (see turn-context + work agent-context).
- * Closed-loop delivery: implement → commit → manage_pull_request (push + Draft PR) → iterate.
+ * Closed-loop delivery: implement → commit → manage_pull_request (push + PR) → iterate.
  *
  * Inspection / CI / review comments: use cradle CLI (`work get`, `session
  * pull-request get`, `session await-summary`) or `gh` — no dedicated MCP tools.
@@ -52,13 +52,16 @@ local history. Delivery to GitHub is owned by Cradle Work submit (not ad-hoc
    first commits, give the managed branch a meaningful \`cradle/wt/\`-prefixed
    name. This is only available before the first pull request exists — after
    that the branch name is fixed.
-4. **PUSH AND CREATE/UPDATE THE DRAFT PR via MCP \`manage_pull_request\` with
-   \`action: 'create_or_update_draft'\`** (Cradle closed-loop delivery).
-   Equivalent CLI: \`cradle work submit <work_id>\` with title/summary/test-plan.
-   Do **not** use \`gh pr create\` / \`gh pr edit\` as the primary delivery path.
+4. **PUSH AND CREATE/UPDATE THE PR via MCP \`manage_pull_request\`** — use
+   \`action: 'create_pr'\` for the first delivery and \`action: 'update_pr'\`
+   for subsequent revisions (Cradle closed-loop delivery). The first PR starts
+   as a draft; \`update_pr\` never changes its draft/ready state — the human
+   controls the ready transition. Equivalent CLI: \`cradle work submit <work_id>\`
+   with title/summary/test-plan. Do **not** use \`gh pr create\` / \`gh pr edit\`
+   as the primary delivery path.
 5. **ITERATE IN A CLOSED LOOP**. After meaningful implementation or test fixes
    in a turn: commit (clean worktree) → call \`manage_pull_request\`
-   (\`create_or_update_draft\`) so the Draft PR tracks the latest revision. If
+   (\`create_pr\` / \`update_pr\`) so the PR tracks the latest revision. If
    delivery fails, fix readiness and retry; do not claim success without a
    successful delivery when you made delivery-related changes.
 6. **CALL \`manage_pull_request\` BEFORE YOUR END-OF-TURN SUMMARY** when you made
@@ -83,8 +86,8 @@ Supporting / non-primary threads must not submit.
 
 ### For git push
 
-- Prefer \`manage_pull_request\` (\`create_or_update_draft\`) for delivery pushes
-  tied to the Draft PR.
+- Prefer \`manage_pull_request\` (\`create_pr\` / \`update_pr\`) for delivery
+  pushes tied to the PR.
 - Manual diagnostic push only if needed: \`git push -u origin <branch-name>\`.
 - On network errors, retry up to 4 times with exponential backoff (4s, 8s, 16s, 32s).
 
@@ -101,8 +104,8 @@ Before claiming the Work is complete:
 
 1. Implementation and relevant verification are done (or blockers are reported).
 2. Managed Worktree is clean; intended commits exist on the Work branch.
-3. \`manage_pull_request\` (\`create_or_update_draft\`) has created or updated the
-   Draft PR for the latest revision.
+3. \`manage_pull_request\` (\`create_pr\` / \`update_pr\`) has created or updated
+   the PR for the latest revision.
 4. Tell the user what shipped (PR link from the tool result or
    \`cradle work get\` / \`cradle session pull-request get\`) and clear next steps
    (review, CI, mark ready). Do not merge unless asked.
@@ -125,8 +128,10 @@ Before claiming the Work is complete:
 
 ### manage_pull_request (MCP) — required finalization
 
-- \`action: 'create_or_update_draft'\` validates readiness, records handoff
-  title/summary/test plan, pushes, and creates or updates the Draft PR.
+- \`action: 'create_pr'\` (first delivery) and \`action: 'update_pr'\`
+  (subsequent revisions) validate readiness, record handoff title/summary/test
+  plan, push, and create or update the PR. The first PR starts as a draft;
+  \`update_pr\` never changes draft/ready state.
 - \`action: 'rename_branch'\` renames the managed branch to a meaningful
   \`cradle/wt/\`-prefixed name; only available before the first pull request
   exists.

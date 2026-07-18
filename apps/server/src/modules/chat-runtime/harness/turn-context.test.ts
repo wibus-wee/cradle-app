@@ -52,7 +52,8 @@ describe('resolveSessionHarness Work context', () => {
     expect(harness.systemPrompt).toContain('cradle-cli')
     expect(harness.systemPrompt).toContain('CRADLE WORK MODE')
     expect(harness.systemPrompt).toContain('manage_pull_request')
-    expect(harness.systemPrompt).toContain('Draft PR')
+    expect(harness.systemPrompt).toContain('create_pr')
+    expect(harness.systemPrompt).toContain('rename_branch')
     // Dynamic Work id stays in harness fragment for cache stability.
     expect(harness.systemPrompt).not.toContain('work-1')
     expect(harness.harness?.fragments).toEqual([{

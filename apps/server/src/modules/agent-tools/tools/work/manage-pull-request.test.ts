@@ -11,11 +11,13 @@ afterEach(() => {
 })
 
 describe('manage_pull_request Agent tool', () => {
-  it('uses mandatory closed-loop finalization language and names both actions', () => {
+  it('uses mandatory closed-loop finalization language and names all actions', () => {
     expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('You MUST call this tool')
     expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('MUST NOT claim completion')
-    expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('Draft pull request')
-    expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('create_or_update_draft')
+    expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('starts as a draft')
+    expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('never changes its draft/ready state')
+    expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('create_pr')
+    expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('update_pr')
     expect(MANAGE_PULL_REQUEST_TOOL_DESCRIPTION).toContain('rename_branch')
   })
 
@@ -49,7 +51,7 @@ describe('manage_pull_request Agent tool', () => {
 
     const result = await executeManagePullRequestTool({
       workId: 'work-1',
-      action: 'create_or_update_draft',
+      action: 'create_pr',
       title: 'Submit Work',
       summary: 'Implemented closed-loop submit.',
       testPlan: 'Run focused tests.',
@@ -80,7 +82,7 @@ describe('manage_pull_request Agent tool', () => {
         },
       },
     })
-    expect(result?.content[0]?.text).toContain('Draft PR created/updated')
+    expect(result?.content[0]?.text).toContain('Pull request delivered')
     expect(result?.content[0]?.text).toContain('pull/42')
   })
 
@@ -116,13 +118,13 @@ describe('manage_pull_request Agent tool', () => {
     expect(result?.content[0]?.text).toContain('cradle/wt/x')
   })
 
-  it('rejects create_or_update_draft without a title before any HTTP call', async () => {
+  it('rejects create_pr without a title before any HTTP call', async () => {
     vi.stubEnv('CRADLE_SERVER_URL', 'http://127.0.0.1:21423')
     const fetchMock = vi.spyOn(globalThis, 'fetch')
 
     const result = await executeManagePullRequestTool({
       workId: 'work-1',
-      action: 'create_or_update_draft',
+      action: 'create_pr',
       summary: 'Implemented closed-loop submit.',
       testPlan: 'Run focused tests.',
     })
@@ -158,7 +160,7 @@ describe('manage_pull_request Agent tool', () => {
 
     const result = await executeManagePullRequestTool({
       workId: 'work-1',
-      action: 'create_or_update_draft',
+      action: 'create_pr',
       title: 'Submit Work',
       summary: 'Implemented closed-loop submit.',
       testPlan: 'Run focused tests.',

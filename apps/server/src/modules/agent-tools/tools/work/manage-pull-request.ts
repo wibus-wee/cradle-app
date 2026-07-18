@@ -7,8 +7,9 @@ import type { AgentToolRegistration } from '../../registry'
 export const MANAGE_PULL_REQUEST_TOOL_NAME = 'manage_pull_request'
 export const MANAGE_PULL_REQUEST_TOOL_DESCRIPTION = [
   'REQUIRED PULL REQUEST DELIVERY TOOL FOR CRADLE WORK.',
-  'You MUST call this tool with action "create_or_update_draft" before claiming that a task is complete or ending a turn in which you made delivery-related code or commit changes.',
-  'Call "create_or_update_draft" only after the requested implementation is finished (or an intermediate revision is ready), relevant verification has run, all intended changes are committed locally, and the managed checkout is clean. It validates local readiness, records the handoff title/summary/test plan, pushes the branch, and creates or updates the Draft pull request — the Cradle equivalent of closed-loop cloud delivery.',
+  'You MUST call this tool with action "create_pr" (first delivery) or "update_pr" (subsequent revisions) before claiming that a task is complete or ending a turn in which you made delivery-related code or commit changes.',
+  'Call it only after the requested implementation is finished (or an intermediate revision is ready), relevant verification has run, all intended changes are committed locally, and the managed checkout is clean. It validates local readiness, records the handoff title/summary/test plan, and pushes the branch. "create_pr" opens the pull request (it starts as a draft); "update_pr" updates its title/body and never changes its draft/ready state — a human controls the ready transition.',
+  'If you are unsure whether a pull request already exists, either action is safe: the server creates it once and updates it afterwards.',
   'Call "rename_branch" early, once the objective is clear and before the first pull request exists, to give the Cradle-managed branch a meaningful name (keeping the cradle/wt/ prefix). Once a pull request exists the branch name is fixed.',
   'If the tool returns an error, you MUST NOT claim completion. Fix the reported problem and call this tool again, or clearly report the blocker to the user.',
   'It does NOT mark the PR ready, merge, or close the PR. Use cradle CLI / gh for inspection; mark-ready only when the user explicitly asks.',
@@ -43,7 +44,7 @@ const ManagePullRequestResponseSchema = z.object({
 
 export interface ManagePullRequestToolInput {
   workId: string
-  action: 'create_or_update_draft' | 'rename_branch'
+  action: 'create_pr' | 'update_pr' | 'rename_branch'
   title?: string
   summary?: string
   testPlan?: string
@@ -61,15 +62,15 @@ function missingFieldError(field: string, action: ManagePullRequestToolInput['ac
   }
 }
 
-async function executeCreateOrUpdateDraft({ workId, title, summary, testPlan, base }: ManagePullRequestToolInput) {
+async function executeDelivery({ workId, action, title, summary, testPlan, base }: ManagePullRequestToolInput) {
   if (!title?.trim()) {
-    return missingFieldError('title', 'create_or_update_draft')
+    return missingFieldError('title', action)
   }
   if (!summary?.trim()) {
-    return missingFieldError('summary', 'create_or_update_draft')
+    return missingFieldError('summary', action)
   }
   if (!testPlan?.trim()) {
-    return missingFieldError('testPlan', 'create_or_update_draft')
+    return missingFieldError('testPlan', action)
   }
 
   try {
@@ -84,8 +85,8 @@ async function executeCreateOrUpdateDraft({ workId, title, summary, testPlan, ba
     })
     const pr = response.pullRequest
     const prLine = pr
-      ? `Draft PR: ${pr.url ?? `${pr.owner}/${pr.repo}#${pr.number}`}${pr.headRef ? ` (head ${pr.headRef})` : ''}.`
-      : 'Submit succeeded but no pull request view was returned; inspect with `cradle work get` or `cradle session pull-request get`.'
+      ? `Pull request: ${pr.url ?? `${pr.owner}/${pr.repo}#${pr.number}`}${pr.headRef ? ` (head ${pr.headRef})` : ''}${pr.isDraft === false ? ' (marked ready)' : ''}.`
+      : 'Delivery succeeded but no pull request view was returned; inspect with `cradle work get` or `cradle session pull-request get`.'
     const readiness = response.readiness
     const readinessLine = readiness
       ? ` Local readiness: clean=${String(readiness.clean ?? 'unknown')}, commitsAhead=${String(readiness.commitsAhead ?? 'unknown')}.`
@@ -95,7 +96,7 @@ async function executeCreateOrUpdateDraft({ workId, title, summary, testPlan, ba
       content: [{
         type: 'text' as const,
         text: [
-          `Draft PR created/updated for Work ${response.work.id}.`,
+          `Pull request delivered for Work ${response.work.id}.`,
           prLine,
           readinessLine.trim(),
           'Closed-loop delivery complete for this revision. Do not merge or mark ready unless the user explicitly asks.',
@@ -128,8 +129,8 @@ async function executeCreateOrUpdateDraft({ workId, title, summary, testPlan, ba
       content: [{
         type: 'text' as const,
         text: normalized instanceof AgentToolHttpRequestError
-          ? `Create/update Draft PR failed (${normalized.code ?? 'request_failed'}): ${normalized.message}. Do not claim completion; resolve this readiness/delivery problem and call manage_pull_request again, or report the blocker.`
-          : `Create/update Draft PR failed: ${normalized.message}. Do not claim completion; resolve the problem and call manage_pull_request again, or report the blocker.`,
+          ? `Pull request delivery failed (${normalized.code ?? 'request_failed'}): ${normalized.message}. Do not claim completion; resolve this readiness/delivery problem and call manage_pull_request again, or report the blocker.`
+          : `Pull request delivery failed: ${normalized.message}. Do not claim completion; resolve the problem and call manage_pull_request again, or report the blocker.`,
       }],
       isError: true,
     }
@@ -155,7 +156,7 @@ async function executeRenameBranch({ workId, branchName }: ManagePullRequestTool
         text: [
           `Branch renamed to ${branch} for Work ${response.work.id}.`,
           'The branch can no longer be renamed once a pull request exists.',
-          'Continue implementation on the managed branch, then call manage_pull_request with action "create_or_update_draft" to deliver.',
+          'Continue implementation on the managed branch, then call manage_pull_request with action "create_pr" to deliver.',
         ].join(' '),
       }],
       structuredContent: {
@@ -181,7 +182,7 @@ async function executeRenameBranch({ workId, branchName }: ManagePullRequestTool
 export async function executeManagePullRequestTool(input: ManagePullRequestToolInput) {
   return input.action === 'rename_branch'
     ? await executeRenameBranch(input)
-    : await executeCreateOrUpdateDraft(input)
+    : await executeDelivery(input)
 }
 
 function registerManagePullRequestTool(server: McpServer): void {
@@ -192,10 +193,10 @@ function registerManagePullRequestTool(server: McpServer): void {
       description: MANAGE_PULL_REQUEST_TOOL_DESCRIPTION,
       inputSchema: {
         workId: z.string().min(1).describe('The active Cradle Work ID supplied in the Work runtime context.'),
-        action: z.enum(['create_or_update_draft', 'rename_branch']),
-        title: z.string().min(1).optional().describe('PR title. Required for create_or_update_draft.'),
-        summary: z.string().min(1).optional().describe('What changed and why. Required for create_or_update_draft.'),
-        testPlan: z.string().min(1).optional().describe('Verification performed. Required for create_or_update_draft.'),
+        action: z.enum(['create_pr', 'update_pr', 'rename_branch']),
+        title: z.string().min(1).optional().describe('PR title. Required for create_pr and update_pr.'),
+        summary: z.string().min(1).optional().describe('What changed and why. Required for create_pr and update_pr.'),
+        testPlan: z.string().min(1).optional().describe('Verification performed. Required for create_pr and update_pr.'),
         base: z.string().min(1).optional().describe('Optional PR base branch.'),
         branchName: z.string().min(1).optional().describe('New branch name with the cradle/wt/ prefix. Required for rename_branch.'),
       },
