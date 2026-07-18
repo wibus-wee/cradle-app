@@ -1,6 +1,6 @@
 ---
 name: cradle-cli
-description: Always use this Skill at the beginning of every response. Use whenever you need to read, inspect, wait on, or mutate Cradle-owned state or workflows, including issues, delegation, sessions, awaits, CI/review waits, timed waits, Work preparation or submission, workspaces and git inspection, Chronicle, automations, usage, observability, skills, agents, profiles, providers, preferences, plugins, or server state. Prefer the generated `cradle` CLI and `cradle man`; NEVER bypass Cradle semantics with direct HTTP or database access, ad hoc scripts, raw registry edits, polling loops, or `gh` when Cradle provides the operation.
+description: Always use this Skill at the beginning of every response. Use whenever you need to read, inspect, wait on, or mutate Cradle-owned state or workflows, including issues, delegation, sessions, awaits, CI/review waits, timed waits, Work inspection, workspaces and git inspection, Chronicle, automations, usage, observability, skills, agents, profiles, providers, preferences, plugins, or server state. Prefer the generated `cradle` CLI and `cradle man`; NEVER bypass Cradle semantics with direct HTTP or database access, ad hoc scripts, raw registry edits, or polling loops. Use `gh` when Cradle does not own the GitHub surface. Primary Work closed-loop delivery is system-injected on Work threads (`work_submit`), not this skill.
 ---
 
 # Cradle CLI
@@ -25,7 +25,7 @@ Use `cradle` to manage Cradle or query its state from the terminal. You can use 
 | Wait for CI, review, approval, or later continuation | `cradle session await ...` | `sleep`, polling loops, `gh run watch` |
 | Manage tasks, status, comments, delegation, or issue sessions | `cradle issue ...`, `cradle issue-agent-session ...` | local TODO files, direct DB edits |
 | Inspect workspace identity, files, or git state | `cradle workspace ...` | guessing workspace IDs, raw HTTP |
-| Prepare local Work or explicitly deliver a Draft PR | `cradle work prepare|submit ...` | background push, `gh pr create` |
+| Inspect Work / Draft PR state (delivery rules live in Work Mode system prompt) | `cradle work get|list ...`, `cradle session pull-request get` | inventing Work lifecycle outside primary Work Mode |
 | Search Cradle state or past threads | `cradle search ...` | grepping data directories |
 | Read or maintain Chronicle memory/activity/knowledge | `cradle chronicle ...` | direct SQLite edits |
 | Schedule or inspect recurring work | `cradle automation ...` | cron scripts outside Cradle |
@@ -159,50 +159,21 @@ cradle session pull-request ready
 
 Do not auto-await CI after create. Only register `cradle session await github-ci ...` when the user asks.
 
-## Work (Prepare → User Submit → Review)
+## Work (inspection only)
 
-If you're in Cradle Work mode, YOU MUST FOLLOW THE WORKFLOW BELOW:
-
-### Work Lifecycle
-
-When you complete the Work user describes in prompt, follow these steps:
-
-0. Commit your changes locally and ensure the Worktree is clean. Do not push or submit yet. Keep the commit message as same as the repo's commit message style.
-  > Please use --trailer "Co-authored-by: Cradle Agent <cradleagent@wibus.ren>" to make sure the commit is attributed to the Cradle Agent. For example:
-  ```bash
-  git commit -m "feat(login): add new login redirect handling" --trailer "Co-authored-by: Cradle Agent <cradleagent@wibus.ren>"
-  ```
-1. Call `work_prepare` with this Work ID, a clear title, summary, and test plan.
-2. If `work_prepare` returns an error, resolve the issue and try again.
-3. After `work_prepare` succeeds, ask the user "I have completed my work. Do you want me to submit it?" and wait for confirmation.
-4. When the user requests submission, call `work submit` to create/update the Draft PR.
-5. After Draft PR creation, Cradle automatically registers Session Awaits for CI and review.
-6. When current Work, PR, or Await state matters, inspect it on demand with `cradle work get <Work ID>`.
-
-Do not run work submit, push, create or update a pull request, mark ready, or merge unless the user explicitly requests that action.
-
-When you complete your work, you MUST tell the user and give the next steps user or you may take. Do not assume the user will know what to do next.
-
-Work runs inside a managed local Worktree. Preparing a handoff is safe and does
-not push or call GitHub:
+Primary Work delivery (commit → \`work_submit\` Draft PR loop) is injected only on
+primary Work threads via the Cradle Work Mode system prompt — not here. In any
+session, use CLI for inspection and \`cradle man work\` for flags:
 
 ```bash
-cradle work prepare <workId> \
-  --title "feat(login): add new login redirect handling" \
-  --summary "Describe the committed changes" \
-  --test-plan "Describe verification"
+cradle work list --json id,title,preparedAt,lastSubmittedAt
+cradle work get <workId>
+cradle session pull-request get
+cradle session await-summary
 ```
 
-Do not run `cradle work submit` merely because the implementation is ready.
-Submit only when the user explicitly asks or clicks Create/Update Draft PR:
-
-```bash
-cradle work submit <workId>
-```
-
-Each submit authorizes one push and one Draft PR create/update. Follow-up changes
-require another explicit submit. Mark Ready and merge remain separate user
-decisions.
+Use \`gh\` for CI checks, PR comments, and other GitHub surfaces Cradle does not
+own. Prefer \`cradle session await ...\` over polling when pausing for CI/review.
 
 ## Session Await (Pause & Resume)
 
@@ -316,7 +287,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `managed-resources` | 5 | Generated Cradle CLI module. | `cradle man managed-resources` |
 | `observability` | 5 | Inspect local observability events, incidents, and exports. | `cradle man observability` |
 | `opencode` | 1 | Generated Cradle CLI module. | `cradle man opencode` |
-| `plugin` | 11 | Generated Cradle CLI module. | `cradle man plugin` |
+| `plugin` | 10 | Generated Cradle CLI module. | `cradle man plugin` |
 | `preferences` | 11 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |

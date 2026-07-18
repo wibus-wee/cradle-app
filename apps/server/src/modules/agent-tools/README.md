@@ -9,7 +9,7 @@
 - `runtime-registration.ts`: publishes the MCP process through the server MCP registry.
 - `mcp-entry.ts`: stdio MCP process entry bundled with the server runtime.
 - `tools/index.ts`: explicit inventory of builtin Agent tools.
-- `tools/work/prepare.ts`: required local Work finalization tool; delegates to `POST /works/:id/prepare` and never publishes externally.
+- `tools/work/submit.ts`: required closed-loop Work finalization tool; delegates to `POST /works/:id/submit` (push + create/update Draft PR).
 
 ## Ownership
 

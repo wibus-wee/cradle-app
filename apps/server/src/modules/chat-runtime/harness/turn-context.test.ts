@@ -50,7 +50,10 @@ describe('resolveSessionHarness Work context', () => {
 
     expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
     expect(harness.systemPrompt).toContain('cradle-cli')
-    expect(harness.systemPrompt).not.toContain('## Cradle Work')
+    expect(harness.systemPrompt).toContain('CRADLE WORK MODE')
+    expect(harness.systemPrompt).toContain('work_submit')
+    expect(harness.systemPrompt).toContain('Draft PR')
+    // Dynamic Work id stays in harness fragment for cache stability.
     expect(harness.systemPrompt).not.toContain('work-1')
     expect(harness.harness?.fragments).toEqual([{
       key: 'cradle-work',
@@ -150,6 +153,8 @@ describe('resolveSessionHarness Work context', () => {
 
     expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
     expect(harness.systemPrompt).toContain('cradle-cli')
+    expect(harness.systemPrompt).not.toContain('CRADLE WORK MODE')
+    expect(harness.systemPrompt).not.toContain('work_submit')
     expect(harness.harness).toBeUndefined()
   })
 })

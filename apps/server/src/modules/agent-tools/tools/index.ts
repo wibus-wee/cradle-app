@@ -1,6 +1,6 @@
 import type { AgentToolRegistration } from '../registry'
-import { workPrepareTool } from './work/prepare'
+import { workSubmitTool } from './work/submit'
 
 export const builtinAgentTools: readonly AgentToolRegistration[] = [
-  workPrepareTool,
+  workSubmitTool,
 ]
