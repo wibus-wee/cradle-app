@@ -67,6 +67,7 @@ async function createProfileAndSession(app: ElysiaApp, workspaceRoot: string) {
       workspaceId: 'workspace-observability',
       title: 'Observability Session',
       providerTargetId: 'provider-target-observability',
+      runtimeKind: 'standard',
     }),
   }))
   expect(sessionRes.status).toBe(200)

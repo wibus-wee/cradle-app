@@ -96,6 +96,7 @@ async function createAutomation(app: ElysiaApp, input?: { id?: string, workspace
       ],
       providerTargetId: profileId,
       modelId: 'gpt-4o-mini',
+      runtimeKind: 'standard',
     },
     createdByKind: 'agent',
   }
