@@ -218,9 +218,21 @@ function buildTerminalResult(awaitId: string, target: ResolvedCITarget): CheckRe
   }
 
   // headSha mismatch means the await is stale (new push happened).
-  // Skip it — registerWorkAwaits will cancel it and register a fresh one.
+  // Mark it superseded so the agent can re-register with the new head.
   if (target.currentHeadSha !== target.ref) {
-    return null
+    return {
+      awaitId,
+      matched: true,
+      resumeText: `GitHub PR #${target.prNumber} head changed from ${target.ref} to ${target.currentHeadSha}.`,
+      resumePayloadJson: JSON.stringify({
+        kind: 'github-ci',
+        repo: `${target.owner}/${target.repo}`,
+        pr: target.prNumber,
+        ref: target.ref,
+        currentHeadSha: target.currentHeadSha,
+        outcome: 'superseded',
+      }),
+    }
   }
 
   const outcome = target.merged

@@ -20,6 +20,33 @@ const nodeRuntimeExternals = [
   'electron',
 ]
 
+/** Observability keys that may be baked into packaged main-process defaults. */
+const PACKAGED_OBSERVABILITY_ENV_KEYS = [
+  'CRADLE_OTEL_ENABLED',
+  'CRADLE_OTEL_TRACES_ENABLED',
+  'CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED',
+  'CRADLE_POSTHOG_AI_CAPTURE_MODE',
+  'CRADLE_POSTHOG_PROJECT_TOKEN',
+  'CRADLE_POSTHOG_HOST',
+] as const
+
+function readPackagedObservabilityEnv(): Record<string, string> {
+  const baked: Record<string, string> = {}
+  for (const key of PACKAGED_OBSERVABILITY_ENV_KEYS) {
+    const value = process.env[key]?.trim()
+    if (value) {
+      baked[key] = value
+    }
+  }
+
+  // Only bake AI Observability when explicitly enabled for this build.
+  if (baked.CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED !== '1') {
+    return {}
+  }
+
+  return baked
+}
+
 export default defineConfig({
   main: {
     ssr: {
@@ -27,6 +54,7 @@ export default defineConfig({
     },
     define: {
       __CRADLE_DESKTOP_UPDATE_URL__: JSON.stringify(desktopUpdateUrl),
+      __CRADLE_DESKTOP_PACKAGED_OBSERVABILITY_ENV__: JSON.stringify(readPackagedObservabilityEnv()),
     },
     build: {
       externalizeDeps: false,
