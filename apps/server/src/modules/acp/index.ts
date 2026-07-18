@@ -5,8 +5,8 @@ import { getRuntimeRegistry } from '../chat-runtime/chat-runtime-provider-regist
 import { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
 import * as Workspace from '../workspace/service'
 import { AcpModel } from './model'
-import * as Acp from './service'
 import type { AcpDownloadCenter } from './service'
+import * as Acp from './service'
 
 function requireNonBlankString(value: string | undefined, field: string): string {
   const trimmed = value?.trim()

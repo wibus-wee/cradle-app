@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { ACP_CHAT_RUNTIME_KIND, type ModelDescriptor, type RuntimeKind } from '~/features/agent-runtime/types'
+import type { ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
+import { ACP_CHAT_RUNTIME_KIND } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import type { Agent } from '~/features/agent-runtime/use-agents'
 import { useAgents } from '~/features/agent-runtime/use-agents'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { useRemoteProviderTargets } from '~/features/agent-runtime/use-remote-provider-targets'
-import type { AcpInstalledAgent } from '~/features/agent-runtimes/use-acp-registry'
-import { useAcpAgents } from '~/features/agent-runtimes/use-acp-registry'
-import { useAcpDraftSession } from '~/features/agent-runtimes/use-acp-draft-session'
 import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
 import {
   DEFAULT_RUNTIME_CATALOG_COMPOSER,
@@ -18,6 +16,9 @@ import {
   runtimeComposerUsesModelSelection,
   useRuntimeCatalog,
 } from '~/features/agent-runtime/use-runtime-catalog'
+import { useAcpDraftSession } from '~/features/agent-runtimes/use-acp-draft-session'
+import type { AcpInstalledAgent } from '~/features/agent-runtimes/use-acp-registry'
+import { useAcpAgents } from '~/features/agent-runtimes/use-acp-registry'
 import { useNewChatStore } from '~/store/new-chat'
 
 import { listSelectableComposerProfiles } from './composer-profile-selection'
@@ -290,8 +291,8 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     : null
   const selectedNewChatAcpAgent = targetMode === 'acp-agent'
     ? acpAgents.find(agent => agent.id === (effectiveManualAcpAgentId ?? lastAcpAgentId))
-      ?? acpAgents[0]
-      ?? null
+    ?? acpAgents[0]
+    ?? null
     : null
   const { draftSession: acpDraftSession, isLoading: isLoadingAcpDraftSession } = useAcpDraftSession({
     agentId: selectedNewChatAcpAgent?.id ?? null,

@@ -20,6 +20,10 @@ import {
   CODEX_RUNTIME_METADATA,
 } from '../chat-runtime-providers/codex/metadata'
 import {
+  STANDARD_RUNTIME_KIND,
+  STANDARD_RUNTIME_METADATA,
+} from '../chat-runtime-providers/openai-compatible/metadata'
+import {
   OPENCODE_RUNTIME_KIND,
   OPENCODE_RUNTIME_METADATA,
 } from '../chat-runtime-providers/opencode/metadata'
@@ -61,6 +65,7 @@ const BUILTIN_RUNTIME_COMPATIBILITY: Array<{
   defaultActor?: RuntimeDefaultActorDescriptor
   ownedProviderTargets?: RuntimeOwnedProviderTargets
 }> = [
+  { runtimeKind: STANDARD_RUNTIME_KIND, metadata: STANDARD_RUNTIME_METADATA },
   { runtimeKind: CLAUDE_AGENT_RUNTIME_KIND, metadata: CLAUDE_AGENT_RUNTIME_METADATA },
   { runtimeKind: CODEX_RUNTIME_KIND, metadata: CODEX_RUNTIME_METADATA },
   {

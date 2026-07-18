@@ -53,7 +53,7 @@ afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-describe('ACP registry distributions', () => {
+describe('aCP registry distributions', () => {
   it('uses the injected fetch boundary and advertises checksum-less binaries', async () => {
     const fetchFn = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       version: '1',

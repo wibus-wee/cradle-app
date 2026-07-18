@@ -8,6 +8,7 @@ import { createClaudeAgentProvider } from '../chat-runtime-providers/claude-agen
 import { createCodexProvider } from '../chat-runtime-providers/codex/provider'
 import { reconcileCodexSessionUsage } from '../chat-runtime-providers/codex/usage-reconciliation'
 import { createMockClaudeAgentProvider } from '../chat-runtime-providers/mock-claude-agent/provider'
+import { createStandardProvider } from '../chat-runtime-providers/openai-compatible/provider'
 import { createOpencodeProvider } from '../chat-runtime-providers/opencode/provider'
 import { createSystemAgentProvider } from '../chat-runtime-providers/system-agent/provider'
 import * as ModelRegistry from '../model-registry/service'
@@ -458,6 +459,7 @@ export function getRuntimeRegistry(): RuntimeRegistry {
     registry = new RuntimeRegistry()
     const ctx = createProviderContext()
     registry.register(createAcpProvider(ctx))
+    registry.register(createStandardProvider(ctx))
     registry.register(createOpencodeProvider(ctx))
     if (process.env.CRADLE_MOCK_LLM_URL) {
       registry.register(createMockClaudeAgentProvider(ctx))

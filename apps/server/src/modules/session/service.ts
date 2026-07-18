@@ -23,6 +23,7 @@ import {
 } from '../../helpers/agent-runtime-config'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
+import { getInstalled as getInstalledAcpAgent } from '../acp/service'
 import { commitSessionEventsWithProjection } from '../chat-runtime/es/commands'
 import type { HydratedMessage } from '../chat-runtime/message-payload-store'
 import {
@@ -37,7 +38,6 @@ import {
   writeSessionRuntimeConfigJson,
 } from '../chat-runtime/runtime-settings'
 import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
-import { getInstalled as getInstalledAcpAgent } from '../acp/service'
 import { ACP_RUNTIME_KIND } from '../chat-runtime-providers/acp/metadata'
 import { normalizeClaudeAgentConfigPatch } from '../provider-contracts/claude-agent-config'
 import {
@@ -975,7 +975,7 @@ function resolveSessionCreateInput(input: {
     }
   }
 
-  const runtimeKind = input.runtimeKind ?? 'codex'
+  const runtimeKind = input.runtimeKind ?? 'standard'
   if (runtimeUsesAgentTerminalLaunch(runtimeKind)) {
     throw new AppError({
       code: 'invalid_session_input',
@@ -1063,7 +1063,7 @@ export async function update(input: {
   if (input.providerTargetId !== undefined) {
     if (assertRuntimeOwnedProviderTargetForRuntime({
       providerTargetId: input.providerTargetId,
-      runtimeKind: record.runtimeKind ?? 'codex',
+      runtimeKind: record.runtimeKind ?? 'standard',
     })) {
       patch.providerTargetId = null
       if (record.agentId) {
