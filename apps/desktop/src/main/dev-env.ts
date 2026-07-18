@@ -18,7 +18,8 @@ const DEFAULT_DEV_CHROMIUM_ARGS = ['--remote-debugging-port=9222']
  * fields automatically.
  *
  * Shell-provided variables win: existing `process.env` entries are never
- * overridden. No-op in production builds, which receive env from the launcher.
+ * overridden. No-op in production builds — packaged builds apply compile-time
+ * defaults via `applyDesktopPackagedObservabilityEnv` instead.
  */
 export function loadDesktopDevEnv(): void {
   const isDev = !!process.env.ELECTRON_RENDERER_URL
