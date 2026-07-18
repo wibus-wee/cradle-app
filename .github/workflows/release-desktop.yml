@@ -392,7 +392,6 @@ jobs:
           artifact-name: desktop-win-x64-${{ needs.resolve.outputs.desktop_version }}
           retention-days: 7
 
-
   build-linux:
     name: Build Desktop (linux x64)
     needs: [resolve]
