@@ -1,21 +1,24 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 
 import {
   getSessionsByIdOptions,
   getWorkspacesByWorkspaceIdOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
+import { postSessionsByIdRead } from '~/api-gen/sdk.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import {
   runtimeComposerUsesCollapsedInput,
   useRuntimeCatalog,
 } from '~/features/agent-runtime/use-runtime-catalog'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
+import { updateSessionReadState } from '~/features/workspace/use-session'
 import { isElectron, nativeIpc } from '~/lib/electron'
 import { closeSurfaceById } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { chatSurfaceId } from '~/navigation/surface-identity'
 import { useSurfaceStore } from '~/navigation/surface-store'
+import { useSessionActivityStore } from '~/store/session-activity'
 
 import { ChatSessionFrameHost } from './chat-session-frame-host'
 import { CHAT_SESSION_FALLBACK_LABEL } from './chat-session-label'
@@ -91,9 +94,26 @@ export function ChatSessionRouteContent({
   'use no memo'
 
   const active = useSurfaceActive()
+  const queryClient = useQueryClient()
   const updateSurfaceTitle = useSurfaceStore(state => state.updateSurfaceTitle)
   const surfaceId = explicitSurfaceId ?? chatSurfaceId(sessionId)
   const slotId = layoutSlotId ?? sessionId
+
+  // Auto-mark session as read when it becomes visible (handles both chat and work surfaces)
+  useEffect(() => {
+    if (!active || !sessionId) {
+      return
+    }
+
+    useSessionActivityStore.getState().setVisibleSession(sessionId)
+    void postSessionsByIdRead({ path: { id: sessionId } })
+      .then(({ data }) => {
+        if (data) {
+          updateSessionReadState(queryClient, data)
+        }
+      })
+      .catch(() => {})
+  }, [active, queryClient, sessionId])
 
   const { data: session } = useQuery({
     ...getSessionsByIdOptions({ path: { id: sessionId } }),
