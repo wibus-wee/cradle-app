@@ -207,7 +207,7 @@ async function createProfileAndSession(
         workspaceId,
         title: 'Chat Runtime Session',
         providerTargetId: ids.providerTargetId,
-        runtimeKind: ids.runtimeKind,
+        runtimeKind: ids.runtimeKind ?? 'standard',
       }),
     }),
   )

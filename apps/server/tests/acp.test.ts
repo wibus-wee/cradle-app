@@ -176,8 +176,8 @@ describe('acp capability', () => {
       }))
       expect(binaryInstallRes.status).toBe(409)
       expect(await binaryInstallRes.json()).toMatchObject({
-        code: 'acp_binary_integrity_metadata_missing',
-        message: 'ACP binary installation requires a trusted publisher checksum, but the registry does not provide one',
+        code: 'acp_distribution_not_supported',
+        message: 'Requested ACP distribution is not supported for this agent on the current platform',
       })
     }
     finally {

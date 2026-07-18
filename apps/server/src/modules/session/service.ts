@@ -975,7 +975,7 @@ function resolveSessionCreateInput(input: {
     }
   }
 
-  const runtimeKind = input.runtimeKind ?? 'standard'
+  const runtimeKind = input.runtimeKind ?? 'codex'
   if (runtimeUsesAgentTerminalLaunch(runtimeKind)) {
     throw new AppError({
       code: 'invalid_session_input',
@@ -1063,7 +1063,7 @@ export async function update(input: {
   if (input.providerTargetId !== undefined) {
     if (assertRuntimeOwnedProviderTargetForRuntime({
       providerTargetId: input.providerTargetId,
-      runtimeKind: record.runtimeKind ?? 'standard',
+      runtimeKind: record.runtimeKind ?? 'codex',
     })) {
       patch.providerTargetId = null
       if (record.agentId) {

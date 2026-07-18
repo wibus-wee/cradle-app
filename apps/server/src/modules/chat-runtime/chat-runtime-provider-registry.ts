@@ -130,7 +130,7 @@ export class RuntimeRegistry {
   }
 
   async listDescriptors(): Promise<ChatRuntimeCatalogItem[]> {
-    const items = this.list()
+    const items = this.list().filter(item => item.runtimeKind !== 'standard')
     const enriched = await Promise.all(items.map(async (item) => {
       const runtime = this.runtimes.get(item.runtimeKind)?.runtime
       if (!runtime?.getDraftPresentation) {
