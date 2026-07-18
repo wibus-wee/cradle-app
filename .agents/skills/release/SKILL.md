@@ -181,7 +181,7 @@ Report success with the release URL. If the workflow failed, report the run URL 
 
 ## Notes
 
-- The public workflow builds desktop artifacts for mac-arm64.
+- The public workflow builds desktop artifacts for mac-arm64, windows-x64, and linux-x64 (AppImage + deb).
 - Release assets are uploaded to `wibus-wee/cradle-app` GitHub releases.
 - Release builds use `https://github.com/wibus-wee/cradle-app/releases/latest/download/`.
 - Dev builds publish both their own `dev-*` release and the rolling `feed-dev` update feed.

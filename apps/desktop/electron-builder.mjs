@@ -231,6 +231,7 @@ const config = {
       'deb',
     ],
     category: 'Development',
+    artifactName: ['$', '{productName}-', '$', '{os}-', '$', '{arch}.', '$', '{ext}'].join(''),
   },
 
   nsis: {

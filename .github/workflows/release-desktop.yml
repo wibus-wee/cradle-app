@@ -392,11 +392,104 @@ jobs:
           artifact-name: desktop-win-x64-${{ needs.resolve.outputs.desktop_version }}
           retention-days: 7
 
+
+  build-linux:
+    name: Build Desktop (linux x64)
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/cradle-app
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ needs.resolve.outputs.source_ref }}
+
+      - name: Setup pnpm & Node.js
+        uses: ./.github/actions/setup
+        with:
+          node-version: 24
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Install Linux packaging dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y fakeroot libarchive-tools rpm
+
+      - name: Configure PostHog build env
+        env:
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+          ANALYTICS_BUILD_CHANNEL: ${{ needs.resolve.outputs.analytics_build_channel }}
+          ANALYTICS_AUDIENCE: ${{ needs.resolve.outputs.analytics_audience }}
+          POSTHOG_AI_ENABLED: ${{ needs.resolve.outputs.posthog_ai_enabled }}
+          POSTHOG_AI_CAPTURE_MODE: ${{ needs.resolve.outputs.posthog_ai_capture_mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${POSTHOG_PROJECT_TOKEN:-}" ]; then
+            echo "POSTHOG_PROJECT_TOKEN repository secret is required for desktop releases." >&2
+            echo "Add it under Settings → Secrets and variables → Actions." >&2
+            exit 1
+          fi
+          {
+            echo "VITE_POSTHOG_PROJECT_TOKEN=$POSTHOG_PROJECT_TOKEN"
+            echo "VITE_POSTHOG_HOST=https://us.i.posthog.com"
+            echo "VITE_POSTHOG_BUILD_CHANNEL=$ANALYTICS_BUILD_CHANNEL"
+            echo "VITE_POSTHOG_AUDIENCE=$ANALYTICS_AUDIENCE"
+            if [ "$POSTHOG_AI_ENABLED" = "1" ]; then
+              echo "CRADLE_OTEL_ENABLED=1"
+              echo "CRADLE_OTEL_TRACES_ENABLED=1"
+              echo "CRADLE_POSTHOG_AI_OBSERVABILITY_ENABLED=1"
+              echo "CRADLE_POSTHOG_AI_CAPTURE_MODE=$POSTHOG_AI_CAPTURE_MODE"
+              echo "CRADLE_POSTHOG_PROJECT_TOKEN=$POSTHOG_PROJECT_TOKEN"
+              echo "CRADLE_POSTHOG_HOST=https://us.i.posthog.com"
+            fi
+          } >> "$GITHUB_ENV"
+          echo "Product analytics: channel=$ANALYTICS_BUILD_CHANNEL audience=$ANALYTICS_AUDIENCE"
+          echo "PostHog AI observability: enabled=$POSTHOG_AI_ENABLED capture=$POSTHOG_AI_CAPTURE_MODE"
+
+      - name: Build relayd (linux-x64)
+        run: pnpm --filter @cradle/relayd build:desktop-resource -- --target=linux-x64
+
+      - name: Set desktop version
+        run: pnpm --filter @cradle/desktop run set-version ${{ needs.resolve.outputs.desktop_version }}
+
+      - name: Build Linux desktop runtime and app bundles
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
+          CRADLE_ELECTRON_REBUILD_ARCH: x64
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm --filter @cradle/desktop build
+
+      - name: Package Linux AppImage and deb
+        working-directory: apps/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb --x64 --publish never
+
+      - name: Upload artifacts
+        uses: ./.github/actions/desktop-upload-artifacts
+        with:
+          artifact-name: desktop-linux-x64-${{ needs.resolve.outputs.desktop_version }}
+          retention-days: 7
+
   # Publish GitHub Release.
   publish:
     name: Publish GitHub Release
-    needs: [resolve, build-macos, build-windows]
-    if: always() && needs.resolve.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success'
+    needs: [resolve, build-macos, build-windows, build-linux]
+    if: always() && needs.resolve.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && needs.build-linux.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Setup Node.js
@@ -512,8 +605,12 @@ jobs:
             const downloadLinks = []
             const dmg = assets.find(f => f.endsWith('.dmg'))
             const exe = assets.find(f => f.endsWith('.exe'))
+            const appImage = assets.find(f => f.endsWith('.AppImage'))
+            const deb = assets.find(f => f.endsWith('.deb'))
             if (dmg) downloadLinks.push(`[macOS (arm64)](${releaseDownloadUrl}/${encodeURIComponent(dmg)})`)
             if (exe) downloadLinks.push(`[Windows (x64)](${releaseDownloadUrl}/${encodeURIComponent(exe)})`)
+            if (appImage) downloadLinks.push(`[Linux AppImage (x64)](${releaseDownloadUrl}/${encodeURIComponent(appImage)})`)
+            if (deb) downloadLinks.push(`[Linux deb (x64)](${releaseDownloadUrl}/${encodeURIComponent(deb)})`)
 
             return template
               .replace(/\{\{title\}\}/g, title)
