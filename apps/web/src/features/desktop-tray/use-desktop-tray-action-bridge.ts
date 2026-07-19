@@ -7,6 +7,7 @@ import { runtimeUiSlotStatesQueryKey } from '~/features/chat/capabilities/chat-c
 import { runtimeSettingsQueryKey } from '~/features/chat/commands/runtime-settings-command'
 import { runtimeSessionStatusQueryKey } from '~/features/chat/runtime/use-runtime-session-status'
 import { isSessionsQueryKey } from '~/features/workspace/use-session'
+import { WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { usePluginStore } from '~/lib/plugin-store'
 import {
   openAutomation,
@@ -17,6 +18,7 @@ import {
   openPluginPanel,
   openSettingsSection,
   openUsage,
+  openWorkspaceDetail,
 } from '~/navigation/navigation-commands'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
@@ -35,6 +37,17 @@ function readChatSessionIdFromPayload(payload: unknown): string | null {
     return null
   }
   return sessionId
+}
+
+function readWorkspaceIdFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+  const { workspaceId } = payload as { workspaceId?: unknown }
+  if (typeof workspaceId !== 'string' || workspaceId.length === 0) {
+    return null
+  }
+  return workspaceId
 }
 
 function openChatFromPayload(payload: unknown): boolean {
@@ -109,6 +122,16 @@ export function useDesktopTrayActionBridge({ onOpenGlobalSearch }: DesktopTrayAc
       case 'open-workspaces':
         openHome()
         return
+      case 'open-workspace': {
+        const workspaceId = readWorkspaceIdFromPayload(request.payload)
+        if (workspaceId) {
+          // CLI may have just registered the workspace; refresh list so sidebar
+          // / search see it even when detail is opened by id alone.
+          void queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY })
+          openWorkspaceDetail(workspaceId)
+        }
+        return
+      }
       case 'open-agents':
         openSettingsRouteSection('agents')
         return

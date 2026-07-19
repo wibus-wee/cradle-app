@@ -27,6 +27,7 @@ export type ChatSessionEventType
     | 'QueueItemClaimed'
     | 'QueueItemReleased'
     | 'QueueItemFailed'
+    | 'QueueItemCompleted'
     | 'QueueItemReordered'
     | 'QueueItemUpdated'
     | 'QueueItemProviderTargetCleared'
@@ -166,6 +167,19 @@ export interface QueueItemFailedPayload extends VersionedChatSessionPayload {
   updatedAt: number
 }
 
+/**
+ * Completes a durable queue item without a dedicated Cradle run. Used when the
+ * provider already absorbed the follow-up into a live turn (Claude Agent mid-turn
+ * `queued_command`) so drain must not open an empty second run.
+ */
+export interface QueueItemCompletedPayload extends VersionedChatSessionPayload {
+  queueItemId: string
+  sessionId: string
+  /** Optional provider/run identity that already produced the follow-up answer. */
+  absorbedByRunId?: string | null
+  updatedAt: number
+}
+
 export interface QueueItemReorderedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
@@ -267,6 +281,7 @@ export type ChatSessionEvent
     | { type: 'QueueItemClaimed', payload: QueueItemClaimedPayload }
     | { type: 'QueueItemReleased', payload: QueueItemReleasedPayload }
     | { type: 'QueueItemFailed', payload: QueueItemFailedPayload }
+    | { type: 'QueueItemCompleted', payload: QueueItemCompletedPayload }
     | { type: 'QueueItemReordered', payload: QueueItemReorderedPayload }
     | { type: 'QueueItemUpdated', payload: QueueItemUpdatedPayload }
     | { type: 'QueueItemProviderTargetCleared', payload: QueueItemProviderTargetClearedPayload }

@@ -7,6 +7,7 @@ export type TrayActionId
     | 'open-awaits'
     | 'open-automation'
     | 'open-workspaces'
+    | 'open-workspace'
     | 'open-agents'
     | 'open-providers'
     | 'open-chronicle'

@@ -505,6 +505,12 @@ function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['p
         queueItemId: event.payload.queueItemId,
         status: 'failed',
       }
+    case 'QueueItemCompleted':
+      return {
+        queueItemId: event.payload.queueItemId,
+        status: 'completed',
+        absorbedByRunId: event.payload.absorbedByRunId ?? null,
+      }
     case 'QueueItemReordered':
       return {
         queueItemId: event.payload.queueItemId,

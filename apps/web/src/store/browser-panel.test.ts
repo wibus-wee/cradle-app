@@ -606,6 +606,63 @@ describe('browser panel shortcuts', () => {
     })
   })
 
+  it('opens and updates a Workflow surface in the right dock', () => {
+    const tabId = useBrowserPanelStore.getState().openWorkflowTab({
+      sessionId: 'session-workflow',
+      toolCallId: 'tool-workflow',
+      title: 'Find unfinished work',
+      surface: {
+        workflowName: 'find-unfinished-work',
+        description: 'Scan the repository',
+        status: 'running',
+        taskId: 'task-1',
+        taskType: 'local_workflow',
+        runId: 'run-1',
+        scriptPath: '/tmp/workflow.js',
+        transcriptDir: '/tmp/transcript',
+        sessionUrl: null,
+        warning: null,
+        error: null,
+        phases: [{ name: 'Scan', description: null }],
+        input: { name: 'find-unfinished-work' },
+        output: { status: 'async_launched' },
+        lifecycle: [],
+        runtime: null,
+      },
+    })
+
+    expect(tabId).toBe('workflow-tool-workflow')
+    expect(useBrowserPanelStore.getState().activeTabId).toBe(tabId)
+    expect(useBrowserPanelStore.getState().tabs).toEqual([
+      expect.objectContaining({ kind: 'workflow', toolCallId: 'tool-workflow' }),
+    ])
+
+    const workflowTab = useBrowserPanelStore.getState().tabs[0]
+    if (workflowTab?.kind !== 'workflow') {
+      throw new TypeError('Expected a Workflow tab')
+    }
+
+    useBrowserPanelStore.getState().updateWorkflowTab({
+      sessionId: 'session-workflow',
+      toolCallId: 'tool-workflow',
+      surface: {
+        ...workflowTab.surface,
+        status: 'completed',
+        output: { status: 'async_launched', summary: 'Done' },
+        lifecycle: [{ type: 'task_notification', status: 'completed' }],
+      },
+    })
+
+    expect(useBrowserPanelStore.getState().tabs[0]).toMatchObject({
+      kind: 'workflow',
+      surface: {
+        status: 'completed',
+        output: { status: 'async_launched', summary: 'Done' },
+        lifecycle: [{ type: 'task_notification', status: 'completed' }],
+      },
+    })
+  })
+
   it('releases runtime resources while retaining restorable thread dock metadata', () => {
     const fileTabId = useBrowserPanelStore.getState().openWorkspaceFileTab({
       workspaceId: 'workspace-1',

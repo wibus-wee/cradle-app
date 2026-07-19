@@ -45,6 +45,10 @@ export function WorkflowOutputPanel({ tab }: { tab: BrowserWorkflowTab }) {
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number | null>(null)
   const selectedPhase = phases.find(phase => phase.index === selectedPhaseIndex)
     ?? runtime?.currentPhase
+    ?? phases.reduce<typeof phases[number] | null>(
+      (latest, phase) => (phase.status !== 'pending' ? phase : latest),
+      null,
+    )
     ?? phases[0]
     ?? null
   const agents = runtime?.agents ?? []
@@ -55,7 +59,7 @@ export function WorkflowOutputPanel({ tab }: { tab: BrowserWorkflowTab }) {
   const progress = agents.length > 0 ? (completedCount / agents.length) * 100 : 0
   const elapsed = runtime ? (runtime.workflow.durationMs ?? now - runtime.workflow.startedAt) : null
   const statusMeta = WORKFLOW_STATUS_META[workflowStatus ?? 'running'] ?? WORKFLOW_STATUS_META.running
-  const resultMarkdown = toResultMarkdown(runtime?.workflow.result)
+  const resultView = toResultView(runtime?.workflow.result)
   const timeline = buildTimelineWindow(visibleAgents, runtime?.workflow.startedAt ?? null, now)
 
   return (
@@ -169,12 +173,20 @@ agents
             )}
           </section>
 
-          {resultMarkdown !== null && (
+          {resultView !== null && (
             <section className="mt-5">
               <h2 className="mb-1.5 text-[12px] font-semibold text-foreground/80">Result</h2>
-              <div className="streamdown-root rounded-lg bg-muted/40 p-2.5 text-[12.5px] leading-relaxed">
-                <StaticRender content={resultMarkdown} />
-              </div>
+              {resultView.kind === 'json'
+                ? (
+                    <pre className="max-h-80 overflow-auto rounded-lg bg-muted/40 p-2.5 font-mono text-[11px] leading-5 whitespace-pre-wrap break-words text-foreground/85">
+                      {JSON.stringify(resultView.value, null, 2)}
+                    </pre>
+                  )
+                : (
+                    <div className="streamdown-root rounded-lg bg-muted/40 p-2.5 text-[12.5px] leading-relaxed">
+                      <StaticRender content={resultView.text} />
+                    </div>
+                  )}
             </section>
           )}
         </div>
@@ -309,12 +321,26 @@ function formatDuration(ms: number): string {
   return minutes > 0 ? `${minutes}m${seconds}s` : `${seconds}s`
 }
 
-function toResultMarkdown(result: unknown): string | null {
+type ResultView = { kind: 'markdown', text: string } | { kind: 'json', value: unknown }
+
+function toResultView(result: unknown): ResultView | null {
   if (result === null || result === undefined) {
     return null
   }
-  if (typeof result === 'string') {
-    return result
+  if (typeof result === 'object') {
+    return { kind: 'json', value: result }
   }
-  return `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``
+  if (typeof result === 'string') {
+    const trimmed = result.trim()
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        return { kind: 'json', value: JSON.parse(trimmed) }
+      }
+      catch {
+        // Not valid JSON after all - fall through to markdown.
+      }
+    }
+    return { kind: 'markdown', text: result }
+  }
+  return { kind: 'markdown', text: String(result) }
 }

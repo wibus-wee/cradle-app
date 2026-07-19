@@ -458,6 +458,7 @@ export const sessionTailEventTypeSchema = t.Union([
   t.Literal('QueueItemClaimed'),
   t.Literal('QueueItemReleased'),
   t.Literal('QueueItemFailed'),
+  t.Literal('QueueItemCompleted'),
   t.Literal('QueueItemReordered'),
   t.Literal('QueueItemUpdated'),
   t.Literal('QueueItemProviderTargetCleared'),

@@ -25,6 +25,7 @@ import type {
   PlanImplementationRespondedPayload,
   QueueItemCancelledPayload,
   QueueItemClaimedPayload,
+  QueueItemCompletedPayload,
   QueueItemFailedPayload,
   QueueItemProviderTargetClearedPayload,
   QueueItemReleasedPayload,
@@ -135,6 +136,9 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       break
     case 'QueueItemFailed':
       projectQueueItemFailed(d, event.payload)
+      break
+    case 'QueueItemCompleted':
+      projectQueueItemCompleted(d, event.payload)
       break
     case 'QueueItemReordered':
       projectQueueItemReordered(d, event.payload)
@@ -366,6 +370,34 @@ function projectQueueItemFailed(d: ProjectorDb, payload: QueueItemFailedPayload)
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
         eq(chatSessionQueueItems.mode, 'queue'),
+      ),
+    )
+    .run()
+  touchSession(d, payload.sessionId, payload.updatedAt)
+}
+
+function projectQueueItemCompleted(d: ProjectorDb, payload: QueueItemCompletedPayload): void {
+  d.update(chatSessionQueueItems)
+    .set({
+      status: 'completed',
+      errorText: null,
+      ...(payload.absorbedByRunId
+        ? { startedRunId: payload.absorbedByRunId }
+        : {}),
+      updatedAt: payload.updatedAt,
+    })
+    .where(
+      and(
+        eq(chatSessionQueueItems.id, payload.queueItemId),
+        eq(chatSessionQueueItems.sessionId, payload.sessionId),
+        eq(chatSessionQueueItems.mode, 'queue'),
+        or(
+          eq(chatSessionQueueItems.status, 'pending'),
+          and(
+            eq(chatSessionQueueItems.status, 'running'),
+            isNull(chatSessionQueueItems.startedRunId),
+          ),
+        ),
       ),
     )
     .run()

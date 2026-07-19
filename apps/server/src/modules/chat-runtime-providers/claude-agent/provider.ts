@@ -57,6 +57,7 @@ import type {
   RuntimeSession,
   RuntimeUiSlotState,
   StartChatSessionInput,
+  SteerTurnInput,
   StreamTurnInput,
   UpdateRuntimeSettingsInput,
 } from '../../chat-runtime/runtime-provider-types'
@@ -163,6 +164,15 @@ type ActiveClaudeNativeFollowUp = {
   queueItemId: string
   messageUuid: string
   userContent: ReturnType<typeof projectClaudeAgentInput>
+  /**
+   * Claude SDK may fold a priority:'next' push into the *current* turn as a
+   * `queued_command` attachment instead of opening a post-result turn. When we
+   * observe that absorption, drain must complete the durable queue row without
+   * opening an empty Cradle run.
+   */
+  absorbedMidTurn: boolean
+  /** Prompt text used to match SDK queue-operation / queued_command payloads. */
+  promptText: string
 }
 
 type ActiveClaudeQuery = {
@@ -749,6 +759,17 @@ export class ClaudeAgentProvider implements ChatRuntime {
       }
 
       const queueItemId = input.queueItemId?.trim() || null
+      // Defensive: drain should complete mid-turn absorbed items without a run.
+      // If a run still starts, finish immediately without re-pushing the prompt.
+      if (queueItemId && this.isNativeFollowUpAbsorbedMidTurn(sessionId, queueItemId)) {
+        this.consumeNativeFollowUpAbsorbedMidTurn(sessionId, queueItemId)
+        if (activeEntry.currentTurn === turn) {
+          activeEntry.currentTurn = null
+        }
+        endGeneration()
+        yield providerChunk.finish('stop')
+        return
+      }
       const adoptNative = queueItemId ? this.claimNativeFollowUp(sessionId, queueItemId) : false
       if (adoptNative) {
         const buffered = activeEntry.preAdoptBuffer.splice(0, activeEntry.preAdoptBuffer.length)
@@ -756,7 +777,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
           await this.handleClaudeSessionMessage(activeEntry, bufferedMessage)
         }
       }
- else {
+      else {
         const pendingHarnessFragments = resolvePendingHarnessFragments(
           input.runtimeSession,
           input.harness?.fragments,
@@ -830,6 +851,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
       }
       await this.completeClaudeSyntheticTurns(entry)
       entry.closed = true
+      // Preserve mid-turn absorption across query teardown for drain.
+      for (const pending of entry.nativeFollowUps.values()) {
+        if (pending.absorbedMidTurn) {
+          this.rememberMidTurnAbsorbedFollowUp(
+            entry.runtimeSession.chatSessionId,
+            pending.queueItemId,
+          )
+        }
+      }
       entry.nativeFollowUps.clear()
       entry.preAdoptBuffer = []
       entry.inputStream.close()
@@ -841,8 +871,13 @@ export class ClaudeAgentProvider implements ChatRuntime {
     entry: ActiveClaudeQuery,
     message: SDKMessage,
   ): Promise<void> {
+    this.markNativeFollowUpsAbsorbedFromSdkMessage(entry, message)
+
     const turn = entry.currentTurn
     if (!turn && entry.nativeFollowUps.size > 0) {
+      // Post-result output while a native follow-up is still pending means the
+      // SDK opened a separate turn — clear mid-turn absorption so adopt works.
+      this.clearNativeFollowUpMidTurnAbsorption(entry, entry.runtimeSession.chatSessionId)
       entry.preAdoptBuffer.push(message)
       return
     }
@@ -938,6 +973,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
         await this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(
           () => undefined,
         )
+        // Follow-ups pushed during this turn were available to Claude for mid-turn
+        // merge. Mark them absorbed; post-result pre-adopt output clears the flag
+        // if the SDK actually opens a separate turn instead.
+        if (entry.nativeFollowUps.size > 0) {
+          this.markPendingNativeFollowUpsAbsorbedMidTurn(
+            entry,
+            entry.runtimeSession.chatSessionId,
+          )
+        }
         turn.endGeneration()
         entry.currentTurn = null
         turn.queue.close()
@@ -1350,6 +1394,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
     if (entry.currentTurn) {
       this.completeClaudeProviderThreadTurns(entry, entry.currentTurn)
     }
+    // Preserve mid-turn absorption across query teardown for drain.
+    for (const pending of entry.nativeFollowUps.values()) {
+      if (pending.absorbedMidTurn) {
+        this.rememberMidTurnAbsorbedFollowUp(
+          entry.runtimeSession.chatSessionId,
+          pending.queueItemId,
+        )
+      }
+    }
     entry.nativeFollowUps.clear()
     entry.preAdoptBuffer = []
     entry.abortController.abort()
@@ -1375,13 +1428,20 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return
     }
     const userContent = projectClaudeAgentInput(message, 'Claude Agent native queue')
+    const promptText = describeClaudeAgentUserContent(userContent)
     const messageUuid = entry.inputStream.push(userContent, {
       priority: 'next',
     })
+    // Mid-turn absorption is confirmed later: either from SDK queue-operation /
+    // queued_command signals, or when the current turn's top-level `result`
+    // lands with no post-result pre-adopt output (separate-turn follow-ups clear
+    // the flag when preAdoptBuffer receives real assistant output).
     entry.nativeFollowUps.set(queueItemId, {
       queueItemId,
       messageUuid,
       userContent,
+      absorbedMidTurn: false,
+      promptText,
     })
   }
 
@@ -1404,7 +1464,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       try {
         await cancelAsyncMessage.call(entry.query, pending.messageUuid)
       }
- catch (error) {
+      catch (error) {
         this.deps.logger?.warn?.('Claude Agent failed to cancel native queued follow-up', {
           error,
           sessionId,
@@ -1421,12 +1481,153 @@ export class ClaudeAgentProvider implements ChatRuntime {
     if (!entry) {
       return false
     }
+    const pending = entry.nativeFollowUps.get(queueItemId)
+    // Mid-turn absorbed follow-ups must not be adopted into a second streamTurn.
+    // Drain completes those durable queue rows without a run.
+    if (!pending || pending.absorbedMidTurn) {
+      return false
+    }
     return entry.nativeFollowUps.delete(queueItemId)
+  }
+
+  private isNativeFollowUpAbsorbedMidTurn(sessionId: string, queueItemId: string): boolean {
+    if (liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(sessionId, queueItemId)) {
+      return true
+    }
+    const entry = this.activeQueries.get(sessionId)
+    return Boolean(entry?.nativeFollowUps.get(queueItemId)?.absorbedMidTurn)
+  }
+
+  private consumeNativeFollowUpAbsorbedMidTurn(sessionId: string, queueItemId: string): boolean {
+    const fromRegistry = liveRuntimeSessionRegistry.consumeNativeFollowUpAbsorbedMidTurn(
+      sessionId,
+      queueItemId,
+    )
+    const entry = this.activeQueries.get(sessionId)
+    const pending = entry?.nativeFollowUps.get(queueItemId)
+    if (pending?.absorbedMidTurn) {
+      entry!.nativeFollowUps.delete(queueItemId)
+      return true
+    }
+    return fromRegistry
+  }
+
+  private rememberMidTurnAbsorbedFollowUp(sessionId: string, queueItemId: string): void {
+    liveRuntimeSessionRegistry.markNativeFollowUpAbsorbedMidTurn(sessionId, queueItemId)
+  }
+
+  private forgetMidTurnAbsorbedFollowUp(sessionId: string, queueItemId: string): void {
+    liveRuntimeSessionRegistry.clearNativeFollowUpAbsorbedMidTurn(sessionId, queueItemId)
+  }
+
+  /**
+   * Post-result SDK output while a native follow-up is pending means Claude opened
+   * a separate turn for that follow-up — clear mid-turn absorption so adopt works.
+   */
+  private clearNativeFollowUpMidTurnAbsorption(entry: ActiveClaudeQuery, sessionId: string): void {
+    for (const pending of entry.nativeFollowUps.values()) {
+      pending.absorbedMidTurn = false
+      this.forgetMidTurnAbsorbedFollowUp(sessionId, pending.queueItemId)
+    }
+  }
+
+  private markPendingNativeFollowUpsAbsorbedMidTurn(
+    entry: ActiveClaudeQuery,
+    sessionId: string,
+  ): void {
+    for (const pending of entry.nativeFollowUps.values()) {
+      pending.absorbedMidTurn = true
+      this.rememberMidTurnAbsorbedFollowUp(sessionId, pending.queueItemId)
+    }
+  }
+
+  /**
+   * Claude SDK may emit queue lifecycle / attachment records for mid-turn merges.
+   * Match by prompt text and keep the absorbed flag set.
+   */
+  private markNativeFollowUpsAbsorbedFromSdkMessage(
+    entry: ActiveClaudeQuery,
+    message: SDKMessage,
+  ): void {
+    if (entry.nativeFollowUps.size === 0) {
+      return
+    }
+
+    const sessionId = entry.runtimeSession.chatSessionId
+    const record = message as Record<string, unknown>
+    const candidates: string[] = []
+
+    if (record.type === 'queue-operation') {
+      const operation = typeof record.operation === 'string' ? record.operation : ''
+      if (operation === 'remove' || operation === 'dequeue' || operation === 'consume') {
+        if (typeof record.content === 'string' && record.content.trim()) {
+          candidates.push(record.content)
+        }
+      }
+    }
+
+    if (record.type === 'attachment') {
+      const attachment = record.attachment
+      if (attachment && typeof attachment === 'object') {
+        const attachmentRecord = attachment as Record<string, unknown>
+        if (
+          attachmentRecord.type === 'queued_command'
+          && typeof attachmentRecord.prompt === 'string'
+          && attachmentRecord.prompt.trim()
+        ) {
+          candidates.push(attachmentRecord.prompt)
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      return
+    }
+
+    for (const pending of entry.nativeFollowUps.values()) {
+      const prompt = pending.promptText.trim()
+      if (!prompt) {
+        continue
+      }
+      if (
+        candidates.some((candidate) => {
+          const text = candidate.trim()
+          return text === prompt || text.includes(prompt) || prompt.includes(text)
+        })
+      ) {
+        pending.absorbedMidTurn = true
+        this.rememberMidTurnAbsorbedFollowUp(sessionId, pending.queueItemId)
+      }
+    }
   }
 
   async getContextUsage(input: GetContextUsageInput): Promise<RuntimeContextUsage | null> {
     return await this.readContextUsage({
       runtimeSession: this.readLiveRuntimeSession(input.runtimeSession),
+    })
+  }
+
+  /**
+   * Live steer for Claude Agent: append into the long-lived SDK input stream without interrupt.
+   * Claude typically absorbs this as a mid-turn `queued_command` on the active turn (product
+   * steer). Unlike durable queue follow-ups, steer does not create a Cradle queue row or a
+   * second run — Chat Runtime persists the user bubble via `SteerApplied`.
+   */
+  async steerTurn(input: SteerTurnInput): Promise<void> {
+    const sessionId = input.runtimeSession.chatSessionId
+    const entry = this.activeQueries.get(sessionId)
+    if (!entry || entry.closed || !entry.pumpRunning) {
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(
+          this.runtimeKind,
+          'steerTurn',
+          `Claude Agent session has no live query to steer: ${sessionId}`,
+        ),
+      )
+    }
+    const userContent = projectClaudeAgentInput(input.message, 'Claude Agent live steer')
+    entry.inputStream.push(userContent, {
+      priority: 'next',
     })
   }
 

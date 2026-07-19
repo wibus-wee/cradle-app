@@ -4145,6 +4145,83 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     )
   })
 
+  it('declares native steer and injects live steer into the SDK input stream without interrupt', async () => {
+    const activeQuery = createPendingQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    expect(provider.capabilities.steer).toBe('native')
+    expect(typeof provider.steerTurn).toBe('function')
+
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-steer',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Initial task'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+
+    await vi.waitFor(() => {
+      expect(sdkMocks.query).toHaveBeenCalledOnce()
+    })
+
+    await expect(readPromptText(0)).resolves.toBe('Initial task')
+
+    await provider.steerTurn({
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Steer while busy'),
+    })
+
+    expect(activeQuery.interrupt).not.toHaveBeenCalled()
+    await expect(readPromptText(0)).resolves.toBe('Steer while busy')
+
+    activeQuery.close()
+    await pendingNext
+  })
+
+  it('rejects live steer when the live query pump is dead', async () => {
+    const activeQuery = createPendingQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-steer-dead',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Initial task'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
+
+    await vi.waitFor(() => {
+      expect(sdkMocks.query).toHaveBeenCalledOnce()
+    })
+
+    activeQuery.close()
+    await vi.waitFor(() => {
+      expect(liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)).toBeUndefined()
+    })
+
+    await expect(
+      provider.steerTurn({
+        runtimeSession,
+        profile: createProfile(),
+        message: createUserMessage('Should fail'),
+      }),
+    ).rejects.toThrow(/no live query/i)
+
+    await provider.dispose()
+  })
+
   it('enqueues native follow-ups into the live SDK input stream without interrupt', async () => {
     const activeQuery = createPendingQuery()
     sdkMocks.query.mockReturnValue(activeQuery)
@@ -4257,6 +4334,96 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       expect.arrayContaining([expect.objectContaining({ type: 'text-delta', delta: 'from queue' })]),
     )
     expect(live!.claimNativeFollowUp!('queue-adopt-1')).toBe(false)
+
+    activeQuery.close()
+    await provider.dispose()
+  })
+
+  it('marks native follow-ups absorbed when Claude folds them into the current turn', async () => {
+    const activeQuery = createControllableQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const runtimeSession = createResumedRuntimeSession({
+      providerSessionId: 'claude-session-native-midturn',
+    })
+
+    const firstStream = provider.streamTurn({
+      runId: 'run-claude-agent-midturn-1',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('First turn'),
+      workspaceId: 'workspace-1',
+    })
+    void firstStream.next().catch(() => undefined)
+
+    await vi.waitFor(() => {
+      expect(sdkMocks.query).toHaveBeenCalledOnce()
+    })
+    await expect(readPromptText(0)).resolves.toBe('First turn')
+
+    const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)
+    await live!.enqueueNativeFollowUp!({
+      queueItemId: 'queue-midturn-1',
+      message: createUserMessage('Follow-up folded mid-turn'),
+    })
+    await expect(readPromptText(0)).resolves.toBe('Follow-up folded mid-turn')
+    expect(liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(runtimeSession.chatSessionId, 'queue-midturn-1')).toBe(false)
+
+    // Claude folds the follow-up into the current turn (queued_command attachment).
+    activeQuery.push({
+      type: 'queue-operation',
+      operation: 'remove',
+      content: 'Follow-up folded mid-turn',
+      session_id: 'claude-session-native-midturn',
+    })
+    activeQuery.push({
+      type: 'attachment',
+      attachment: {
+        type: 'queued_command',
+        prompt: 'Follow-up folded mid-turn',
+      },
+      session_id: 'claude-session-native-midturn',
+    })
+    activeQuery.push({
+      type: 'assistant',
+      session_id: 'claude-session-native-midturn',
+      message: {
+        content: [{ type: 'text', text: 'answered first and follow-up together' }],
+      },
+    })
+    activeQuery.push({
+      type: 'result',
+      session_id: 'claude-session-native-midturn',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+
+    for await (const _chunk of firstStream) {
+      // drain the single merged turn
+    }
+
+    // No separate post-result turn — absorption must stick for drain.
+    expect(liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(runtimeSession.chatSessionId, 'queue-midturn-1')).toBe(true)
+    expect(live!.claimNativeFollowUp!('queue-midturn-1')).toBe(false)
+
+    // Defensive streamTurn path: finish immediately without re-pushing.
+    const secondChunks: UIMessageChunk[] = []
+    for await (const chunk of provider.streamTurn({
+      runId: 'run-claude-agent-midturn-2',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Follow-up folded mid-turn'),
+      queueItemId: 'queue-midturn-1',
+      workspaceId: 'workspace-1',
+    })) {
+      secondChunks.push(chunk)
+    }
+    expect(secondChunks).toEqual([
+      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+    ])
+    expect(liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(runtimeSession.chatSessionId, 'queue-midturn-1')).toBe(false)
 
     activeQuery.close()
     await provider.dispose()
