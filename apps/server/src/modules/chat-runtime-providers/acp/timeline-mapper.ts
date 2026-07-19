@@ -86,8 +86,13 @@ export class AcpChunkMapper {
       providerChunk.toolInputStart(update.toolCallId, update.title),
     ]
 
-    if (update.status === 'completed' && output) {
-      chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output }))
+    const input = update.rawInput
+    if (input !== undefined) {
+      chunks.push(providerChunk.toolInputAvailable({ toolCallId: update.toolCallId, toolName: update.title, input }))
+    }
+
+    if (update.status === 'completed') {
+      chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output: output || '' }))
     }
 
     return chunks
@@ -97,11 +102,11 @@ export class AcpChunkMapper {
     const output = stringifyPayload(update.rawOutput)
     const chunks: UIMessageChunk[] = []
 
-    if (output) {
-      chunks.push(providerChunk.toolInputDelta(update.toolCallId, output))
+    if (update.rawInput !== undefined) {
+      chunks.push(providerChunk.toolInputAvailable({ toolCallId: update.toolCallId, toolName: update.title ?? update.kind ?? 'tool', input: update.rawInput }))
     }
 
-    if (update.status === 'completed') {
+    if (output) {
       chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output: output || '' }))
     }
 
