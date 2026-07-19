@@ -60,6 +60,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
   const visibleRef = useRef(visible)
   const focusFrameRef = useRef<number | null>(null)
   const stopOnUnmountRef = useRef(stopOnUnmount)
+  const ensureShellRunningRef = useRef<(() => void) | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -87,6 +88,8 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
       return
     }
 
+    // Re-attach stdin/focus and revive a PTY reaped after shell-lease expiry.
+    ensureShellRunningRef.current?.()
     focusFrameRef.current = requestAnimationFrame(() => {
       focusFrameRef.current = null
       if (!visibleRef.current || terminalRef.current !== terminal) {
@@ -238,10 +241,30 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
       }
     }
 
+    let processRunning = false
+    let restarting = false
+    let disposed = false
+    // After a clean process exit we let the parent remove the tab. Background
+    // lease expiry / socket death can leave a live tab attached to a dead PTY —
+    // those recover via ensureShellRunning when the tab is visible again.
+    let intentionalExit = false
+
     const channel = createPtyChannel({
       socketPath: `/terminal-sessions/shell/${encodeURIComponent(ptyId)}/socket`,
       onSnapshot(event) {
         writeSnapshot(event.buffer, event.running)
+        processRunning = event.running
+        if (!event.running) {
+          exitShown = true
+        }
+        if (
+          !event.running
+          && !intentionalExit
+          && visibleRef.current
+          && !disposed
+        ) {
+          void ensureShellRunning()
+        }
       },
       onOutput(event) {
         if (event.data) {
@@ -251,12 +274,25 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
         }
       },
       onExit() {
+        processRunning = false
+        intentionalExit = true
         if (!exitShown) {
           exitShown = true
           appendTranscript(toPlainTerminalText(EXIT_BANNER))
           terminal.write(EXIT_BANNER)
         }
         onExitedRef.current?.()
+      },
+      onError(event) {
+        if (
+          event.code === 'terminal_not_running'
+          && !intentionalExit
+          && visibleRef.current
+          && !disposed
+        ) {
+          processRunning = false
+          void ensureShellRunning()
+        }
       },
     })
 
@@ -277,20 +313,62 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
         terminal.resize(pendingCols, pendingRows)
         lastCols = pendingCols
         lastRows = pendingRows
-        channel.sendResize(lastCols, lastRows)
+        if (processRunning) {
+          channel.sendResize(lastCols, lastRows)
+        }
       }, 100)
     }
 
-    async function initShell(cols: number, rows: number) {
-      terminal.resize(cols, rows)
-      lastCols = cols
-      lastRows = rows
+    function resolveShellSize(): { cols: number, rows: number } | null {
+      const dims = fitAddon.proposeDimensions()
+      if (dims && dims.cols > 0 && dims.rows > 0) {
+        return dims
+      }
+      if (lastCols > 0 && lastRows > 0) {
+        return { cols: lastCols, rows: lastRows }
+      }
+      return null
+    }
 
-      await postTerminalSessionsShellStart({
-        body: { ptyId, cwd, cols, rows },
-      })
-      channel.connect()
-      setReady(true)
+    async function ensureShellRunning(preferred?: { cols: number, rows: number }) {
+      if (disposed || restarting || intentionalExit) {
+        return
+      }
+      const size = preferred ?? resolveShellSize()
+      if (!size) {
+        return
+      }
+
+      restarting = true
+      try {
+        terminal.resize(size.cols, size.rows)
+        lastCols = size.cols
+        lastRows = size.rows
+
+        await postTerminalSessionsShellStart({
+          body: { ptyId, cwd, cols: size.cols, rows: size.rows },
+        })
+        if (disposed) {
+          return
+        }
+        exitShown = false
+        processRunning = true
+        shellStarted = true
+        channel.connect()
+        setReady(true)
+      }
+      catch {
+        if (disposed) {
+          return
+        }
+        processRunning = false
+        shellStarted = false
+        setReady(false)
+        terminal.write('\r\n\x1B[31m[Unable to start terminal]\x1B[0m\r\n')
+      }
+      finally {
+        restarting = false
+      }
     }
 
     function fitAndNotify() {
@@ -305,15 +383,14 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
         }
         initDebounceTimer = setTimeout(() => {
           initDebounceTimer = null
-          if (shellStarted) {
+          if (shellStarted || disposed) {
             return
           }
           const final = fitAddon.proposeDimensions()
           if (!final || final.cols <= 0 || final.rows <= 0) {
             return
           }
-          shellStarted = true
-          void initShell(final.cols, final.rows)
+          void ensureShellRunning(final)
         }, 100)
         return
       }
@@ -324,9 +401,13 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     // ── Initial setup ────────────────────────────────────────────────────────
     void (async () => {
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      if (disposed) {
+        return
+      }
 
       const dims = fitAddon.proposeDimensions()
       if (!dims || dims.cols <= 0 || dims.rows <= 0) {
+        // Wait for ResizeObserver / fitAndNotify once the panel has real size.
         return
       }
 
@@ -334,8 +415,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
         clearTimeout(initDebounceTimer)
         initDebounceTimer = null
       }
-      shellStarted = true
-      await initShell(dims.cols, dims.rows)
+      await ensureShellRunning(dims)
     })()
 
     // ── Live updates ─────────────────────────────────────────────────────────
@@ -374,8 +454,11 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     })
 
     const dataDisposable = terminal.onData((data) => {
-      if (!visibleRef.current) {
+      if (!visibleRef.current || intentionalExit) {
         return
+      }
+      if (!processRunning) {
+        void ensureShellRunning()
       }
       channel.sendInput(data)
     })
@@ -385,7 +468,26 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     })
     resizeObserver.observe(el)
 
+    const onPointerDown = () => {
+      if (!visibleRef.current) {
+        return
+      }
+      terminal.options.disableStdin = false
+      terminal.focus()
+      if (!processRunning && !intentionalExit) {
+        void ensureShellRunning()
+      }
+    }
+    el.addEventListener('pointerdown', onPointerDown)
+    ensureShellRunningRef.current = () => {
+      if (!processRunning && !intentionalExit) {
+        void ensureShellRunning()
+      }
+    }
+
     return () => {
+      disposed = true
+      ensureShellRunningRef.current = null
       if (resizeTimer) {
         clearTimeout(resizeTimer)
       }
@@ -407,6 +509,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
           path: { ptyId },
         }).catch(() => {})
       }
+      el.removeEventListener('pointerdown', onPointerDown)
       channel.close()
       dataDisposable.dispose()
       resizeObserver.disconnect()
