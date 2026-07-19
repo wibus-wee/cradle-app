@@ -227,6 +227,76 @@ export interface BrowserPlanRefineTab {
   favicon: null
 }
 
+/** Live workflow agent row (SSE runtime snapshot). */
+export interface BrowserWorkflowRuntimeAgent {
+  id: string
+  label: string
+  status: string
+  phaseIndex: number | null
+  startedAt: number | null
+  completedAt: number | null
+  model?: string | null
+  lastToolName?: string | null
+  totalTokens?: number | null
+  toolUses?: number | null
+}
+
+export interface BrowserWorkflowRuntimePhase {
+  index: number
+  title: string
+  detail?: string | null
+  status: string
+  agentCount: number
+  completedAgentCount: number
+  runningAgentCount: number
+  failedAgentCount: number
+}
+
+export interface BrowserWorkflowRuntimeSnapshot {
+  updatedAt: number
+  workflow: {
+    name?: string | null
+    description?: string | null
+    status?: string | null
+    startedAt: number
+    durationMs?: number | null
+    result?: unknown
+  }
+  phases: BrowserWorkflowRuntimePhase[]
+  currentPhase?: BrowserWorkflowRuntimePhase | null
+  agents: BrowserWorkflowRuntimeAgent[]
+}
+
+export interface BrowserWorkflowSurfaceSnapshot {
+  workflowName: string | null
+  description: string | null
+  status: string | null
+  taskId: string | null
+  taskType: string | null
+  runId: string | null
+  scriptPath: string | null
+  transcriptDir: string | null
+  sessionUrl: string | null
+  warning: string | null
+  error: string | null
+  phases: { name: string, description?: string | null }[]
+  input: unknown
+  output: unknown
+  lifecycle: unknown
+  runtime: BrowserWorkflowRuntimeSnapshot | null
+}
+
+export interface BrowserWorkflowTab {
+  kind: 'workflow'
+  id: string
+  sessionId: string | null
+  toolCallId: string
+  title: string
+  surface: BrowserWorkflowSurfaceSnapshot
+  loading: false
+  favicon: null
+}
+
 export type BrowserPanelTab
   = | BrowserWebTab
     | BrowserWorkspaceFileTab
@@ -239,6 +309,7 @@ export type BrowserPanelTab
     | BrowserTuiTab
     | BrowserPlanDocumentTab
     | BrowserPlanRefineTab
+    | BrowserWorkflowTab
 
 export const BROWSER_PANEL_TAB_KINDS = [
   'browser',
@@ -252,6 +323,7 @@ export const BROWSER_PANEL_TAB_KINDS = [
   'tui',
   'plan-document',
   'plan-refine',
+  'workflow',
 ] as const satisfies readonly BrowserPanelTab['kind'][]
 
 export type BrowserPanelTabKind = (typeof BROWSER_PANEL_TAB_KINDS)[number]
@@ -265,6 +337,7 @@ const MULTI_INSTANCE_BROWSER_PANEL_TAB_KINDS: ReadonlySet<BrowserPanelTabKind> =
   'tui',
   'plan-document',
   'plan-refine',
+  'workflow',
 ])
 
 export const SINGLETON_BROWSER_PANEL_TAB_KINDS: ReadonlySet<BrowserPanelTabKind> = new Set(
@@ -376,6 +449,78 @@ const planRefineTabSchema = z.object({
   favicon: z.null(),
 }) satisfies z.ZodType<BrowserPlanRefineTab>
 
+const workflowRuntimePhaseSchema = z.object({
+  index: z.number(),
+  title: z.string(),
+  detail: z.string().nullable().optional(),
+  status: z.string(),
+  agentCount: z.number(),
+  completedAgentCount: z.number(),
+  runningAgentCount: z.number(),
+  failedAgentCount: z.number(),
+})
+
+const workflowRuntimeAgentSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.string(),
+  phaseIndex: z.number().nullable(),
+  startedAt: z.number().nullable(),
+  completedAt: z.number().nullable(),
+  model: z.string().nullable().optional(),
+  lastToolName: z.string().nullable().optional(),
+  totalTokens: z.number().nullable().optional(),
+  toolUses: z.number().nullable().optional(),
+})
+
+export const browserWorkflowRuntimeSnapshotSchema = z.object({
+  updatedAt: z.number(),
+  workflow: z.object({
+    name: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    startedAt: z.number(),
+    durationMs: z.number().nullable().optional(),
+    result: z.unknown().optional(),
+  }),
+  phases: z.array(workflowRuntimePhaseSchema),
+  currentPhase: workflowRuntimePhaseSchema.nullable().optional(),
+  agents: z.array(workflowRuntimeAgentSchema),
+}) satisfies z.ZodType<BrowserWorkflowRuntimeSnapshot>
+
+const workflowSurfaceSnapshotSchema = z.object({
+  workflowName: z.string().nullable(),
+  description: z.string().nullable(),
+  status: z.string().nullable(),
+  taskId: z.string().nullable(),
+  taskType: z.string().nullable(),
+  runId: z.string().nullable(),
+  scriptPath: z.string().nullable(),
+  transcriptDir: z.string().nullable(),
+  sessionUrl: z.string().nullable(),
+  warning: z.string().nullable(),
+  error: z.string().nullable(),
+  phases: z.array(z.object({
+    name: z.string(),
+    description: z.string().nullable().optional(),
+  })),
+  input: z.unknown(),
+  output: z.unknown(),
+  lifecycle: z.unknown(),
+  runtime: browserWorkflowRuntimeSnapshotSchema.nullable(),
+}) satisfies z.ZodType<BrowserWorkflowSurfaceSnapshot>
+
+const workflowTabSchema = z.object({
+  kind: z.literal('workflow'),
+  id: z.string(),
+  sessionId: z.string().nullable(),
+  toolCallId: z.string(),
+  title: z.string(),
+  surface: workflowSurfaceSnapshotSchema,
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserWorkflowTab>
+
 const restorableBrowserPanelTabSchema = z.discriminatedUnion('kind', [
   workspaceFileTabSchema,
   workspaceDiffTabSchema,
@@ -385,6 +530,7 @@ const restorableBrowserPanelTabSchema = z.discriminatedUnion('kind', [
   contextUsageReportTabSchema,
   planDocumentTabSchema,
   planRefineTabSchema,
+  workflowTabSchema,
 ]) satisfies z.ZodType<RestorableBrowserPanelTab>
 
 const persistedBrowserPanelDockStateSchema = z.object({
@@ -731,6 +877,19 @@ interface BrowserPanelState {
     text: string
     ownerId?: string | null
   }) => string
+  openWorkflowTab: (input: {
+    sessionId: string | null
+    toolCallId: string
+    title: string
+    surface: BrowserWorkflowSurfaceSnapshot
+    ownerId?: string | null
+  }) => string
+  updateWorkflowTab: (input: {
+    sessionId: string | null
+    toolCallId: string
+    surface: BrowserWorkflowSurfaceSnapshot
+    ownerId?: string | null
+  }) => void
   requestScrollToFilePath: (input: { path: string, tabId: string }) => void
   clearScrollToFilePath: (ownerId?: string | null) => void
   saveAnnotation: (
@@ -1542,6 +1701,48 @@ function createBrowserPanelStore() {
           favicon: null,
         }
         return commitOpenTab(set, ownerId, tab)
+      },
+
+      openWorkflowTab: ({ sessionId, toolCallId, title, surface, ownerId: ownerIdInput }) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        const tab: BrowserWorkflowTab = {
+          kind: 'workflow',
+          id: `workflow:${toolCallId}`,
+          sessionId,
+          toolCallId,
+          title,
+          surface,
+          loading: false,
+          favicon: null,
+        }
+        return commitOpenTab(set, ownerId, tab)
+      },
+
+      updateWorkflowTab: ({ sessionId, toolCallId, surface, ownerId: ownerIdInput }) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        set((state) => {
+          const ownerState = getOwnerState(state, ownerId)
+          const tabId = `workflow:${toolCallId}`
+          let found = false
+          const tabs = ownerState.tabs.map((tab) => {
+            if (tab.kind !== 'workflow' || tab.id !== tabId) {
+              return tab
+            }
+            found = true
+            return {
+              ...tab,
+              sessionId,
+              surface,
+            }
+          })
+          if (!found) {
+            return state
+          }
+          return applyOwnerState(state, ownerId, {
+            ...ownerState,
+            tabs,
+          })
+        })
       },
 
       requestScrollToFilePath: ({ path, tabId }) => {

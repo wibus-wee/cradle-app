@@ -32,12 +32,14 @@ describe('acp chunk mapper', () => {
       ...mapper.flush(),
     ]
 
+    // tool_call without rawInput only emits tool-input-start; input deltas /
+    // tool-input-available appear only when rawInput is present on the call
+    // or a later tool_call_update.
     expect(chunks.map(chunk => chunk.type)).toEqual([
       'text-start',
       'text-delta',
       'text-delta',
       'tool-input-start',
-      'tool-input-delta',
       'tool-output-available',
       'text-end',
     ])
