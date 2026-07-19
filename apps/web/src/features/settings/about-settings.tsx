@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Switch } from '~/components/ui/switch'
+import { productAnalyticsConfigured } from '~/features/product-analytics/client'
 import { useProductAnalyticsStore } from '~/features/product-analytics/store'
 import { isElectron, nativeIpc } from '~/lib/electron'
 
@@ -150,23 +151,25 @@ export function AboutSettings() {
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup
-        label={t('about.analytics.title')}
-        description={t('about.analytics.description')}
-      >
-        <SettingsRow
-          label={t('about.analytics.share.label')}
-          description={t('about.analytics.share.description')}
+      {productAnalyticsConfigured() && (
+        <SettingsGroup
+          label={t('about.analytics.title')}
+          description={t('about.analytics.description')}
         >
-          <Switch
-            size="sm"
-            checked={analyticsEnabled}
-            onCheckedChange={setAnalyticsEnabled}
-            aria-label={t('about.analytics.share.label')}
-            data-testid="product-analytics-enabled"
-          />
-        </SettingsRow>
-      </SettingsGroup>
+          <SettingsRow
+            label={t('about.analytics.share.label')}
+            description={t('about.analytics.share.description')}
+          >
+            <Switch
+              size="sm"
+              checked={analyticsEnabled}
+              onCheckedChange={setAnalyticsEnabled}
+              aria-label={t('about.analytics.share.label')}
+              data-testid="product-analytics-enabled"
+            />
+          </SettingsRow>
+        </SettingsGroup>
+      )}
 
       <SettingsGroup
         label={t('about.external.title')}
