@@ -2,6 +2,7 @@ import type { MutableRefObject, ReactNode } from 'react'
 
 import type { ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
 
+import type { ComposerDecoration } from './composer/composer'
 import type { ChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import type { MentionItem, PluginMentionItem } from './mentions/mention-panel'
 import type { SkillMentionItem } from './mentions/skill-mention-panel'
@@ -38,6 +39,8 @@ export interface ChatViewProps {
   }>
   /** Currently selected composer model, including provider-switched chat sessions before the first run persists. */
   composerModel?: ModelDescriptor | null
+  /** Active composer decoration, e.g. 'ultra' while ultra thinking effort is selected. */
+  composerDecoration?: ComposerDecoration | null
   /** Custom context bar rendered before the send button */
   composerContextBar?: ReactNode
   /**

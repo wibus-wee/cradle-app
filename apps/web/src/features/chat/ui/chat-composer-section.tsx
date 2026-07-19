@@ -14,7 +14,7 @@ import type {
   ChatRuntimePlanUiSlotState,
 } from '../capabilities/chat-capabilities'
 import type { ChatQueueEnqueueBody, ChatQueueItem } from '../commands/chat-response-command'
-import type { ComposerRuntimeSettingsController } from '../composer/composer'
+import type { ComposerDecoration, ComposerRuntimeSettingsController } from '../composer/composer'
 import { Composer } from '../composer/composer'
 import type {
   ComposerSlashCommandActionContext,
@@ -97,6 +97,7 @@ export function ChatComposerSection({
   usageSlot,
   onQuickQuestion,
   onComposerFocusChange,
+  composerDecoration = null,
   rollbackDraftSignal,
   clearDraftSignal,
   suspendDraftPersistence,
@@ -139,6 +140,7 @@ export function ChatComposerSection({
   usageSlot: ComposerUsageSlotActions
   onQuickQuestion?: (question: string) => void
   onComposerFocusChange?: (focused: boolean) => void
+  composerDecoration?: ComposerDecoration | null
   rollbackDraftSignal?: RollbackDraftSignal | null
   clearDraftSignal?: number
   suspendDraftPersistence?: boolean
@@ -443,6 +445,7 @@ export function ChatComposerSection({
             onActionTargetElementChange: appshotRuntime.setActionTargetElement,
           }}
           runtimeSettings={runtimeSettings}
+          decoration={composerDecoration}
           slots={{
             toolbar,
             contextBar,

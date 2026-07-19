@@ -33,6 +33,7 @@ import {
 } from './resolution/composer-selection'
 import { readFallbackRuntimeKind, resolveComposerRuntimeKind } from './resolution/runtime-selection'
 import type { ComposerContext, ComposerSelection, ComposerTargetMode, ModelsByProfileId, ProviderModelOption, RuntimeProviderBinding, ThinkingEffort } from './types'
+import { markUltraThinkingActivated } from './ultra-thinking-activation'
 
 interface ComposerStateConfig {
   context: ComposerContext
@@ -615,6 +616,9 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     setManualSelectionResetKey(resetKey)
     setManualThinkingEffort(effort)
     setLastThinkingEffort(effort)
+    if (effort === 'ultra') {
+      markUltraThinkingActivated()
+    }
     if (profileId) {
       setLastThinkingForProfile(profileId, effort)
       if (modelId) {

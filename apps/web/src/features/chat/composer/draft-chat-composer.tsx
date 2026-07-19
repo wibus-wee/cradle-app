@@ -609,6 +609,7 @@ function DraftChatComposerContent({
           disabled: sending,
           onChange: updateRuntimeSettings,
         }}
+        decoration={selection.thinkingEffort === 'ultra' ? 'ultra' : null}
         slots={{
           toolbar,
           footer,

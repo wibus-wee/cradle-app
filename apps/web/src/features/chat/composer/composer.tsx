@@ -78,8 +78,12 @@ import type {
   PromptEditorTriggerRange,
 } from './prompt-editor'
 import { PromptEditor } from './prompt-editor'
+import { UltraThinkingDecoration } from './ultra-thinking-decoration'
 
 export type { ComposerSendHandler } from './composer-submit'
+
+/** Decorative composer treatments owned by the caller (e.g. ultra thinking). */
+export type ComposerDecoration = 'ultra'
 
 export interface ComposerSendVariant {
   id: string
@@ -221,6 +225,8 @@ export interface ComposerProps {
   slots?: ComposerSlots
   externalSignals?: ComposerExternalSignals
   view?: ComposerViewOptions
+  /** Active decorative treatment; 'ultra' renders the rose grid-wave overlay. */
+  decoration?: ComposerDecoration | null
   testIds?: ComposerTestIds
   accessibility?: ComposerAccessibilityOptions
 }
@@ -247,6 +253,7 @@ export function Composer({
   slots,
   externalSignals,
   view,
+  decoration = null,
   testIds,
   accessibility,
 }: ComposerProps) {
@@ -421,6 +428,7 @@ export function Composer({
       ? undefined
       : (textareaRowsClasses[textareaRows] ?? textareaRowsClasses[3])
   const isPlanMode = isPlanRuntimeSettings(runtimeSettings?.settings ?? {})
+  const isUltraDecoration = decoration === 'ultra'
   const runtimeSettingsDisabled = runtimeSettings?.disabled ?? false
   const onRuntimeSettingsChange = runtimeSettings?.onChange
   const runtimeKind = runtimeSettings?.runtimeKind ?? null
@@ -1026,6 +1034,12 @@ export function Composer({
             'dark:border-amber-300/55 dark:shadow-[0_0_0_1px_rgba(252,211,77,0.16),0_18px_40px_-30px_rgba(251,191,36,0.48)]',
             'dark:focus-within:border-amber-300/80 dark:focus-within:shadow-[0_0_0_1px_rgba(252,211,77,0.26),0_22px_44px_-32px_rgba(251,191,36,0.56)]',
           ],
+          isUltraDecoration && [
+            'border-rose-400/60 shadow-[0_0_0_1px_rgba(251,113,133,0.14),0_18px_40px_-30px_rgba(244,63,94,0.55)]',
+            'focus-within:border-rose-400/85 focus-within:shadow-[0_0_0_1px_rgba(251,113,133,0.26),0_22px_44px_-32px_rgba(244,63,94,0.62)]',
+            'dark:border-rose-300/50 dark:shadow-[0_0_0_1px_rgba(253,164,175,0.14),0_18px_40px_-30px_rgba(251,113,133,0.45)]',
+            'dark:focus-within:border-rose-300/75 dark:focus-within:shadow-[0_0_0_1px_rgba(253,164,175,0.22),0_22px_44px_-32px_rgba(251,113,133,0.52)]',
+          ],
           footer && [
             'border-0 bg-transparent shadow-none ring-0',
             'focus-within:border-transparent focus-within:shadow-none',
@@ -1036,12 +1050,30 @@ export function Composer({
       >
         <div
           className={cn(
+            'relative',
             footer && [
-              'relative z-10 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_8px_24px_-20px_rgb(0_0_0_/_0.28)]',
-              'focus-within:border-ring/50',
+              'z-10 overflow-hidden rounded-2xl border bg-background',
+              isUltraDecoration
+                ? [
+                    'border-rose-400/60 shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_8px_24px_-18px_rgba(244,63,94,0.38)]',
+                    'focus-within:border-rose-400/85',
+                    'dark:border-rose-300/50 dark:focus-within:border-rose-300/75',
+                  ]
+                : [
+                    'border-border/60 shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_8px_24px_-20px_rgb(0_0_0_/_0.28)]',
+                    'focus-within:border-ring/50',
+                  ],
             ],
           )}
         >
+          {isUltraDecoration && (
+            <UltraThinkingDecoration
+              className={cn(
+                'pointer-events-none absolute inset-0',
+                footer ? 'rounded-2xl' : 'rounded-xl',
+              )}
+            />
+          )}
           {!inputCollapsed && (
             <ComposerAttachmentInput
               fileInputRef={attachmentController.fileInputRef}
@@ -1087,7 +1119,7 @@ export function Composer({
           </div>
 
           {!inputCollapsed && pastedTexts.length > 0 && (
-            <div className="px-3 py-2 pb-0">
+            <div className={cn('px-3 py-2 pb-0', isUltraDecoration && 'relative')}>
               <div className="flex gap-2">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {pastedTexts.map(pastedText => (
@@ -1114,13 +1146,17 @@ export function Composer({
               attachments={attachmentController.attachments}
               onRemove={attachmentController.removeAttachment}
               pendingAppshots={pendingAppshots}
-              className={attachmentListClassName}
+              className={cn(isUltraDecoration && 'relative', attachmentListClassName)}
             />
           )}
 
           {/* Action bar — subtle, blends with the card */}
           <div
-            className={cn('flex items-center justify-between gap-2 px-3 py-2', actionBarClassName)}
+            className={cn(
+              'flex items-center justify-between gap-2 px-3 py-2',
+              isUltraDecoration && 'relative',
+              actionBarClassName,
+            )}
           >
             {/* Left: custom toolbar from parent */}
             <div className={cn('min-w-0 flex-1', toolbarClassName)}>

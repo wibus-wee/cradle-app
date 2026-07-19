@@ -89,6 +89,7 @@ export function ChatView({
   composerContextBar,
   sendOverridesRef,
   composerModel,
+  composerDecoration = null,
   placeholder,
   runtimeKind: _runtimeKind,
   workspaceId,
@@ -816,6 +817,7 @@ export function ChatView({
                 sessionId && hasQuickQuestionSlot ? quickQuestion.openQuickQuestion : undefined
               }
               onComposerFocusChange={scrollRuntime.handleComposerFocusChange}
+              composerDecoration={composerDecoration}
               rollbackDraftSignal={rollbackDraftSignal}
               clearDraftSignal={clearComposerDraftSignal}
               suspendDraftPersistence={Boolean(pendingRollbackMessageId)}

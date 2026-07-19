@@ -251,6 +251,7 @@ export function ChatRuntimeView({
         hideRuntimeToolbar={hideRuntimeToolbar}
         sendOverridesRef={sendOverridesRef}
         composerModel={sessionComposerState.effectiveModel}
+        composerDecoration={sessionComposerState.selection.thinkingEffort === 'ultra' ? 'ultra' : null}
         placeholder={placeholder}
         messageTextTransform={messageTextTransform}
         prepareSend={prepareSend}
