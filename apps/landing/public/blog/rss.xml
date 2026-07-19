@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Cradle Blog</title>
+    <link>https://cradle.app/#/blog</link>
+    <description>Longer-form writing about what we're building and why.</description>
+    <item>
+      <title>Chat is for exploration. Work is for finishing.</title>
+      <link>https://cradle.app/#/blog/chat-explores-work-finishes</link>
+      <guid>https://cradle.app/#/blog/chat-explores-work-finishes</guid>
+      <pubDate>Thu, 16 Jul 2026 00:00:00 GMT</pubDate>
+      <description>Conversations are great for understanding problems, but real work has an objective, an environment, and a delivery. Cradle Work is a new concept built for finishing.</description>
+    </item>
+    <item>
+      <title>Session Await: agents that know how to wait</title>
+      <link>https://cradle.app/#/blog/session-await</link>
+      <guid>https://cradle.app/#/blog/session-await</guid>
+      <pubDate>Fri, 10 Jul 2026 00:00:00 GMT</pubDate>
+      <description>Your agent pushed a PR and it's waiting for CI — but you don't have to wait with it. Session Await suspends a session on a condition and resumes it the moment the condition fires.</description>
+    </item>
+    <item>
+      <title>Run four agents on the same codebase. At the same time.</title>
+      <link>https://cradle.app/#/blog/multi-agent-orchestration</link>
+      <guid>https://cradle.app/#/blog/multi-agent-orchestration</guid>
+      <pubDate>Mon, 06 Jul 2026 00:00:00 GMT</pubDate>
+      <description>Love Claude Code? Run four of them. Cradle orchestrates every agent as a parallel worker — each with its own task, kanban card, and live status, none of them tripping over each other.</description>
+    </item>
+    <item>
+      <title>Conversation Bridge: keep your agent sessions going from Slack</title>
+      <link>https://cradle.app/#/blog/conversation-bridge</link>
+      <guid>https://cradle.app/#/blog/conversation-bridge</guid>
+      <pubDate>Sun, 21 Jun 2026 00:00:00 GMT</pubDate>
+      <description>Conversation Bridge connects external conversation platforms to Cradle Chat Sessions, so work doesn't have to stop at the desktop window. The first Bridge plugin supports Slack.</description>
+    </item>
+    <item>
+      <title>Cradle dev builds are open for testing</title>
+      <link>https://cradle.app/#/blog/hello-cradle</link>
+      <guid>https://cradle.app/#/blog/hello-cradle</guid>
+      <pubDate>Thu, 18 Jun 2026 00:00:00 GMT</pubDate>
+      <description>After roughly two months of development, the first public dev build of Cradle Desktop is available. Here's what we're testing and where the current edges are.</description>
+    </item>
+  </channel>
+</rss>

@@ -2,6 +2,8 @@
 title: Conversation Bridge: keep your agent sessions going from Slack
 date: 2026-06-21
 cover: /blog/covers/conversation-bridge.svg
+tags: Product
+author: Cradle Team
 description: Conversation Bridge connects external conversation platforms to Cradle Chat Sessions, so work doesn't have to stop at the desktop window. The first Bridge plugin supports Slack.
 ---
 
@@ -16,6 +18,8 @@ Conversation Bridge is our answer. It lets Cradle connect external conversation 
 The first Bridge plugin supports Slack. Follow the setup guide in Integration settings, bind a Slack conversation, and keep chatting with Cradle directly from Slack.
 
 Bind, status, unbind, runtime, and model selection controls are all integrated into the Slack flow — no need to switch back to the desktop app.
+
+![How Conversation Bridge connects a desktop session to Slack with a two-way event flow](/blog/figures/bridge-flow.svg)
 
 ## What's next
 

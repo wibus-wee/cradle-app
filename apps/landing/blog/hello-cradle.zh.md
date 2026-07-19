@@ -2,6 +2,8 @@
 title: Cradle 开发版开放测试
 date: 2026-06-18
 cover: /blog/covers/hello-cradle.svg
+tags: Announcement
+author: Cradle Team
 description: 经过约两个月的开发，Cradle Desktop 的第一个公开开发版本正式开放测试。这篇文章介绍了我们想验证什么，以及当前的边界在哪里。
 ---
 

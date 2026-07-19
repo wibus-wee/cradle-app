@@ -2,6 +2,8 @@
 title: Chat 用来探索，Work 用来完成
 date: 2026-07-16
 cover: /blog/covers/cradle-work.svg
+tags: Product
+author: Cradle Team
 description: 对话擅长帮你理解问题，但真正的工作有目标、有环境、有交付。Cradle Work 是为"完成"而生的新概念。
 ---
 
@@ -21,6 +23,8 @@ Cradle Work 不依赖 issue，也不依赖看板。你随时可以创建一个 W
 
 `目标 → 隔离执行 → 评审变更 → 本地提交 → 用户确认 → Pull Request`
 
+![从目标到 Pull Request 的交付路径：agent 负责执行，确认与交付的边界属于你](/blog/figures/work-delivery.svg)
+
 Agent 先在隔离的环境里工作。完成之后，Cradle 会把变更带回一个可评审的界面，由你决定是继续修改、创建本地 commit，还是进入交付流程。推送、开 PR 这类远端动作，只会在你明确确认之后发生。
 
 这条路径里最关键的设计，是**每一步的边界都属于你**。Agent 负责执行，你负责决定什么算完成。
@@ -32,3 +36,29 @@ AI 编程工具大多把力气花在"开始"上——怎么更快地生成代码
 Work 把这一整段过程变成一个一等公民。它有状态（running、waiting、blocked、Draft PR、Ready PR、merged），有记忆，有边界。你不再是盯着聊天框等结果的人，而是站在交付路径终点做决策的人。
 
 这不是一个新的聊天模式。这是一种和 agent 一起把事情做完的方式。
+
+## 工作台，不只是分组
+
+Work 落地的同时，Workspace 也从一个"给会话分组的方式"变成了真正的工作台。
+
+你可以在右侧打开浏览器查文档、看部署、操作网页工具；可以从底部拉起 Terminal 或 TUI 面板。这些面板跟随 Workspace 的生命周期，关闭时释放资源。
+
+工作台对异常也有答案。项目目录被移动了、磁盘暂时不可用，Cradle 会把 Workspace 标记为 missing，并允许你把它 relink 到新的位置。远端 Workspace 的主机离线时，界面会明确阻止新的操作，而不是让消息静默失败。
+
+甚至 Cradle 自己的数据目录也可以搬走——数据库、日志、插件、运行时文件都能迁到另一块磁盘。迁移先走暂存副本，逐文件校验，对新位置做健康检查，确认无恙之后才切换；旧目录继续保留作为备份。
+
+## 把过去的工作带回家
+
+Work 管的是未来，Import Center 管的是过去。
+
+它会扫描你本机或已连接服务器上的 Claude Code 和 Codex 会话，重建它们所属的项目，呈现为一个可恢复的 Workspace，由你挑选要带回来的对话。导入之后，这些历史不再是散落在各个 provider 目录里的 JSONL 文件，而是可搜索、可浏览、可继续、可归档的 Cradle 会话。
+
+整个过程对外部数据只读：Cradle 先创建自己的副本，对副本做大小和 SHA-256 校验，然后从副本投影会话历史，原始的 Claude 和 Codex 数据目录一个字节都不会被修改。
+
+## 理解 agent 工作的成本
+
+当 agent 完成的不再是一段对话而是一件完整的工作，一个新的问题出现了：这件工作花了多少？
+
+Usage 现在提供两个互补的视角：本机 Claude 和 Codex 归档里记录的设备级权威总量，以及 Cradle 能直接归因到具体 run 和会话的活动。主会话和它所有子 agent 的消耗会聚合成一棵完整的会话树。Prompt、Completion、Cache、Reasoning 各类 token 和估算成本，可以按时间、模型、会话逐一检视。
+
+完成工作的前提是理解工作——包括它的成本。

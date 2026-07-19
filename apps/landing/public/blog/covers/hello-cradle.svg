@@ -1,34 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
   <defs>
-    <radialGradient id="glow" cx="50%" cy="62%" r="55%">
-      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.14"/>
+    <radialGradient id="warm" cx="50%" cy="64%" r="52%">
+      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="#ffe9c2" stop-opacity="0.05"/>
       <stop offset="100%" stop-color="#ffe9c2" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="arc" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f4f4f5" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#f4f4f5" stop-opacity="0.08"/>
+    <radialGradient id="cool" cx="18%" cy="18%" r="45%">
+      <stop offset="0%" stop-color="#8a8f9c" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#8a8f9c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arcFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4f4f5" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#f4f4f5" stop-opacity="0.06"/>
     </linearGradient>
+    <radialGradient id="ballHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#ffe9c2" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="1000" height="600" fill="#0d0d10"/>
-  <rect width="1000" height="600" fill="url(#glow)"/>
-  <g fill="none" stroke="#ffffff" stroke-opacity="0.05">
-    <path d="M0 150 H1000 M0 300 H1000 M0 450 H1000"/>
-    <path d="M250 0 V600 M500 0 V600 M750 0 V600"/>
+  <rect width="1600" height="1000" fill="#0b0b0e"/>
+  <rect width="1600" height="1000" fill="url(#cool)"/>
+  <rect width="1600" height="1000" fill="url(#warm)"/>
+  <!-- fine grid -->
+  <g stroke="#ffffff" stroke-opacity="0.045" stroke-width="1">
+    <path d="M0 250 H1600 M0 500 H1600 M0 750 H1600"/>
+    <path d="M400 0 V1000 M800 0 V1000 M1200 0 V1000"/>
   </g>
-  <!-- cradle: nested hanging arcs -->
-  <g fill="none" stroke="url(#arc)" stroke-width="1.5">
-    <circle cx="500" cy="372" r="180" stroke-dasharray="565 566" stroke-dashoffset="283"/>
-    <circle cx="500" cy="372" r="132" stroke-dasharray="414 416" stroke-dashoffset="207" stroke-opacity="0.7"/>
-    <circle cx="500" cy="372" r="84" stroke-dasharray="264 265" stroke-dashoffset="132" stroke-opacity="0.45"/>
+  <!-- nested cradle arcs -->
+  <g fill="none" stroke="url(#arcFade)">
+    <circle cx="800" cy="620" r="330" stroke-width="1.5" stroke-dasharray="1037 1037" stroke-dashoffset="518"/>
+    <circle cx="800" cy="620" r="258" stroke-width="1.25" stroke-dasharray="810 811" stroke-dashoffset="405" stroke-opacity="0.75"/>
+    <circle cx="800" cy="620" r="186" stroke-width="1.25" stroke-dasharray="584 585" stroke-dashoffset="292" stroke-opacity="0.5"/>
+    <circle cx="800" cy="620" r="114" stroke-width="1" stroke-dasharray="358 359" stroke-dashoffset="179" stroke-opacity="0.3"/>
   </g>
-  <!-- suspended weight -->
-  <line x1="500" y1="192" x2="500" y2="340" stroke="#f4f4f5" stroke-opacity="0.35" stroke-width="1.5"/>
-  <circle cx="500" cy="356" r="16" fill="#f4f4f5" fill-opacity="0.9"/>
-  <circle cx="500" cy="356" r="16" fill="none" stroke="#ffe9c2" stroke-opacity="0.5" stroke-width="6" stroke-linecap="round" stroke-dasharray="20 81"/>
-  <!-- resting dots on the baseline -->
-  <g fill="#f4f4f5" fill-opacity="0.25">
-    <circle cx="320" cy="372" r="3"/>
-    <circle cx="680" cy="372" r="3"/>
+  <!-- baseline -->
+  <line x1="380" y1="620" x2="1220" y2="620" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+  <!-- suspension -->
+  <line x1="800" y1="290" x2="800" y2="560" stroke="#f4f4f5" stroke-opacity="0.35" stroke-width="1.5"/>
+  <!-- ball with halo -->
+  <circle cx="800" cy="590" r="72" fill="url(#ballHalo)"/>
+  <circle cx="800" cy="590" r="26" fill="#f4f4f5"/>
+  <circle cx="800" cy="590" r="26" fill="none" stroke="#ffe9c2" stroke-opacity="0.6" stroke-width="8" stroke-linecap="round" stroke-dasharray="34 130"/>
+  <!-- resting dots -->
+  <g fill="#f4f4f5" fill-opacity="0.28">
+    <circle cx="470" cy="620" r="4"/>
+    <circle cx="1130" cy="620" r="4"/>
   </g>
-  <line x1="240" y1="372" x2="760" y2="372" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <!-- drifting particles -->
+  <g fill="#ffe9c2" fill-opacity="0.35">
+    <circle cx="560" cy="380" r="2.5"/>
+    <circle cx="1010" cy="330" r="2"/>
+    <circle cx="680" cy="250" r="2"/>
+  </g>
+  <!-- vignette -->
+  <rect width="1600" height="1000" fill="none" stroke="#000000" stroke-opacity="0.35" stroke-width="2"/>
 </svg>

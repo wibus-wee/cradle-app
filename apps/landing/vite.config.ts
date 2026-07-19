@@ -19,6 +19,8 @@ interface BlogEntry {
   title: Record<string, string>
   description: Record<string, string>
   cover?: string
+  author?: string
+  tags: string[]
   languages: string[]
 }
 
@@ -104,7 +106,7 @@ function blogIndexPlugin(): Plugin {
       }
 
       // Group files by slug: slug.zh.md / slug.en.md → slug
-      const postMap = new Map<string, { languages: string[], title: Record<string, string>, description: Record<string, string>, date: string, cover?: string }>()
+      const postMap = new Map<string, { languages: string[], title: Record<string, string>, description: Record<string, string>, date: string, cover?: string, author?: string, tags: string[] }>()
 
       for (const file of files) {
         const content = readFileSync(join(blogDir, file), 'utf-8')
@@ -116,6 +118,7 @@ function blogIndexPlugin(): Plugin {
         if (!nameMatch) { continue }
         const slug = nameMatch[1]
         const locale = nameMatch[2]
+        const tags = meta.tags ? meta.tags.split(',').map(t => t.trim()).filter(Boolean) : []
 
         const existing = postMap.get(slug)
         if (existing) {
@@ -123,6 +126,8 @@ function blogIndexPlugin(): Plugin {
           existing.title[locale] = meta.title
           existing.description[locale] = meta.description || ''
           if (meta.cover) { existing.cover = meta.cover }
+          if (meta.author) { existing.author = meta.author }
+          if (tags.length > 0) { existing.tags = tags }
         }
         else {
           postMap.set(slug, {
@@ -131,6 +136,8 @@ function blogIndexPlugin(): Plugin {
             title: { [locale]: meta.title },
             description: { [locale]: meta.description || '' },
             cover: meta.cover || undefined,
+            author: meta.author || undefined,
+            tags,
           })
         }
 
@@ -142,6 +149,33 @@ function blogIndexPlugin(): Plugin {
         .sort((a, b) => b.date.localeCompare(a.date))
 
       writeFileSync(join(outDir, 'index.json'), JSON.stringify(entries, null, 2))
+
+      // RSS feed (English titles preferred, fall back to whatever exists)
+      const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const items = entries.map((e) => {
+        const title = e.title.en || Object.values(e.title)[0] || e.slug
+        const description = e.description.en || Object.values(e.description)[0] || ''
+        return [
+          '    <item>',
+          `      <title>${escapeXml(title)}</title>`,
+          `      <link>https://cradle.app/#/blog/${e.slug}</link>`,
+          `      <guid>https://cradle.app/#/blog/${e.slug}</guid>`,
+          `      <pubDate>${new Date(`${e.date}T00:00:00Z`).toUTCString()}</pubDate>`,
+          `      <description>${escapeXml(description)}</description>`,
+          '    </item>',
+        ].join('\n')
+      }).join('\n')
+      const rss = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Cradle Blog</title>
+    <link>https://cradle.app/#/blog</link>
+    <description>Longer-form writing about what we're building and why.</description>
+${items}
+  </channel>
+</rss>
+`
+      writeFileSync(join(outDir, 'rss.xml'), rss)
     },
   }
 }

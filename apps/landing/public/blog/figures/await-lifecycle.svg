@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 800">
+  <defs>
+    <radialGradient id="cool" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#8a8f9c" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#8a8f9c" stop-opacity="0"/>
+    </radialGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#a1a1aa" fill-opacity="0.6"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="800" fill="#0b0b0e"/>
+  <rect width="1600" height="800" fill="url(#cool)"/>
+  <!-- cycle arcs -->
+  <g fill="none" stroke-width="2">
+    <path d="M800 190 A 210 210 0 0 1 1010 400" stroke="#f4f4f5" stroke-opacity="0.35" marker-end="url(#arrow)"/>
+    <path d="M1010 400 A 210 210 0 0 1 800 610" stroke="#f4f4f5" stroke-opacity="0.2" marker-end="url(#arrow)"/>
+    <path d="M800 610 A 210 210 0 0 1 590 400" stroke="#f4f4f5" stroke-opacity="0.2" marker-end="url(#arrow)"/>
+    <path d="M590 400 A 210 210 0 0 1 800 190" stroke="#ffe9c2" stroke-opacity="0.5" marker-end="url(#arrow)"/>
+  </g>
+  <!-- stage nodes -->
+  <g font-family="ui-monospace, monospace" font-size="19" text-anchor="middle">
+    <circle cx="800" cy="190" r="34" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="2"/>
+    <text x="800" y="197" fill="#f4f4f5">run</text>
+
+    <circle cx="1010" cy="400" r="34" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="2"/>
+    <text x="1010" y="396" fill="#f4f4f5">set</text>
+    <text x="1010" y="420" fill="#f4f4f5" font-size="15">condition</text>
+
+    <circle cx="800" cy="610" r="34" fill="#0b0b0e" stroke="#ffe9c2" stroke-opacity="0.7" stroke-width="2"/>
+    <line x1="790" y1="600" x2="790" y2="620" stroke="#ffe9c2" stroke-width="4" stroke-linecap="round"/>
+    <line x1="810" y1="600" x2="810" y2="620" stroke="#ffe9c2" stroke-width="4" stroke-linecap="round"/>
+    <text x="800" y="678" fill="#a1a1aa" font-size="16">suspended</text>
+
+    <circle cx="590" cy="400" r="34" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="2"/>
+    <text x="590" y="396" fill="#f4f4f5">resume</text>
+    <text x="590" y="420" fill="#f4f4f5" font-size="15">on fire</text>
+  </g>
+  <!-- center annotation -->
+  <g font-family="ui-monospace, monospace" font-size="17" fill="#6b6b73" text-anchor="middle">
+    <text x="800" y="392">context, objective,</text>
+    <text x="800" y="418">progress preserved</text>
+  </g>
+  <!-- event trigger -->
+  <g font-family="ui-monospace, monospace" font-size="15" fill="#6b6b73" text-anchor="middle">
+    <circle cx="420" cy="240" r="7" fill="none" stroke="#f4f4f5" stroke-opacity="0.4" stroke-width="2"/>
+    <text x="420" y="210">CI passes / review lands / file changes</text>
+    <line x1="432" y1="252" x2="560" y2="372" stroke="#f4f4f5" stroke-opacity="0.2" stroke-width="1.5" stroke-dasharray="3 6"/>
+  </g>
+</svg>

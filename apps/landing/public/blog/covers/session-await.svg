@@ -1,37 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
   <defs>
-    <radialGradient id="glow" cx="50%" cy="50%" r="55%">
+    <radialGradient id="cool" cx="50%" cy="52%" r="55%">
       <stop offset="0%" stop-color="#8a8f9c" stop-opacity="0.16"/>
       <stop offset="100%" stop-color="#8a8f9c" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="pauseGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffe9c2" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="1000" height="600" fill="#0d0d10"/>
-  <rect width="1000" height="600" fill="url(#glow)"/>
-  <g fill="none" stroke="#ffffff" stroke-opacity="0.05">
-    <path d="M0 150 H1000 M0 300 H1000 M0 450 H1000"/>
-    <path d="M250 0 V600 M500 0 V600 M750 0 V600"/>
+  <rect width="1600" height="1000" fill="#0b0b0e"/>
+  <rect width="1600" height="1000" fill="url(#cool)"/>
+  <g stroke="#ffffff" stroke-opacity="0.045" stroke-width="1">
+    <path d="M0 250 H1600 M0 500 H1600 M0 750 H1600"/>
+    <path d="M400 0 V1000 M800 0 V1000 M1200 0 V1000"/>
   </g>
   <!-- timeline -->
-  <line x1="240" y1="300" x2="760" y2="300" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1"/>
-  <!-- active segment before the wait -->
-  <line x1="240" y1="300" x2="430" y2="300" stroke="#f4f4f5" stroke-opacity="0.45" stroke-width="1.5"/>
-  <circle cx="240" cy="300" r="6" fill="#f4f4f5" fill-opacity="0.9"/>
+  <line x1="320" y1="520" x2="1280" y2="520" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <line x1="320" y1="520" x2="680" y2="520" stroke="#f4f4f5" stroke-opacity="0.45" stroke-width="2"/>
+  <circle cx="320" cy="520" r="10" fill="#f4f4f5"/>
   <!-- pause mark -->
-  <g>
-    <circle cx="500" cy="300" r="34" fill="none" stroke="#f4f4f5" stroke-opacity="0.3" stroke-width="1.5"/>
-    <line x1="492" y1="288" x2="492" y2="312" stroke="#ffe9c2" stroke-opacity="0.95" stroke-width="3" stroke-linecap="round"/>
-    <line x1="508" y1="288" x2="508" y2="312" stroke="#ffe9c2" stroke-opacity="0.95" stroke-width="3" stroke-linecap="round"/>
-  </g>
-  <!-- condition event ticking -->
-  <circle cx="660" cy="300" r="6" fill="#0d0d10" stroke="#f4f4f5" stroke-opacity="0.4" stroke-width="1.5"/>
-  <!-- resume checkmark -->
-  <g>
-    <circle cx="760" cy="300" r="18" fill="none" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="1.5"/>
-    <path d="M752 300 l6 6 l11 -12" fill="none" stroke="#f4f4f5" stroke-opacity="0.9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <circle cx="800" cy="520" r="92" fill="url(#pauseGlow)"/>
+  <circle cx="800" cy="520" r="58" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.35" stroke-width="2"/>
+  <line x1="786" y1="498" x2="786" y2="542" stroke="#ffe9c2" stroke-width="6" stroke-linecap="round"/>
+  <line x1="814" y1="498" x2="814" y2="542" stroke="#ffe9c2" stroke-width="6" stroke-linecap="round"/>
+  <!-- condition event -->
+  <circle cx="1060" cy="520" r="9" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.4" stroke-width="2"/>
+  <circle cx="1060" cy="520" r="20" fill="none" stroke="#f4f4f5" stroke-opacity="0.12" stroke-width="1.5"/>
+  <!-- resume check -->
+  <circle cx="1280" cy="520" r="30" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="2"/>
+  <path d="M1267 520 l9 9 l18 -19" fill="none" stroke="#f4f4f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- suspended zzz -->
-  <g fill="#f4f4f5" fill-opacity="0.3" font-family="monospace" font-size="20">
-    <text x="528" y="252">z</text>
-    <text x="542" y="236" font-size="15">z</text>
+  <g fill="#f4f4f5" fill-opacity="0.3" font-family="monospace">
+    <text x="858" y="448" font-size="34">z</text>
+    <text x="884" y="416" font-size="25">z</text>
+    <text x="906" y="390" font-size="18">z</text>
+  </g>
+  <!-- particles -->
+  <g fill="#8a8f9c" fill-opacity="0.4">
+    <circle cx="480" cy="380" r="2.5"/>
+    <circle cx="1180" cy="400" r="2.5"/>
   </g>
 </svg>

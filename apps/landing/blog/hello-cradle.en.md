@@ -2,6 +2,8 @@
 title: Cradle dev builds are open for testing
 date: 2026-06-18
 cover: /blog/covers/hello-cradle.svg
+tags: Announcement
+author: Cradle Team
 description: After roughly two months of development, the first public dev build of Cradle Desktop is available. Here's what we're testing and where the current edges are.
 ---
 

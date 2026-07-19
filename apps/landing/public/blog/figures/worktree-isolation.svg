@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 800">
+  <defs>
+    <radialGradient id="warm" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#ffe9c2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="800" fill="#0b0b0e"/>
+  <rect width="1600" height="800" fill="url(#warm)"/>
+  <!-- four isolated worktrees -->
+  <g font-family="ui-monospace, monospace" font-size="17">
+    <!-- lane 1 -->
+    <rect x="140" y="150" width="1320" height="120" rx="16" fill="none" stroke="#ffe9c2" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="5 6"/>
+    <text x="180" y="200" fill="#6b6b73">worktree · task-a</text>
+    <line x1="180" y1="232" x2="900" y2="232" stroke="#ffe9c2" stroke-opacity="0.4" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="915" cy="232" r="10" fill="#ffe9c2"/>
+    <text x="1400" y="222" fill="#a1a1aa" text-anchor="end">running</text>
+
+    <!-- lane 2 -->
+    <rect x="140" y="310" width="1320" height="120" rx="16" fill="none" stroke="#f4f4f5" stroke-opacity="0.18" stroke-width="1.5" stroke-dasharray="5 6"/>
+    <text x="180" y="360" fill="#6b6b73">worktree · task-b</text>
+    <line x1="180" y1="392" x2="640" y2="392" stroke="#f4f4f5" stroke-opacity="0.25" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="655" cy="392" r="10" fill="#f4f4f5" fill-opacity="0.9"/>
+    <text x="1400" y="382" fill="#a1a1aa" text-anchor="end">running</text>
+
+    <!-- lane 3 -->
+    <rect x="140" y="470" width="1320" height="120" rx="16" fill="none" stroke="#f4f4f5" stroke-opacity="0.18" stroke-width="1.5" stroke-dasharray="5 6"/>
+    <text x="180" y="520" fill="#6b6b73">worktree · task-c</text>
+    <line x1="180" y1="552" x2="1040" y2="552" stroke="#f4f4f5" stroke-opacity="0.25" stroke-width="3" stroke-linecap="round"/>
+    <line x1="1046" y1="544" x2="1046" y2="560" stroke="#ffe9c2" stroke-width="3" stroke-linecap="round"/>
+    <line x1="1062" y1="544" x2="1062" y2="560" stroke="#ffe9c2" stroke-width="3" stroke-linecap="round"/>
+    <text x="1400" y="542" fill="#a1a1aa" text-anchor="end">waiting</text>
+
+    <!-- lane 4 -->
+    <rect x="140" y="630" width="1320" height="120" rx="16" fill="none" stroke="#8a8f9c" stroke-opacity="0.3" stroke-width="1.5" stroke-dasharray="5 6"/>
+    <text x="180" y="680" fill="#6b6b73">worktree · task-d</text>
+    <line x1="180" y1="712" x2="430" y2="712" stroke="#8a8f9c" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="445" cy="712" r="10" fill="#8a8f9c"/>
+    <text x="1400" y="702" fill="#a1a1aa" text-anchor="end">running</text>
+  </g>
+  <!-- caption -->
+  <text x="800" y="100" font-family="ui-monospace, monospace" font-size="16" fill="#6b6b73" text-anchor="middle">session-level isolation — no two agents touch the same files</text>
+</svg>

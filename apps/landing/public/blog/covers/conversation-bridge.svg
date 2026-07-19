@@ -1,36 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
   <defs>
-    <radialGradient id="glowL" cx="22%" cy="50%" r="40%">
-      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.12"/>
+    <radialGradient id="glowL" cx="24%" cy="56%" r="42%">
+      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.14"/>
       <stop offset="100%" stop-color="#ffe9c2" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="glowR" cx="78%" cy="50%" r="40%">
+    <radialGradient id="glowR" cx="76%" cy="56%" r="42%">
       <stop offset="0%" stop-color="#8a8f9c" stop-opacity="0.16"/>
       <stop offset="100%" stop-color="#8a8f9c" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1000" height="600" fill="#0d0d10"/>
-  <rect width="1000" height="600" fill="url(#glowL)"/>
-  <rect width="1000" height="600" fill="url(#glowR)"/>
-  <g fill="none" stroke="#ffffff" stroke-opacity="0.05">
-    <path d="M0 150 H1000 M0 300 H1000 M0 450 H1000"/>
-    <path d="M250 0 V600 M500 0 V600 M750 0 V600"/>
+  <rect width="1600" height="1000" fill="#0b0b0e"/>
+  <rect width="1600" height="1000" fill="url(#glowL)"/>
+  <rect width="1600" height="1000" fill="url(#glowR)"/>
+  <g stroke="#ffffff" stroke-opacity="0.045" stroke-width="1">
+    <path d="M0 250 H1600 M0 500 H1600 M0 750 H1600"/>
+    <path d="M400 0 V1000 M800 0 V1000 M1200 0 V1000"/>
   </g>
-  <!-- bridge arc between two endpoints -->
-  <path d="M220 360 C 360 180, 640 180, 780 360" fill="none" stroke="#f4f4f5" stroke-opacity="0.4" stroke-width="1.5"/>
-  <path d="M220 360 C 360 420, 640 420, 780 360" fill="none" stroke="#f4f4f5" stroke-opacity="0.12" stroke-width="1.5"/>
-  <!-- message packets travelling the arc -->
-  <circle cx="360" cy="271" r="4" fill="#ffe9c2" fill-opacity="0.85"/>
-  <circle cx="500" cy="238" r="4" fill="#f4f4f5" fill-opacity="0.7"/>
-  <circle cx="640" cy="271" r="4" fill="#8a8f9c" fill-opacity="0.9"/>
-  <!-- endpoints: desktop node / conversation node -->
+  <!-- bridge arcs -->
+  <path d="M380 580 C 600 320, 1000 320, 1220 580" fill="none" stroke="#f4f4f5" stroke-opacity="0.4" stroke-width="2"/>
+  <path d="M380 580 C 600 690, 1000 690, 1220 580" fill="none" stroke="#f4f4f5" stroke-opacity="0.12" stroke-width="2"/>
+  <path d="M380 580 C 600 250, 1000 250, 1220 580" fill="none" stroke="#f4f4f5" stroke-opacity="0.1" stroke-width="1.5" stroke-dasharray="3 8"/>
+  <!-- packets -->
+  <circle cx="575" cy="440" r="7" fill="#ffe9c2"/>
+  <circle cx="575" cy="440" r="16" fill="none" stroke="#ffe9c2" stroke-opacity="0.3" stroke-width="2"/>
+  <circle cx="800" cy="382" r="6" fill="#f4f4f5" fill-opacity="0.8"/>
+  <circle cx="1025" cy="440" r="6" fill="#8a8f9c"/>
+  <!-- endpoints -->
   <g>
-    <rect x="188" y="328" width="64" height="64" rx="14" fill="none" stroke="#f4f4f5" stroke-opacity="0.55" stroke-width="1.5"/>
-    <circle cx="220" cy="360" r="8" fill="#f4f4f5" fill-opacity="0.9"/>
+    <rect x="314" y="514" width="132" height="132" rx="30" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="2"/>
+    <circle cx="380" cy="580" r="15" fill="#f4f4f5"/>
+    <circle cx="380" cy="580" r="34" fill="none" stroke="#ffe9c2" stroke-opacity="0.35" stroke-width="2"/>
   </g>
   <g>
-    <rect x="748" y="328" width="64" height="64" rx="14" fill="none" stroke="#f4f4f5" stroke-opacity="0.55" stroke-width="1.5"/>
-    <path d="M768 356 h32 M768 366 h20" stroke="#f4f4f5" stroke-opacity="0.9" stroke-width="4" stroke-linecap="round"/>
+    <rect x="1154" y="514" width="132" height="132" rx="30" fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.5" stroke-width="2"/>
+    <path d="M1192 570 h76 M1192 592 h48" stroke="#f4f4f5" stroke-opacity="0.9" stroke-width="8" stroke-linecap="round"/>
   </g>
-  <line x1="140" y1="424" x2="860" y2="424" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <!-- ground line + reflections -->
+  <line x1="240" y1="700" x2="1360" y2="700" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <g stroke="#f4f4f5" stroke-opacity="0.08" stroke-width="1.5">
+    <line x1="380" y1="660" x2="380" y2="700"/>
+    <line x1="1220" y1="660" x2="1220" y2="700"/>
+  </g>
+  <!-- particles -->
+  <g fill="#f4f4f5" fill-opacity="0.25">
+    <circle cx="520" cy="300" r="2.5"/>
+    <circle cx="900" cy="260" r="2"/>
+    <circle cx="1120" cy="330" r="2.5"/>
+  </g>
 </svg>

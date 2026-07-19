@@ -14,7 +14,11 @@
       "en": "Conversations are great for understanding problems, but real work has an objective, an environment, and a delivery. Cradle Work is a new concept built for finishing.",
       "zh": "对话擅长帮你理解问题，但真正的工作有目标、有环境、有交付。Cradle Work 是为\"完成\"而生的新概念。"
     },
-    "cover": "/blog/covers/cradle-work.svg"
+    "cover": "/blog/covers/cradle-work.svg",
+    "author": "Cradle Team",
+    "tags": [
+      "Product"
+    ]
   },
   {
     "slug": "session-await",
@@ -31,7 +35,11 @@
       "en": "Your agent pushed a PR and it's waiting for CI — but you don't have to wait with it. Session Await suspends a session on a condition and resumes it the moment the condition fires.",
       "zh": "Agent 推完 PR 之后在等 CI——但你不必陪着等。Session Await 让会话挂起在条件上，条件满足时自动继续。"
     },
-    "cover": "/blog/covers/session-await.svg"
+    "cover": "/blog/covers/session-await.svg",
+    "author": "Cradle Team",
+    "tags": [
+      "Engineering"
+    ]
   },
   {
     "slug": "multi-agent-orchestration",
@@ -48,7 +56,11 @@
       "en": "Love Claude Code? Run four of them. Cradle orchestrates every agent as a parallel worker — each with its own task, kanban card, and live status, none of them tripping over each other.",
       "zh": "喜欢 Claude Code？那就跑四个。Cradle 把每个 agent 编排成并行的工作者——各自有任务、有看板卡片、有实时状态，互不干扰。"
     },
-    "cover": "/blog/covers/multi-agent.svg"
+    "cover": "/blog/covers/multi-agent.svg",
+    "author": "Cradle Team",
+    "tags": [
+      "Engineering"
+    ]
   },
   {
     "slug": "conversation-bridge",
@@ -65,7 +77,11 @@
       "en": "Conversation Bridge connects external conversation platforms to Cradle Chat Sessions, so work doesn't have to stop at the desktop window. The first Bridge plugin supports Slack.",
       "zh": "Conversation Bridge 把外部对话平台接入 Cradle 的 Chat Session，让工作不必停留在桌面窗口里。第一个 Bridge 插件支持 Slack。"
     },
-    "cover": "/blog/covers/conversation-bridge.svg"
+    "cover": "/blog/covers/conversation-bridge.svg",
+    "author": "Cradle Team",
+    "tags": [
+      "Product"
+    ]
   },
   {
     "slug": "hello-cradle",
@@ -82,6 +98,10 @@
       "en": "After roughly two months of development, the first public dev build of Cradle Desktop is available. Here's what we're testing and where the current edges are.",
       "zh": "经过约两个月的开发，Cradle Desktop 的第一个公开开发版本正式开放测试。这篇文章介绍了我们想验证什么，以及当前的边界在哪里。"
     },
-    "cover": "/blog/covers/hello-cradle.svg"
+    "cover": "/blog/covers/hello-cradle.svg",
+    "author": "Cradle Team",
+    "tags": [
+      "Announcement"
+    ]
   }
 ]

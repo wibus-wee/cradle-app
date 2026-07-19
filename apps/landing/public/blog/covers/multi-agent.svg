@@ -1,40 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
   <defs>
-    <radialGradient id="glow" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.1"/>
+    <radialGradient id="warm" cx="50%" cy="50%" r="58%">
+      <stop offset="0%" stop-color="#ffe9c2" stop-opacity="0.11"/>
       <stop offset="100%" stop-color="#ffe9c2" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1000" height="600" fill="#0d0d10"/>
-  <rect width="1000" height="600" fill="url(#glow)"/>
-  <g fill="none" stroke="#ffffff" stroke-opacity="0.05">
-    <path d="M0 150 H1000 M0 300 H1000 M0 450 H1000"/>
-    <path d="M250 0 V600 M500 0 V600 M750 0 V600"/>
+  <rect width="1600" height="1000" fill="#0b0b0e"/>
+  <rect width="1600" height="1000" fill="url(#warm)"/>
+  <g stroke="#ffffff" stroke-opacity="0.045" stroke-width="1">
+    <path d="M0 250 H1600 M0 500 H1600 M0 750 H1600"/>
+    <path d="M400 0 V1000 M800 0 V1000 M1200 0 V1000"/>
   </g>
-  <!-- four parallel lanes -->
-  <g stroke-width="1.5">
-    <line x1="200" y1="190" x2="800" y2="190" stroke="#f4f4f5" stroke-opacity="0.4"/>
-    <line x1="200" y1="263" x2="800" y2="263" stroke="#f4f4f5" stroke-opacity="0.28"/>
-    <line x1="200" y1="337" x2="800" y2="337" stroke="#f4f4f5" stroke-opacity="0.28"/>
-    <line x1="200" y1="410" x2="800" y2="410" stroke="#f4f4f5" stroke-opacity="0.28"/>
+  <!-- four lanes -->
+  <g stroke-width="2">
+    <line x1="340" y1="290" x2="1260" y2="290" stroke="#f4f4f5" stroke-opacity="0.4"/>
+    <line x1="340" y1="430" x2="1260" y2="430" stroke="#f4f4f5" stroke-opacity="0.26"/>
+    <line x1="340" y1="570" x2="1260" y2="570" stroke="#f4f4f5" stroke-opacity="0.26"/>
+    <line x1="340" y1="710" x2="1260" y2="710" stroke="#f4f4f5" stroke-opacity="0.26"/>
+  </g>
+  <!-- progress trails -->
+  <g stroke-width="5" stroke-linecap="round">
+    <line x1="340" y1="290" x2="890" y2="290" stroke="#ffe9c2" stroke-opacity="0.25"/>
+    <line x1="340" y1="430" x2="660" y2="430" stroke="#f4f4f5" stroke-opacity="0.16"/>
+    <line x1="340" y1="570" x2="1020" y2="570" stroke="#f4f4f5" stroke-opacity="0.16"/>
+    <line x1="340" y1="710" x2="520" y2="710" stroke="#8a8f9c" stroke-opacity="0.3"/>
   </g>
   <!-- workers -->
-  <circle cx="560" cy="190" r="8" fill="#ffe9c2" fill-opacity="0.95"/>
-  <circle cx="420" cy="263" r="7" fill="#f4f4f5" fill-opacity="0.85"/>
-  <circle cx="640" cy="337" r="7" fill="#f4f4f5" fill-opacity="0.85"/>
-  <circle cx="330" cy="410" r="7" fill="#8a8f9c" fill-opacity="0.95"/>
-  <!-- trailing progress -->
-  <g stroke-width="3" stroke-linecap="round">
-    <line x1="200" y1="190" x2="548" y2="190" stroke="#ffe9c2" stroke-opacity="0.25"/>
-    <line x1="200" y1="263" x2="408" y2="263" stroke="#f4f4f5" stroke-opacity="0.18"/>
-    <line x1="200" y1="337" x2="628" y2="337" stroke="#f4f4f5" stroke-opacity="0.18"/>
-    <line x1="200" y1="410" x2="318" y2="410" stroke="#8a8f9c" stroke-opacity="0.3"/>
+  <circle cx="905" cy="290" r="14" fill="#ffe9c2"/>
+  <circle cx="905" cy="290" r="30" fill="none" stroke="#ffe9c2" stroke-opacity="0.25" stroke-width="2"/>
+  <circle cx="675" cy="430" r="12" fill="#f4f4f5" fill-opacity="0.9"/>
+  <circle cx="1035" cy="570" r="12" fill="#f4f4f5" fill-opacity="0.9"/>
+  <circle cx="535" cy="710" r="12" fill="#8a8f9c"/>
+  <!-- lane capsules -->
+  <g fill="#0b0b0e" stroke="#f4f4f5" stroke-opacity="0.35" stroke-width="2">
+    <rect x="282" y="272" width="36" height="36" rx="11"/>
+    <rect x="282" y="412" width="36" height="36" rx="11"/>
+    <rect x="282" y="552" width="36" height="36" rx="11"/>
+    <rect x="282" y="692" width="36" height="36" rx="11"/>
   </g>
-  <!-- lane endpoints -->
-  <g fill="none" stroke="#f4f4f5" stroke-opacity="0.35" stroke-width="1.5">
-    <rect x="168" y="178" width="24" height="24" rx="7"/>
-    <rect x="168" y="251" width="24" height="24" rx="7"/>
-    <rect x="168" y="325" width="24" height="24" rx="7"/>
-    <rect x="168" y="398" width="24" height="24" rx="7"/>
+  <!-- finish flags -->
+  <g stroke="#f4f4f5" stroke-opacity="0.25" stroke-width="2" fill="none">
+    <line x1="1260" y1="260" x2="1260" y2="740"/>
+  </g>
+  <!-- particles -->
+  <g fill="#f4f4f5" fill-opacity="0.22">
+    <circle cx="760" cy="200" r="2.5"/>
+    <circle cx="1120" cy="480" r="2.5"/>
+    <circle cx="480" cy="620" r="2"/>
   </g>
 </svg>
