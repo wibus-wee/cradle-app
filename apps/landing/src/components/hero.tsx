@@ -2,8 +2,8 @@
  * Hero — full-viewport intro over the FoldGradient shader.
  *
  * Type-led and minimal (Raycast / Cursor / Perplexity feel): eyebrow pill,
- * tight-tracking headline, one-line value prop, two CTAs, footnote, scroll
- * cue. The shader is the hero's signature visual; no faux product mock.
+ * tight-tracking headline, one-line value prop, multi-platform download CTAs.
+ * The shader is the hero's signature visual; no faux product mock.
  * Below the hero the page is solid var(--bg), so the shader never shows
  * through content.
  *
@@ -11,12 +11,11 @@
  * user prefers reduced motion — no GPU spent animating an offscreen canvas.
  */
 
-import { Download } from 'lucide-react'
 import { motion } from 'motion/react'
-import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
 import FoldGradient from '../foldGradient'
+import { DownloadActions } from './download-cta'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -181,76 +180,11 @@ export function Hero() {
           issues, and tools, all in one focused desktop workspace.
         </p>
 
-        {/* CTAs */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-          }}
-        >
-          <motion.a
-            href="https://github.com/wibus-wee/cradle-app/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            style={primaryButtonStyle}
-          >
-            <Download style={{ width: 14, height: 14 }} />
-            Download for macOS
-          </motion.a>
-          <motion.a
-            href="https://github.com/wibus-wee/cradle-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            style={ghostButtonStyle}
-          >
-            View on GitHub
-          </motion.a>
+        {/* CTAs — multi-platform, with Motion blur hover + platform rail */}
+        <div style={{ marginTop: 0 }}>
+          <DownloadActions />
         </div>
-
-        {/* Footnote */}
-        <span
-          style={{
-            marginTop: 40,
-            fontSize: 11,
-            color: 'var(--text-muted)',
-          }}
-        >
-          macOS 14+ · Apple Silicon & Intel · Free forever
-        </span>
       </motion.div>
     </section>
   )
-}
-
-const primaryButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '11px 22px',
-  background: 'var(--text)',
-  color: 'var(--bg)',
-  fontWeight: 600,
-  fontSize: 13,
-  textDecoration: 'none',
-  borderRadius: 8,
-}
-
-const ghostButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '11px 22px',
-  background: 'transparent',
-  color: 'var(--text-secondary)',
-  border: '1px solid var(--border)',
-  fontWeight: 500,
-  fontSize: 13,
-  textDecoration: 'none',
-  borderRadius: 8,
 }

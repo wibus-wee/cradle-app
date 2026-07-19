@@ -6,9 +6,10 @@
  * toggle.
  */
 
-import { Download } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
+
+import { NavDownloadButton } from './download-cta'
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false)
@@ -81,39 +82,7 @@ export function Nav() {
           <NavLink href="#/changelog">Changelog</NavLink>
         </div>
 
-        <a
-          href="https://github.com/wibus-wee/cradle-app/releases"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            height: 30,
-            padding: '0 14px',
-            border: '1px solid var(--border)',
-            background: 'transparent',
-            color: 'var(--text-secondary)',
-            fontSize: 13,
-            fontWeight: 500,
-            textDecoration: 'none',
-            borderRadius: 8,
-            transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--fill-hover)'
-            e.currentTarget.style.color = 'var(--text)'
-            e.currentTarget.style.borderColor = 'var(--border-strong)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--text-secondary)'
-            e.currentTarget.style.borderColor = 'var(--border)'
-          }}
-        >
-          <Download style={{ width: 13, height: 13 }} />
-          Download
-        </a>
+        <NavDownloadButton />
       </div>
     </motion.nav>
   )
