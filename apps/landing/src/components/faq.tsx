@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: 'What platforms does it run on?',
-    a: 'macOS 14+ on Apple Silicon and Intel. More platforms are on the roadmap.',
+    a: 'macOS 14+ (Apple Silicon & Intel), Windows, and Linux. Grab a build from the GitHub releases page.',
   },
   {
     q: 'How is it different from running each tool myself?',

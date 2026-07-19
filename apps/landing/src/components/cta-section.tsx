@@ -2,9 +2,9 @@
  * CTA — closing download section.
  */
 
-import { Download } from 'lucide-react'
 import { motion } from 'motion/react'
-import type { CSSProperties } from 'react'
+
+import { DownloadActions } from './download-cta'
 
 export function CTASection() {
   return (
@@ -43,72 +43,12 @@ export function CTASection() {
             margin: '0 auto 32px',
           }}
         >
-          Download Cradle and turn scattered tools into one command center.
+          Download Cradle for macOS, Windows, or Linux — and turn scattered tools
+          into one command center.
         </p>
 
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-          }}
-        >
-          <motion.a
-            href="https://github.com/wibus-wee/cradle-app/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            style={primaryButtonStyle}
-          >
-            <Download style={{ width: 14, height: 14 }} />
-            Download for macOS
-          </motion.a>
-          <motion.a
-            href="https://github.com/wibus-wee/cradle-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            style={ghostButtonStyle}
-          >
-            View on GitHub
-          </motion.a>
-        </div>
-
-        <p style={{ marginTop: 22, fontSize: 11, color: 'var(--text-muted)' }}>
-          macOS 14+ · Apple Silicon & Intel · Free forever
-        </p>
+        <DownloadActions />
       </motion.div>
     </section>
   )
-}
-
-const primaryButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '11px 22px',
-  background: 'var(--text)',
-  color: 'var(--bg)',
-  fontSize: 13,
-  fontWeight: 600,
-  textDecoration: 'none',
-  borderRadius: 8,
-}
-
-const ghostButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '11px 22px',
-  background: 'transparent',
-  color: 'var(--text-secondary)',
-  border: '1px solid var(--border)',
-  fontSize: 13,
-  fontWeight: 500,
-  textDecoration: 'none',
-  borderRadius: 8,
 }

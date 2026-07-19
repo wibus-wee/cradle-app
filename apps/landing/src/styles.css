@@ -78,6 +78,19 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
 
+/* Visually hidden but available to assistive tech (download CTA labels). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ─── Markdown prose (changelog releases + blog articles) ─────── */
 /* Scoped to `.prose` so the rest of the landing stays untouched.
    Content is curated by us, rendered from marked — no user input. */

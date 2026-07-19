@@ -53,10 +53,6 @@
   "pill.today": "Today",
   "pill.totalCost": "Total Cost",
   "pill.turns": "Turns",
-  "sessions.description": "Latest sessions with recorded token usage.",
-  "sessions.title": "Recent sessions",
-  "sessions.tokensAndTurns": "{{tokens}} · {{turns}} turns",
-  "sessions.unknownAgent": "Unknown agent",
   "streak.day": "day streak",
   "summary.estimatedCost": "estimated cost",
   "summary.totalTokens": "total tokens",
@@ -71,10 +67,5 @@
   "trend.toggleCost": "Cost",
   "trend.toggleTokens": "Tokens",
   "trend.total": "Total",
-  "trend.visibleRange": "{{start}} – {{end}}",
-  "trend.interactionHint": "Scroll to zoom · drag to pan · double-click to reset",
-  "trend.zoomControls": "Chart zoom controls",
-  "trend.zoomIn": "Zoom in",
-  "trend.zoomOut": "Zoom out",
-  "trend.resetZoom": "Reset zoom"
+  "trend.visibleRange": "{{start}} – {{end}}"
 }
