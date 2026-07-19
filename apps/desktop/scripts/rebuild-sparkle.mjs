@@ -38,18 +38,28 @@ function resolveElectronVersion() {
 }
 
 function resolveCli() {
+  // Package "exports" only expose dist entrypoints, not bin/package.json, so resolve
+  // via the main entry and walk up to the package root.
+  const candidates = []
   try {
-    return require.resolve('electron-sparkle-updater/bin/electron-sparkle-updater.js')
+    const mainEntry = require.resolve('electron-sparkle-updater')
+    candidates.push(join(dirname(mainEntry), '..', 'bin', 'electron-sparkle-updater.js'))
   }
   catch {
-    try {
-      const pkgRoot = dirname(require.resolve('electron-sparkle-updater/package.json'))
-      return join(pkgRoot, 'bin', 'electron-sparkle-updater.js')
-    }
-    catch {
-      return null
+    // fall through to path probes
+  }
+
+  candidates.push(
+    join(desktopRoot, 'node_modules', 'electron-sparkle-updater', 'bin', 'electron-sparkle-updater.js'),
+    join(desktopRoot, '..', '..', 'node_modules', 'electron-sparkle-updater', 'bin', 'electron-sparkle-updater.js'),
+  )
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate
     }
   }
+  return null
 }
 
 const cli = resolveCli()
