@@ -37,6 +37,7 @@ const SIDEBAR_MAX = 400
 
 const EMPTY_UPDATE_STATUS: DesktopUpdateStatus = {
   unsupported: true,
+  provider: null,
   currentVersion: '0.0.0',
   isCheckingForUpdates: false,
   isPreparingUpdate: false,

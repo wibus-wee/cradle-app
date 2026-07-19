@@ -23,6 +23,8 @@ runs:
           apps/desktop/release/*.exe
           apps/desktop/release/*.blockmap
           apps/desktop/release/*.yml
+          apps/desktop/release/*.xml
+          apps/desktop/release/*.delta
           apps/desktop/release/*.AppImage
           apps/desktop/release/*.deb
           apps/desktop/release/*.rpm

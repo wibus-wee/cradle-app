@@ -31,13 +31,11 @@
 - `native-appshot-codex-assets.test.ts`：覆盖 Codex temp asset reader 的 root 边界、image 类型过滤、baseline inventory 过滤，以及 observer 对新产物的识别。
 - `native-appshot-target.ts`：拥有 desktop-owned Appshot research target synthesis，在没有 renderer composer frame 时生成 composer-like destination，避免 parity probe 退回到 source-equals-destination geometry。
 - `native-services.test.ts`：覆盖 Appshot parity target synthesis，确保 research probe 的默认 destination 不等于 frontmost window fallback。
-- `update-manager.ts`：拥有 renderer-visible Desktop Updates workflow；按平台编排 macOS manifest updater 或 Windows NSIS updater 的检查、下载、安装触发和状态事件。
-- `update-manager.test.ts`：覆盖 Desktop Updates 手动 Check/Download/Apply 编排、macOS installer launch、Windows NSIS updater apply、quit hook，以及没有 prepared update 时的 apply error。
+- `update-manager.ts`：拥有 renderer-visible Desktop Updates workflow；按平台编排 macOS Sparkle updater 或 Windows NSIS updater 的检查、下载、安装触发和状态事件。
+- `update-manager.test.ts`：覆盖 Desktop Updates 手动 Check/Download/Apply 编排、macOS Sparkle install、Windows NSIS updater apply、quit hook，以及没有 prepared update 时的 apply error。
+- `macos-sparkle-update-adapter.ts`：拥有 macOS `electron-sparkle-updater` / Sparkle bridge adapter，负责 appcast 初始化、原生检查 UI、appcast 探测和 `installUpdateNow`。
+- `update-feed.ts`：拥有 shared feed URL helpers（Windows generic root / macOS appcast 推导、public Ed key 读取）。
 - `windows-update-adapter.ts`：拥有 Windows `electron-updater` adapter，把 GitHub release feed 中的 `latest.yml`、NSIS installer 和 blockmap 投影到统一的 desktop update 状态模型。
-- `update-source.ts`：拥有 desktop update manifest 读取、schema 校验、版本比较和 artifact 选择。
-- `update-source.test.ts`：覆盖 desktop update manifest URL 解析、renderer-visible 状态投影、版本比较，以及非 numeric dot version 的拒绝行为。
-- `update-installer.ts`：拥有 macOS `.app` bundle staging、bundle version 校验、detached installer script 生成、替换和 relaunch 触发。
-- `update-installer.test.ts`：覆盖 update staging plan 生成、bundle version 校验、detached installer script 关键命令、临时 `.app` bundle 替换 smoke，以及版本不匹配时拒绝安装。
 - `mac-bridge-manager.ts`：拥有 desktop-owned `cradle-mac-bridge` 子进程生命周期、NDJSON request/response 协议、hotkey event 投影、显式 parity-test synthetic hotkey helper、dev/packaged binary 路径解析，以及缺少 binary 时的非阻塞状态。
 - `mac-bridge-protocol.ts`：定义 Electron main 与 Swift Mac Bridge 共享的协议 schema，包括 `bridge.status`、权限状态、双 Command hotkey 配置、显式 synthetic both-Command parity helper、frontmost window capture、显式 `targetWindow` capture、Appshot capture/frontmost context、display/window recording 和 hotkey event。
 - `mac-screenshot-sinks.ts`：拥有 Mac Bridge screenshot 的 post-capture sink，包括保留文件、写剪贴板和可选 CleanShot URL scheme handoff。CleanShot 不是 hard dependency。
@@ -64,15 +62,19 @@
 
 ## Desktop update ownership
 
-`update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart. Check reads the platform update feed and updates status; it does not implicitly download in the manual flow. When desktop preferences enable automatic checks, the main process checks every 5 minutes in the background; when automatic download is also enabled, an available update starts downloading and broadcasts progress through Download Center task changes.
+`update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart on Windows. On macOS, Check opens Sparkle's native update UI (download is owned by Sparkle), and Restart calls `installUpdateNow` after preparing desktop runtime shutdown.
 
-Updates are available only in packaged macOS and Windows builds with `CRADLE_DESKTOP_UPDATE_URL` configured. macOS uses the Cradle-owned JSON manifest and zip replacement path; the manifest artifact is downloaded through the desktop Download Center, which performs streaming, integrity verification, task persistence, and renderer progress projection. Restart spawns the detached installer script first, shuts down the desktop-owned server runtime, replaces the current `.app` bundle, and relaunches Cradle with `open -n`. If the target app directory is not writable, the installer uses macOS administrator privileges for the replacement step.
+Updates are available only in packaged macOS and Windows builds with update feeds configured:
+- macOS: `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` (or derive `appcast.xml` from `CRADLE_DESKTOP_UPDATE_URL`) plus `SPARKLE_ED_PUBLIC_KEY`
+- Windows: `CRADLE_DESKTOP_UPDATE_URL` generic feed root containing `latest.yml`
 
-Windows uses `electron-updater` with the NSIS target. The same `CRADLE_DESKTOP_UPDATE_URL` may point at the macOS `manifest.json`; Windows strips that filename and reads `latest.yml` from the feed directory. Restart prepares the desktop runtime shutdown, then delegates quit/install/relaunch to the downloaded NSIS installer through `quitAndInstall`.
+macOS uses `electron-sparkle-updater` (Sparkle) with ad-hoc or Developer ID codesigning. Packaging re-signs the staged `.app` ad-hoc after pack so `generate_appcast` can verify the archive. Sparkle owns download/install/relaunch; Cradle does not stage zip replacement through Download Center on macOS.
+
+Windows uses `electron-updater` with the NSIS target. The same `CRADLE_DESKTOP_UPDATE_URL` may point at a feed root that also hosts `appcast.xml` / legacy `manifest.json`; Windows normalizes to the feed directory and reads `latest.yml`. Restart prepares the desktop runtime shutdown, then delegates quit/install/relaunch to the downloaded NSIS installer through `quitAndInstall`.
 
 ## Desktop Download Center ownership
 
-`download-center/` is the only Electron-main owner for ordinary desktop artifact transfer state. It persists a compact, redacted task record under Electron user data, keeps URLs/headers and artifact paths private to the main process, broadcasts task views through `download-center:task-changed`, and exposes only list/get/cancel to preload. The web Download Center feature subscribes to that projection and to the server projection; it does not create another downloader or updater-progress bridge. Windows `electron-updater` remains the transport owner for NSIS, but reports its lifecycle into this task model.
+`download-center/` is the only Electron-main owner for ordinary desktop artifact transfer state. It persists a compact, redacted task record under Electron user data, keeps URLs/headers and artifact paths private to the main process, broadcasts task views through `download-center:task-changed`, and exposes only list/get/cancel to preload. The web Download Center feature subscribes to that projection and to the server projection; it does not create another downloader or updater-progress bridge. Windows `electron-updater` remains the transport owner for NSIS, but reports its lifecycle into this task model. macOS Sparkle updates do not use Download Center for update bytes.
 
 ## Mac Bridge ownership
 

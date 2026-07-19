@@ -1,16 +1,17 @@
 import { EventEmitter } from 'node:events'
-import { basename } from 'node:path'
 
-import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import { app } from 'electron'
 
 import type { DesktopDownloadCenterService } from './download-center'
-import { DesktopUpdateInstaller } from './update-installer'
-import { DesktopUpdateSource, readUpdateFeedUrl } from './update-source'
+import { MacOSSparkleUpdateAdapter } from './macos-sparkle-update-adapter'
+import {
+  readSparkleAppcastUrl,
+  readUpdateFeedUrl,
+  resolveElectronUpdaterFeedUrl,
+} from './update-feed'
 import type {
   DesktopUpdateCandidate,
-  DesktopUpdateDownload,
-  DesktopUpdateInstallerPlan,
+  DesktopUpdateInfo,
   DesktopUpdatePreferences,
   DesktopUpdateStatus,
 } from './update-types'
@@ -40,6 +41,8 @@ export type DesktopUpdateManagerOptions = {
   prepareQuitForUpdate?: () => void | Promise<void>
   requestQuitForUpdate?: () => void | Promise<void>
   downloadCenter?: Pick<DesktopDownloadCenterService, 'execute' | 'release'>
+  sparkleAdapter?: MacOSSparkleUpdateAdapter
+  windowsUpdater?: WindowsDesktopUpdateAdapter
 }
 
 type CheckForUpdatesOptions = {
@@ -73,19 +76,15 @@ export class DesktopUpdateManager {
   private readonly events = new EventEmitter()
   private readonly prepareQuitForUpdate: (() => void | Promise<void>) | null
   private readonly requestQuitForUpdate: (() => void | Promise<void>) | null
-  private readonly source: DesktopUpdateSource | null
-  private readonly installer: DesktopUpdateInstaller | null
+  private readonly sparkleAdapter: MacOSSparkleUpdateAdapter | null
   private readonly windowsUpdater: WindowsDesktopUpdateAdapter | null
   private preferences: DesktopUpdatePreferences
   private statusSnapshot: DesktopUpdateStatus
   private backgroundTimer: NodeJS.Timeout | null = null
   private backgroundCheckRunning = false
   private downloadInProgress = false
-  private availableUpdate: DesktopUpdateCandidate | null = null
-  private installerPlan: DesktopUpdateInstallerPlan | null = null
-  private preparedDownloadTaskId: string | null = null
+  private sparkleReadyPromise: Promise<void> | null = null
   private downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release'> | null
-  private applyLaunched = false
 
   constructor(options: DesktopUpdateManagerOptions = {}) {
     const currentVersion = app.getVersion()
@@ -96,18 +95,17 @@ export class DesktopUpdateManager {
     this.prepareQuitForUpdate = options.prepareQuitForUpdate ?? null
     this.requestQuitForUpdate = options.requestQuitForUpdate ?? null
     this.downloadCenter = options.downloadCenter ?? null
-    this.source = updatePlatform === 'darwin'
-      ? new DesktopUpdateSource({
+    this.sparkleAdapter = updatePlatform === 'darwin'
+      ? (options.sparkleAdapter ?? new MacOSSparkleUpdateAdapter({
           updateFeedUrl,
           currentVersion,
-        })
+        }))
       : null
-    this.installer = updatePlatform === 'darwin' ? new DesktopUpdateInstaller() : null
     this.windowsUpdater = updatePlatform === 'win32'
-      ? new WindowsDesktopUpdateAdapter({
+      ? (options.windowsUpdater ?? new WindowsDesktopUpdateAdapter({
           updateFeedUrl: updateFeedUrl!,
           onStatusChanged: patch => this.setStatus(patch),
-        })
+        }))
       : null
     this.preferences = {
       autoCheckForUpdates: options.preferences?.autoCheckForUpdates ?? true,
@@ -115,6 +113,13 @@ export class DesktopUpdateManager {
     }
     this.statusSnapshot = {
       unsupported: unsupportedReason !== null,
+      provider: unsupportedReason
+        ? null
+        : updatePlatform === 'darwin'
+          ? 'sparkle'
+          : updatePlatform === 'win32'
+            ? 'electron-updater'
+            : null,
       currentVersion,
       isCheckingForUpdates: false,
       isPreparingUpdate: false,
@@ -123,8 +128,8 @@ export class DesktopUpdateManager {
       errorMessage: unsupportedReason,
     }
 
-    if (this.installer) {
-      void this.loadLastApplyResult()
+    if (this.sparkleAdapter && !unsupportedReason) {
+      this.sparkleReadyPromise = this.initializeSparkle()
     }
   }
 
@@ -138,25 +143,20 @@ export class DesktopUpdateManager {
   }
 
   /**
-   * Prepared macOS updates are intentionally session-scoped. An app restart
-   * cannot safely recover the in-memory installer plan, so release its durable
-   * artifact and staging rather than presenting an unusable update.
+   * Sparkle owns macOS update staging. Legacy Cradle macos-update Download Center
+   * tasks are released so Settings does not show a stale prepared update.
    */
   async recoverDownloadCenter(downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release' | 'beginExternal' | 'reportExternal' | 'list'>): Promise<void> {
     this.setDownloadCenter(downloadCenter)
-    if (!this.installer) { return }
     const staleTasks = downloadCenter.list().filter(task =>
       task.status === 'completed'
       && task.owner.namespace === 'desktop-update'
       && task.owner.resourceType === 'macos-update')
     await Promise.all(staleTasks.map(task => downloadCenter.release(task.taskId)))
-    await this.installer.discardStaleStaging()
   }
 
   async shutdown(): Promise<void> {
     this.stopBackgroundChecks()
-    if (this.applyLaunched) { return }
-    await this.discardPreparedUpdate()
   }
 
   on<K extends DesktopUpdateEventName>(
@@ -177,11 +177,20 @@ export class DesktopUpdateManager {
 
   startBackgroundChecks(): void {
     if (
-      (!this.source && !this.windowsUpdater)
+      (!this.sparkleAdapter && !this.windowsUpdater)
       || this.backgroundTimer
       || this.backgroundCheckRunning
       || !this.preferences.autoCheckForUpdates
+      || this.statusSnapshot.unsupported
     ) {
+      return
+    }
+
+    // macOS: Sparkle owns scheduled checks via setAutomaticChecks.
+    if (this.sparkleAdapter) {
+      void this.ensureSparkleReady().then(() => {
+        this.sparkleAdapter?.setAutomaticChecks(this.preferences.autoCheckForUpdates)
+      })
       return
     }
 
@@ -205,6 +214,9 @@ export class DesktopUpdateManager {
   }
 
   stopBackgroundChecks(): void {
+    if (this.sparkleAdapter) {
+      this.sparkleAdapter.setAutomaticChecks(false)
+    }
     if (!this.backgroundTimer) {
       return
     }
@@ -214,6 +226,13 @@ export class DesktopUpdateManager {
 
   configurePreferences(preferences: DesktopUpdatePreferences): DesktopUpdateStatus {
     this.preferences = preferences
+
+    if (this.sparkleAdapter) {
+      void this.ensureSparkleReady().then(() => {
+        this.sparkleAdapter?.setAutomaticChecks(preferences.autoCheckForUpdates)
+      })
+      return this.statusSnapshot
+    }
 
     if (!preferences.autoCheckForUpdates) {
       this.stopBackgroundChecks()
@@ -229,34 +248,8 @@ export class DesktopUpdateManager {
       return await this.checkForWindowsUpdates(options)
     }
 
-    if (!this.source || this.statusSnapshot.isCheckingForUpdates || this.downloadInProgress || this.statusSnapshot.isPreparingUpdate) {
-      return this.statusSnapshot
-    }
-
-    this.setStatus({
-      isCheckingForUpdates: true,
-      errorMessage: null,
-    })
-
-    try {
-      const candidate = await retryWithBackoff(() => this.source!.checkForUpdates())
-      await this.discardPreparedUpdate()
-      this.availableUpdate = candidate
-      this.setStatus({
-        isCheckingForUpdates: false,
-        updateInfo: candidate?.info ?? null,
-        updateDownloaded: false,
-      })
-    }
-    catch (error) {
-      this.availableUpdate = null
-      this.installerPlan = null
-      this.setStatus({
-        isCheckingForUpdates: false,
-        updateInfo: null,
-        updateDownloaded: false,
-        errorMessage: options.quiet ? this.statusSnapshot.errorMessage : readErrorMessage(error),
-      })
+    if (this.sparkleAdapter) {
+      return await this.checkForSparkleUpdates(options)
     }
 
     return this.statusSnapshot
@@ -267,43 +260,21 @@ export class DesktopUpdateManager {
       return await this.downloadWindowsUpdate()
     }
 
-    if (
-      !this.installer
-      || this.downloadInProgress
-      || !this.availableUpdate
-    ) {
+    if (this.sparkleAdapter) {
+      // Sparkle owns download after checkForUpdates(). Keep the IPC method so the
+      // Settings UI contract stays stable, but surface that no separate download
+      // step is needed on macOS.
+      if (this.statusSnapshot.updateInfo) {
+        this.setStatus({
+          errorMessage: null,
+        })
+      }
+      else {
+        this.setStatus({
+          errorMessage: 'On macOS, use Check for Updates. Sparkle downloads inside its update UI.',
+        })
+      }
       return this.statusSnapshot
-    }
-    const installer = this.installer
-    const availableUpdate = this.availableUpdate
-
-    this.downloadInProgress = true
-    this.setStatus({ isPreparingUpdate: false, updateDownloaded: false, errorMessage: null })
-
-    try {
-      const download = await this.downloadCandidate(availableUpdate)
-      this.preparedDownloadTaskId = download.taskId
-      this.setStatus({
-        isPreparingUpdate: true,
-      })
-      const plan = await installer.prepare(download, availableUpdate.info.version)
-      this.installerPlan = plan
-      this.setStatus({
-        isPreparingUpdate: false,
-        updateDownloaded: true,
-      })
-    }
-    catch (error) {
-      await this.releasePreparedArtifact()
-      this.installerPlan = null
-      this.setStatus({
-        isPreparingUpdate: false,
-        updateDownloaded: false,
-        errorMessage: readErrorMessage(error),
-      })
-    }
-    finally {
-      this.downloadInProgress = false
     }
 
     return this.statusSnapshot
@@ -315,24 +286,28 @@ export class DesktopUpdateManager {
       return
     }
 
-    if (!this.installerPlan) {
+    if (!this.sparkleAdapter) {
       this.setStatus({
         errorMessage: 'No prepared desktop update is available',
       })
       return
     }
-    if (!this.requestQuitForUpdate) {
-      this.setStatus({
-        errorMessage: 'Desktop update quit hook is not configured',
-      })
-      return
-    }
 
     try {
-      this.installer!.launch(this.installerPlan)
-      this.applyLaunched = true
-      await this.releasePreparedArtifact()
-      await this.requestQuitForUpdate()
+      await this.ensureSparkleReady()
+      if (!this.sparkleAdapter.isReady) {
+        throw new Error(this.sparkleAdapter.lastInitError ?? 'Sparkle bridge is not ready')
+      }
+
+      // Stop the desktop-owned server runtime before Sparkle replaces the bundle.
+      if (this.prepareQuitForUpdate) {
+        await this.prepareQuitForUpdate()
+      }
+      else if (this.requestQuitForUpdate) {
+        await this.requestQuitForUpdate()
+      }
+
+      this.sparkleAdapter.installUpdateNow()
     }
     catch (error) {
       this.setStatus({
@@ -341,41 +316,83 @@ export class DesktopUpdateManager {
     }
   }
 
-  private async loadLastApplyResult(): Promise<void> {
-    const result = await this.installer!.readLastResult()
-    if (!result || result.ok) {
+  private async initializeSparkle(): Promise<void> {
+    const result = await this.sparkleAdapter!.initialize()
+    if (!result.ready) {
+      this.setStatus({
+        unsupported: true,
+        errorMessage: result.errorMessage,
+      })
       return
     }
 
+    this.sparkleAdapter!.setAutomaticChecks(this.preferences.autoCheckForUpdates)
     this.setStatus({
-      errorMessage: result.error ?? `Desktop update ${result.version} failed`,
+      unsupported: false,
+      errorMessage: null,
     })
   }
 
-  private async downloadCandidate(
-    candidate: DesktopUpdateCandidate,
-  ): Promise<DesktopUpdateDownload & { taskId: string }> {
-    if (!this.downloadCenter) {
-      throw new Error('Desktop Download Center is not ready')
-    }
-    const artifact = await this.downloadCenter.execute(toUpdateDownloadRequest(candidate))
-    return toDesktopUpdateDownload(candidate, artifact)
-  }
-
-  private async releasePreparedArtifact(): Promise<void> {
-    const taskId = this.preparedDownloadTaskId
-    this.preparedDownloadTaskId = null
-    if (taskId && this.downloadCenter) {
-      await this.downloadCenter.release(taskId)
+  private async ensureSparkleReady(): Promise<void> {
+    if (this.sparkleReadyPromise) {
+      await this.sparkleReadyPromise
     }
   }
 
-  private async discardPreparedUpdate(): Promise<void> {
-    if (this.applyLaunched) { return }
-    const plan = this.installerPlan
-    this.installerPlan = null
-    await this.releasePreparedArtifact()
-    if (plan) { await this.installer?.discard(plan) }
+  private async checkForSparkleUpdates(options: CheckForUpdatesOptions): Promise<DesktopUpdateStatus> {
+    if (this.statusSnapshot.isCheckingForUpdates || this.downloadInProgress || this.statusSnapshot.isPreparingUpdate) {
+      return this.statusSnapshot
+    }
+
+    this.setStatus({
+      isCheckingForUpdates: true,
+      errorMessage: null,
+    })
+
+    try {
+      await this.ensureSparkleReady()
+      if (!this.sparkleAdapter!.isReady) {
+        throw new Error(this.sparkleAdapter!.lastInitError ?? 'Sparkle bridge is not ready')
+      }
+
+      // Best-effort metadata for Settings before opening Sparkle UI.
+      let updateInfo: DesktopUpdateInfo | null = null
+      try {
+        updateInfo = await retryWithBackoff(() => this.sparkleAdapter!.probeForUpdate())
+      }
+      catch (probeError) {
+        if (!options.quiet) {
+          this.logSparkleProbeFailure(probeError)
+        }
+      }
+
+      // Manual checks always open Sparkle UI; quiet background probes only refresh status.
+      if (!options.quiet) {
+        this.sparkleAdapter!.checkForUpdatesWithUI()
+      }
+
+      this.setStatus({
+        isCheckingForUpdates: false,
+        updateInfo,
+        // Sparkle may already have a downloaded package; the bridge cannot report it.
+        // Keep false so Restart remains an explicit installUpdateNow action.
+        updateDownloaded: false,
+      })
+    }
+    catch (error) {
+      this.setStatus({
+        isCheckingForUpdates: false,
+        updateInfo: null,
+        updateDownloaded: false,
+        errorMessage: options.quiet ? this.statusSnapshot.errorMessage : readErrorMessage(error),
+      })
+    }
+
+    return this.statusSnapshot
+  }
+
+  private logSparkleProbeFailure(error: unknown): void {
+    console.warn(`[desktop-update] Sparkle appcast probe failed: ${readErrorMessage(error)}`)
   }
 
   private setStatus(patch: Partial<DesktopUpdateStatus>): void {
@@ -398,8 +415,6 @@ export class DesktopUpdateManager {
 
     try {
       const updateInfo = await retryWithBackoff(() => this.windowsUpdater!.checkForUpdates())
-      this.availableUpdate = null
-      this.installerPlan = null
       this.setStatus({
         isCheckingForUpdates: false,
         updateInfo,
@@ -477,7 +492,12 @@ function readUnsupportedReason(updateFeedUrl: string | null): string | null {
   if (process.platform !== 'darwin' && process.platform !== 'win32') {
     return 'Desktop self-updates are only available on macOS and Windows'
   }
-  if (!updateFeedUrl) {
+  if (process.platform === 'darwin') {
+    if (!readSparkleAppcastUrl(updateFeedUrl)) {
+      return 'CRADLE_DESKTOP_SPARKLE_APPCAST_URL / CRADLE_DESKTOP_UPDATE_URL is not configured'
+    }
+  }
+  else if (!updateFeedUrl) {
     return 'CRADLE_DESKTOP_UPDATE_URL is not configured'
   }
   if (!app.isPackaged && process.env.CRADLE_DESKTOP_ALLOW_DEV_UPDATES !== 'true') {
@@ -493,35 +513,7 @@ function readUpdatePlatform(): 'darwin' | 'win32' | null {
   return null
 }
 
-function toUpdateDownloadRequest(candidate: DesktopUpdateCandidate): DownloadRequest {
-  if (candidate.artifact.size === null || candidate.artifact.sha256 === null) {
-    throw new Error('Update artifact size and SHA-256 are required')
-  }
-  const fileName = basename(new URL(candidate.artifact.url).pathname) || `Cradle-${candidate.info.version}.zip`
-  return {
-    owner: {
-      namespace: 'desktop-update',
-      resourceType: 'macos-update',
-      resourceId: candidate.info.version,
-      displayName: `Cradle ${candidate.info.version}`,
-    },
-    fileName,
-    sources: [{ id: 'desktop-update', url: candidate.artifact.url }],
-    integrity: {
-      expectedBytes: candidate.artifact.size,
-      checksum: { algorithm: 'sha256', value: candidate.artifact.sha256 },
-    },
-    maxBytes: candidate.artifact.size,
-  }
-}
-
-function toDesktopUpdateDownload(
-  candidate: DesktopUpdateCandidate,
-  artifact: DownloadedArtifact,
-): DesktopUpdateDownload & { taskId: string } {
-  return {
-    artifact: candidate.artifact,
-    archivePath: artifact.filePath,
-    taskId: artifact.taskId,
-  }
-}
+// Re-export feed helper for packaging scripts and tests that previously imported
+// resolve logic for packaging scripts and tests.
+export { readUpdateFeedUrl, resolveElectronUpdaterFeedUrl }
+export type { DesktopUpdateCandidate }

@@ -151,7 +151,11 @@
     "vitest": "^4.1.4"
   },
   "pnpm": {
-    "approveBuilds": ["fs-xattr", "macos-alias"]
+    "approveBuilds": [
+      "electron-sparkle-updater",
+      "fs-xattr",
+      "macos-alias"
+    ]
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint:staged"
