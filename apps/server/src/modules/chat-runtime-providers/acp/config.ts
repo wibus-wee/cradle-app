@@ -1,9 +1,11 @@
 import type { AcpChatConfig } from '../../../helpers/provider-config-schemas'
+import type { AcpLaunchDistributionType } from '../../acp/launch-config'
+import { resolveEffectiveLaunch } from '../../acp/launch-config'
 import { getInstalled } from '../../acp/service'
 import { ProviderErrors, ProviderRuntimeError } from '../../chat-runtime/runtime-provider-types'
 import { ACP_RUNTIME_KIND } from './metadata'
 
-export type AcpDistributionType = 'binary' | 'npx' | 'uvx'
+export type AcpDistributionType = AcpLaunchDistributionType
 export type AcpRuntimeConfig = AcpChatConfig
 
 export interface AcpConnectionRecord {
@@ -41,8 +43,9 @@ export function buildAcpConnectionRecord(configJson: string): AcpConnectionRecor
 /**
  * Resolve the process launch record for an ACP connection from the merged session config.
  * When the config carries `acpAgentId`, the launch config comes from the installed agent's
- * `acp_agents` row and the connection keys one process per installed agent; otherwise the
- * legacy provider-target connection config drives the launch under the caller's key.
+ * `acp_agents` row (effective launch = base + overrides) and the connection keys one process
+ * per installed agent; otherwise the legacy provider-target connection config drives the
+ * launch under the caller's key.
  */
 export function resolveAcpConnectionRecord(configJson: string, legacyConnectionKey: string): ResolvedAcpConnection {
   const acpAgentId = readAcpAgentId(configJson)
@@ -57,13 +60,25 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
     )
   }
 
+  if (installed.status !== 'installed') {
+    throw new ProviderRuntimeError(
+      ProviderErrors.requestFailed(
+        ACP_RUNTIME_KIND,
+        'resolve-connection',
+        `ACP agent is not ready (status=${installed.status}): ${acpAgentId}`,
+      ),
+    )
+  }
+
+  const effective = resolveEffectiveLaunch(installed)
+
   return {
     record: {
-      distributionType: installed.distributionType as AcpDistributionType,
-      installPath: installed.installPath,
-      cmd: installed.cmd ?? '',
-      args: installed.args,
-      env: installed.env,
+      distributionType: effective.distributionType,
+      installPath: effective.installPath,
+      cmd: effective.cmd,
+      args: JSON.stringify(effective.args),
+      env: JSON.stringify(effective.env),
     },
     connectionKey: `acp:${acpAgentId}`,
   }

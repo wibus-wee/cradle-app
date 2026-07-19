@@ -1,8 +1,9 @@
-import { join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 
 import type { ManagedChildProcess } from '../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../infra/managed-process'
+import type { AcpLaunchDistributionType } from '../../acp/launch-config'
+import { resolveBinaryCommand } from '../../acp/launch-config'
 
 export interface ProcessMetrics {
   pid: number
@@ -45,7 +46,7 @@ export class AcpProcessManager {
     args: string[]
     env: Record<string, string>
     cwd?: string
-    distributionType: 'binary' | 'npx' | 'uvx'
+    distributionType: AcpLaunchDistributionType
     installPath?: string | null
   }): ProcessEntry {
     if (this.disposed) {
@@ -153,16 +154,21 @@ export class AcpProcessManager {
 function resolveLaunchCommand(opts: {
   cmd: string
   args: string[]
-  distributionType: 'binary' | 'npx' | 'uvx'
+  distributionType: AcpLaunchDistributionType
   installPath?: string | null
 }): { command: string, finalArgs: string[] } {
   switch (opts.distributionType) {
+    case 'command':
+      return {
+        command: opts.cmd,
+        finalArgs: opts.args,
+      }
     case 'binary':
       if (!opts.installPath) {
         throw new Error('installPath is required for binary ACP agents')
       }
       return {
-        command: join(opts.installPath, opts.cmd),
+        command: resolveBinaryCommand(opts.installPath, opts.cmd),
         finalArgs: opts.args,
       }
     case 'npx':

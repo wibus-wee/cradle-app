@@ -281,6 +281,13 @@
       "when": 1784272205388,
       "tag": "0039_amusing_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1784455167281,
+      "tag": "0040_fuzzy_power_man",
+      "breakpoints": true
     }
   ]
 }

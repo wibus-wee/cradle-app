@@ -571,6 +571,199 @@ describe('acp chat runtime capability', () => {
     })
   })
 
+  it('resolves local command agents and registry overrides into effective launch for spawn', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+
+    let app: Awaited<ReturnType<typeof createServerApp>> | undefined
+
+    try {
+      app = await createServerApp()
+      const { resolveAcpConnectionRecord } = await import('../src/modules/chat-runtime-providers/acp/config')
+
+      db().insert(acpAgents).values({
+        id: 'local-cmd-agent',
+        name: 'Local Cmd',
+        version: 'local',
+        source: 'local',
+        distributionType: 'command',
+        installPath: null,
+        cmd: '/usr/local/bin/my-acp',
+        args: JSON.stringify(['--stdio']),
+        env: JSON.stringify({ LOCAL: '1' }),
+        status: 'installed',
+      }).run()
+
+      const localResolved = resolveAcpConnectionRecord(
+        JSON.stringify({ acpAgentId: 'local-cmd-agent' }),
+        'legacy-key',
+      )
+      expect(localResolved.connectionKey).toBe('acp:local-cmd-agent')
+      expect(localResolved.record).toEqual({
+        distributionType: 'command',
+        installPath: null,
+        cmd: '/usr/local/bin/my-acp',
+        args: JSON.stringify(['--stdio']),
+        env: JSON.stringify({ LOCAL: '1' }),
+      })
+
+      db().insert(acpAgents).values({
+        id: 'registry-override-agent',
+        name: 'Registry Overridden',
+        version: '1.0.0',
+        source: 'registry',
+        distributionType: 'npx',
+        installPath: null,
+        cmd: '@demo/acp-agent',
+        args: JSON.stringify(['--stdio']),
+        env: JSON.stringify({ BASE: '1', SHARED: 'base' }),
+        overrideCmd: null,
+        overrideArgs: JSON.stringify(['--stdio', '--debug']),
+        overrideEnv: JSON.stringify({ SHARED: 'override', EXTRA: 'x' }),
+        status: 'installed',
+      }).run()
+
+      const overridden = resolveAcpConnectionRecord(
+        JSON.stringify({ acpAgentId: 'registry-override-agent' }),
+        'legacy-key',
+      )
+      expect(overridden.connectionKey).toBe('acp:registry-override-agent')
+      expect(overridden.record.cmd).toBe('@demo/acp-agent')
+      expect(JSON.parse(overridden.record.args)).toEqual(['--stdio', '--debug'])
+      expect(JSON.parse(overridden.record.env)).toEqual({
+        BASE: '1',
+        SHARED: 'override',
+        EXTRA: 'x',
+      })
+
+      db().insert(acpAgents).values({
+        id: 'failed-agent',
+        name: 'Failed',
+        version: '1.0.0',
+        source: 'registry',
+        distributionType: 'npx',
+        cmd: '@demo/fail',
+        args: '[]',
+        env: '{}',
+        status: 'failed',
+      }).run()
+
+      expect(() => resolveAcpConnectionRecord(
+        JSON.stringify({ acpAgentId: 'failed-agent' }),
+        'legacy-key',
+      )).toThrow(/not ready/)
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      if (previousDataDir === undefined) {
+        delete process.env.CRADLE_DATA_DIR
+      }
+      else {
+        process.env.CRADLE_DATA_DIR = previousDataDir
+      }
+      void app
+    }
+  })
+
+  it('spawns a local command ACP agent using effective launch env and args', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+
+    let app: Awaited<ReturnType<typeof createServerApp>> | undefined
+
+    try {
+      const { AcpProcessManager } = await import('../src/modules/chat-runtime-providers/acp/process-manager')
+      const spawnSpy = vi.spyOn(AcpProcessManager.prototype, 'spawn')
+
+      app = await createServerApp()
+      db().insert(workspaces).values({
+        id: 'workspace-acp-local',
+        name: 'Workspace ACP Local',
+        path: workspaceRoot,
+        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+      }).run()
+      db().insert(acpAgents).values({
+        id: 'local-spawn-agent',
+        name: 'Local Spawn',
+        version: 'local',
+        source: 'local',
+        distributionType: 'command',
+        installPath: null,
+        cmd: '/bin/echo',
+        args: JSON.stringify(['--stdio']),
+        env: JSON.stringify({ LOCAL_SPAWN: 'yes' }),
+        status: 'installed',
+      }).run()
+
+      const agentRes = await app.handle(new Request('http://localhost/agents', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Local ACP Identity',
+          avatarStyle: 'bottts',
+          avatarSeed: 'local-acp-identity',
+          runtimeKind: 'acp-chat',
+          configJson: JSON.stringify({ acpAgentId: 'local-spawn-agent' }),
+        }),
+      }))
+      expect(agentRes.status).toBe(200)
+      const agent = await agentRes.json() as { id: string }
+
+      const sessionRes = await app.handle(new Request('http://localhost/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: 'session-acp-local',
+          workspaceId: 'workspace-acp-local',
+          title: 'ACP Local Session',
+          agentId: agent.id,
+        }),
+      }))
+      expect(sessionRes.status).toBe(200)
+
+      const runRes = await app.handle(new Request('http://localhost/chat/sessions/session-acp-local/response', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'Hello local agent' }),
+      }))
+      expect(runRes.status).toBe(200)
+
+      const approvalRequestId = await waitForToolApprovalRequest('session-acp-local')
+      const approvalRes = await app.handle(new Request(`http://localhost/chat/sessions/session-acp-local/tool-approval/${approvalRequestId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ approved: true }),
+      }))
+      expect(approvalRes.status).toBe(200)
+
+      await waitForMessageStatus(app, 'session-acp-local', 'complete')
+
+      expect(spawnSpy).toHaveBeenCalledWith(expect.objectContaining({
+        agentId: 'acp:local-spawn-agent',
+        distributionType: 'command',
+        installPath: null,
+        cmd: '/bin/echo',
+        args: ['--stdio'],
+        env: { LOCAL_SPAWN: 'yes' },
+      }))
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      if (previousDataDir === undefined) {
+        delete process.env.CRADLE_DATA_DIR
+      }
+      else {
+        process.env.CRADLE_DATA_DIR = previousDataDir
+      }
+    }
+  })
+
   it('passes registered MCP servers when loading and resuming ACP sessions', async () => {
     const { AcpConnectionManager } = await import('../src/modules/chat-runtime-providers/acp/connection-manager')
     const manager = new AcpConnectionManager({

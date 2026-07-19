@@ -55,6 +55,26 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     },
     response: { 200: t.Array(AcpModel.acpAgent) },
   })
+  .post('/agents', ({ body }) => {
+    return Acp.createLocalAgent({
+      id: body.id,
+      name: body.name,
+      cmd: body.cmd,
+      args: body.args,
+      env: body.env,
+      distributionType: body.distributionType,
+      version: body.version,
+    })
+  }, {
+    detail: {
+      'summary': 'Register a local ACP agent',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'create'],
+      },
+    },
+    body: AcpModel.createLocalAgentBody,
+    response: { 200: AcpModel.acpAgent },
+  })
   .get('/agents/:agentId', ({ params }) => {
     const agent = Acp.getInstalled(requireNonBlankString(params.agentId, 'agentId'))
     if (!agent) {
@@ -69,6 +89,29 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
       },
     },
     params: AcpModel.agentIdParams,
+    response: { 200: AcpModel.acpAgent },
+  })
+  .patch('/agents/:agentId/launch-config', ({ params, body }) => {
+    return Acp.updateLaunchConfig(requireNonBlankString(params.agentId, 'agentId'), {
+      name: body.name,
+      overrideCmd: body.overrideCmd,
+      overrideArgs: body.overrideArgs,
+      overrideEnv: body.overrideEnv,
+      cmd: body.cmd,
+      args: body.args,
+      env: body.env,
+      distributionType: body.distributionType,
+      version: body.version,
+    })
+  }, {
+    detail: {
+      'summary': 'Update ACP agent launch config (local base or registry overrides)',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'launch-config'],
+      },
+    },
+    params: AcpModel.agentIdParams,
+    body: AcpModel.launchConfigBody,
     response: { 200: AcpModel.acpAgent },
   })
   .post('/agents/:agentId/draft-session', ({ params, body }) => {

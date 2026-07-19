@@ -22,11 +22,15 @@ export const AcpModel = {
     id: t.String(),
     name: t.String(),
     version: t.Nullable(t.String()),
+    source: t.String(),
     distributionType: t.String(),
     installPath: t.Nullable(t.String()),
     cmd: t.Nullable(t.String()),
     args: t.Nullable(t.String()),
     env: t.Nullable(t.String()),
+    overrideCmd: t.Nullable(t.String()),
+    overrideArgs: t.Nullable(t.String()),
+    overrideEnv: t.Nullable(t.String()),
     status: t.String(),
     createdAt: t.Number(),
     updatedAt: t.Number(),
@@ -65,6 +69,38 @@ export const AcpModel = {
       t.Literal('npx'),
       t.Literal('uvx'),
     ]),
+  }),
+
+  createLocalAgentBody: t.Object({
+    id: t.Optional(t.String({ minLength: 1 })),
+    name: t.String({ minLength: 1 }),
+    cmd: t.String({ minLength: 1 }),
+    args: t.Optional(t.Array(t.String())),
+    env: t.Optional(t.Record(t.String(), t.String())),
+    distributionType: t.Optional(t.Union([
+      t.Literal('command'),
+      t.Literal('npx'),
+      t.Literal('uvx'),
+    ])),
+    version: t.Optional(t.String({ minLength: 1 })),
+  }),
+
+  launchConfigBody: t.Object({
+    name: t.Optional(t.String({ minLength: 1 })),
+    // registry overrides (null clears)
+    overrideCmd: t.Optional(t.Union([t.String(), t.Null()])),
+    overrideArgs: t.Optional(t.Union([t.Array(t.String()), t.Null()])),
+    overrideEnv: t.Optional(t.Union([t.Record(t.String(), t.String()), t.Null()])),
+    // local base fields
+    cmd: t.Optional(t.String({ minLength: 1 })),
+    args: t.Optional(t.Array(t.String())),
+    env: t.Optional(t.Record(t.String(), t.String())),
+    distributionType: t.Optional(t.Union([
+      t.Literal('command'),
+      t.Literal('npx'),
+      t.Literal('uvx'),
+    ])),
+    version: t.Optional(t.String({ minLength: 1 })),
   }),
 
   agentIdParams: t.Object({
