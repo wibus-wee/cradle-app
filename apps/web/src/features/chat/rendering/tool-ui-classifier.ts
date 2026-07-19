@@ -132,6 +132,7 @@ type WorkflowLiteral
     | { [key: string]: WorkflowLiteral }
 
 interface ToolObjectPayload {
+  rawValue: unknown
   input: string | null
   description: string | null
   explanation: string | null
@@ -218,6 +219,7 @@ interface ToolObjectPayload {
   results: ToolWebResult[]
   contents: ToolContentBlock[]
   outputFile: string | null
+  workflowLifecycle: unknown[]
   newTodos: ToolTodo[]
   todos: ToolTodo[]
   tasks: ToolTodo[]
@@ -618,6 +620,7 @@ function readToolObjectPayload(value: unknown): ToolObjectPayload {
   const script = readNullableString(record.script)
   const workflowMeta = readWorkflowMeta(script)
   return {
+    rawValue: value,
     input: readNullableString(record.input),
     description: readNullableString(record.description),
     explanation: readNullableString(record.explanation),
@@ -704,6 +707,7 @@ function readToolObjectPayload(value: unknown): ToolObjectPayload {
     results: readWebResults(record.results),
     contents: readContentBlocks(record.contents),
     outputFile: readNullableString(record.outputFile),
+    workflowLifecycle: readUnknownList(record.workflowLifecycle ?? record.lifecycle ?? record.rawLifecycle),
     newTodos: readTodos(record.newTodos),
     todos: readTodos(record.todos),
     tasks: readTodos(record.tasks),
@@ -717,6 +721,7 @@ function readToolObjectPayload(value: unknown): ToolObjectPayload {
 
 export interface ToolPayload {
   rawText: string | null
+  rawValue: unknown
   inputText: string | null
   description: string | null
   type: string | null
@@ -781,6 +786,7 @@ export interface ToolPayload {
   contentBlocks: ToolContentBlock[]
   contents: ToolContentBlock[]
   outputFile: string | null
+  workflowLifecycle: unknown[]
   todos: ToolTodo[]
   newTodos: ToolTodo[]
   tasks: ToolTodo[]
@@ -794,6 +800,7 @@ export interface ToolPayload {
 function toolPayloadFromObject(value: ToolObjectPayload): ToolPayload {
   return {
     rawText: null,
+    rawValue: value.rawValue,
     inputText: value.input,
     description: value.description ?? value.workflowDescription ?? value.explanation ?? value.goal ?? value.title ?? value.task,
     type: value.type,
@@ -858,6 +865,7 @@ function toolPayloadFromObject(value: ToolObjectPayload): ToolPayload {
     contentBlocks: value.content.blocks,
     contents: value.contents,
     outputFile: value.outputFile,
+    workflowLifecycle: value.workflowLifecycle,
     todos: value.todos,
     newTodos: value.newTodos,
     tasks: value.tasks,
@@ -882,10 +890,14 @@ export function readToolPayload(value: unknown): ToolPayload {
     return {
       ...toolPayloadFromObject(readToolObjectPayload({})),
       rawText: value,
+      rawValue: value,
     }
   }
   if (Array.isArray(value)) {
-    return toolPayloadFromObject(readToolObjectPayload({ contents: value }))
+    return {
+      ...toolPayloadFromObject(readToolObjectPayload({ contents: value })),
+      rawValue: value,
+    }
   }
   return toolPayloadFromObject(readToolObjectPayload(value))
 }

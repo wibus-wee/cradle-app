@@ -984,6 +984,129 @@ describe('mapClaudeAgentMessageToChunks', () => {
     ])
   })
 
+  it('preserves complete Workflow input, output, and lifecycle metadata', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const workflowInput = {
+      script: 'export const meta = { name: \'research\', phases: [] }\nagent(\'worker\')',
+      name: 'research',
+      description: 'Research workflow',
+      title: 'Research title',
+      args: { question: 'What changed?' },
+      scriptPath: '/tmp/workflow.js',
+      resumeFromRunId: 'wf_previous',
+    }
+    const workflowOutput = {
+      status: 'async_launched',
+      taskId: 'workflow-task-1',
+      taskType: 'local_workflow',
+      workflowName: 'research',
+      runId: 'wf_run_1',
+      summary: 'Workflow launched',
+      transcriptDir: '/tmp/transcripts/workflow-task-1',
+      scriptPath: '/tmp/workflow.js',
+      warning: 'Local branch differs',
+    }
+
+    await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-workflow-full',
+      message: {
+        content: [{
+          type: 'tool_use',
+          id: 'toolu_workflow_full',
+          name: 'Workflow',
+          input: workflowInput,
+        }],
+      },
+    } as unknown as SDKMessage, state)
+
+    const launched = await mapClaudeAgentMessageToChunks({
+      type: 'user',
+      session_id: 'claude-session-workflow-full',
+      tool_use_result: workflowOutput,
+      message: {
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'toolu_workflow_full',
+          content: 'Workflow launched with task workflow-task-1',
+        }],
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(launched.chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'tool-output-available',
+        output: expect.objectContaining({
+          result: workflowOutput,
+        }),
+      }),
+    ]))
+    expect(launched.capturedCrewCalls).toEqual([
+      expect.objectContaining({
+        toolCallId: 'toolu_workflow_full',
+        status: 'running',
+        workflow: {
+          toolCallId: 'toolu_workflow_full',
+          tool: 'Workflow',
+          status: 'running',
+          input: workflowInput,
+          output: expect.objectContaining(workflowOutput),
+          lifecycle: [],
+          rawInput: workflowInput,
+          rawOutput: workflowOutput,
+          rawLifecycle: [],
+          startedAt: 0,
+          completedAt: null,
+        },
+      }),
+    ])
+
+    const notification = await mapClaudeAgentMessageToChunks({
+      type: 'system',
+      subtype: 'task_notification',
+      session_id: 'claude-session-workflow-full',
+      uuid: 'workflow-notification-full',
+      task_id: 'workflow-task-1',
+      status: 'completed',
+      output_file: '/tmp/workflow-output.json',
+      summary: 'Workflow complete',
+      usage: { total_tokens: 42, tool_uses: 7, duration_ms: 1234 },
+      skip_transcript: false,
+    } as unknown as SDKMessage, state)
+
+    expect(notification.capturedCrewCalls).toEqual([
+      expect.objectContaining({
+        toolCallId: 'toolu_workflow_full',
+        tool: 'Workflow',
+        workflow: expect.objectContaining({
+          status: 'completed',
+          lifecycle: [expect.objectContaining({
+            type: 'task_notification',
+            taskId: 'workflow-task-1',
+            outputFile: '/tmp/workflow-output.json',
+            summary: 'Workflow complete',
+            usage: { totalTokens: 42, toolUses: 7, durationMs: 1234 },
+          })],
+        }),
+      }),
+    ])
+    expect(notification.chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'tool-output-available',
+        toolCallId: 'toolu_workflow_full',
+        output: expect.objectContaining({
+          result: expect.objectContaining({
+            lifecycle: [expect.objectContaining({
+              type: 'system',
+              subtype: 'task_notification',
+              task_id: 'workflow-task-1',
+            })],
+          }),
+        }),
+      }),
+    ]))
+  })
+
   it('maps parent-tool child stream events as ordinary chunks without subagent snapshots', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const chunks: Awaited<ReturnType<typeof mapClaudeAgentMessageToChunks>>['chunks'] = []

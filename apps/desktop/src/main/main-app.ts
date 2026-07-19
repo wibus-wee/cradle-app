@@ -49,6 +49,12 @@ import {
   setDesktopRuntimeDiagnosticsProvider,
   startDesktopResourceReporting,
 } from './observability-reporter'
+import {
+  collectOpenWorkspaceUrls,
+  isOpenWorkspaceUrl,
+  OpenWorkspaceLinkError,
+  parseOpenWorkspaceUrl,
+} from './open-workspace-links'
 import type { PluginInstallResult, PluginInstallSummary } from './plugin-install-links'
 import {
   collectPluginInstallUrls,
@@ -101,6 +107,8 @@ const DEEP_LINK_PROTOCOL = 'cradle'
 let installQueue = Promise.resolve()
 let canProcessPluginInstallLinks = false
 const pendingPluginInstallUrls: string[] = []
+let canProcessOpenWorkspaceLinks = false
+const pendingOpenWorkspaceUrls: string[] = []
 const browserManager = new DesktopBrowserManager()
 let desktopServerStatus: DesktopServerStatus = { state: 'starting' }
 
@@ -418,6 +426,49 @@ function processPendingPluginInstallUrls(): void {
   handlePluginInstallUrls(urls)
 }
 
+async function openWorkspaceFromDeepLink(rawUrl: string): Promise<void> {
+  showMainWindow()
+  try {
+    const request = parseOpenWorkspaceUrl(rawUrl)
+    if (!trayManager) {
+      // Tray owns the renderer action bridge (including pending queue while the
+      // main window is still loading). Defer until desktop services are ready.
+      pendingOpenWorkspaceUrls.push(rawUrl)
+      return
+    }
+    await trayManager.performAction('open-workspace', { workspaceId: request.workspaceId })
+  }
+  catch (err) {
+    console.error('[open-workspace] deep link failed:', err)
+    const message = err instanceof Error ? err.message : String(err)
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'Open Workspace Failed',
+      message: err instanceof OpenWorkspaceLinkError
+        ? 'The open workspace link is invalid.'
+        : 'Cradle could not open the workspace.',
+      detail: message,
+      buttons: ['OK'],
+    })
+  }
+}
+
+function handleOpenWorkspaceUrls(urls: readonly string[]): void {
+  if (!canProcessOpenWorkspaceLinks || !trayManager) {
+    pendingOpenWorkspaceUrls.push(...urls)
+    return
+  }
+  for (const url of urls) {
+    void openWorkspaceFromDeepLink(url)
+  }
+}
+
+function processPendingOpenWorkspaceUrls(): void {
+  canProcessOpenWorkspaceLinks = true
+  const urls = pendingOpenWorkspaceUrls.splice(0)
+  handleOpenWorkspaceUrls(urls)
+}
+
 async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): Promise<void> {
   if (!options.stopServerRuntime) {
     console.warn('[desktop] stopServerRuntime=false is ignored; desktop-owned server will be stopped')
@@ -582,6 +633,7 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
     },
   })
   trayManager.initialize()
+  processPendingOpenWorkspaceUrls()
 
   notificationCenterManager = new NotificationCenterManager({
     serverUrl,
@@ -693,6 +745,12 @@ export async function startDesktopApp(): Promise<void> {
 
   app.on('open-url', (event, url) => {
     event.preventDefault()
+    // Prefer exact open-workspace parser over prefix match so future cradle://open/*
+    // routes are not mis-handled, and plugin links stay on the install path.
+    if (isOpenWorkspaceUrl(url)) {
+      handleOpenWorkspaceUrls([url])
+      return
+    }
     handlePluginInstallUrls([url])
   })
 
@@ -730,6 +788,7 @@ export async function startDesktopApp(): Promise<void> {
         await activateDesktopPlugins()
         processPendingPluginInstallUrls()
         handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
+        handleOpenWorkspaceUrls(collectOpenWorkspaceUrls(process.argv))
 
         const pendingDataMigration = getDesktopDataDirectoryState().pendingMigration
         if (pendingDataMigration && !['completed', 'failed'].includes(pendingDataMigration.phase)) {
@@ -807,5 +866,6 @@ export async function startDesktopApp(): Promise<void> {
   app.on('second-instance', (_event, argv) => {
     showMainWindow()
     handlePluginInstallUrls(collectPluginInstallUrls(argv))
+    handleOpenWorkspaceUrls(collectOpenWorkspaceUrls(argv))
   })
 }

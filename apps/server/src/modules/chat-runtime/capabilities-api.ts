@@ -1,4 +1,6 @@
 import { AppError } from '../../errors/app-error'
+import { readClaudeAgentWorkflowExecutions } from '../chat-runtime-providers/claude-agent/state-projector'
+import { getClaudeWorkflowArtifactSource } from '../chat-runtime-providers/claude-agent/workflow'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-snapshot'
 import type { RuntimeKind } from '../provider-contracts/types'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
@@ -248,6 +250,51 @@ export async function readProviderThread(
     threadId,
     includeTurns: false,
   })
+}
+
+export async function readWorkflowArtifactSource(sessionId: string, toolCallId: string) {
+  const context = getSessionRunContext(sessionId)
+  if (!context) {
+    throw new AppError({
+      code: 'chat_session_not_found',
+      status: 404,
+      message: 'Chat session was not found',
+    })
+  }
+  const runtimeKind = context.session.runtimeKind ?? 'standard'
+  if (runtimeKind !== 'claude-agent') {
+    throw new AppError({
+      code: 'workflow_artifacts_not_supported',
+      status: 501,
+      message: `Workflow artifact streaming is not supported by ${runtimeKind}`,
+    })
+  }
+
+  const activeRunId = runRegistry.getActiveRunIdForSession(sessionId)
+  const activeRun = activeRunId ? runRegistry.getActiveRun(activeRunId) : undefined
+  const runtime = getRuntimeRegistry().get(runtimeKind)
+  const resolved = activeRun?.runtimeSession.runtimeKind === runtimeKind
+    ? { runtimeSession: activeRun.runtimeSession }
+    : runtime
+      ? await resolveExistingRuntimeSessionForContext({ sessionId, context, runtimeKind, runtime })
+      : null
+  if (!resolved) {
+    throw new AppError({
+      code: 'workflow_artifacts_unavailable',
+      status: 404,
+      message: 'Workflow runtime state is not available for this session',
+    })
+  }
+  const execution = readClaudeAgentWorkflowExecutions(resolved.runtimeSession)
+    .find(item => item.toolCallId === toolCallId)
+  if (!execution) {
+    throw new AppError({
+      code: 'workflow_not_found',
+      status: 404,
+      message: 'Workflow execution was not found in this session',
+    })
+  }
+  return await getClaudeWorkflowArtifactSource({ sessionId, execution })
 }
 
 export async function deleteProviderThread(

@@ -63,14 +63,26 @@ export function useGlobalEventListeners(
   const visibleSessionId = chatSessionIdForSurface(useActiveSurface())
   const workspacePath = options.workspacePath
 
-  useShortcut('layout.toggle-bottom-panel', { ctrl: true, key: '`' }, toggleBottomPanel)
-  useShortcut('layout.toggle-aside', { meta: true, alt: true, key: 'b' }, toggleAside)
+  // Chrome layout chords must work from Composer (contenteditable) and the
+  // bottom-panel xterm textarea; without allowInEditable they are silently
+  // skipped while the user is typing.
+  useShortcut(
+    'layout.toggle-bottom-panel',
+    { ctrl: true, key: '`', allowInEditable: true },
+    toggleBottomPanel,
+  )
+  useShortcut(
+    'layout.toggle-aside',
+    { meta: true, alt: true, key: 'b', allowInEditable: true },
+    toggleAside,
+  )
   useShortcut(
     'terminal.open-external',
     {
       ...(platform === 'darwin' ? { meta: true } : { ctrl: true }),
       shift: true,
       key: 'c',
+      allowInEditable: true,
     },
     useCallback(() => {
       if (!isElectron || !nativeIpc || !workspacePath) {
@@ -101,16 +113,21 @@ export function useGlobalEventListeners(
       closeActiveSurface()
     }, []),
   )
-  useShortcut('chat.new', { meta: true, key: 't' }, openNewChat, !isTearoffWindow)
+  useShortcut(
+    'chat.new',
+    { meta: true, key: 't', allowInEditable: true },
+    openNewChat,
+    !isTearoffWindow,
+  )
   useShortcut(
     'surface.next',
-    { ctrl: true, key: 'Tab' },
+    { ctrl: true, key: 'Tab', allowInEditable: true },
     () => activateAdjacentSurface(1),
     !isTearoffWindow,
   )
   useShortcut(
     'surface.previous',
-    { ctrl: true, shift: true, key: 'Tab' },
+    { ctrl: true, shift: true, key: 'Tab', allowInEditable: true },
     () => activateAdjacentSurface(-1),
     !isTearoffWindow,
   )

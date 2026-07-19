@@ -1,9 +1,13 @@
 // Headline KPI row — deliberately card-less. Everything further down the
-// page (heatmap, breakdown, patterns, sessions) lives inside a bordered
-// card, so this row's whole job is to look and feel different: big, quiet
-// typography with nothing but whitespace and hairline dividers between the
-// numbers, the way Vercel/Linear open their own analytics pages. The numbers
-// do the talking; a border would only get in the way.
+// page (heatmap, breakdown, patterns) lives inside a bordered card, so this
+// row's whole job is to look and feel different: big, quiet typography with
+// nothing but whitespace and hairline dividers between the numbers, the way
+// Vercel/Linear open their own analytics pages. The numbers do the talking;
+// a border would only get in the way.
+//
+// Absolute totals follow the selected range (7D/30D/…): densified series are
+// built for 2× the window so comparePeriods can contrast "current N days" vs
+// the N days immediately before. Streak is all-history by nature.
 import { FireFill, FireLine, TrendingDownLine, TrendingUpLine } from '@mingcute/react'
 import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,15 +19,14 @@ import { AnimatedNumber } from './animated-number'
 import { comparePeriods, denseCostSeries, denseTokenSeries } from './usage-insights'
 import type { UsageRangeKey } from './usage-time-range'
 import { rangeDays } from './usage-time-range'
-import type { CostSummary, DailyCost, DailyUsage, UsageStats, UsageSummary } from './use-usage-overview'
+import type { DailyCost, DailyUsage, UsageStats } from './use-usage-overview'
 
 interface UsageHeroCardsProps {
   daily: DailyUsage[]
   dailyCost: DailyCost[]
-  summary: UsageSummary
   stats: UsageStats
-  costSummary: CostSummary | null
   range: UsageRangeKey
+  hasCost: boolean
 }
 
 // Deliberately restrained to two hues (blue = volume, emerald = money) plus
@@ -36,25 +39,26 @@ const DOT = {
   streak: 'bg-rose-500',
 } as const
 
-export function UsageHeroCards({ daily, dailyCost, summary, stats, costSummary, range }: UsageHeroCardsProps) {
+export function UsageHeroCards({ daily, dailyCost, stats, range, hasCost }: UsageHeroCardsProps) {
   const { t } = useTranslation('usage')
   const days = rangeDays(range)
-  const denseTokens = denseTokenSeries(daily, days)
-  const denseCost = denseCostSeries(dailyCost, days)
+  // 2× window so comparePeriods has a real previous period to contrast against.
+  const denseTokens = denseTokenSeries(daily, days * 2)
+  const denseCost = denseCostSeries(dailyCost, days * 2)
 
   const tokenComparison = comparePeriods(denseTokens.map(d => d.totalTokens), days)
   const costComparison = comparePeriods(denseCost.map(d => d.costUsd), days)
   const turnComparison = comparePeriods(denseTokens.map(d => d.count), days)
 
-  const hasCost = Boolean(costSummary && costSummary.totalCostUsd > 0)
   const vsRangeLabel = t('hero.vsPreviousRange', { days })
+  const showCost = hasCost && costComparison.currentTotal > 0
 
   const items = [
-    hasCost && {
+    showCost && {
       key: 'cost',
       dot: DOT.cost,
       label: t('hero.totalCost'),
-      value: <AnimatedNumber value={costSummary!.totalCostUsd} formatter={formatUsd} className="text-3xl font-semibold tabular-nums text-foreground" />,
+      value: <AnimatedNumber value={costComparison.currentTotal} formatter={formatUsd} className="text-3xl font-semibold tabular-nums text-foreground" />,
       delta: costComparison.changePct,
       deltaLabel: vsRangeLabel,
       dataTestId: 'usage-hero-cost',
@@ -63,7 +67,7 @@ export function UsageHeroCards({ daily, dailyCost, summary, stats, costSummary, 
       key: 'tokens',
       dot: DOT.tokens,
       label: t('hero.totalTokens'),
-      value: <AnimatedNumber value={summary.totalTokens} formatter={formatTokenCount} className="text-3xl font-semibold tabular-nums text-foreground" dataTestId="usage-total-tokens" />,
+      value: <AnimatedNumber value={tokenComparison.currentTotal} formatter={formatTokenCount} className="text-3xl font-semibold tabular-nums text-foreground" dataTestId="usage-total-tokens" />,
       delta: tokenComparison.changePct,
       deltaLabel: vsRangeLabel,
       dataTestId: 'usage-hero-tokens',
@@ -72,7 +76,7 @@ export function UsageHeroCards({ daily, dailyCost, summary, stats, costSummary, 
       key: 'turns',
       dot: DOT.turns,
       label: t('hero.totalTurns'),
-      value: <AnimatedNumber value={summary.totalTurns} formatter={value => value.toLocaleString()} className="text-3xl font-semibold tabular-nums text-foreground" />,
+      value: <AnimatedNumber value={turnComparison.currentTotal} formatter={value => value.toLocaleString()} className="text-3xl font-semibold tabular-nums text-foreground" />,
       delta: turnComparison.changePct,
       deltaLabel: vsRangeLabel,
       dataTestId: 'usage-hero-turns',

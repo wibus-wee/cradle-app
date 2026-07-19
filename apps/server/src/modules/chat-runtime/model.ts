@@ -63,6 +63,11 @@ export const ChatRuntimeModel = {
     threadId: t.String({ minLength: 1 }),
   }),
 
+  workflowArtifactParams: t.Object({
+    sessionId: t.String({ minLength: 1 }),
+    toolCallId: t.String({ minLength: 1 }),
+  }),
+
   backgroundTerminalParams: t.Object({
     sessionId: t.String({ minLength: 1 }),
     processId: t.String({ minLength: 1 }),

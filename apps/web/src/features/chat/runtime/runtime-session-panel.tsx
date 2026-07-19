@@ -1,8 +1,10 @@
 import {
   CheckCircleLine as CheckCircle2Icon,
+  CloseCircleLine as XCircleIcon,
   EyeLine as EyeIcon,
   HeartbeatLine as ActivityIcon,
   ListCheckLine as ListChecksIcon,
+  MindMapLine as WorkflowIcon,
   RobotLine as BotIcon,
   RoundLine as CircleIcon,
   StopwatchLine as TimerIcon,
@@ -19,6 +21,7 @@ import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { cn } from '~/lib/cn'
 import { formatElapsedRangeMs, formatPercentFromRatio } from '~/lib/number-format'
+import type { BrowserWorkflowRuntimeSnapshot } from '~/store/browser-panel'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
@@ -41,8 +44,15 @@ import { readRenderableToolPart } from '../rendering/chat-render-plan'
 import { toolNameFromPart } from '../rendering/chat-tool-entities'
 import { SubagentIdenticon } from '../rendering/subagent-identicon'
 import type { RenderableToolPart, ToolState } from '../rendering/tool-ui-classifier'
-import { describeToolCall, formatToolName } from '../rendering/tool-ui-classifier'
+import {
+  describeToolCall,
+  formatToolName,
+  readToolInputPayload,
+  readToolPayload,
+} from '../rendering/tool-ui-classifier'
+import { hasWorkflowDetails, readWorkflowSurfaceSnapshot } from '../rendering/workflow-surface'
 import { useSessionTodos } from '../session/use-session-todos'
+import { useWorkflowRuntime } from '../workflow/use-workflow-runtime'
 import {
   formatRuntimeSettingsSummary,
   readComposerRuntimeSettingsFields,
@@ -131,6 +141,11 @@ export function RuntimeSessionPanel({
     activeSessionId ? chatSelectors.messages(activeSessionId) : () => EMPTY_MESSAGES,
   )
   const tools = collectSessionToolParts(messages)
+  const workflowTool = findLatestWorkflowTool(tools)
+  const workflowRuntime = useWorkflowRuntime(
+    activeSessionId,
+    workflowTool?.toolCallId ?? null,
+  )
   const runMeta = useChatStore(
     active && lastAssistantId ? chatSelectors.runDisplayMeta(lastAssistantId) : () => undefined,
   )
@@ -155,6 +170,13 @@ export function RuntimeSessionPanel({
     <div className="flex flex-1 flex-col gap-3 overflow-auto p-3">
       <ProgressPanel items={progressItems} loading={runtimeUiSlotStatesLoading} />
       <SubagentsPanel sessionId={sessionId} crewState={crewState} />
+      {workflowTool && (
+        <WorkflowRuntimePanel
+          sessionId={sessionId}
+          tool={workflowTool}
+          runtime={workflowRuntime}
+        />
+      )}
 
       <div className="border-t" />
 
@@ -378,6 +400,74 @@ function SubagentsPanel({
           ))}
         </div>
       </div>
+    </section>
+  )
+}
+
+function WorkflowRuntimePanel({
+  sessionId,
+  tool,
+  runtime,
+}: {
+  sessionId: string
+  tool: RenderableToolPart
+  runtime: BrowserWorkflowRuntimeSnapshot | null
+}) {
+  const openWorkflowTab = useBrowserPanelStore(state => state.openWorkflowTab)
+  const descriptor = describeToolCall(tool)
+  const input = readToolInputPayload(tool.input, tool.argumentsText)
+  const output = readToolPayload(tool.output)
+  const surface = readWorkflowSurfaceSnapshot(input, output)
+  const currentPhase = runtime?.currentPhase
+  const runningAgents = runtime?.agents.filter(agent => agent.status === 'running').length ?? 0
+  const completedAgents = runtime?.agents.filter(agent => agent.status === 'completed').length ?? 0
+  const totalAgents = runtime?.agents.length ?? 0
+  const status = runtime?.workflow.status ?? (tool.state === 'output-error' ? 'failed' : 'running')
+
+  return (
+    <section className="space-y-2">
+      <PanelHeading icon={WorkflowIcon} label="Workflow" />
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-auto w-full min-w-0 justify-start rounded-md bg-muted/35 p-2 text-left hover:bg-muted/60"
+        onClick={() => openWorkflowTab({
+          sessionId,
+          toolCallId: tool.toolCallId,
+          title: runtime?.workflow.name ?? surface.workflowName ?? descriptor.title,
+          surface: { ...surface, runtime },
+        })}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex min-w-0 items-center gap-2">
+            {status === 'failed'
+              ? <XCircleIcon className="size-3.5 shrink-0 !text-destructive" aria-hidden="true" />
+              : status === 'completed'
+                ? <CheckCircle2Icon className="size-3.5 shrink-0 !text-emerald-500" aria-hidden="true" />
+                : <Spinner className="size-3.5 shrink-0 !text-primary" />}
+            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
+              {runtime?.workflow.name ?? surface.workflowName ?? descriptor.title}
+            </span>
+            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+              {completedAgents}
+/
+{totalAgents || '—'}
+            </span>
+          </span>
+          <span className="flex min-w-0 items-center justify-between gap-2 pl-5 text-[10px] text-muted-foreground">
+            <span className="truncate">
+              {currentPhase ? `Phase ${currentPhase.index} · ${currentPhase.title}` : 'Discovering phases…'}
+            </span>
+            {runningAgents > 0 && (
+<span className="shrink-0">
+{runningAgents}
+{' '}
+active
+</span>
+)}
+          </span>
+        </span>
+      </Button>
     </section>
   )
 }
@@ -624,6 +714,16 @@ function collectSessionToolParts(messages: UIMessage[]): RenderableToolPart[] {
     }
   }
   return tools
+}
+
+function findLatestWorkflowTool(tools: RenderableToolPart[]): RenderableToolPart | null {
+  for (let index = tools.length - 1; index >= 0; index -= 1) {
+    const tool = tools[index]!
+    const input = readToolInputPayload(tool.input, tool.argumentsText)
+    const output = readToolPayload(tool.output)
+    if (hasWorkflowDetails(input, output, describeToolCall(tool))) { return tool }
+  }
+  return null
 }
 
 function formatStatus(status: RuntimeSessionStatusKind | 'error'): string {

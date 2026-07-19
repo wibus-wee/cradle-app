@@ -2470,6 +2470,21 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         }),
       ]),
     )
+
+    const snapshot = JSON.parse(runtimeSession.providerStateSnapshot ?? '{}') as {
+      claudeAgent?: { workflowExecutions?: Array<Record<string, unknown>> }
+    }
+    expect(snapshot.claudeAgent?.workflowExecutions).toEqual([
+      expect.objectContaining({
+        toolCallId: 'toolu_workflow_1',
+        tool: 'Workflow',
+        status: 'completed',
+        lifecycle: expect.arrayContaining([
+          expect.objectContaining({ type: 'task_started', taskId: 'wciccg1br' }),
+          expect.objectContaining({ type: 'task_notification', taskId: 'wciccg1br', status: 'completed' }),
+        ]),
+      }),
+    ])
   })
 
   it('projects structured Task state into progress UI slot state', async () => {

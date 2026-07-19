@@ -31,6 +31,7 @@ import type {
   ToolUiDescriptor,
 } from '../tool-ui-classifier'
 import { describeToolCall, readToolInputPayload, readToolPayload } from '../tool-ui-classifier'
+import { hasWorkflowDetails, readWorkflowSurfaceSnapshot } from '../workflow-surface'
 import { EditFileBlock } from './edit-file-block'
 import type { ToolCallBlockProps } from './tool-call-block-types'
 import {
@@ -80,34 +81,6 @@ function hasRenderableChildren(children: ReactNode): boolean {
     return children.some(hasRenderableChildren)
   }
   return true
-}
-
-function hasWorkflowDetails(
-  input: ToolPayload,
-  output: ToolPayload,
-  descriptor: ToolUiDescriptor,
-): boolean {
-  return (
-    descriptor.kind === 'subagent'
-    && (descriptor.toolName === 'Workflow'
-      || descriptor.toolName === 'claude-code/Workflow'
-      || input.taskType === 'local_workflow'
-      || output.taskType === 'local_workflow'
-      || input.taskType === 'remote_agent'
-      || output.taskType === 'remote_agent'
-      || input.workflowName !== null
-      || output.workflowName !== null
-      || input.workflowDescription !== null
-      || output.workflowDescription !== null
-      || input.workflowPhases.length > 0
-      || output.workflowPhases.length > 0
-      || input.workflowRunId !== null
-      || output.workflowRunId !== null
-      || input.workflowScriptPath !== null
-      || output.workflowScriptPath !== null
-      || input.workflowSessionUrl !== null
-      || output.workflowSessionUrl !== null)
-  )
 }
 
 function readSubagentPanelName(
@@ -179,18 +152,27 @@ function _ToolDetails({
   errorText?: string
   children?: ReactNode
 }) {
+  const workflowDetails = hasWorkflowDetails(input, output, descriptor)
   return (
     <div className="grid gap-3">
-      <ToolSpecificDetails descriptor={descriptor} input={input} output={output} />
-      {input !== undefined && (
-        <DetailSection title="Input">
-          <RawValue value={input} />
-        </DetailSection>
-      )}
-      {(output !== undefined || errorText) && (
-        <DetailSection title={errorText ? 'Error' : 'Output'}>
-          <RawValue value={errorText ?? output} />
-        </DetailSection>
+      {workflowDetails
+? (
+        <WorkflowExecutionDetails input={input} output={output} />
+      )
+: (
+        <>
+          <ToolSpecificDetails descriptor={descriptor} input={input} output={output} />
+          {input !== undefined && (
+            <DetailSection title="Input">
+              <RawValue value={input} />
+            </DetailSection>
+          )}
+          {(output !== undefined || errorText) && (
+            <DetailSection title={errorText ? 'Error' : 'Output'}>
+              <RawValue value={errorText ?? output} />
+            </DetailSection>
+          )}
+        </>
       )}
       {children && (
         <DetailSection title="Nested activity">
@@ -287,6 +269,9 @@ function FileDiffDetails({ input, output }: { input: ToolPayload, output: ToolPa
 
 function WorkflowExecutionDetails({ input, output }: { input: ToolPayload, output: ToolPayload }) {
   const phases = output.workflowPhases.length > 0 ? output.workflowPhases : input.workflowPhases
+  const lifecycle = output.workflowLifecycle.length > 0
+    ? output.workflowLifecycle
+    : input.workflowLifecycle
   return (
     <div className="grid gap-3">
       <DetailSection title="Workflow">
@@ -307,6 +292,15 @@ function WorkflowExecutionDetails({ input, output }: { input: ToolPayload, outpu
         />
       </DetailSection>
       <WorkflowPhaseList phases={phases} />
+      <DetailSection title="Full input">
+        <RawValue value={input.rawValue} />
+      </DetailSection>
+      <DetailSection title="Full output">
+        <RawValue value={output.rawValue} />
+      </DetailSection>
+      <DetailSection title="Lifecycle events">
+        <RawValue value={lifecycle} />
+      </DetailSection>
     </div>
   )
 }
@@ -356,7 +350,7 @@ export function ToolCallBlock({
     = (descriptor.kind === 'file-diff' || descriptor.kind === 'notebook-diff')
       && (!!errorText || hasFileDiffInlineContent(inputPayload, outputPayload))
   const hasWorkflowPanel = hasWorkflowDetails(inputPayload, outputPayload, descriptor)
-  const hasStructuredPanel = hasTerminalPanel || hasDiffPanel || hasWorkflowPanel
+  const hasStructuredPanel = hasTerminalPanel || hasDiffPanel
   const hasDetailPayload
     = hasStructuredPanel
       || input !== undefined
@@ -370,6 +364,8 @@ export function ToolCallBlock({
   const canOpenWorkspaceDiff = !!workspaceDiffTarget && !!workspaceDiffPath
   const openWorkspaceDiffTab = useBrowserPanelStore(s => s.openWorkspaceDiffTab)
   const openSubagentTab = useBrowserPanelStore(s => s.openSubagentTab)
+  const openWorkflowTab = useBrowserPanelStore(s => s.openWorkflowTab)
+  const updateWorkflowTab = useBrowserPanelStore(s => s.updateWorkflowTab)
   const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
   const hasChildren = hasRenderableChildren(children)
   const expandable = hasStructuredPanel || hasChildren
@@ -382,7 +378,10 @@ export function ToolCallBlock({
   const planImplementationApproval
     = descriptor.kind === 'plan-implementation' && state === 'approval-requested'
   const approvalReason = readApprovalReason(input, approval)
-  const canOpenSubagentThread = descriptor.kind === 'subagent' && !!sessionId
+  const workflowSurface = hasWorkflowPanel
+    ? readWorkflowSurfaceSnapshot(inputPayload, outputPayload)
+    : null
+  const canOpenSubagentThread = descriptor.kind === 'subagent' && !!sessionId && !hasWorkflowPanel
   const subagentPanelName = canOpenSubagentThread
     ? readSubagentPanelName(inputPayload, outputPayload, descriptor)
     : null
@@ -395,6 +394,17 @@ export function ToolCallBlock({
       setExpanded(true)
     }
   }, [errored, hasStructuredPanel])
+
+  useEffect(() => {
+    if (!workflowSurface) {
+      return
+    }
+    updateWorkflowTab({
+      sessionId,
+      toolCallId,
+      surface: workflowSurface,
+    })
+  }, [sessionId, toolCallId, updateWorkflowTab, workflowSurface])
 
   const openWorkspaceDiff = () => {
     if (!workspaceDiffTarget || !workspaceDiffPath) {
@@ -421,6 +431,20 @@ export function ToolCallBlock({
       agentName: subagentPanelName,
       agentRole: subagentPanelRole,
       ownerId,
+    })
+  }
+
+  const openWorkflowSurface = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!workflowSurface) {
+      return
+    }
+    openWorkflowTab({
+      sessionId,
+      toolCallId,
+      title: workflowSurface.workflowName ?? descriptor.title,
+      surface: workflowSurface,
     })
   }
 
@@ -472,7 +496,7 @@ export function ToolCallBlock({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground/80">
             {descriptor.title}
           </span>
-          {canOpenSubagentThread && (
+          {(canOpenSubagentThread || hasWorkflowPanel) && (
             <Tooltip>
               <TooltipTrigger
                 render={(
@@ -481,23 +505,29 @@ export function ToolCallBlock({
                     variant="ghost"
                     size="icon-xs"
                     className="size-6 text-muted-foreground/50 hover:text-foreground"
-                    aria-label={`Open ${subagentPanelName ?? 'Subagent'} output`}
-                    onClick={openSubagentOutput}
+                    aria-label={hasWorkflowPanel
+                      ? `Open ${workflowSurface?.workflowName ?? 'Workflow'} surface`
+                      : `Open ${subagentPanelName ?? 'Subagent'} output`}
+                    onClick={hasWorkflowPanel ? openWorkflowSurface : openSubagentOutput}
                   >
                     <ExternalLinkIcon className="size-3.5" aria-hidden />
                   </Button>
                 )}
               />
-              <TooltipContent sideOffset={6}>Open output</TooltipContent>
+              <TooltipContent sideOffset={6}>{hasWorkflowPanel ? 'Open Workflow surface' : 'Open output'}</TooltipContent>
             </Tooltip>
           )}
-          {hasDetailPayload && (
+          {hasDetailPayload && !hasWorkflowPanel && (
             <Button
               type="button"
               variant="ghost"
               size="xs"
               className="h-6 px-2 text-[11px] text-muted-foreground"
               onClick={(event) => {
+                if (hasWorkflowPanel) {
+                  openWorkflowSurface(event)
+                  return
+                }
                 event.preventDefault()
                 event.stopPropagation()
                 setDetailsOpen(true)
@@ -568,13 +598,7 @@ export function ToolCallBlock({
           </div>
         )}
 
-        {hasWorkflowPanel && expanded && (
-          <div className="px-3 pb-3">
-            <WorkflowExecutionDetails input={inputPayload} output={outputPayload} />
-          </div>
-        )}
-
-        {(!hasStructuredPanel || !expanded)
+        {!hasWorkflowPanel && (!hasStructuredPanel || !expanded)
           && hasHeroContent(descriptor, inputPayload, outputPayload, errorText) && (
             <div className="px-3 pb-3">
               <ToolHero

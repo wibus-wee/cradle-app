@@ -12,6 +12,8 @@ import type { WorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import { readWorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import type { ClaudeAgentCapturedPlan, ClaudeAgentCapturedTaskActivity, ClaudeAgentCapturedTodos } from './event-to-chunk-mapper'
 import type { TodoPluginItem, TodoPluginStatus } from './tools/todo-plugin-state'
+import type { ClaudeWorkflowExecutionRecord } from './workflow'
+import { mergeClaudeWorkflowExecutionRecord, readClaudeWorkflowExecutionRecord } from './workflow'
 
 interface ClaudeAgentPlanSnapshot {
   threadId: string
@@ -601,6 +603,46 @@ export function writeClaudeAgentCrewCall(
   runtimeSession.providerStateSnapshot = JSON.stringify({
     ...snapshot,
     claudeAgent: claudeAgentState,
+  })
+}
+
+export function writeClaudeAgentWorkflowExecution(
+  runtimeSession: RuntimeSession,
+  execution: ClaudeWorkflowExecutionRecord,
+): void {
+  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
+  const claudeAgentState = { ...readRecord(snapshot.claudeAgent) }
+  const existingExecutions = readClaudeAgentWorkflowExecutionsSnapshot(claudeAgentState.workflowExecutions)
+  const index = existingExecutions.findIndex(item => item.toolCallId === execution.toolCallId)
+
+  if (index >= 0) {
+    existingExecutions[index] = mergeClaudeWorkflowExecutionRecord(existingExecutions[index]!, execution)
+  }
+  else {
+    existingExecutions.push(execution)
+  }
+
+  claudeAgentState.workflowExecutions = existingExecutions
+  runtimeSession.providerStateSnapshot = JSON.stringify({
+    ...snapshot,
+    claudeAgent: claudeAgentState,
+  })
+}
+
+export function readClaudeAgentWorkflowExecutions(
+  runtimeSession: RuntimeSession,
+): ClaudeWorkflowExecutionRecord[] {
+  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
+  return readClaudeAgentWorkflowExecutionsSnapshot(readRecord(snapshot.claudeAgent).workflowExecutions)
+}
+
+function readClaudeAgentWorkflowExecutionsSnapshot(value: unknown): ClaudeWorkflowExecutionRecord[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.flatMap((item): ClaudeWorkflowExecutionRecord[] => {
+    const execution = readClaudeWorkflowExecutionRecord(item)
+    return execution ? [execution] : []
   })
 }
 

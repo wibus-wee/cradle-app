@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RenderableToolPart } from './tool-ui-classifier'
-import { describeToolCall, describeToolCallCached } from './tool-ui-classifier'
+import { describeToolCall, describeToolCallCached, readToolPayload } from './tool-ui-classifier'
 
 function toolPart(input: unknown, type = 'tool-Bash'): RenderableToolPart {
   return {
@@ -129,5 +129,36 @@ describe('describeToolCall', () => {
     expect(inputDescriptor.kind).toBe('terminal')
     expect(outputDescriptor).not.toBe(inputDescriptor)
     expect(outputDescriptor.kind).toBe('file-read')
+  })
+
+  it('preserves the complete Workflow payload and lifecycle for detail rendering', () => {
+    const input = {
+      script: 'export const meta = { name: \'research\', phases: [] }',
+      name: 'research',
+      args: { question: 'What changed?' },
+      scriptPath: '/tmp/research.js',
+      futureInputField: { preserve: true },
+    }
+    const output = {
+      status: 'async_launched',
+      taskId: 'workflow-task-1',
+      taskType: 'local_workflow',
+      workflowName: 'research',
+      runId: 'wf_run_1',
+      futureOutputField: ['preserve', 'this'],
+      lifecycle: [{
+        type: 'task_notification',
+        taskId: 'workflow-task-1',
+        status: 'completed',
+      }],
+    }
+
+    const inputPayload = readToolPayload(input)
+    const outputPayload = readToolPayload(output)
+
+    expect(inputPayload.rawValue).toBe(input)
+    expect(outputPayload.rawValue).toBe(output)
+    expect(outputPayload.workflowLifecycle).toEqual(output.lifecycle)
+    expect(outputPayload.workflowRunId).toBe('wf_run_1')
   })
 })

@@ -149,6 +149,7 @@ import {
   writeClaudeAgentProgress,
   writeClaudeAgentRateLimitSnapshot,
   writeClaudeAgentTaskActivity,
+  writeClaudeAgentWorkflowExecution,
 } from './state-projector'
 import { ClaudeCodeToolName } from './tools/identity'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload } from './tools/mapper'
@@ -176,6 +177,8 @@ type ActiveClaudeQuery = {
    * the crew link `resolveClaudeTaskCrewLink` registers must be visible from all of them.
    */
   taskLaunchesById: Map<string, ClaudeCrewLink>
+  workflowOutputsByToolCallId: Map<string, Record<string, unknown>>
+  workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>>
   permissionBridgeState: ClaudeAgentPermissionBridgeState
   runtimeSession: RuntimeSession
   providerTargetId: string
@@ -572,12 +575,21 @@ export class ClaudeAgentProvider implements ChatRuntime {
         })
       }
       const taskLaunchesById: Map<string, ClaudeCrewLink> = new Map()
+      const workflowOutputsByToolCallId: Map<string, Record<string, unknown>> = new Map()
+      const workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>> = new Map()
       activeEntry = {
         query: activeQuery,
         abortController,
         inputStream,
-        mapperState: createClaudeAgentChunkMapperState(undefined, taskLaunchesById),
+        mapperState: createClaudeAgentChunkMapperState(
+          undefined,
+          taskLaunchesById,
+          workflowOutputsByToolCallId,
+          workflowLifecyclesByToolCallId,
+        ),
         taskLaunchesById,
+        workflowOutputsByToolCallId,
+        workflowLifecyclesByToolCallId,
         permissionBridgeState,
         runtimeSession: input.runtimeSession,
         providerTargetId: profile.providerTargetId,
@@ -866,6 +878,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
     for (const crewCall of result.capturedCrewCalls) {
       writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
+      if (crewCall.workflow) {
+        writeClaudeAgentWorkflowExecution(entry.runtimeSession, crewCall.workflow)
+      }
     }
     for (const taskActivity of result.capturedTaskActivity) {
       writeClaudeAgentTaskActivity(entry.runtimeSession, taskActivity)
@@ -944,6 +959,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     )
     for (const crewCall of result.capturedCrewCalls) {
       writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
+      if (crewCall.workflow) {
+        writeClaudeAgentWorkflowExecution(entry.runtimeSession, crewCall.workflow)
+      }
     }
     for (const taskActivity of result.capturedTaskActivity) {
       writeClaudeAgentTaskActivity(entry.runtimeSession, taskActivity)
@@ -972,6 +990,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
       mapperState: createClaudeAgentChunkMapperState(
         `provider-thread:${providerThreadId}`,
         entry.taskLaunchesById,
+        entry.workflowOutputsByToolCallId,
+        entry.workflowLifecyclesByToolCallId,
       ),
       terminal: false,
     }
@@ -1171,7 +1191,12 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const syntheticTurn: ActiveClaudeSyntheticTurn = {
       providerTurnId: `claude-synthetic-${randomUUID()}`,
       providerThreadId: null,
-      mapperState: createClaudeAgentChunkMapperState(undefined, entry.taskLaunchesById),
+      mapperState: createClaudeAgentChunkMapperState(
+        undefined,
+        entry.taskLaunchesById,
+        entry.workflowOutputsByToolCallId,
+        entry.workflowLifecyclesByToolCallId,
+      ),
       onProviderSyntheticTurnEvent,
     }
     entry.mainSyntheticTurn = syntheticTurn
@@ -1194,7 +1219,12 @@ export class ClaudeAgentProvider implements ChatRuntime {
     const syntheticTurn: ActiveClaudeSyntheticTurn = {
       providerTurnId: `claude-synthetic-${randomUUID()}`,
       providerThreadId,
-      mapperState: createClaudeAgentChunkMapperState(undefined, entry.taskLaunchesById),
+      mapperState: createClaudeAgentChunkMapperState(
+        undefined,
+        entry.taskLaunchesById,
+        entry.workflowOutputsByToolCallId,
+        entry.workflowLifecyclesByToolCallId,
+      ),
       onProviderSyntheticTurnEvent,
     }
     entry.providerThreadSyntheticTurns.set(providerThreadId, syntheticTurn)

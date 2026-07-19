@@ -37,6 +37,10 @@ import {
 } from './tools/task-progress-state'
 import type { TodoPluginItem } from './tools/todo-plugin-state'
 import { isTodoWriteToolName, synthesizeTodoWritePluginState } from './tools/todo-plugin-state'
+import type { ClaudeWorkflowExecutionRecord } from './workflow'
+import {
+  createClaudeWorkflowExecutionRecord,
+} from './workflow'
 
 interface BetaContentBlock {
   type: string
@@ -92,6 +96,10 @@ export interface ClaudeAgentChunkMapperState {
   toolInputTextByToolCallId: Map<string, TextAccumulator>
   /** Caches Cradle-owned tool args by tool call so results can carry a stable tool envelope. */
   toolArgsByToolCallId: Map<string, unknown>
+  /** Keeps structured Workflow output available while task lifecycle events arrive later. */
+  workflowOutputsByToolCallId: Map<string, Record<string, unknown>>
+  /** Keeps raw Workflow lifecycle events available for the same tool output projection. */
+  workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>>
   /**
    * Maps a `task_started` SDK task id to the crew call it was linked to (its real `Agent`/
    * `Workflow` tool_use id, or a synthesized id for tool_use-less local workflows). Lets later
@@ -152,6 +160,7 @@ export interface ClaudeAgentCapturedCrewCall {
   status: 'running' | 'completed' | 'failed'
   startedAt: number
   completedAt: number | null
+  workflow?: ClaudeWorkflowExecutionRecord
 }
 
 /**
@@ -191,6 +200,8 @@ function normalizeClaudeAgentChunkMapperState(state: ClaudeAgentChunkMapperState
   state.toolNamesByToolCallId ??= new Map()
   state.toolInputTextByToolCallId ??= new Map()
   state.toolArgsByToolCallId ??= new Map()
+  state.workflowOutputsByToolCallId ??= new Map()
+  state.workflowLifecyclesByToolCallId ??= new Map()
   state.taskLaunchesById ??= new Map()
   state.taskProgress ??= createClaudeAgentTaskProgressState()
   state.activeTextBlockByIndex ??= new Map()
@@ -214,6 +225,8 @@ function normalizeClaudeAgentChunkMapperState(state: ClaudeAgentChunkMapperState
 export function createClaudeAgentChunkMapperState(
   textItemId: string = randomUUID(),
   taskLaunchesById: Map<string, ClaudeCrewLink> = new Map(),
+  workflowOutputsByToolCallId: Map<string, Record<string, unknown>> = new Map(),
+  workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>> = new Map(),
 ): ClaudeAgentChunkMapperState {
   return {
     textItemId,
@@ -226,6 +239,8 @@ export function createClaudeAgentChunkMapperState(
     toolInputTextByToolCallId: new Map(),
     toolArgsByToolCallId: new Map(),
     taskLaunchesById,
+    workflowOutputsByToolCallId,
+    workflowLifecyclesByToolCallId,
     taskProgress: createClaudeAgentTaskProgressState(),
     activeTextBlockByIndex: new Map(),
     activeThinkingBlockByIndex: new Map(),
@@ -302,6 +317,15 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
     const textId = randomUUID()
     const linkedCrewTool = resolveClaudeTaskCrewLink(taskMsg.task_id, taskMsg.tool_use_id, taskMsg.task_type, state)
     if (linkedCrewTool) {
+      const workflow = linkedCrewTool.tool === ClaudeCodeToolName.Workflow
+        ? createClaudeWorkflowExecutionRecord({
+            toolCallId: linkedCrewTool.toolCallId,
+            lifecycle: taskMsg,
+            status: 'running',
+            startedAt: Date.now(),
+            completedAt: null,
+          })
+        : undefined
       base.capturedCrewCalls.push({
         toolCallId: linkedCrewTool.toolCallId,
         tool: linkedCrewTool.tool,
@@ -317,7 +341,11 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
         status: 'running',
         startedAt: Date.now(),
         completedAt: null,
+        ...(workflow ? { workflow } : {}),
       })
+      if (linkedCrewTool.tool === ClaudeCodeToolName.Workflow) {
+        chunks.push(createClaudeWorkflowLifecycleChunk(linkedCrewTool.toolCallId, taskMsg, state))
+      }
     }
     else {
       base.capturedTaskActivity.push({
@@ -338,6 +366,15 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
     const taskMsg = systemEvent.message
     const linkedCrewTool = resolveClaudeTaskCrewLink(taskMsg.task_id, taskMsg.tool_use_id, undefined, state)
     if (linkedCrewTool) {
+      const workflow = linkedCrewTool.tool === ClaudeCodeToolName.Workflow
+        ? createClaudeWorkflowExecutionRecord({
+            toolCallId: linkedCrewTool.toolCallId,
+            lifecycle: taskMsg,
+            status: 'running',
+            startedAt: 0,
+            completedAt: null,
+          })
+        : undefined
       base.capturedCrewCalls.push({
         toolCallId: linkedCrewTool.toolCallId,
         tool: linkedCrewTool.tool,
@@ -353,7 +390,11 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
         status: 'running',
         startedAt: 0,
         completedAt: null,
+        ...(workflow ? { workflow } : {}),
       })
+      if (linkedCrewTool.tool === ClaudeCodeToolName.Workflow) {
+        chunks.push(createClaudeWorkflowLifecycleChunk(linkedCrewTool.toolCallId, taskMsg, state))
+      }
     }
     else {
       base.capturedTaskActivity.push({
@@ -372,6 +413,15 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
     const resolvedStatus = status === 'completed' ? 'completed' : 'failed'
     const linkedCrewTool = resolveClaudeTaskCrewLink(taskMsg.task_id, taskMsg.tool_use_id, undefined, state)
     if (linkedCrewTool) {
+      const workflow = linkedCrewTool.tool === ClaudeCodeToolName.Workflow
+        ? createClaudeWorkflowExecutionRecord({
+            toolCallId: linkedCrewTool.toolCallId,
+            lifecycle: taskMsg,
+            status: status === 'completed' ? 'completed' : status === 'stopped' ? 'stopped' : 'failed',
+            startedAt: 0,
+            completedAt: Date.now(),
+          })
+        : undefined
       base.capturedCrewCalls.push({
         toolCallId: linkedCrewTool.toolCallId,
         tool: linkedCrewTool.tool,
@@ -387,7 +437,11 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
         status: resolvedStatus,
         startedAt: 0,
         completedAt: Date.now(),
+        ...(workflow ? { workflow } : {}),
       })
+      if (linkedCrewTool.tool === ClaudeCodeToolName.Workflow) {
+        chunks.push(createClaudeWorkflowLifecycleChunk(linkedCrewTool.toolCallId, taskMsg, state))
+      }
     }
     else {
       base.capturedTaskActivity.push({
@@ -413,6 +467,40 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
   }
 
   return { ...base, chunks, sessionId }
+}
+
+function createClaudeWorkflowLifecycleChunk(
+  toolCallId: string,
+  message: SDKTaskStartedMessage | SDKTaskProgressMessage | SDKTaskNotificationMessage,
+  state: ClaudeAgentChunkMapperState,
+): UIMessageChunk {
+  const rawLifecycle = { ...message } as Record<string, unknown>
+  const existingLifecycle = state.workflowLifecyclesByToolCallId.get(toolCallId) ?? []
+  const lifecycleIndex = typeof rawLifecycle.uuid === 'string'
+    ? existingLifecycle.findIndex(item => item.uuid === rawLifecycle.uuid)
+    : -1
+  const lifecycle = [...existingLifecycle]
+  if (lifecycleIndex >= 0) {
+    lifecycle[lifecycleIndex] = rawLifecycle
+  }
+  else {
+    lifecycle.push(rawLifecycle)
+  }
+  state.workflowLifecyclesByToolCallId.set(toolCallId, lifecycle)
+
+  const output = {
+    ...(state.workflowOutputsByToolCallId.get(toolCallId) ?? {}),
+    lifecycle,
+    rawLifecycle: lifecycle,
+  }
+  return providerChunk.toolOutputAvailable({
+    toolCallId,
+    output: createClaudeCodeToolResultPayload({
+      apiName: ClaudeCodeToolName.Workflow,
+      args: readToolCallArgs(toolCallId, state),
+      result: output,
+    }),
+  })
 }
 
 type ClaudeSystemLifecycleEvent
@@ -587,15 +675,18 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
         const b = block as { type: string, tool_use_id?: string, content?: unknown, is_error?: boolean }
         if (b.type === 'tool_result' && b.tool_use_id) {
           const normalizedOutput = normalizeToolResultContent(readToolResultContent(msg, b))
-
-          // Capture Agent tool result as crew call completion
           const toolName = state.toolNamesByToolCallId.get(b.tool_use_id)
           const normalizedToolName = toolName ? normalizeClaudeCodeToolApiName(toolName) : null
+          if (normalizedToolName === ClaudeCodeToolName.Workflow && isRecord(normalizedOutput)) {
+            state.workflowOutputsByToolCallId.set(b.tool_use_id, { ...normalizedOutput })
+          }
+
+          // Capture Agent tool result as crew call completion
           if (normalizedToolName === ClaudeCodeToolName.Agent || normalizedToolName === ClaudeCodeToolName.Workflow) {
             const launch = readClaudeAgentAsyncLaunchResult(normalizedOutput)
             const status = b.is_error
               ? 'failed'
-              : launch?.status === 'async_launched'
+              : launch !== null
                 ? 'running'
                 : 'completed'
             // Once launched, the SDK identifies this task purely by its `agentId` (== task_id)
@@ -603,7 +694,10 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
             // omit `tool_use_id` entirely. Link that id now so `resolveClaudeTaskCrewLink` keeps
             // updating this same crew call instead of routing it to `capturedTaskActivity`.
             if (launch?.agentId) {
-              state.taskLaunchesById.set(launch.agentId, { toolCallId: launch.agentId, tool: normalizedToolName })
+              state.taskLaunchesById.set(launch.agentId, {
+                toolCallId: normalizedToolName === ClaudeCodeToolName.Workflow ? b.tool_use_id : launch.agentId,
+                tool: normalizedToolName,
+              })
             }
             capturedCrewCalls.push({
               toolCallId: b.tool_use_id,
@@ -620,6 +714,18 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
               status,
               startedAt: 0,
               completedAt: status === 'running' ? null : Date.now(),
+              ...(normalizedToolName === ClaudeCodeToolName.Workflow
+                ? {
+                    workflow: createClaudeWorkflowExecutionRecord({
+                      toolCallId: b.tool_use_id,
+                      input: readToolCallArgs(b.tool_use_id, state),
+                      output: normalizedOutput,
+                      status: status === 'running' ? 'running' : 'completed',
+                      startedAt: 0,
+                      completedAt: status === 'running' ? null : Date.now(),
+                    }),
+                  }
+                : {}),
             })
           }
 
@@ -633,7 +739,9 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
           else {
             const output = createClaudeCodeToolResult(
               b.tool_use_id,
-              normalizedOutput,
+              normalizedToolName === ClaudeCodeToolName.Workflow
+                ? readClaudeWorkflowOutputWithLifecycle(b.tool_use_id, normalizedOutput, state)
+                : normalizedOutput,
               state,
             )
             const todoCapture = readTodoWriteCapture(b.tool_use_id, state)
@@ -995,6 +1103,15 @@ function emitToolUseChunks(
     const normalizedToolName = normalizeClaudeCodeToolApiName(toolName)
     if (normalizedToolName === ClaudeCodeToolName.Agent || normalizedToolName === ClaudeCodeToolName.Workflow) {
       const args = (input ?? {}) as Record<string, unknown>
+      const workflow = normalizedToolName === ClaudeCodeToolName.Workflow
+        ? createClaudeWorkflowExecutionRecord({
+            toolCallId,
+            input,
+            status: 'running',
+            startedAt: Date.now(),
+            completedAt: null,
+          })
+        : undefined
       capturedCrewCalls.push({
         toolCallId,
         tool: normalizedToolName,
@@ -1014,6 +1131,7 @@ function emitToolUseChunks(
         status: 'running',
         startedAt: Date.now(),
         completedAt: null,
+        ...(workflow ? { workflow } : {}),
       })
     }
   }
@@ -1045,17 +1163,21 @@ function emitToolUseChunks(
   return { chunks, capturedPlans, capturedTodos, capturedInteractionModes, capturedCrewCalls }
 }
 
-function readClaudeAgentAsyncLaunchResult(output: unknown): { status: 'async_launched', agentId: string | null, outputFile: string | null } | null {
+function readClaudeAgentAsyncLaunchResult(output: unknown): { status: 'async_launched' | 'remote_launched', agentId: string | null, outputFile: string | null } | null {
   if (!output || typeof output !== 'object') {
     return null
   }
   const record = output as Record<string, unknown>
-  if (record.status !== 'async_launched') {
+  if (record.status !== 'async_launched' && record.status !== 'remote_launched') {
     return null
   }
   return {
-    status: 'async_launched',
-    agentId: typeof record.agentId === 'string' ? record.agentId : null,
+    status: record.status,
+    agentId: typeof record.agentId === 'string'
+      ? record.agentId
+      : typeof record.taskId === 'string'
+        ? record.taskId
+        : null,
     outputFile: typeof record.outputFile === 'string' ? record.outputFile : null,
   }
 }
@@ -1199,6 +1321,22 @@ function createClaudeCodeToolResult(
     args,
     result: enrichedResult,
   })
+}
+
+function readClaudeWorkflowOutputWithLifecycle(
+  toolCallId: string,
+  output: unknown,
+  state: ClaudeAgentChunkMapperState,
+): unknown {
+  const lifecycle = state.workflowLifecyclesByToolCallId.get(toolCallId) ?? []
+  if (lifecycle.length === 0 || !isRecord(output)) {
+    return output
+  }
+  return {
+    ...output,
+    lifecycle,
+    rawLifecycle: lifecycle,
+  }
 }
 
 function readTodoWriteCapture(toolCallId: string, state: ClaudeAgentChunkMapperState): ClaudeAgentCapturedTodos | null {

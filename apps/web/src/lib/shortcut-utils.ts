@@ -18,10 +18,30 @@ export type ShortcutEntry = {
   enabled: boolean
 }
 
+/** Physical key codes for non-letter shortcuts that may report unstable `event.key` values. */
+const SHORTCUT_KEY_CODES: Record<string, string> = {
+  '`': 'Backquote',
+  '~': 'Backquote',
+  'tab': 'Tab',
+  'escape': 'Escape',
+  'esc': 'Escape',
+  'enter': 'Enter',
+  'return': 'Enter',
+  'backspace': 'Backspace',
+  'delete': 'Delete',
+  ' ': 'Space',
+  'space': 'Space',
+}
+
 export function matchesShortcut(event: KeyboardEvent, shortcut: ShortcutDefinition): boolean {
   const key = shortcut.key.toLowerCase()
   const letterKeyCode = /^[a-z]$/.test(key) ? `Key${key.toUpperCase()}` : null
-  if (event.key.toLowerCase() !== key && event.code !== letterKeyCode) {
+  const namedKeyCode = SHORTCUT_KEY_CODES[key] ?? null
+  const eventKey = event.key.toLowerCase()
+  const keyMatched = eventKey === key
+    || (letterKeyCode !== null && event.code === letterKeyCode)
+    || (namedKeyCode !== null && event.code === namedKeyCode)
+  if (!keyMatched) {
     return false
   }
   const modUsesMeta = navigator.platform.toLowerCase().includes('mac')

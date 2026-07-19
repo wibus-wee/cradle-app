@@ -10,7 +10,6 @@ import { UsageBreakdown } from './usage-breakdown'
 import { UsageHeatmap } from './usage-heatmap'
 import { UsageHeroCards } from './usage-hero-cards'
 import { UsagePatterns } from './usage-patterns'
-import { UsageRecentSessions } from './usage-recent-sessions'
 import type { UsageRangeKey } from './usage-time-range'
 import { USAGE_RANGE_OPTIONS } from './usage-time-range'
 import { UsageTrendChart } from './usage-trend-chart'
@@ -20,7 +19,7 @@ import { useUsageOverview } from './use-usage-overview'
 export function UsageDashboard() {
   const { t } = useTranslation('usage')
   const [range, setRange] = useState<UsageRangeKey>('30d')
-  const { daily, dailyByModel, hourly, summary, stats, recentSessions, costSummary, dailyCost, usageReady, hasData } = useUsageOverview()
+  const { daily, dailyByModel, hourly, summary, stats, costSummary, dailyCost, usageReady, hasData } = useUsageOverview()
 
   const hasCost = Boolean(costSummary && costSummary.totalCostUsd > 0)
   const hasRankedUsage = Boolean(
@@ -80,10 +79,9 @@ export function UsageDashboard() {
             <UsageHeroCards
               daily={daily}
               dailyCost={dailyCost}
-              summary={summary}
               stats={stats}
-              costSummary={costSummary}
               range={range}
+              hasCost={hasCost}
             />
 
             <SecondaryStats summary={summary} stats={stats} />
@@ -115,12 +113,6 @@ export function UsageDashboard() {
               <SectionCard>
                 <UsagePatterns daily={daily} dailyByModel={dailyByModel} hourly={hourly} />
               </SectionCard>
-
-              {recentSessions.length > 0 && (
-                <SectionCard>
-                  <UsageRecentSessions sessions={recentSessions} />
-                </SectionCard>
-              )}
             </div>
           </div>
         )}

@@ -56,10 +56,6 @@
   "streak.day": "日継続",
   "summary.estimatedCost": "推定コスト",
   "summary.totalTokens": "総 tokens",
-  "sessions.description": "token 使用量が記録された最新セッションです。",
-  "sessions.title": "最近のセッション",
-  "sessions.tokensAndTurns": "{{tokens}} · {{turns}} ターン",
-  "sessions.unknownAgent": "不明な Agent",
   "title": "使用量",
   "tooltip.otherModels": "その他のモデル",
   "tooltip.unknownModel": "不明なモデル",
@@ -71,10 +67,5 @@
   "trend.toggleCost": "コスト",
   "trend.toggleTokens": "Tokens",
   "trend.total": "合計",
-  "trend.visibleRange": "{{start}} – {{end}}",
-  "trend.interactionHint": "スクロールでズーム · ドラッグで移動 · ダブルクリックでリセット",
-  "trend.zoomControls": "チャートのズーム操作",
-  "trend.zoomIn": "拡大",
-  "trend.zoomOut": "縮小",
-  "trend.resetZoom": "ズームをリセット"
+  "trend.visibleRange": "{{start}} – {{end}}"
 }

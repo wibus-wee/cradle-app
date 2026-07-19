@@ -7,7 +7,6 @@ import {
   getUsageDailyByModelOptions,
   getUsageDailyOptions,
   getUsagePatternsHourlyOptions,
-  getUsageSessionsRecentOptions,
   getUsageStatsOptions,
   getUsageSummaryOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
@@ -17,7 +16,6 @@ import type {
   GetUsageDailyByModelResponse,
   GetUsageDailyResponse,
   GetUsagePatternsHourlyResponse,
-  GetUsageSessionsRecentResponse,
   GetUsageStatsResponse,
   GetUsageSummaryResponse,
 } from '~/api-gen/types.gen'
@@ -25,7 +23,6 @@ import type {
 export type DailyUsage = GetUsageDailyResponse[number]
 export type DailyUsageByModel = GetUsageDailyByModelResponse[number]
 export type HourlyUsage = GetUsagePatternsHourlyResponse[number]
-export type RecentUsageSession = GetUsageSessionsRecentResponse[number]
 export type UsageSummary = GetUsageSummaryResponse
 export type UsageStats = GetUsageStatsResponse
 export type CostSummary = GetUsageCostSummaryResponse
@@ -34,7 +31,6 @@ export type DailyCost = GetUsageCostDailyResponse[number]
 const EMPTY_DAILY_USAGE: GetUsageDailyResponse = []
 const EMPTY_DAILY_USAGE_BY_MODEL: GetUsageDailyByModelResponse = []
 const EMPTY_HOURLY_USAGE: GetUsagePatternsHourlyResponse = []
-const EMPTY_RECENT_SESSIONS: GetUsageSessionsRecentResponse = []
 const EMPTY_DAILY_COST: GetUsageCostDailyResponse = []
 
 export function useUsageOverview() {
@@ -52,9 +48,6 @@ export function useUsageOverview() {
   })
   const statsQuery = useQuery({
     ...getUsageStatsOptions(),
-  })
-  const recentSessionsQuery = useQuery({
-    ...getUsageSessionsRecentOptions({ query: { limit: '6' } }),
   })
   const costSummaryQuery = useQuery({
     ...getUsageCostSummaryOptions(),
@@ -81,7 +74,6 @@ export function useUsageOverview() {
     hourly: hourlyQuery.data ?? EMPTY_HOURLY_USAGE,
     summary,
     stats: statsQuery.data ?? null,
-    recentSessions: recentSessionsQuery.data ?? EMPTY_RECENT_SESSIONS,
     costSummary: costSummaryQuery.data ?? null,
     dailyCost: dailyCostQuery.data ?? EMPTY_DAILY_COST,
     usageReady:
@@ -89,7 +81,6 @@ export function useUsageOverview() {
       && hourlyQuery.isSuccess
       && summaryQuery.isSuccess
       && statsQuery.isSuccess
-      && recentSessionsQuery.isSuccess
       && costSummaryQuery.isSuccess
       && dailyCostQuery.isSuccess,
     hasData: Boolean(summary && summary.totalTokens > 0),

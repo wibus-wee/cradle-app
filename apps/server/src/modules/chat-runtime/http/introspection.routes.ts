@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { AppError } from '../../../errors/app-error'
+import { openSseEventStream } from '../../../infra/sse-event-stream'
 import { getCodexAppServerCapabilities } from '../../chat-runtime-providers/codex/app-server/bridge'
 import {
   deleteProviderThread,
@@ -11,6 +12,7 @@ import {
   listProviderThreadTurns,
   readContextUsage,
   readProviderThread,
+  readWorkflowArtifactSource,
   terminateBackgroundTerminal,
 } from '../capabilities-api'
 import {
@@ -305,6 +307,28 @@ export const chatRuntimeIntrospectionRoutes = new Elysia({
         },
       },
       params: ChatRuntimeModel.providerThreadParams,
+    },
+  )
+  // GET /chat/sessions/:sessionId/workflows/:toolCallId/stream -> provider-owned Workflow artifact stream
+  .get(
+    '/sessions/:sessionId/workflows/:toolCallId/stream',
+    async ({ params, request }) => {
+      const source = await readWorkflowArtifactSource(params.sessionId, params.toolCallId)
+      return new Response(openSseEventStream({ source, signal: request.signal }), {
+        headers: EVENT_STREAM_HEADERS,
+      })
+    },
+    {
+      detail: {
+        summary: 'Subscribe to a Workflow artifact state stream',
+        responses: {
+          200: {
+            description: 'Workflow runtime snapshots from provider-owned local artifacts.',
+            content: { 'text/event-stream': { schema: { type: 'string' } } },
+          },
+        },
+      },
+      params: ChatRuntimeModel.workflowArtifactParams,
     },
   )
   // GET /chat/sessions/:sessionId/runtime-status -> server-owned runtime session/run status

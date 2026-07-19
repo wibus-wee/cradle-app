@@ -153,6 +153,7 @@ export const UsageModel = {
 
   dailyCost: t.Array(t.Object({
     date: t.String(),
+    modelId: t.String(),
     costUsd: t.Number(),
     promptTokens: t.Number(),
     completionTokens: t.Number(),

@@ -34,6 +34,16 @@ describe('workspace capability', () => {
       expect(created.createdAt).toBeTypeOf('number')
       expect(created.updatedAt).toBeTypeOf('number')
 
+      // from-directory is idempotent so CLI `cradle open` can ensure-then-open.
+      const reimportRes = await app.handle(new Request('http://localhost/workspaces/from-directory', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: workspaceRoot }),
+      }))
+      expect(reimportRes.status).toBe(200)
+      const reimported = await reimportRes.json()
+      expect(reimported).toEqual(expect.objectContaining({ id: created.id, name: created.name }))
+
       const explicitRes = await app.handle(new Request('http://localhost/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

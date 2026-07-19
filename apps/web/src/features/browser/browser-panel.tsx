@@ -103,6 +103,7 @@ import { SideConversationPanel } from './side-conversation-panel'
 import { SubagentOutputPanel } from './subagent-output-panel'
 import type { BrowserLocalServer } from './use-local-servers'
 import { useLocalServers } from './use-local-servers'
+import { WorkflowOutputPanel } from './workflow-output-panel'
 import { WorkspaceDiffViewer } from './workspace-diff-viewer'
 
 interface BrowserPanelProps {
@@ -2934,6 +2935,9 @@ export function BrowserPanel({
                 {tab.kind === 'subagent' && (
                   <BotIcon className="size-3 shrink-0 !text-muted-foreground/60" />
                 )}
+                {tab.kind === 'workflow' && (
+                  <BotIcon className="size-3 shrink-0 !text-muted-foreground/60" />
+                )}
                 {tab.kind === 'side-conversation' && (
                   <MessageSquarePlusIcon className="size-3 shrink-0 !text-muted-foreground/60" />
                 )}
@@ -3334,6 +3338,10 @@ export function BrowserPanel({
             agentName={activePanelTab.agentName}
             agentRole={activePanelTab.agentRole}
           />
+        )}
+
+        {activePanelTab?.kind === 'workflow' && (
+          <WorkflowOutputPanel tab={activePanelTab} />
         )}
 
         {activePanelTab?.kind === 'side-conversation' && (

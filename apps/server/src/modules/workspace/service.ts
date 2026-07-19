@@ -130,7 +130,9 @@ export function resolveByLocator(locator: WorkspaceLocator): WorkspaceView | nul
 }
 
 export function resolveByPath(path: string): WorkspaceView | null {
-  return resolveByLocator(localWorkspaceLocator(path))
+  // Match addFromDirectory / inspectDirectory absolute-path storage so
+  // relative and absolute forms resolve the same workspace.
+  return resolveByLocator(localWorkspaceLocator(resolve(path.trim())))
 }
 
 export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): HistoricalWorkspacePlan {
@@ -266,16 +268,37 @@ export function relinkWorkspace(id: string, path: string): WorkspaceView | null 
 }
 
 export function addFromDirectory(path: string): WorkspaceView {
-  const configPath = join(path, MULTI_WORKSPACE_CONFIG_FILE)
+  const absolutePath = resolve(path.trim())
+  if (!isDirectory(absolutePath)) {
+    throw new AppError({
+      code: 'workspace_location_not_found',
+      status: 400,
+      message: 'Workspace location must be an existing directory',
+      details: { path: absolutePath },
+    })
+  }
+  const configPath = join(absolutePath, MULTI_WORKSPACE_CONFIG_FILE)
   // Recognize a cradle-workspace.json and route to the multi-folder import — but
   // only when the experimental feature flag is on. When the flag is off we fall
   // back to a plain single-folder import instead of blocking the user: the mere
   // presence of an experimental artifact must not break the basic "add this
   // folder" action. The recognition is surfaced up-front via inspectDirectory.
   if (existsSync(configPath) && isAppFeatureFlagEnabled('multiWorkspacePoc')) {
+    const existingMulti = resolveByPath(absolutePath)
+    if (existingMulti) {
+      return existingMulti
+    }
     return createMultiFolderWorkspaceFromConfigPath(configPath)
   }
-  return create({ name: basename(path), locator: localWorkspaceLocator(path) })
+
+  // Idempotent open/import path: re-importing an already-registered directory
+  // returns the existing workspace instead of 409, so CLI `cradle open .` can
+  // safely ensure-then-open without a separate resolve round-trip.
+  const existing = resolveByPath(absolutePath)
+  if (existing) {
+    return existing
+  }
+  return create({ name: basename(absolutePath), locator: localWorkspaceLocator(absolutePath) })
 }
 
 export type DirectoryInspectionAction = 'multi-folder' | 'single-folder'
@@ -305,14 +328,15 @@ export interface DirectoryInspection {
  * config) — it reports them in the result instead.
  */
 export function inspectDirectory(path: string): DirectoryInspection {
-  const configPath = join(path, MULTI_WORKSPACE_CONFIG_FILE)
+  const absolutePath = resolve(path.trim())
+  const configPath = join(absolutePath, MULTI_WORKSPACE_CONFIG_FILE)
   const detected = existsSync(configPath)
   const featureFlagEnabled = isAppFeatureFlagEnabled('multiWorkspacePoc')
-  const alreadyImported = resolveByLocator(localWorkspaceLocator(path)) !== null
+  const alreadyImported = resolveByPath(absolutePath) !== null
 
   if (!detected) {
     return {
-      path,
+      path: absolutePath,
       cradleWorkspaceDetected: false,
       config: null,
       configValid: false,
@@ -338,7 +362,7 @@ export function inspectDirectory(path: string): DirectoryInspection {
   }
 
   return {
-    path,
+    path: absolutePath,
     cradleWorkspaceDetected: true,
     config,
     configValid,
@@ -401,6 +425,13 @@ export function createMultiFolderWorkspace(input: MultiFolderWorkspaceConfig): W
   assertMultiWorkspacePocEnabled()
   const config = normalizeMultiFolderWorkspaceConfig(input)
   const workspaceRoot = resolveMultiWorkspacePath(config.name)
+
+  // Idempotent re-import / cradle open: if the managed root is already registered,
+  // return it instead of racing create() into a locator 409.
+  const alreadyRegistered = resolveByPath(workspaceRoot)
+  if (alreadyRegistered) {
+    return alreadyRegistered
+  }
 
   if (existsSync(workspaceRoot)) {
     // The target directory already exists on disk. This typically happens when

@@ -637,7 +637,7 @@ function ProviderCard({
                 </Button>
               )}
             </div>
-            <Input type="password" value={apiKey} onChange={event => onApiKeyChange(event.target.value)} placeholder="Enter API key" className={FLAT_IMPORT_FIELD_CLASS} />
+            <Input type="text" value={apiKey} onChange={event => onApiKeyChange(event.target.value)} placeholder="Enter API key" className={FLAT_IMPORT_FIELD_CLASS} />
           </label>
           {kind !== 'universal' && shouldShowV1Reminder(baseUrl) && <BaseUrlV1Reminder />}
           {(() => {

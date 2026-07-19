@@ -56,10 +56,6 @@
   "streak.day": "días de racha",
   "summary.estimatedCost": "costo estimado",
   "summary.totalTokens": "tokens totales",
-  "sessions.description": "Últimas sesiones con uso de tokens registrado.",
-  "sessions.title": "Sesiones recientes",
-  "sessions.tokensAndTurns": "{{tokens}} · {{turns}} turnos",
-  "sessions.unknownAgent": "Agente desconocido",
   "title": "Uso",
   "tooltip.otherModels": "Otros modelos",
   "tooltip.unknownModel": "Modelo desconocido",
@@ -71,10 +67,5 @@
   "trend.toggleCost": "Costo",
   "trend.toggleTokens": "Tokens",
   "trend.total": "Total",
-  "trend.visibleRange": "{{start}} – {{end}}",
-  "trend.interactionHint": "Desplaza para ampliar · arrastra para mover · doble clic para restablecer",
-  "trend.zoomControls": "Controles de zoom del gráfico",
-  "trend.zoomIn": "Ampliar",
-  "trend.zoomOut": "Reducir",
-  "trend.resetZoom": "Restablecer zoom"
+  "trend.visibleRange": "{{start}} – {{end}}"
 }
