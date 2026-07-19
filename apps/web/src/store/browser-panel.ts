@@ -166,6 +166,96 @@ export interface BrowserSubagentTab {
   favicon: null
 }
 
+/** Live workflow runtime agent row (SSE snapshot from chat-runtime). */
+export interface BrowserWorkflowRuntimeAgent {
+  id: string
+  declarationId: string | null
+  index: number | null
+  label: string
+  phaseIndex: number | null
+  phaseTitle: string | null
+  alignment: 'declared' | 'unmatched' | 'inferred' | 'observed'
+  prompt: string | null
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+  model: string | null
+  totalTokens: number | null
+  toolUses: number
+  lastToolName: string | null
+  lastToolSummary: string | null
+  queuedAt: number | null
+  startedAt: number | null
+  updatedAt: number | null
+  completedAt: number | null
+  durationMs: number | null
+  attempt: number | null
+  result: unknown
+  resultPreview: string | null
+}
+
+export interface BrowserWorkflowRuntimePhase {
+  index: number
+  title: string
+  detail: string | null
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  agentCount: number
+  completedAgentCount: number
+  runningAgentCount: number
+  failedAgentCount: number
+}
+
+/** Live workflow runtime snapshot streamed from `/workflows/:toolCallId/stream`. */
+export interface BrowserWorkflowRuntimeSnapshot {
+  type: 'workflow-snapshot'
+  workflow: {
+    runId: string
+    name: string | null
+    description: string | null
+    status: 'running' | 'completed' | 'failed' | 'stopped'
+    startedAt: number
+    durationMs: number | null
+    result: unknown
+    totalTokens: number | null
+    totalToolCalls: number | null
+    declarationIncomplete: boolean
+  }
+  phases: BrowserWorkflowRuntimePhase[]
+  currentPhase: BrowserWorkflowRuntimePhase | null
+  agents: BrowserWorkflowRuntimeAgent[]
+  logs: string[]
+  updatedAt: number
+}
+
+/** Static surface derived from tool input/output for opening a workflow tab. */
+export interface BrowserWorkflowSurfaceSnapshot {
+  workflowName: string | null
+  description: string | null
+  status: string | null
+  taskId: string | null
+  taskType: string | null
+  runId: string | null
+  scriptPath: string | null
+  transcriptDir: string | null
+  sessionUrl: string | null
+  warning: string | null
+  error: string | null
+  phases: Array<{ name: string, description: string | null }>
+  input: unknown
+  output: unknown
+  lifecycle: unknown[]
+  runtime: BrowserWorkflowRuntimeSnapshot | null
+}
+
+export interface BrowserWorkflowTab {
+  kind: 'workflow'
+  id: string
+  sessionId: string | null
+  toolCallId: string
+  title: string
+  surface: BrowserWorkflowSurfaceSnapshot
+  loading: false
+  favicon: null
+}
+
 export interface BrowserSideConversationTab {
   kind: 'side-conversation'
   id: string
@@ -233,6 +323,7 @@ export type BrowserPanelTab
     | BrowserWorkspaceDiffTab
     | BrowserPullRequestTab
     | BrowserSubagentTab
+    | BrowserWorkflowTab
     | BrowserSideConversationTab
     | BrowserContextUsageReportTab
     | BrowserPanelLauncherTab
@@ -246,6 +337,7 @@ export const BROWSER_PANEL_TAB_KINDS = [
   'workspace-diff',
   'pull-request',
   'subagent',
+  'workflow',
   'side-conversation',
   'context-usage-report',
   'launcher',
@@ -261,6 +353,7 @@ const MULTI_INSTANCE_BROWSER_PANEL_TAB_KINDS: ReadonlySet<BrowserPanelTabKind> =
   'workspace-file',
   'pull-request',
   'subagent',
+  'workflow',
   'side-conversation',
   'tui',
   'plan-document',
@@ -333,6 +426,98 @@ const subagentTabSchema = z.object({
   favicon: z.null(),
 }) satisfies z.ZodType<BrowserSubagentTab>
 
+const workflowPhaseSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable(),
+})
+
+const browserWorkflowRuntimeAgentSchema = z.object({
+  id: z.string(),
+  declarationId: z.string().nullable(),
+  index: z.number().nullable(),
+  label: z.string(),
+  phaseIndex: z.number().nullable(),
+  phaseTitle: z.string().nullable(),
+  alignment: z.enum(['declared', 'unmatched', 'inferred', 'observed']),
+  prompt: z.string().nullable(),
+  status: z.enum(['pending', 'running', 'completed', 'failed', 'skipped']),
+  model: z.string().nullable(),
+  totalTokens: z.number().nullable(),
+  toolUses: z.number(),
+  lastToolName: z.string().nullable(),
+  lastToolSummary: z.string().nullable(),
+  queuedAt: z.number().nullable(),
+  startedAt: z.number().nullable(),
+  updatedAt: z.number().nullable(),
+  completedAt: z.number().nullable(),
+  durationMs: z.number().nullable(),
+  attempt: z.number().nullable(),
+  result: z.unknown(),
+  resultPreview: z.string().nullable(),
+}) satisfies z.ZodType<BrowserWorkflowRuntimeAgent>
+
+const browserWorkflowRuntimePhaseSchema = z.object({
+  index: z.number(),
+  title: z.string(),
+  detail: z.string().nullable(),
+  status: z.enum(['pending', 'running', 'completed', 'failed']),
+  agentCount: z.number(),
+  completedAgentCount: z.number(),
+  runningAgentCount: z.number(),
+  failedAgentCount: z.number(),
+}) satisfies z.ZodType<BrowserWorkflowRuntimePhase>
+
+export const browserWorkflowRuntimeSnapshotSchema = z.object({
+  type: z.literal('workflow-snapshot'),
+  workflow: z.object({
+    runId: z.string(),
+    name: z.string().nullable(),
+    description: z.string().nullable(),
+    status: z.enum(['running', 'completed', 'failed', 'stopped']),
+    startedAt: z.number(),
+    durationMs: z.number().nullable(),
+    result: z.unknown(),
+    totalTokens: z.number().nullable(),
+    totalToolCalls: z.number().nullable(),
+    declarationIncomplete: z.boolean(),
+  }),
+  phases: z.array(browserWorkflowRuntimePhaseSchema),
+  currentPhase: browserWorkflowRuntimePhaseSchema.nullable(),
+  agents: z.array(browserWorkflowRuntimeAgentSchema),
+  logs: z.array(z.string()),
+  updatedAt: z.number(),
+}) satisfies z.ZodType<BrowserWorkflowRuntimeSnapshot>
+
+const browserWorkflowSurfaceSnapshotSchema = z.object({
+  workflowName: z.string().nullable(),
+  description: z.string().nullable(),
+  status: z.string().nullable(),
+  taskId: z.string().nullable(),
+  taskType: z.string().nullable(),
+  runId: z.string().nullable(),
+  scriptPath: z.string().nullable(),
+  transcriptDir: z.string().nullable(),
+  sessionUrl: z.string().nullable(),
+  warning: z.string().nullable(),
+  error: z.string().nullable(),
+  phases: z.array(workflowPhaseSchema),
+  input: z.unknown(),
+  output: z.unknown(),
+  lifecycle: z.array(z.unknown()),
+  runtime: browserWorkflowRuntimeSnapshotSchema.nullable(),
+}) satisfies z.ZodType<BrowserWorkflowSurfaceSnapshot>
+
+const workflowTabSchema = z.object({
+  kind: z.literal('workflow'),
+  id: z.string(),
+  sessionId: z.string().nullable(),
+  toolCallId: z.string(),
+  title: z.string(),
+  surface: browserWorkflowSurfaceSnapshotSchema,
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserWorkflowTab>
+
 const sideConversationTabSchema = z.object({
   kind: z.literal('side-conversation'),
   id: z.string(),
@@ -381,6 +566,7 @@ const restorableBrowserPanelTabSchema = z.discriminatedUnion('kind', [
   workspaceDiffTabSchema,
   pullRequestTabSchema,
   subagentTabSchema,
+  workflowTabSchema,
   sideConversationTabSchema,
   contextUsageReportTabSchema,
   planDocumentTabSchema,
@@ -698,6 +884,20 @@ interface BrowserPanelState {
     agentRole?: string | null
     ownerId?: string | null
   }) => string
+  openWorkflowTab: (input: {
+    sessionId?: string | null
+    toolCallId: string
+    title?: string
+    surface: BrowserWorkflowSurfaceSnapshot
+    ownerId?: string | null
+  }) => string
+  updateWorkflowTab: (input: {
+    sessionId?: string | null
+    toolCallId: string
+    surface: BrowserWorkflowSurfaceSnapshot
+    title?: string
+    ownerId?: string | null
+  }) => void
   openSideConversationTab: (input: {
     parentSessionId: string
     sideConversationId: string
@@ -1013,6 +1213,10 @@ function matchesMultiInstanceBrowserPanelTab(
       return existing.kind === 'subagent'
         && existing.sessionId === incoming.sessionId
         && existing.threadId === incoming.threadId
+    case 'workflow':
+      return existing.kind === 'workflow'
+        && existing.toolCallId === incoming.toolCallId
+        && existing.sessionId === incoming.sessionId
     case 'side-conversation':
       return existing.kind === 'side-conversation'
         && existing.sideConversationId === incoming.sideConversationId
@@ -1446,6 +1650,54 @@ function createBrowserPanelStore() {
           favicon: null,
         }
         return commitOpenTab(set, ownerId, tab)
+      },
+
+      openWorkflowTab: ({ sessionId, toolCallId, title, surface, ownerId: ownerIdInput }) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        const tabId = `workflow:${sessionId ?? 'local'}:${toolCallId}`
+        const tab: BrowserWorkflowTab = {
+          kind: 'workflow',
+          id: tabId,
+          sessionId: sessionId ?? null,
+          toolCallId,
+          title: title ?? surface.workflowName ?? 'Workflow',
+          surface,
+          loading: false,
+          favicon: null,
+        }
+        return commitOpenTab(set, ownerId, tab)
+      },
+
+      updateWorkflowTab: ({ sessionId, toolCallId, surface, title, ownerId: ownerIdInput }) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        const tabId = `workflow:${sessionId ?? 'local'}:${toolCallId}`
+        set((state) => {
+          const ownerState = getOwnerState(state, ownerId)
+          let found = false
+          const tabs = ownerState.tabs.map((tab) => {
+            if (tab.kind !== 'workflow' || tab.toolCallId !== toolCallId) {
+              return tab
+            }
+            if (sessionId != null && tab.sessionId != null && tab.sessionId !== sessionId) {
+              return tab
+            }
+            found = true
+            return {
+              ...tab,
+              sessionId: sessionId ?? tab.sessionId,
+              title: title ?? surface.workflowName ?? tab.title,
+              surface,
+            }
+          })
+          if (!found) {
+            return state
+          }
+          return applyOwnerState(state, ownerId, {
+            ...ownerState,
+            tabs,
+          })
+        })
+        void tabId
       },
 
       openSideConversationTab: ({
