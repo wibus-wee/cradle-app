@@ -4,12 +4,12 @@
   "version": "0.0.1",
   "private": true,
   "description": "Cradle desktop app",
-  "homepage": "https://github.com/wibus-wee/cradle-app",
   "author": {
     "email": "wibus_wee@outlook.com",
     "name": "wibus-wee",
     "url": "https://wibus.ren"
   },
+  "homepage": "https://github.com/wibus-wee/cradle-app",
   "main": "dist/main/index.js",
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
