@@ -68,7 +68,7 @@ Updates are available only in packaged macOS and Windows builds with update feed
 - macOS: `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` (or derive `appcast.xml` from `CRADLE_DESKTOP_UPDATE_URL`) plus `SPARKLE_ED_PUBLIC_KEY`
 - Windows: `CRADLE_DESKTOP_UPDATE_URL` generic feed root containing `latest.yml`
 
-macOS uses `electron-sparkle-updater` (Sparkle) with ad-hoc or Developer ID codesigning. Packaging re-signs the staged `.app` ad-hoc after pack so `generate_appcast` can verify the archive. Sparkle owns download/install/relaunch; Cradle does not stage zip replacement through Download Center on macOS.
+macOS uses `electron-sparkle-updater` (Sparkle) with ad-hoc or Developer ID codesigning. Packaging re-signs the staged `.app` ad-hoc after pack so `generate_appcast` can verify the archive. Sparkle owns download/install/relaunch; Cradle does not stage zip replacement through Download Center on macOS. Release CI uses `Innei/electron-sparkle-updater/action@v1` to sign the appcast, pull prior release zips as delta bases, and emit `appcast.xml` + optional `*.delta` patches (full zip remains the fallback when no base matches).
 
 Windows uses `electron-updater` with the NSIS target. The same `CRADLE_DESKTOP_UPDATE_URL` may point at a feed root that also hosts `appcast.xml` / legacy `manifest.json`; Windows normalizes to the feed directory and reads `latest.yml`. Restart prepares the desktop runtime shutdown, then delegates quit/install/relaunch to the downloaded NSIS installer through `quitAndInstall`.
 

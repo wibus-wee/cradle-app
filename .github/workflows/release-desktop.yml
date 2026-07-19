@@ -49,6 +49,7 @@ jobs:
       source_ref: ${{ steps.params.outputs.source_ref }}
       update_url: ${{ steps.params.outputs.update_url }}
       sparkle_appcast_url: ${{ steps.params.outputs.sparkle_appcast_url }}
+      sparkle_tag_prefix: ${{ steps.params.outputs.sparkle_tag_prefix }}
       release_download_url: ${{ steps.params.outputs.release_download_url }}
       analytics_build_channel: ${{ steps.params.outputs.analytics_build_channel }}
       analytics_audience: ${{ steps.params.outputs.analytics_audience }}
@@ -113,6 +114,8 @@ jobs:
           if [ "$CHANNEL" = "release" ]; then
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/"
             SPARKLE_APPCAST_URL="https://github.com/${{ github.repository }}/releases/latest/download/appcast.xml"
+            # Official Sparkle action filters previous releases by tag prefix for delta bases.
+            SPARKLE_TAG_PREFIX="v"
             ANALYTICS_BUILD_CHANNEL="release"
             ANALYTICS_AUDIENCE="external"
             # End-user builds: product analytics only. AI full/metadata capture stays off
@@ -122,6 +125,7 @@ jobs:
           elif [ "$CHANNEL" = "bleeding-edge" ]; then
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/"
             SPARKLE_APPCAST_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/appcast.xml"
+            SPARKLE_TAG_PREFIX="bleeding-edge-"
             ANALYTICS_BUILD_CHANNEL="bleeding-edge"
             ANALYTICS_AUDIENCE="internal"
             POSTHOG_AI_ENABLED="1"
@@ -129,6 +133,7 @@ jobs:
           else
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/"
             SPARKLE_APPCAST_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/appcast.xml"
+            SPARKLE_TAG_PREFIX="dev-"
             ANALYTICS_BUILD_CHANNEL="development"
             ANALYTICS_AUDIENCE="internal"
             POSTHOG_AI_ENABLED="1"
@@ -150,6 +155,7 @@ jobs:
           echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
           echo "update_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
           echo "sparkle_appcast_url=$SPARKLE_APPCAST_URL" >> "$GITHUB_OUTPUT"
+          echo "sparkle_tag_prefix=$SPARKLE_TAG_PREFIX" >> "$GITHUB_OUTPUT"
           echo "release_download_url=$RELEASE_DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
           echo "analytics_build_channel=$ANALYTICS_BUILD_CHANNEL" >> "$GITHUB_OUTPUT"
           echo "analytics_audience=$ANALYTICS_AUDIENCE" >> "$GITHUB_OUTPUT"
@@ -326,15 +332,12 @@ jobs:
           cp "$zip_path" "$legacy_zip_path"
           /usr/bin/du -h "$zip_path"
 
-      - name: Generate Sparkle appcast
+      - name: Prepare Sparkle archive directory
         working-directory: apps/desktop
         env:
           DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
           RELEASE_ARCH: arm64
-          RELEASE_CHANNEL: ${{ needs.resolve.outputs.channel }}
-          RELEASE_DOWNLOAD_URL: ${{ needs.resolve.outputs.release_download_url }}
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
-          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -344,43 +347,54 @@ jobs:
           fi
 
           archive_dir="release/sparkle-archive"
-          key_dir="$(mktemp -d /tmp/sparkle-ed.XXXXXX)"
-          key_file="${key_dir}/ed25519-private.pem"
-          cleanup() {
-            rm -rf "$key_dir"
-          }
-          trap cleanup EXIT
-
-          umask 077
-          printf '%s\n' "$SPARKLE_ED_PRIVATE_KEY" > "$key_file"
-
-          rm -rf "$archive_dir"
-          mkdir -p "$archive_dir"
-          cp "release/Cradle-${DESKTOP_VERSION}-mac-${RELEASE_ARCH}.zip" "$archive_dir/"
-
-          download_prefix="${RELEASE_DOWNLOAD_URL%/}/"
-          generate_args=(
-            generate-appcast
-            "$archive_dir"
-            --ed-key-file "$key_file"
-            --download-url-prefix "$download_prefix"
-          )
-
-          # Stable release tags are vX.Y.Z. Feed channels publish into fixed tags, so
-          # enclosure rewrite by versioned tag is only meaningful for release.
-          if [ "$RELEASE_CHANNEL" = "release" ]; then
-            generate_args+=(--repo "$GH_REPO" --tag-prefix v)
-          fi
-
-          pnpm exec electron-sparkle-updater "${generate_args[@]}"
-          if [ ! -f "$archive_dir/appcast.xml" ]; then
-            echo "generate-appcast did not produce appcast.xml" >&2
+          zip_name="Cradle-${DESKTOP_VERSION}-mac-${RELEASE_ARCH}.zip"
+          if [ ! -f "release/${zip_name}" ]; then
+            echo "Sparkle zip missing: release/${zip_name}" >&2
             exit 1
           fi
+
+          # Official action treats every *.zip present before it runs as "this release".
+          # Only put the versioned zip here — never the stable Cradle-mac-*.zip alias,
+          # and never prior-release bases (the action fetches those itself).
+          rm -rf "$archive_dir"
+          mkdir -p "$archive_dir"
+          cp "release/${zip_name}" "$archive_dir/"
+          ls -la "$archive_dir"
+
+      - name: Generate Sparkle appcast + deltas
+        uses: Innei/electron-sparkle-updater/action@v1
+        with:
+          tag: ${{ needs.resolve.outputs.channel == 'bleeding-edge' && needs.resolve.outputs.bleeding_edge_feed_tag || needs.resolve.outputs.release_tag }}
+          archive-dir: ${{ github.workspace }}/apps/desktop/release/sparkle-archive
+          ed-private-key: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          repo: ${{ github.repository }}
+          tag-prefix: ${{ needs.resolve.outputs.sparkle_tag_prefix }}
+          download-url-prefix: ${{ needs.resolve.outputs.release_download_url }}/
+          # Pull last 2 matching channel releases as delta bases. First-ever channel
+          # release simply yields a full-only appcast (no bases found).
+          fetch-delta-bases: 'true'
+          delta-bases: '2'
+          # Keep Cradle's multi-platform publish job as the single release publisher.
+          publish: 'false'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect Sparkle appcast assets
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir="release/sparkle-archive"
+          if [ ! -f "$archive_dir/appcast.xml" ]; then
+            echo "official Sparkle action did not produce appcast.xml" >&2
+            exit 1
+          fi
+
+          # Promote only this release's feed products. Prior-release zips fetched as
+          # delta bases stay in archive_dir and must not be re-uploaded.
           cp "$archive_dir/appcast.xml" release/appcast.xml
-          # Also keep any delta patches Sparkle produced.
           find "$archive_dir" -maxdepth 1 -type f -name '*.delta' -exec cp {} release/ \;
           ls -la release/appcast.xml
+          find release -maxdepth 1 -type f \( -name 'appcast.xml' -o -name '*.delta' \) -print | sort
 
       - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
