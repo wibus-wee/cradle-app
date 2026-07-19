@@ -111,6 +111,12 @@ cradle issue undelegate <issueId>
 ## Workspace Helpers
 
 ```bash
+# Open a directory in Cradle Desktop (register if needed) — VS Code-style
+cradle .                         # cwd
+cradle open /path/to/project
+cradle open . --import-only      # register only, no UI
+cradle open . --json id,name,opened,created
+
 cradle workspace list --json id,name,path
 cradle workspace get                                   # ambient: resolved from $PWD or CRADLE_WORKSPACE_ID
 cradle workspace files --json type,name,path            # same — workspace argument is optional

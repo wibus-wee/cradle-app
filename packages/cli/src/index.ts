@@ -2,6 +2,7 @@ import { Command } from 'commander'
 
 import { registerGeneratedCommands } from './commands/generated/index.generated'
 import { registerJavascriptCommand } from './commands/javascript'
+import { applyOpenPathSugar, registerOpenCommand } from './commands/open'
 import { registerSessionAwaitCommand } from './commands/session-await'
 import { registerPluginDevCommand } from './commands/plugin-dev'
 import { createCommandContext } from './runtime/context'
@@ -15,6 +16,7 @@ const program = new Command()
   .option('--server <url>', 'Cradle server URL')
 
 registerGeneratedCommands(program)
+registerOpenCommand(program)
 registerSessionAwaitCommand(program)
 registerJavascriptCommand(program)
 registerPluginDevCommand(program)
@@ -25,7 +27,10 @@ program.hook('preAction', (root) => {
   root.setOptionValue('__context', createCommandContext({ serverUrl: resolveServerUrl({ explicitServerUrl: opts.server }) }))
 })
 
-program.parseAsync().catch((error: unknown) => {
+const knownTopLevelCommands = new Set(program.commands.map(command => command.name()))
+const argv = applyOpenPathSugar(process.argv, knownTopLevelCommands)
+
+program.parseAsync(argv).catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error)
   console.error(message)
   process.exit(1)
