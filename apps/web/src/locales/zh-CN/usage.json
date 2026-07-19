@@ -56,10 +56,6 @@
   "streak.day": "天连续",
   "summary.estimatedCost": "预估成本",
   "summary.totalTokens": "总 tokens",
-  "sessions.description": "最近有 token 用量记录的会话。",
-  "sessions.title": "最近会话",
-  "sessions.tokensAndTurns": "{{tokens}} · {{turns}} 轮次",
-  "sessions.unknownAgent": "未知 Agent",
   "title": "使用量",
   "tooltip.otherModels": "其他模型",
   "tooltip.unknownModel": "未知模型",
@@ -71,10 +67,5 @@
   "trend.toggleCost": "成本",
   "trend.toggleTokens": "Tokens",
   "trend.total": "总计",
-  "trend.visibleRange": "{{start}} – {{end}}",
-  "trend.interactionHint": "滚动缩放 · 拖拽平移 · 双击复位",
-  "trend.zoomControls": "图表缩放控件",
-  "trend.zoomIn": "放大",
-  "trend.zoomOut": "缩小",
-  "trend.resetZoom": "重置缩放"
+  "trend.visibleRange": "{{start}} – {{end}}"
 }

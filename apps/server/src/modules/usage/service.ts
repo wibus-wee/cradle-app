@@ -711,6 +711,7 @@ export function getRecentUsageSessions(limit = 6): RecentUsageSession[] {
 
 export interface DailyCostEntry {
   date: string
+  modelId: string
   costUsd: number
   promptTokens: number
   completionTokens: number
@@ -718,6 +719,9 @@ export interface DailyCostEntry {
   stepCount: number
 }
 
+// One row per calendar day × model so the trend chart can stack cost by model
+// the same way `/daily-by-model` stacks tokens. Callers that only need a daily
+// total (hero KPIs) should sum costUsd across model rows for each date.
 export function getDailyCost(from?: string, to?: string): DailyCostEntry[] {
   const { fromEpoch, toEpoch } = resolveTimeRange(from, to)
 
@@ -740,34 +744,18 @@ export function getDailyCost(from?: string, to?: string): DailyCostEntry[] {
     WHERE ${usageLogs.createdAt} >= ${fromEpoch}
       AND ${usageLogs.createdAt} < ${toEpoch}
     GROUP BY date(${usageLogs.createdAt}, 'unixepoch', 'localtime'), ${usageLogs.modelId}
-    ORDER BY date ASC
+    ORDER BY date ASC, model_id ASC
   `)
 
-  const dateMap = new Map<string, { costUsd: number, promptTokens: number, completionTokens: number, totalTokens: number, stepCount: number }>()
-  for (const row of rows) {
-    const cost = estimateCost(row.model_id, { promptTokens: row.prompt_tokens, completionTokens: row.completion_tokens })
-    const entry = dateMap.get(row.date)
-    if (entry) {
-      entry.costUsd += cost
-      entry.promptTokens += row.prompt_tokens
-      entry.completionTokens += row.completion_tokens
-      entry.totalTokens += row.total_tokens
-      entry.stepCount += row.step_count
-    }
-    else {
-      dateMap.set(row.date, {
-        costUsd: cost,
-        promptTokens: row.prompt_tokens,
-        completionTokens: row.completion_tokens,
-        totalTokens: row.total_tokens,
-        stepCount: row.step_count,
-      })
-    }
-  }
-
-  return Array.from(dateMap.entries())
-    .map(([date, data]) => ({ date, ...data }))
-    .sort((a, b) => a.date.localeCompare(b.date))
+  return rows.map(row => ({
+    date: row.date,
+    modelId: row.model_id,
+    costUsd: estimateCost(row.model_id, { promptTokens: row.prompt_tokens, completionTokens: row.completion_tokens }),
+    promptTokens: row.prompt_tokens,
+    completionTokens: row.completion_tokens,
+    totalTokens: row.total_tokens,
+    stepCount: row.step_count,
+  }))
 }
 
 export function getTodayCostUsd(): number {

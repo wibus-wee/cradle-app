@@ -1636,6 +1636,7 @@ export type GetUsageCostDailyResponses = {
      */
     200: Array<{
         date: string;
+        modelId: string;
         costUsd: number;
         promptTokens: number;
         completionTokens: number;

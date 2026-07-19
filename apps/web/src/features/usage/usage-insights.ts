@@ -44,8 +44,48 @@ export function denseTokenSeries(daily: DailyUsage[], days: number): DailyUsage[
   }))
 }
 
-export function denseCostSeries(dailyCost: DailyCost[], days: number): DailyCost[] {
-  return buildDenseDailySeries(dailyCost, days, date => ({
+/**
+ * Dense per-day cost totals. `/usage/cost/daily` returns one row per day × model,
+ *  so we sum cost (and tokens) per calendar day before densifying gaps.
+ */
+export function denseCostSeries(dailyCost: DailyCost[], days: number): Array<{
+  date: string
+  costUsd: number
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  stepCount: number
+}> {
+  const byDate = new Map<string, {
+    date: string
+    costUsd: number
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+    stepCount: number
+  }>()
+  for (const row of dailyCost) {
+    const existing = byDate.get(row.date)
+    if (existing) {
+      existing.costUsd += row.costUsd
+      existing.promptTokens += row.promptTokens
+      existing.completionTokens += row.completionTokens
+      existing.totalTokens += row.totalTokens
+      existing.stepCount += row.stepCount
+    }
+    else {
+      byDate.set(row.date, {
+        date: row.date,
+        costUsd: row.costUsd,
+        promptTokens: row.promptTokens,
+        completionTokens: row.completionTokens,
+        totalTokens: row.totalTokens,
+        stepCount: row.stepCount,
+      })
+    }
+  }
+
+  return buildDenseDailySeries(Array.from(byDate.values()), days, date => ({
     date,
     costUsd: 0,
     promptTokens: 0,
@@ -169,6 +209,45 @@ export function denseModelStackSeries(
     const key = topSet.has(row.modelId) ? row.modelId : OTHER_MODEL_KEY
     const bucket = byDate.get(row.date) ?? new Map<string, number>()
     bucket.set(key, (bucket.get(key) ?? 0) + row.totalTokens)
+    byDate.set(row.date, bucket)
+  }
+
+  const series: ModelStackDatum[] = lastDateKeys(days).map((date) => {
+    const bucket = byDate.get(date)
+    const datum: ModelStackDatum = { date }
+    for (const modelId of models) {
+      datum[modelId] = bucket?.get(modelId) ?? 0
+    }
+    return datum
+  })
+
+  return { series, models }
+}
+
+/**
+ * Pivots daily cost rows into one stacked-bar datum per calendar day for the
+ * cost metric on the trend chart — same shape as denseModelStackSeries but
+ * stacking costUsd instead of totalTokens.
+ */
+export function denseCostModelStackSeries(
+  dailyCost: DailyCost[],
+  days: number,
+  limit = 6,
+): ModelStackSeries {
+  const totalsByModel = new Map<string, number>()
+  for (const row of dailyCost) {
+    totalsByModel.set(row.modelId, (totalsByModel.get(row.modelId) ?? 0) + row.costUsd)
+  }
+  const ranked = [...totalsByModel.entries()].sort((a, b) => b[1] - a[1]).map(([modelId]) => modelId)
+  const top = ranked.slice(0, limit)
+  const topSet = new Set(top)
+  const models = ranked.length > limit ? [...top, OTHER_MODEL_KEY] : [...top]
+
+  const byDate = new Map<string, Map<string, number>>()
+  for (const row of dailyCost) {
+    const key = topSet.has(row.modelId) ? row.modelId : OTHER_MODEL_KEY
+    const bucket = byDate.get(row.date) ?? new Map<string, number>()
+    bucket.set(key, (bucket.get(key) ?? 0) + row.costUsd)
     byDate.set(row.date, bucket)
   }
 
