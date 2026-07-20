@@ -309,10 +309,6 @@ const config = {
     ...(sparkle.dmg ?? {}),
   },
 
-  zip: {
-    ...(sparkle.zip ?? {}),
-  },
-
   win: {
     target: [
       'nsis',
