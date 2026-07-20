@@ -16,6 +16,8 @@
   "continuation.steer.label": "ガイド",
   "empty.startConversation": "メッセージを送信して会話を開始",
   "error.loadMessages": "メッセージを読み込めませんでした。（不明なエラー）",
+  "history.loadEarlier": "以前のメッセージを読み込む",
+  "history.loadingEarlier": "以前のメッセージを読み込み中…",
   "minimap.assistantReply": "アシスタントの返信",
   "minimap.userMessage": "ユーザーメッセージ",
   "pastedText.chars_many": "{{count}} 文字",

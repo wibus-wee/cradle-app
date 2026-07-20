@@ -16,6 +16,8 @@
   "continuation.steer.label": "引导",
   "empty.startConversation": "发送一条消息开始对话",
   "error.loadMessages": "消息加载失败。（未知错误）",
+  "history.loadEarlier": "加载更早的消息",
+  "history.loadingEarlier": "正在加载更早的消息…",
   "minimap.assistantReply": "助手回复",
   "minimap.userMessage": "用户消息",
   "pastedText.chars_many": "{{count}} 个字符",

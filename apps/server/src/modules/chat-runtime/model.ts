@@ -58,6 +58,11 @@ export const ChatRuntimeModel = {
     limit: t.Optional(t.Number({ minimum: 1, maximum: 200 })),
   }),
 
+  chatMessagesQuery: t.Object({
+    cursor: t.Optional(t.String({ minLength: 1 })),
+    limit: t.Optional(t.Number({ minimum: 1, maximum: 200 })),
+  }),
+
   providerThreadParams: t.Object({
     sessionId: t.String({ minLength: 1 }),
     threadId: t.String({ minLength: 1 }),
@@ -452,6 +457,7 @@ export const ChatRuntimeModel = {
     {
       revision: t.Number({ minimum: 0 }),
       rows: t.Array(chatMessageSnapshotSchema),
+      nextCursor: t.Union([t.String(), t.Null()]),
     },
     { additionalProperties: false },
   ),

@@ -1,10 +1,10 @@
 import type { ChatSessionMessageRow } from './use-chat-session'
 
 const DB_NAME = 'cradle-chat-stable-message-cache'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE_NAME = 'stable-message-rows'
 const CACHED_SESSION_LIMIT = 80
-const CACHE_SCHEMA_VERSION = 2
+const CACHE_SCHEMA_VERSION = 3
 
 export interface StableMessageCacheSnapshot {
   sessionId: string
@@ -13,6 +13,7 @@ export interface StableMessageCacheSnapshot {
   snapshotState: 'present' | 'empty'
   cachedAt: number
   rows: ChatSessionMessageRow[]
+  nextCursor: string | null
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null
@@ -38,6 +39,7 @@ export async function writeStableMessageRows(
   sessionId: string,
   revision: number,
   rows: ChatSessionMessageRow[],
+  nextCursor: string | null,
 ): Promise<void> {
   if (!canUseIndexedDb()) {
     return
@@ -51,6 +53,7 @@ export async function writeStableMessageRows(
     snapshotState: rows.length === 0 ? 'empty' : 'present',
     cachedAt: Date.now(),
     rows,
+    nextCursor,
   })
   await pruneStableMessageCache(db)
 }
@@ -113,6 +116,7 @@ export function parseStableMessageCacheRecord(value: unknown): StableMessageCach
     || record.revision < 0
     || (record.snapshotState !== 'present' && record.snapshotState !== 'empty')
     || typeof record.cachedAt !== 'number'
+    || (record.nextCursor !== null && typeof record.nextCursor !== 'string')
   ) {
     return null
   }
@@ -130,6 +134,7 @@ export function parseStableMessageCacheRecord(value: unknown): StableMessageCach
     snapshotState: record.snapshotState,
     cachedAt: record.cachedAt,
     rows,
+    nextCursor: record.nextCursor,
   }
 }
 

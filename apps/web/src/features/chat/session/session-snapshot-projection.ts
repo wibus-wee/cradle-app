@@ -14,7 +14,7 @@ import {
 export interface SessionSnapshotProjectionInput {
   rows: ChatSessionMessageRow[]
   runState: ChatRunState
-  existingMessageCount: number
+  existingMessages: UIMessage[]
   runtimeStatusKnown: boolean
   runtimeIdle: boolean
   runtimeActiveRunMessageId: string | null
@@ -74,8 +74,16 @@ export function deriveSessionSnapshotProjection(
     ? 'streaming'
     : derivePassiveStatus(input.rows)
 
+  const messages = projectMainMessagesFromSnapshotRows(input.rows)
+  const liveMessage = input.runtimeActiveRunMessageId
+    ? input.existingMessages.find(message => message.id === input.runtimeActiveRunMessageId)
+    : undefined
+  if (liveMessage && !messages.some(message => message.id === liveMessage.id)) {
+    messages.push(liveMessage)
+  }
+
   return {
-    messages: projectMainMessagesFromSnapshotRows(input.rows),
+    messages,
     passiveRunState: {
       messageIds: passiveMessageIds,
       allowMissingMessage: Boolean(input.runtimeActiveRunMessageId),

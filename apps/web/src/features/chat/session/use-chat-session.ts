@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -8,6 +8,7 @@ import {
 } from '~/features/agent-runtime/use-runtime-catalog'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
+import { chatMessageHistoryInfiniteOptions } from '../api/messages'
 import { listChatSessionQueue } from '../commands/chat-response-command'
 import { runtimeSupportsCodexGoalBridge } from '../runtime/codex-app-server-bridge'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
@@ -57,6 +58,10 @@ export function useChatSession(chatSessionId: string | null, active = true) {
     queryFn: () => listChatSessionQueue(chatSessionId!),
     enabled: queryEnabled,
     refetchInterval: false,
+  })
+  const historyQuery = useInfiniteQuery({
+    ...chatMessageHistoryInfiniteOptions(chatSessionId ?? ''),
+    enabled: queryEnabled,
   })
   const runtimeStatusQuery = useRuntimeSessionStatus(queryEnabled ? chatSessionId : null, queryEnabled, {
     refetchInterval: false,
@@ -138,6 +143,13 @@ export function useChatSession(chatSessionId: string | null, active = true) {
       rollback: rollbackLastTurn,
     },
     isReady,
+    history: {
+      hasEarlier: historyQuery.hasNextPage,
+      loadingEarlier: historyQuery.isFetchingNextPage,
+      loadEarlier: async () => {
+        await historyQuery.fetchNextPage()
+      },
+    },
     queueItems: queueQuery.data?.items ?? EMPTY_QUEUE_ITEMS,
     cancelQueueItem,
     reorderQueueItems,

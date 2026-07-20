@@ -18103,11 +18103,15 @@ export type GetAcpAgentsResponses = {
         id: string;
         name: string;
         version: string | null;
+        source: string;
         distributionType: string;
         installPath: string | null;
         cmd: string | null;
         args: string | null;
         env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -18115,6 +18119,48 @@ export type GetAcpAgentsResponses = {
 };
 
 export type GetAcpAgentsResponse = GetAcpAgentsResponses[keyof GetAcpAgentsResponses];
+
+export type PostAcpAgentsData = {
+    body: {
+        id?: string;
+        name: string;
+        cmd: string;
+        args?: Array<string>;
+        env?: {
+            [key: string]: unknown;
+        };
+        distributionType?: 'command' | 'npx' | 'uvx';
+        version?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/acp/agents';
+};
+
+export type PostAcpAgentsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        version: string | null;
+        source: string;
+        distributionType: string;
+        installPath: string | null;
+        cmd: string | null;
+        args: string | null;
+        env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
+        status: string;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostAcpAgentsResponse = PostAcpAgentsResponses[keyof PostAcpAgentsResponses];
 
 export type DeleteAcpAgentsByAgentIdData = {
     body?: never;
@@ -18153,11 +18199,15 @@ export type GetAcpAgentsByAgentIdResponses = {
         id: string;
         name: string;
         version: string | null;
+        source: string;
         distributionType: string;
         installPath: string | null;
         cmd: string | null;
         args: string | null;
         env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -18165,6 +18215,54 @@ export type GetAcpAgentsByAgentIdResponses = {
 };
 
 export type GetAcpAgentsByAgentIdResponse = GetAcpAgentsByAgentIdResponses[keyof GetAcpAgentsByAgentIdResponses];
+
+export type PatchAcpAgentsByAgentIdLaunchConfigData = {
+    body: {
+        name?: string;
+        overrideCmd?: string | null;
+        overrideArgs?: Array<string> | null;
+        overrideEnv?: {
+            [key: string]: unknown;
+        } | null;
+        cmd?: string;
+        args?: Array<string>;
+        env?: {
+            [key: string]: unknown;
+        };
+        distributionType?: 'command' | 'npx' | 'uvx';
+        version?: string;
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/launch-config';
+};
+
+export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        version: string | null;
+        source: string;
+        distributionType: string;
+        installPath: string | null;
+        cmd: string | null;
+        args: string | null;
+        env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
+        status: string;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchAcpAgentsByAgentIdLaunchConfigResponse = PatchAcpAgentsByAgentIdLaunchConfigResponses[keyof PatchAcpAgentsByAgentIdLaunchConfigResponses];
 
 export type PostAcpAgentsByAgentIdDraftSessionData = {
     body: {
@@ -18232,11 +18330,15 @@ export type PutAcpAgentsByAgentIdInstallationResponses = {
         id: string;
         name: string;
         version: string | null;
+        source: string;
         distributionType: string;
         installPath: string | null;
         cmd: string | null;
         args: string | null;
         env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -20932,7 +21034,10 @@ export type GetChatSessionsBySessionIdMessagesData = {
     path: {
         sessionId: string;
     };
-    query?: never;
+    query?: {
+        cursor?: string;
+        limit?: number;
+    };
     url: '/chat/sessions/{sessionId}/messages';
 };
 
@@ -20963,6 +21068,7 @@ export type GetChatSessionsBySessionIdMessagesResponses = {
             taskId: string | null;
             depth: number;
         }>;
+        nextCursor: string | null;
     };
 };
 
@@ -25136,7 +25242,13 @@ export type PostTerminalSessionsBySessionIdStartOrAttachResponses = {
     200: {
         sessionId: string;
         running: boolean;
-        mode: 'live-attach' | 'resume' | 'fresh';
+        mode: 'live-attach' | 'resume' | 'fresh' | 'history';
+        agent?: string;
+        restore?: {
+            mode: 'live-attach' | 'resume' | 'fresh' | 'history';
+            agent?: string;
+            reason?: string;
+        };
     };
 };
 
@@ -25161,6 +25273,46 @@ export type DeleteTerminalSessionsBySessionIdResponses = {
 };
 
 export type DeleteTerminalSessionsBySessionIdResponse = DeleteTerminalSessionsBySessionIdResponses[keyof DeleteTerminalSessionsBySessionIdResponses];
+
+export type GetTerminalSessionsBySessionIdHostData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/terminal-sessions/{sessionId}/host';
+};
+
+export type GetTerminalSessionsBySessionIdHostResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        role: string;
+        running: boolean;
+        phase: 'absent' | 'running' | 'exited';
+        mode: 'live-attach' | 'resume' | 'fresh' | 'history' | null;
+        agent: string | null;
+        workspacePath: string;
+        ptyStartedAt: number | null;
+        providerSession: {
+            source: string;
+            agent: string;
+            kind: 'id' | 'path';
+            value: string;
+            workspacePath: string;
+            capturedAt: number;
+            startedAt: number;
+            sourcePath?: string;
+            confidence: 'exact' | 'heuristic';
+        } | null;
+        historyEnabled: boolean;
+        hasHistory: boolean;
+    };
+};
+
+export type GetTerminalSessionsBySessionIdHostResponse = GetTerminalSessionsBySessionIdHostResponses[keyof GetTerminalSessionsBySessionIdHostResponses];
 
 export type DeleteTerminalSessionsBySessionIdProviderSessionData = {
     body?: never;

@@ -16,6 +16,8 @@
   "continuation.steer.label": "Guía",
   "empty.startConversation": "Envía un mensaje para iniciar la conversación",
   "error.loadMessages": "No se pudieron cargar los mensajes. (Error desconocido)",
+  "history.loadEarlier": "Cargar mensajes anteriores",
+  "history.loadingEarlier": "Cargando mensajes anteriores…",
   "minimap.assistantReply": "Respuesta del asistente",
   "minimap.userMessage": "Mensaje de usuario",
   "pastedText.chars_many": "{{count}} caracteres",
