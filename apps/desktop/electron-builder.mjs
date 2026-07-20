@@ -1,8 +1,11 @@
-import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import { fixMacOSFrameworkSymlinks } from './scripts/fix-macos-framework-symlinks.mjs'
+import {
+  prunePackagedApp,
+  shouldBundleAgentBinaries,
+} from './scripts/prune-packaged-app.mjs'
 import { copyCodexRuntimeToPackagedResources } from './scripts/sync-codex-runtime.mjs'
 
 const require = createRequire(import.meta.url)
@@ -17,17 +20,6 @@ const hasAppleSigningIdentity = Boolean(process.env.CSC_LINK || process.env.CSC_
 if (!hasAppleSigningIdentity) {
   process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 }
-
-const keepElectronFrameworkLocales = new Set([
-  'en',
-  'en_GB',
-  'en-US',
-  'en_US',
-  'es',
-  'ja',
-  'zh_CN',
-  'zh_TW',
-])
 
 function getPublishConfig() {
   if (!updateServerUrl) {
@@ -103,55 +95,6 @@ function loadSparkleBuilderFragments() {
 
 const sparkle = loadSparkleBuilderFragments()
 
-async function removeUnusedMacFrameworkLocales(context) {
-  if (!['darwin', 'mas'].includes(context.electronPlatformName)) {
-    return
-  }
-
-  const frameworkResources = path.join(
-    context.appOutDir,
-    `${context.packager.appInfo.productFilename}.app`,
-    'Contents',
-    'Frameworks',
-    'Electron Framework.framework',
-    'Versions',
-    'A',
-    'Resources',
-  )
-
-  let entries
-  try {
-    entries = await fs.readdir(frameworkResources)
-  }
-  catch {
-    return
-  }
-
-  let removed = false
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (!entry.endsWith('.lproj')) {
-        return
-      }
-
-      const locale = entry.slice(0, -'.lproj'.length)
-      if (keepElectronFrameworkLocales.has(locale)) {
-        return
-      }
-
-      await fs.rm(path.join(frameworkResources, entry), { recursive: true, force: true })
-      removed = true
-    }),
-  )
-
-  if (removed) {
-    // Remove stale code signature so electron-builder regenerates it during re-signing.
-    // _CodeSignature lives at Electron Framework.framework/_CodeSignature (3 levels above Resources).
-    const frameworkRoot = path.resolve(frameworkResources, '..', '..', '..')
-    await fs.rm(path.join(frameworkRoot, '_CodeSignature'), { recursive: true, force: true }).catch(() => {})
-  }
-}
-
 async function adHocSignAfterPack(context) {
   try {
     const builder = await import('electron-sparkle-updater/builder')
@@ -165,8 +108,20 @@ async function adHocSignAfterPack(context) {
 }
 
 async function afterPack(context) {
-  await copyCodexRuntimeToPackagedResources(context)
-  await removeUnusedMacFrameworkLocales(context)
+  // Codex app-server alone is ~200MB; only embed when offline agent bundles are requested.
+  if (shouldBundleAgentBinaries()) {
+    await copyCodexRuntimeToPackagedResources(context)
+  }
+  else {
+    console.warn(
+      '[desktop] Skipping bundled Codex runtime (slim package). '
+      + 'Set CRADLE_DESKTOP_BUNDLE_AGENT_BINARIES=1 to embed it.',
+    )
+  }
+
+  // Locale/pak/ffmpeg/agent-binary strip before any re-sign.
+  await prunePackagedApp(context)
+
   if (['darwin', 'mas'].includes(context.electronPlatformName)) {
     const appPath = path.join(
       context.appOutDir,
@@ -208,6 +163,9 @@ const config = {
   ],
 
   compression: 'maximum',
+  // Keep only Chromium chrome locales that match product languages. electron-builder
+  // strips locales/*.pak on supported targets; afterPack also hard-prunes leftovers.
+  electronLanguages: ['en-US', 'en-GB', 'es', 'ja', 'zh-CN', 'zh-TW'],
   detectUpdateChannel: true,
   generateUpdatesFilesForAllChannels: true,
   npmRebuild: false,
@@ -227,6 +185,8 @@ const config = {
     // loader can require native/build/Release/sparkle_bridge.node from asar.unpacked.
     'node_modules/electron-sparkle-updater/**/*',
     '!node_modules/electron-sparkle-updater/node_modules',
+    '!node_modules/electron-sparkle-updater/**/*.{md,ts,map}',
+    '!node_modules/electron-sparkle-updater/**/{test,tests,__tests__,docs}/**',
     ...(Array.isArray(sparkle.files) ? sparkle.files : []),
   ],
 
@@ -307,7 +267,13 @@ const config = {
 
   dmg: {
     ...(sparkle.dmg ?? {}),
+    // UDZO is the strongest widely-compatible hdiutil format electron-builder
+    // supports natively. Installer build-dmg.mjs further converts to ULMO (LZMA).
+    format: 'UDZO',
   },
+
+  // Note: electron-builder 26.x has no top-level `zip` schema key (validation fails).
+  // ZIP compression follows global `compression: 'maximum'`. Installer DMG uses ULMO.
 
   win: {
     target: [

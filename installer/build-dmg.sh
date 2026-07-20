@@ -204,19 +204,32 @@ stage_payload() {
 
 create_dmg() {
   local output_abs
+  local format_used="UDZO"
 
   output_abs="$(resolve_path "$OUTPUT_PATH")"
   /bin/mkdir -p "$(dirname "$output_abs")"
   /bin/rm -f "$output_abs"
 
-  /usr/bin/hdiutil create \
+  # Prefer ULMO (LZMA) for smallest download size; fall back to max zlib UDZO.
+  if /usr/bin/hdiutil create \
     -volname "$VOLUME_NAME" \
     -srcfolder "$STAGE_DIR" \
     -ov \
-    -format UDZO \
-    "$output_abs" >/dev/null
+    -format ULMO \
+    "$output_abs" >/dev/null 2>&1; then
+    format_used="ULMO"
+  else
+    /bin/rm -f "$output_abs"
+    /usr/bin/hdiutil create \
+      -volname "$VOLUME_NAME" \
+      -srcfolder "$STAGE_DIR" \
+      -ov \
+      -format UDZO \
+      -imagekey zlib-level=9 \
+      "$output_abs" >/dev/null
+  fi
 
-  printf 'Wrote %s\n' "$output_abs"
+  printf 'Wrote %s (format=%s)\n' "$output_abs" "$format_used"
 }
 
 main() {

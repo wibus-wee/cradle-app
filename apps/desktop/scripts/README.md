@@ -5,7 +5,8 @@
 - **set-version.mjs**: Writes the desktop package version before release packaging.
 - **build-mac-bridge.mjs**: Builds the Swift Mac Bridge binary for packaging.
 - **fix-macos-framework-symlinks.mjs**: Rewrites absolute Electron framework symlinks after pack.
-- **sync-codex-runtime.mjs**: Copies Codex runtime assets into packaged resources.
+- **sync-codex-runtime.mjs**: Copies Codex runtime assets into packaged resources (skipped unless `CRADLE_DESKTOP_BUNDLE_AGENT_BINARIES=1`).
+- **prune-packaged-app.mjs**: afterPack size prune — Chromium locales/lproj, optional ffmpeg/swiftshader, slim Claude/Codex agent binaries. See `docs/package-size.md`.
 - **verify-macos-distribution-credentials.mjs**: Optional Developer ID credential checks.
 
 ## Sparkle update packaging notes

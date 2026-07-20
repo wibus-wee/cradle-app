@@ -235,28 +235,44 @@ async function main() {
     try { execFileSync('/bin/sync', { stdio: 'ignore' }) }
  catch {}
 
+    // Prefer ULMO (LZMA) for smallest download size on modern macOS; fall back to
+    // UDZO zlib-level=9 when ULMO is unavailable. Both beat default UDZO.
     // hdiutil convert can transiently fail on CI runners when a prior detach
     // hasn't fully released the image.  Retry up to 3 times with a short delay.
+    const preferredFormats = [
+      { format: 'ULMO', args: ['-format', 'ULMO'] },
+      { format: 'UDZO', args: ['-format', 'UDZO', '-imagekey', 'zlib-level=9'] },
+    ]
     let convertErr
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        execFileSync('/usr/bin/hdiutil', ['convert', rwDmg, '-format', 'UDZO', '-o', outputAbs], { stdio: 'pipe' })
-        convertErr = null
-        break
-      }
- catch (err) {
-        convertErr = err
-        const stderr = err.stderr?.toString?.() ?? ''
-        console.error(`hdiutil convert attempt ${attempt} failed${stderr ? `: ${stderr.trim()}` : ''}`)
-        if (attempt < 3) {
-          // Wait before retrying — gives APFS time to release the image
-          execFileSync('/bin/sleep', ['2'])
+    let usedFormat = null
+    formatLoop: for (const candidate of preferredFormats) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          execFileSync(
+            '/usr/bin/hdiutil',
+            ['convert', rwDmg, ...candidate.args, '-o', outputAbs],
+            { stdio: 'pipe' },
+          )
+          convertErr = null
+          usedFormat = candidate.format
+          break formatLoop
+        }
+        catch (err) {
+          convertErr = err
+          const stderr = err.stderr?.toString?.() ?? ''
+          console.error(
+            `hdiutil convert ${candidate.format} attempt ${attempt} failed${stderr ? `: ${stderr.trim()}` : ''}`,
+          )
+          if (attempt < 3) {
+            // Wait before retrying — gives APFS time to release the image
+            execFileSync('/bin/sleep', ['2'])
+          }
         }
       }
     }
     if (convertErr) { throw convertErr }
 
-    console.log(`Wrote ${outputAbs}`)
+    console.log(`Wrote ${outputAbs} (format=${usedFormat})`)
   }
  finally {
     if (!args.keepStage) {
