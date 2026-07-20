@@ -171,23 +171,23 @@ export async function executeRun(
     )
     const actualModelId = activeRun.runtime.lastModelId ?? activeRun.modelId
     let handoff: ActiveTurnHandoff = { kind: 'queue' }
-    await deps.completeActiveTurn(activeRun, {
+    const completion = await deps.completeActiveTurn(activeRun, {
       source: 'normal',
       terminalChunk: finalChunk,
       profile,
-      requiredBookkeeping: async () => {
+      requiredBookkeeping: async (terminalChunk) => {
         if (!activeRun.cancelRequested) {
-          deps.finalizeSnapshot(activeRun, finalChunk, {
+          deps.finalizeSnapshot(activeRun, terminalChunk, {
             modelId: actualModelId,
             diagnostics,
             profile,
           })
         }
       },
-      bestEffortBookkeeping: async () => {
+      bestEffortBookkeeping: async (terminalChunk) => {
         recordRunUsageAndFailure(
           activeRun,
-          finalChunk,
+          terminalChunk,
           failurePayload,
           diagnostics,
           actualModelId,
@@ -207,7 +207,7 @@ export async function executeRun(
         }
         handoff = recordRunCompletion(
           activeRun,
-          finalChunk,
+          terminalChunk,
           diagnostics,
           profile,
           actualModelId,
@@ -216,6 +216,7 @@ export async function executeRun(
       },
       resolveHandoff: () => handoff,
     })
+    const settledFinalChunk = completion.terminalChunk ?? finalChunk
     const usage = activeRun.runtime.usageAccounting === 'provider-events'
       ? activeRun.usageEventAggregate
       : activeRun.runtime.totalUsage ?? activeRun.runtime.lastUsage ?? null
@@ -226,8 +227,8 @@ export async function executeRun(
       timeToFirstTokenMs: profile.firstTokenAtMs === null
         ? null
         : Math.max(0, profile.firstTokenAtMs - profile.startedAtMs),
-      outcome: toAiGenerationOutcome(finalChunk),
-      stopReason: readAiGenerationStopReason(finalChunk),
+      outcome: toAiGenerationOutcome(settledFinalChunk),
+      stopReason: readAiGenerationStopReason(settledFinalChunk),
       outputChoices: captureMode === 'full'
         ? [{
             role: 'assistant',

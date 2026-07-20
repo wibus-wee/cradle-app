@@ -27,15 +27,16 @@ export interface ActiveTurnOutcome {
   terminalChunk: UIMessageChunk
   profile?: ChatRuntimeProfile
   /** Required work blocks notification and handoff when it rejects. */
-  requiredBookkeeping?: () => Promise<void>
+  requiredBookkeeping?: (terminalChunk: UIMessageChunk) => Promise<void>
   /** Best-effort work is observed and logged, but cannot reopen a durable terminal. */
-  bestEffortBookkeeping?: () => Promise<void> | void
+  bestEffortBookkeeping?: (terminalChunk: UIMessageChunk) => Promise<void> | void
   /** Resolved after bookkeeping; the completion owner performs it after release. */
   resolveHandoff?: () => ActiveTurnHandoff
 }
 
 export interface ActiveTurnCompletionResult {
   durableTerminal: boolean
+  terminalChunk?: UIMessageChunk
 }
 
 export interface ActiveTurnCompletionDeps {
@@ -45,7 +46,7 @@ export interface ActiveTurnCompletionDeps {
     profile?: ChatRuntimeProfile,
   ) => Promise<PersistedTerminalChunk>
   publishTerminalNotification: (activeRun: ActiveRun, chunk: UIMessageChunk) => void
-  recoverTerminalPersistenceFailure: (sessionId: string) => Promise<void>
+  recoverTerminalPersistenceFailure: (activeRun: ActiveRun) => Promise<PersistedTerminalChunk | null>
   releaseActiveRun: (activeRun: ActiveRun) => void
   performHandoff: (activeRun: ActiveRun, handoff: ActiveTurnHandoff) => void
   recordTerminalPersistenceIncident: (input: {
@@ -102,8 +103,9 @@ async function performCompletion(
       )
     }
     catch (terminalError) {
+      let recoveredTerminal: PersistedTerminalChunk | null
       try {
-        await deps.recoverTerminalPersistenceFailure(activeRun.sessionId)
+        recoveredTerminal = await deps.recoverTerminalPersistenceFailure(activeRun)
       }
       catch (recoveryError) {
         deps.recordTerminalPersistenceIncident({
@@ -112,17 +114,28 @@ async function performCompletion(
           terminalError,
           recoveryError,
         })
+        throw terminalError
       }
-      throw terminalError
+      if (!recoveredTerminal?.durableTerminal) {
+        const recoveryError = new Error('Terminal persistence recovery did not establish a durable terminal state.')
+        deps.recordTerminalPersistenceIncident({
+          activeRun,
+          source: outcome.source,
+          terminalError,
+          recoveryError,
+        })
+        throw terminalError
+      }
+      persistedTerminal = recoveredTerminal
     }
 
     if (!persistedTerminal.durableTerminal) {
       return { durableTerminal: false }
     }
 
-    await outcome.requiredBookkeeping?.()
+    await outcome.requiredBookkeeping?.(persistedTerminal.notificationChunk)
     try {
-      await outcome.bestEffortBookkeeping?.()
+      await outcome.bestEffortBookkeeping?.(persistedTerminal.notificationChunk)
     }
     catch (error) {
       deps.warn('best-effort chat turn completion bookkeeping failed', {
@@ -135,7 +148,7 @@ async function performCompletion(
 
     deps.publishTerminalNotification(activeRun, persistedTerminal.notificationChunk)
     handoffAllowed = true
-    return { durableTerminal: true }
+    return { durableTerminal: true, terminalChunk: persistedTerminal.notificationChunk }
   }
   finally {
     deps.releaseActiveRun(activeRun)

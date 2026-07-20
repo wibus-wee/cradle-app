@@ -115,6 +115,47 @@ describe('active turn completion owner', () => {
     })
   })
 
+  it('uses the recovered canonical terminal for bookkeeping, notification, release, and handoff', async () => {
+    const order: string[] = []
+    const terminalError = new Error('terminal write failed')
+    const recoveredTerminal: UIMessageChunk = {
+      type: 'error',
+      errorText: 'Response interrupted because the Cradle server process exited while the run was streaming.',
+    }
+    const controller = createActiveTurnCompletionController({
+      persistTerminalChunk: vi.fn().mockRejectedValue(terminalError),
+      publishTerminalNotification: vi.fn((_activeRun, chunk) => {
+        expect(chunk).toEqual(recoveredTerminal)
+        order.push('notification')
+      }),
+      recoverTerminalPersistenceFailure: vi.fn(async () => {
+        order.push('recovery')
+        return { durableTerminal: true, notificationChunk: recoveredTerminal }
+      }),
+      releaseActiveRun: vi.fn(() => order.push('release')),
+      performHandoff: vi.fn(() => order.push('handoff')),
+      recordTerminalPersistenceIncident: vi.fn(),
+      warn: vi.fn(),
+    })
+
+    const result = await controller.completeActiveTurn(activeRun(), {
+      source: 'normal',
+      terminalChunk: { type: 'finish', finishReason: 'stop' },
+      requiredBookkeeping: async (terminalChunk) => {
+        expect(terminalChunk).toEqual(recoveredTerminal)
+        order.push('required')
+      },
+      bestEffortBookkeeping: async (terminalChunk) => {
+        expect(terminalChunk).toEqual(recoveredTerminal)
+        order.push('best-effort')
+      },
+      resolveHandoff: () => ({ kind: 'queue' }),
+    })
+
+    expect(result).toEqual({ durableTerminal: true, terminalChunk: recoveredTerminal })
+    expect(order).toEqual(['recovery', 'required', 'best-effort', 'notification', 'release', 'handoff'])
+  })
+
   it('blocks notification and handoff when required bookkeeping fails', async () => {
     const terminalChunk: UIMessageChunk = { type: 'abort', reason: 'user' }
     const publishTerminalNotification = vi.fn()

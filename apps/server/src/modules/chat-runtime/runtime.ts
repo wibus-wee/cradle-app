@@ -74,6 +74,7 @@ import type { CreateRunInput, RunCoordinatorDeps } from './run/run-coordinator'
 import {
   createRun as createRunFromCoordinator,
 } from './run/run-coordinator'
+import { readRunWriteFence } from './run/run-write-fence'
 import type { RuntimeGoalContinuationSchedulerDeps } from './run/runtime-goal-continuation'
 import {
   scheduleRuntimeGoalContinuation,
@@ -203,8 +204,17 @@ const { persistTerminalChunk, publishTerminalNotification } = terminalRunFinaliz
 const activeTurnCompletionController = createActiveTurnCompletionController({
   persistTerminalChunk,
   publishTerminalNotification,
-  recoverTerminalPersistenceFailure: async (sessionId) => {
-    await recoverChatRuntimeSession(sessionId)
+  recoverTerminalPersistenceFailure: async (activeRun) => {
+    await recoverChatRuntimeSession(activeRun.sessionId)
+    const fence = readRunWriteFence(activeRun.runId)
+    if (fence.status === 'streaming' || fence.status === 'missing') {
+      return null
+    }
+    activeRun.terminalStatus = fence.status
+    return {
+      durableTerminal: true,
+      notificationChunk: terminalChunkForFence(fence),
+    }
   },
   releaseActiveRun: activeRun => activeRunReleaseController.releaseActiveRun(activeRun),
   performHandoff: (activeRun, handoff) => {

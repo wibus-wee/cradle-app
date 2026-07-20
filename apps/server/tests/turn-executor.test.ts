@@ -91,9 +91,9 @@ function createDeps(overrides: Partial<TurnExecutorDeps> = {}): TurnExecutorDeps
           : outcome.terminalChunk.type === 'abort'
             ? 'aborted'
             : 'failed'
-      await outcome.requiredBookkeeping?.()
-      await outcome.bestEffortBookkeeping?.()
-      return { durableTerminal: true }
+      await outcome.requiredBookkeeping?.(outcome.terminalChunk)
+      await outcome.bestEffortBookkeeping?.(outcome.terminalChunk)
+      return { durableTerminal: true, terminalChunk: outcome.terminalChunk }
     }),
     recordSnapshotEvent: vi.fn(),
     finalizeSnapshot: vi.fn(),
