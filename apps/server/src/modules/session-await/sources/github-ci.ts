@@ -212,27 +212,16 @@ async function resolveTarget(filter: GitHubCIFilter): Promise<ResolvedCITarget |
   }
 }
 
-function buildTerminalResult(awaitId: string, target: ResolvedCITarget): CheckResult | null {
+function buildTerminalResult(awaitId: string, target: ResolvedCITarget, filter: GitHubCIFilter): CheckResult | null {
   if (!target.prNumber || !target.currentHeadSha) {
     return null
   }
 
   // headSha mismatch means the await is stale (new push happened).
-  // Mark it superseded so the agent can re-register with the new head.
+  // Silently update the filter to track the new head instead of resuming.
   if (target.currentHeadSha !== target.ref) {
-    return {
-      awaitId,
-      matched: true,
-      resumeText: `GitHub PR #${target.prNumber} head changed from ${target.ref} to ${target.currentHeadSha}.`,
-      resumePayloadJson: JSON.stringify({
-        kind: 'github-ci',
-        repo: `${target.owner}/${target.repo}`,
-        pr: target.prNumber,
-        ref: target.ref,
-        currentHeadSha: target.currentHeadSha,
-        outcome: 'superseded',
-      }),
-    }
+    const updatedFilter = { ...filter, headSha: target.currentHeadSha, targetUrl: null }
+    return { awaitId, matched: false, filterUpdate: JSON.stringify(updatedFilter) }
   }
 
   const outcome = target.merged
@@ -558,7 +547,7 @@ export const githubCISource: SessionAwaitSource = {
         continue
       }
 
-      const terminalResult = buildTerminalResult(row.id, target)
+      const terminalResult = buildTerminalResult(row.id, target, filter)
       if (terminalResult) {
         results.push(terminalResult)
         continue

@@ -40,6 +40,8 @@ interface PendingCheckResult {
   transientError?: string
   permanentError?: string
   incrementErrorCount?: boolean
+  /** When set, the await's filterJson is silently updated (e.g. head SHA tracking) without triggering a resume. */
+  filterUpdate?: string
 }
 
 interface MatchedCheckResult {

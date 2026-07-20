@@ -584,7 +584,7 @@ describe('gitHub session-await sources', () => {
     expect(JSON.parse(result.resumePayloadJson ?? '{}')).toMatchObject({ outcome: 'merged' })
   })
 
-  it('supersedes a review await when the pull request head changes', async () => {
+  it('silently updates the filter when the pull request head changes', async () => {
     installGitHubFetch({
       '/repos/acme/app/pulls/42': {
         number: 42,
@@ -604,11 +604,15 @@ describe('gitHub session-await sources', () => {
       ),
     ])
 
-    expect(result.matched).toBe(true)
-    expect(JSON.parse(result.resumePayloadJson ?? '{}')).toMatchObject({
-      outcome: 'superseded',
-      headSha: 'old-head-sha',
-      currentHeadSha: 'new-head-sha',
+    expect(result.matched).toBe(false)
+    expect('filterUpdate' in result && result.filterUpdate).toBeTruthy()
+    const updatedFilter = JSON.parse(result.filterUpdate as string)
+    expect(updatedFilter).toMatchObject({
+      owner: 'acme',
+      repo: 'app',
+      pr: 42,
+      mode: 'approved',
+      headSha: 'new-head-sha',
     })
   })
 

@@ -67,6 +67,12 @@ export async function applyCheckResults(
       continue
     }
 
+    if ('filterUpdate' in result && result.filterUpdate) {
+      service.updateFilterJson(result.awaitId, result.filterUpdate)
+      service.updateLastChecked(result.awaitId)
+      continue
+    }
+
     if (result.permanentError) {
       const failed = service.markFailed(
         result.awaitId,

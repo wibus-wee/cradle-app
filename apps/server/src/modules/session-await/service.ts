@@ -450,6 +450,18 @@ export function updateLastChecked(awaitId: string, errorText?: string): void {
     .run()
 }
 
+export function updateFilterJson(awaitId: string, filterJson: string): void {
+  const now = Math.floor(Date.now() / 1000)
+  db()
+    .update(sessionAwaits)
+    .set({
+      filterJson,
+      lastCheckedAt: now,
+    })
+    .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
+    .run()
+}
+
 // Used by sources that opt into tracksConsecutiveErrors (javascript). Keeps the
 // shared updateLastChecked path free of counter side effects for other sources.
 export function recordTrackedEvaluationCheck(awaitId: string, errorText?: string): void {
