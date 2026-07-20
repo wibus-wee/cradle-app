@@ -243,9 +243,10 @@ async function main() {
       { format: 'ULMO', args: ['-format', 'ULMO'] },
       { format: 'UDZO', args: ['-format', 'UDZO', '-imagekey', 'zlib-level=9'] },
     ]
-    let convertErr
+    let convertErr = null
     let usedFormat = null
-    formatLoop: for (const candidate of preferredFormats) {
+    for (const candidate of preferredFormats) {
+      convertErr = null
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           execFileSync(
@@ -255,7 +256,7 @@ async function main() {
           )
           convertErr = null
           usedFormat = candidate.format
-          break formatLoop
+          break
         }
         catch (err) {
           convertErr = err
@@ -268,6 +269,9 @@ async function main() {
             execFileSync('/bin/sleep', ['2'])
           }
         }
+      }
+      if (usedFormat) {
+        break
       }
     }
     if (convertErr) { throw convertErr }
