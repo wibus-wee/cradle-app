@@ -8,6 +8,7 @@ allowBuilds:
   better-sqlite3: true
   core-js: false
   electron: true
+  electron-sparkle-updater: true
   electron-winstaller: true
   esbuild: true
   fs-xattr: true

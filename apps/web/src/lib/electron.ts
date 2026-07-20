@@ -408,8 +408,11 @@ export interface DesktopUpdateInfo {
   files: DesktopUpdateFile[]
 }
 
+export type DesktopUpdateProvider = 'sparkle' | 'electron-updater' | null
+
 export interface DesktopUpdateStatus {
   unsupported: boolean
+  provider: DesktopUpdateProvider
   currentVersion: string
   isCheckingForUpdates: boolean
   isPreparingUpdate: boolean

@@ -48,6 +48,8 @@ jobs:
       bleeding_edge_feed_tag: ${{ steps.params.outputs.bleeding_edge_feed_tag }}
       source_ref: ${{ steps.params.outputs.source_ref }}
       update_url: ${{ steps.params.outputs.update_url }}
+      sparkle_appcast_url: ${{ steps.params.outputs.sparkle_appcast_url }}
+      sparkle_tag_prefix: ${{ steps.params.outputs.sparkle_tag_prefix }}
       release_download_url: ${{ steps.params.outputs.release_download_url }}
       analytics_build_channel: ${{ steps.params.outputs.analytics_build_channel }}
       analytics_audience: ${{ steps.params.outputs.analytics_audience }}
@@ -110,7 +112,10 @@ jobs:
           fi
 
           if [ "$CHANNEL" = "release" ]; then
-            UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/manifest.json"
+            UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/"
+            SPARKLE_APPCAST_URL="https://github.com/${{ github.repository }}/releases/latest/download/appcast.xml"
+            # Official Sparkle action filters previous releases by tag prefix for delta bases.
+            SPARKLE_TAG_PREFIX="v"
             ANALYTICS_BUILD_CHANNEL="release"
             ANALYTICS_AUDIENCE="external"
             # End-user builds: product analytics only. AI full/metadata capture stays off
@@ -118,13 +123,17 @@ jobs:
             POSTHOG_AI_ENABLED="0"
             POSTHOG_AI_CAPTURE_MODE="metadata"
           elif [ "$CHANNEL" = "bleeding-edge" ]; then
-            UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/manifest.json"
+            UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/"
+            SPARKLE_APPCAST_URL="https://github.com/${{ github.repository }}/releases/download/${BLEEDING_EDGE_FEED_TAG}/appcast.xml"
+            SPARKLE_TAG_PREFIX="bleeding-edge-"
             ANALYTICS_BUILD_CHANNEL="bleeding-edge"
             ANALYTICS_AUDIENCE="internal"
             POSTHOG_AI_ENABLED="1"
             POSTHOG_AI_CAPTURE_MODE="full"
           else
-            UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/manifest.json"
+            UPDATE_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/"
+            SPARKLE_APPCAST_URL="https://github.com/${{ github.repository }}/releases/download/${DEV_FEED_TAG}/appcast.xml"
+            SPARKLE_TAG_PREFIX="dev-"
             ANALYTICS_BUILD_CHANNEL="development"
             ANALYTICS_AUDIENCE="internal"
             POSTHOG_AI_ENABLED="1"
@@ -145,6 +154,8 @@ jobs:
           echo "bleeding_edge_feed_tag=$BLEEDING_EDGE_FEED_TAG" >> "$GITHUB_OUTPUT"
           echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
           echo "update_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
+          echo "sparkle_appcast_url=$SPARKLE_APPCAST_URL" >> "$GITHUB_OUTPUT"
+          echo "sparkle_tag_prefix=$SPARKLE_TAG_PREFIX" >> "$GITHUB_OUTPUT"
           echo "release_download_url=$RELEASE_DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
           echo "analytics_build_channel=$ANALYTICS_BUILD_CHANNEL" >> "$GITHUB_OUTPUT"
           echo "analytics_audience=$ANALYTICS_AUDIENCE" >> "$GITHUB_OUTPUT"
@@ -253,11 +264,17 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
+          CRADLE_DESKTOP_SPARKLE_APPCAST_URL: ${{ needs.resolve.outputs.sparkle_appcast_url }}
+          SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
           CRADLE_ELECTRON_REBUILD_ARCH: arm64
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
           NODE_OPTIONS: --max-old-space-size=4096
         shell: bash
         run: |
+          if [ -z "${SPARKLE_ED_PUBLIC_KEY:-}" ]; then
+            echo "SPARKLE_ED_PUBLIC_KEY repository secret is required for macOS Sparkle updates." >&2
+            exit 1
+          fi
           pnpm dist:mac --arm64
 
       - name: Verify macOS framework symlinks
@@ -266,6 +283,19 @@ jobs:
           node apps/desktop/scripts/fix-macos-framework-symlinks.mjs \
             apps/desktop/release/mac-arm64/Cradle.app \
             --check
+
+      - name: Verify ad-hoc codesign for Sparkle
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="apps/desktop/release/mac-arm64/Cradle.app"
+          codesign --verify --deep --strict "$app_path"
+          codesign -dv --verbose=2 "$app_path" 2>&1 | tee /tmp/cradle-codesign.txt
+          # Ad-hoc signatures report as Signature=adhoc / Authority=(absent)
+          if ! rg -q 'Signature=(adhoc|Authority=|flags=0x2\(adhoc\))|Authority=' /tmp/cradle-codesign.txt; then
+            echo "Unexpected codesign identity (expected ad-hoc or Developer ID):" >&2
+            cat /tmp/cradle-codesign.txt >&2
+          fi
 
       - name: Build installer DMG
         env:
@@ -278,7 +308,7 @@ jobs:
             --app apps/desktop/release/mac-${RELEASE_ARCH}/Cradle.app \
             --output apps/desktop/release/Cradle.dmg
 
-      - name: Create macOS updater zip
+      - name: Create macOS Sparkle updater zip
         working-directory: apps/desktop
         env:
           DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
@@ -287,16 +317,84 @@ jobs:
         run: |
           set -euo pipefail
           app_path="release/mac-${RELEASE_ARCH}/Cradle.app"
-          zip_path="release/Cradle-mac-${RELEASE_ARCH}.zip"
+          # Include version in the zip name so Sparkle fix-appcast can rewrite enclosures.
+          zip_path="release/Cradle-${DESKTOP_VERSION}-mac-${RELEASE_ARCH}.zip"
+          legacy_zip_path="release/Cradle-mac-${RELEASE_ARCH}.zip"
 
           if [ ! -d "$app_path" ]; then
             echo "Packaged app is missing: $app_path" >&2
             exit 1
           fi
 
-          rm -f "$zip_path"
+          rm -f "$zip_path" "$legacy_zip_path"
           /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
+          # Keep a stable alias name for download pages / landing CTA.
+          cp "$zip_path" "$legacy_zip_path"
           /usr/bin/du -h "$zip_path"
+
+      - name: Prepare Sparkle archive directory
+        working-directory: apps/desktop
+        env:
+          DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
+          RELEASE_ARCH: arm64
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SPARKLE_ED_PRIVATE_KEY:-}" ]; then
+            echo "SPARKLE_ED_PRIVATE_KEY repository secret is required for macOS Sparkle appcast generation." >&2
+            exit 1
+          fi
+
+          archive_dir="release/sparkle-archive"
+          zip_name="Cradle-${DESKTOP_VERSION}-mac-${RELEASE_ARCH}.zip"
+          if [ ! -f "release/${zip_name}" ]; then
+            echo "Sparkle zip missing: release/${zip_name}" >&2
+            exit 1
+          fi
+
+          # Official action treats every *.zip present before it runs as "this release".
+          # Only put the versioned zip here — never the stable Cradle-mac-*.zip alias,
+          # and never prior-release bases (the action fetches those itself).
+          rm -rf "$archive_dir"
+          mkdir -p "$archive_dir"
+          cp "release/${zip_name}" "$archive_dir/"
+          ls -la "$archive_dir"
+
+      - name: Generate Sparkle appcast + deltas
+        uses: Innei/electron-sparkle-updater/action@v1
+        with:
+          tag: ${{ needs.resolve.outputs.channel == 'bleeding-edge' && needs.resolve.outputs.bleeding_edge_feed_tag || needs.resolve.outputs.release_tag }}
+          archive-dir: ${{ github.workspace }}/apps/desktop/release/sparkle-archive
+          ed-private-key: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          repo: ${{ github.repository }}
+          tag-prefix: ${{ needs.resolve.outputs.sparkle_tag_prefix }}
+          download-url-prefix: ${{ needs.resolve.outputs.release_download_url }}/
+          # Pull last 2 matching channel releases as delta bases. First-ever channel
+          # release simply yields a full-only appcast (no bases found).
+          fetch-delta-bases: 'true'
+          delta-bases: '2'
+          # Keep Cradle's multi-platform publish job as the single release publisher.
+          publish: 'false'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect Sparkle appcast assets
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir="release/sparkle-archive"
+          if [ ! -f "$archive_dir/appcast.xml" ]; then
+            echo "official Sparkle action did not produce appcast.xml" >&2
+            exit 1
+          fi
+
+          # Promote only this release's feed products. Prior-release zips fetched as
+          # delta bases stay in archive_dir and must not be re-uploaded.
+          cp "$archive_dir/appcast.xml" release/appcast.xml
+          find "$archive_dir" -maxdepth 1 -type f -name '*.delta' -exec cp {} release/ \;
+          ls -la release/appcast.xml
+          find release -maxdepth 1 -type f \( -name 'appcast.xml' -o -name '*.delta' \) -print | sort
 
       - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
@@ -370,6 +468,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
+          CRADLE_DESKTOP_SPARKLE_APPCAST_URL: ${{ needs.resolve.outputs.sparkle_appcast_url }}
           CRADLE_ELECTRON_REBUILD_ARCH: x64
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
         run: pnpm --filter @cradle/desktop build
@@ -533,7 +632,7 @@ jobs:
           mkdir -p release-assets
 
           shopt -s globstar nullglob
-          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,AppImage,deb}; do
+          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,xml,AppImage,deb,delta}; do
             basename="$(basename "$file")"
             if [[ "$basename" == "builder-debug.yml" ]]; then
               continue
@@ -721,18 +820,23 @@ jobs:
             return null
           }
 
-          function writeCradleUpdateManifest() {
-            if (!updateManifestUrl || !updateManifestUrl.endsWith('/manifest.json')) {
-              throw new Error('UPDATE_MANIFEST_URL must point directly at manifest.json')
-            }
+          function writeLegacyCradleUpdateManifest() {
+            // Optional dual-publish for already-shipped custom macOS clients during transition.
+            // New macOS clients consume appcast.xml generated on the macOS build runner.
             if (!desktopVersion) {
               throw new Error('DESKTOP_VERSION is required')
             }
 
-            const rawAssetBaseUrl = (releaseChannel === 'dev' || releaseChannel === 'bleeding-edge') ? releaseDownloadUrl : dirnameUrl(updateManifestUrl)
+            const rawAssetBaseUrl = (releaseChannel === 'dev' || releaseChannel === 'bleeding-edge')
+              ? releaseDownloadUrl
+              : (updateManifestUrl || releaseDownloadUrl)
             const assetBaseUrl = rawAssetBaseUrl.endsWith('/') ? rawAssetBaseUrl : `${rawAssetBaseUrl}/`
             const updateFiles = []
-            for (const artifactName of fs.readdirSync(outputRoot).filter(entry => entry.startsWith('Cradle-mac-') && entry.endsWith('.zip')).sort()) {
+            for (const artifactName of fs.readdirSync(outputRoot).filter(entry => (
+              (entry.startsWith('Cradle-mac-') || entry.includes('-mac-'))
+              && entry.endsWith('.zip')
+              && !entry.includes('.delta')
+            )).sort()) {
               const artifactPath = path.join(outputRoot, artifactName)
               if (!fs.existsSync(artifactPath)) {
                 continue
@@ -749,7 +853,8 @@ jobs:
             }
 
             if (updateFiles.length === 0) {
-              throw new Error('Cradle update manifest requires at least one macOS artifact')
+              console.warn('Skipping legacy Cradle manifest.json: no macOS zip artifacts found')
+              return
             }
 
             const updateManifest = {
@@ -766,6 +871,15 @@ jobs:
               `${JSON.stringify(updateManifest, null, 2)}\n`,
               'utf8',
             )
+            console.log('Wrote legacy manifest.json for transitional macOS clients')
+          }
+
+          function assertSparkleAppcastPresent() {
+            const appcastPath = path.join(outputRoot, 'appcast.xml')
+            if (!fs.existsSync(appcastPath)) {
+              throw new Error('appcast.xml is required in release assets for macOS Sparkle updates')
+            }
+            console.log('Found Sparkle appcast.xml')
           }
 
           const manifestsByName = new Map()
@@ -796,7 +910,8 @@ jobs:
             )
           }
 
-          writeCradleUpdateManifest()
+          writeLegacyCradleUpdateManifest()
+          assertSparkleAppcastPresent()
 
           function writeLatestYml() {
             const exeName = fs.readdirSync(outputRoot).find(f => f.endsWith('-setup.exe'))
@@ -834,12 +949,19 @@ jobs:
           fs.writeFileSync('release-body.md', releaseBody, 'utf8')
           NODE
 
-          if [ "$RELEASE_CHANNEL" = "dev" ]; then
+          if [ "$RELEASE_CHANNEL" = "dev" ] || [ "$RELEASE_CHANNEL" = "bleeding-edge" ]; then
             mkdir -p feed-assets
-            cp release-assets/manifest.json feed-assets/
+            if [ -f release-assets/appcast.xml ]; then
+              cp release-assets/appcast.xml feed-assets/
+            fi
+            if [ -f release-assets/manifest.json ]; then
+              cp release-assets/manifest.json feed-assets/
+            fi
             if [ -f release-assets/latest.yml ]; then
               cp release-assets/latest.yml feed-assets/
             fi
+            # Versioned mac zips for the feed channel.
+            find release-assets -maxdepth 1 -type f \( -name 'Cradle-*-mac-*.zip' -o -name 'Cradle-mac-*.zip' -o -name '*.delta' \) -exec cp {} feed-assets/ \;
             find feed-assets -maxdepth 1 -type f -print | sort
           fi
 

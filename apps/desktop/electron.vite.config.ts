@@ -13,11 +13,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const webRoot = resolve(__dirname, '../web')
 const packageJson: { version: string } = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8'))
 const desktopUpdateUrl = process.env.CRADLE_DESKTOP_UPDATE_URL ?? ''
+const sparkleAppcastUrl = process.env.CRADLE_DESKTOP_SPARKLE_APPCAST_URL ?? ''
+const sparklePublicEdKey = process.env.SPARKLE_ED_PUBLIC_KEY ?? ''
 const isE2E = process.env.CRADLE_E2E === '1'
 const nodeRuntimeExternals = [
   ...builtinModules,
   ...builtinModules.map(moduleName => `node:${moduleName}`),
   'electron',
+  // Keep Sparkle bridge external so the N-API addon resolves from node_modules
+  // (packaged under app.asar.unpacked) instead of a bundled import.meta.url root.
+  'electron-sparkle-updater',
+  'electron-sparkle-updater/builder',
+  'electron-sparkle-updater/fallback',
 ]
 
 /** Observability keys that may be baked into packaged main-process defaults. */
@@ -54,6 +61,8 @@ export default defineConfig({
     },
     define: {
       __CRADLE_DESKTOP_UPDATE_URL__: JSON.stringify(desktopUpdateUrl),
+      __CRADLE_DESKTOP_SPARKLE_APPCAST_URL__: JSON.stringify(sparkleAppcastUrl),
+      __CRADLE_SPARKLE_ED_PUBLIC_KEY__: JSON.stringify(sparklePublicEdKey),
       __CRADLE_DESKTOP_PACKAGED_OBSERVABILITY_ENV__: JSON.stringify(readPackagedObservabilityEnv()),
     },
     build: {

@@ -1,10 +1,17 @@
 import fs from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import { fixMacOSFrameworkSymlinks } from './scripts/fix-macos-framework-symlinks.mjs'
 import { copyCodexRuntimeToPackagedResources } from './scripts/sync-codex-runtime.mjs'
 
+const require = createRequire(import.meta.url)
+
 const updateServerUrl = process.env.CRADLE_DESKTOP_UPDATE_URL?.trim()
+const sparkleAppcastUrl = resolveSparkleAppcastUrlForBuild(
+  process.env.CRADLE_DESKTOP_SPARKLE_APPCAST_URL?.trim() || updateServerUrl || '',
+)
+const sparklePublicEdKey = process.env.SPARKLE_ED_PUBLIC_KEY?.trim() || undefined
 const hasAppleSigningIdentity = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
 
 if (!hasAppleSigningIdentity) {
@@ -36,14 +43,65 @@ function getPublishConfig() {
 }
 
 function resolveElectronUpdaterFeedUrl(url) {
+  if (url.endsWith('/appcast.xml')) {
+    return url.slice(0, -'appcast.xml'.length)
+  }
   if (url.endsWith('/manifest.json')) {
     return url.slice(0, -'manifest.json'.length)
   }
-  if (url.endsWith('.json')) {
+  if (url.endsWith('.xml') || url.endsWith('.json') || url.endsWith('.yml') || url.endsWith('.yaml')) {
     return url.slice(0, url.lastIndexOf('/') + 1)
   }
   return url.endsWith('/') ? url : `${url}/`
 }
+
+function resolveSparkleAppcastUrlForBuild(url) {
+  if (!url) {
+    return 'https://github.com/wibus-wee/cradle-app/releases/latest/download/appcast.xml'
+  }
+  if (url.endsWith('.xml')) {
+    return url
+  }
+  if (url.endsWith('/manifest.json')) {
+    return `${url.slice(0, -'manifest.json'.length)}appcast.xml`
+  }
+  if (url.endsWith('.json') || url.endsWith('.yml') || url.endsWith('.yaml')) {
+    return `${url.slice(0, url.lastIndexOf('/') + 1)}appcast.xml`
+  }
+  return url.endsWith('/') ? `${url}appcast.xml` : `${url}/appcast.xml`
+}
+
+function loadSparkleBuilderFragments() {
+  try {
+    // Prefer the published package helper when available.
+    const { sparkleBuilderConfig } = require('electron-sparkle-updater/builder')
+    return sparkleBuilderConfig({
+      feedUrl: sparkleAppcastUrl,
+      publicEdKey: sparklePublicEdKey,
+      scheduledCheckIntervalSeconds: 5 * 60,
+    })
+  }
+  catch (error) {
+    console.warn(`[desktop] electron-sparkle-updater/builder unavailable: ${error instanceof Error ? error.message : String(error)}`)
+    return {
+      extraFiles: [],
+      files: [],
+      asarUnpack: [],
+      dmg: { writeUpdateInfo: false },
+      zip: { writeUpdateInfo: false },
+      mac: {
+        extendInfo: {
+          SUFeedURL: sparkleAppcastUrl,
+          ...(sparklePublicEdKey ? { SUPublicEDKey: sparklePublicEdKey } : {}),
+          SUEnableInstallerLauncherService: false,
+          SUScheduledCheckInterval: 5 * 60,
+        },
+      },
+    }
+  }
+}
+
+const sparkle = loadSparkleBuilderFragments()
 
 async function removeUnusedMacFrameworkLocales(context) {
   if (!['darwin', 'mas'].includes(context.electronPlatformName)) {
@@ -94,6 +152,18 @@ async function removeUnusedMacFrameworkLocales(context) {
   }
 }
 
+async function adHocSignAfterPack(context) {
+  try {
+    const builder = await import('electron-sparkle-updater/builder')
+    await builder.adHocSignAfterPack(context)
+  }
+  catch {
+    // Fallback for environments where the package is not resolvable as ESM.
+    const { adHocSignAfterPack: adHocSign } = require('electron-sparkle-updater/builder')
+    await adHocSign(context)
+  }
+}
+
 async function afterPack(context) {
   await copyCodexRuntimeToPackagedResources(context)
   await removeUnusedMacFrameworkLocales(context)
@@ -112,6 +182,10 @@ async function afterPack(context) {
     if (result.rewritten > 0) {
       console.warn(`[desktop] Rewrote ${result.rewritten} macOS framework symlink(s).`)
     }
+
+    // Load-bearing for Sparkle: generate_appcast requires codesign --verify --deep --strict.
+    // Ad-hoc re-sign covers unsigned Developer ID-less builds.
+    await adHocSignAfterPack(context)
   }
 }
 
@@ -130,6 +204,7 @@ const config = {
   asarUnpack: [
     '**/*.node',
     '**/*.wasm',
+    ...(Array.isArray(sparkle.asarUnpack) ? sparkle.asarUnpack : [sparkle.asarUnpack].filter(Boolean)),
   ],
 
   compression: 'maximum',
@@ -148,6 +223,15 @@ const config = {
     'dist/preload/**/*',
     'dist/renderer/**/*',
     '!node_modules',
+    // Sparkle bridge must ship as a real node_modules package so the packaged
+    // loader can require native/build/Release/sparkle_bridge.node from asar.unpacked.
+    'node_modules/electron-sparkle-updater/**/*',
+    '!node_modules/electron-sparkle-updater/node_modules',
+    ...(Array.isArray(sparkle.files) ? sparkle.files : []),
+  ],
+
+  extraFiles: [
+    ...(Array.isArray(sparkle.extraFiles) ? sparkle.extraFiles : []),
   ],
 
   extraResources: [
@@ -213,9 +297,20 @@ const config = {
     gatekeeperAssess: false,
     hardenedRuntime: hasAppleSigningIdentity,
     ...(hasAppleSigningIdentity ? {} : { identity: null }),
+    extendInfo: {
+      ...(sparkle.mac?.extendInfo ?? {}),
+    },
     target: [
       'dir',
     ],
+  },
+
+  dmg: {
+    ...(sparkle.dmg ?? {}),
+  },
+
+  zip: {
+    ...(sparkle.zip ?? {}),
   },
 
   win: {

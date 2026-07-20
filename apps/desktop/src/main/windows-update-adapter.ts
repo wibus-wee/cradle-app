@@ -7,6 +7,7 @@ import type {
 import { autoUpdater, CancellationToken as ElectronUpdaterCancellationToken } from 'electron-updater'
 
 import type { DesktopDownloadCenterService } from './download-center'
+import { resolveElectronUpdaterFeedUrl } from './update-feed'
 import type {
   DesktopUpdateFile,
   DesktopUpdateInfo,
@@ -182,14 +183,7 @@ function createWindowsDownloadRequest(info: UpdateInfo, updateFeedUrl: string) {
 }
 
 export function resolveWindowsUpdaterFeedUrl(updateFeedUrl: string): string {
-  const url = updateFeedUrl.trim()
-  if (url.endsWith('/manifest.json')) {
-    return url.slice(0, -'manifest.json'.length)
-  }
-  if (url.endsWith('.json')) {
-    return url.slice(0, url.lastIndexOf('/') + 1)
-  }
-  return url.endsWith('/') ? url : `${url}/`
+  return resolveElectronUpdaterFeedUrl(updateFeedUrl)
 }
 
 function projectUpdateInfo(info: UpdateInfo): DesktopUpdateInfo {
