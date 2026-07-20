@@ -40,6 +40,11 @@ describe('mock claude agent provider', () => {
         session_id: 'mock-session-1',
         event: { type: 'message_delta', delta: { stop_reason: 'end_turn' } },
       },
+      {
+        type: 'result',
+        session_id: 'mock-session-1',
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
     ]))
     vi.stubGlobal('fetch', fetchMock)
 
