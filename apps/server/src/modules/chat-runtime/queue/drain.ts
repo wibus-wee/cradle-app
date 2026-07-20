@@ -11,7 +11,7 @@ import {
   releaseSessionQueueItem,
 } from '../es/commands'
 import type { SerializedChatError } from '../run/errors'
-import { createDraftTurn } from '../run/turn-draft'
+import { appendDraftUserMessage, createDraftTurn } from '../run/turn-draft'
 import { liveRuntimeSessionRegistry } from '../runtime-live-session-registry'
 import type { RuntimeSettings } from '../runtime-provider-types'
 import { assertStoredSession } from '../runtime-session-context'
@@ -172,13 +172,14 @@ async function completeAbsorbedMidTurnQueueItem(
   // Persist the user bubble without starting a Cradle run — the previous live turn
   // already produced the assistant answer. Product semantics are steer (mid-turn
   // fold into the active turn), even when the entry arrived via the durable queue.
-  await createDraftTurn({
+  const draft = createDraftTurn({
     sessionId,
     userText: row.text,
     files: parseQueueFiles(row.filesJson),
     contextParts: parseQueueContextParts(row.contextPartsJson),
     continuation: { mode: 'steer', queueItemId: row.id },
   })
+  await appendDraftUserMessage({ sessionId, userMessage: draft.userMessage })
   await completeSessionQueueItem(sessionId, row.id, {
     absorbedByRunId: row.sourceRunId,
   })

@@ -61,14 +61,13 @@ export interface CreateRunResult {
 }
 
 export interface RunCoordinatorDeps {
-  finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
   startActiveRunSnapshot: (
     activeRun: ActiveRun,
     input: { workspaceId?: string | null, agentId?: string | null },
   ) => void
   startSnapshotTimer: (activeRun: ActiveRun) => void
   scheduleQueueDrain: (sessionId: string) => void
-  executeRun: (activeRun: ActiveRun, input: ExecuteRunInput) => void
+  executeRun: (activeRun: ActiveRun, input: ExecuteRunInput) => Promise<void>
   warn: (message: string, payload: Record<string, unknown>) => void
 }
 
@@ -76,11 +75,8 @@ export async function createRun(
   input: CreateRunInput,
   deps: RunCoordinatorDeps,
 ): Promise<CreateRunResult> {
-  await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(input.sessionId)
-  if (
-    runRegistry.hasActiveRunForSession(input.sessionId)
-    || runRegistry.hasPendingRun(input.sessionId)
-  ) {
+  const pendingState: PendingRunState = { cancelled: false, queueItemId: input.queueItemId }
+  if (!runRegistry.claimPendingRun(input.sessionId, pendingState)) {
     throw new AppError({
       code: 'chat_run_in_progress',
       status: 409,
@@ -88,20 +84,9 @@ export async function createRun(
       details: { sessionId: input.sessionId },
     })
   }
-  const maintenanceKind = runRegistry.getSessionMaintenance(input.sessionId)
-  if (maintenanceKind) {
-    throw new AppError({
-      code: 'chat_session_maintenance_in_progress',
-      status: 409,
-      message: 'Chat session is completing an exclusive maintenance operation',
-      details: { sessionId: input.sessionId, maintenanceKind },
-    })
-  }
   if (input.internalContinuation !== 'runtimeGoal') {
     cancelPendingRuntimeGoalContinuation(input.sessionId)
   }
-  const pendingState: PendingRunState = { cancelled: false, queueItemId: input.queueItemId }
-  runRegistry.setPendingRun(input.sessionId, pendingState)
 
   try {
     const userText = input.text ?? ''
@@ -223,22 +208,24 @@ export async function createRun(
             userMessage: runtimeGoalContinuation!.annotateContinuationMessage({
               message: createUserMessage(randomUUID(), runtimeGoalContinuation!.continuationPrompt),
             }),
+            appendUserMessage: false,
           }
         : lastRequestMessage?.role === 'assistant'
           ? {
               userMessageId: '',
               assistantMessageId: lastRequestMessage.id,
               userMessage: lastRequestMessage,
+              appendUserMessage: false,
             }
           : lastRequestMessage?.role === 'user'
-            ? await createDraftTurnFromUserMessage({
+            ? createDraftTurnFromUserMessage({
                 sessionId: input.sessionId,
                 userMessage: lastRequestMessage,
                 continuation: input.continuationMode
                   ? { mode: input.continuationMode, queueItemId: input.queueItemId }
                   : undefined,
               })
-            : await createDraftTurn({
+            : createDraftTurn({
                 sessionId: input.sessionId,
                 userText,
                 files,
@@ -297,6 +284,7 @@ export async function createRun(
         lastRequestMessage?.role === 'assistant'
           ? lastRequestMessage
           : createAssistantMessage(draft.assistantMessageId),
+      userMessage: draft.appendUserMessage ? draft.userMessage : undefined,
       queueItemId: input.queueItemId ?? null,
     })
     const activeRun: ActiveRun = {
@@ -368,7 +356,7 @@ export async function createRun(
           draftUserMessageId: draft.userMessageId,
         })
 
-    deps.executeRun(activeRun, {
+    void deps.executeRun(activeRun, {
       message: projectLightOcrMessage(draft.userMessage),
       profile: context.profile,
       modelId:
@@ -387,6 +375,12 @@ export async function createRun(
       workspaceId: context.session.workspaceId,
       workspacePath: context.workspacePath,
       agentId: context.session.agentId,
+    }).catch((error) => {
+      deps.warn('chat run executor rejected', {
+        error,
+        sessionId: activeRun.sessionId,
+        runId: activeRun.runId,
+      })
     })
 
     return {

@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../src/infra'
 import { createFinalMessageProjectionState } from '../src/modules/chat-runtime/run/final-message-projection'
+import type { ActiveTurnOutcome } from '../src/modules/chat-runtime/run/turn-completion'
 import type { TurnExecutorDeps } from '../src/modules/chat-runtime/run/turn-executor'
 import { executeRun } from '../src/modules/chat-runtime/run/turn-executor'
 import type { ActiveRun } from '../src/modules/chat-runtime/run-registry'
@@ -83,12 +84,19 @@ function createDeps(overrides: Partial<TurnExecutorDeps> = {}): TurnExecutorDeps
       publishRunStartChunk: vi.fn(),
       publishRuntimeChunk: vi.fn(),
     },
-    publishTerminalChunk: vi.fn().mockResolvedValue(true),
+    completeActiveTurn: vi.fn(async (run: ActiveRun, outcome: ActiveTurnOutcome) => {
+      run.terminalStatus
+        = outcome.terminalChunk.type === 'finish'
+          ? 'complete'
+          : outcome.terminalChunk.type === 'abort'
+            ? 'aborted'
+            : 'failed'
+      await outcome.requiredBookkeeping?.()
+      await outcome.bestEffortBookkeeping?.()
+      return { durableTerminal: true }
+    }),
     recordSnapshotEvent: vi.fn(),
     finalizeSnapshot: vi.fn(),
-    releaseActiveRun: vi.fn(),
-    scheduleQueueDrain: vi.fn(),
-    scheduleRuntimeGoalContinuation: vi.fn(),
     pendingQueueItemCount: vi.fn().mockReturnValue(0),
     readRuntimeGoalContinuationOptions: vi.fn().mockReturnValue(undefined),
     warn: vi.fn(),
@@ -201,13 +209,10 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
         deps,
       )
 
-      // The cancel flow already finalized this run: the pump must not
-      // re-publish a terminal chunk on top of it.
-      expect(deps.publishTerminalChunk).not.toHaveBeenCalled()
-
-      expect(deps.finalizeSnapshot).toHaveBeenCalledTimes(1)
-      const [, finalChunk] = (deps.finalizeSnapshot as ReturnType<typeof vi.fn>).mock.calls[0]
-      expect(finalChunk).toEqual({ type: 'abort', reason: 'user' })
+      expect(deps.completeActiveTurn).toHaveBeenCalledTimes(1)
+      const [, outcome] = (deps.completeActiveTurn as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(outcome.terminalChunk).toEqual({ type: 'abort', reason: 'user' })
+      expect(deps.finalizeSnapshot).not.toHaveBeenCalled()
     })
   })
 
@@ -227,13 +232,13 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
         deps,
       )
 
-      expect(deps.publishTerminalChunk).toHaveBeenCalledTimes(1)
+      expect(deps.completeActiveTurn).toHaveBeenCalledTimes(1)
       const [, finalChunk] = (deps.finalizeSnapshot as ReturnType<typeof vi.fn>).mock.calls[0]
       expect(finalChunk).toMatchObject({ type: 'error' })
     })
   })
 
-  it('releases the active run and drains the queue when completion throws', async () => {
+  it('observes required completion bookkeeping rejection', async () => {
     await withTempDataDir(async () => {
       const sessionId = `session-${randomUUID()}`
       const runId = `run-${randomUUID()}`
@@ -252,10 +257,7 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
         deps,
       )).rejects.toThrow(failure)
 
-      expect(deps.releaseActiveRun).toHaveBeenCalledTimes(1)
-      expect(deps.releaseActiveRun).toHaveBeenCalledWith(activeRun)
-      expect(deps.scheduleQueueDrain).toHaveBeenCalledTimes(1)
-      expect(deps.scheduleQueueDrain).toHaveBeenCalledWith(sessionId)
+      expect(deps.completeActiveTurn).toHaveBeenCalledTimes(1)
     })
   })
 })

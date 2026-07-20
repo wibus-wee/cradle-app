@@ -18,7 +18,6 @@ import { assertRuntimeCompatibleTarget, getSessionRunContext } from '../runtime-
 import { createUserMessage, projectLightOcrMessage } from '../ui-message'
 
 export interface SubmitSessionSteerTurnDeps {
-  finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
   scheduleSessionQueueDrain: (sessionId: string) => void
   warn: (message: string, payload: Record<string, unknown>) => void
 }
@@ -41,8 +40,6 @@ async function enqueueSteerRequestAsQueueItem(
     providerTargetId: input.providerTargetId,
   }
   const queueItem: ChatSessionQueueItemDto = await enqueueSessionQueueItem(enqueueInput, {
-    finalizeInterruptedPersistedStreamingSessionIfIdle:
-      deps.finalizeInterruptedPersistedStreamingSessionIfIdle,
     scheduleSessionQueueDrain: deps.scheduleSessionQueueDrain,
   })
   return {
@@ -68,8 +65,6 @@ export async function submitSessionSteerTurn(
       details: { sessionId: input.sessionId },
     })
   }
-
-  await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(input.sessionId)
 
   const context = getSessionRunContext(input.sessionId, {
     providerTargetId: input.providerTargetId,

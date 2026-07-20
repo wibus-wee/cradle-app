@@ -11,6 +11,7 @@ import { createActiveRunChunkLog } from '../stream/run-chunk-log'
 import { createAssistantMessage } from '../ui-message'
 import { createFinalMessageProjectionState } from './final-message-projection'
 import { isTerminalUIMessageChunk } from './stream-chunks'
+import type { ActiveTurnCompletionController } from './turn-completion'
 import { startRun } from './turn-draft'
 
 interface ProviderSyntheticTurnHandlerDeps {
@@ -18,22 +19,28 @@ interface ProviderSyntheticTurnHandlerDeps {
     publishRunStartChunk: (activeRun: ActiveRun) => void
     publishRuntimeChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => void
   }
-  publishTerminalChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => Promise<boolean>
-  releaseActiveRun: (activeRun: ActiveRun) => void
-  scheduleQueueDrain: (sessionId: string) => void
+  completeActiveTurn: ActiveTurnCompletionController['completeActiveTurn']
 }
 
 interface ProviderSyntheticTurnState {
   providerTurnId: string
   providerThreadId: null
   activeRun: ActiveRun
+  completionStarted: boolean
+}
+
+interface ProviderSyntheticTurnInboxEntry {
+  tail: Promise<void>
+  state: ProviderSyntheticTurnState | null
+  closed: boolean
+  pendingDeliveries: number
 }
 
 export function createProviderSyntheticTurnEventHandler(
   parentRun: ActiveRun,
   deps: ProviderSyntheticTurnHandlerDeps,
 ): (event: ProviderSyntheticTurnEvent) => Promise<void> {
-  const syntheticTurns = new Map<string, ProviderSyntheticTurnState>()
+  const syntheticTurns = new Map<string, ProviderSyntheticTurnInboxEntry>()
 
   return async (event) => {
     if (event.chunks.length === 0) {
@@ -55,32 +62,54 @@ export function createProviderSyntheticTurnEventHandler(
       return
     }
 
-    let syntheticTurn = syntheticTurns.get(event.providerTurnId)
-    try {
-      if (!syntheticTurn) {
-        syntheticTurn = await startProviderSyntheticTurn(parentRun, event)
-        syntheticTurns.set(event.providerTurnId, syntheticTurn)
+    let inbox = syntheticTurns.get(event.providerTurnId)
+    if (!inbox) {
+      inbox = {
+        tail: Promise.resolve(),
+        state: null,
+        closed: false,
+        pendingDeliveries: 0,
+      }
+      syntheticTurns.set(event.providerTurnId, inbox)
+    }
+
+    inbox.pendingDeliveries += 1
+    const delivery = inbox.tail.then(async () => {
+      if (inbox.closed) {
+        return
+      }
+      if (!inbox.state) {
+        inbox.state = await startProviderSyntheticTurn(parentRun, event)
       }
 
-      for (const chunk of event.chunks) {
-        await applyProviderSyntheticTurnChunk(syntheticTurn, chunk, deps)
-        if (syntheticTurn.activeRun.terminalStatus) {
-          syntheticTurns.delete(event.providerTurnId)
-          break
+      try {
+        for (const chunk of event.chunks) {
+          await applyProviderSyntheticTurnChunk(inbox.state, chunk, deps)
+          if (inbox.state.activeRun.terminalStatus) {
+            inbox.closed = true
+            break
+          }
         }
       }
-    }
-    catch (error) {
-      if (syntheticTurn && !syntheticTurn.activeRun.terminalStatus) {
-        syntheticTurns.delete(event.providerTurnId)
-        await finalizeProviderSyntheticTurn(
-          syntheticTurn,
-          { type: 'error', errorText: error instanceof Error ? error.message : String(error) },
-          deps,
-        )
+      catch (error) {
+        inbox.closed = true
+        if (!inbox.state.completionStarted && !inbox.state.activeRun.terminalStatus) {
+          await finalizeProviderSyntheticTurn(
+            inbox.state,
+            { type: 'error', errorText: error instanceof Error ? error.message : String(error) },
+            deps,
+          )
+        }
+        throw error
       }
-      throw error
-    }
+    }).finally(() => {
+      inbox.pendingDeliveries -= 1
+      if (inbox.closed && inbox.pendingDeliveries === 0 && syntheticTurns.get(event.providerTurnId) === inbox) {
+        syntheticTurns.delete(event.providerTurnId)
+      }
+    })
+    inbox.tail = delivery.catch(() => undefined)
+    return delivery
   }
 }
 
@@ -136,6 +165,7 @@ async function startProviderSyntheticTurn(
     providerTurnId: event.providerTurnId,
     providerThreadId: null,
     activeRun,
+    completionStarted: false,
   }
 }
 
@@ -173,11 +203,9 @@ async function finalizeProviderSyntheticTurn(
     return
   }
 
-  try {
-    await deps.publishTerminalChunk(activeRun, terminalChunk)
-  }
-  finally {
-    deps.releaseActiveRun(activeRun)
-    deps.scheduleQueueDrain(activeRun.sessionId)
-  }
+  syntheticTurn.completionStarted = true
+  await deps.completeActiveTurn(activeRun, {
+    source: 'provider-synthetic',
+    terminalChunk,
+  })
 }

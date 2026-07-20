@@ -94,7 +94,7 @@ export interface ChatRuntimeSessionStatusDto {
 }
 
 export interface RuntimeSessionStatusDeps {
-  releaseTerminalPersistedActiveRunForSession: (sessionId: string) => Promise<boolean>
+  completeTerminalPersistedActiveRunForSession: (sessionId: string) => Promise<boolean>
   /**
    * Generic goal-continuation degradation options (see `RuntimeGoalContinuation` on
    * `ChatRuntime`). This orchestrator layer must not know which runtime kind, if any,
@@ -155,7 +155,7 @@ export async function getRuntimeSessionStatus(
     })
   }
 
-  await deps.releaseTerminalPersistedActiveRunForSession(sessionId)
+  await deps.completeTerminalPersistedActiveRunForSession(sessionId)
 
   const binding = session.providerTargetId
     ? readReusableDurableProviderRuntimeBinding({

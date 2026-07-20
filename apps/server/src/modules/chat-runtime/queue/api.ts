@@ -45,7 +45,6 @@ import {
 } from './session-queue'
 
 export interface SessionQueueApiDeps {
-  finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
   scheduleSessionQueueDrain: (sessionId: string) => void
 }
 
@@ -85,7 +84,6 @@ export async function enqueueSessionQueueItem(
   input: EnqueueSessionQueueItemInput,
   deps: SessionQueueApiDeps,
 ): Promise<ChatSessionQueueItemDto> {
-  await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(input.sessionId)
   const context = getSessionRunContext(input.sessionId, {
     providerTargetId: input.providerTargetId,
   })

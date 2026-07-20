@@ -145,6 +145,18 @@ export class RunRegistry {
     this.pendingRunSessions.set(sessionId, state)
   }
 
+  claimPendingRun(sessionId: string, state: PendingRunState): boolean {
+    if (
+      this.activeRunIdsBySession.has(sessionId)
+      || this.pendingRunSessions.has(sessionId)
+      || this.sessionMaintenance.has(sessionId)
+    ) {
+      return false
+    }
+    this.pendingRunSessions.set(sessionId, state)
+    return true
+  }
+
   deletePendingRun(sessionId: string): void {
     this.pendingRunSessions.delete(sessionId)
   }

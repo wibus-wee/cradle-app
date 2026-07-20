@@ -3,6 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { RunRegistry } from './run-registry'
 
 describe('run registry session maintenance', () => {
+  it('claims pending admission synchronously and exclusively', () => {
+    const registry = new RunRegistry()
+    const first = { cancelled: false }
+    const second = { cancelled: false }
+
+    expect(registry.claimPendingRun('session-1', first)).toBe(true)
+    expect(registry.claimPendingRun('session-1', second)).toBe(false)
+    expect(registry.getPendingRun('session-1')).toBe(first)
+  })
+
   it('rejects maintenance while a session run is active or pending', () => {
     const registry = new RunRegistry()
 
