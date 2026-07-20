@@ -2,6 +2,7 @@ import type {
   PtyExitEvent,
   PtyExitState,
   PtyOutputEvent,
+  PtyRestoreInfo,
   PtySnapshotEvent,
   PtyTimelineEvent,
 } from './protocol'
@@ -16,6 +17,7 @@ interface TimelineRecord {
   buffer: string
   running: boolean
   exit: PtyExitState | null
+  restore: PtyRestoreInfo | null
   events: PtyTimelineEvent[]
   subscribers: Set<TimelineSubscriber>
 }
@@ -35,6 +37,7 @@ export class PtyTimelineStore {
       buffer: '',
       running: true,
       exit: null,
+      restore: null,
       events: [],
       subscribers: new Set(),
     })
@@ -51,11 +54,32 @@ export class PtyTimelineStore {
       buffer: '',
       running: true,
       exit: null,
+      restore: null,
       events: [],
       subscribers: new Set(),
     }
     this.sessions.set(sessionId, record)
     return record
+  }
+
+  setRestore(sessionId: string, restore: PtyRestoreInfo | null): void {
+    const record = this.ensureSession(sessionId)
+    record.restore = restore
+  }
+
+  seedBuffer(sessionId: string, ansi: string): void {
+    if (!ansi) {
+      return
+    }
+    const record = this.ensureSession(sessionId)
+    if (record.buffer.length > 0) {
+      return
+    }
+    record.buffer = trimBuffer(ansi)
+  }
+
+  getBuffer(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.buffer ?? null
   }
 
   hasSession(sessionId: string): boolean {
@@ -115,6 +139,7 @@ export class PtyTimelineStore {
       seq: record.seq,
       buffer: record.buffer,
       running: record.running,
+      ...(record.restore ? { restore: record.restore } : {}),
     }
   }
 

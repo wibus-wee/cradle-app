@@ -104,7 +104,22 @@ describe('pty capability HTTP control plane', () => {
         body: JSON.stringify({ cols: 80, rows: 24 }),
       }))
       expect(startRes.status).toBe(200)
-      expect(await startRes.json()).toEqual({ sessionId: 'session-cli-tui', running: true })
+      expect(await startRes.json()).toMatchObject({
+        sessionId: 'session-cli-tui',
+        running: true,
+        mode: 'fresh',
+        restore: { mode: 'fresh' },
+      })
+
+      const hostRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/host'))
+      expect(hostRes.status).toBe(200)
+      expect(await hostRes.json()).toMatchObject({
+        sessionId: 'session-cli-tui',
+        role: 'cli-tui',
+        running: true,
+        phase: 'running',
+        mode: 'fresh',
+      })
 
       const attachAgainRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/start-or-attach', {
         method: 'POST',
@@ -112,7 +127,12 @@ describe('pty capability HTTP control plane', () => {
         body: JSON.stringify({ cols: 100, rows: 30 }),
       }))
       expect(attachAgainRes.status).toBe(200)
-      expect(await attachAgainRes.json()).toEqual({ sessionId: 'session-cli-tui', running: true })
+      expect(await attachAgainRes.json()).toMatchObject({
+        sessionId: 'session-cli-tui',
+        running: true,
+        mode: 'live-attach',
+        restore: { mode: 'live-attach' },
+      })
 
       const stopRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui', { method: 'DELETE' }))
       expect(stopRes.status).toBe(200)
@@ -372,6 +392,179 @@ describe('pty capability HTTP control plane', () => {
       }
       else {
         process.env.CRADLE_DATA_DIR = previousDataDir
+      }
+    }
+  })
+
+  it('reports and clears provider session bindings for CLI TUI resume', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-pty-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    shutdownInfra()
+
+    let app: ElysiaApp | undefined
+
+    try {
+      app = await createServerApp()
+      await createCliTuiSession(app, workspaceRoot)
+
+      const reportRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/provider-session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          source: 'cradle:opencode',
+          agent: 'opencode',
+          kind: 'id',
+          value: '019e3c07-d7df-73d2-a3dc-dfaf5f883050',
+        }),
+      }))
+      expect(reportRes.status).toBe(200)
+      const reported = await reportRes.json() as {
+        sessionId: string
+        providerSession: { agent: string, value: string, workspacePath: string }
+      }
+      expect(reported.sessionId).toBe('session-cli-tui')
+      expect(reported.providerSession).toMatchObject({
+        agent: 'opencode',
+        value: '019e3c07-d7df-73d2-a3dc-dfaf5f883050',
+        workspacePath: workspaceRoot,
+      })
+
+      const getRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/provider-session'))
+      expect(getRes.status).toBe(200)
+      expect(await getRes.json()).toMatchObject({
+        sessionId: 'session-cli-tui',
+        providerSession: {
+          agent: 'opencode',
+          value: '019e3c07-d7df-73d2-a3dc-dfaf5f883050',
+        },
+      })
+
+      const clearRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/provider-session', {
+        method: 'DELETE',
+      }))
+      expect(clearRes.status).toBe(200)
+      expect(await clearRes.json()).toEqual({
+        sessionId: 'session-cli-tui',
+        providerSession: null,
+      })
+
+      const invalidRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/provider-session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          source: 'evil:opencode',
+          agent: 'opencode',
+          value: 'nope',
+        }),
+      }))
+      expect(invalidRes.status).toBe(400)
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      if (previousDataDir === undefined) {
+        delete process.env.CRADLE_DATA_DIR
+      }
+      else {
+        process.env.CRADLE_DATA_DIR = previousDataDir
+      }
+    }
+  })
+
+  it('seeds durable history on fresh launch when enabled', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-pty-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousHistory = process.env.CRADLE_TERMINAL_HISTORY
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_TERMINAL_HISTORY = '1'
+    shutdownInfra()
+
+    let app: ElysiaApp | undefined
+
+    try {
+      app = await createServerApp()
+      await createCliTuiSession(app, workspaceRoot)
+
+      const startRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/start-or-attach', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cols: 80, rows: 24 }),
+      }))
+      expect(startRes.status).toBe(200)
+
+      // Write history as if a prior process exited with screen contents.
+      const historyDir = `${dataDir}/terminal-history`
+      const { mkdirSync, writeFileSync } = await import('node:fs')
+      mkdirSync(historyDir, { recursive: true })
+      writeFileSync(`${historyDir}/session-cli-tui.json`, JSON.stringify({
+        version: 1,
+        sessionId: 'session-cli-tui',
+        ansi: 'PRIOR SCREEN\r\n',
+        lines: 1,
+        capturedAt: Math.floor(Date.now() / 1000),
+      }))
+
+      // Destroy runtime without deleting history, then start again.
+      const stopRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui', { method: 'DELETE' }))
+      expect(stopRes.status).toBe(200)
+
+      // Kill is async; wait until host reports the process is gone.
+      const deadline = Date.now() + 3000
+      while (Date.now() < deadline) {
+        const host = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/host'))
+        const body = await host.json() as { running: boolean }
+        if (!body.running) {
+          break
+        }
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+
+      // Re-seed history after stop (stop may overwrite empty buffer).
+      writeFileSync(`${historyDir}/session-cli-tui.json`, JSON.stringify({
+        version: 1,
+        sessionId: 'session-cli-tui',
+        ansi: 'PRIOR SCREEN\r\n',
+        lines: 1,
+        capturedAt: Math.floor(Date.now() / 1000),
+      }))
+
+      const restartRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/start-or-attach', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cols: 80, rows: 24 }),
+      }))
+      expect(restartRes.status).toBe(200)
+      const restarted = await restartRes.json() as { mode: string, restore?: { mode: string } }
+      expect(restarted.mode).toBe('fresh')
+      expect(restarted.restore?.mode).toBe('history')
+
+      const hostRes = await app.handle(new Request('http://localhost/terminal-sessions/session-cli-tui/host'))
+      expect(hostRes.status).toBe(200)
+      expect(await hostRes.json()).toMatchObject({
+        historyEnabled: true,
+        hasHistory: true,
+        mode: 'history',
+      })
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      if (previousDataDir === undefined) {
+        delete process.env.CRADLE_DATA_DIR
+      }
+      else {
+        process.env.CRADLE_DATA_DIR = previousDataDir
+      }
+      if (previousHistory === undefined) {
+        delete process.env.CRADLE_TERMINAL_HISTORY
+      }
+      else {
+        process.env.CRADLE_TERMINAL_HISTORY = previousHistory
       }
     }
   })

@@ -8,11 +8,20 @@ export type PtyClientEvent
     | { type: 'resize', cols: number, rows: number }
     | { type: 'ping' }
 
+export type PtyRestoreMode = 'live-attach' | 'resume' | 'fresh' | 'history'
+
+export type PtyRestoreInfo = {
+  mode: PtyRestoreMode
+  agent?: string
+  reason?: string
+}
+
 export type PtySnapshotEvent = {
   type: 'snapshot'
   seq: number
   buffer: string
   running: boolean
+  restore?: PtyRestoreInfo
 }
 
 export type PtyOutputEvent = {

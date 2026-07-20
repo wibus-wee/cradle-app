@@ -24,6 +24,11 @@ const PtyServerEventJsonSchema = z.string()
       seq: z.number(),
       buffer: z.string(),
       running: z.boolean(),
+      restore: z.object({
+        mode: z.enum(['live-attach', 'resume', 'fresh', 'history']),
+        agent: z.string().optional(),
+        reason: z.string().optional(),
+      }).optional(),
     }),
     z.object({
       type: z.literal('output'),
@@ -264,13 +269,14 @@ describe('pty websocket live channels', () => {
         body: JSON.stringify({ cols: 80, rows: 24 }),
       })
       expect(startRes.status).toBe(200)
-      expect(await startRes.json()).toEqual({ sessionId: 'session-cli-tui', running: true })
+      expect(await startRes.json()).toMatchObject({ sessionId: 'session-cli-tui', running: true, mode: 'fresh', restore: { mode: 'fresh' } })
 
       const socket1 = createSocketClient(toWebSocketUrl(started.baseUrl, '/terminal-sessions/session-cli-tui/socket'))
       await socket1.open
       const snapshot = await socket1.waitFor((message): message is Extract<PtyServerEvent, { type: 'snapshot' }> => message.type === 'snapshot')
       expect(snapshot.type).toBe('snapshot')
       expect(snapshot.running).toBe(true)
+      expect(snapshot.restore).toMatchObject({ mode: 'fresh' })
 
       if (!snapshot.buffer.includes('READY')) {
         const readyOutput = await socket1.waitFor((message): message is Extract<PtyServerEvent, { type: 'output' }> => message.type === 'output' && message.data.includes('READY'))

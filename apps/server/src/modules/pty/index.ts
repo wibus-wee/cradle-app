@@ -97,6 +97,59 @@ export function registerPtyRoutes(app: Elysia): Elysia {
         response: { 200: PtyModel.okResponse },
       },
     )
+    .get(
+      '/terminal-sessions/:sessionId/host',
+      ({ params }) => {
+        return Pty.getHost(params.sessionId)
+      },
+      {
+        detail: { summary: 'Get CLI TUI host snapshot and restore state', tags: ['pty'] },
+        params: PtyModel.sessionIdParams,
+        response: { 200: PtyModel.hostResponse },
+      },
+    )
+    .get(
+      '/terminal-sessions/:sessionId/provider-session',
+      ({ params }) => {
+        return Pty.getProviderSession(params.sessionId)
+      },
+      {
+        detail: { summary: 'Get provider session binding for CLI TUI resume', tags: ['pty'] },
+        params: PtyModel.sessionIdParams,
+        response: { 200: PtyModel.providerSessionResponse },
+      },
+    )
+    .post(
+      '/terminal-sessions/:sessionId/provider-session',
+      ({ params, body }) => {
+        return Pty.reportProviderSession({
+          sessionId: params.sessionId,
+          source: body.source,
+          agent: body.agent,
+          kind: body.kind,
+          value: body.value,
+          sourcePath: body.sourcePath,
+          confidence: body.confidence,
+        })
+      },
+      {
+        detail: { summary: 'Report provider session binding for CLI TUI resume', tags: ['pty'] },
+        params: PtyModel.sessionIdParams,
+        body: PtyModel.providerSessionBody,
+        response: { 200: PtyModel.providerSessionResponse },
+      },
+    )
+    .delete(
+      '/terminal-sessions/:sessionId/provider-session',
+      ({ params }) => {
+        return Pty.clearProviderSession(params.sessionId)
+      },
+      {
+        detail: { summary: 'Clear provider session binding for CLI TUI resume', tags: ['pty'] },
+        params: PtyModel.sessionIdParams,
+        response: { 200: PtyModel.providerSessionResponse },
+      },
+    )
     .post(
       '/terminal-sessions/shell/start',
       ({ body }) => {

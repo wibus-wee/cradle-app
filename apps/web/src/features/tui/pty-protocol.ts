@@ -5,11 +5,18 @@ export type PtyClientEvent
     | { type: 'resize', cols: number, rows: number }
     | { type: 'ping' }
 
+export type PtyRestoreInfo = {
+  mode: 'live-attach' | 'resume' | 'fresh' | 'history'
+  agent?: string
+  reason?: string
+}
+
 export type PtySnapshotEvent = {
   type: 'snapshot'
   seq: number
   buffer: string
   running: boolean
+  restore?: PtyRestoreInfo
 }
 
 export type PtyOutputEvent = {
@@ -41,6 +48,11 @@ export const PtyServerEventSchema = z.discriminatedUnion('type', [
     seq: z.number().finite(),
     buffer: z.string(),
     running: z.boolean(),
+    restore: z.object({
+      mode: z.enum(['live-attach', 'resume', 'fresh', 'history']),
+      agent: z.string().optional(),
+      reason: z.string().optional(),
+    }).optional(),
   }),
   z.object({
     type: z.literal('output'),

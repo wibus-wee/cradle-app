@@ -2,10 +2,11 @@ import { sessions, worktrees } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
-import type { CodexCliSessionBinding } from '../../helpers/agent-runtime-config'
+import type { CodexCliSessionBinding, ProviderSessionBinding } from '../../helpers/agent-runtime-config'
 import {
   SessionRuntimeConfigJsonSchema,
   writeCodexCliSessionBindingToSessionConfig,
+  writeProviderSessionBindingToSessionConfig,
 } from '../../helpers/agent-runtime-config'
 import { db } from '../../infra'
 import type { ResolvedRootBoundary } from '../../security/path-boundary'
@@ -20,13 +21,21 @@ import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { resolveSessionExecutionRootById } from '../worktree/service'
 import { captureCodexCliSession } from './codex-session-capture'
-import type { PtyClientEvent } from './protocol'
+import {
+  deleteTerminalHistory,
+  readTerminalHistory,
+  terminalHistoryEnabled,
+  writeTerminalHistory,
+} from './history'
+import type { CliTuiLaunchMode } from './launch-planner'
+import { isOfficialProviderSource, planCliTuiLaunch } from './launch-planner'
+import type { PtyClientEvent, PtyRestoreInfo } from './protocol'
 import type { PtyRuntimeRole } from './pty.runtime'
 import { PtyRuntimeRegistry } from './pty.runtime'
 import type { PtyLiveSocket } from './pty.socket'
 import { PtySocketHub } from './pty.socket'
 import { ptyTimeline } from './pty.timeline'
-import { getDefaultShell, getExecutableCommand } from './pty-platform'
+import { getDefaultShell } from './pty-platform'
 
 const codexCaptureTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellLeaseTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -37,26 +46,8 @@ const CODEX_CAPTURE_RETRY_MS = 500
 const MAX_OSC_LOOKBEHIND_CHARS = 1_000
 const OSC_SEQUENCE_RE = /\u001B\](\d+);([^\u0007\u001B]*(?:\u001B(?!\\)[^\u0007\u001B]*)*)(?:\u0007|\u001B\\)/g
 const TITLE_OSC_CODES = new Set(['0', '2'])
-const CODEX_VALUE_OPTIONS = new Set([
-  '-a',
-  '-c',
-  '-C',
-  '-i',
-  '-m',
-  '-p',
-  '-s',
-  '--add-dir',
-  '--ask-for-approval',
-  '--cd',
-  '--config',
-  '--image',
-  '--local-provider',
-  '--model',
-  '--profile',
-  '--remote',
-  '--remote-auth-token-env',
-  '--sandbox',
-])
+
+const lastRestoreBySession = new Map<string, PtyRestoreInfo>()
 
 const ptyRuntime = new PtyRuntimeRegistry({
   onOutput: (sessionId, role, data) => {
@@ -65,10 +56,12 @@ const ptyRuntime = new PtyRuntimeRegistry({
   },
   onExit: (sessionId, exit) => {
     pendingTitleOscBuffers.delete(sessionId)
+    persistTimelineHistory(sessionId)
     ptyTimeline.appendExit(sessionId, exit)
   },
   onRelease: (sessionId) => {
     pendingTitleOscBuffers.delete(sessionId)
+    lastRestoreBySession.delete(sessionId)
     ptyTimeline.delete(sessionId)
   },
 })
@@ -122,11 +115,14 @@ function detachShellSocket(ptyId: string): void {
 
 SessionService.onSessionCleanup((sessionId) => {
   cancelCodexSessionCapture(sessionId)
+  persistTimelineHistory(sessionId)
+  deleteTerminalHistory(sessionId)
   ptyRuntime.destroy(sessionId)
 })
 
 SessionService.onSessionArchived((sessionId) => {
   destroyPtySession(sessionId)
+  deleteTerminalHistory(sessionId)
 })
 
 export interface TerminalSessionContext {
@@ -218,39 +214,13 @@ function requireTimelineSession(sessionId: string, message: string): void {
   }
 }
 
-function isClaudeCli(executable: string): boolean {
-  const base = getExecutableCommand(executable)
-  return base === 'claude' || base.startsWith('claude-')
-}
-
-function isCodexCli(executable: string): boolean {
-  const base = getExecutableCommand(executable)
-  return base === 'codex' || base.startsWith('codex-')
-}
-
-function hasCodexPositionalArg(args: string[]): boolean {
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index]
-    if (!arg) {
-      continue
-    }
-    if (arg === '--') {
-      return index < args.length - 1
-    }
-    if (!arg.startsWith('-')) {
-      return true
-    }
-    if (arg.includes('=')) {
-      continue
-    }
-    if (CODEX_VALUE_OPTIONS.has(arg)) {
-      index += 1
-    }
-  }
-  return false
-}
-
-export function startOrAttach(input: { sessionId: string, cols: number, rows: number }) {
+export function startOrAttach(input: { sessionId: string, cols: number, rows: number }): {
+  sessionId: string
+  running: boolean
+  mode: CliTuiLaunchMode
+  agent?: string
+  restore?: PtyRestoreInfo
+} {
   const context = requireTerminalContext(input.sessionId)
   if (!runtimeUsesAgentTerminalLaunch(context.session.runtimeKind ?? 'standard')) {
     throw new AppError({
@@ -271,50 +241,60 @@ export function startOrAttach(input: { sessionId: string, cols: number, rows: nu
       details: { sessionId: input.sessionId },
     })
   }
-  const args = [...config.args]
+
   const running = ptyRuntime.isRunning(input.sessionId)
-  let shouldCaptureCodexSession = false
+  const plan = planCliTuiLaunch({
+    sessionId: input.sessionId,
+    executable: config.executable,
+    args: config.args,
+    env: config.env,
+    running,
+    ptyStartedAt: context.session.ptyStartedAt,
+    workspacePath: context.workspacePath,
+    providerSession: sessionConfig.providerSession,
+    codexCliSession: sessionConfig.codexCliSession,
+    harnessSystemPrompt: getCradleHarnessSystemInstructions(),
+  })
 
-  if (isClaudeCli(config.executable)) {
-    if (context.session.ptyStartedAt) {
-      args.push('--resume', input.sessionId)
-    }
- else {
-      args.push('--session-id', input.sessionId)
-    }
-
-    const workflow = getCradleHarnessSystemInstructions()
-    if (workflow) {
-      args.push('--append-system-prompt', workflow)
-    }
-  }
-  else if (isCodexCli(config.executable)) {
-    const binding = sessionConfig.codexCliSession
-    const autoResumeAllowed = !hasCodexPositionalArg(args)
-    const bindingMatchesWorkspace = binding?.workspacePath === context.workspacePath
-    if (!running && autoResumeAllowed && bindingMatchesWorkspace) {
-      args.push('resume', binding.sessionId)
-    }
-    shouldCaptureCodexSession = !running && autoResumeAllowed && !bindingMatchesWorkspace
-  }
-
-  if (!running) {
+  if (plan.mode !== 'live-attach') {
     ptyTimeline.reset(input.sessionId)
     pendingTitleOscBuffers.delete(input.sessionId)
   }
+
+  // Native agent resume wins over durable screen history. History only seeds
+  // cold fresh spawns so reconnects do not invent a prior conversation.
+  let restore: PtyRestoreInfo = {
+    mode: plan.mode,
+    agent: plan.agent === 'generic' ? undefined : plan.agent,
+  }
+  if (plan.mode === 'fresh') {
+    const history = readTerminalHistory(input.sessionId)
+    if (history?.ansi) {
+      ptyTimeline.seedBuffer(input.sessionId, history.ansi)
+      restore = {
+        mode: 'history',
+        agent: plan.agent === 'generic' ? undefined : plan.agent,
+        reason: 'seeded durable terminal history before fresh launch',
+      }
+    }
+  }
+
+  ptyTimeline.setRestore(input.sessionId, restore)
+  lastRestoreBySession.set(input.sessionId, restore)
 
   const startedAt = Date.now()
   ptyRuntime.ensureSession({
     sessionId: input.sessionId,
     role: 'cli-tui',
-    executable: config.executable,
-    args,
+    executable: plan.executable,
+    args: plan.args,
     cwd: context.workspacePath,
     cols: input.cols,
     rows: input.rows,
     env: {
-      ...config.env,
+      ...plan.env,
       CRADLE_CHAT_SESSION_ID: input.sessionId,
+      CRADLE_TUI_LAUNCH_MODE: plan.mode,
       ...(context.session.workspaceId ? { CRADLE_WORKSPACE_ID: context.session.workspaceId } : {}),
     },
   })
@@ -327,7 +307,7 @@ export function startOrAttach(input: { sessionId: string, cols: number, rows: nu
       .run()
   }
 
-  if (shouldCaptureCodexSession) {
+  if (plan.needsCapture && plan.captureDriver === 'codex-filesystem') {
     scheduleCodexSessionCapture({
       sessionId: input.sessionId,
       workspacePath: context.workspacePath,
@@ -335,7 +315,49 @@ export function startOrAttach(input: { sessionId: string, cols: number, rows: nu
     })
   }
 
-  return { sessionId: input.sessionId, running: ptyRuntime.isRunning(input.sessionId) }
+  return {
+    sessionId: input.sessionId,
+    running: ptyRuntime.isRunning(input.sessionId),
+    mode: plan.mode,
+    ...(plan.agent !== 'generic' ? { agent: plan.agent } : {}),
+    restore,
+  }
+}
+
+export function getHost(sessionId: string) {
+  const context = requireTerminalContext(sessionId)
+  if (!runtimeUsesAgentTerminalLaunch(context.session.runtimeKind ?? 'standard')) {
+    throw new AppError({
+      code: 'terminal_profile_not_supported',
+      status: 409,
+      message: 'Host snapshot only applies to agent terminal sessions',
+      details: { sessionId, runtimeKind: context.session.runtimeKind },
+    })
+  }
+
+  const running = ptyRuntime.isRunning(sessionId)
+  const hasTimeline = ptyTimeline.hasSession(sessionId)
+  const restore = lastRestoreBySession.get(sessionId) ?? null
+  const provider = getProviderSession(sessionId).providerSession
+  const history = readTerminalHistory(sessionId)
+
+  return {
+    sessionId,
+    role: 'cli-tui' as const,
+    running,
+    phase: running
+      ? 'running' as const
+      : hasTimeline
+        ? 'exited' as const
+        : 'absent' as const,
+    mode: restore?.mode ?? null,
+    agent: restore?.agent ?? provider?.agent ?? null,
+    workspacePath: context.workspacePath,
+    ptyStartedAt: context.session.ptyStartedAt,
+    providerSession: provider,
+    historyEnabled: terminalHistoryEnabled(),
+    hasHistory: Boolean(history?.ansi),
+  }
 }
 
 export function openChatSocket(input: {
@@ -366,7 +388,129 @@ export function closeSocket(ws: PtyLiveSocket): void {
 export function stop(sessionId: string): void {
   requireSession(sessionId)
   cancelCodexSessionCapture(sessionId)
+  persistTimelineHistory(sessionId)
   ptyRuntime.destroy(sessionId)
+}
+
+export function getProviderSession(sessionId: string): {
+  sessionId: string
+  providerSession: ProviderSessionBinding | null
+} {
+  const context = requireTerminalContext(sessionId)
+  const config = SessionRuntimeConfigJsonSchema.parse(context.session.configJson)
+  return {
+    sessionId,
+    providerSession: config.providerSession
+      ?? (config.codexCliSession
+        ? {
+            source: 'cradle:codex',
+            agent: 'codex',
+            kind: 'id' as const,
+            value: config.codexCliSession.sessionId,
+            workspacePath: config.codexCliSession.workspacePath,
+            capturedAt: config.codexCliSession.capturedAt,
+            startedAt: config.codexCliSession.startedAt,
+            sourcePath: config.codexCliSession.sourcePath,
+            confidence: 'exact' as const,
+          }
+        : null),
+  }
+}
+
+export function reportProviderSession(input: {
+  sessionId: string
+  source: string
+  agent: string
+  kind?: 'id' | 'path'
+  value: string
+  sourcePath?: string
+  confidence?: 'exact' | 'heuristic'
+}): {
+  sessionId: string
+  providerSession: ProviderSessionBinding
+} {
+  const context = requireTerminalContext(input.sessionId)
+  if (!runtimeUsesAgentTerminalLaunch(context.session.runtimeKind ?? 'standard')) {
+    throw new AppError({
+      code: 'terminal_profile_not_supported',
+      status: 409,
+      message: 'Provider session bindings only apply to agent terminal sessions',
+      details: { sessionId: input.sessionId, runtimeKind: context.session.runtimeKind },
+    })
+  }
+
+  if (!isOfficialProviderSource(input.source, input.agent)) {
+    throw new AppError({
+      code: 'terminal_provider_session_invalid',
+      status: 400,
+      message: 'Provider session source/agent pair is not supported',
+      details: { source: input.source, agent: input.agent },
+    })
+  }
+
+  const kind = input.kind ?? 'id'
+  if (kind === 'path' && !input.value.startsWith('/')) {
+    throw new AppError({
+      code: 'terminal_provider_session_invalid',
+      status: 400,
+      message: 'Provider session path bindings must be absolute',
+      details: { value: input.value },
+    })
+  }
+
+  if (input.value.split('').some(char => char.charCodeAt(0) < 32)) {
+    throw new AppError({
+      code: 'terminal_provider_session_invalid',
+      status: 400,
+      message: 'Provider session value contains control characters',
+    })
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const binding: ProviderSessionBinding = {
+    source: input.source,
+    agent: input.agent,
+    kind,
+    value: input.value,
+    workspacePath: context.workspacePath,
+    capturedAt: now,
+    startedAt: context.session.ptyStartedAt ?? now,
+    ...(input.sourcePath ? { sourcePath: input.sourcePath } : {}),
+    confidence: input.confidence ?? 'exact',
+  }
+
+  db()
+    .update(sessions)
+    .set({
+      configJson: writeProviderSessionBindingToSessionConfig({
+        configJson: context.session.configJson,
+        binding,
+      }),
+    })
+    .where(eq(sessions.id, input.sessionId))
+    .run()
+
+  return { sessionId: input.sessionId, providerSession: binding }
+}
+
+export function clearProviderSession(sessionId: string): {
+  sessionId: string
+  providerSession: null
+} {
+  const context = requireTerminalContext(sessionId)
+  const config = SessionRuntimeConfigJsonSchema.parse(context.session.configJson)
+  if (!config.providerSession && !config.codexCliSession) {
+    return { sessionId, providerSession: null }
+  }
+
+  const { providerSession: _providerSession, codexCliSession: _codexCliSession, ...rest } = config
+  db()
+    .update(sessions)
+    .set({ configJson: JSON.stringify(rest) })
+    .where(eq(sessions.id, sessionId))
+    .run()
+
+  return { sessionId, providerSession: null }
 }
 
 export function startShell(input: { ptyId: string, cwd: string, cols: number, rows: number }) {
@@ -451,7 +595,15 @@ export function shellStop(ptyId: string): void {
 
 export function destroyPtySession(sessionId: string): void {
   cancelCodexSessionCapture(sessionId)
+  persistTimelineHistory(sessionId)
   ptyRuntime.destroy(sessionId)
+}
+
+function persistTimelineHistory(sessionId: string): void {
+  const buffer = ptyTimeline.getBuffer(sessionId)
+  if (buffer) {
+    writeTerminalHistory(sessionId, buffer)
+  }
 }
 
 export function shutdownPtyModule(): void {

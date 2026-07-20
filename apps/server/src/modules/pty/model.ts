@@ -17,6 +17,80 @@ export const PtyModel = {
   startOrAttachResponse: t.Object({
     sessionId: t.String(),
     running: t.Boolean(),
+    mode: t.Union([
+      t.Literal('live-attach'),
+      t.Literal('resume'),
+      t.Literal('fresh'),
+      t.Literal('history'),
+    ]),
+    agent: t.Optional(t.String()),
+    restore: t.Optional(t.Object({
+      mode: t.Union([
+        t.Literal('live-attach'),
+        t.Literal('resume'),
+        t.Literal('fresh'),
+        t.Literal('history'),
+      ]),
+      agent: t.Optional(t.String()),
+      reason: t.Optional(t.String()),
+    })),
+  }),
+
+  hostResponse: t.Object({
+    sessionId: t.String(),
+    role: t.Literal('cli-tui'),
+    running: t.Boolean(),
+    phase: t.Union([
+      t.Literal('absent'),
+      t.Literal('running'),
+      t.Literal('exited'),
+    ]),
+    mode: t.Nullable(t.Union([
+      t.Literal('live-attach'),
+      t.Literal('resume'),
+      t.Literal('fresh'),
+      t.Literal('history'),
+    ])),
+    agent: t.Nullable(t.String()),
+    workspacePath: t.String(),
+    ptyStartedAt: t.Nullable(t.Number()),
+    providerSession: t.Nullable(t.Object({
+      source: t.String(),
+      agent: t.String(),
+      kind: t.Union([t.Literal('id'), t.Literal('path')]),
+      value: t.String(),
+      workspacePath: t.String(),
+      capturedAt: t.Number(),
+      startedAt: t.Number(),
+      sourcePath: t.Optional(t.String()),
+      confidence: t.Union([t.Literal('exact'), t.Literal('heuristic')]),
+    })),
+    historyEnabled: t.Boolean(),
+    hasHistory: t.Boolean(),
+  }),
+
+  providerSessionBody: t.Object({
+    source: t.String({ minLength: 1 }),
+    agent: t.String({ minLength: 1 }),
+    kind: t.Optional(t.Union([t.Literal('id'), t.Literal('path')])),
+    value: t.String({ minLength: 1, maxLength: 512 }),
+    sourcePath: t.Optional(t.String({ minLength: 1 })),
+    confidence: t.Optional(t.Union([t.Literal('exact'), t.Literal('heuristic')])),
+  }),
+
+  providerSessionResponse: t.Object({
+    sessionId: t.String(),
+    providerSession: t.Nullable(t.Object({
+      source: t.String(),
+      agent: t.String(),
+      kind: t.Union([t.Literal('id'), t.Literal('path')]),
+      value: t.String(),
+      workspacePath: t.String(),
+      capturedAt: t.Number(),
+      startedAt: t.Number(),
+      sourcePath: t.Optional(t.String()),
+      confidence: t.Union([t.Literal('exact'), t.Literal('heuristic')]),
+    })),
   }),
 
   startShellResponse: t.Object({
