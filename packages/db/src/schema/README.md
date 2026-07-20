@@ -8,7 +8,7 @@
 
 ## Files
 
-- **backend-control-plane.ts**: backend binding、run、run snapshot/event 与 session-start capability snapshot 相关表；`backend_runs` 是 Chat Runtime run 查询状态，`messages.message_json` 是 Chat message hydration 真相源，`chat_session_queue_items` 是 durable queue 状态；binding 只保留 Cradle-owned backend snapshot + requested model，run snapshot/event 表承载 Cradle-owned harness envelope 与 ordered forensic event stream，不复制 provider-owned goal/plan/tool 语义；snapshot/event 使用毫秒时间并在 session/run 删除后保留取证记录，只将对应 FK 置空
+- **backend-control-plane.ts**: backend binding、run、run snapshot/event 与 session-start capability snapshot 相关表；`backend_runs` 是 Chat Runtime run 查询投影，并通过 `backend_runs_one_streaming_per_session_unique` partial unique index 保证每个 Chat Session 最多一个 `streaming` top-level run（包括 `system` origin）；`runRegistry` 仅是 live-resource projection，权威仍是 `session_events`、同事务 projection 和该数据库约束；`messages.message_json` 是 Chat message hydration 真相源，`chat_session_queue_items` 是 durable queue 状态；binding 只保留 Cradle-owned backend snapshot + requested model，run snapshot/event 表承载 Cradle-owned harness envelope 与 ordered forensic event stream，不复制 provider-owned goal/plan/tool 语义；snapshot/event 使用毫秒时间并在 session/run 删除后保留取证记录，只将对应 FK 置空
 - **automation.ts**: Agent-authored automation definition、run、artifact 与 event 相关表；只写 automation namespace，通过 ID 引用 normal chat session/backend run
 - **assets.ts**: Cradle-owned reusable asset metadata 表；文件字节落在 server data directory 下的 `assets/` namespace，业务模块只保存 asset id / `cradle-asset://` 引用，不拥有压缩或文件生命周期
 - **index.ts**: Schema barrel，聚合导出所有 context-specific schema 模块
