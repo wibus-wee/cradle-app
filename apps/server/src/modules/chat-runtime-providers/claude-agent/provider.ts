@@ -1188,7 +1188,11 @@ export class ClaudeAgentProvider implements ChatRuntime {
         message,
         syntheticTurn.mapperState,
       )
-      await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
+      // Never block the long-lived SDK pump on synthetic-run persistence. Synthetic
+      // handlers may wait for the parent Cradle run to finish; awaiting that here
+      // freezes handleClaudeSessionMessage and starves the next streamTurn's
+      // currentTurn of chunks (zombie streaming runs).
+      this.enqueueClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
       if (message.type === 'result') {
         entry.providerThreadSyntheticTurns.delete(providerThreadId)
       }
@@ -1215,7 +1219,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       message,
       syntheticTurn.mapperState,
     )
-    await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
+    this.enqueueClaudeSyntheticTurnEvent(entry, syntheticTurn, result.chunks)
     if (message.type === 'result') {
       entry.mainSyntheticTurn = null
     }
@@ -1284,10 +1288,28 @@ export class ClaudeAgentProvider implements ChatRuntime {
     entry.providerThreadSyntheticTurns.clear()
 
     for (const syntheticTurn of syntheticTurns) {
+      // Query teardown can still await terminal synthetic finish — pump is already
+      // exiting, so blocking here does not starve an active streamTurn.
       await this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, [
         providerChunk.finish('stop'),
       ])
     }
+  }
+
+  /**
+   * Schedule synthetic-turn publishing without blocking the SDK pump. The synthetic
+   * handler may `waitForRunCompletion` on the parent Cradle run; awaiting that on the
+   * pump freezes all subsequent SDK message handling.
+   */
+  private enqueueClaudeSyntheticTurnEvent(
+    entry: ActiveClaudeQuery,
+    syntheticTurn: ActiveClaudeSyntheticTurn,
+    chunks: UIMessageChunk[],
+  ): void {
+    if (chunks.length === 0) {
+      return
+    }
+    void this.publishClaudeSyntheticTurnEvent(entry, syntheticTurn, chunks)
   }
 
   private async publishClaudeSyntheticTurnEvent(
@@ -1307,7 +1329,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     try {
       await syntheticTurn.onProviderSyntheticTurnEvent(event)
     }
- catch (error) {
+    catch (error) {
       this.deps.logger?.warn('Claude Agent synthetic turn event failed', {
         error,
         chatSessionId: entry.runtimeSession.chatSessionId,

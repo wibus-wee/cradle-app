@@ -4222,6 +4222,117 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.dispose()
   })
 
+  it('keeps the Cradle turn open across model end_turn until the SDK result', async () => {
+    // Regression: message_delta stop_reason=end_turn used to emit finish and kill
+    // Work first-runs while the long-lived Claude query kept tool-looping.
+    const activeQuery = createControllableQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const runtimeSession = createRuntimeSession()
+    const harness = {
+      fragments: [
+        {
+          key: 'cradle-work',
+          revision: 'cradle-work:work-1:primary:v1',
+          content:
+            '<cradle_work_state>\nwork_id: work-1\nthread_role: primary\n</cradle_work_state>',
+        },
+      ],
+    }
+
+    const chunks: UIMessageChunk[] = []
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-multi-step',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Implement the Work objective'),
+      harness,
+      workspaceId: 'workspace-1',
+    })
+    const consuming = (async () => {
+      for await (const chunk of stream) {
+        chunks.push(chunk)
+      }
+    })()
+
+    await vi.waitFor(() => {
+      expect(sdkMocks.query).toHaveBeenCalledOnce()
+    })
+
+    // Model-level end_turn after partial text must not finish the Cradle turn.
+    // A later agent-loop model message reuses content-block index 0 and must
+    // still land on the same Cradle streamTurn.
+    for (const message of [
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-multi',
+        event: {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'text' },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-multi',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'Working' },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-multi',
+        event: {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-multi',
+        event: {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'text' },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-multi',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: ' still going' },
+        },
+      },
+      {
+        type: 'result',
+        session_id: 'claude-session-multi',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      },
+    ]) {
+      activeQuery.push(message)
+    }
+
+    await consuming
+    const text = chunks
+      .filter((chunk): chunk is Extract<UIMessageChunk, { type: 'text-delta' }> =>
+        chunk.type === 'text-delta')
+      .map(chunk => chunk.delta)
+      .join('')
+    expect(text).toContain('Working')
+    expect(text).toContain('still going')
+    expect(chunks.filter(chunk => chunk.type === 'finish')).toEqual([
+      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+    ])
+    await provider.dispose()
+  })
+
   it('enqueues native follow-ups into the live SDK input stream without interrupt', async () => {
     const activeQuery = createPendingQuery()
     sdkMocks.query.mockReturnValue(activeQuery)

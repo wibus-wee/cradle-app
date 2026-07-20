@@ -118,6 +118,12 @@ export interface ClaudeAgentChunkMapperState {
   completedTextBlockIndices: Set<number>
   /** Content block indices whose thinking blocks were fully emitted via stream events (reasoning-end sent). */
   completedThinkingBlockIndices: Set<number>
+  /**
+   * Set after a model-level terminal stop_reason (e.g. end_turn). The next
+   * assistant snapshot or content_block_start starts a new model message and
+   * may reuse content-block indices from 0 within the same Cradle/agent turn.
+   */
+  pendingModelMessageBoundary: boolean
   /** Tool call IDs whose ExitPlanMode signal was captured by Cradle. */
   capturedExitPlanToolCallIds: Set<string>
   /** Latest plan body written through Claude plan mode before ExitPlanMode. */
@@ -208,6 +214,7 @@ function normalizeClaudeAgentChunkMapperState(state: ClaudeAgentChunkMapperState
   state.activeThinkingBlockByIndex ??= new Map()
   state.completedTextBlockIndices ??= new Set()
   state.completedThinkingBlockIndices ??= new Set()
+  state.pendingModelMessageBoundary ??= false
   state.capturedExitPlanToolCallIds ??= new Set()
   state.latestPlanFileContent ??= null
 }
@@ -246,6 +253,7 @@ export function createClaudeAgentChunkMapperState(
     activeThinkingBlockByIndex: new Map(),
     completedTextBlockIndices: new Set(),
     completedThinkingBlockIndices: new Set(),
+    pendingModelMessageBoundary: false,
     capturedExitPlanToolCallIds: new Set(),
     latestPlanFileContent: null,
   }
@@ -264,6 +272,7 @@ export function resetClaudeAgentChunkMapperForTurn(state: ClaudeAgentChunkMapper
   state.activeThinkingBlockByIndex.clear()
   state.completedTextBlockIndices.clear()
   state.completedThinkingBlockIndices.clear()
+  state.pendingModelMessageBoundary = false
   state.capturedExitPlanToolCallIds.clear()
   state.latestPlanFileContent = null
 }
@@ -590,6 +599,14 @@ function mapAssistant(msg: SDKAssistantMessage, state: ClaudeAgentChunkMapperSta
   const capturedInteractionModes: ClaudeAgentCapturedInteractionMode[] = []
   const capturedCrewCalls: ClaudeAgentCapturedCrewCall[] = []
 
+  // CRITICAL: do NOT release model-message state here.
+  // With includePartialMessages, the consolidating `assistant` snapshot for the
+  // same API message arrives after stream_event deltas (and often after
+  // message_delta end_turn). Releasing completed block indices on snapshot is
+  // what double-emitted progress text (text:N, text:N). Snapshot must still see
+  // completedTextBlockIndices / completedThinkingBlockIndices and skip.
+  // A new model message only starts on a later content_block_start (or tool_result).
+
   const flushTextSegment = (text: string) => {
     if (text.length === 0) {
       return
@@ -661,6 +678,8 @@ function mapAssistant(msg: SDKAssistantMessage, state: ClaudeAgentChunkMapperSta
 }
 
 async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState): Promise<ClaudeAgentChunkMapperResult> {
+  // tool_result (and other user content) closes the previous model message's
+  // index space so the next assistant API message can reuse block index 0.
   clearCompletedAssistantBlockIndices(state)
 
   const chunks: UIMessageChunk[] = []
@@ -827,10 +846,19 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
           totalTokens: (messageDeltaEvent.usage.input_tokens ?? 0) + (messageDeltaEvent.usage.output_tokens ?? 0),
         }
       }
+      // Close open text blocks when the model message ends, but do NOT emit
+      // `finish` here. Claude Agent multi-step sessions stream many assistant
+      // messages (tools → more assistant). A model-level `end_turn` only ends
+      // one API message; the Cradle/agent turn ends on the SDK top-level
+      // `result`. Emitting finish on end_turn caused Work first-runs to die on
+      // a lone empty finish while the long-lived query kept working.
       const stopReason = messageDeltaEvent.delta?.stop_reason
       if (stopReason && isTerminalClaudeStopReason(stopReason)) {
         chunks.push(...finishOpenTextBlocks(state))
-        chunks.push(providerChunk.finish('stop'))
+        // Keep completed indices until the NEXT model message actually starts
+        // (content_block_start) or a tool_result arrives. The consolidating
+        // assistant snapshot for THIS message still needs those indices.
+        state.pendingModelMessageBoundary = true
       }
       break
     }
@@ -858,6 +886,12 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
     }
     case 'content_block_start': {
       const startEvent = msg.event as BetaRawContentBlockStartEvent
+      // A new streamed block after end_turn is a new API message (agent loop).
+      // Release the previous message's completed indices so index 0 can restart.
+      // Never do this on the consolidating assistant snapshot path.
+      if (state.pendingModelMessageBoundary) {
+        releaseClaudeMapperModelMessageState(state)
+      }
       if (startEvent.content_block.type === 'text') {
         chunks.push(...ensureTextBlockStarted(state, startEvent.index))
         if (startEvent.content_block.text) {
@@ -931,12 +965,33 @@ function mapStreamEvent(msg: SDKPartialAssistantMessage, state: ClaudeAgentChunk
 function clearCompletedAssistantBlockIndices(state: ClaudeAgentChunkMapperState): void {
   state.completedTextBlockIndices.clear()
   state.completedThinkingBlockIndices.clear()
+  // tool_result / user content means the previous model message is done; the next
+  // assistant API message may reuse block indices from 0.
+  state.pendingModelMessageBoundary = false
+  state.activeTextBlockByIndex.clear()
+  state.activeThinkingBlockByIndex.clear()
+  state.activeToolBlockIds.clear()
+  state.assistantStarted = false
+  state.textItemId = randomUUID()
+  state.hadToolCallSinceLastText = false
 }
 
 function ensureTextBlockStarted(state: ClaudeAgentChunkMapperState, blockIndex: number): UIMessageChunk[] {
+  // New streamed content after end_turn is a new API message inside the agent turn.
+  if (state.pendingModelMessageBoundary) {
+    releaseClaudeMapperModelMessageState(state)
+  }
+
   const existingTextItemId = state.activeTextBlockByIndex.get(blockIndex)
   if (existingTextItemId) {
     state.textItemId = existingTextItemId
+    return []
+  }
+
+  // Same model message must not restart a completed block index (that was the
+  // double-emit path when indices were cleared too early). After a true message
+  // boundary, releaseClaudeMapperModelMessageState already cleared completed.
+  if (state.completedTextBlockIndices.has(blockIndex)) {
     return []
   }
 
@@ -963,6 +1018,9 @@ function finishOpenTextBlocks(state: ClaudeAgentChunkMapperState): UIMessageChun
   const chunks: UIMessageChunk[] = []
   const seenTextItemIds = new Set<string>()
   if (state.activeTextBlockByIndex.size === 0 && state.assistantStarted) {
+    // Streamed text without a tracked block index still counts as completed for
+    // this model message so a consolidating assistant snapshot does not replay it.
+    state.completedTextBlockIndices.add(-1)
     seenTextItemIds.add(state.textItemId)
     chunks.push(providerChunk.textEnd(state.textItemId))
     state.assistantStarted = false
@@ -983,8 +1041,30 @@ function finishOpenTextBlocks(state: ClaudeAgentChunkMapperState): UIMessageChun
   return chunks
 }
 
+/**
+ * Model-message stop reasons that mean "this assistant API message is done"
+ * (as opposed to `tool_use`, which continues into tool execution). Used only to
+ * close open text blocks — not to finish the Cradle turn.
+ */
 function isTerminalClaudeStopReason(stopReason: string): boolean {
   return stopReason !== 'tool_use'
+}
+
+/**
+ * Free per-model-message mapper state so the next assistant API message in the
+ * same agent turn can reuse content-block indices (always starting at 0).
+ * Only call after a model-level terminal stop_reason has been observed.
+ */
+function releaseClaudeMapperModelMessageState(state: ClaudeAgentChunkMapperState): void {
+  state.completedTextBlockIndices.clear()
+  state.completedThinkingBlockIndices.clear()
+  state.activeToolBlockIds.clear()
+  state.activeTextBlockByIndex.clear()
+  state.activeThinkingBlockByIndex.clear()
+  state.textItemId = randomUUID()
+  state.assistantStarted = false
+  state.hadToolCallSinceLastText = false
+  state.pendingModelMessageBoundary = false
 }
 
 function mapResult(msg: SDKResultMessage, state: ClaudeAgentChunkMapperState): ClaudeAgentChunkMapperResult {

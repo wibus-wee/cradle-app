@@ -1160,7 +1160,7 @@ describe('mapClaudeAgentMessageToChunks', () => {
     expect(text).toContain('tail')
   })
 
-  it('closes streamed text and finishes the turn when Claude reports end_turn', async () => {
+  it('closes streamed text on end_turn without finishing the agent turn', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const chunks: import('ai').UIMessageChunk[] = []
 
@@ -1174,13 +1174,156 @@ describe('mapClaudeAgentMessageToChunks', () => {
       chunks.push(...result.chunks)
     }
 
+    // Model-level end_turn only closes text. Cradle/agent turn finish is owned by
+    // the top-level SDK `result` message (see mapResult).
     expect(chunks).toEqual([
       { type: 'text-start', id: 'text-1' },
       { type: 'text-delta', id: 'text-1', delta: 'Done' },
       { type: 'text-end', id: 'text-1' },
+    ])
+    expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
+    assertValidProviderChunkSequence(chunks)
+  })
+
+  it('does not re-emit consolidating assistant snapshot text after stream end_turn', async () => {
+    // Regression for session 93072f29: stream_event already projected progress
+    // text; the consolidating assistant snapshot for the SAME API message must
+    // not open a second text part. Releasing completed indices on snapshot was
+    // the dual-channel wiring bug (not a string-dedupe problem).
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const chunks: import('ai').UIMessageChunk[] = []
+
+    for (const message of [
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_start', index: 0, content_block: { type: 'text' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '继续排查 mid-turn' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_stop', index: 0 } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'message_delta', delta: { stop_reason: 'end_turn' } } },
+      {
+        type: 'assistant',
+        session_id: 's1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '继续排查 mid-turn' }],
+        },
+      },
+    ]) {
+      const result = await mapClaudeAgentMessageToChunks(message as unknown as SDKMessage, state)
+      chunks.push(...result.chunks)
+    }
+
+    const textDeltas = chunks.filter(chunk => chunk.type === 'text-delta')
+    expect(textDeltas).toHaveLength(1)
+    expect(textDeltas[0]).toMatchObject({ type: 'text-delta', delta: '继续排查 mid-turn' })
+    expect(chunks.filter(chunk => chunk.type === 'text-start')).toHaveLength(1)
+    expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
+    assertValidProviderChunkSequence(chunks)
+  })
+
+  it('finishes the agent turn only on the SDK result message', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const chunks: import('ai').UIMessageChunk[] = []
+
+    for (const message of [
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_start', index: 0, content_block: { type: 'text' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Done' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'message_delta', delta: { stop_reason: 'end_turn' } } },
+      { type: 'result', session_id: 's1', usage: { input_tokens: 1, output_tokens: 1 } },
+    ]) {
+      const result = await mapClaudeAgentMessageToChunks(message as unknown as SDKMessage, state)
+      chunks.push(...result.chunks)
+    }
+
+    expect(chunks.filter(chunk => chunk.type === 'finish')).toEqual([
       { type: 'finish', finishReason: 'stop' },
     ])
     assertValidProviderChunkSequence(chunks)
+  })
+
+  it('accepts a later agent-loop text stream that reuses content-block index 0 after end_turn', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const chunks: import('ai').UIMessageChunk[] = []
+
+    for (const message of [
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_start', index: 0, content_block: { type: 'text' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'First' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'message_delta', delta: { stop_reason: 'end_turn' } } },
+      // Consolidating snapshot for the first API message — must not re-emit.
+      {
+        type: 'assistant',
+        session_id: 's1',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'First' }] },
+      },
+      // Next model message reuses index 0 within the same agent turn (after tools
+      // this is content_block_start; here we simulate the next streamed message).
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_start', index: 0, content_block: { type: 'text' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Second' } } },
+    ]) {
+      const result = await mapClaudeAgentMessageToChunks(message as unknown as SDKMessage, state)
+      chunks.push(...result.chunks)
+    }
+
+    const text = chunks
+      .filter((chunk): chunk is Extract<import('ai').UIMessageChunk, { type: 'text-delta' }> =>
+        chunk.type === 'text-delta')
+      .map(chunk => chunk.delta)
+      .join('')
+    expect(text).toBe('FirstSecond')
+    expect(chunks.filter(chunk => chunk.type === 'text-start')).toHaveLength(2)
+    expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
+    // Sequence ends mid second message; allow the open text block.
+    assertValidProviderChunkSequence(chunks, { allowOpenTextAtEnd: true })
+  })
+
+  it('starts a new model message after tool_result so index 0 can be reused', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const chunks: import('ai').UIMessageChunk[] = []
+
+    for (const message of [
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_start', index: 0, content_block: { type: 'text' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Before tool' } } },
+      { type: 'stream_event', session_id: 's1', event: { type: 'content_block_stop', index: 0 } },
+      {
+        type: 'assistant',
+        session_id: 's1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Before tool' },
+            { type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'pwd' } },
+          ],
+        },
+      },
+      {
+        type: 'user',
+        session_id: 's1',
+        message: {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: '/tmp' }],
+        },
+      },
+      {
+        type: 'assistant',
+        session_id: 's1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'After tool' }],
+        },
+      },
+    ]) {
+      const result = await mapClaudeAgentMessageToChunks(message as unknown as SDKMessage, state)
+      chunks.push(...result.chunks)
+    }
+
+    const text = chunks
+      .filter((chunk): chunk is Extract<import('ai').UIMessageChunk, { type: 'text-delta' }> =>
+        chunk.type === 'text-delta')
+      .map(chunk => chunk.delta)
+      .join('')
+    expect(text).toContain('Before tool')
+    expect(text).toContain('After tool')
+    // First text only once (stream path), second text once (post tool_result snapshot).
+    expect(text.match(/Before tool/g)).toHaveLength(1)
+    expect(text.match(/After tool/g)).toHaveLength(1)
   })
 
   it('does not duplicate thinking parts when an assistant snapshot arrives after stream events', async () => {
