@@ -2,7 +2,6 @@ import { readFile, stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 import { createEngine, OcrError } from '@arcships/light-ocr'
-import sharp from 'sharp'
 
 import { AppError } from '../../errors/app-error'
 
@@ -84,20 +83,6 @@ async function readImageBytes(file: ImageOcrFile): Promise<Buffer> {
   return await readFile(filePath)
 }
 
-async function decodeForLightOcr(bytes: Buffer) {
-  try {
-    return await sharp(bytes)
-      .rotate()
-      .removeAlpha()
-      .toColourspace('srgb')
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-  }
- catch {
-    rejectInvalidImage('Image format cannot be decoded for OCR')
-  }
-}
-
 export async function recognizeImages(
   files: ImageOcrFile[],
   signal?: AbortSignal,
@@ -115,21 +100,8 @@ export async function recognizeImages(
     files.map(async (file, index) => {
       assertImageFile(file)
       const bytes = await readImageBytes(file)
-      const decoded = await decodeForLightOcr(bytes)
-      if (decoded.info.channels !== 3) {
-        rejectInvalidImage('Image could not be normalized to RGB pixels')
-      }
       try {
-        const result = await engine.recognize(
-          {
-            data: decoded.data,
-            width: decoded.info.width,
-            height: decoded.info.height,
-            stride: decoded.info.width * decoded.info.channels,
-            pixelFormat: 'rgb8',
-          },
-          { signal },
-        )
+        const result = await engine.recognizeEncoded(bytes, { signal })
         const lines = result.lines.map(line => line.text.trim()).filter(Boolean)
         return {
           index,
