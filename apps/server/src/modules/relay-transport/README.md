@@ -91,8 +91,19 @@ socket; they become encrypted `stream_data` frames over relayd and exit on the
 host side as a TCP connection to the host Cradle Server's own local HTTP port.
 
 The stream protocol uses 256 KiB chunks and a 512 KiB unacknowledged credit
-window. The receiver sends cumulative `stream_ack` frames every 64 KiB so the
-sender can pause and resume local socket reads before relayd's queue fills.
+window. Send-side credit (`peerAckedBytes` / `bytesInFlight`) and receive-side
+progress (`appliedBytes` / `ackedToPeerBytes`) are tracked separately on each
+stream — HTTP request and response share one `streamId` and must not corrupt
+each other's windows. The receiver only emits cumulative `stream_ack` frames
+after the local transport has applied the bytes (TCP write success), typically
+every 64 KiB, so a slow consumer cannot inflate the peer's send window.
+
+Pairing codes are returned on create (as `pairingString`) and may be re-read
+only via `GET .../pairing-string` while the enrollment is still pairable.
+List/get responses expose a boolean `pairable` flag and never embed the raw
+code. Deleting an enrollment stops the host connector, drops the row (so the
+relay auth token stops matching), and removes sibling secrets (host key,
+signing key, relay auth token, controller signing pubkey).
 
 ## CLI
 

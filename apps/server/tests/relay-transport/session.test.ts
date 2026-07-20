@@ -259,4 +259,137 @@ describe('relay session', () => {
     expect(reassembled.length).toBe(payload.length)
     expect(reassembled.equals(Buffer.from(payload))).toBe(true)
   })
+
+  it('pauses the sender when unacked send credit is exhausted and resumes after peer acks', () => {
+    const hostKeys = generateRelayKeyPair()
+    const controllerKeys = generateRelayKeyPair()
+    const pairingCode = 'PAIR-CREDIT'
+    const roomId = 'room_credit'
+
+    const onPause = vi.fn()
+    const onResume = vi.fn()
+
+    const host = new RelaySession(
+      'host',
+      hostKeys.privateKeyBase64,
+      { roomId, pairingCode, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
+      {
+        send: () => {},
+        onStreamOpen: () => {},
+        onStreamData: (streamId, data) => {
+          // Apply immediately so the host acks and the controller can keep sending
+          // past the first credit window in a later assertion path.
+          host.reportStreamDataConsumed(streamId, data.byteLength)
+        },
+      },
+    )
+    const controller = new RelaySession(
+      'controller',
+      controllerKeys.privateKeyBase64,
+      { roomId, pairingCode, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
+      {
+        send: () => {},
+        onPauseStream: onPause,
+        onResumeStream: onResume,
+      },
+    )
+
+    const wire = wireSessions(host, controller, roomId)
+    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+
+    host.start()
+    controller.start()
+    controller.openStream('c1')
+
+    // Hold acks on the host so the controller exhausts its 512 KiB window.
+    ;(host as unknown as { cb: { onStreamData: (s: string, d: Uint8Array) => void } }).cb.onStreamData = () => {}
+
+    const payload = new Uint8Array(512 * 1024)
+    controller.writeStreamData('c1', payload)
+    expect(onPause).toHaveBeenCalledWith('c1')
+    expect(onResume).not.toHaveBeenCalled()
+
+    // Explicit cumulative ack releases send credit without touching receive-side state.
+    host.ackStream('c1', payload.byteLength)
+    expect(onResume).toHaveBeenCalledWith('c1')
+  })
+
+  it('keeps send and receive credit independent on a duplex stream', () => {
+    const hostKeys = generateRelayKeyPair()
+    const controllerKeys = generateRelayKeyPair()
+    const pairingCode = 'PAIR-DUPLEX'
+    const roomId = 'room_duplex'
+
+    const controllerPause = vi.fn()
+    const controllerResume = vi.fn()
+    const hostPause = vi.fn()
+    const hostResume = vi.fn()
+
+    // Buffer delivered bytes so tests control when credit is released.
+    const hostReceived: Uint8Array[] = []
+    const controllerReceived: Uint8Array[] = []
+
+    const host = new RelaySession(
+      'host',
+      hostKeys.privateKeyBase64,
+      { roomId, pairingCode, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
+      {
+        send: () => {},
+        onStreamOpen: () => {},
+        onStreamData: (_id, data) => hostReceived.push(data),
+        onPauseStream: hostPause,
+        onResumeStream: hostResume,
+      },
+    )
+    const controller = new RelaySession(
+      'controller',
+      controllerKeys.privateKeyBase64,
+      { roomId, pairingCode, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
+      {
+        send: () => {},
+        onStreamData: (_id, data) => controllerReceived.push(data),
+        onPauseStream: controllerPause,
+        onResumeStream: controllerResume,
+      },
+    )
+
+    const wire = wireSessions(host, controller, roomId)
+    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+
+    host.start()
+    controller.start()
+    controller.openStream('c1')
+
+    // Controller → host: 1 MiB request. Host does NOT apply yet, so no acks.
+    const request = new Uint8Array(1024 * 1024)
+    controller.writeStreamData('c1', request)
+    // 512 KiB credit window pauses after first window; without acks it stays paused.
+    expect(controllerPause).toHaveBeenCalled()
+    expect(hostReceived.length).toBeGreaterThan(0)
+
+    // Host → controller: large response on the same streamId. Even though the
+    // host has received a lot, that must not pollute the host's *send* credit
+    // (the old single-ackedBytes bug would over-release send credit here).
+    const response = new Uint8Array(600 * 1024)
+    host.writeStreamData('c1', response)
+    expect(hostPause).toHaveBeenCalledWith('c1')
+    // Controller has not applied response bytes yet.
+    expect(hostResume).not.toHaveBeenCalled()
+
+    // Applying host-received request bytes must NOT resume the host's send side.
+    for (const chunk of hostReceived) {
+      host.reportStreamDataConsumed('c1', chunk.byteLength)
+    }
+    expect(hostResume).not.toHaveBeenCalled()
+    // But it should unpause the controller's send credit.
+    expect(controllerResume).toHaveBeenCalled()
+
+    // Applying controller-received response bytes resumes the host sender.
+    for (const chunk of controllerReceived) {
+      controller.reportStreamDataConsumed('c1', chunk.byteLength)
+    }
+    expect(hostResume).toHaveBeenCalledWith('c1')
+  })
 })

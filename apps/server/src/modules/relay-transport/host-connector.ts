@@ -284,10 +284,13 @@ class HostConnection {
 
   private handleStreamData(streamId: string, data: Uint8Array): void {
     const stream = this.streams.get(streamId)
-    if (!stream) {
+    const session = this.session
+    if (!stream || !session) {
       return
     }
-    stream.requestWriter.write(data)
+    stream.requestWriter.write(data, (consumed) => {
+      session.reportStreamDataConsumed(streamId, consumed)
+    })
   }
 
   private handleStreamClose(streamId: string): void {
@@ -475,6 +478,8 @@ class RelayHttpRequestWriter {
   private buffered: Buffer[] = []
   private bufferedLength = 0
   private released = false
+  /** Original stream bytes accepted into the header buffer but not yet applied. */
+  private pendingOriginalBytes = 0
 
   constructor(
     private readonly socket: net.Socket,
@@ -482,15 +487,21 @@ class RelayHttpRequestWriter {
     private readonly reject: () => void,
   ) {}
 
-  write(data: Uint8Array): void {
+  /**
+   * Write inbound stream bytes. `onConsumed` is invoked with the number of
+   * original* stream bytes that have been applied (header rewrite may change
+   * the on-wire size, but credit tracks the peer's plaintext stream).
+   */
+  write(data: Uint8Array, onConsumed: (bytes: number) => void): void {
     if (this.released) {
-      this.writeToSocket(Buffer.from(data))
+      this.writeToSocket(Buffer.from(data), data.byteLength, onConsumed)
       return
     }
 
     const chunk = Buffer.from(data)
     this.buffered.push(chunk)
     this.bufferedLength += chunk.byteLength
+    this.pendingOriginalBytes += chunk.byteLength
     if (this.bufferedLength > MAX_RELAY_HTTP_HEADER_BYTES) {
       this.reject()
       return
@@ -499,6 +510,7 @@ class RelayHttpRequestWriter {
     const buffered = Buffer.concat(this.buffered, this.bufferedLength)
     const headerEnd = buffered.indexOf('\r\n\r\n')
     if (headerEnd < 0) {
+      // Still buffering headers — do not release credit yet.
       return
     }
 
@@ -512,18 +524,26 @@ class RelayHttpRequestWriter {
     this.released = true
     this.buffered = []
     this.bufferedLength = 0
+    const originalBytes = this.pendingOriginalBytes
+    this.pendingOriginalBytes = 0
     const body = buffered.subarray(headerEnd + 4)
-    this.writeToSocket(Buffer.concat([
-      Buffer.from(`${rewrittenHeader}\r\n\r\n`, 'latin1'),
-      body,
-    ]))
+    this.writeToSocket(
+      Buffer.concat([
+        Buffer.from(`${rewrittenHeader}\r\n\r\n`, 'latin1'),
+        body,
+      ]),
+      originalBytes,
+      onConsumed,
+    )
   }
 
-  private writeToSocket(data: Buffer): void {
+  private writeToSocket(data: Buffer, originalBytes: number, onConsumed: (bytes: number) => void): void {
     this.socket.write(data, (error) => {
       if (error) {
         this.socket.destroy()
+        return
       }
+      onConsumed(originalBytes)
     })
   }
 }

@@ -30,7 +30,20 @@ export type RelayEnvelopeKind
     | typeof RELAY_ENVELOPE_KIND.peerClosed
     | typeof RELAY_ENVELOPE_KIND.relayError
 
-/** Outer envelope as relayd forwards it. `payload` is a raw JSON value. */
+/**
+ * Outer envelope as relayd forwards it. `payload` is a raw JSON value.
+ *
+ * Dual-written with `apps/relayd/internal/relay/envelope.go`. Keep the shapes
+ * in lockstep: any field rename needs a coordinated Go + TS change.
+ *
+ * Field usage today:
+ * - `seq`: set by the sender for ordering/debug; relayd and peers do not
+ *   enforce it yet (reserved for anti-replay hardening).
+ * - `ack` / `streamId` (outer): reserved / unused by the current transport.
+ *   Stream multiplexing and credit live in *inner* frames (`stream_data`,
+ *   `stream_ack`), not on the outer envelope. Do not invent semantics for
+ *   these fields without a protocol version bump.
+ */
 export const relayEnvelopeSchema = z.object({
   version: z.literal(RELAY_PROTOCOL_VERSION),
   roomId: z.string().min(1),

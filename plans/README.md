@@ -66,7 +66,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 003  | Require auth on relay-tunneled traffic                   | P1       | M      | 002        | DONE                                                                                   |
 | 004  | Constrain filesystem browse + shell cwd to roots         | P1       | S      | 002        | DONE                                                                                   |
 | 005  | Close SSRF gaps (link-preview + provider-catalog)        | P1       | M      | —          | DONE                                                                                   |
-| 006  | Stop returning relay pairing codes on read routes        | P1       | S      | 002        | BLOCKED (drift check: relay-transport changed since ac47f3b)                           |
+| 006  | Stop returning relay pairing codes on read routes        | P1       | S      | 002        | DONE                                                                                   |
 | 010  | Fix issue-agent run-tracking races + delegation tx       | P1       | M      | —          | DONE                                                                                   |
 | 013  | Include apps/web tests in root test run                  | P1       | S      | —          | DONE                                                                                   |
 | 014  | Crash-safe SSE/WS handlers + cursor-correct reconnect    | P1       | M      | —          | DONE                                                                                   |

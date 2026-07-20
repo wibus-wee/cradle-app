@@ -11,11 +11,14 @@ import {
   generateRelaySigningKeyPair,
   signRelayAssertion,
 } from '../relay-servers/relay-signature-service'
-import { upsertSecret } from '../secrets/service'
+import { removeSecret, upsertSecret } from '../secrets/service'
 import { generateRelayKeyPair, relayPublicKeyFingerprint } from './crypto'
 import type { HostEnrollmentLiveState } from './host-connector'
 import { getHostConnectorService } from './host-connector'
-import { upsertHostRelayAuthToken } from './relay-auth-token-service'
+import {
+  relayHostAuthTokenSecretId,
+  upsertHostRelayAuthToken,
+} from './relay-auth-token-service'
 
 /**
  * Host-side enrollment service.
@@ -43,7 +46,12 @@ export interface HostEnrollmentView {
   hostKeyFingerprint: string
   pinnedControllerPubkey: string | null
   status: 'pending' | 'paired' | 'offline'
-  pairingCode: string | null
+  /**
+   * True while a pairing code is still stored and the enrollment has not been
+   * claimed. The raw code is never re-served on list/get — only create and the
+   * explicit pairing-string route return it.
+   */
+  pairable: boolean
   lastError: string | null
   createdAt: number
   updatedAt: number
@@ -52,7 +60,11 @@ export interface HostEnrollmentView {
 }
 
 export interface CreatedHostEnrollment extends HostEnrollmentView {
-  /** `<pairingCode>:<roomId>#<hostKeyFingerprint>` — show to the user, input on a controller. */
+  /**
+   * `<pairingCode>:<roomId>#<hostKeyFingerprint>` — show once at creation.
+   * List/get never return this; operators re-read via the pairing-string route
+   * only while the enrollment is still pending.
+   */
   pairingString: string
   pairingCodeExpiresAt: string | null
 }
@@ -165,6 +177,22 @@ export async function deleteHostEnrollment(id: string): Promise<void> {
   }
   getHostConnectorService()?.stopForEnrollment(id)
   db().delete(relayHostEnrollments).where(eq(relayHostEnrollments.id, id)).run()
+  // Explicit revoke: drop every sibling secret so delete is not just "token no
+  // longer listed". Auth already rejects tokens without an enrollment row;
+  // removing the secret closes the orphan window.
+  for (const secretId of [
+    row.hostPrivateKeySecretId,
+    `relay-host-sign-key:${id}`,
+    relayHostAuthTokenSecretId(id),
+    `relay-host-controller-sign-pubkey:${id}`,
+  ]) {
+    try {
+      removeSecret(secretId)
+    }
+    catch {
+      // Best-effort cleanup for older enrollments missing a sibling secret.
+    }
+  }
 }
 
 export function readHostEnrollmentPairingString(id: string): { pairingString: string, pairingCode: string, hostKeyFingerprint: string } {
@@ -234,7 +262,7 @@ function toView(row: typeof relayHostEnrollments.$inferSelect): HostEnrollmentVi
     hostKeyFingerprint: relayPublicKeyFingerprint(row.hostPubkey),
     pinnedControllerPubkey: row.pinnedControllerPubkey,
     status: row.status as 'pending' | 'paired' | 'offline',
-    pairingCode: row.pairingCode,
+    pairable: Boolean(row.pairingCode),
     lastError: row.lastError,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
