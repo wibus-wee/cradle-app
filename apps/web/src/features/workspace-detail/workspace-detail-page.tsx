@@ -512,6 +512,9 @@ function useWorkspaceDetailOwner(workspaceId: string) {
           ? {
               workspaceId,
               title: sessionTitle,
+              providerTargetId: opts.providerTargetId,
+              modelId: opts.modelId ?? null,
+              thinkingEffort: opts.thinkingEffort,
               runtimeKind: opts.runtimeKind,
               runtimeSettings: opts.runtimeSettings,
             }
@@ -548,6 +551,9 @@ function useWorkspaceDetailOwner(workspaceId: string) {
             workspaceId,
             runtimeKind: opts.runtimeKind,
             title: sessionTitle,
+            providerTargetId: opts.providerTargetId,
+            modelId: opts.modelId ?? null,
+            thinkingEffort: opts.thinkingEffort,
             runtimeSettings: opts.runtimeSettings,
           }
         : {
@@ -566,8 +572,8 @@ function useWorkspaceDetailOwner(workspaceId: string) {
       id: session.id,
       title: sessionTitle,
       workspaceId,
-      providerTargetId: isRemoteWorkspace ? null : (opts.providerTargetId ?? null),
-      modelId: isRemoteWorkspace ? null : (opts.modelId ?? null),
+      providerTargetId: opts.providerTargetId ?? null,
+      modelId: opts.modelId ?? null,
       runtimeKind: opts.runtimeKind,
     }, { promote: true })
     await openCreatedWorkspaceSession(session.id, target)
@@ -579,7 +585,8 @@ function useWorkspaceDetailOwner(workspaceId: string) {
         text,
         files,
         contextParts,
-        modelId: isRemoteWorkspace ? undefined : opts.modelId,
+        providerTargetId: opts.providerTargetId,
+        modelId: opts.modelId,
         thinkingEffort: opts.thinkingEffort,
         runtimeSettings: readRunRuntimeSettingsPatch(opts.runtimeSettings),
       },
