@@ -292,15 +292,24 @@ export async function listProviderTargets(input: ListProviderTargetsInput = {}):
   if (!input.runtimeKind) {
     return rows
   }
+  const runtimeKind = input.runtimeKind
   const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
   const runtimeOwnedTargets = await listRuntimeOwnedProviderTargets({
-    runtimeKind: input.runtimeKind,
+    runtimeKind,
     workspacePath,
     now: nowUnix(),
   })
-  return runtimeOwnsProviderBinding(input.runtimeKind)
-    ? runtimeOwnedTargets
-    : [...rows, ...runtimeOwnedTargets]
+  const providerBinding = readRuntimeProviderBinding(runtimeKind)
+  if (providerBinding === 'runtime-owned') {
+    return runtimeOwnedTargets
+  }
+  if (providerBinding === 'none') {
+    return []
+  }
+  return [
+    ...rows.filter(row => runtimeSupportsProviderKind(runtimeKind, row.providerKind)),
+    ...runtimeOwnedTargets,
+  ]
 }
 
 export function getProviderTarget(id: string): ProviderTargetRow | null {

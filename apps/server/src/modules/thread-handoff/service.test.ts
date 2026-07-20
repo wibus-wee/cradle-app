@@ -117,9 +117,18 @@ describe('thread handoff service', () => {
     await expect(ThreadHandoff.create({
       requestId: 'request-1',
       sourceSessionId: 'source-session',
+      destinationRuntimeKind: 'codex',
       destinationProviderTargetId: 'destination-target',
     })).rejects.toThrow('import failed')
 
+    expect(providerTargetsMock.assertProviderTargetCompatibleWithRuntime).toHaveBeenCalledWith(
+      'destination-target',
+      'codex',
+    )
+    expect(sessionMock.create).toHaveBeenCalledWith(expect.objectContaining({
+      providerTargetId: 'destination-target',
+      runtimeKind: 'codex',
+    }))
     expect(sessionMock.remove).toHaveBeenCalledOnce()
     expect(sessionMock.remove).toHaveBeenCalledWith(expect.any(String))
   })
@@ -144,6 +153,7 @@ describe('thread handoff service', () => {
     const result = await ThreadHandoff.create({
       requestId: 'request-1',
       sourceSessionId: 'source-session',
+      destinationRuntimeKind: 'codex',
       destinationProviderTargetId: 'destination-target',
     })
 
@@ -151,5 +161,19 @@ describe('thread handoff service', () => {
     expect(result.session).toBe(destinationSession)
     expect(sessionMock.create).not.toHaveBeenCalled()
     expect(importedMessagesMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects handing off to the current runtime and provider target combination', async () => {
+    sessionMock.get.mockReturnValue(sourceSession)
+    providerTargetsMock.getProviderTarget.mockReturnValue({ id: 'source-target', enabled: true })
+
+    await expect(ThreadHandoff.create({
+      requestId: 'request-same-target',
+      sourceSessionId: 'source-session',
+      destinationRuntimeKind: 'standard',
+      destinationProviderTargetId: 'source-target',
+    })).rejects.toThrow('Choose a different runtime or provider target for handoff')
+
+    expect(sessionMock.create).not.toHaveBeenCalled()
   })
 })

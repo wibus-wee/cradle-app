@@ -9,7 +9,7 @@ export const threadHandoff = new Elysia({
 })
   .post('', ({ body }) => ThreadHandoff.create(body), {
     detail: {
-      'summary': 'Hand off a chat thread to another provider target',
+      'summary': 'Hand off a chat thread to another runtime and provider target',
       'x-cradle-cli': { command: ['chat', 'handoff', 'create'], defaultChatSessionId: true },
     },
     body: ThreadHandoffModel.createBody,

@@ -7013,7 +7013,7 @@ export type GetSessionsByIdEnvironmentResponses = {
             sourceSessionId: string;
             destinationSessionId: string;
             sourceProviderTargetId: string | null;
-            destinationProviderTargetId: string;
+            destinationProviderTargetId: string | null;
             importedMessageCount: number;
             createdAt: number;
         } | null;
@@ -7220,7 +7220,8 @@ export type PostThreadHandoffsData = {
     body: {
         requestId: string;
         sourceSessionId: string;
-        destinationProviderTargetId: string;
+        destinationRuntimeKind: string;
+        destinationProviderTargetId?: string | null;
         modelId?: string | null;
         thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
     };
@@ -7240,7 +7241,7 @@ export type PostThreadHandoffsResponses = {
             sourceSessionId: string;
             destinationSessionId: string;
             sourceProviderTargetId: string | null;
-            destinationProviderTargetId: string;
+            destinationProviderTargetId: string | null;
             importedMessageCount: number;
             createdAt: number;
         };
@@ -7306,7 +7307,7 @@ export type GetThreadHandoffsDestinationBySessionIdResponses = {
         sourceSessionId: string;
         destinationSessionId: string;
         sourceProviderTargetId: string | null;
-        destinationProviderTargetId: string;
+        destinationProviderTargetId: string | null;
         importedMessageCount: number;
         createdAt: number;
     } | null;
@@ -8093,6 +8094,120 @@ export type PostWorksByIdSubmitResponses = {
 
 export type PostWorksByIdSubmitResponse = PostWorksByIdSubmitResponses[keyof PostWorksByIdSubmitResponses];
 
+export type PostWorksByIdBranchData = {
+    body: {
+        branch: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/works/{id}/branch';
+};
+
+export type PostWorksByIdBranchResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        work: {
+            id: string;
+            title: string;
+            objective: string;
+            linkedIssueId: string | null;
+            handoffTitle: string | null;
+            handoffSummary: string | null;
+            handoffTestPlan: string | null;
+            preparedAt: number | null;
+            lastSubmittedAt: number | null;
+            closedAt: number | null;
+            archivedAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        };
+        primaryThread: {
+            id: string;
+            execution: {
+                kind: string;
+            } | {
+                kind: string;
+                hostId: string;
+                remoteSessionId: string;
+            };
+            parentSessionId: string | null;
+            sideContextSource: 'provider-native' | 'cradle-context' | null;
+            workspaceId: string | null;
+            title: string | null;
+            origin: string;
+            providerTargetId: string | null;
+            agentId: string | null;
+            modelId: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+            linkedIssueId: string | null;
+            sessionGroupId: string | null;
+            runtimeKind: string;
+            status: 'idle' | 'streaming' | 'error';
+            pinned: number;
+            archivedAt: number | null;
+            lastReadAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            latestUserMessageAt: number | null;
+            latestAssistantMessageAt: number | null;
+            unread: boolean;
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+        execution: {
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+        readiness: {
+            isolated: boolean;
+            clean: boolean;
+            branch: string | null;
+            baseRef: string | null;
+            commitsAhead: number;
+            changedFiles: number;
+        };
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+        } | null;
+        activity: 'idle' | 'running' | 'waiting' | 'blocked';
+    };
+};
+
+export type PostWorksByIdBranchResponse = PostWorksByIdBranchResponses[keyof PostWorksByIdBranchResponses];
+
 export type GetSessionsByIdWorkData = {
     body?: never;
     path: {
@@ -8878,6 +8993,7 @@ export type GetSessionAwaitsResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     }>;
 };
 
@@ -8920,6 +9036,7 @@ export type PostSessionAwaitsResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     };
 };
 
@@ -8956,6 +9073,7 @@ export type GetSessionAwaitsByIdResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     };
 };
 
@@ -8992,6 +9110,7 @@ export type PostSessionAwaitsByIdCancelResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     };
 };
 
@@ -9031,6 +9150,7 @@ export type PostSessionAwaitsByIdTriggerResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     };
 };
 
@@ -9070,6 +9190,7 @@ export type PostSessionAwaitsByIdRetryDeliveryResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     };
 };
 
@@ -9178,6 +9299,7 @@ export type PostSessionAwaitsByIdBypassCheckResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        consecutiveErrorCount: number;
     };
 };
 
@@ -9279,6 +9401,31 @@ export type PatchSessionAwaitsBypassRulesByIdResponses = {
 };
 
 export type PatchSessionAwaitsBypassRulesByIdResponse = PatchSessionAwaitsBypassRulesByIdResponses[keyof PatchSessionAwaitsBypassRulesByIdResponses];
+
+export type PostJavascriptEvaluateData = {
+    body: {
+        program: string;
+        timeoutMs?: number;
+        cwd?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/javascript/evaluate';
+};
+
+export type PostJavascriptEvaluateResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+        result?: unknown;
+        error?: string;
+        kind?: string;
+    };
+};
+
+export type PostJavascriptEvaluateResponse = PostJavascriptEvaluateResponses[keyof PostJavascriptEvaluateResponses];
 
 export type GetIssuesStatusesData = {
     body?: never;
@@ -19387,6 +19534,25 @@ export type GetChatSessionsBySessionIdProviderThreadsByThreadIdStreamResponses =
 
 export type GetChatSessionsBySessionIdProviderThreadsByThreadIdStreamResponse = GetChatSessionsBySessionIdProviderThreadsByThreadIdStreamResponses[keyof GetChatSessionsBySessionIdProviderThreadsByThreadIdStreamResponses];
 
+export type GetChatSessionsBySessionIdWorkflowsByToolCallIdStreamData = {
+    body?: never;
+    path: {
+        sessionId: string;
+        toolCallId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/workflows/{toolCallId}/stream';
+};
+
+export type GetChatSessionsBySessionIdWorkflowsByToolCallIdStreamResponses = {
+    /**
+     * Workflow runtime snapshots from provider-owned local artifacts.
+     */
+    200: string;
+};
+
+export type GetChatSessionsBySessionIdWorkflowsByToolCallIdStreamResponse = GetChatSessionsBySessionIdWorkflowsByToolCallIdStreamResponses[keyof GetChatSessionsBySessionIdWorkflowsByToolCallIdStreamResponses];
+
 export type GetChatSessionsBySessionIdRuntimeStatusData = {
     body?: never;
     path: {
@@ -24970,6 +25136,7 @@ export type PostTerminalSessionsBySessionIdStartOrAttachResponses = {
     200: {
         sessionId: string;
         running: boolean;
+        mode: 'live-attach' | 'resume' | 'fresh';
     };
 };
 
@@ -24994,6 +25161,106 @@ export type DeleteTerminalSessionsBySessionIdResponses = {
 };
 
 export type DeleteTerminalSessionsBySessionIdResponse = DeleteTerminalSessionsBySessionIdResponses[keyof DeleteTerminalSessionsBySessionIdResponses];
+
+export type DeleteTerminalSessionsBySessionIdProviderSessionData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/terminal-sessions/{sessionId}/provider-session';
+};
+
+export type DeleteTerminalSessionsBySessionIdProviderSessionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        providerSession: {
+            source: string;
+            agent: string;
+            kind: 'id' | 'path';
+            value: string;
+            workspacePath: string;
+            capturedAt: number;
+            startedAt: number;
+            sourcePath?: string;
+            confidence: 'exact' | 'heuristic';
+        } | null;
+    };
+};
+
+export type DeleteTerminalSessionsBySessionIdProviderSessionResponse = DeleteTerminalSessionsBySessionIdProviderSessionResponses[keyof DeleteTerminalSessionsBySessionIdProviderSessionResponses];
+
+export type GetTerminalSessionsBySessionIdProviderSessionData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/terminal-sessions/{sessionId}/provider-session';
+};
+
+export type GetTerminalSessionsBySessionIdProviderSessionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        providerSession: {
+            source: string;
+            agent: string;
+            kind: 'id' | 'path';
+            value: string;
+            workspacePath: string;
+            capturedAt: number;
+            startedAt: number;
+            sourcePath?: string;
+            confidence: 'exact' | 'heuristic';
+        } | null;
+    };
+};
+
+export type GetTerminalSessionsBySessionIdProviderSessionResponse = GetTerminalSessionsBySessionIdProviderSessionResponses[keyof GetTerminalSessionsBySessionIdProviderSessionResponses];
+
+export type PostTerminalSessionsBySessionIdProviderSessionData = {
+    body: {
+        source: string;
+        agent: string;
+        kind?: 'id' | 'path';
+        value: string;
+        sourcePath?: string;
+        confidence?: 'exact' | 'heuristic';
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/terminal-sessions/{sessionId}/provider-session';
+};
+
+export type PostTerminalSessionsBySessionIdProviderSessionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        providerSession: {
+            source: string;
+            agent: string;
+            kind: 'id' | 'path';
+            value: string;
+            workspacePath: string;
+            capturedAt: number;
+            startedAt: number;
+            sourcePath?: string;
+            confidence: 'exact' | 'heuristic';
+        } | null;
+    };
+};
+
+export type PostTerminalSessionsBySessionIdProviderSessionResponse = PostTerminalSessionsBySessionIdProviderSessionResponses[keyof PostTerminalSessionsBySessionIdProviderSessionResponses];
 
 export type PostTerminalSessionsShellStartData = {
     body: {

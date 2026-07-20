@@ -11,6 +11,8 @@ import type { MessageRecordedFact } from '../chat-runtime/es/events'
 import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 import { runRegistry } from '../chat-runtime/run-registry'
 import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
+import { runtimeSkipsProviderTarget } from '../provider-contracts/runtime-compatibility'
+import type { RuntimeKind } from '../provider-contracts/types'
 import * as ProviderTargets from '../provider-targets/service'
 import * as Session from '../session/service'
 
@@ -19,7 +21,8 @@ export type ThreadHandoffView = typeof threadHandoffs.$inferSelect
 export async function create(input: {
   requestId: string
   sourceSessionId: string
-  destinationProviderTargetId: string
+  destinationRuntimeKind: RuntimeKind
+  destinationProviderTargetId?: string | null
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort | null
 }): Promise<{ handoff: ThreadHandoffView, session: Session.SessionView }> {
@@ -42,8 +45,10 @@ export async function create(input: {
   }
   assertSourceIdle(source.id)
 
-  const target = ProviderTargets.getProviderTarget(input.destinationProviderTargetId)
-  if (!target || !target.enabled) {
+  const target = input.destinationProviderTargetId
+    ? ProviderTargets.getProviderTarget(input.destinationProviderTargetId)
+    : null
+  if (input.destinationProviderTargetId && (!target || !target.enabled)) {
     throw new AppError({
       code: 'thread_handoff_target_unavailable',
       status: 409,
@@ -51,15 +56,42 @@ export async function create(input: {
       details: { providerTargetId: input.destinationProviderTargetId },
     })
   }
-  if (source.providerTargetId === target.id) {
+  if (!target && !runtimeSkipsProviderTarget(input.destinationRuntimeKind)) {
+    throw new AppError({
+      code: 'thread_handoff_target_required',
+      status: 400,
+      message: 'Destination runtime requires a provider target',
+      details: { runtimeKind: input.destinationRuntimeKind },
+    })
+  }
+  if (target && runtimeSkipsProviderTarget(input.destinationRuntimeKind)) {
+    throw new AppError({
+      code: 'thread_handoff_target_not_supported',
+      status: 400,
+      message: 'Destination runtime manages its own provider connection',
+      details: {
+        runtimeKind: input.destinationRuntimeKind,
+        providerTargetId: target.id,
+      },
+    })
+  }
+  if (
+    source.runtimeKind === input.destinationRuntimeKind
+    && source.providerTargetId === (target?.id ?? null)
+  ) {
     throw new AppError({
       code: 'thread_handoff_same_target',
       status: 409,
-      message: 'Choose a different provider target for handoff',
-      details: { providerTargetId: target.id },
+      message: 'Choose a different runtime or provider target for handoff',
+      details: {
+        runtimeKind: input.destinationRuntimeKind,
+        providerTargetId: target?.id ?? null,
+      },
     })
   }
-  ProviderTargets.assertProviderTargetCompatibleWithRuntime(target.id, source.runtimeKind)
+  if (target) {
+    ProviderTargets.assertProviderTargetCompatibleWithRuntime(target.id, input.destinationRuntimeKind)
+  }
 
   const importedMessages = buildImportedMessages(source.id)
   if (importedMessages.length === 0) {
@@ -79,8 +111,8 @@ export async function create(input: {
       workspaceId: source.workspaceId,
       title: source.title?.trim() || 'Handoff',
       origin: 'thread-handoff',
-      providerTargetId: target.id,
-      runtimeKind: source.runtimeKind,
+      providerTargetId: target?.id,
+      runtimeKind: input.destinationRuntimeKind,
       modelId: input.modelId,
       thinkingEffort: input.thinkingEffort,
       linkedIssueId: source.linkedIssueId,
@@ -95,7 +127,7 @@ export async function create(input: {
       sourceSessionId: source.id,
       destinationSessionId: destinationId,
       sourceProviderTargetId: source.providerTargetId,
-      destinationProviderTargetId: target.id,
+      destinationProviderTargetId: target?.id ?? null,
       importedMessageCount: reboundMessages.length,
       createdAt: currentUnixSeconds(),
     }).returning().get()

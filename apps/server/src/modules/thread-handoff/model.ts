@@ -8,7 +8,7 @@ const handoff = t.Object({
   sourceSessionId: t.String(),
   destinationSessionId: t.String(),
   sourceProviderTargetId: t.Nullable(t.String()),
-  destinationProviderTargetId: t.String(),
+  destinationProviderTargetId: t.Nullable(t.String()),
   importedMessageCount: t.Number(),
   createdAt: t.Number(),
 })
@@ -18,7 +18,8 @@ export const ThreadHandoffModel = {
   createBody: t.Object({
     requestId: t.String({ minLength: 1 }),
     sourceSessionId: t.String({ minLength: 1 }),
-    destinationProviderTargetId: t.String({ minLength: 1 }),
+    destinationRuntimeKind: t.String({ minLength: 1 }),
+    destinationProviderTargetId: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
     modelId: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
     thinkingEffort: t.Optional(t.Nullable(t.Union([
       t.Literal('none'),

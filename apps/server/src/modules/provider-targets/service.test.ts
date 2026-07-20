@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { db } from '../../infra'
 import { toOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/native-provider-target-id'
-import { registerRuntimeProviderBinding } from '../provider-contracts/runtime-compatibility'
+import {
+  registerRuntimeProviderBinding,
+  registerRuntimeProviderKinds,
+} from '../provider-contracts/runtime-compatibility'
 import {
   assertProviderTargetCompatibleWithRuntime,
   listProviderTargets,
@@ -13,10 +16,14 @@ import {
 
 const RUNTIME_OWNED_TEST_RUNTIME = 'runtime-owned-test'
 const ORDINARY_PROVIDER_TARGET_ID = 'ordinary-provider'
+const ANTHROPIC_PROVIDER_TARGET_ID = 'anthropic-provider'
 
 afterEach(() => {
   registerRuntimeProviderBinding(RUNTIME_OWNED_TEST_RUNTIME, 'required')
-  db().delete(providerTargets).where(eq(providerTargets.id, ORDINARY_PROVIDER_TARGET_ID)).run()
+  registerRuntimeProviderKinds(RUNTIME_OWNED_TEST_RUNTIME, [])
+  for (const id of [ORDINARY_PROVIDER_TARGET_ID, ANTHROPIC_PROVIDER_TARGET_ID]) {
+    db().delete(providerTargets).where(eq(providerTargets.id, id)).run()
+  }
 })
 
 describe('runtime-owned provider targets', () => {
@@ -59,5 +66,35 @@ describe('runtime-owned provider targets', () => {
     registerRuntimeProviderBinding(RUNTIME_OWNED_TEST_RUNTIME, 'runtime-owned')
 
     await expect(listProviderTargets({ runtimeKind: RUNTIME_OWNED_TEST_RUNTIME })).resolves.toEqual([])
+  })
+
+  it('lists only stored provider targets compatible with the selected runtime', async () => {
+    db().insert(providerTargets).values([
+      {
+        id: ORDINARY_PROVIDER_TARGET_ID,
+        kind: 'manual',
+        providerKind: 'openai-compatible',
+        displayName: 'OpenAI Provider',
+        enabled: true,
+        connectionConfigJson: '{}',
+        enabledModelsJson: '[]',
+        customModelsJson: '[]',
+      },
+      {
+        id: ANTHROPIC_PROVIDER_TARGET_ID,
+        kind: 'manual',
+        providerKind: 'anthropic',
+        displayName: 'Anthropic Provider',
+        enabled: true,
+        connectionConfigJson: '{}',
+        enabledModelsJson: '[]',
+        customModelsJson: '[]',
+      },
+    ]).run()
+    registerRuntimeProviderKinds(RUNTIME_OWNED_TEST_RUNTIME, ['anthropic'])
+
+    const targets = await listProviderTargets({ runtimeKind: RUNTIME_OWNED_TEST_RUNTIME })
+
+    expect(targets.map(target => target.id)).toEqual([ANTHROPIC_PROVIDER_TARGET_ID])
   })
 })

@@ -16,7 +16,6 @@ export const threadHandoffs = sqliteTable('thread_handoffs', {
   sourceProviderTargetId: text('source_provider_target_id')
     .references(() => providerTargets.id, { onDelete: 'set null' }),
   destinationProviderTargetId: text('destination_provider_target_id')
-    .notNull()
     .references(() => providerTargets.id, { onDelete: 'restrict' }),
   importedMessageCount: int('imported_message_count').notNull(),
   createdAt: int('created_at').notNull(),

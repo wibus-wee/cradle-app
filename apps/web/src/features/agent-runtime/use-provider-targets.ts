@@ -10,6 +10,7 @@ export type ProviderTargetRecord = GetProviderTargetsResponse[number]
 export interface UseProviderTargetsOptions {
   runtimeKind?: string | null
   workspaceId?: string | null
+  enabled?: boolean
 }
 
 export interface ProviderTargetOption {
@@ -45,7 +46,10 @@ export function useProviderTargets(options: UseProviderTargetsOptions = {}) {
     runtimeKind: options.runtimeKind ?? undefined,
     workspaceId: options.workspaceId ?? undefined,
   }
-  const { data: providerTargets = [], isLoading, isSuccess, refetch } = useQuery(getProviderTargetsOptions({ query }))
+  const { data: providerTargets = [], isLoading, isSuccess, refetch } = useQuery({
+    ...getProviderTargetsOptions({ query }),
+    enabled: options.enabled ?? true,
+  })
 
   const providerOptions = useMemo(
     () => providerTargets.map(target => toProviderTargetOption(target)),

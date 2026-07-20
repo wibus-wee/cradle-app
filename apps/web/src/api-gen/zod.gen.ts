@@ -1505,7 +1505,8 @@ export const zPatchSessionsByIdEnvironmentMarkersByMarkerIdPath = z.object({
 export const zPostThreadHandoffsBody = z.object({
     requestId: z.string().min(1),
     sourceSessionId: z.string().min(1),
-    destinationProviderTargetId: z.string().min(1),
+    destinationRuntimeKind: z.string().min(1),
+    destinationProviderTargetId: z.string().min(1).nullish(),
     modelId: z.string().min(1).nullish(),
     thinkingEffort: z.enum([
         'none',
@@ -1613,6 +1614,14 @@ export const zPostWorksByIdSubmitBody = z.object({
 });
 
 export const zPostWorksByIdSubmitPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostWorksByIdBranchBody = z.object({
+    branch: z.string().min(1)
+});
+
+export const zPostWorksByIdBranchPath = z.object({
     id: z.string().min(1)
 });
 
@@ -1789,6 +1798,12 @@ export const zPatchSessionAwaitsBypassRulesByIdBody = z.object({
 
 export const zPatchSessionAwaitsBypassRulesByIdPath = z.object({
     id: z.string().min(1)
+});
+
+export const zPostJavascriptEvaluateBody = z.object({
+    program: z.string().min(1),
+    timeoutMs: z.number().optional(),
+    cwd: z.string().optional()
 });
 
 export const zGetIssuesStatusesQuery = z.object({
@@ -2947,6 +2962,11 @@ export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdTurnsQuery = z.
 export const zGetChatSessionsBySessionIdProviderThreadsByThreadIdStreamPath = z.object({
     sessionId: z.string().min(1),
     threadId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdWorkflowsByToolCallIdStreamPath = z.object({
+    sessionId: z.string().min(1),
+    toolCallId: z.string().min(1)
 });
 
 export const zGetChatSessionsBySessionIdRuntimeStatusPath = z.object({
@@ -4287,6 +4307,27 @@ export const zPostTerminalSessionsBySessionIdStartOrAttachPath = z.object({
 });
 
 export const zDeleteTerminalSessionsBySessionIdPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zDeleteTerminalSessionsBySessionIdProviderSessionPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetTerminalSessionsBySessionIdProviderSessionPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostTerminalSessionsBySessionIdProviderSessionBody = z.object({
+    source: z.string().min(1),
+    agent: z.string().min(1),
+    kind: z.enum(['id', 'path']).optional(),
+    value: z.string().min(1).max(512),
+    sourcePath: z.string().min(1).optional(),
+    confidence: z.enum(['exact', 'heuristic']).optional()
+});
+
+export const zPostTerminalSessionsBySessionIdProviderSessionPath = z.object({
     sessionId: z.string().min(1)
 });
 
