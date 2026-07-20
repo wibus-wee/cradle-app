@@ -13,6 +13,21 @@ const INTRO_DURATION = 1.15
 /** Thickness (px) of the bright band trailing the activation wavefront. */
 const INTRO_BAND = 90
 
+type GridCell = {
+  x: number
+  y: number
+  distance: number
+  falloff: number
+}
+
+type Particle = {
+  x: number
+  y: number
+  seed: number
+  /** Distance from wave origin to the particle's base position (precomputed). */
+  distance: number
+}
+
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453
   return value - Math.floor(value)
@@ -67,7 +82,16 @@ export function UltraThinkingDecoration({ className }: { className?: string }) {
     let isIntersecting = true
     let origin = { x: 24, y: 0 }
     let maxDistance = 1
-    let particles: Array<{ x: number, y: number, seed: number }> = []
+    let grid: GridCell[] = []
+    let particles: Particle[] = []
+    // Theme class flips are rare; cache so paint never touches the DOM.
+    let rose = readRoseColor()
+    let roseFill = `rgb(${rose[0]},${rose[1]},${rose[2]})`
+
+    const syncRose = () => {
+      rose = readRoseColor()
+      roseFill = `rgb(${rose[0]},${rose[1]},${rose[2]})`
+    }
 
     const syncSize = () => {
       const rect = canvas.getBoundingClientRect()
@@ -101,56 +125,72 @@ export function UltraThinkingDecoration({ className }: { className?: string }) {
         1,
       )
 
-      particles = Array.from({ length: PARTICLE_COUNT }, (_, index) => ({
-        x: seededUnit(index, 71) * width,
-        y: seededUnit(index, 83) * height,
-        seed: seededUnit(index, 97),
-      }))
+      // Precompute static per-cell geometry so paint only evaluates the wave.
+      const nextGrid: GridCell[] = []
+      const cols = Math.ceil(width / GRID_SPACING)
+      const rows = Math.ceil(height / GRID_SPACING)
+      const falloffScale = maxDistance * 0.85
+      for (let row = 0; row <= rows; row++) {
+        for (let col = 0; col <= cols; col++) {
+          const x = col * GRID_SPACING
+          const y = row * GRID_SPACING
+          const distance = Math.sqrt((x - origin.x) ** 2 + (y - origin.y) ** 2)
+          const falloff = Math.max(0, 1 - distance / falloffScale)
+          if (falloff <= 0) {
+            continue
+          }
+          nextGrid.push({ x, y, distance, falloff })
+        }
+      }
+      grid = nextGrid
+
+      particles = Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+        const x = seededUnit(index, 71) * width
+        const y = seededUnit(index, 83) * height
+        return {
+          x,
+          y,
+          seed: seededUnit(index, 97),
+          distance: Math.sqrt((x - origin.x) ** 2 + (y - origin.y) ** 2),
+        }
+      })
     }
 
     const paint = (time: number) => {
       ctx.clearRect(0, 0, width, height)
-      const [cr, cg, cb] = readRoseColor()
       const introProgress = introEnabled ? clamp01(time / INTRO_DURATION) : 1
       const wavefront = easeOutCubic(introProgress) * maxDistance
       const introActive = introProgress < 1
       // Ambient field ramps in behind the wavefront, then stays.
       const ambientLevel = introEnabled ? clamp01(time / (INTRO_DURATION * 0.9)) : 1
 
+      // One fillStyle per frame; per-dot alpha via globalAlpha (no rgba strings).
+      ctx.fillStyle = roseFill
+
       // Dense fine grid — a soft radial wave emanating from the trigger.
-      const cols = Math.ceil(width / GRID_SPACING)
-      const rows = Math.ceil(height / GRID_SPACING)
-      for (let row = 0; row <= rows; row++) {
-        for (let col = 0; col <= cols; col++) {
-          const x = col * GRID_SPACING
-          const y = row * GRID_SPACING
-          const distance = Math.sqrt((x - origin.x) ** 2 + (y - origin.y) ** 2)
-          if (distance > wavefront) {
-            continue
-          }
-          const falloff = Math.max(0, 1 - distance / (maxDistance * 0.85))
-          if (falloff <= 0) {
-            continue
-          }
-          const wave = Math.sin(distance * WAVE_FREQUENCY - time * WAVE_SPEED) * 0.5 + 0.5
-          // Bright ignition flash right where the wavefront just passed.
-          const ignition = introActive ? Math.max(0, 1 - (wavefront - distance) / INTRO_BAND) : 0
-          const energy = Math.min(1, wave * ambientLevel + ignition)
-          const radius = (0.35 + (1.05 + ignition * 1.2) * energy) * (0.45 + 0.55 * falloff)
-          const alpha = ((0.04 + 0.13 * wave) * ambientLevel + ignition * 0.4) * falloff
-          if (alpha <= 0.004) {
-            continue
-          }
-          ctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha.toFixed(3)})`
-          ctx.beginPath()
-          ctx.arc(x, y, radius, 0, Math.PI * 2)
-          ctx.fill()
+      for (const cell of grid) {
+        if (cell.distance > wavefront) {
+          continue
         }
+        const wave = Math.sin(cell.distance * WAVE_FREQUENCY - time * WAVE_SPEED) * 0.5 + 0.5
+        // Bright ignition flash right where the wavefront just passed.
+        const ignition = introActive ? Math.max(0, 1 - (wavefront - cell.distance) / INTRO_BAND) : 0
+        const energy = Math.min(1, wave * ambientLevel + ignition)
+        const radius = (0.35 + (1.05 + ignition * 1.2) * energy) * (0.45 + 0.55 * cell.falloff)
+        const alpha = ((0.04 + 0.13 * wave) * ambientLevel + ignition * 0.4) * cell.falloff
+        if (alpha <= 0.004) {
+          continue
+        }
+        ctx.globalAlpha = alpha
+        ctx.beginPath()
+        ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2)
+        ctx.fill()
       }
 
       // The wavefront ring itself — visible while the sweep is running.
       if (introActive && wavefront > 0.5) {
-        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${(0.35 * (1 - introProgress)).toFixed(3)})`
+        ctx.globalAlpha = 0.35 * (1 - introProgress)
+        ctx.strokeStyle = roseFill
         ctx.lineWidth = 1.2
         ctx.beginPath()
         ctx.arc(origin.x, origin.y, wavefront, 0, Math.PI * 2)
@@ -159,20 +199,21 @@ export function UltraThinkingDecoration({ className }: { className?: string }) {
 
       // Small drifting particles with a soft twinkle.
       for (const particle of particles) {
-        const orbit = time * (0.22 + particle.seed * 0.3)
-        const x = particle.x + Math.cos(orbit + particle.seed * Math.PI * 2) * 10
-        const y = particle.y + Math.sin(orbit * 0.8 + particle.seed * Math.PI * 4) * 7
-        const distance = Math.sqrt((particle.x - origin.x) ** 2 + (particle.y - origin.y) ** 2)
-        const revealed = clamp01((wavefront - distance) / 60)
+        const revealed = clamp01((wavefront - particle.distance) / 60)
         if (revealed <= 0) {
           continue
         }
+        const orbit = time * (0.22 + particle.seed * 0.3)
+        const x = particle.x + Math.cos(orbit + particle.seed * Math.PI * 2) * 10
+        const y = particle.y + Math.sin(orbit * 0.8 + particle.seed * Math.PI * 4) * 7
         const twinkle = Math.sin(time * 1.3 + particle.seed * Math.PI * 6) * 0.5 + 0.5
-        ctx.fillStyle = `rgba(${cr},${cg},${cb},${((0.1 + 0.24 * twinkle) * revealed).toFixed(3)})`
+        ctx.globalAlpha = (0.1 + 0.24 * twinkle) * revealed
         ctx.beginPath()
         ctx.arc(x, y, 0.7 + twinkle * 0.5, 0, Math.PI * 2)
         ctx.fill()
       }
+
+      ctx.globalAlpha = 1
     }
 
     const startTime = introEnabled ? activatedAt : performance.now()
@@ -225,12 +266,25 @@ export function UltraThinkingDecoration({ className }: { className?: string }) {
     })
     intersectionObserver.observe(canvas)
 
+    const themeObserver = new MutationObserver(() => {
+      syncRose()
+      // Reduced-motion paints a single static frame; refresh it on theme flip.
+      if (reduceMotion) {
+        paint(STATIC_FRAME_TIME)
+      }
+    })
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
     return () => {
       disposed = true
       cancelAnimationFrame(frameId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
+      themeObserver.disconnect()
     }
   }, [])
 
