@@ -120,6 +120,10 @@ export function readCodexToolName(item: CodexAppServerItem): string {
  * so this only covers the api names the frontend previously classified, plus real MCP tool
  * calls (`item.type === 'mcpToolCall'`) which are always classified as `'mcp'`; everything
  * else — including dynamic tool calls — stays `'generic'` until that migration happens.
+ *
+ * Codex Agent Control tools arrive as `collabAgentToolCall` with api names from
+ * `CollabAgentTool` (`spawnAgent` | `sendInput` | `resumeAgent` | `wait` | `closeAgent`).
+ * Classify by item type first so those concrete names are not left as `'generic'`.
  */
 const CODEX_TOOL_KINDS: Record<string, CradleToolKind> = {
   'command_execution': 'terminal',
@@ -128,6 +132,11 @@ const CODEX_TOOL_KINDS: Record<string, CradleToolKind> = {
   'approval.file_change': 'file-diff',
   'web_search': 'web',
   'collab_agent': 'subagent',
+  'spawnAgent': 'subagent',
+  'sendInput': 'subagent',
+  'resumeAgent': 'subagent',
+  'wait': 'subagent',
+  'closeAgent': 'subagent',
   'plan': 'plan',
   'plan_implementation': 'plan-implementation',
   'mcp.elicitation': 'mcp',
@@ -136,6 +145,9 @@ const CODEX_TOOL_KINDS: Record<string, CradleToolKind> = {
 export function classifyCodexToolKind(apiName: string, itemType?: string): CradleToolKind {
   if (itemType === 'mcpToolCall') {
     return 'mcp'
+  }
+  if (itemType === 'collabAgentToolCall') {
+    return 'subagent'
   }
   return CODEX_TOOL_KINDS[apiName] ?? 'generic'
 }
