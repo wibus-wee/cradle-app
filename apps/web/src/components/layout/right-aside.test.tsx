@@ -119,27 +119,4 @@ describe('rightAside browser panel coupling', () => {
       expect(useLayoutStore.getState().asideActiveTab).toBe('files')
     })
   })
-
-  it('shows the Environment tab for session-owned surfaces', () => {
-    const { rerender } = renderRightAside(<RightAside ownerId="owner-b" visible />)
-    expect(screen.queryByTestId('right-aside-tab-work')).toBeNull()
-
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <TooltipProvider>
-          <RightAside ownerId="owner-b" sessionId="session-1" visible />
-        </TooltipProvider>
-      </QueryClientProvider>,
-    )
-    expect(screen.getByTestId('right-aside-tab-work')).not.toBeNull()
-
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <TooltipProvider>
-          <RightAside ownerId="owner-b" workId="work-1" visible />
-        </TooltipProvider>
-      </QueryClientProvider>,
-    )
-    expect(screen.queryByTestId('right-aside-tab-work')).toBeNull()
-  })
 })

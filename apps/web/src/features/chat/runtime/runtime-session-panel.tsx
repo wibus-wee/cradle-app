@@ -1,4 +1,6 @@
 import {
+  BookmarkLine as BookmarkIcon,
+  CalendarTimeAddLine as AutomationIcon,
   CheckCircleLine as CheckCircle2Icon,
   CloseCircleLine as XCircleIcon,
   EyeLine as EyeIcon,
@@ -8,19 +10,21 @@ import {
   RobotLine as BotIcon,
   RoundLine as CircleIcon,
   StopwatchLine as TimerIcon,
+  TargetLine as TargetIcon,
   ToolLine as WrenchIcon,
 } from '@mingcute/react'
 import { useQuery } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
-import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { getSessionsByIdEnvironmentOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { useWorkDetail } from '~/features/work/use-work'
 import { cn } from '~/lib/cn'
-import { formatElapsedRangeMs, formatPercentFromRatio } from '~/lib/number-format'
+import { formatElapsedRangeMs } from '~/lib/number-format'
 import type { BrowserWorkflowRuntimeSnapshot } from '~/store/browser-panel'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { chatSelectors, useChatStore } from '~/store/chat'
@@ -39,7 +43,6 @@ import {
 } from '../capabilities/chat-capabilities'
 import type { ChatTodoItem, SessionTodoSnapshot } from '../capabilities/chat-todo-projection'
 import type { RuntimeSessionStatusKind } from '../commands/runtime-session-status-command'
-import { readChatAttentionSnapshot, subscribeChatAttentionSnapshots } from '../context/chat-context'
 import { readRenderableToolPart } from '../rendering/chat-render-plan'
 import { toolNameFromPart } from '../rendering/chat-tool-entities'
 import { SubagentIdenticon } from '../rendering/subagent-identicon'
@@ -64,6 +67,8 @@ interface RuntimeSessionPanelProps {
   sessionId: string | null
   runtimeKind?: RuntimeKind | null
   providerTargetId?: string | null
+  workId?: string | null
+  workspaceId?: string | null
   active?: boolean
 }
 
@@ -78,7 +83,6 @@ const TOOL_STATE_LABELS: Record<ToolState, string> = {
 }
 
 const EMPTY_MESSAGES: UIMessage[] = []
-const subscribeInactiveChatAttentionSnapshots = () => () => undefined
 
 type ProgressTaskStatus = 'pending' | 'inProgress' | 'completed'
 
@@ -93,6 +97,8 @@ export function RuntimeSessionPanel({
   sessionId,
   runtimeKind,
   providerTargetId,
+  workId,
+  // workspaceId,
   active = true,
 }: RuntimeSessionPanelProps) {
   const { t } = useTranslation('chat')
@@ -112,11 +118,6 @@ export function RuntimeSessionPanel({
     runtimeSettingsFields,
     runtimeStatus?.runtimeSettings ?? {},
   )
-  const attentionSnapshot = useSyncExternalStore(
-    active ? subscribeChatAttentionSnapshots : subscribeInactiveChatAttentionSnapshots,
-    () => (active ? readChatAttentionSnapshot(sessionId) : null),
-    () => null,
-  )
   const { data: runtimeUiSlotStates, isLoading: runtimeUiSlotStatesLoading } = useQuery({
     queryKey: runtimeUiSlotStatesQueryKey(activeSessionId, runtimeKind),
     queryFn: ({ signal }) => getChatRuntimeUiSlotStates(activeSessionId!, signal),
@@ -134,6 +135,13 @@ export function RuntimeSessionPanel({
     retry: false,
   })
   const todoSnapshot = useSessionTodos(sessionId, active)
+  const environmentQuery = useQuery({
+    ...getSessionsByIdEnvironmentOptions({ path: { id: sessionId ?? '' } }),
+    enabled: !!sessionId,
+    refetchInterval: 5_000,
+  })
+  const workQuery = useWorkDetail(workId)
+  const environment = environmentQuery.data
   const lastAssistantId = useChatStore(
     activeSessionId ? chatSelectors.lastAssistantId(activeSessionId) : () => undefined,
   )
@@ -178,30 +186,59 @@ export function RuntimeSessionPanel({
         />
       )}
 
-      <div className="border-t" />
+     {sessionId && environment && (
+        <>
+          <section className="space-y-2">
+            <PanelHeading icon={EyeIcon} label="Environment" />
+            <div className="grid grid-cols-2 gap-2">
+              <Metric label="Checkpoints" value={String(environment.checkpoints.length)} />
+              <Metric label="Pins" value={String(environment.pins.length)} />
+              <Metric label="Markers" value={String(environment.markers.length)} />
+              <Metric label="Automation" value={String(environment.automationRuns.length)} />
+              {environment.usage && (
+                <>
+                  <Metric label="Tokens" value={environment.usage.totalTokens.toLocaleString()} />
+                  <Metric label="Turns" value={String(environment.usage.count)} />
+                </>
+              )}
+            </div>
+          </section>
 
-      <section className="space-y-2">
-        <PanelHeading icon={EyeIcon} label="Attention" />
-        {attentionSnapshot
-? (
-          <div className="grid grid-cols-2 gap-2">
-            <Metric label="Visible" value={formatAttentionRange(attentionSnapshot)} />
-            <Metric label="Scroll" value={formatPercentFromRatio(attentionSnapshot.scrollRatio)} />
-            <Metric label="Focus" value={attentionSnapshot.focusedArea ?? 'none'} />
-            <Metric
-              label="Freshness"
-              value={formatSnapshotFreshness(attentionSnapshot.updatedAt)}
-            />
-          </div>
-        )
-: (
-          <p className="rounded-md bg-muted/30 p-2 text-[11px] text-muted-foreground">
-            No chat attention snapshot for this session
-          </p>
-        )}
-      </section>
+          {workQuery.data && (
+            <section className="space-y-2">
+              <PanelHeading icon={TargetIcon} label="Work" />
+              <div className="grid grid-cols-3 gap-2">
+                <Metric label="Files" value={String(workQuery.data.readiness.changedFiles)} />
+                <Metric label="Commits" value={String(workQuery.data.readiness.commitsAhead)} />
+                <Metric label="State" value={workQuery.data.activity} />
+              </div>
+              <p className="text-pretty text-[11px] leading-5 text-foreground/80">{workQuery.data.work.objective}</p>
+              {workQuery.data.work.handoffSummary && (
+                <p className="text-pretty text-[11px] leading-5 text-muted-foreground">{workQuery.data.work.handoffSummary}</p>
+              )}
+            </section>
+          )}
 
-      <div className="border-t" />
+          {environment.notes && (
+            <section className="space-y-2">
+              <PanelHeading icon={BookmarkIcon} label="Notes" />
+              <p className="whitespace-pre-wrap text-[11px] leading-5 text-foreground/80">{environment.notes}</p>
+            </section>
+          )}
+
+          {environment.automationRuns.length > 0 && (
+            <section className="space-y-2">
+              <PanelHeading icon={AutomationIcon} label="Automation" />
+              <div className="space-y-1.5 rounded-md bg-muted/40 p-2">
+                {environment.automationRuns.map(run => (
+                  <KeyValue key={run.id} label={run.id.slice(0, 8)} value={run.status} />
+                ))}
+              </div>
+            </section>
+          )}
+
+        </>
+      )}
 
       <section className="space-y-2">
         <PanelHeading icon={ActivityIcon} label="Session" />
@@ -741,26 +778,6 @@ function formatThreadId(threadId: string): string {
     return threadId
   }
   return `${threadId.slice(0, 8)}...${threadId.slice(-4)}`
-}
-
-function formatAttentionRange(
-  snapshot: NonNullable<ReturnType<typeof readChatAttentionSnapshot>>,
-): string {
-  if (snapshot.firstVisibleIndex === null || snapshot.lastVisibleIndex === null) {
-    return `${snapshot.messageCount} messages`
-  }
-  return `${snapshot.firstVisibleIndex + 1}-${snapshot.lastVisibleIndex + 1}/${snapshot.messageCount}`
-}
-
-function formatSnapshotFreshness(updatedAt: number): string {
-  const ageSeconds = Math.max(0, Math.floor((Date.now() - updatedAt) / 1_000))
-  if (ageSeconds < 5) {
-    return 'live'
-  }
-  if (ageSeconds < 60) {
-    return `${ageSeconds}s ago`
-  }
-  return `${Math.floor(ageSeconds / 60)}m ago`
 }
 
 function statusShouldPoll(status: RuntimeSessionStatusKind | undefined): boolean {

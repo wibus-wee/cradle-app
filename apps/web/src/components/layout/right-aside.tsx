@@ -3,7 +3,6 @@ import {
   DotCircleLine as CircleDotIcon,
   GitBranchLine as GitBranchIcon,
   GitCompareLine as FileDiffIcon,
-  GitPullRequestLine as WorkIcon,
   HeartbeatLine as ActivityIcon,
   RssLine as RssIcon,
   SelectorHorizontalLine as SlidersHorizontalIcon,
@@ -26,7 +25,6 @@ import { IssueAsidePanel } from '~/features/kanban/issue-aside-panel'
 import { useLinkedIssue } from '~/features/kanban/use-kanban'
 import { useSessionIsolationState } from '~/features/session/use-session-isolation'
 import { AwaitPanel } from '~/features/session-await/await-panel'
-import { SessionEnvironmentPanel } from '~/features/session-environment/session-environment-panel'
 import { FileTree } from '~/features/workspace/file-tree'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
@@ -44,7 +42,6 @@ interface Tab {
     | 'rightAside.tab.await'
     | 'rightAside.tab.runtime'
     | 'rightAside.tab.adjustment'
-    | 'rightAside.tab.environment'
   icon: typeof FolderTreeIcon
   requiresSession?: boolean
   requiresWork?: boolean
@@ -52,7 +49,6 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: 'files', labelKey: 'rightAside.tab.files', icon: FolderTreeIcon },
-  { id: 'work', labelKey: 'rightAside.tab.environment', icon: WorkIcon, requiresSession: true },
   { id: 'changes', labelKey: 'rightAside.tab.changes', icon: FileDiffIcon },
   { id: 'git', labelKey: 'rightAside.tab.git', icon: GitBranchIcon },
   { id: 'issue', labelKey: 'rightAside.tab.issue', icon: CircleDotIcon, requiresSession: true },
@@ -181,9 +177,6 @@ function RightAsidePanelContent({
   providerTargetId,
   active,
 }: RightAsidePanelContentProps) {
-  if (tabId === 'work' && sessionId) {
-    return <SessionEnvironmentPanel sessionId={sessionId} workspaceId={workspaceId} workId={workId} />
-  }
   if (tabId === 'files') {
     return (
       <div
@@ -264,6 +257,8 @@ function RightAsidePanelContent({
           sessionId={sessionId ?? null}
           runtimeKind={runtimeKind}
           providerTargetId={providerTargetId}
+          workId={workId}
+          workspaceId={workspaceId}
           active={active}
         />
       </div>

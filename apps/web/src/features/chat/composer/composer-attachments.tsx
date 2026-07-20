@@ -2,6 +2,11 @@ import {
   AttachmentLine as PaperclipIcon,
   CloseLine as XIcon,
   FileLine as FileIcon,
+  PicLine as ImageIcon,
+  RightLine as ArrowRightIcon,
+  SafeShieldLine as ShieldIcon,
+  ScanLine as ScanIcon,
+  TextLine as TextLinesIcon,
 } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
 import { m } from 'motion/react'
@@ -103,25 +108,67 @@ export function ComposerAttachmentButton({
     return (
       <Popover open={ocrPopoverOpen} onOpenChange={setOcrPopoverOpen}>
         <PopoverTrigger asChild>{attachmentButton}</PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-72 gap-3 p-3">
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">Use local image text recognition?</p>
-            <p className="text-pretty text-xs leading-5 text-muted-foreground">
-              This model cannot see images. Cradle will extract their text locally and send only
-              that text to the model.
-            </p>
+        <PopoverContent side="top" align="start" className="w-80 gap-0 overflow-hidden p-0">
+          {/* Header */}
+          <div className="flex items-start gap-3 p-3.5 pb-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ScanIcon className="size-4.5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <p className="font-medium leading-5 text-foreground">Turn images into text</p>
+              <p className="text-pretty text-xs leading-5 text-muted-foreground">
+                This model can't see images, so Cradle reads their text for you.
+              </p>
+            </div>
           </div>
-          <Button
-            type="button"
-            size="xs"
-            className="self-end"
-            onClick={() => {
-              setOcrPopoverOpen(false)
-              onPickFiles()
-            }}
-          >
-            Choose images
-          </Button>
+
+          {/* Image → text visual */}
+          <div className="flex items-center gap-3 border-y border-border/50 bg-muted/30 px-3.5 py-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background shadow-xs">
+              <ImageIcon className="size-5 text-muted-foreground" aria-hidden="true" />
+            </div>
+            <m.div
+              initial={{ opacity: 0.25 }}
+              animate={{ opacity: [0.25, 1, 0.25] }}
+              transition={{ duration: 1.6, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
+            >
+              <ArrowRightIcon className="size-4 text-primary" aria-hidden="true" />
+            </m.div>
+            <div className="flex h-12 min-w-0 flex-1 flex-col justify-center gap-1.5 rounded-md border border-border/70 bg-background px-2.5 shadow-xs">
+              {[0, 1, 2].map(line => (
+                <m.div
+                  key={line}
+                  className={cn('h-1 rounded-full bg-muted-foreground/25', line === 2 && 'w-2/3')}
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.15 + line * 0.12, duration: 0.3, ease: 'easeOut' }}
+                  style={{ transformOrigin: 'left' }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Privacy note + action */}
+          <div className="space-y-3 p-3.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldIcon className="size-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+              <span className="text-pretty">
+                Extracted on this device — the image itself never leaves.
+              </span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                setOcrPopoverOpen(false)
+                onPickFiles()
+              }}
+            >
+              <TextLinesIcon className="size-4" aria-hidden="true" />
+              Choose images
+            </Button>
+          </div>
         </PopoverContent>
       </Popover>
     )
