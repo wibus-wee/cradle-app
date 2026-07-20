@@ -1,4 +1,5 @@
 import {
+  ExternalLinkLine as ExternalLinkIcon,
   GitBranchLine as GitBranchIcon,
   GitPullRequestLine as PullRequestIcon,
   Search2Line as SearchIcon,
@@ -11,6 +12,7 @@ import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -105,6 +107,20 @@ function groupByRecency(items: CradlePullRequest[]): Array<{ id: RecencyGroupId,
     .filter(group => group.items.length > 0)
 }
 
+function isGitHubAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const record = error as { code?: unknown, error?: unknown }
+  if (record.code === 'github_auth_required') {
+    return true
+  }
+  return !!record.error
+    && typeof record.error === 'object'
+    && (record.error as { code?: unknown }).code === 'github_auth_required'
+}
+
 export function PullRequestsPage({
   selectedRef,
   onSelectedRefChange,
@@ -164,6 +180,7 @@ export function PullRequestsPage({
   const activeFeeds = filter === 'authored' ? [authored] : filter === 'reviewing' ? [reviewing] : [authored, reviewing]
   const hasMorePullRequests = activeFeeds.some(feed => feed.hasNextPage)
   const isFetchingMorePullRequests = activeFeeds.some(feed => feed.isFetchingNextPage)
+  const hasGitHubAuthError = isGitHubAuthError(error)
   const loadMorePullRequests = () => {
     for (const feed of activeFeeds) {
       if (feed.hasNextPage) {
@@ -172,8 +189,35 @@ export function PullRequestsPage({
     }
   }
 
-  if (error) {
+  if (error && !hasGitHubAuthError) {
     throw error
+  }
+
+  if (hasGitHubAuthError) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="pull-requests-page">
+        <header className="flex shrink-0 items-center border-b border-border/60 px-5 py-4">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">{t('page.title')}</h1>
+        </header>
+        <div className="min-h-0 flex-1">
+          <Empty className="h-full border-0">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><PullRequestIcon /></EmptyMedia>
+              <EmptyTitle>{t('auth.emptyTitle')}</EmptyTitle>
+              <EmptyDescription>{t('auth.emptyDescription')}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="flex-row justify-center">
+              <Button variant="outline" size="sm" asChild>
+                <a href="https://cli.github.com/" target="_blank" rel="noreferrer">
+                  <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+                  {t('auth.install')}
+                </a>
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
+      </div>
+    )
   }
 
   return (
