@@ -4,6 +4,7 @@ import { remoteSessionLinks, sessions } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
+import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
 import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
@@ -179,6 +180,12 @@ export async function createRemoteProjectedSession(input: {
         })
   }
 
+  const localConfigJson = JSON.stringify({
+    ...(input.modelId ? { requestedModelId: input.modelId } : {}),
+    ...(input.providerTargetId ? { requestedProviderTargetId: input.providerTargetId } : {}),
+    ...(input.thinkingEffort ? { requestedThinkingEffort: input.thinkingEffort } : {}),
+  })
+
   try {
     db().transaction((tx) => {
       tx.insert(sessions)
@@ -190,7 +197,7 @@ export async function createRemoteProjectedSession(input: {
           providerTargetId: null,
           runtimeKind: input.runtimeKind ?? 'standard',
           agentId: null,
-          configJson: '{}',
+          configJson: localConfigJson,
           linkedIssueId: input.linkedIssueId ?? null,
           sessionGroupId: input.sessionGroupId ?? null,
         })
@@ -294,4 +301,46 @@ export function buildProxiedJsonRequest(
     body: JSON.stringify(body),
     signal: request.signal,
   })
+}
+
+/**
+ * Fetch the remote session title and update the local projection if it changed.
+ * Returns `true` if the title was updated.
+ */
+export async function syncRemoteSessionTitle(localSessionId: string): Promise<boolean> {
+  const link = getRemoteSessionLink(localSessionId)
+  if (!link) {
+    return false
+  }
+
+  try {
+    const { baseUrl } = await ensureRemoteHostConnected(link.hostId)
+    const remote = await upstreamJsonByBaseUrl<{ id: string, title: string | null }>(
+      baseUrl,
+      `/sessions/${encodeURIComponent(link.remoteSessionId)}`,
+    )
+    if (!remote?.title) {
+      return false
+    }
+
+    const local = db()
+      .select({ title: sessions.title })
+      .from(sessions)
+      .where(eq(sessions.id, localSessionId))
+      .get()
+    if (!local || local.title === remote.title) {
+      return false
+    }
+
+    db()
+      .update(sessions)
+      .set({ title: remote.title, updatedAt: currentUnixSeconds() })
+      .where(eq(sessions.id, localSessionId))
+      .run()
+    return true
+  }
+  catch {
+    // Best-effort: do not fail the request if title sync fails.
+    return false
+  }
 }

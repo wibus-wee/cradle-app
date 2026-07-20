@@ -6,13 +6,23 @@ import { WorktreeModel } from '../worktree/model'
 import * as Worktree from '../worktree/service'
 import { sessionArchiveChunks } from './export-archive'
 import { SessionModel } from './model'
+import { isRemoteProjectedSession, syncRemoteSessionTitle } from './remote-projection'
 import * as Session from './service'
 
 export const session = new Elysia({
   prefix: '/sessions',
   detail: { tags: ['session'] },
 })
-  .get('/', ({ query }) => Session.list(query), {
+  .get('/', ({ query }) => {
+    const sessions = Session.list(query)
+    // Best-effort: sync titles from remote host for any remote-projected sessions.
+    for (const s of sessions) {
+      if (s.execution.kind === 'remote-host') {
+        void syncRemoteSessionTitle(s.id)
+      }
+    }
+    return sessions
+  }, {
     detail: {
       'summary': 'List sessions',
       'x-cradle-cli': {
@@ -28,6 +38,10 @@ export const session = new Elysia({
       const s = Session.get(params.id)
       if (!s) {
         throw new AppError({ code: 'session_not_found', status: 404, message: 'Session not found' })
+      }
+      // Best-effort: sync title from remote host so the local projection stays fresh.
+      if (isRemoteProjectedSession(params.id)) {
+        void syncRemoteSessionTitle(params.id)
       }
       return s
     },

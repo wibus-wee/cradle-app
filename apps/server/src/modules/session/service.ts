@@ -163,6 +163,13 @@ export function readSessionModelPreference(configJson: string | null | undefined
     : null
 }
 
+export function readSessionProviderPreference(configJson: string | null | undefined): string | null {
+  const config = parseTrustedConfigJson(configJson)
+  return typeof config.requestedProviderTargetId === 'string' && config.requestedProviderTargetId.trim().length > 0
+    ? config.requestedProviderTargetId.trim()
+    : null
+}
+
 export function readSessionThinkingEffortPreference(
   configJson: string | null | undefined,
 ): ChatThinkingEffort | null {
@@ -350,7 +357,7 @@ function toSessionView(
   return {
     ...session,
     execution: readSessionExecutionTarget(session.id),
-    providerTargetId: session.providerTargetId,
+    providerTargetId: session.providerTargetId ?? readSessionProviderPreference(session.configJson),
     modelId,
     thinkingEffort: readSessionThinkingEffortPreference(session.configJson),
     status,
