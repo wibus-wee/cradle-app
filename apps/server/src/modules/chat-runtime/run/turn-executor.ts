@@ -175,16 +175,25 @@ export async function executeRun(
       source: 'normal',
       terminalChunk: finalChunk,
       profile,
-      requiredBookkeeping: async (terminalChunk) => {
-        if (!activeRun.cancelRequested) {
-          deps.finalizeSnapshot(activeRun, terminalChunk, {
-            modelId: actualModelId,
-            diagnostics,
-            profile,
-          })
-        }
-      },
+      // Run snapshots are forensic/diagnostic. Once the durable terminal fact exists,
+      // snapshot failure must not suppress terminal notification or queue/goal handoff.
       bestEffortBookkeeping: async (terminalChunk) => {
+        if (!activeRun.cancelRequested) {
+          try {
+            deps.finalizeSnapshot(activeRun, terminalChunk, {
+              modelId: actualModelId,
+              diagnostics,
+              profile,
+            })
+          }
+          catch (error) {
+            deps.warn('failed to finalize run snapshot after durable terminal', {
+              error,
+              sessionId: activeRun.sessionId,
+              runId: activeRun.runId,
+            })
+          }
+        }
         recordRunUsageAndFailure(
           activeRun,
           terminalChunk,

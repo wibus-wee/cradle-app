@@ -92,7 +92,13 @@ function createDeps(overrides: Partial<TurnExecutorDeps> = {}): TurnExecutorDeps
             ? 'aborted'
             : 'failed'
       await outcome.requiredBookkeeping?.(outcome.terminalChunk)
-      await outcome.bestEffortBookkeeping?.(outcome.terminalChunk)
+      try {
+        await outcome.bestEffortBookkeeping?.(outcome.terminalChunk)
+      }
+      catch (error) {
+        // Mirror production: best-effort failures are observed, not fatal.
+        void error
+      }
       return { durableTerminal: true, terminalChunk: outcome.terminalChunk }
     }),
     recordSnapshotEvent: vi.fn(),
@@ -238,7 +244,7 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
     })
   })
 
-  it('observes required completion bookkeeping rejection', async () => {
+  it('keeps the turn successful when forensic snapshot finalization fails after durable terminal', async () => {
     await withTempDataDir(async () => {
       const sessionId = `session-${randomUUID()}`
       const runId = `run-${randomUUID()}`
@@ -251,13 +257,22 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
         }),
       })
 
-      await expect(executeRun(
+      await executeRun(
         activeRun,
         { message: { id: 'msg-1', role: 'user', parts: [] }, profile: null },
         deps,
-      )).rejects.toThrow(failure)
+      )
 
       expect(deps.completeActiveTurn).toHaveBeenCalledTimes(1)
+      expect(deps.finalizeSnapshot).toHaveBeenCalledTimes(1)
+      expect(deps.warn).toHaveBeenCalledWith(
+        'failed to finalize run snapshot after durable terminal',
+        expect.objectContaining({
+          error: failure,
+          sessionId,
+          runId,
+        }),
+      )
     })
   })
 })

@@ -26,7 +26,11 @@ export interface ActiveTurnOutcome {
   source: ActiveTurnCompletionSource
   terminalChunk: UIMessageChunk
   profile?: ChatRuntimeProfile
-  /** Required work blocks notification and handoff when it rejects. */
+  /**
+   * Optional work that must succeed before notification and handoff.
+   * Do not put forensic/diagnostic work here once a durable terminal exists —
+   * use bestEffortBookkeeping instead (e.g. run-snapshot finalization).
+   */
   requiredBookkeeping?: (terminalChunk: UIMessageChunk) => Promise<void>
   /** Best-effort work is observed and logged, but cannot reopen a durable terminal. */
   bestEffortBookkeeping?: (terminalChunk: UIMessageChunk) => Promise<void> | void

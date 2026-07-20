@@ -183,4 +183,50 @@ describe('active turn completion owner', () => {
     expect(performHandoff).not.toHaveBeenCalled()
     expect(releaseActiveRun).toHaveBeenCalledTimes(1)
   })
+
+  it('still notifies and handoffs when best-effort bookkeeping fails after durable terminal', async () => {
+    const terminalChunk: UIMessageChunk = { type: 'finish', finishReason: 'stop' }
+    const publishTerminalNotification = vi.fn()
+    const performHandoff = vi.fn()
+    const releaseActiveRun = vi.fn()
+    const warn = vi.fn()
+    const controller = createActiveTurnCompletionController({
+      persistTerminalChunk: vi.fn(async () => ({
+        durableTerminal: true,
+        notificationChunk: terminalChunk,
+      })),
+      publishTerminalNotification,
+      recoverTerminalPersistenceFailure: vi.fn(),
+      releaseActiveRun,
+      performHandoff,
+      recordTerminalPersistenceIncident: vi.fn(),
+      warn,
+    })
+
+    const result = await controller.completeActiveTurn(activeRun(), {
+      source: 'normal',
+      terminalChunk,
+      bestEffortBookkeeping: () => Promise.reject(new Error('snapshot finalization failed')),
+      resolveHandoff: () => ({ kind: 'queue' }),
+    })
+
+    expect(result).toEqual({ durableTerminal: true, terminalChunk })
+    expect(warn).toHaveBeenCalledWith(
+      'best-effort chat turn completion bookkeeping failed',
+      expect.objectContaining({
+        source: 'normal',
+        sessionId: 'session-1',
+        runId: 'run-1',
+      }),
+    )
+    expect(publishTerminalNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 'run-1' }),
+      terminalChunk,
+    )
+    expect(releaseActiveRun).toHaveBeenCalledTimes(1)
+    expect(performHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 'run-1' }),
+      { kind: 'queue' },
+    )
+  })
 })
