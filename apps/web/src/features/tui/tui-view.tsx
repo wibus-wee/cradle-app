@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 
+import { getTerminalLifetimeController } from './terminal-lifetime-controller'
 import { tuiRuntimeRegistry } from './tui-runtime-registry'
 
 interface TuiViewProps {
@@ -15,6 +16,7 @@ interface TuiViewProps {
  * The xterm runtime lives in tuiRuntimeRegistry, independently from this React mount.
  * Surface changes park the runtime instead of disposing it, preserving the terminal's
  * renderer, selection, scrollback, socket, and CLI process until the surface is closed.
+ * Process stop is owned by terminal-lifetime-controller on surface dispose.
  */
 export function TuiView({ sessionId, visible = true }: TuiViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -25,8 +27,18 @@ export function TuiView({ sessionId, visible = true }: TuiViewProps) {
     if (!container) {
       return
     }
+    const lifetime = getTerminalLifetimeController()
+    lifetime.register({
+      terminalId: sessionId,
+      adapterKind: 'cli-tui',
+      ownerId: `chat:${sessionId}`,
+    })
+    lifetime.attach(sessionId)
     tuiRuntimeRegistry.attach(sessionId, container, false, setReady)
-    return () => tuiRuntimeRegistry.detach(sessionId, container, setReady)
+    return () => {
+      lifetime.park(sessionId)
+      tuiRuntimeRegistry.detach(sessionId, container, setReady)
+    }
   }, [sessionId])
 
   useLayoutEffect(() => {

@@ -3381,7 +3381,6 @@ export function BrowserPanel({
                 ptyId={activePanelTab.ptyId}
                 cwd={activePanelTab.cwd}
                 visible={activePanelTab.id === resolvedActivePanelTabId}
-                stopOnUnmount={false}
                 onMetadata={metadata => handleTuiMetadata(activePanelTab.id, metadata)}
                 onExited={() => handleTuiExited(activePanelTab.id)}
               />

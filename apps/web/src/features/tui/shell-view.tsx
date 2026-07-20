@@ -2,16 +2,14 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import {
-  deleteTerminalSessionsShellByPtyId,
-  postTerminalSessionsShellStart,
-} from '~/api-gen/sdk.gen'
+import { postTerminalSessionsShellStart } from '~/api-gen/sdk.gen'
 
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
 import { installTerminalAddons } from './terminal-addons'
 import { getTerminalFontFamily } from './terminal-font'
+import { getTerminalLifetimeController } from './terminal-lifetime-controller'
 import type { TerminalMetadata } from './terminal-metadata'
 import { mergeTerminalMetadata, readTerminalMetadata } from './terminal-metadata'
 import { useTerminalPreferencesStore } from './terminal-preferences'
@@ -45,11 +43,9 @@ interface ShellViewProps {
   onExited?: () => void
   /** Called when OSC title/path metadata is observed in the terminal stream. */
   onMetadata?: (metadata: TerminalMetadata) => void
-  /** Whether unmounting this view should stop the backing PTY process. */
-  stopOnUnmount?: boolean
 }
 
-export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, stopOnUnmount = true }: ShellViewProps) {
+export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: ShellViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLPreElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -59,15 +55,13 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
   const onMetadataRef = useRef(onMetadata)
   const visibleRef = useRef(visible)
   const focusFrameRef = useRef<number | null>(null)
-  const stopOnUnmountRef = useRef(stopOnUnmount)
   const ensureShellRunningRef = useRef<(() => void) | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     onExitedRef.current = onExited
     onMetadataRef.current = onMetadata
-    stopOnUnmountRef.current = stopOnUnmount
-  }, [onExited, onMetadata, stopOnUnmount])
+  }, [onExited, onMetadata])
 
   useLayoutEffect(() => {
     visibleRef.current = visible
@@ -248,6 +242,16 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
     // lease expiry / socket death can leave a live tab attached to a dead PTY —
     // those recover via ensureShellRunning when the tab is visible again.
     let intentionalExit = false
+
+    const lifetime = getTerminalLifetimeController()
+    lifetime.register({
+      terminalId: ptyId,
+      adapterKind: 'bottom-panel',
+      ownerId: ptyId.startsWith('terminal:')
+        ? ptyId.slice('terminal:'.length).replace(/:\d+$/, '')
+        : ptyId,
+    })
+    lifetime.attach(ptyId)
 
     const channel = createPtyChannel({
       socketPath: `/terminal-sessions/shell/${encodeURIComponent(ptyId)}/socket`,
@@ -504,11 +508,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata, st
         cancelAnimationFrame(focusFrameRef.current)
         focusFrameRef.current = null
       }
-      if (stopOnUnmountRef.current) {
-        void deleteTerminalSessionsShellByPtyId({
-          path: { ptyId },
-        }).catch(() => {})
-      }
+      getTerminalLifetimeController().park(ptyId)
       el.removeEventListener('pointerdown', onPointerDown)
       channel.close()
       dataDisposable.dispose()

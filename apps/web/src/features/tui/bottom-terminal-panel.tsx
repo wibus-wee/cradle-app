@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 
-import { deleteTerminalSessionsShellByPtyId } from '~/api-gen/sdk.gen'
 import { useBottomPanelVisibility } from '~/components/layout/bottom-panel-visibility'
 import { useLayoutStore } from '~/store/layout'
 
+import { getTerminalLifetimeController } from './terminal-lifetime-controller'
 import type { TerminalMetadata } from './terminal-metadata'
 import { TerminalPaneView } from './terminal-pane-view'
 import type { TerminalPanelSession } from './terminal-panel-store'
@@ -40,8 +40,17 @@ export function BottomTerminalPanel({ ownerId, cwd }: BottomTerminalPanelProps) 
   const sessionsById = new Map(sessions.map(session => [session.id, session]))
 
   function handleRemoveSession(sessionId: string, stopProcess: boolean) {
+    const lifetime = getTerminalLifetimeController()
+    lifetime.register({
+      terminalId: sessionId,
+      adapterKind: 'bottom-panel',
+      ownerId,
+    })
     if (stopProcess) {
-      void deleteTerminalSessionsShellByPtyId({ path: { ptyId: sessionId } }).catch(() => {})
+      void lifetime.stop(sessionId).catch(() => {})
+    }
+    else {
+      lifetime.recordExited(sessionId)
     }
     const remainingCount = removeSession(ownerId, sessionId)
     if (remainingCount === 0) {

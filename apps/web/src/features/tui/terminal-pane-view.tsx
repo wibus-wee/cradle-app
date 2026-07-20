@@ -179,7 +179,6 @@ function TerminalPane({
                 ptyId={session.id}
                 cwd={session.cwd}
                 visible={panelVisible && selected}
-                stopOnUnmount={false}
                 onMetadata={metadata => onMetadata(session.id, metadata)}
                 onExited={() => onExited(session.id)}
               />

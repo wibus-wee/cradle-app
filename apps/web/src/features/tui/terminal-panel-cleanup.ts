@@ -1,14 +1,17 @@
-import { deleteTerminalSessionsShellByPtyId } from '~/api-gen/sdk.gen'
-
+import { getTerminalLifetimeController } from './terminal-lifetime-controller'
 import { useTerminalPanelStore } from './terminal-panel-store'
 
 export function stopTerminalPanelOwner(ownerId: string): void {
   const sessions = useTerminalPanelStore.getState().removeOwner(ownerId)
+  const lifetime = getTerminalLifetimeController()
 
   for (const session of sessions) {
-    void deleteTerminalSessionsShellByPtyId({
-      path: { ptyId: session.id },
-    }).catch(() => {})
+    lifetime.register({
+      terminalId: session.id,
+      adapterKind: 'bottom-panel',
+      ownerId,
+    })
+    void lifetime.stop(session.id).catch(() => {})
   }
 }
 

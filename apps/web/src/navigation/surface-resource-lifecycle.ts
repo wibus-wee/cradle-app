@@ -1,8 +1,8 @@
-import { deleteTerminalSessionsShellByPtyId } from '~/api-gen/sdk.gen'
 import {
   markComposerDraftSurfaceDiscarded,
   queueServerComposerDraftDelete,
 } from '~/features/chat/commands/composer-draft-command'
+import { getTerminalLifetimeController } from '~/features/tui/terminal-lifetime-controller'
 import { stopTerminalPanelOwners } from '~/features/tui/terminal-panel-cleanup'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { useComposerDraftStore } from '~/store/composer-draft'
@@ -81,11 +81,15 @@ export function selectClosedChatSessionIds(
 }
 
 function disposeTuiRuntimes(sessionIds: string[]): void {
-  void import('~/features/tui/tui-runtime-registry').then(({ tuiRuntimeRegistry }) => {
-    for (const sessionId of sessionIds) {
-      tuiRuntimeRegistry.dispose(sessionId)
-    }
-  })
+  const lifetime = getTerminalLifetimeController()
+  for (const sessionId of sessionIds) {
+    lifetime.register({
+      terminalId: sessionId,
+      adapterKind: 'cli-tui',
+      ownerId: `chat:${sessionId}`,
+    })
+    void lifetime.stop(sessionId).catch(() => {})
+  }
 }
 
 function releaseBrowserPanelOwners(ownerIds: string[]): void {
@@ -123,10 +127,14 @@ export function selectClosedBrowserPanelTuiPtyIds(
 }
 
 function stopShellPtyIds(ptyIds: Iterable<string>): void {
+  const lifetime = getTerminalLifetimeController()
   for (const ptyId of ptyIds) {
-    void deleteTerminalSessionsShellByPtyId({
-      path: { ptyId },
-    }).catch(() => {})
+    lifetime.register({
+      terminalId: ptyId,
+      adapterKind: 'browser-tui',
+      ownerId: 'browser-panel',
+    })
+    void lifetime.stop(ptyId).catch(() => {})
   }
 }
 
