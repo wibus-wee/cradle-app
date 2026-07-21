@@ -40,6 +40,7 @@ Each capability is documented in its own file following the per-capability recon
 | 8 | providers | ✅ | Provider health check and model metadata |
 | 9 | kanban | ✅ | Boards, statuses, issue core loop, comments |
 | 10 | search | ✅ | Full-text thread search (FTS5 + jieba) |
+| 10b | recall | 📝 | Agent execution memory — CodeAct `recall_query` (Plan 061 Phase A spec) |
 | 11 | usage-tracking | ✅ | Token usage logs, daily/summary aggregation |
 
 ### Tier 3 — Extended Capabilities
