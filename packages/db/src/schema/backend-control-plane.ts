@@ -22,7 +22,7 @@ export const backendSessionBindings = sqliteTable(
     backendStateSnapshot: text('backend_state_snapshot'),
     requestedModelId: text('requested_model_id'),
     usageReconciliationStatus: text('usage_reconciliation_status', {
-      enum: ['pending', 'completed', 'blocked'],
+      enum: ['pending', 'completed', 'blocked', 'unavailable'],
     }).notNull().default('pending'),
     usageReconciliationAttemptedAt: int('usage_reconciliation_attempted_at'),
     ...timestamps(),

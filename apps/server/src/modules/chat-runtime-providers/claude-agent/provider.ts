@@ -71,8 +71,8 @@ import {
   mergeRuntimeSettings,
 } from '../../chat-runtime/runtime-settings'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../../chat-runtime/stream-trace'
-import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { readTrustedClaudeAgentConfig } from '../../provider-contracts/provider-base'
+import { recordRuntimeUsageEvent } from '../../usage/ingest'
 import { AsyncEventQueue } from '../async-event-queue'
 import { createBoundedTextCollector } from '../bounded-text-collector'
 import { providerChunk } from '../kit/chunk-mapper'
@@ -159,6 +159,7 @@ import type {
   ClaudeAgentSessionInfo,
   ClaudeTitleGenerationThinkingEffort,
 } from './types'
+import { projectClaudeAssistantUsageEvent } from './usage-event-projector'
 
 type ActiveClaudeNativeFollowUp = {
   queueItemId: string
@@ -199,6 +200,7 @@ type ActiveClaudeQuery = {
   providerThreadTurns: Map<string, ActiveClaudeProviderThreadTurn>
   completedProviderThreadParentOutputIds: Set<string>
   onProviderSyntheticTurnEvent: StreamTurnInput['onProviderSyntheticTurnEvent'] | null
+  onUsageEvent: StreamTurnInput['onUsageEvent'] | null
   /** Follow-ups already pushed into the SDK input stream, waiting for a Cradle run to adopt. */
   nativeFollowUps: Map<string, ActiveClaudeNativeFollowUp>
   /** SDK messages received after a turn `result` while a native follow-up is waiting to be adopted. */
@@ -303,6 +305,7 @@ export function createClaudeAgentProvider(ctx: ProviderContext): ChatRuntime {
 
 export class ClaudeAgentProvider implements ChatRuntime {
   readonly runtimeKind = CLAUDE_AGENT_RUNTIME_KIND
+  readonly usageAccounting = 'provider-events' as const
   readonly metadata = CLAUDE_AGENT_RUNTIME_METADATA
   readonly capabilities = CLAUDE_AGENT_RUNTIME_CAPABILITIES
 
@@ -311,17 +314,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
   private readonly lastContextUsageBySession = new Map<string, RuntimeContextUsage>()
   private readonly lastContextUsageSampledAtBySession = new Map<string, number>()
   private readonly activePermissionModesBySession = new Map<string, Options['permissionMode']>()
-  private _lastUsage: TokenUsage | null = null
-  private _totalUsage: TokenUsage | null = null
-
-  get lastUsage(): TokenUsage | null {
-    return this._lastUsage
-  }
-
-  get totalUsage(): TokenUsage | null {
-    return this._totalUsage
-  }
-
   constructor(private readonly deps: ClaudeAgentProviderDeps) {}
 
   private releaseQuery(sessionId: string, entry: ActiveClaudeQuery): void {
@@ -610,6 +602,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         providerThreadTurns: new Map(),
         completedProviderThreadParentOutputIds: new Set(),
         onProviderSyntheticTurnEvent: null,
+        onUsageEvent: null,
         nativeFollowUps: new Map(),
         preAdoptBuffer: [],
         closed: false,
@@ -668,11 +661,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
       activeEntry.runtimeSession = input.runtimeSession
       resetClaudeAgentChunkMapperForTurn(activeEntry.mapperState)
     }
-    this._lastUsage = null
-    this._totalUsage = null
     const traceMessageId = input.responseMessageId ?? input.message.id
 
     activeEntry.onProviderSyntheticTurnEvent = input.onProviderSyntheticTurnEvent ?? null
+    activeEntry.onUsageEvent = input.onUsageEvent ?? null
     clearClaudeAgentCapturedPlan(input.runtimeSession)
 
     // Langfuse tracing via @langfuse/tracing SDK
@@ -711,13 +703,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
  else {
         generation.update({
           output: outputTextCollector.read(),
-          ...(this._lastUsage && {
-            usageDetails: {
-              input: this._lastUsage.promptTokens,
-              output: this._lastUsage.completionTokens,
-              total: this._lastUsage.totalTokens,
-            },
-          }),
         })
       }
       generation.end()
@@ -905,6 +890,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
 
     const result = await mapClaudeAgentMessageToChunks(message, entry.mapperState)
+    if (turn) {
+      await this.updateClaudeTurnProviderSession(entry, turn, result.sessionId)
+    }
+    await this.emitClaudeAssistantUsageEvent(entry, message, turn?.effectiveModel)
     for (const plan of result.capturedPlans) {
       writeClaudeAgentCapturedPlan(entry.runtimeSession, plan)
     }
@@ -954,8 +943,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
 
     if (turn) {
-      await this.updateClaudeTurnProviderSession(entry, turn, result.sessionId)
-      this.updateClaudeTurnUsage(result.usage)
       for (const chunk of result.chunks) {
         if (chunk.type === 'text-delta' && 'delta' in chunk) {
           turn.outputTextCollector.append((chunk as { delta: string }).delta)
@@ -1001,6 +988,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
       message,
       providerThreadTurn.mapperState,
     )
+    await this.updateClaudeTurnProviderSession(entry, turn, result.sessionId)
+    await this.emitClaudeAssistantUsageEvent(entry, message, turn.effectiveModel)
     for (const crewCall of result.capturedCrewCalls) {
       writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
       if (crewCall.workflow) {
@@ -1010,7 +999,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
     for (const taskActivity of result.capturedTaskActivity) {
       writeClaudeAgentTaskActivity(entry.runtimeSession, taskActivity)
     }
-    this.updateClaudeTurnUsage(result.usage)
     this.publishClaudeProviderThreadEvent(turn, providerThreadTurn, result.chunks)
     if (hasTerminalProviderThreadChunk(result.chunks)) {
       this.emitClaudeProviderThreadParentOutput(entry, turn, providerThreadId, result.chunks)
@@ -1385,26 +1373,64 @@ export class ClaudeAgentProvider implements ChatRuntime {
     })
   }
 
-  private updateClaudeTurnUsage(usage: TokenUsage | null): void {
-    if (!usage) {
-      return
+  private async emitClaudeAssistantUsageEvent(
+    entry: ActiveClaudeQuery,
+    message: SDKMessage,
+    fallbackModelId: string | null | undefined,
+  ): Promise<void> {
+    let event: ReturnType<typeof projectClaudeAssistantUsageEvent>
+    try {
+      event = projectClaudeAssistantUsageEvent({
+        message,
+        fallbackModelId,
+      })
     }
-    this._lastUsage = usage
-    if (this._totalUsage) {
-      this._totalUsage = {
-        promptTokens: this._totalUsage.promptTokens + usage.promptTokens,
-        completionTokens: this._totalUsage.completionTokens + usage.completionTokens,
-        totalTokens: this._totalUsage.totalTokens + usage.totalTokens,
-        cachedInputTokens:
-          (this._totalUsage.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0),
-        cacheWriteInputTokens:
-          (this._totalUsage.cacheWriteInputTokens ?? 0) + (usage.cacheWriteInputTokens ?? 0),
-        reasoningOutputTokens:
-          (this._totalUsage.reasoningOutputTokens ?? 0) + (usage.reasoningOutputTokens ?? 0),
+    catch (error) {
+      if (entry.currentTurn) {
+        throw error
       }
+      this.deps.logger?.warn?.('Claude Agent ignored malformed late assistant usage event', {
+        error,
+        chatSessionId: entry.runtimeSession.chatSessionId,
+      })
       return
     }
-    this._totalUsage = { ...usage }
+    if (!event) {
+      return
+    }
+    if (entry.currentTurn && entry.onUsageEvent) {
+      await entry.onUsageEvent(event)
+      return
+    }
+
+    const providerSessionId = entry.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      this.deps.logger?.warn?.('Claude Agent late assistant usage event arrived before provider session binding', {
+        chatSessionId: entry.runtimeSession.chatSessionId,
+        providerThreadId: event.providerThreadId,
+        providerTurnId: event.providerTurnId,
+      })
+      return
+    }
+    try {
+      recordRuntimeUsageEvent({
+        event,
+        sessionId: entry.runtimeSession.chatSessionId,
+        runId: null,
+        messageId: null,
+        providerTargetId: entry.providerTargetId,
+        providerSessionId,
+      })
+    }
+    catch (error) {
+      this.deps.logger?.warn?.('Claude Agent failed to persist late assistant usage event', {
+        error,
+        chatSessionId: entry.runtimeSession.chatSessionId,
+        providerSessionId,
+        providerThreadId: event.providerThreadId,
+        providerTurnId: event.providerTurnId,
+      })
+    }
   }
 
   private closeSessionQuery(sessionId: string, entry: ActiveClaudeQuery): void {
