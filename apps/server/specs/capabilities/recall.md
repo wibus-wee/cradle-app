@@ -98,5 +98,5 @@ Search remains human-facing facade until unified; Recall owns **agent CodeAct co
 ## Related Documents
 
 - Plan: `plans/061-cradle-recall-agent-cognition-stack.md`
-- Skill: `.claude/skills/recall/SKILL.md`
-- Agent design: `.claude/skills/agent-design/SKILL.md`
+- Retrieval contract (draft, pre-skill): `plans/061-recall-retrieval-contract.md`
+- Agent design: `.agents/skills/agent-design/SKILL.md`

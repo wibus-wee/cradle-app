@@ -5,7 +5,7 @@
 > Follow milestones in order; honor STOP conditions. When Phase A is merged, update
 > the status row in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat HEAD -- plans/061-cradle-recall-agent-cognition-stack.md apps/server/specs/capabilities/recall.md .claude/skills/recall`
+> **Drift check (run first)**: `git diff --stat HEAD -- plans/061-cradle-recall-agent-cognition-stack.md plans/061-recall-retrieval-contract.md apps/server/specs/capabilities/recall.md`
 > Mismatch between this plan and live docs is a STOP condition until reconciled.
 
 ## Status
@@ -261,20 +261,22 @@ same assumption as Obelisk.
 Deliverables:
 
 - [ ] This plan (`plans/061-cradle-recall-agent-cognition-stack.md`)
+- [ ] Retrieval contract draft (`plans/061-recall-retrieval-contract.md`) — **not** a skill yet
 - [ ] Capability spec (`apps/server/specs/capabilities/recall.md`)
-- [ ] Agent skill (`.claude/skills/recall/SKILL.md` + `references/retrieval-contract.md`)
 - [ ] Row in `plans/README.md`
+
+**Not in Phase A:** `.agents/skills/recall/` — skill installs with Phase B runtime.
 
 **Verification:** Docs review only; no server/web code required.
 
 ### Phase B — L3 `recall_query` MVP
 
-**Goal:** In-chat tool executes read-only sandbox; skill teaches usage.
+**Goal:** In-chat tool executes read-only sandbox; **then** add agent skill.
 
 - New module `recall` (or extend `search` with clear L3 owner — decision at Phase B start)
 - Chat runtime registers `recall_query` tool for agent-capable runtimes
 - Reuse/adapt `javascript-eval` process sandbox with recall helpers wired to L1 reads
-- Skill triggers on explicit user/agent recall intent
+- Promote `plans/061-recall-retrieval-contract.md` → `.agents/skills/recall/SKILL.md`
 
 **Depends on:** Phase A merged; 050 recommended for session scope accuracy.
 
