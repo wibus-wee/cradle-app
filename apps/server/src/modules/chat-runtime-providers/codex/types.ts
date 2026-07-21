@@ -44,6 +44,8 @@ export interface CodexProviderConfig {
 export type CodexProviderDeps = ProviderContext & CodexProviderConfig
 
 export interface CodexAppServerClientLike {
+  /** Returns the PID of the underlying codex-app-server process, if known. */
+  readonly pid: number | null
   initialize: () => Promise<void>
   request: (method: string, params?: unknown) => Promise<unknown>
   nextNotification: (signal?: AbortSignal) => Promise<CodexAppServerMessage | null>

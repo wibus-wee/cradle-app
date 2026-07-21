@@ -1,9 +1,11 @@
 import type { Command } from 'commander'
 
 import { register as registerAcpAgentCancelInstall } from './acp/agent/cancel-install'
+import { register as registerAcpAgentCreate } from './acp/agent/create'
 import { register as registerAcpAgentGet } from './acp/agent/get'
 import { register as registerAcpAgentInstall } from './acp/agent/install'
 import { register as registerAcpAgentInstallPath } from './acp/agent/install-path'
+import { register as registerAcpAgentLaunchConfig } from './acp/agent/launch-config'
 import { register as registerAcpAgentList } from './acp/agent/list'
 import { register as registerAcpAgentUninstall } from './acp/agent/uninstall'
 import { register as registerAcpAudit } from './acp/audit'
@@ -113,6 +115,7 @@ import { register as registerChronicleSpeakerProfilesList } from './chronicle/sp
 import { register as registerChronicleSpeakerProfilesUpsert } from './chronicle/speaker-profiles/upsert'
 import { register as registerChronicleStatus } from './chronicle/status'
 import { register as registerChronicleTimeline } from './chronicle/timeline'
+import { register as registerCodexAppServerResources } from './codex/app-server/resources'
 import { register as registerDownloadCenterCancel } from './download-center/cancel'
 import { register as registerDownloadCenterGet } from './download-center/get'
 import { register as registerDownloadCenterList } from './download-center/list'
@@ -164,6 +167,7 @@ import { register as registerIssueUpdate } from './issue/update'
 import { register as registerIssueAgentSessionActivities } from './issue-agent-session/activities'
 import { register as registerIssueAgentSessionRerun } from './issue-agent-session/rerun'
 import { register as registerIssueAgentSessionStop } from './issue-agent-session/stop'
+import { register as registerKimiServerResources } from './kimi/server/resources'
 import { register as registerLinkPreviewGet } from './link-preview/get'
 import { register as registerManagedResourcesGet } from './managed-resources/get'
 import { register as registerManagedResourcesInstall } from './managed-resources/install'
@@ -279,6 +283,7 @@ import { register as registerUsageCostSummary } from './usage/cost/summary'
 import { register as registerUsageDaily } from './usage/daily'
 import { register as registerUsageDailyByModel } from './usage/daily-by-model'
 import { register as registerUsagePatternsHourly } from './usage/patterns/hourly'
+import { register as registerUsageReconcileClaude } from './usage/reconcile/claude'
 import { register as registerUsageSession } from './usage/session'
 import { register as registerUsageSessionsRecent } from './usage/sessions/recent'
 import { register as registerUsageStats } from './usage/stats'
@@ -351,9 +356,11 @@ import { register as registerWorkspaceWorktreeList } from './workspace/worktree/
 
 export function registerGeneratedCommands(program: Command): void {
   registerAcpAgentCancelInstall(program)
+  registerAcpAgentCreate(program)
   registerAcpAgentGet(program)
   registerAcpAgentInstall(program)
   registerAcpAgentInstallPath(program)
+  registerAcpAgentLaunchConfig(program)
   registerAcpAgentList(program)
   registerAcpAgentUninstall(program)
   registerAcpAudit(program)
@@ -463,6 +470,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerChronicleSpeakerProfilesUpsert(program)
   registerChronicleStatus(program)
   registerChronicleTimeline(program)
+  registerCodexAppServerResources(program)
   registerDownloadCenterCancel(program)
   registerDownloadCenterGet(program)
   registerDownloadCenterList(program)
@@ -514,6 +522,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerIssueAgentSessionActivities(program)
   registerIssueAgentSessionRerun(program)
   registerIssueAgentSessionStop(program)
+  registerKimiServerResources(program)
   registerLinkPreviewGet(program)
   registerManagedResourcesGet(program)
   registerManagedResourcesInstall(program)
@@ -629,6 +638,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerUsageDaily(program)
   registerUsageDailyByModel(program)
   registerUsagePatternsHourly(program)
+  registerUsageReconcileClaude(program)
   registerUsageSession(program)
   registerUsageSessionsRecent(program)
   registerUsageStats(program)

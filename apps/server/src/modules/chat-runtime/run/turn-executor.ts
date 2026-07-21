@@ -299,7 +299,7 @@ async function pumpRuntimeStream(
         const providerSessionId = activeRun.runtimeSession.providerSessionId
         if (!providerSessionId) {
           recordUsageIngestionFailure(activeRun, 'Runtime usage event arrived before provider session identity was available.')
-          throw new Error('Runtime usage event requires a provider session identity.')
+          return
         }
         try {
           const result = recordRuntimeUsageEvent({
@@ -317,7 +317,6 @@ async function pumpRuntimeStream(
         }
         catch (error) {
           recordUsageIngestionFailure(activeRun, error instanceof Error ? error.message : 'Runtime usage ingestion failed.')
-          throw error
         }
       },
       onProviderThreadEvent: event =>
@@ -386,7 +385,6 @@ async function pumpRuntimeStream(
       && !activeRun.terminalStatus
     ) {
       recordUsageIngestionFailure(activeRun, 'Provider-event accounting completed without a usage event.')
-      throw new Error('Provider-event accounting completed without a usage event.')
     }
     // If `activeRun.terminalStatus` is already set here, the loop above hit
     // `if (activeRun.terminalStatus) break` before the runtime produced (or

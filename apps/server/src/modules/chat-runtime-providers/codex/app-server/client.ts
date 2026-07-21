@@ -88,6 +88,11 @@ export class CodexAppServerClient {
   private closed = false
   private stderrText = ''
 
+  /** Returns the PID of the underlying codex-app-server process, if known. */
+  get pid(): number | null {
+    return this.child.targetPid ?? this.child.pid ?? null
+  }
+
   constructor(options: CodexAppServerClientOptions = {}) {
     this.serverRequestHandler = options.serverRequestHandler
     this.exposeServerRequestsAsNotifications = options.exposeServerRequestsAsNotifications ?? true

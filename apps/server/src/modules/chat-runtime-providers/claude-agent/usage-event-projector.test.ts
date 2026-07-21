@@ -87,7 +87,7 @@ describe('projectClaudeAssistantUsageEvent', () => {
     })).toBeNull()
   })
 
-  it('rejects missing immutable identity and nonpositive totals', () => {
+  it('rejects missing immutable identity', () => {
     expect(() => projectClaudeAssistantUsageEvent({
       message: {
         type: 'assistant',
@@ -96,14 +96,16 @@ describe('projectClaudeAssistantUsageEvent', () => {
       } as unknown as SDKMessage,
       fallbackModelId: 'claude-sonnet-5',
     })).toThrow(ClaudeUsageEventProjectionError)
+  })
 
-    expect(() => projectClaudeAssistantUsageEvent({
+  it('ignores a zero-token assistant snapshot while usage is pending', () => {
+    expect(projectClaudeAssistantUsageEvent({
       message: {
         type: 'assistant',
         session_id: 'session-root',
         message: { id: 'msg-empty', usage: { input_tokens: 0, output_tokens: 0 } },
       } as unknown as SDKMessage,
       fallbackModelId: 'claude-sonnet-5',
-    })).toThrow('positive model-call total')
+    })).toBeNull()
   })
 })

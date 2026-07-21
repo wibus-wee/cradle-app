@@ -43,15 +43,17 @@ export function projectClaudeAssistantUsageEvent(input: {
   if (!usage) {
     return null
   }
+
+  const tokenUsage = toTokenUsage(usage)
+  // Claude re-emits an assistant message while its usage is still being
+  // finalized. A zero-token snapshot is not a billable model call.
+  if (tokenUsage.totalTokens <= 0) {
+    return null
+  }
   if (!providerSessionId || !providerTurnId || !modelId) {
     throw new ClaudeUsageEventProjectionError(
       'Claude assistant usage is missing provider session, message, or model identity.',
     )
-  }
-
-  const tokenUsage = toTokenUsage(usage)
-  if (tokenUsage.totalTokens <= 0) {
-    throw new ClaudeUsageEventProjectionError('Claude assistant usage does not contain a positive model-call total.')
   }
 
   const providerThreadId = message.parent_tool_use_id?.trim() || providerSessionId

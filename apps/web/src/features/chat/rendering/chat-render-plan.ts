@@ -391,6 +391,10 @@ export function splitExecutionPhase(
       candidate => !shouldKeepToolWithFinalReply(candidate, options),
     )
 
+    if (hasVisibleAssistantOutput(executionItems)) {
+      return null
+    }
+
     return {
       executionItems,
       finalItems: [...retainedFinalItems, ...items.slice(index)],
@@ -424,6 +428,10 @@ export function splitSegmentExecutionPhase(
       candidate => !shouldKeepToolWithFinalReply(candidate, options),
     )
 
+    if (hasVisibleAssistantOutput(executionItems)) {
+      return null
+    }
+
     return {
       executionItems,
       finalItems: [...retainedFinalItems, ...items.slice(index)],
@@ -431,6 +439,18 @@ export function splitSegmentExecutionPhase(
   }
 
   return null
+}
+
+function hasVisibleAssistantOutput(items: Array<ChatRenderItem | ChatRenderSegment>): boolean {
+  return items.some((item) => {
+    if (item.kind === 'reasoning') {
+      return true
+    }
+    if (item.kind !== 'text') {
+      return false
+    }
+    return 'hasText' in item ? item.hasText : item.text.trim().length > 0
+  })
 }
 
 function isExecutionPhaseToolItem(

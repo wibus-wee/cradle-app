@@ -50,6 +50,13 @@ export interface OpencodeServerMetricSnapshot {
   cpuPercent: number | null
 }
 
+export interface RuntimeProcessMetricSnapshot {
+  running: boolean
+  pid: number | null
+  rssMB: number | null
+  cpuPercent: number | null
+}
+
 export interface ObservabilityMetricSnapshot {
   queueDepth: number
   recentEvents: number
@@ -75,6 +82,8 @@ let providerRuntimeSnapshot: ProviderRuntimeMetricSnapshot | null = null
 let ptySnapshot: PtyMetricSnapshot | null = null
 let chronicleSnapshot: ChronicleMetricSnapshot | null = null
 let opencodeServerSnapshot: OpencodeServerMetricSnapshot | null = null
+let kimiServerSnapshot: RuntimeProcessMetricSnapshot | null = null
+let codexAppServerSnapshot: RuntimeProcessMetricSnapshot | null = null
 let observabilitySnapshot: ObservabilityMetricSnapshot | null = null
 let desktopSnapshot: DesktopMetricSnapshot | null = null
 
@@ -281,6 +290,50 @@ export function initializeCradleMetrics(): void {
     }
   })
 
+  const kimiRssGauge = meter.createObservableGauge('cradle_kimi_server_rss_bytes', {
+    description: 'Kimi web host process RSS in bytes.',
+  })
+  kimiRssGauge.addCallback((result) => {
+    if (kimiServerSnapshot?.rssMB !== null && kimiServerSnapshot?.rssMB !== undefined) {
+      result.observe(kimiServerSnapshot.rssMB * 1024 * 1024, { process: 'kimi-server' })
+    }
+  })
+
+  const kimiStateGauge = meter.createObservableGauge('cradle_kimi_server_state', {
+    description: 'Kimi web host running state and CPU percent.',
+  })
+  kimiStateGauge.addCallback((result) => {
+    if (!kimiServerSnapshot) {
+      return
+    }
+    result.observe(kimiServerSnapshot.running ? 1 : 0, { kind: 'running' })
+    if (kimiServerSnapshot.cpuPercent !== null) {
+      result.observe(kimiServerSnapshot.cpuPercent, { kind: 'cpu_percent' })
+    }
+  })
+
+  const codexAppServerRssGauge = meter.createObservableGauge('cradle_codex_app_server_rss_bytes', {
+    description: 'Codex app-server process RSS in bytes.',
+  })
+  codexAppServerRssGauge.addCallback((result) => {
+    if (codexAppServerSnapshot?.rssMB !== null && codexAppServerSnapshot?.rssMB !== undefined) {
+      result.observe(codexAppServerSnapshot.rssMB * 1024 * 1024, { process: 'codex-app-server' })
+    }
+  })
+
+  const codexAppServerStateGauge = meter.createObservableGauge('cradle_codex_app_server_state', {
+    description: 'Codex app-server running state and CPU percent.',
+  })
+  codexAppServerStateGauge.addCallback((result) => {
+    if (!codexAppServerSnapshot) {
+      return
+    }
+    result.observe(codexAppServerSnapshot.running ? 1 : 0, { kind: 'running' })
+    if (codexAppServerSnapshot.cpuPercent !== null) {
+      result.observe(codexAppServerSnapshot.cpuPercent, { kind: 'cpu_percent' })
+    }
+  })
+
   const observabilityQueueGauge = meter.createObservableGauge('cradle_observability_queue_depth', {
     description: 'Current pending observability event queue depth.',
   })
@@ -400,6 +453,14 @@ export function updateChronicleMetrics(snapshot: ChronicleMetricSnapshot): void 
 
 export function updateOpencodeServerMetrics(snapshot: OpencodeServerMetricSnapshot): void {
   opencodeServerSnapshot = snapshot
+}
+
+export function updateKimiServerMetrics(snapshot: RuntimeProcessMetricSnapshot): void {
+  kimiServerSnapshot = snapshot
+}
+
+export function updateCodexAppServerMetrics(snapshot: RuntimeProcessMetricSnapshot): void {
+  codexAppServerSnapshot = snapshot
 }
 
 export function updateObservabilityMetrics(snapshot: ObservabilityMetricSnapshot): void {

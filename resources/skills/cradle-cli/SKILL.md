@@ -321,19 +321,21 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 
 | Module | Commands | Scope | Manual |
 | --- | ---: | --- | --- |
-| `acp` | 9 | Manage ACP agent installation and registry state. | `cradle man acp` |
+| `acp` | 11 | Manage ACP agent installation and registry state. | `cradle man acp` |
 | `agent` | 5 | Manage Cradle agent identities. | `cradle man agent` |
 | `automation` | 16 | Manage scheduled automations, runs, and artifacts. | `cradle man automation` |
 | `background-job` | 3 | Generated Cradle CLI module. | `cradle man background-job` |
 | `board` | 4 | Manage Kanban boards. | `cradle man board` |
 | `chat` | 20 | Control chat runtime commands. | `cradle man chat` |
 | `chronicle` | 56 | Generated Cradle CLI module. | `cradle man chronicle` |
+| `codex` | 1 | Generated Cradle CLI module. | `cradle man codex` |
 | `download-center` | 3 | Generated Cradle CLI module. | `cradle man download-center` |
 | `external-issue-source` | 9 | Generated Cradle CLI module. | `cradle man external-issue-source` |
 | `external-session-import` | 5 | Generated Cradle CLI module. | `cradle man external-session-import` |
 | `health` | 1 | Check server health. | `cradle man health` |
 | `issue` | 30 | Manage Kanban issues, comments, relations, delegation, and context refs. | `cradle man issue` |
 | `issue-agent-session` | 3 | Inspect and control issue agent sessions. | `cradle man issue-agent-session` |
+| `kimi` | 1 | Generated Cradle CLI module. | `cradle man kimi` |
 | `link-preview` | 1 | Generated Cradle CLI module. | `cradle man link-preview` |
 | `managed-resources` | 5 | Generated Cradle CLI module. | `cradle man managed-resources` |
 | `observability` | 5 | Inspect local observability events, incidents, and exports. | `cradle man observability` |
@@ -351,7 +353,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `session` | 27 | Manage chat sessions and session links. | `cradle man session` |
 | `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
-| `usage` | 10 | Inspect usage and cost data. | `cradle man usage` |
+| `usage` | 11 | Inspect usage and cost data. | `cradle man usage` |
 | `work` | 7 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
 | `workspace` | 54 | Manage workspaces, files, and git helpers. | `cradle man workspace` |

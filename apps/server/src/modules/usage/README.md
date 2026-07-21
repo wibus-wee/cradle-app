@@ -2,7 +2,7 @@
 
 Provides read-model analytics for `usage_logs` including daily totals, hourly patterns, dashboard summary, streak stats, per-session totals, recent session feed rows, and cost summaries.
 Token and cost breakdowns use `sessions.agentId` for Agent attribution and `usage_logs.providerTargetId` for provider-target attribution.
-Route metadata includes `x-cradle-cli` descriptors for generated CLI commands.
+Route metadata includes `x-cradle-cli` descriptors for generated CLI commands. `POST /usage/reconcile/claude` is an explicit repair operation for completed Claude Agent bindings: it rereads only Cradle-owned Claude transcripts and upserts deterministic message usage events. It does not run automatically, touch pending scheduler work, or retry blocked bindings.
 
 `usage_logs` is the single Cradle-owned usage fact ledger. Codex writes one deterministic row per native model-call checkpoint through `provider-events` accounting; each row carries the Cradle session, root provider session, actual provider thread/turn, model, delta usage, cumulative provider checkpoint, and event timestamp. Codex rollout reconciliation starts only from durable Cradle Codex bindings and reads only the dedicated Cradle Codex runtime home, so global `~/.codex` sessions and other local provider archives are outside this module's authority. Existing runtimes that have not exposed equivalent per-call events continue to write one `run-summary` row.
 

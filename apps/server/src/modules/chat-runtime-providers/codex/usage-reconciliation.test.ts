@@ -290,6 +290,7 @@ describe('codex usage reconciliation', () => {
 
 function fakeClient(root: Record<string, unknown>, descendants: Array<Record<string, unknown>> = []): CodexAppServerClientLike {
   return {
+    pid: null,
     initialize: vi.fn(async () => undefined),
     close: vi.fn(async () => undefined),
     nextNotification: vi.fn(async () => null),

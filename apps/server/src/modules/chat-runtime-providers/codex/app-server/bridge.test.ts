@@ -11,6 +11,7 @@ afterEach(() => {
 })
 
 class FakeBridgeAppServerClient {
+  readonly pid = null
   readonly requests: Array<{ method: string, params?: unknown }> = []
   readonly skillExtraRootsRequests: unknown[] = []
   readonly unsupportedMethods = new Set<string>()

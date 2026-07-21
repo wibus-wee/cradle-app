@@ -31,6 +31,7 @@ afterEach(() => {
 })
 
 class FakeCodexAppServerClient {
+  readonly pid = null
   readonly requests: Array<{ method: string, params?: unknown }> = []
   readonly skillExtraRootsRequests: unknown[] = []
   options: CodexAppServerClientOptions

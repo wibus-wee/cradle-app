@@ -95,6 +95,28 @@ describe('chat streaming handler store boundary', () => {
     expect(settledEvents).toEqual([])
   })
 
+  it('keeps streaming output when the server assigns the message id before a start chunk', async () => {
+    const handler = new ChatStreamingHandler('session-1', 'assistant-local', 0)
+    handler.start(new AbortController())
+    handler.adoptServerMessageId('assistant-server')
+
+    await handler.consume(createChunkStream([
+      { type: 'text-start', id: 'text-1' },
+      { type: 'text-delta', id: 'text-1', delta: 'Hello' },
+    ]))
+
+    const messages = chatSelectors.messages('session-1')(useChatStore.getState())
+    expect(messages).toEqual([expect.objectContaining({
+      id: 'assistant-server',
+      role: 'assistant',
+      parts: [expect.objectContaining({ type: 'text', text: 'Hello' })],
+    })])
+    expect(useChatStore.getState().streamLeaseMap.get('assistant-server')).toMatchObject({
+      sessionId: 'session-1',
+      source: 'local',
+    })
+  })
+
   it('emits settled events for the default main chat store path', () => {
     const settledEvents: unknown[] = []
     const unsubscribe = onChatRunSettled(event => settledEvents.push(event))

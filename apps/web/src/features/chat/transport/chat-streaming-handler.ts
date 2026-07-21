@@ -86,6 +86,13 @@ export class ChatStreamingHandler {
     this.analyticsCorrelation = correlation ?? undefined
   }
 
+  adoptServerMessageId(messageId: string | undefined): void {
+    if (!messageId || this.mode !== 'local') {
+      return
+    }
+    this.activateServerMessage(messageId)
+  }
+
   async consume(stream: ReadableStream<ChatStreamChunk>): Promise<void> {
     const initialMessage = this.useStoredMessageSnapshot
       ? cloneMessageForStreamReader(

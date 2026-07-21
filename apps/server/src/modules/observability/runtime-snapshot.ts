@@ -1,7 +1,9 @@
 import {
   updateChatRuntimeMetrics,
   updateChronicleMetrics,
+  updateCodexAppServerMetrics,
   updateDesktopMetrics,
+  updateKimiServerMetrics,
   updateObservabilityMetrics,
   updateOpencodeServerMetrics,
   updateProviderRuntimeMetrics,
@@ -9,6 +11,8 @@ import {
   updateServerProcessMetrics,
 } from '../../telemetry/metrics'
 import * as ChatRuntime from '../chat-runtime/runtime'
+import { getCodexAppServerResources } from '../chat-runtime-providers/codex/app-server/resources'
+import { getKimiServerResources } from '../chat-runtime-providers/kimi/resources'
 import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
 import { getDaemonResources } from '../chronicle/daemon-manager'
 import * as Health from '../health/service'
@@ -340,6 +344,8 @@ export async function getRuntimeSnapshot() {
   const pty = await Pty.listResources()
   const chronicle = getDaemonResources()
   const opencodeServer = getOpencodeServerResources()
+  const kimiServer = getKimiServerResources()
+  const codexAppServer = getCodexAppServerResources()
   const observability = getQueueHealth()
   const desktop = {
     latestSamples: getDesktopRuntimeSamples(),
@@ -513,6 +519,18 @@ export async function getRuntimeSnapshot() {
     rssMB: opencodeServer.rssMB,
     cpuPercent: opencodeServer.cpuPercent,
   })
+  updateKimiServerMetrics({
+    running: kimiServer.running,
+    pid: kimiServer.pid,
+    rssMB: kimiServer.rssMB,
+    cpuPercent: kimiServer.cpuPercent,
+  })
+  updateCodexAppServerMetrics({
+    running: codexAppServer.running,
+    pid: codexAppServer.pid,
+    rssMB: codexAppServer.rssMB,
+    cpuPercent: codexAppServer.cpuPercent,
+  })
   updateDesktopMetrics({
     latestSampleAgeMs: latestDesktopSample ? Date.now() - latestDesktopSample.sampledAt : null,
     windowCount: latestDesktopSample?.windows.length ?? 0,
@@ -559,6 +577,8 @@ export async function getRuntimeSnapshot() {
     pty,
     chronicle,
     opencodeServer,
+    kimiServer,
+    codexAppServer,
     desktop,
     drilldowns,
     observability,

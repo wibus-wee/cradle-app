@@ -28,6 +28,7 @@ import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-pro
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
 import { createChronicleManagedResourceAdapter } from './modules/chronicle/managed-resource-adapter'
+import { codexAppServer } from './modules/codex-app-server'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
 import { diffReview } from './modules/diff-review'
@@ -44,6 +45,7 @@ import { issue } from './modules/issue'
 import { issueAgent } from './modules/issue-agent'
 import { javascriptEval } from './modules/javascript-eval'
 import { kanban } from './modules/kanban'
+import { kimiServer } from './modules/kimi-server'
 import { linkPreview } from './modules/link-preview'
 import { createManagedResourcesModule } from './modules/managed-resources'
 import { ManagedResourceService } from './modules/managed-resources/service'
@@ -235,6 +237,8 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(chronicle)
   app.use(createManagedResourcesModule(managedResources))
   app.use(opencodeServer)
+  app.use(kimiServer)
+  app.use(codexAppServer)
   app.use(agentInteractionRuntime)
   app.use(desktop)
   app.use(downloadCenter.routes)

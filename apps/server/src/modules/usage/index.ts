@@ -7,6 +7,16 @@ export const usage = new Elysia({
   prefix: '/usage',
   detail: { tags: ['usage'] },
 })
+  .post('/reconcile/claude', ({ query }) => Usage.reconcileCompletedClaudeUsage(query.maxBindings), {
+    detail: {
+      'summary': 'Backfill completed Claude usage from Cradle-owned transcripts',
+      'x-cradle-cli': {
+        command: ['usage', 'reconcile', 'claude'],
+      },
+    },
+    query: UsageModel.claudeReconciliationQuery,
+    response: { 200: UsageModel.usageReconciliationSummary },
+  })
   .get('/daily', ({ query }) => Usage.getDailyUsage(query.days), {
     detail: {
       'summary': 'Get daily usage',

@@ -15,8 +15,10 @@ export interface RuntimeUsageEventContext {
 
 export function recordRuntimeUsageEvent(input: RuntimeUsageEventContext): 'inserted' | 'duplicate' {
   validateRuntimeUsageEventContext(input)
-  const result = insertRuntimeUsageEvent(db(), input)
-  return result.changes > 0 ? 'inserted' : 'duplicate'
+  const database = db()
+  const existing = database.select({ id: usageLogs.id }).from(usageLogs).where(eq(usageLogs.id, input.event.id)).get()
+  insertRuntimeUsageEvent(database, input)
+  return existing ? 'duplicate' : 'inserted'
 }
 
 export function replaceLegacyRuntimeUsage(input: {
@@ -43,13 +45,10 @@ export function replaceLegacyRuntimeUsage(input: {
     let inserted = 0
     let duplicates = 0
     for (const event of input.events) {
-      const result = insertRuntimeUsageEvent(tx, event)
-      if (result.changes > 0) {
-        inserted += 1
-      }
-      else {
-        duplicates += 1
-      }
+      const existing = tx.select({ id: usageLogs.id }).from(usageLogs).where(eq(usageLogs.id, event.event.id)).get()
+      insertRuntimeUsageEvent(tx, event)
+      if (existing) { duplicates += 1 }
+      else { inserted += 1 }
     }
     tx.delete(usageLogs)
       .where(and(eq(usageLogs.sessionId, input.sessionId), isNull(usageLogs.providerThreadId)))
@@ -83,7 +82,25 @@ function insertRuntimeUsageEvent(database: ReturnType<typeof db>, input: Runtime
       providerTotalTokens: input.event.providerTotal.totalTokens,
       createdAt: input.event.occurredAt,
     })
-    .onConflictDoNothing({ target: usageLogs.id })
+    // Claude can emit the same assistant message before and after its usage is
+    // finalized. The event id identifies that model call, so retain its latest
+    // provider snapshot instead of permanently keeping the first partial one.
+    .onConflictDoUpdate({
+      target: usageLogs.id,
+      set: {
+        modelId: input.event.modelId,
+        promptTokens: input.event.usage.promptTokens,
+        cachedInputTokens: input.event.usage.cachedInputTokens ?? 0,
+        completionTokens: input.event.usage.completionTokens,
+        reasoningOutputTokens: input.event.usage.reasoningOutputTokens ?? 0,
+        totalTokens: input.event.usage.totalTokens,
+        providerTotalPromptTokens: input.event.providerTotal.promptTokens,
+        providerTotalCachedInputTokens: input.event.providerTotal.cachedInputTokens ?? 0,
+        providerTotalCompletionTokens: input.event.providerTotal.completionTokens,
+        providerTotalReasoningOutputTokens: input.event.providerTotal.reasoningOutputTokens ?? 0,
+        providerTotalTokens: input.event.providerTotal.totalTokens,
+      },
+    })
     .run()
 }
 

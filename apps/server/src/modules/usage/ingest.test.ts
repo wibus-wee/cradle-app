@@ -99,6 +99,40 @@ describe('recordRuntimeUsageEvent', () => {
     })).toThrow('providerTurnId')
   })
 
+  it('replaces a partial usage snapshot when the same model call is finalized', () => {
+    db().insert(sessions).values({ id: 'session-1', title: 'Session', runtimeKind: 'claude-agent' }).run()
+    const input = {
+      event: {
+        id: 'event-1',
+        providerThreadId: 'thread-1',
+        providerTurnId: 'turn-1',
+        modelId: 'claude-opus-4-8',
+        occurredAt: 1_789_000_000,
+        usage: { promptTokens: 811, completionTokens: 0, totalTokens: 811 },
+        providerTotal: { promptTokens: 811, completionTokens: 0, totalTokens: 811 },
+      },
+      sessionId: 'session-1',
+      runId: 'run-1',
+      messageId: null,
+      providerTargetId: null,
+      providerSessionId: 'claude-session-1',
+    }
+
+    expect(recordRuntimeUsageEvent(input)).toBe('inserted')
+    expect(recordRuntimeUsageEvent({
+      ...input,
+      event: {
+        ...input.event,
+        usage: { promptTokens: 811, completionTokens: 200, totalTokens: 1_011 },
+        providerTotal: { promptTokens: 811, completionTokens: 200, totalTokens: 1_011 },
+      },
+    })).toBe('duplicate')
+
+    expect(db().select().from(usageLogs).where(eq(usageLogs.id, 'event-1')).get()).toEqual(
+      expect.objectContaining({ promptTokens: 811, completionTokens: 200, totalTokens: 1_011 }),
+    )
+  })
+
   it('atomically replaces only legacy Codex summary rows after a verified session replay', () => {
     db().insert(sessions).values({ id: 'session-1', title: 'Session', runtimeKind: 'codex' }).run()
     db().insert(backendSessionBindings).values({

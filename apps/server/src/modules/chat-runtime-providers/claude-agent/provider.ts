@@ -1385,10 +1385,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       })
     }
     catch (error) {
-      if (entry.currentTurn) {
-        throw error
-      }
-      this.deps.logger?.warn?.('Claude Agent ignored malformed late assistant usage event', {
+      this.deps.logger?.warn?.('Claude Agent ignored malformed assistant usage event', {
         error,
         chatSessionId: entry.runtimeSession.chatSessionId,
       })

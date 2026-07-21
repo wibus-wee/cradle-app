@@ -28,6 +28,45 @@ function readToolPart(message: UIMessage, toolCallId: string): UIMessage['parts'
 }
 
 describe('projectFinalMessageChunk', () => {
+  it('preserves tool calls between closed text blocks', () => {
+    const run = createProjectionRun()
+
+    projectFinalMessageChunk(run, { type: 'text-start', id: 'before' })
+    projectFinalMessageChunk(run, { type: 'text-delta', id: 'before', delta: 'Before' })
+    projectFinalMessageChunk(run, { type: 'text-end', id: 'before' })
+    projectFinalMessageChunk(run, {
+      type: 'tool-input-start',
+      toolCallId: 'toolu_shell',
+      toolName: 'shell',
+    })
+    projectFinalMessageChunk(run, {
+      type: 'tool-input-available',
+      toolCallId: 'toolu_shell',
+      toolName: 'shell',
+      input: { command: 'pwd' },
+    })
+    projectFinalMessageChunk(run, {
+      type: 'tool-output-available',
+      toolCallId: 'toolu_shell',
+      output: '/workspace',
+    })
+    projectFinalMessageChunk(run, { type: 'text-start', id: 'after' })
+    projectFinalMessageChunk(run, { type: 'text-delta', id: 'after', delta: 'After' })
+    projectFinalMessageChunk(run, { type: 'text-end', id: 'after' })
+
+    expect(run.finalMessage.parts).toEqual([
+      { type: 'text', text: 'Before', state: 'done' },
+      {
+        type: 'tool-shell',
+        toolCallId: 'toolu_shell',
+        state: 'output-available',
+        input: { command: 'pwd' },
+        output: '/workspace',
+      },
+      { type: 'text', text: 'After', state: 'done' },
+    ])
+  })
+
   it('persists runtime warnings in their streamed message position', () => {
     const run = createProjectionRun()
 

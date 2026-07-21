@@ -24789,6 +24789,49 @@ export type GetOpencodeServerResourcesResponses = {
 
 export type GetOpencodeServerResourcesResponse = GetOpencodeServerResourcesResponses[keyof GetOpencodeServerResourcesResponses];
 
+export type GetKimiServerResourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/kimi/server/resources';
+};
+
+export type GetKimiServerResourcesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        running: boolean;
+        pid: number | null;
+        rssMB: number | null;
+        cpuPercent: number | null;
+        url: string | null;
+    };
+};
+
+export type GetKimiServerResourcesResponse = GetKimiServerResourcesResponses[keyof GetKimiServerResourcesResponses];
+
+export type GetCodexAppServerResourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/codex/app-server/resources';
+};
+
+export type GetCodexAppServerResourcesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        running: boolean;
+        pid: number | null;
+        rssMB: number | null;
+        cpuPercent: number | null;
+    };
+};
+
+export type GetCodexAppServerResourcesResponse = GetCodexAppServerResourcesResponses[keyof GetCodexAppServerResourcesResponses];
+
 export type GetAgentSessionsByAgentSessionIdData = {
     body?: never;
     path: {
@@ -25773,6 +25816,19 @@ export type GetObservabilityRuntimeSnapshotResponses = {
             url: string | null;
             startedAt: number | null;
             uptimeSeconds: number | null;
+            rssMB: number | null;
+            cpuPercent: number | null;
+        };
+        kimiServer: {
+            running: boolean;
+            pid: number | null;
+            rssMB: number | null;
+            cpuPercent: number | null;
+            url: string | null;
+        };
+        codexAppServer: {
+            running: boolean;
+            pid: number | null;
             rssMB: number | null;
             cpuPercent: number | null;
         };

@@ -14,6 +14,7 @@ import type { CodexAppServerClientOptions } from './client'
 import { codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
 
 class FakeCodexAccountClient implements CodexAppServerClientLike {
+  readonly pid = null
   readonly requests: Array<{ method: string, params?: unknown }> = []
   readonly close = vi.fn()
   readonly initialize = vi.fn(async () => undefined)

@@ -259,16 +259,18 @@ export function useChatActions(input: UseChatActionsInput) {
           signal: controller.signal,
         })
         handler.setTelemetryCorrelation(readTelemetryCorrelation(transport))
+        handler.adoptServerMessageId(transport.assistantMessageId)
         acceptedByServer = true
 
         scheduleSnapshotRefresh(0)
 
         const acceptedAtMs = performance.now()
         const store = useChatStore.getState()
+        const activeMessageId = handler.readActiveMessageId()
         if (transport.runId) {
-          store.setRunDisplayId(assistantMessageId, transport.runId)
+          store.setRunDisplayId(activeMessageId, transport.runId)
         }
-        store.markRunAccepted(assistantMessageId, acceptedAtMs)
+        store.markRunAccepted(activeMessageId, acceptedAtMs)
 
         if (sessionBindingQueryKey) {
           void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })
@@ -486,15 +488,17 @@ export function useChatActions(input: UseChatActionsInput) {
         signal: controller.signal,
       })
       handler.setTelemetryCorrelation(readTelemetryCorrelation(transport))
+      handler.adoptServerMessageId(transport.assistantMessageId)
 
       scheduleSnapshotRefresh(0)
 
       const acceptedAtMs = performance.now()
       const store = useChatStore.getState()
+      const activeMessageId = handler.readActiveMessageId()
       if (transport.runId) {
-        store.setRunDisplayId(response.messageId, transport.runId)
+        store.setRunDisplayId(activeMessageId, transport.runId)
       }
-      store.markRunAccepted(response.messageId, acceptedAtMs)
+      store.markRunAccepted(activeMessageId, acceptedAtMs)
 
       if (sessionBindingQueryKey) {
         void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })

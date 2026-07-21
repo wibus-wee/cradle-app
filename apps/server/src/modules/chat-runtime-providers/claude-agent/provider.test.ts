@@ -251,6 +251,14 @@ function createPromptDrivenQuery(
   }
 }
 
+function deferred<T>(): { promise: Promise<T>, resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 function createContextUsageResponse(
   overrides: Partial<SDKControlGetContextUsageResponse> = {},
 ): SDKControlGetContextUsageResponse {
@@ -3391,6 +3399,116 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     expect(activeQueries[0]?.close).toHaveBeenCalledOnce()
   })
 
+  it('submits a reused-query turn while an earlier synthetic turn is still persisting', async () => {
+    const prompts: unknown[] = []
+    const syntheticDeliveryStarted = deferred<void>()
+    const releaseSyntheticDelivery = deferred<void>()
+    sdkMocks.query.mockImplementation(
+      (call: { prompt?: AsyncIterable<{ message: { content: unknown } }> }) => {
+        expect(call.prompt).toBeDefined()
+        return createPromptDrivenQuery(
+          call.prompt!,
+          [
+            [
+              {
+                type: 'assistant',
+                session_id: 'claude-session-synthetic-boundary',
+                message: {
+                  content: [{ type: 'text', text: 'First response' }],
+                },
+              },
+              {
+                type: 'result',
+                session_id: 'claude-session-synthetic-boundary',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+              // This output belongs to a provider-created background turn, not
+              // the next Cradle user turn. Its persistence may wait for the
+              // parent run, but must never block submission of that next input.
+              {
+                type: 'assistant',
+                session_id: 'claude-session-synthetic-boundary',
+                message: {
+                  content: [{ type: 'text', text: 'Background response' }],
+                },
+              },
+              {
+                type: 'result',
+                session_id: 'claude-session-synthetic-boundary',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+            ],
+            [
+              {
+                type: 'assistant',
+                session_id: 'claude-session-synthetic-boundary',
+                message: {
+                  content: [{ type: 'text', text: 'Second response' }],
+                },
+              },
+              {
+                type: 'result',
+                session_id: 'claude-session-synthetic-boundary',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+            ],
+          ],
+          prompts,
+        )
+      },
+    )
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const runtimeSession = createRuntimeSession()
+    let drainSecondTurn: Promise<void> | null = null
+    try {
+      for await (const _chunk of provider.streamTurn({
+        runId: 'run-claude-agent-synthetic-boundary-1',
+        runtimeSession,
+        profile: createProfile(),
+        message: createUserMessage('First task'),
+        workspaceId: 'workspace-1',
+        onProviderSyntheticTurnEvent: async () => {
+          syntheticDeliveryStarted.resolve()
+          await releaseSyntheticDelivery.promise
+        },
+      })) {
+        // Drain the completed first turn.
+      }
+
+      await syntheticDeliveryStarted.promise
+      drainSecondTurn = (async () => {
+        for await (const _chunk of provider.streamTurn({
+          runId: 'run-claude-agent-synthetic-boundary-2',
+          runtimeSession,
+          profile: createProfile(),
+          message: createUserMessage('Second task'),
+          workspaceId: 'workspace-1',
+          onProviderSyntheticTurnEvent: async () => undefined,
+        })) {
+          // Drain the completed second turn.
+        }
+      })()
+
+      // The SDK input itself is the handoff boundary. It must not depend on an
+      // unrelated background projection reaching durable completion first.
+      await vi.waitFor(() => {
+        expect(prompts).toEqual(['First task', 'Second task'])
+      })
+
+      releaseSyntheticDelivery.resolve()
+      await drainSecondTurn
+      expect(prompts).toEqual(['First task', 'Second task'])
+    }
+    finally {
+      releaseSyntheticDelivery.resolve()
+      await drainSecondTurn
+      await provider.dispose()
+    }
+  })
+
   it.sequential(
     'routes active parent-tool child messages to provider-thread events instead of parent chunks',
     async () => {
@@ -5103,6 +5221,16 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         type: 'stream_event',
         event: { type: 'message_delta', usage: { input_tokens: 100, output_tokens: 50 } },
         session_id: 'claude-session-1',
+      },
+      {
+        type: 'assistant',
+        session_id: 'claude-session-1',
+        message: {
+          id: 'msg-final',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Hello' }],
+          usage: { input_tokens: 0, output_tokens: 0 },
+        },
       },
       {
         type: 'assistant',

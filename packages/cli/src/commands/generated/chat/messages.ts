@@ -16,7 +16,20 @@ const spec = {
     "messages"
   ],
   "description": "Get chat message snapshot rows",
-  "flags": [],
+  "flags": [
+    {
+      "name": "cursor",
+      "required": false,
+      "target": "query.cursor",
+      "type": "string"
+    },
+    {
+      "name": "limit",
+      "required": false,
+      "target": "query.limit",
+      "type": "number"
+    }
+  ],
   "method": "get",
   "path": "/chat/sessions/{sessionId}/messages"
 } satisfies CliOperationSpec

@@ -3,7 +3,7 @@ import { isAbsolute, join, relative } from 'node:path'
 import { createInterface } from 'node:readline'
 
 import { backendSessionBindings, providerTargets, usageLogs } from '@cradle/db'
-import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '../../../infra'
@@ -16,6 +16,7 @@ import { resolveClaudeAgentSdkConfigDir } from './runtime-context'
 import { projectClaudeAssistantUsageEvent } from './usage-event-projector'
 
 const DEFAULT_MAX_BINDINGS = 200
+type ClaudeUsageReconciliationStatus = 'pending' | 'completed' | 'blocked' | 'unavailable'
 
 const TranscriptRecordSchema = z.object({
   type: z.string(),
@@ -124,11 +125,13 @@ export async function reconcileClaudeSessionUsage(input: {
 export async function reconcileCradleClaudeUsage(input: {
   maxBindings?: number
   runtimeHome?: string
+  statuses?: ClaudeUsageReconciliationStatus[]
 } = {}): Promise<ClaudeUsageReconciliationSummary> {
+  const statuses = input.statuses ?? ['pending']
   const bindings = db().select().from(backendSessionBindings).where(and(
       eq(backendSessionBindings.runtimeKind, 'claude-agent'),
       isNotNull(backendSessionBindings.backendSessionId),
-      eq(backendSessionBindings.usageReconciliationStatus, 'pending'),
+      inArray(backendSessionBindings.usageReconciliationStatus, statuses),
     )).orderBy(desc(backendSessionBindings.updatedAt)).limit(input.maxBindings ?? DEFAULT_MAX_BINDINGS).all()
   const summary = emptySummary()
   for (const binding of bindings) {
@@ -146,6 +149,13 @@ export async function reconcileCradleClaudeUsage(input: {
     }))
   }
   return summary
+}
+
+export function reconcileCompletedCradleClaudeUsage(input: {
+  maxBindings?: number
+  runtimeHome?: string
+} = {}): Promise<ClaudeUsageReconciliationSummary> {
+  return reconcileCradleClaudeUsage({ ...input, statuses: ['completed'] })
 }
 
 function isApiKeyClaudeBinding(providerTargetId: string | null): boolean {

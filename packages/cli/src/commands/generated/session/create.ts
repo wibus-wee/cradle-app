@@ -51,6 +51,18 @@ const spec = {
       "type": "string"
     },
     {
+      "name": "acpAgentId",
+      "required": false,
+      "target": "body.acpAgentId",
+      "type": "string"
+    },
+    {
+      "name": "acpDraftSessionId",
+      "required": false,
+      "target": "body.acpDraftSessionId",
+      "type": "string"
+    },
+    {
       "name": "runtimeKind",
       "required": false,
       "target": "body.runtimeKind",

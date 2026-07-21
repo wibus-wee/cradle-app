@@ -205,6 +205,39 @@ export class ProviderRuntimeHostManager {
     }))
   }
 
+  /**
+   * Iterate over all active resources for a given runtime kind.
+   * The callback receives the stored resource (typed as `unknown`) and the host entry.
+   * This allows provider-specific code to cast and extract resource data.
+   */
+  forEachResource<T>(
+    runtimeKind: RuntimeKind,
+    callback: (resource: unknown, entry: ProviderRuntimeHostSnapshot) => T | undefined,
+  ): T | undefined {
+    this.reapIdleHosts()
+    for (const entry of this.hosts.values()) {
+      if (entry.runtimeKind !== runtimeKind || !entry.hasResource || entry.resource === undefined) {
+        continue
+      }
+      const snapshot: ProviderRuntimeHostSnapshot = {
+        hostId: entry.hostId,
+        runtimeKind: entry.runtimeKind,
+        providerTargetId: entry.providerTargetId,
+        scopeId: entry.scopeId,
+        refCount: entry.refCount,
+        pinnedCount: entry.pinnedCount,
+        hasResource: entry.hasResource,
+        expiresAt: entry.expiresAt,
+        updatedAt: entry.updatedAt,
+      }
+      const result = callback(entry.resource, snapshot)
+      if (result !== undefined) {
+        return result
+      }
+    }
+    return undefined
+  }
+
   hasHost(hostId: string): boolean {
     this.reapIdleHosts()
     return this.hosts.has(hostId)

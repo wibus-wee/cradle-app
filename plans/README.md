@@ -64,7 +64,12 @@ Agent Cognition Stack（L1 Evidence → L5 Orchestration）与 CodeAct 契约
 不做 helper 级 MCP tool sprawl、不引入 async CQRS 索引。Phase A 仅 design docs + skill；
 implementation 建议等 Plan 050/051 收敛 session/issue projection 后再做 Phase B。
 
-
+2026-07-21 在 commit `be474dca` 上补充 Plan 062：以 Claude Agent SDK 原生会话为权威，
+把 Cradle 从「第二套 turn scheduler」收敛为 session 事件投影层。保留长期 Query +
+AsyncIterable；允许 post-result 开新的 UI Run（展示容器）；删除 absorb/adopt/
+queued_command 文本匹配 / 150ms settle，以及用 UI Run 完成态阻塞 `inputStream.push`
+的做法。与 Plan 061 互补：061 管 UI Run 准入与风暴，062 管 Claude 输入通道与
+native 队列所有权。
 
 Each executor: read the plan fully before starting, run its drift check, honor its
 STOP conditions, and update your row below when done. Plans are self-contained —
@@ -137,6 +142,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 060  | Rename agent tool to `manage_pull_request` + pre-PR branch rename | P2  | M      | branch `feat/enhance-work` | DONE (`dfe2fb88`..`a7aa8e93` on `feat/enhance-work`; advisor-reviewed)   |
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
+| 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

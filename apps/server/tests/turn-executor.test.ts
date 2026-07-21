@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { sessions, usageLogs } from '@cradle/db'
+import { backendRuns, sessions, usageLogs } from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -187,6 +187,64 @@ describe('executeRun provider usage events', () => {
         expect.objectContaining({ id: 'usage-event-2', runId, sessionId, providerThreadId: 'child-thread' }),
       ])
       expect(activeRun.usageEventCount).toBe(2)
+    })
+  })
+
+  it('does not fail generation when provider usage arrives before its session identity', async () => {
+    await withTempDataDir(async () => {
+      const sessionId = `session-${randomUUID()}`
+      const runId = `run-${randomUUID()}`
+      db().insert(sessions).values({ id: sessionId, title: 'Session', runtimeKind: 'codex' }).run()
+      insertMessageFixtures(db(), {
+        id: `${runId}-message`,
+        sessionId,
+        role: 'assistant',
+        content: '',
+        messageJson: JSON.stringify({ id: `${runId}-message`, role: 'assistant', parts: [] }),
+      })
+      db().insert(backendRuns).values({
+        id: runId,
+        bindingId: null,
+        chatSessionId: sessionId,
+        messageId: `${runId}-message`,
+        origin: 'user',
+        status: 'streaming',
+        stopReason: null,
+        errorText: null,
+        startedAt: 1_789_000_000,
+        finishedAt: null,
+      }).run()
+      const runtime = {
+        ...createStreamingRuntime([]),
+        runtimeKind: 'codex',
+        usageAccounting: 'provider-events',
+        async* streamTurn(input) {
+          await input.onUsageEvent?.({
+            id: 'usage-event-1',
+            providerThreadId: 'root-thread',
+            providerTurnId: 'turn-1',
+            modelId: 'gpt-5.6-sol',
+            occurredAt: 1_789_000_000,
+            usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+            providerTotal: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+          })
+          yield { type: 'text-delta', id: 'text-1', delta: 'done' }
+          yield { type: 'finish', finishReason: 'stop' }
+        },
+      } as ChatRuntime
+      const activeRun = createActiveRun({ runId, sessionId, runtime })
+      const deps = createDeps()
+
+      await executeRun(
+        activeRun,
+        { message: { id: 'msg-1', role: 'user', parts: [] }, profile: null },
+        deps,
+      )
+
+      expect(deps.completeActiveTurn).toHaveBeenCalledOnce()
+      expect(activeRun.usageEventCount).toBe(0)
+      const [, finalChunk] = (deps.finalizeSnapshot as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(finalChunk).toEqual({ type: 'finish', finishReason: 'stop' })
     })
   })
 })

@@ -98,6 +98,18 @@ export const UsageModel = {
     limit: t.Optional(t.Numeric({ minimum: 1, maximum: 20 })),
   }),
 
+  claudeReconciliationQuery: t.Object({
+    maxBindings: t.Optional(t.Numeric({ minimum: 1, maximum: 1_000 })),
+  }),
+
+  usageReconciliationSummary: t.Object({
+    bindings: t.Number(),
+    transcripts: t.Number(),
+    inserted: t.Number(),
+    duplicates: t.Number(),
+    incidents: t.Number(),
+  }),
+
   sessionParams: t.Object({
     sessionId: t.String({ minLength: 1 }),
   }),

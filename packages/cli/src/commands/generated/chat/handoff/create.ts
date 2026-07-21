@@ -9,7 +9,7 @@ const spec = {
     "handoff",
     "create"
   ],
-  "description": "Hand off a chat thread to another provider target",
+  "description": "Hand off a chat thread to another runtime and provider target",
   "flags": [
     {
       "name": "requestId",
@@ -24,8 +24,14 @@ const spec = {
       "type": "string"
     },
     {
-      "name": "destinationProviderTargetId",
+      "name": "destinationRuntimeKind",
       "required": true,
+      "target": "body.destinationRuntimeKind",
+      "type": "string"
+    },
+    {
+      "name": "destinationProviderTargetId",
+      "required": false,
       "target": "body.destinationProviderTargetId",
       "type": "string"
     },

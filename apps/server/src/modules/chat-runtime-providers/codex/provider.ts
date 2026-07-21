@@ -2016,6 +2016,7 @@ function createCodexSubscribedNotificationClient(
   }
 
   return {
+    pid: client.pid,
     initialize: client.initialize.bind(client),
     request: client.request.bind(client),
     nextNotification: async (signal?: AbortSignal) => {

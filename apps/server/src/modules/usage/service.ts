@@ -2,9 +2,20 @@ import { agents, providerTargets, sessions, usageLogs } from '@cradle/db'
 import { sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
+import { reconcileCompletedCradleClaudeUsage } from '../chat-runtime-providers/claude-agent/usage-reconciliation'
 import { estimateCost } from './pricing'
 
 const usageTurnKey = sql`COALESCE(${usageLogs.runId}, ${usageLogs.providerTurnId}, ${usageLogs.id})`
+
+export async function reconcileCompletedClaudeUsage(maxBindings?: number): Promise<{
+  bindings: number
+  transcripts: number
+  inserted: number
+  duplicates: number
+  incidents: number
+}> {
+  return reconcileCompletedCradleClaudeUsage({ maxBindings })
+}
 
 export interface DailyUsage {
   date: string
