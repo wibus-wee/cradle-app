@@ -18,16 +18,33 @@ conversation tail — never as rebuilt system prompt or harness injection.
 
 ## Scope first
 
+**Default: current workspace** — including Work primary threads. Work is task
+orchestration (L5), not a recall boundary. Do not restrict to Work-linked sessions
+unless the user explicitly asks ("just this Work", "this task only").
+
 Classify the locator before writing a query:
 
-| Type | Example | First action |
-| ---- | ------- | ------------ |
-| **Scope** | "in this work", "this repo" | `overview()` + workspace/work filter |
-| **Artifact** | `src/auth.ts`, session id | `fileHistory(path)` or direct id |
-| **Semantic** | "auth bug fix" | `search()` with scoped opts |
+| Type | Example | Scope |
+| ---- | ------- | ----- |
+| **Semantic** | "auth bug fix", "上次怎么修的" | `workspaceId` (default) |
+| **Session** | "this chat", "刚才说的" | `sessionId` |
+| **Work-narrow** | "only in this Work" | `workId` filter (opt-in) |
+| **Issue-narrow** | "on this issue" | `issueId` filter (opt-in) |
+| **Artifact** | `src/auth.ts`, message id | path/id helpers, still workspace unless session-specific |
 
-Narrowest valid scope wins. Empty scoped results are valid — broaden only when the
-user asks or scope was clearly wrong.
+```js
+// Default — workspace-wide (even in a Work session)
+search('auth fix', { workspaceId: overview().workspace.id, limit: 8 });
+
+// Opt-in narrow — only when user asked
+search('auth fix', { workId: overview().work?.id, limit: 8 });
+```
+
+`overview()` shows Work/Issue for orientation; it does **not** auto-apply them as
+search filters.
+
+Broaden to cross-workspace/global only when the user asks or workspace search is
+clearly insufficient.
 
 ## Orient first
 
@@ -87,9 +104,37 @@ In the final answer to the user:
 
 1. Cite stable IDs (`session_id`, `message_id`, `run_id`, `tool_call_id`)
 2. Use short snippets, not pasted transcripts
-3. Separate evidence from inference
-4. If memory influenced the answer, say it was previously recorded and cross-check
-   evidence when correctness matters
+3. Separate evidence from inference — never merge without labels
+4. See **Synthesis protocol** below when both evidence and memory are present
+
+## Synthesis protocol (evidence + memory)
+
+When `recall_query` returns both evidence and memory, structure the script output
+for synthesis tasks as three channels:
+
+```js
+return {
+  evidence: [/* hits from search, failures, fileHistory, context — with ids */],
+  memories: [/* hits from memories() — with id + summary */],
+  conflicts: [/* { memory_id, evidence_id, note } or [] */],
+};
+```
+
+**Rules for the final answer:**
+
+| Claim | Constraint |
+| ----- | ---------- |
+| Fact (file, tool, time, outcome) | Requires `evidence` cite. No ID → not a fact. |
+| Why / lesson / intent | Mark as inference; memory may inform hypothesis only. |
+| From memory alone | Say: "Previously recorded (not re-verified here): …" |
+| Memory vs evidence conflict | Report both; **evidence wins** on facts; never hide conflict. |
+| Nothing found | Say so; do not invent history. |
+
+**Do not:**
+
+- Quote memory as if you re-read the original session in this query
+- Let memory override evidence on paths, failures, or timestamps
+- Propose attune without evidence support in the same query (unless user explicitly requests recording their stated conclusion)
 
 ## Memory vs evidence
 

@@ -47,21 +47,33 @@ const topic = 'English topic terms from the user request';
 return {
   orientation: map,
   prior_memories: memories({ query: topic, limit: 5 }),
-  session_evidence: search(topic.replace(/[-_]/g, ' '), { limit: 8 }),
+  session_evidence: search(topic.replace(/[-_]/g, ' '), {
+    workspaceId: map.workspace.id,
+    limit: 8,
+  }),
 };
 ```
 
 Use `sql()` only when helpers cannot express the join or aggregation.
 
-## Scope (narrowest first)
+## Scope
 
-1. Current session
-2. Current Work-linked sessions (if in a Work thread)
-3. Current Issue-linked sessions (when available)
-4. Current workspace
-5. Global — only when user asks to broaden
+**Default: current workspace** — even in a Work session. Work does not narrow recall.
 
-Empty scoped results are valid. Do not silently broaden without reason.
+| When | Scope |
+| ---- | ----- |
+| Normal past-work questions | **workspace** |
+| "This chat / 刚才这条" | current **session** |
+| "Only this Work / 就这个任务" | opt-in **workId** filter |
+| "On this issue" | opt-in **issueId** filter |
+| Cross-repo / explicit global | broaden only when user asks |
+
+```js
+// Default in Work session — still workspace-wide
+search(topic, { workspaceId: overview().workspace.id, limit: 8 });
+```
+
+Do not silently restrict to Work-linked sessions. Empty workspace results are valid.
 
 ## Authority
 

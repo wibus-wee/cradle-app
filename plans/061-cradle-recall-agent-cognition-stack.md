@@ -131,28 +131,80 @@ Return shapes are **contract-tested**; changing a helper requires doc + test upd
 When sources conflict:
 
 1. **L1 Evidence** wins for factual claims ("what was edited", "which tool failed")
-2. **L2 Memory** is a prior note — agent must say it was "previously recorded" and
-   compare with L1 when correctness matters
-3. **Agent synthesis** must cite stable IDs (`session_id`, `message_id`, `run_id`,
-   `tool_call_id`) from L3 results
+2. **L2 Memory** is a prior note — never treated as proof without L1 support
+3. **Agent synthesis** must cite stable IDs from L3 results for every factual claim
 
-Skill must teach: **Evidence before conclusion**; compact JSON ideally under 10k–12k
-chars for synthesis tasks.
+### Synthesis protocol (skill-enforced)
+
+When a query returns **both** evidence and memory, the agent must follow this
+**three-channel** shape in the `recall_query` script return value when doing synthesis:
+
+```js
+return {
+  evidence: [/* search/failures/fileHistory hits with ids + snippets */],
+  memories: [/* memories() hits with id + summary */],
+  conflicts: [/* explicit pairs where memory contradicts evidence, or [] */],
+};
+```
+
+**Answer rules** (final message to user):
+
+| Claim type | Rule |
+| ---------- | ---- |
+| **Fact** (who/when/what file/tool) | Must trace to `evidence[]` with cited IDs. No ID → do not state as fact. |
+| **Interpretation** (why, intent, lesson) | Label as inference; may use memory as hypothesis if evidence is thin. |
+| **Memory-only** | Prefix: "Previously recorded (not re-verified in this query): …" |
+| **Conflict** | State both sides; **evidence wins** for facts; surface conflict explicitly. Do not silently prefer memory. |
+| **No evidence, memory yes** | Answer from memory with disclaimer; suggest re-verification or broader search. |
+| **Neither** | Say history was not found; do not invent. |
+
+**Prohibited synthesis patterns:**
+
+- Blending memory text into evidence narrative without attribution
+- Stating memory content as if it were observed in this query
+- Dropping IDs when the user asked for "what we did" or "which sessions"
+- Using memory to override evidence on file paths, tool outcomes, or timestamps
+
+**Attune gate:** Only propose `recall_attune` when synthesis is supported by evidence
+in the same query (or user explicitly asks to record a conclusion they already approved).
 
 ## Scope model
 
-Default retrieval scope (narrowest first):
+**Default scope = current workspace** for all workspace-bound sessions, **including
+Work primary threads**. Work (L5) is orchestration context, not a memory firewall.
+Agents need cross-session history within the same repo/workspace even while inside Work.
 
 ```text
-1. Current session (if question is about "this conversation")
-2. Current Work container sessions (if session is Work-scoped)
-3. Current Issue-linked sessions (after Plan 051)
-4. Current workspace
-5. Global (explicit broaden only)
+Default (implicit):
+  workspaceId = current session's workspace
+
+Narrow (explicit user intent or query opts only):
+  sessionId     — "this conversation", "刚才这条"
+  workId        — "在这个 Work 里", "this task only" (opt-in filter)
+  issueId       — "在这个 issue 上" (opt-in, after Plan 051)
+  origin/import — provenance filter when user asks
+
+Broaden (explicit only):
+  cross-workspace / global — user asks or workspace-scoped search returned nothing relevant
 ```
 
-`overview()` establishes scope before deep retrieval. Empty scoped results are valid
-unless the user asked to broaden.
+**Decision table:**
+
+| User intent | Default scope | Narrow filter |
+| ----------- | ------------- | ------------- |
+| General past work ("上次 auth 怎么修的") | **workspace** | none |
+| This chat only | current **session** | `sessionId` |
+| Inside Work, no narrowing phrase | **workspace** | none — Work does not restrict |
+| "Just this Work / this task" | workspace → filter | `workId` |
+| "On this issue" | workspace → filter | `issueId` |
+| Imported Claude/Codex only | workspace | `origin=imported` |
+
+`overview()` shows Work/Issue as **orientation** (map), not as an automatic search
+filter. Helpers accept optional `workId` / `issueId` / `sessionId` — omit them for
+the default workspace-wide recall.
+
+Empty workspace-scoped results are valid. Broaden to global only when the user asks
+or workspace scope clearly cannot answer (e.g. cross-repo question).
 
 ## Assembly model (L3 vs L4)
 
