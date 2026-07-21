@@ -5,19 +5,15 @@ import { and, eq } from 'drizzle-orm'
 import { AppError } from '../../../errors/app-error'
 import { db } from '../../../infra'
 import { cancelQueuedSessionItem, normalizeSessionQueuePositions } from '../es/commands'
-import { abortProjectedStreamingRun, recoverChatRuntimeSession } from '../es/recovery'
-import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
+import { abortProjectedStreamingRun } from '../es/recovery'
+import type { ActiveTurnCompletionController } from '../run/turn-completion'
+import type { ActiveRun } from '../run-registry'
 import { runRegistry } from '../run-registry'
 import { attachBinding, getSessionRunContext } from '../runtime-session-context'
 
 export interface ActiveRunLifecycleDeps {
   readRun: (runId: string) => BackendRun | undefined
-  settleActiveRun: (
-    activeRun: ActiveRun,
-    status: TerminalChatMessageStatus,
-    errorText: string | null,
-  ) => Promise<void>
-  releaseActiveRun: (activeRun: ActiveRun) => void
+  completeActiveTurn: ActiveTurnCompletionController['completeActiveTurn']
   warn: (message: string, payload: Record<string, unknown>) => void
 }
 
@@ -37,20 +33,19 @@ export async function abortRun(runId: string, deps: ActiveRunLifecycleDeps): Pro
     return
   }
 
-  await deps.settleActiveRun(active, 'aborted', null)
-  try {
-    await requestRuntimeCancel(active, deps)
-  }
- finally {
-    deps.releaseActiveRun(active)
-  }
+  active.cancelRequested = true
+  await deps.completeActiveTurn(active, {
+    source: 'cancel',
+    terminalChunk: { type: 'abort', reason: 'user' },
+    bestEffortBookkeeping: () => requestRuntimeCancel(active, deps),
+  })
 }
 
 export async function cancelSession(
   sessionId: string,
   deps: ActiveRunLifecycleDeps,
 ): Promise<void> {
-  if (await releaseTerminalPersistedActiveRunForSession(sessionId, deps)) {
+  if (await completeTerminalPersistedActiveRunForSession(sessionId, deps)) {
     return
   }
   const runId = runRegistry.getActiveRunIdForSession(sessionId)
@@ -85,22 +80,24 @@ export async function abortAllRuns(deps: ActiveRunLifecycleDeps): Promise<void> 
       continue
     }
     try {
-      await deps.settleActiveRun(active, 'aborted', null)
-      await requestRuntimeCancel(active, deps)
+      active.cancelRequested = true
+      await deps.completeActiveTurn(active, {
+        source: 'shutdown',
+        terminalChunk: { type: 'abort', reason: 'user' },
+        bestEffortBookkeeping: () => requestRuntimeCancel(active, deps),
+        resolveHandoff: () => ({ kind: 'none' }),
+      })
     }
  catch {
       /* best-effort */
-    }
- finally {
-      deps.releaseActiveRun(active)
     }
   }
   runRegistry.clearAll()
 }
 
-export async function releaseTerminalPersistedActiveRunForSession(
+export async function completeTerminalPersistedActiveRunForSession(
   sessionId: string,
-  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'releaseActiveRun'>,
+  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'completeActiveTurn'>,
 ): Promise<boolean> {
   const runId = runRegistry.getActiveRunIdForSession(sessionId)
   if (!runId) {
@@ -117,23 +114,20 @@ export async function releaseTerminalPersistedActiveRunForSession(
 
   const activeRun = runRegistry.getActiveRun(runId)
   if (activeRun) {
-    activeRun.terminalStatus ??= run.status
-    deps.releaseActiveRun(activeRun)
+    await deps.completeActiveTurn(activeRun, {
+      source: 'stale-fence',
+      terminalChunk:
+        run.status === 'complete'
+          ? { type: 'finish', finishReason: 'stop' }
+          : run.status === 'aborted'
+            ? { type: 'abort', reason: 'user' }
+            : { type: 'error', errorText: run.errorText ?? 'Chat run failed' },
+    })
   }
  else {
     runRegistry.deleteActiveRunIdForSession(sessionId)
   }
   return true
-}
-
-export async function finalizeInterruptedPersistedStreamingSessionIfIdle(
-  sessionId: string,
-  deps: Pick<ActiveRunLifecycleDeps, 'readRun' | 'releaseActiveRun'>,
-): Promise<void> {
-  await releaseTerminalPersistedActiveRunForSession(sessionId, deps)
-  if (!runRegistry.hasActiveRunForSession(sessionId) && !runRegistry.hasPendingRun(sessionId)) {
-    await recoverChatRuntimeSession(sessionId)
-  }
 }
 
 async function requestRuntimeCancel(

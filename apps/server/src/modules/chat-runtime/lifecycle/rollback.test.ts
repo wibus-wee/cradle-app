@@ -211,7 +211,6 @@ describe('rollbackLastTurn coordination', () => {
     runRegistry.setPendingRun('session-1', { cancelled: false })
 
     await expect(rollbackLastTurn('session-1', {
-      finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
       scheduleSessionQueueDrain: () => {},
     }, { beforeProviderRollback })).rejects.toMatchObject({
       code: 'chat_rollback_run_in_progress',
@@ -227,7 +226,6 @@ describe('rollbackLastTurn coordination', () => {
     const beforeProviderRollback = vi.fn()
 
     await expect(rollbackLastTurn('session-1', {
-      finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
       scheduleSessionQueueDrain: () => {},
     }, { beforeProviderRollback })).rejects.toMatchObject({
       code: 'chat_rollback_not_supported',
@@ -257,7 +255,6 @@ describe('rollbackLastTurn coordination', () => {
     })
 
     await rollbackLastTurn('session-1', {
-      finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
       scheduleSessionQueueDrain: () => {},
     }, {
       beforeProviderRollback: async () => {
@@ -285,7 +282,6 @@ describe('rollbackLastTurn coordination', () => {
     })
 
     const result = await rollbackTurns('session-1', 2, {
-      finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
       scheduleSessionQueueDrain: () => {},
     })
 
@@ -302,7 +298,6 @@ describe('rollbackLastTurn coordination', () => {
     const beforeProviderRollback = vi.fn()
 
     await expect(rollbackTurns('session-1', 2, {
-      finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
       scheduleSessionQueueDrain: () => {},
     }, { beforeProviderRollback })).rejects.toMatchObject({
       code: 'chat_rollback_turn_count_out_of_range',
@@ -317,7 +312,6 @@ describe('rollbackLastTurn coordination', () => {
     const providerRollback = setResolvedRuntime()
 
     await expect(rollbackLastTurn('session-1', {
-      finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
       scheduleSessionQueueDrain: () => {},
     }, {
       beforeProviderRollback: async () => {

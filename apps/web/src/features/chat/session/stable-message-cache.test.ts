@@ -22,20 +22,22 @@ describe('stable message cache records', () => {
   it('accepts revisioned present and authoritative-empty snapshots', () => {
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: 4,
       snapshotState: 'present',
       cachedAt: 100,
       rows,
+      nextCursor: 'older-page',
     })).toMatchObject({ revision: 4, snapshotState: 'present', rows })
 
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: 5,
       snapshotState: 'empty',
       cachedAt: 101,
       rows: [],
+      nextCursor: null,
     })).toMatchObject({ revision: 5, snapshotState: 'empty', rows: [] })
   })
 
@@ -47,19 +49,21 @@ describe('stable message cache records', () => {
     })).toBeNull()
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: -1,
       snapshotState: 'present',
       cachedAt: 100,
       rows,
+      nextCursor: null,
     })).toBeNull()
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: 4,
       snapshotState: 'present',
       cachedAt: 100,
       rows: [{ messageId: 'broken' }],
+      nextCursor: null,
     })).toBeNull()
   })
 })

@@ -1,10 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { getServerUrl } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
-import { chatMessageSnapshotQueryOptions } from '../api/messages'
+import { chatMessageHistoryInfiniteOptions } from '../api/messages'
 import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
 import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
@@ -35,18 +35,23 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
   controlsRef.current = controls
   const driverEnabled = active && !!chatSessionId
   const generatedSnapshotRowsOptions = useMemo(
-    () => chatMessageSnapshotQueryOptions(chatSessionId ?? ''),
+    () => chatMessageHistoryInfiniteOptions(chatSessionId ?? ''),
     [chatSessionId],
   )
-  const snapshotRowsQuery = useQuery({
+  const snapshotRowsQuery = useInfiniteQuery({
     ...generatedSnapshotRowsOptions,
     enabled: driverEnabled,
   })
   const runtimeStatusQuery = useRuntimeSessionStatus(driverEnabled ? chatSessionId : null, driverEnabled, {
     refetchInterval: false,
   })
-  const snapshotRevision = snapshotRowsQuery.data?.revision
-  const snapshotRows = snapshotRowsQuery.data?.rows as ChatSessionMessageRow[] | undefined
+  const snapshotRevision = snapshotRowsQuery.data?.pages[0]?.revision
+  const snapshotNextCursor = snapshotRowsQuery.data?.pages.at(-1)?.nextCursor ?? null
+  const snapshotRows = snapshotRowsQuery.data
+    ? [...snapshotRowsQuery.data.pages]
+        .reverse()
+        .flatMap(page => page.rows) as ChatSessionMessageRow[]
+    : undefined
   const runtimeStatus = runtimeStatusQuery.data
   // eslint-disable-next-line react-hooks/exhaustive-deps -- reset freshness baseline when the session identity changes
   const mountedAtMs = useMemo(() => Date.now(), [chatSessionId])
@@ -216,7 +221,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     const projection = deriveSessionSnapshotProjection({
       rows: snapshotRows,
       runState,
-      existingMessageCount: store.messagesMap.get(chatSessionId)?.length ?? 0,
+      existingMessages: store.messagesMap.get(chatSessionId) ?? [],
       runtimeStatusKnown,
       runtimeIdle,
       runtimeActiveRunMessageId,
@@ -279,10 +284,15 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     if (!stableRows) {
       return
     }
-    void writeStableMessageRows(chatSessionId, snapshotRevision, stableRows).catch((error: unknown) => {
+    void writeStableMessageRows(
+      chatSessionId,
+      snapshotRevision,
+      stableRows,
+      snapshotNextCursor,
+    ).catch((error: unknown) => {
       console.warn('[useChatSession] failed to write stable message cache', error)
     })
-  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, snapshotRevision, snapshotRows])
+  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, snapshotNextCursor, snapshotRevision, snapshotRows])
 
   useEffect(() => {
     if (!driverEnabled || !chatSessionId || !snapshotRowsQuery.isError) {

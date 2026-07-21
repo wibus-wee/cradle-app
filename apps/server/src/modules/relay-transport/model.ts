@@ -23,7 +23,8 @@ const hostEnrollment = t.Object({
   hostKeyFingerprint: t.String(),
   pinnedControllerPubkey: nullableString,
   status: enrollmentStatus,
-  pairingCode: nullableString,
+  /** True while a pairing code is still stored; the raw code is never listed. */
+  pairable: t.Boolean(),
   lastError: nullableString,
   createdAt: t.Number(),
   updatedAt: t.Number(),
@@ -43,12 +44,17 @@ export const RelayHostEnrollmentModel = {
     relayUrl: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
+  /** Create-only response: includes the pairing string shown once to the operator. */
   createdEnrollment: t.Object({
     ...hostEnrollment.properties,
     pairingString: t.String({ minLength: 1 }),
     pairingCodeExpiresAt: nullableString,
   }, { additionalProperties: false }),
 
+  /**
+   * Explicit re-read while the enrollment is still pairable. Preferred path for
+   * "show pairing string again" — list/get never embed the secret.
+   */
   pairingString: t.Object({
     pairingString: t.String({ minLength: 1 }),
     pairingCode: t.String({ minLength: 1 }),

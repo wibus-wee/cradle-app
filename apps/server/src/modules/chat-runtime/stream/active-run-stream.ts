@@ -28,7 +28,7 @@ import {
 import { runSubscribers } from './live-run-streams'
 
 export interface ActiveRunStreamControllerDeps {
-  releaseStaleActiveRun: (activeRun: ActiveRun, fence: RunWriteFence) => void
+  handleStaleActiveRun: (activeRun: ActiveRun, fence: RunWriteFence) => void
   error: (message: string, payload?: Record<string, unknown>) => void
 }
 
@@ -97,7 +97,7 @@ export function createActiveRunStreamController(
  catch (error) {
         const latestFence = readRunWriteFence(activeRun.runId)
         if (latestFence.status !== 'streaming') {
-          deps.releaseStaleActiveRun(activeRun, latestFence)
+          deps.handleStaleActiveRun(activeRun, latestFence)
           return
         }
         deps.error('failed to persist streaming message checkpoint', {
@@ -117,7 +117,7 @@ export function createActiveRunStreamController(
 
     // Run is already terminal or gone: a stale active run continued after
     // recovery. Stop writing and release it. The persisted terminal fact wins.
-    deps.releaseStaleActiveRun(activeRun, fence)
+    deps.handleStaleActiveRun(activeRun, fence)
   }
 
   function startSnapshotTimer(activeRun: ActiveRun): void {
@@ -210,7 +210,7 @@ export function createActiveRunStreamController(
     if (chunk && !activeRun.terminalStatus) {
       const fence = readRunWriteFence(activeRun.runId)
       if (fence.status !== 'streaming') {
-        deps.releaseStaleActiveRun(activeRun, fence)
+        deps.handleStaleActiveRun(activeRun, fence)
         return
       }
       publishUIMessageChunk(activeRun, chunk, false)

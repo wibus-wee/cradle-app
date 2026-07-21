@@ -78,7 +78,7 @@ function decideStartRun(
   state: ChatSessionState,
   event: Extract<ChatSessionEvent, { type: 'RunStarted' }>,
 ): ChatSessionDecisionResult {
-  if (event.payload.run.origin !== 'system' && state.activeRun) {
+  if (state.activeRun) {
     return domainError('run_already_active', 'Chat session already has an active run', {
       activeRunId: state.activeRun.runId,
       runId: event.payload.run.id,
@@ -107,9 +107,6 @@ function decideTerminalRun(
   state: ChatSessionState,
   event: Extract<ChatSessionEvent, { type: TerminalRunEventType }>,
 ): ChatSessionDecisionResult {
-  if (state.runOriginById.get(event.payload.runId) === 'system') {
-    return { ok: true, events: [event] }
-  }
   if (state.activeRun?.runId !== event.payload.runId) {
     return domainError('run_not_active', 'Terminal run event does not match the active run', {
       activeRunId: state.activeRun?.runId ?? null,

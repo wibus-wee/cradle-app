@@ -38,22 +38,22 @@ export interface TerminalRunFinalizerDeps {
   error: (message: string, payload: Record<string, unknown>) => void
 }
 
+export interface PersistedTerminalChunk {
+  durableTerminal: boolean
+  notificationChunk: UIMessageChunk
+}
+
 export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
-  async function publishTerminalChunk(
+  async function persistTerminalChunk(
     activeRun: ActiveRun,
     chunk: UIMessageChunk,
     profile?: ChatRuntimeProfile,
-  ): Promise<boolean> {
+  ): Promise<PersistedTerminalChunk> {
     deps.stream.publishRunStartChunk(activeRun)
     deps.stream.flushPendingRunDelta(activeRun)
     const status = readTerminalStatus(chunk)
     const errorText = chunk.type === 'error' ? chunk.errorText : null
-    const finalized = await finalizeActiveRun(activeRun, status, errorText, chunk, profile)
-    if (!finalized) {
-      return false
-    }
-    deps.stream.publishUIMessageChunk(activeRun, chunk, true)
-    return true
+    return finalizeActiveRun(activeRun, status, errorText, chunk, profile)
   }
 
   async function finalizeActiveRun(
@@ -62,21 +62,28 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     errorText: string | null,
     terminalChunk: UIMessageChunk,
     profile?: ChatRuntimeProfile,
-  ): Promise<boolean> {
-    if (status === 'streaming' || activeRun.terminalStatus) {
-      return false
+  ): Promise<PersistedTerminalChunk> {
+    if (status === 'streaming') {
+      return { durableTerminal: false, notificationChunk: terminalChunk }
+    }
+    if (activeRun.terminalStatus) {
+      return {
+        durableTerminal: true,
+        notificationChunk: terminalChunkForStatus(activeRun.terminalStatus),
+      }
     }
 
     const fence = readRunWriteFence(activeRun.runId)
     if (fence.status !== 'streaming') {
-      deps.stream.publishUIMessageChunk(activeRun, terminalChunkForFence(fence), true)
       if (fence.status !== 'missing') {
         activeRun.terminalStatus = fence.status
       }
-      return false
+      return {
+        durableTerminal: fence.status !== 'missing',
+        notificationChunk: terminalChunkForFence(fence),
+      }
     }
 
-    activeRun.terminalStatus = status
     if (profile) {
       profile.finalizeStartedAtMs = performance.now()
     }
@@ -91,6 +98,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
       errorText,
       bindingId,
     )
+    activeRun.terminalStatus = status
     if (profile) {
       profile.finalMessageJsonBytes = snapshotResult?.messageJsonBytes ?? null
     }
@@ -124,27 +132,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
         error: error instanceof Error ? error.message : String(error),
       })
     })
-    return true
-  }
-
-  async function settleActiveRun(
-    activeRun: ActiveRun,
-    status: TerminalChatMessageStatus,
-    errorText: string | null,
-  ): Promise<void> {
-    if (activeRun.terminalStatus) {
-      return
-    }
-    if (status === 'aborted') {
-      activeRun.cancelRequested = true
-    }
-    const terminalChunk: UIMessageChunk
-      = status === 'complete'
-        ? { type: 'finish', finishReason: 'stop' }
-        : status === 'aborted'
-          ? { type: 'abort', reason: 'user' }
-          : { type: 'error', errorText: errorText ?? 'Chat run failed' }
-    await publishTerminalChunk(activeRun, terminalChunk)
+    return { durableTerminal: true, notificationChunk: terminalChunk }
   }
 
   async function persistTerminalMessageSnapshot(
@@ -152,14 +140,13 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     status: TerminalChatMessageStatus,
     errorText: string | null,
     bindingId?: string | null,
-  ): Promise<{ messageJsonBytes: number } | null> {
-    try {
-      const now = currentUnixSeconds()
-      const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage))
-      const messageJson = JSON.stringify(message)
-      await commitSessionEventsWithProjection(
-        activeRun.sessionId,
-        [
+  ): Promise<{ messageJsonBytes: number }> {
+    const now = currentUnixSeconds()
+    const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage))
+    const messageJson = JSON.stringify(message)
+    await commitSessionEventsWithProjection(
+      activeRun.sessionId,
+      [
           {
             type: 'AssistantMessageCompleted',
             payload: {
@@ -187,28 +174,19 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
               finishedAt: now,
             },
           },
-        ],
-        (tx) => {
-          deleteRunStreamCheckpoint(activeRun.runId, tx)
-        },
-      )
-      return { messageJsonBytes: Buffer.byteLength(messageJson) }
-    }
- catch (error) {
-      deps.error('failed to persist final message snapshot', {
-        error,
-        sessionId: activeRun.sessionId,
-        runId: activeRun.runId,
-        messageId: activeRun.messageId,
-        status,
-      })
-      return null
-    }
+      ],
+      (tx) => {
+        deleteRunStreamCheckpoint(activeRun.runId, tx)
+      },
+    )
+    return { messageJsonBytes: Buffer.byteLength(messageJson) }
   }
 
   return {
-    publishTerminalChunk,
-    settleActiveRun,
+    persistTerminalChunk,
+    publishTerminalNotification: (activeRun: ActiveRun, chunk: UIMessageChunk): void => {
+      deps.stream.publishUIMessageChunk(activeRun, chunk, true)
+    },
   }
 }
 

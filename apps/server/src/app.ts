@@ -23,6 +23,7 @@ import {
 } from './modules/chat-runtime/http/events.routes'
 import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked-session-proxy'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
+import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
 import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-providers/opencode/managed-resource-adapter'
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
@@ -81,7 +82,6 @@ import { RuntimeResourceRegistry } from './runtime-resource-registry'
 
 interface CreateServerAppOptions {
   startBackgroundTasks?: boolean
-  recoverPersistedRunsOnCreate?: boolean
 }
 
 interface CreateServerContractAppOptions {
@@ -253,7 +253,6 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 
 export async function createServerApp(options: CreateServerAppOptions = {}) {
   const {
-    recoverPersistedRunsOnCreate = false,
     startBackgroundTasks = process.env.NODE_ENV !== 'test',
   } = options
   const downloadCenterService = new DownloadCenterService()
@@ -299,9 +298,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
     import('./modules/chat-runtime/run-snapshot-maintenance'),
   ])
-  if (recoverPersistedRunsOnCreate) {
-    recoverPersistedRunProjections()
-  }
+  await recoverPersistedRunProjections()
 
   const opencodeRuntimeInstallationService = new OpencodeRuntimeInstallationService({
     downloadCenter: downloadCenterService,
@@ -342,6 +339,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   reconcileExternalIssueSourceRegistrations()
 
   const runtimeResources = new RuntimeResourceRegistry()
+  const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()
   const runSnapshotMaintenance = new RunSnapshotMaintenanceScheduler()
   runtimeResources.register({
@@ -364,6 +362,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     name: 'opencode-runtime-installation',
     phase: 'drain',
     stop: () => opencodeRuntimeInstallationService.shutdown(),
+  })
+  runtimeResources.register({
+    name: 'claude-usage-reconciliation',
+    phase: 'cancel',
+    stop: () => claudeUsageReconciliation.stop(),
   })
   runtimeResources.register({
     name: 'codex-usage-reconciliation',
@@ -430,6 +433,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
 
   // Start chronicle daemon if enabled
   if (startBackgroundTasks) {
+    claudeUsageReconciliation.start()
     codexUsageReconciliation.start()
     runSnapshotMaintenance.start()
     BackgroundJobPoller.start()

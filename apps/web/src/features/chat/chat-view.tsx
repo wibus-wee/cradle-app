@@ -115,6 +115,7 @@ export function ChatView({
     respondToToolApproval,
     stop,
     rollback,
+    history,
     isReady,
     queueItems,
     cancelQueueItem,
@@ -172,6 +173,19 @@ export function ChatView({
     [composerRuntime, remoteConnectionBlocked],
   )
   const scrollRuntime = useChatScrollRuntime({ active: chatActive, sessionId, messageIds, status })
+  const loadEarlierMessages = useCallback(async () => {
+    const viewport = scrollRuntime.viewportRef.current
+    const previousScrollHeight = viewport?.scrollHeight ?? 0
+    const previousScrollTop = viewport?.scrollTop ?? 0
+    await history.loadEarlier()
+    requestAnimationFrame(() => {
+      const currentViewport = scrollRuntime.viewportRef.current
+      if (!currentViewport) {
+        return
+      }
+      currentViewport.scrollTop = previousScrollTop + currentViewport.scrollHeight - previousScrollHeight
+    })
+  }, [history, scrollRuntime.viewportRef])
   const appshotRuntime = useComposerAppshotCapture({
     active: chatActive,
     supportsAttachments: composerRuntime.supportsAttachments,
@@ -773,6 +787,19 @@ export function ChatView({
         messageTextTransform={messageTextTransform}
         hideMinimap={hideRuntimeToolbar}
         compactInset={compactInset}
+        historyControl={history.hasEarlier
+          ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={history.loadingEarlier}
+                onClick={() => void loadEarlierMessages()}
+              >
+                {history.loadingEarlier ? t('history.loadingEarlier') : t('history.loadEarlier')}
+              </Button>
+            )
+          : null}
         composerStack={(
           <>
             {remoteConnectionBlocked

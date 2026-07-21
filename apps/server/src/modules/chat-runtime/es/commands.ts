@@ -96,6 +96,77 @@ export function appendDecidedSessionEvents(
   return storedEvents
 }
 
+/**
+ * Recovery-only append path for a projection row that has already been validated as terminal.
+ * Normal commands must use {@link appendDecidedSessionEvents}; this path exists so startup can
+ * close legacy multi-run storms whose historical event ordering predates the all-origin
+ * single-active-run invariant.
+ */
+export function appendValidatedRecoverySessionEvents(
+  tx: ChatRuntimeTx,
+  sessionId: string,
+  input: {
+    runId: string
+    messageId: string | null
+    events: ChatSessionEvent[]
+    projectEvent?: (event: StoredChatSessionEvent) => boolean
+  },
+): StoredChatSessionEvent[] {
+  if (!input.events.some(event =>
+    (event.type === 'RunCompleted' || event.type === 'RunFailed' || event.type === 'RunAborted')
+    && event.payload.runId === input.runId)) {
+    throw new Error(`Recovery append requires a terminal fact for run ${input.runId}`)
+  }
+
+  const state = reduceChatSessionEvents(readSessionEvents(sessionId, tx))
+  let expectedVersion = state.version
+  const storedEvents: StoredChatSessionEvent[] = []
+  for (const event of input.events) {
+    assertRecoveryEventBelongsToRun(event, input)
+    const stored = appendSessionEvent(tx, {
+      aggregateId: sessionId,
+      event,
+      expectedVersion,
+    })
+    if (input.projectEvent?.(stored) ?? true) {
+      projectSessionEvent(tx, stored)
+    }
+    storedEvents.push(stored)
+    expectedVersion = stored.version
+  }
+  return storedEvents
+}
+
+function assertRecoveryEventBelongsToRun(
+  event: ChatSessionEvent,
+  input: { runId: string, messageId: string | null },
+): void {
+  switch (event.type) {
+    case 'RunStarted':
+      if (event.payload.run.id === input.runId) {
+        return
+      }
+      break
+    case 'AssistantMessageCompleted':
+      if (input.messageId !== null && event.payload.message.id === input.messageId) {
+        return
+      }
+      break
+    case 'RunCompleted':
+    case 'RunFailed':
+    case 'RunAborted':
+      if (event.payload.runId === input.runId) {
+        return
+      }
+      break
+    case 'QueueItemEnqueued':
+      return
+    default:
+      break
+  }
+  throw new Error(`Unsupported recovery event ${event.type} for run ${input.runId}`)
+}
+
 export function readRunTerminalEventType(
   status: Exclude<ChatMessageStatus, 'streaming'>,
 ): TerminalRunEventType {
@@ -467,7 +538,7 @@ export async function recordQueuePositions(
 
 function throwDomainError(error: ChatSessionDomainError): never {
   throw new AppError({
-    code: `chat_session_${error.code}`,
+    code: error.code === 'run_already_active' ? 'chat_run_in_progress' : `chat_session_${error.code}`,
     status: 409,
     message: error.message,
     details: error.details,

@@ -10,7 +10,7 @@ import { db } from '../../../infra'
 import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contract'
 import * as Observability from '../../observability/service'
 import type { RuntimeUsageEventContext } from '../../usage/ingest'
-import { recordRuntimeUsageEvent, replaceLegacyCodexUsage } from '../../usage/ingest'
+import { recordRuntimeUsageEvent, replaceLegacyRuntimeUsage } from '../../usage/ingest'
 import { CodexAppServerClient, resolveCodexAppServerHome } from './app-server/client'
 import type { Thread } from './app-server-protocol/v2/Thread'
 import type { ThreadListParams } from './app-server-protocol/v2/ThreadListParams'
@@ -155,7 +155,7 @@ export async function reconcileCodexSessionUsage(
   }
 
   const persisted = input.replaceLegacyUsage
-    ? replaceLegacyCodexUsage({ sessionId: input.sessionId, events })
+    ? replaceLegacyRuntimeUsage({ sessionId: input.sessionId, runtimeKind: 'codex', events })
     : persistUsageEvents(events)
   summary.inserted += persisted.inserted
   summary.duplicates += persisted.duplicates

@@ -993,7 +993,7 @@ describe('session capability', () => {
         })
         .run()
 
-      app = await createServerApp({ recoverPersistedRunsOnCreate: true })
+      app = await createServerApp()
 
       const getRes = await app.handle(new Request(`http://localhost/sessions/${sessionId}`))
       expect(await getRes.json()).toEqual(

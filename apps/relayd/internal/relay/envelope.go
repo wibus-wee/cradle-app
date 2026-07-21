@@ -21,6 +21,12 @@ var (
 	ErrFrameTooLarge   = errors.New("relay: frame too large")
 )
 
+// Envelope is the outer relayd frame. Dual-written with
+// apps/server/src/modules/relay-transport/protocol.ts — keep shapes in lockstep.
+//
+// Seq is stamped by senders for debug/ordering; relayd does not enforce it yet.
+// Ack and StreamID are reserved/unused: stream multiplexing and credit live in
+// the encrypted inner frames (opaque payload), not on this envelope.
 type Envelope struct {
 	Version  int             `json:"version"`
 	RoomID   string          `json:"roomId"`

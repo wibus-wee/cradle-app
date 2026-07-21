@@ -85,7 +85,7 @@ describe('session snapshot projection', () => {
         row({ id: 'assistant-empty', role: 'assistant', status: 'streaming', parts: [] }),
       ],
       runState: idleRunState,
-      existingMessageCount: 2,
+      existingMessages: [],
       runtimeStatusKnown: true,
       runtimeIdle: true,
       runtimeActiveRunMessageId: null,
@@ -110,7 +110,7 @@ describe('session snapshot projection', () => {
     const projection = deriveSessionSnapshotProjection({
       rows: [],
       runState: idleRunState,
-      existingMessageCount: 2,
+      existingMessages: [],
       runtimeStatusKnown: true,
       runtimeIdle: true,
       runtimeActiveRunMessageId: null,
@@ -134,7 +134,7 @@ describe('session snapshot projection', () => {
         row({ id: 'assistant-old', role: 'assistant', text: 'Previous answer' }),
       ],
       runState: idleRunState,
-      existingMessageCount: 2,
+      existingMessages: [],
       runtimeStatusKnown: true,
       runtimeIdle: false,
       runtimeActiveRunMessageId: 'assistant-live',
@@ -149,13 +149,27 @@ describe('session snapshot projection', () => {
     })
   })
 
+  it('preserves a live streamed message when a paged snapshot has not projected it yet', () => {
+    const live = message({ id: 'assistant-live', role: 'assistant', text: 'Streaming' })
+    const projection = deriveSessionSnapshotProjection({
+      rows: [row({ id: 'assistant-old', role: 'assistant', text: 'Previous answer' })],
+      runState: idleRunState,
+      existingMessages: [live],
+      runtimeStatusKnown: true,
+      runtimeIdle: false,
+      runtimeActiveRunMessageId: 'assistant-live',
+    })
+
+    expect(projection?.messages.map(item => item.id)).toEqual(['assistant-old', 'assistant-live'])
+  })
+
   it('does not project snapshots over a locally driven run', () => {
     const projection = deriveSessionSnapshotProjection({
       rows: [
         row({ id: 'assistant-passive', role: 'assistant', status: 'streaming', text: 'Passive' }),
       ],
       runState: { phase: 'streaming', source: 'local', messageId: 'assistant-local' },
-      existingMessageCount: 1,
+      existingMessages: [],
       runtimeStatusKnown: true,
       runtimeIdle: false,
       runtimeActiveRunMessageId: 'assistant-passive',

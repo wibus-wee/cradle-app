@@ -31,7 +31,6 @@ export interface RollbackLastTurnDto {
 }
 
 export interface RollbackLastTurnDeps {
-  finalizeInterruptedPersistedStreamingSessionIfIdle: (sessionId: string) => Promise<void>
   scheduleSessionQueueDrain: (sessionId: string) => void
 }
 
@@ -67,8 +66,6 @@ export async function rollbackTurns(
 
   claimRollbackSession(sessionId)
   try {
-    await deps.finalizeInterruptedPersistedStreamingSessionIfIdle(sessionId)
-
     const queue = readBlockingQueueCounts(sessionId)
     if (queue.pending > 0 || queue.running > 0) {
       throw new AppError({

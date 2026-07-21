@@ -51,11 +51,20 @@ agent 交付工具 `work_submit` 改名为 git 语义的 `manage_pull_request`�
 （编号 059 已被 `advisor/059-javascript-session-await` 分支上的
 `059-programmable-javascript-session-await` 占用，故本计划取 060。）
 
+2026-07-20 在 commit `b2d90065` 上补充 Plan 061：针对 Session
+`8f9964fe-9df6-4d09-aa28-88f0aeee0235` 的 880-way Claude synthetic turn storm，
+把 all-origin admission、durable terminal、boot recovery 与 bounded history hydration
+收敛为一个 Chat Runtime 生命周期方案。Plan 061 取代只覆盖 completion 的 Plan 044；
+不删除历史 event，而以 upgrade-safe recovery、DB 单 streaming-run invariant 和 cursor
+pagination 同时封死写入 fan-out 与打开 Session 的无界 CPU 成本。
+
 2026-07-21 补充 Plan 061：Cradle Recall（Cradle 版 Obelisk agent design）。先落
 Agent Cognition Stack（L1 Evidence → L5 Orchestration）与 CodeAct 契约
 （`recall_query` / `recall_attune`），再分阶段实现 runtime。明确不做 harness 自动注入、
 不做 helper 级 MCP tool sprawl、不引入 async CQRS 索引。Phase A 仅 design docs + skill；
 implementation 建议等 Plan 050/051 收敛 session/issue projection 后再做 Phase B。
+
+
 
 Each executor: read the plan fully before starting, run its drift check, honor its
 STOP conditions, and update your row below when done. Plans are self-contained —
@@ -72,7 +81,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 003  | Require auth on relay-tunneled traffic                   | P1       | M      | 002        | DONE                                                                                   |
 | 004  | Constrain filesystem browse + shell cwd to roots         | P1       | S      | 002        | DONE                                                                                   |
 | 005  | Close SSRF gaps (link-preview + provider-catalog)        | P1       | M      | —          | DONE                                                                                   |
-| 006  | Stop returning relay pairing codes on read routes        | P1       | S      | 002        | BLOCKED (drift check: relay-transport changed since ac47f3b)                           |
+| 006  | Stop returning relay pairing codes on read routes        | P1       | S      | 002        | DONE                                                                                   |
 | 010  | Fix issue-agent run-tracking races + delegation tx       | P1       | M      | —          | DONE                                                                                   |
 | 013  | Include apps/web tests in root test run                  | P1       | S      | —          | DONE                                                                                   |
 | 014  | Crash-safe SSE/WS handlers + cursor-correct reconnect    | P1       | M      | —          | DONE                                                                                   |
@@ -110,7 +119,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 041  | Enforce domain and lifecycle ownership                   | P1       | XL     | 038, 040   | DONE                                                                                  |
 | 042  | Collapse Automation contract and query path              | P0       | L      | 040        | TODO                                                                                  |
 | 043  | Deepen Composer Draft lifecycle ownership                | P1       | M      | 040        | TODO                                                                                  |
-| 044  | Establish one Chat turn completion owner                 | P1       | L      | 024, 041   | TODO                                                                                  |
+| 044  | Establish one Chat turn completion owner                 | P1       | L      | 024, 041   | REJECTED (superseded by end-to-end lifecycle Plan 061)                                |
 | 045  | Close the Provider Catalog target query seam             | P2       | M      | 035, 048   | TODO (execute after Plan 035 status is reconciled and Plan 048 lands)                  |
 | 046  | Deepen Terminal lifetime ownership                       | P2       | M      | 041        | TODO                                                                                  |
 | 047  | Build a unified, thin Download Center                    | P1       | XL     | 028, 041   | TODO                                                                                  |
@@ -126,7 +135,8 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 058  | Add a configurable, crash-safe desktop server data directory | P1       | L      | —         | DONE (`cb781d4`; reviewed in disposable worktree)                                     |
 | 059  | Programmable JavaScript Session Awaits via worker-thread cells | P1       | L      | —         | DONE (`cc7c1e9`; reviewed in `tmp/worktree-plan-059`)                                 |
 | 060  | Rename agent tool to `manage_pull_request` + pre-PR branch rename | P2  | M      | branch `feat/enhance-work` | DONE (`dfe2fb88`..`a7aa8e93` on `feat/enhance-work`; advisor-reviewed)   |
-| 061  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
+| 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
+| 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

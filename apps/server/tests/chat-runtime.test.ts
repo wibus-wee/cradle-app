@@ -3724,6 +3724,87 @@ describe('chat runtime capability', () => {
     }
   })
 
+  it('admits one of two concurrent starts without persisting the losing draft', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousSecret = process.env.CRADLE_CREDENTIAL_SECRET
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_CREDENTIAL_SECRET = 'chat-runtime-secret'
+
+    const runtime = new TestPendingRuntimeSettingsRuntime()
+    const originalCodexRuntime = getRuntimeRegistry().get('codex')
+    let app: Awaited<ReturnType<typeof createServerApp>> | undefined
+
+    try {
+      app = await createServerApp()
+      registerRuntime(runtime)
+      db()
+        .insert(workspaces)
+        .values({
+          id: 'workspace-concurrent-start',
+          name: 'Workspace Concurrent Start',
+          path: workspaceRoot,
+          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        })
+        .run()
+
+      await createProfileAndSession(app, 'workspace-concurrent-start', {
+        providerTargetId: 'provider-target-concurrent-start',
+        sessionId: 'session-concurrent-start',
+        runtimeKind: 'codex',
+      })
+
+      const firstResponsePromise = app.handle(
+        new Request('http://localhost/chat/sessions/session-concurrent-start/response', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: 'First admitted turn' }),
+        }),
+      )
+      await runtime.startRequested
+
+      const losingResponse = await app.handle(
+        new Request('http://localhost/chat/sessions/session-concurrent-start/response', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: 'Losing concurrent turn' }),
+        }),
+      )
+
+      expect(losingResponse.status).toBe(409)
+      expect(await losingResponse.json()).toEqual(
+        expect.objectContaining({ code: 'chat_run_in_progress' }),
+      )
+      expect(
+        db().select().from(messages).where(eq(messages.sessionId, 'session-concurrent-start')).all(),
+      ).toHaveLength(0)
+      expect(
+        db()
+          .select()
+          .from(backendRuns)
+          .where(eq(backendRuns.chatSessionId, 'session-concurrent-start'))
+          .all(),
+      ).toHaveLength(0)
+
+      runtime.release()
+      const firstResponse = await firstResponsePromise
+      expect(firstResponse.status).toBe(200)
+      await collectSseChunks(firstResponse)
+    }
+    finally {
+      runtime.release()
+      if (originalCodexRuntime) {
+        registerRuntime(originalCodexRuntime)
+      }
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_CREDENTIAL_SECRET', previousSecret)
+    }
+  })
+
   it('auto-falls back to queueing a live steer when its provider target differs from the active run', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')

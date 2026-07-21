@@ -7,6 +7,7 @@ import { createAcpProvider } from '../chat-runtime-providers/acp/provider'
 import { createClaudeAgentProvider } from '../chat-runtime-providers/claude-agent/provider'
 import { createCodexProvider } from '../chat-runtime-providers/codex/provider'
 import { reconcileCodexSessionUsage } from '../chat-runtime-providers/codex/usage-reconciliation'
+import { createKimiProvider } from '../chat-runtime-providers/kimi/provider'
 import { createMockClaudeAgentProvider } from '../chat-runtime-providers/mock-claude-agent/provider'
 import { createStandardProvider } from '../chat-runtime-providers/openai-compatible/provider'
 import { createOpencodeProvider } from '../chat-runtime-providers/opencode/provider'
@@ -497,6 +498,7 @@ export function getRuntimeRegistry(): RuntimeRegistry {
         }
       },
     }))
+    registry.register(createKimiProvider(ctx))
     registry.register(createSystemAgentProvider(ctx))
   }
   return registry

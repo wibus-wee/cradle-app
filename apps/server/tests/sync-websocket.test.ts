@@ -146,7 +146,7 @@ function waitForSyncFrame(socket: WebSocket, timeoutMs = 5000): Promise<z.infer<
 }
 
 async function startTestServer(): Promise<{ app: ElysiaApp, baseUrl: string }> {
-  const app = await createServerApp({ recoverPersistedRunsOnCreate: false, startBackgroundTasks: false })
+  const app = await createServerApp({ startBackgroundTasks: false })
   const port = await getAvailablePort()
   app.listen({ hostname: '127.0.0.1', port })
   return {

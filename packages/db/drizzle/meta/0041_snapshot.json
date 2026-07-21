@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "dda026db-fec9-4e08-9a95-b912dc89d849",
-  "prevId": "ca1bbbc1-a00c-4094-ad90-641642b65d5c",
+  "id": "6c2fbe7d-38d6-4f45-9f88-78cd3815d27a",
+  "prevId": "dda026db-fec9-4e08-9a95-b912dc89d849",
   "tables": {
     "acp_agents": {
       "name": "acp_agents",
@@ -15750,7 +15750,7 @@
           "name": "destination_provider_target_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "imported_message_count": {

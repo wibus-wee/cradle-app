@@ -63,7 +63,6 @@ describe('enqueueSessionQueueItem', () => {
           providerTargetId: toOpenCodeRuntimeNativeProviderTargetId('github-copilot'),
         },
         {
-          finalizeInterruptedPersistedStreamingSessionIfIdle: async () => {},
           scheduleSessionQueueDrain: () => {},
         },
       )
