@@ -45,6 +45,7 @@ interface ChatComposerSendOverrides {
 export interface ChatComposerRuntime {
   disabled: boolean
   isStreaming: boolean
+  canStop: boolean
   send: (
     text: string,
     files: FileUIPart[],
@@ -71,6 +72,7 @@ interface UseChatComposerRuntimeOptions {
   active?: boolean
   sessionId: string | null
   isStreaming: boolean
+  canStop: boolean
   isReady: boolean
   workspaceId?: string | null
   remoteHostId?: string | null
@@ -128,6 +130,7 @@ export function useChatComposerRuntime({
   active = true,
   sessionId,
   isStreaming,
+  canStop,
   isReady,
   workspaceId,
   remoteHostId = null,
@@ -162,7 +165,7 @@ export function useChatComposerRuntime({
     enabled: sessionQueriesEnabled,
     staleTime: 2_000,
     refetchInterval: query =>
-      active && (isStreaming || shouldPollRuntimeSlotStates(query.state.data?.states ?? []))
+      active && (canStop || shouldPollRuntimeSlotStates(query.state.data?.states ?? []))
         ? 5_000
         : false,
     retry: false,
@@ -349,6 +352,7 @@ export function useChatComposerRuntime({
   return {
     disabled: !isReady,
     isStreaming,
+    canStop,
     send,
     stop,
     slashCommands,

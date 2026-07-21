@@ -428,7 +428,7 @@ export function ChatComposerSection({
           send={{
             submit: submitComposerMessage,
             stop: composerRuntime.stop,
-            isStreaming: composerRuntime.isStreaming,
+            isStreaming: composerRuntime.canStop,
             disabled: composerRuntime.disabled || planRefineEditorOpen,
             onQuickQuestion,
           }}

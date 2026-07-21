@@ -21,6 +21,10 @@ export interface LobeIconEntry {
 
 export const lobeIconsToc = tocData as LobeIconEntry[]
 
+export function getLobeIconBrandColor(slug: string): string | null {
+  return lobeIconsToc.find(entry => entry.docsUrl === slug)?.color ?? null
+}
+
 // Vite glob import for PNG icons (as URL, for <img> usage)
 const darkIcons = import.meta.glob<string>(
   '/node_modules/@lobehub/icons-static-png/dark/*.png',

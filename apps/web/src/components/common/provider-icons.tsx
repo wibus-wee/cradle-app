@@ -2,13 +2,15 @@ import type { ComponentProps } from 'react'
 import { useEffect, useState } from 'react'
 
 import { cn } from '~/lib/cn'
-import { getLobeIconUrl } from '~/lib/lobe-icons'
+import { getLobeIconBrandColor, getLobeIconUrl } from '~/lib/lobe-icons'
 import { useResolvedThemeMode } from '~/store/theme'
 
 import hijarvisIconUrl from './assets/hijarvis.png'
 
 type IconProps = ComponentProps<'svg'>
 export type RuntimeIconDescriptor = { key: string } | { svg: string } | { url: string }
+
+const LOBE_ICON_BRAND_BACKGROUND_SLUGS = new Set(['kimi'])
 
 // ─── Brand icons (SVG paths sourced from @lobehub/icons-static-svg) ────────────
 // Each icon uses its official brand color.
@@ -172,6 +174,21 @@ function LobeIconImage({ slug, className }: { slug: string, className?: string }
 
   if (!url) {
     return <div className={cn('animate-pulse rounded bg-muted', className)} />
+  }
+
+  const backgroundColor = LOBE_ICON_BRAND_BACKGROUND_SLUGS.has(slug)
+    ? getLobeIconBrandColor(slug)
+    : null
+  if (backgroundColor) {
+    return (
+      <div className={cn('flex items-center justify-center rounded p-0.5', className)} style={{ backgroundColor }}>
+        <img
+          src={url}
+          alt={slug}
+          className={cn('object-contain', className)}
+        />
+      </div>
+    )
   }
 
   return (
