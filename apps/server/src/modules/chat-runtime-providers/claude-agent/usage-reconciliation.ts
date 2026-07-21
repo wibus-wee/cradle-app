@@ -62,7 +62,18 @@ export async function reconcileClaudeSessionUsage(input: {
   summary.bindings = 1
   const recordIncident = input.recordIncident ?? (incident => recordReconciliationIncident(input.sessionId, incident))
   const runtimeHome = input.runtimeHome ?? resolveClaudeAgentSdkConfigDir()
-  const transcriptPaths = findClaudeTranscriptPaths(runtimeHome, input.providerSessionId)
+  let transcriptPaths: string[]
+  try {
+    transcriptPaths = findClaudeTranscriptPaths(runtimeHome, input.providerSessionId)
+  }
+  catch (error) {
+    summary.incidents += 1
+    recordIncident({
+      reason: `Claude usage reconciliation could not locate a Cradle-owned transcript: ${errorMessage(error)}`,
+    })
+    markBindingReconciliation(input.bindingId, 'blocked')
+    return { ...summary, completed: false }
+  }
   if (transcriptPaths.length === 0) {
     summary.incidents += 1
     recordIncident({ reason: 'Claude usage reconciliation could not locate a Cradle-owned transcript.' })
@@ -73,16 +84,22 @@ export async function reconcileClaudeSessionUsage(input: {
   const events: RuntimeUsageEventContext[] = []
   for (const path of transcriptPaths) {
     summary.transcripts += 1
-    const result = await readClaudeTranscript({
-      path,
-      runtimeHome,
-      providerSessionId: input.providerSessionId,
-      sessionId: input.sessionId,
-      providerTargetId: input.providerTargetId,
-      recordIncident,
-    })
-    events.push(...result.events)
-    summary.incidents += result.incidents
+    try {
+      const result = await readClaudeTranscript({
+        path,
+        runtimeHome,
+        providerSessionId: input.providerSessionId,
+        sessionId: input.sessionId,
+        providerTargetId: input.providerTargetId,
+        recordIncident,
+      })
+      events.push(...result.events)
+      summary.incidents += result.incidents
+    }
+    catch (error) {
+      summary.incidents += 1
+      recordIncident({ reason: `Claude transcript could not be replayed: ${errorMessage(error)}`, path })
+    }
   }
   if (summary.incidents > 0) {
     markBindingReconciliation(input.bindingId, 'blocked')
