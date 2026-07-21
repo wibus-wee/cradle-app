@@ -203,7 +203,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-session-1',
         message: {
+          id: 'msg_1',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Claude says hi' }],
+          usage: { input_tokens: 9, output_tokens: 4 },
         },
       },
       {
@@ -300,7 +303,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-agent-settings-session',
         message: {
+          id: 'msg_2',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Agent configured' }],
+          usage: { input_tokens: 3, output_tokens: 2 },
         },
       },
       {
@@ -432,7 +438,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-session-matrix-session',
         message: {
+          id: 'msg_3',
+          model: 'claude-sonnet-main',
           content: [{ type: 'text', text: 'Session configured' }],
+          usage: { input_tokens: 4, output_tokens: 2 },
         },
       },
       {
@@ -550,9 +559,12 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-tool-session',
         message: {
+          id: 'msg_4a',
+          model: 'claude-sonnet-4-20250514',
           content: [
             { type: 'tool_use', id: 'toolu_abc123', name: 'bash', input: { command: 'echo hello' } },
           ],
+          usage: { input_tokens: 10, output_tokens: 3 },
         },
       },
       {
@@ -568,7 +580,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-tool-session',
         message: {
+          id: 'msg_4b',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Done running bash' }],
+          usage: { input_tokens: 15, output_tokens: 5 },
         },
       },
       {
@@ -676,10 +691,13 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-subagent-session',
         message: {
+          id: 'msg_5a',
+          model: 'claude-sonnet-4-20250514',
           content: [
             { type: 'text', text: 'Main task dispatch' },
             { type: 'tool_use', id: 'toolu_parent_1', name: 'task', input: { description: 'Investigate runtime' } },
           ],
+          usage: { input_tokens: 10, output_tokens: 4 },
         },
       },
       {
@@ -696,14 +714,20 @@ describe('sdk-backed providers in unified chat runtime', () => {
         session_id: 'claude-subagent-session',
         parent_tool_use_id: 'toolu_parent_1',
         message: {
+          id: 'msg_5b',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Subagent investigating' }],
+          usage: { input_tokens: 5, output_tokens: 2 },
         },
       },
       {
         type: 'assistant',
         session_id: 'claude-subagent-session',
         message: {
+          id: 'msg_5c',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Main task finished' }],
+          usage: { input_tokens: 15, output_tokens: 5 },
         },
       },
       {
@@ -802,10 +826,13 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-subagent-late-task-session',
         message: {
+          id: 'msg_6a',
+          model: 'claude-sonnet-4-20250514',
           content: [
             { type: 'text', text: 'Dispatch late-task subagent' },
             { type: 'tool_use', id: 'toolu_parent_late', name: 'task', input: { description: 'Investigate late task metadata' } },
           ],
+          usage: { input_tokens: 10, output_tokens: 4 },
         },
       },
       {
@@ -813,7 +840,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
         session_id: 'claude-subagent-late-task-session',
         parent_tool_use_id: 'toolu_parent_late',
         message: {
+          id: 'msg_6b',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Working before task metadata arrives' }],
+          usage: { input_tokens: 5, output_tokens: 2 },
         },
       },
       {
@@ -918,18 +948,24 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-subagent-split-session',
         message: {
+          id: 'msg_7a',
+          model: 'claude-sonnet-4-20250514',
           content: [
             { type: 'tool_use', id: 'call_parent_a', name: 'Agent', input: { description: 'Explore preferences', subagent_type: 'Explore' } },
           ],
+          usage: { input_tokens: 10, output_tokens: 3 },
         },
       },
       {
         type: 'assistant',
         session_id: 'claude-subagent-split-session',
         message: {
+          id: 'msg_7b',
+          model: 'claude-sonnet-4-20250514',
           content: [
             { type: 'tool_use', id: 'call_parent_b', name: 'Agent', input: { description: 'Explore diff-review', subagent_type: 'Explore' } },
           ],
+          usage: { input_tokens: 10, output_tokens: 3 },
         },
       },
       {
@@ -1103,9 +1139,12 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-err-session',
         message: {
+          id: 'msg_8a',
+          model: 'claude-sonnet-4-20250514',
           content: [
             { type: 'tool_use', id: 'toolu_err456', name: 'bash', input: { command: 'false' } },
           ],
+          usage: { input_tokens: 8, output_tokens: 2 },
         },
       },
       {
@@ -1121,7 +1160,10 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'assistant',
         session_id: 'claude-err-session',
         message: {
+          id: 'msg_8b',
+          model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Command failed' }],
+          usage: { input_tokens: 12, output_tokens: 4 },
         },
       },
       {

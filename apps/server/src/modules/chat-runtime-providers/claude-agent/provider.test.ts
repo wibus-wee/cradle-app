@@ -5093,7 +5093,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     expect(activeQuery.getContextUsage).toHaveBeenCalledOnce()
   })
 
-  it('accumulates usage across multiple streaming messages', async () => {
+  it('emits only final assistant usage events', async () => {
     const provider = new ClaudeAgentProvider({
       readSecret: () => 'sk-ant-test',
     })
@@ -5101,70 +5101,49 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     const activeQuery = createAsyncQuery([
       {
         type: 'stream_event',
-        event: {
-          type: 'message_delta',
+        event: { type: 'message_delta', usage: { input_tokens: 100, output_tokens: 50 } },
+        session_id: 'claude-session-1',
+      },
+      {
+        type: 'assistant',
+        session_id: 'claude-session-1',
+        message: {
+          id: 'msg-final',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Hello' }],
           usage: { input_tokens: 100, output_tokens: 50 },
         },
-        session_id: 'claude-session-1',
-      },
-      {
-        type: 'stream_event',
-        event: {
-          type: 'content_block_delta',
-          index: 0,
-          delta: { type: 'text_delta', text: 'Hello' },
-        },
-        session_id: 'claude-session-1',
-      },
-      {
-        type: 'stream_event',
-        event: {
-          type: 'message_delta',
-          usage: { input_tokens: 0, output_tokens: 25 },
-        },
-        session_id: 'claude-session-1',
       },
       {
         type: 'result',
-        usage: { input_tokens: 0, output_tokens: 10 },
+        usage: { input_tokens: 100, output_tokens: 50 },
         session_id: 'claude-session-1',
       },
     ])
-
     sdkMocks.query.mockReturnValue(activeQuery)
+    const usageEvents: unknown[] = []
 
     const chunks: UIMessageChunk[] = []
     for await (const chunk of provider.streamTurn({
       runId: 'run-test',
       runtimeSession: createRuntimeSession(),
       profile: createProfile(),
-      message: {
-        id: 'user-1',
-        role: 'user',
-        parts: [{ type: 'text', text: 'Test' }],
-      },
+      message: { id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Test' }] },
       workspaceId: 'workspace-1',
+      onUsageEvent: (event) => { usageEvents.push(event) },
     })) {
       chunks.push(chunk)
     }
 
-    // lastUsage should be the most recent usage
-    expect(provider.lastUsage).toEqual({
-      promptTokens: 0,
-      completionTokens: 10,
-      totalTokens: 10,
-      cachedInputTokens: 0,
-      cacheWriteInputTokens: 0,
-    })
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'finish' }))
 
-    // totalUsage should be the sum of all usage
-    expect(provider.totalUsage).toEqual({
-      promptTokens: 100,
-      completionTokens: 85, // 50 + 25 + 10
-      totalTokens: 185,
-      cachedInputTokens: 0,
-      cacheWriteInputTokens: 0,
-      reasoningOutputTokens: 0,
-    })
+    expect(usageEvents).toEqual([
+      expect.objectContaining({
+        providerThreadId: 'claude-session-1',
+        providerTurnId: 'msg-final',
+        modelId: 'claude-opus-4-8',
+        usage: expect.objectContaining({ totalTokens: 150 }),
+      }),
+    ])
   })
 })

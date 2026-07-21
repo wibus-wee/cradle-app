@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { sessions, usageLogs } from '@cradle/db'
+import { backendSessionBindings, sessions, usageLogs } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
-import { recordRuntimeUsageEvent, replaceLegacyCodexUsage } from './ingest'
+import { recordRuntimeUsageEvent, replaceLegacyRuntimeUsage } from './ingest'
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
 let dataDir = ''
@@ -101,6 +101,11 @@ describe('recordRuntimeUsageEvent', () => {
 
   it('atomically replaces only legacy Codex summary rows after a verified session replay', () => {
     db().insert(sessions).values({ id: 'session-1', title: 'Session', runtimeKind: 'codex' }).run()
+    db().insert(backendSessionBindings).values({
+      id: 'binding-1',
+      chatSessionId: 'session-1',
+      runtimeKind: 'codex',
+    }).run()
     db().insert(usageLogs).values({
       id: 'legacy-summary',
       sessionId: 'session-1',
@@ -111,8 +116,9 @@ describe('recordRuntimeUsageEvent', () => {
       createdAt: 1_700_000_000,
     }).run()
 
-    const result = replaceLegacyCodexUsage({
+    const result = replaceLegacyRuntimeUsage({
       sessionId: 'session-1',
+      runtimeKind: 'codex',
       events: [{
         event: {
           id: 'event-1',

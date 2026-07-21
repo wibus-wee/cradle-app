@@ -1,4 +1,4 @@
-import { usageLogs } from '@cradle/db'
+import { backendSessionBindings, usageLogs } from '@cradle/db'
 import { and, eq, isNull } from 'drizzle-orm'
 
 import { db } from '../../infra'
@@ -19,15 +19,24 @@ export function recordRuntimeUsageEvent(input: RuntimeUsageEventContext): 'inser
   return result.changes > 0 ? 'inserted' : 'duplicate'
 }
 
-export function replaceLegacyCodexUsage(input: {
+export function replaceLegacyRuntimeUsage(input: {
   sessionId: string
+  runtimeKind: string
   events: RuntimeUsageEventContext[]
 }): { inserted: number, duplicates: number } {
   for (const event of input.events) {
     validateRuntimeUsageEventContext(event)
     if (event.sessionId !== input.sessionId) {
-      throw new Error('Codex usage reconciliation events must belong to one Cradle session.')
+      throw new Error('Runtime usage reconciliation events must belong to one Cradle session.')
     }
+  }
+
+  const binding = db().select({ id: backendSessionBindings.id }).from(backendSessionBindings).where(and(
+      eq(backendSessionBindings.chatSessionId, input.sessionId),
+      eq(backendSessionBindings.runtimeKind, input.runtimeKind),
+    )).get()
+  if (!binding) {
+    throw new Error('Runtime usage reconciliation can only replace a matching session binding.')
   }
 
   return db().transaction((tx) => {
