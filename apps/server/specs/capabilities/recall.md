@@ -77,14 +77,19 @@ Authority: L1 evidence > L2 memory for factual claims.
 - Separate MCP tool per helper
 - Semantic vector search (FTS + structured first)
 
+## Module ownership
+
+- **Owner:** `modules/recall` — L3 agent contract, sandbox, attune (Phase D)
+- **Facade:** `modules/search` — human palette; delegates to recall query core
+- **Evidence writers:** chat-runtime projectors → recall ingest (read model only)
+
 ## Overlap with Search Module
 
-| Today | Future |
-| ----- | ------ |
-| `GET /search/threads` — human FTS, incomplete indexer | May delegate to recall query core |
-| `GET /search/chronicle` — lexical scan | Replace with L2 `memories()` / chronicle public search |
-
-Search remains human-facing facade until unified; Recall owns **agent CodeAct contract**.
+| Surface | Owner |
+| ------- | ----- |
+| Agent `recall_query` | recall |
+| Human `@` threads / palette | search → recall core |
+| Chronicle MCP | **Unchanged**; out of scope for recall track |
 
 ## Test Plan (when implementing)
 

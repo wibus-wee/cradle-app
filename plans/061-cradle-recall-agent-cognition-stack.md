@@ -206,7 +206,89 @@ the default workspace-wide recall.
 Empty workspace-scoped results are valid. Broaden to global only when the user asks
 or workspace scope clearly cannot answer (e.g. cross-repo question).
 
-## Assembly model (L3 vs L4)
+## Locked decisions (2026-07-21)
+
+| # | Topic | Decision |
+| - | ----- | -------- |
+| 1 | Module owner | **`modules/recall`** owns L3 agent contract; **`search`** remains human palette facade over same query core |
+| 4 | Sandbox | **Reuse `javascript-eval`** managed-process pattern |
+| 5 | Runtime coverage | Register **`recall_query` on all agent-capable runtimes** |
+| 6 | Control-plane filter | **`is_meta` (or equivalent) on evidence rows**; default exclude in helpers |
+| 8 | Surfaces | **Agent → `recall_query`**; **Human → palette/search**; do not unify or replace Chronicle MCP tools in this track |
+
+Details for #2, #3, #7 below (industry-aligned, Cradle-specific).
+
+## L1 evidence indexing (#2) — industry + Cradle choice
+
+**What authorities do for *execution memory* (not generic chat memory):**
+
+| System | Pattern |
+| ------ | ------- |
+| **Obelisk** | Normalized relational evidence schema (`messages`, `tool_calls`, `tool_results`, `subagents`, …) + **FTS5** on text with `content=` triggers; structured tables enable `failures()`, `fileHistory()` joins — not plain-message FTS alone |
+| **Mem0** | Vector + BM25 + entity graph on **extracted facts** (L2 semantic memory) — different problem; raw transcript is not the retrieval unit |
+| **LangGraph / checkpoint stores** | Thread state snapshots for **resume**, not agent archaeology across tool/file history |
+
+**Cradle choice (aligned with Obelisk for L1, not Mem0):**
+
+- **Dedicated `recall_*` read model** in Drizzle — projector from chat ES / run snapshots
+- **Structured facets**: messages, tool_calls, tool_results, runs (minimum for `failures` / `fileHistory`)
+- **FTS** on searchable text fields (message excerpt + tool summary), not only legacy `messages.content`
+- **Sync projector hook** on message/run terminal (Plan 024 style — no async index bus)
+- v1: **FTS + structured**; semantic embeddings deferred (Mem0-style hybrid is L2/Chronicle territory)
+
+Do **not** only repair existing `messages_fts` on plain `content` — that cannot answer Obelisk-class joins.
+
+## L2 attune (#3) — industry + Cradle choice
+
+**What authorities do for *synthesis vs evidence*:**
+
+| System | Write path | Philosophy |
+| ------ | ---------- | ---------- |
+| **Obelisk** | **`attune` sandbox** separate from `query`; `remember()` / `forget()`; markdown file + registry row; **anchors** to `message_start` / `message_end`; user approval | Evidence immutable; synthesis is opt-in, auditable |
+| **Mem0** | Automatic **ADD/UPDATE/DELETE** extraction after each turn; vector store of distilled facts | Hands-free semantic memory; not user-approved per fact |
+| **Anthropic memory tool** | User-visible memory entries; agent proposes, user can correct | Closer to Obelisk attune than Mem0 auto-extract |
+
+**Cradle choice (Obelisk-style for recall attune, Chronicle stays separate):**
+
+- **`recall_attune`** = approved conclusions from **recall sessions**, Obelisk-shaped:
+  - Registry row + optional markdown body
+  - Evidence anchors (`session_id`, `message_id` range, optional file anchors)
+  - `forget()` archives, does not delete evidence
+- **Chronicle** = ambient capture → triage → memory/knowledge (**automatic pipeline**, not recall attune)
+- Do **not** merge attune into Mem0-style auto-extraction on every turn
+- Phase D: implement attune table under **`recall` owner** or **`chronicle` public write API** — pick one write owner at Phase D start; **read** via `memories()` helper regardless
+
+## Boundary entities (#7) — industry + Cradle tiers
+
+**What Obelisk does:**
+
+- Primary JSONL transcript → **fully indexed** (messages, tool_calls, tool_results)
+- Subagents / workflow agents → **indexed when provider emits structure** (Claude workflows; Codex child threads → `subagents` table)
+- Gaps (Codex workflows) → **empty tables**, not fake data
+- No lazy fetch — everything comes from local JSONL parse
+
+**Cradle tier model (native ES + provider APIs):**
+
+| Tier | Source | Index strategy |
+| ---- | ------ | -------------- |
+| **T0** | Top-level `messages` + tool parts from `message_json` | **Always** — projector on message complete |
+| **T1** | `backend_run_snapshot_events` | **Always** — failures / run phases |
+| **T2** | `parentToolCallId` child messages | Index with `is_sidechain: true`; exclude from default `thread()` unless opted in |
+| **T3** | Provider-native threads (`provider-threads` API) | **Lazy** — `providerThread(id)` helper fetches on query; optional short-lived cache |
+| **T4** | Ephemeral side chat | **Do not index** — not in DB |
+| **T5** | Remote session projections | **Metadata only** in recall; transcript via remote fetch helper when implemented |
+| **T6** | Control-plane (`steer`, harness synthetic, goal continuation) | Store with **`is_meta: true`**; default exclude |
+
+This matches industry pattern: **hot path fully materialized**, **secondary sources lazy**, **ephemeral omitted**.
+
+## Consumer surfaces (#8)
+
+```text
+Agent (all agent-capable runtimes) → recall_query / recall_attune
+Human (Command Palette)            → search module → recall query core (read-only)
+Chronicle MCP tools                → out of scope for this track; no convergence work
+```
+
 
 ```text
 Turn start:
@@ -238,7 +320,7 @@ same assumption as Obelisk.
 | -------- | ----- | ------------- |
 | `chat-runtime/harness` | L4 | Unchanged; **no** recall injection |
 | `chronicle` | L2 (+ L1 activity) | `memories()` reads public projection; attune may write |
-| `search` | Human L3 facade today | Becomes one consumer of recall query core OR deprecated gradually |
+| `search` | Human palette facade | **Reads recall query core**; not agent surface |
 | `external-session-import` | L1 ingest | Imported sessions indexed same as native |
 | `observability` | Ops evidence | Not product recall; may share snapshot reads |
 | `javascript-eval` | Sandbox precedent | Reuse managed-process / read-only patterns for `recall_query` |
@@ -273,29 +355,30 @@ Deliverables:
 
 **Goal:** In-chat tool executes read-only sandbox; **then** add agent skill.
 
-- New module `recall` (or extend `search` with clear L3 owner — decision at Phase B start)
-- Chat runtime registers `recall_query` tool for agent-capable runtimes
-- Reuse/adapt `javascript-eval` process sandbox with recall helpers wired to L1 reads
+- New module **`modules/recall`** (L3 owner)
+- Register **`recall_query` on all agent-capable runtimes**
+- **Reuse `javascript-eval`** managed-process sandbox; inject recall helpers
+- **`search`** module calls recall query core for human palette (facade only)
 - Promote `plans/061-recall-retrieval-contract.md` → `.agents/skills/recall/SKILL.md`
 
 **Depends on:** Phase A merged; 050 recommended for session scope accuracy.
 
 ### Phase C — L1 evidence completeness
 
-**Goal:** Ground truth sufficient for Obelisk-class questions.
+**Goal:** Obelisk-class structured evidence + FTS.
 
-- Projector hook: index on message completion (text + tool parts + file paths)
-- FTS migration in Drizzle (or `recall_*` tables — decide at Phase C start)
-- `failures()`, `fileHistory()` backed by run snapshots + tool part extractor
-- Backfill job from existing messages
+- **`recall_*` Drizzle schema** (messages, tool_calls, tool_results, runs facets)
+- Projector hooks from chat ES + run snapshots; **`is_meta`** on control-plane rows
+- FTS on searchable excerpts; backfill from existing data
+- Boundary tiers **T0–T2** mandatory; **T3** lazy helper stub
 
 ### Phase D — L2 attune + human facade
 
-**Goal:** Approved synthesis + optional UI.
+**Goal:** Approved synthesis + palette integration.
 
-- `recall_attune` with `remember()` / `forget()` (Chronicle or dedicated attune table)
-- Human global search mode consuming same query core
-- Provider-thread lazy fetch helper
+- **`recall_attune`** — Obelisk-shaped `remember()` / `forget()` (Phase D pick write owner)
+- **`search`/palette** — human facade over recall query core (no Chronicle MCP work)
+- Provider-thread lazy helper (**T3**); remote metadata (**T5**) as implemented
 
 ## STOP conditions
 
