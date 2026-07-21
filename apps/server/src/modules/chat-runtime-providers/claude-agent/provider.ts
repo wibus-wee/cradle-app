@@ -988,7 +988,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
       message,
       providerThreadTurn.mapperState,
     )
-    await this.updateClaudeTurnProviderSession(entry, turn, result.sessionId)
     await this.emitClaudeAssistantUsageEvent(entry, message, turn.effectiveModel)
     for (const crewCall of result.capturedCrewCalls) {
       writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
