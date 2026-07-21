@@ -60,4 +60,19 @@ describe('runtime-settings-registry', () => {
       interactionMode: 'plan',
     })
   })
+
+  it('uses the same 2D runtime settings contract for Kimi', () => {
+    const entry = resolveRuntimeSettingsEntry('kimi')
+    expect(readRuntimeSettingsDefaults('kimi')).toEqual({
+      accessMode: 'full-access',
+      interactionMode: 'default',
+    })
+    expect(entry?.normalize({
+      accessMode: 'approval-required',
+      interactionMode: 'plan',
+    })).toEqual({
+      accessMode: 'approval-required',
+      interactionMode: 'plan',
+    })
+  })
 })
