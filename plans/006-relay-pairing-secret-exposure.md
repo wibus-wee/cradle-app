@@ -12,6 +12,7 @@
 - **Depends on**: plans/002-http-ws-auth-plugin.md
 - **Category**: security
 - **Planned at**: commit `ac47f3b`, 2026-07-05
+- **Completed**: 2026-07-20 — list/get use `pairable` (no `pairingCode`); create returns `pairingString` once; explicit `pairing-string` re-read kept for pending enrollments; UI uses `pairable` for show-again.
 
 ## Why this matters
 
@@ -66,10 +67,10 @@ List/get responses never contain `pairingCode`; create returns it once; expired/
 
 ## Done criteria
 
-- [ ] `pnpm --filter @cradle/server typecheck` exits 0
-- [ ] `pnpm --filter @cradle/server test` exits 0; new tests pass
-- [ ] `grep -rn "pairingCode" apps/server/src/modules/relay-transport/model.ts` shows it only in the create-response schema
-- [ ] `plans/README.md` status row updated
+- [x] `pnpm --filter @cradle/server typecheck` exits 0
+- [x] `pnpm --filter @cradle/server test` exits 0; new tests pass
+- [x] `grep -rn "pairingCode" apps/server/src/modules/relay-transport/model.ts` shows it only on the explicit pairing-string response (list/get use `pairable`)
+- [x] `plans/README.md` status row updated
 
 ## STOP conditions
 

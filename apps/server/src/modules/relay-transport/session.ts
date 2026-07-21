@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto'
+
 import { x25519 } from '@noble/curves/ed25519'
 
 import { AppError } from '../../errors/app-error'
@@ -79,17 +81,39 @@ export interface RelaySessionCallbacks {
 type SessionState = 'idle' | 'handshake' | 'ready' | 'closed'
 
 interface StreamFlowState {
-  /** Bytes sent (plaintext) for which we have not yet received an ack. */
-  bytesInFlight: number
   /** Whether the local source is currently paused due to flow control. */
   paused: boolean
   /** Total plaintext bytes sent on this stream. */
   sentBytes: number
-  /** Total plaintext bytes received on this stream (receiver side). */
+  /**
+   * Cumulative bytes the peer has acked for data *we* sent (send-side credit).
+   * Independent of receive-side counters — HTTP request+response share one
+   * streamId, so send credit and receive progress must not share a counter.
+   */
+  peerAckedBytes: number
+  /** Total plaintext bytes delivered to the local transport callback. */
   receivedBytes: number
-  /** Bytes already acked back to the peer. */
-  ackedBytes: number
+  /** Cumulative bytes the local transport has applied (TCP write / drain). */
+  appliedBytes: number
+  /** Last cumulative value we advertised to the peer via stream_ack. */
+  ackedToPeerBytes: number
   closed: boolean
+}
+
+function createStreamFlowState(): StreamFlowState {
+  return {
+    paused: false,
+    sentBytes: 0,
+    peerAckedBytes: 0,
+    receivedBytes: 0,
+    appliedBytes: 0,
+    ackedToPeerBytes: 0,
+    closed: false,
+  }
+}
+
+function bytesInFlight(flow: StreamFlowState): number {
+  return Math.max(0, flow.sentBytes - flow.peerAckedBytes)
 }
 
 const ACK_INTERVAL_BYTES = 64 * 1024
@@ -373,7 +397,7 @@ export class RelaySession {
     }
     const sharedSecret = computeRelaySharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
     const expected = this.buildConfirm(sharedSecret)
-    if (frame.confirm !== expected) {
+    if (!confirmEquals(frame.confirm, expected)) {
       this.fail(new AppError({
         code: 'relay_handshake_confirm_mismatch',
         status: 400,
@@ -408,7 +432,7 @@ export class RelaySession {
     if (!this.isReady) {
       throw new AppError({ code: 'relay_not_ready', status: 503, message: 'Relay session is not ready.' })
     }
-    this.streams.set(streamId, { bytesInFlight: 0, paused: false, sentBytes: 0, receivedBytes: 0, ackedBytes: 0, closed: false })
+    this.streams.set(streamId, createStreamFlowState())
     this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamOpen, streamId })
   }
 
@@ -438,21 +462,67 @@ export class RelaySession {
         data: Buffer.from(chunk).toString('base64'),
       })
       flow.sentBytes += chunk.length
-      flow.bytesInFlight += chunk.length
       offset = chunkEnd
     }
-    if (flow.bytesInFlight >= RELAY_STREAM_CREDIT_BYTES && !flow.paused) {
+    if (bytesInFlight(flow) >= RELAY_STREAM_CREDIT_BYTES && !flow.paused) {
       flow.paused = true
       this.cb.onPauseStream?.(streamId)
     }
   }
 
-  /** Receiver side: acknowledge received bytes to release sender credit. */
+  /**
+   * Receiver side: report that `consumedBytes` of previously delivered stream
+   * data have been applied locally (TCP write success / drain). Credit is
+   * released to the peer only after real consumption so a slow local consumer
+   * cannot inflate the window.
+   *
+   * Cumulative `stream_ack` frames are emitted every {@link ACK_INTERVAL_BYTES}.
+   * Pass `flush: true` (or close the stream) to advertise any remainder.
+   */
+  reportStreamDataConsumed(streamId: string, consumedBytes: number, options?: { flush?: boolean }): void {
+    const flow = this.streams.get(streamId)
+    if (!flow || flow.closed || !this.isReady || consumedBytes <= 0) {
+      return
+    }
+    flow.appliedBytes = Math.min(flow.receivedBytes, flow.appliedBytes + consumedBytes)
+    this.maybeSendReceiveAck(streamId, flow, Boolean(options?.flush))
+  }
+
+  /**
+   * Receiver side: acknowledge applied bytes to release sender credit.
+   * Prefer {@link reportStreamDataConsumed} so credit tracks real drain;
+   * this remains for tests and explicit cumulative acks.
+   */
   ackStream(streamId: string, ackedBytes: number): void {
+    const flow = this.streams.get(streamId)
+    if (!flow || flow.closed || !this.isReady) {
+      return
+    }
+    if (ackedBytes < flow.ackedToPeerBytes || ackedBytes > flow.receivedBytes) {
+      return
+    }
+    flow.appliedBytes = Math.max(flow.appliedBytes, ackedBytes)
+    flow.ackedToPeerBytes = ackedBytes
+    this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamAck, streamId, ackedBytes })
+  }
+
+  private maybeSendReceiveAck(streamId: string, flow: StreamFlowState, flush: boolean): void {
     if (!this.isReady) {
       return
     }
-    this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamAck, streamId, ackedBytes })
+    const pending = flow.appliedBytes - flow.ackedToPeerBytes
+    if (pending <= 0) {
+      return
+    }
+    if (!flush && pending < ACK_INTERVAL_BYTES) {
+      return
+    }
+    flow.ackedToPeerBytes = flow.appliedBytes
+    this.sendEncryptedFrame({
+      kind: INNER_FRAME_KIND.streamAck,
+      streamId,
+      ackedBytes: flow.ackedToPeerBytes,
+    })
   }
 
   /** Close a stream (either side). */
@@ -461,6 +531,11 @@ export class RelaySession {
     if (!flow || flow.closed) {
       return
     }
+    // Flush any unacked receive progress so the peer can release remaining credit.
+    if (this.isReady && flow.appliedBytes < flow.receivedBytes) {
+      flow.appliedBytes = flow.receivedBytes
+    }
+    this.maybeSendReceiveAck(streamId, flow, true)
     flow.closed = true
     this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamClose, streamId, ...(reason ? { reason } : {}) })
   }
@@ -470,7 +545,7 @@ export class RelaySession {
       this.fail(new AppError({ code: 'relay_stream_duplicate', status: 400, message: `Stream ${streamId} already open.` }))
       return
     }
-    this.streams.set(streamId, { bytesInFlight: 0, paused: false, sentBytes: 0, receivedBytes: 0, ackedBytes: 0, closed: false })
+    this.streams.set(streamId, createStreamFlowState())
     this.cb.onStreamOpen?.(streamId)
   }
 
@@ -481,13 +556,9 @@ export class RelaySession {
     }
     const data = new Uint8Array(Buffer.from(dataBase64, 'base64'))
     flow.receivedBytes += data.length
+    // Deliver first; credit is released only when the transport reports the
+    // bytes were applied (TCP write success / drain). See reportStreamDataConsumed.
     this.cb.onStreamData?.(streamId, data)
-
-    // Ack cumulatively every ACK_INTERVAL_BYTES to release sender credit.
-    if (flow.receivedBytes - flow.ackedBytes >= ACK_INTERVAL_BYTES) {
-      flow.ackedBytes = flow.receivedBytes
-      this.ackStream(streamId, flow.ackedBytes)
-    }
   }
 
   private handleStreamAck(streamId: string, ackedBytes: number): void {
@@ -498,9 +569,9 @@ export class RelaySession {
     if (ackedBytes > flow.sentBytes) {
       return
     }
-    flow.ackedBytes = Math.max(flow.ackedBytes, ackedBytes)
-    flow.bytesInFlight = flow.sentBytes - flow.ackedBytes
-    if (flow.paused && flow.bytesInFlight < RELAY_STREAM_CREDIT_BYTES / 2) {
+    // Send-side credit only — never touch receive-side counters here.
+    flow.peerAckedBytes = Math.max(flow.peerAckedBytes, ackedBytes)
+    if (flow.paused && bytesInFlight(flow) < RELAY_STREAM_CREDIT_BYTES / 2) {
       flow.paused = false
       this.cb.onResumeStream?.(streamId)
     }
@@ -613,4 +684,16 @@ function publicKeyFromPrivateKey(privateKeyBase64: string): string {
 
 function peerFingerprint(publicKeyBase64: string): string {
   return relayPublicKeyFingerprint(publicKeyBase64)
+}
+
+/** Constant-time compare of base64-encoded confirm digests (or any equal-length secrets). */
+function confirmEquals(actual: string, expected: string): boolean {
+  const a = Buffer.from(actual)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) {
+    // Still run a dummy compare so length leaks are the only timing channel.
+    timingSafeEqual(b, b)
+    return false
+  }
+  return timingSafeEqual(a, b)
 }

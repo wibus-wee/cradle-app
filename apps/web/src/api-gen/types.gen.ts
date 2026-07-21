@@ -2519,7 +2519,7 @@ export type GetRelayTransportHostEnrollmentsResponses = {
         hostKeyFingerprint: string;
         pinnedControllerPubkey: string | null;
         status: 'pending' | 'paired' | 'offline';
-        pairingCode: string | null;
+        pairable: boolean;
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -2558,7 +2558,7 @@ export type PostRelayTransportHostEnrollmentsResponses = {
         hostKeyFingerprint: string;
         pinnedControllerPubkey: string | null;
         status: 'pending' | 'paired' | 'offline';
-        pairingCode: string | null;
+        pairable: boolean;
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -2617,7 +2617,7 @@ export type GetRelayTransportHostEnrollmentsByEnrollmentIdResponses = {
         hostKeyFingerprint: string;
         pinnedControllerPubkey: string | null;
         status: 'pending' | 'paired' | 'offline';
-        pairingCode: string | null;
+        pairable: boolean;
         lastError: string | null;
         createdAt: number;
         updatedAt: number;

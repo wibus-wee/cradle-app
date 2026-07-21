@@ -487,7 +487,7 @@ function EnrollmentRow({ enrollment, onShowPairing }: { enrollment: Enrollment, 
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        {enrollment.status === 'pending' && (
+        {enrollment.pairable && (
           <Button
             size="xs"
             variant="ghost"

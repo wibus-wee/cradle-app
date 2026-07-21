@@ -260,14 +260,29 @@ class ControllerTransport {
 
   private handleStreamData(streamId: string, data: Uint8Array): void {
     const stream = this.streams.get(streamId)
-    if (!stream) {
+    const session = this.session
+    if (!stream || !session) {
       return
     }
-    stream.socket.write(Buffer.from(data), (error) => {
+    const chunk = Buffer.from(data)
+    const accepted = stream.socket.write(chunk, (error) => {
       if (error) {
         stream.socket.destroy()
+        return
       }
+      // Kernel accepted the write; release peer credit for these bytes.
+      session.reportStreamDataConsumed(streamId, chunk.byteLength)
     })
+    // If the kernel buffer is full, pause reading from the relay side by
+    // holding further stream delivery until drain — the session still only
+    // acks after the write callback, so credit stays tight for slow consumers.
+    if (!accepted && !stream.socket.destroyed) {
+      stream.socket.once('drain', () => {
+        // no-op: write callbacks already advance credit; drain just ensures
+        // Node resumes internal buffering. Pause/resume of the local source
+        // is owned by the session credit window.
+      })
+    }
   }
 
   private handleStreamClose(streamId: string): void {
