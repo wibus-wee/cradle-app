@@ -43,6 +43,7 @@ export interface DraftTurnResult {
   userMessageId: string
   assistantMessageId: string
   userMessage: UIMessage
+  appendUserMessage: boolean
 }
 
 export interface InsertCompletedUserMessageInput {
@@ -56,6 +57,7 @@ export interface StartRunInput {
   messageId: string
   origin: 'user' | 'issue-agent' | 'system'
   assistantMessage: UIMessage
+  userMessage?: UIMessage
   queueItemId?: string | null
 }
 
@@ -89,10 +91,9 @@ export function annotateContinuationMessage(
   } as UIMessage
 }
 
-export async function createDraftTurn(input: DraftTurnInput): Promise<DraftTurnResult> {
+export function createDraftTurn(input: DraftTurnInput): DraftTurnResult {
   const userMessageId = randomUUID()
   const assistantMessageId = randomUUID()
-  const now = currentUnixSeconds()
   const goalObjective
     = input.goalContinuation?.readGoalCommandObjective?.({ text: input.userText }) ?? null
   const userText = goalObjective ?? input.userText
@@ -105,63 +106,31 @@ export async function createDraftTurn(input: DraftTurnInput): Promise<DraftTurnR
       : createUserMessage(userMessageId, userText, input.files, input.contextParts),
     input.continuation ?? null,
   )
-  const userContent = extractMessageText(userMessage)
-
-  await commitSessionEvents(input.sessionId, [
-    {
-      type: 'UserMessageAppended',
-      payload: {
-        message: {
-          id: userMessageId,
-          sessionId: input.sessionId,
-          parentMessageId: null,
-          parentToolCallId: null,
-          taskId: null,
-          depth: 0,
-          role: 'user',
-          status: 'complete',
-          content: userContent,
-          messageJson: JSON.stringify(userMessage),
-          createdAt: now,
-          updatedAt: now,
-        },
-      },
-    },
-  ])
-
-  return { userMessageId, assistantMessageId, userMessage }
+  return { userMessageId, assistantMessageId, userMessage, appendUserMessage: true }
 }
 
-export async function createDraftTurnFromUserMessage(
+export function createDraftTurnFromUserMessage(
   input: DraftTurnFromUserMessageInput,
-): Promise<DraftTurnResult> {
+): DraftTurnResult {
   const assistantMessageId = randomUUID()
-  const now = currentUnixSeconds()
   const userMessage = annotateContinuationMessage(input.userMessage, input.continuation ?? null)
+  return {
+    userMessageId: userMessage.id,
+    assistantMessageId,
+    userMessage,
+    appendUserMessage: true,
+  }
+}
 
-  await commitSessionEvents(input.sessionId, [
-    {
-      type: 'UserMessageAppended',
-      payload: {
-        message: {
-          id: userMessage.id,
-          sessionId: input.sessionId,
-          parentMessageId: null,
-          parentToolCallId: null,
-          taskId: null,
-          depth: 0,
-          role: 'user',
-          status: 'complete',
-          content: extractMessageText(userMessage),
-          messageJson: JSON.stringify(userMessage),
-          createdAt: now,
-          updatedAt: now,
-        },
-      },
-    },
-  ])
-
-  return { userMessageId: userMessage.id, assistantMessageId, userMessage }
+export async function appendDraftUserMessage(input: {
+  sessionId: string
+  userMessage: UIMessage
+}): Promise<void> {
+  const now = currentUnixSeconds()
+  await commitSessionEvents(input.sessionId, [{
+    type: 'UserMessageAppended',
+    payload: { message: createUserMessageFact(input.sessionId, input.userMessage, now) },
+  }])
 }
 
 export async function insertCompletedUserMessage(
@@ -207,6 +176,12 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
     finishedAt: null,
   } satisfies BackendRunStartedFact
   await commitSessionEvents(input.sessionId, [
+    ...(input.userMessage
+      ? [{
+          type: 'UserMessageAppended' as const,
+          payload: { message: createUserMessageFact(input.sessionId, input.userMessage, now) },
+        }]
+      : []),
     {
       type: 'RunStarted',
       payload: {
@@ -231,4 +206,21 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
     },
   ])
   return run
+}
+
+function createUserMessageFact(sessionId: string, message: UIMessage, now: number) {
+  return {
+    id: message.id,
+    sessionId,
+    parentMessageId: null,
+    parentToolCallId: null,
+    taskId: null,
+    depth: 0,
+    role: 'user' as const,
+    status: 'complete' as const,
+    content: extractMessageText(message),
+    messageJson: JSON.stringify(message),
+    createdAt: now,
+    updatedAt: now,
+  }
 }

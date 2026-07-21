@@ -25,6 +25,7 @@ import {
 import { extractMessageText, parseStoredMessageSnapshot } from '../ui-message'
 import {
   appendDecidedSessionEvents,
+  appendValidatedRecoverySessionEvents,
   readRunStopReason,
   readRunTerminalEventType,
 } from './commands'
@@ -165,6 +166,8 @@ function projectTerminalRunFactInActor(sessionId: string, runId: string): Stored
     },
   })
   return commitRecoverySessionEventsInTransaction(run.chatSessionId, {
+    runId: run.id,
+    messageId: run.messageId,
     events,
     alreadyProjectedCount: bootstrapEvents.length,
     afterAppend: (tx) => {
@@ -326,6 +329,8 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
     },
   })
   return commitRecoverySessionEventsInTransaction(sessionId, {
+    runId: run.id,
+    messageId: run.messageId,
     events,
     alreadyProjectedCount: bootstrapEvents.length,
     afterAppend: (tx) => {
@@ -381,6 +386,8 @@ function readInterruptedAssistantMessage(input: {
 function commitRecoverySessionEventsInTransaction(
   sessionId: string,
   input: {
+    runId: string
+    messageId: string | null
     events: ChatSessionEvent[]
     alreadyProjectedCount: number
     afterAppend?: (tx: Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0]) => void
@@ -394,7 +401,10 @@ function commitRecoverySessionEventsInTransaction(
   db().transaction((tx) => {
     let appended = 0
     storedEvents.push(
-      ...appendDecidedSessionEvents(tx, sessionId, input.events, {
+      ...appendValidatedRecoverySessionEvents(tx, sessionId, {
+        runId: input.runId,
+        messageId: input.messageId,
+        events: input.events,
         projectEvent: () => {
           appended += 1
           return appended > input.alreadyProjectedCount

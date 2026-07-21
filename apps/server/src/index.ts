@@ -117,12 +117,10 @@ async function bootstrap() {
     { createServerApp },
     { loadServerConfig },
     { warmupModelsDevCache },
-    { recoverPersistedRunProjections },
   ] = await Promise.all([
     import('./app'),
     import('./config/server-config'),
     import('./modules/model-registry/model-info-registry'),
-    import('./modules/chat-runtime/runtime'),
   ])
 
   const config = loadServerConfig()
@@ -140,9 +138,6 @@ async function bootstrap() {
     (server) => {
       runtimeServer = server
       activeRuntimeServer = server
-      void recoverPersistedRunProjections().catch((error) => {
-        logger.warn('failed to recover persisted run projections', { error })
-      })
     },
   )
 

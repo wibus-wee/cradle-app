@@ -35,7 +35,6 @@ import {
 import type { ChatRuntimeProfile } from './profile'
 import { recordChatRuntimeProfile, startChatRuntimeProfile } from './profile'
 import { createProviderSyntheticTurnEventHandler } from './provider-synthetic-turn'
-import type { RuntimeGoalContinuationScheduleInput } from './runtime-goal-continuation'
 import {
   shouldScheduleRuntimeGoalContinuation,
   updateRuntimeGoalContinuationBackoff,
@@ -47,6 +46,10 @@ import {
 } from './snapshot-events'
 import { isTerminalUIMessageChunk, readTerminalStatus } from './stream-chunks'
 import { terminalChunkForStatus } from './terminal-finalizer'
+import type {
+  ActiveTurnCompletionController,
+  ActiveTurnHandoff,
+} from './turn-completion'
 import {
   estimateRunUsageCost,
   insertRuntimeStepUsages,
@@ -84,11 +87,7 @@ export interface TurnExecutorDeps {
     publishRunStartChunk: (activeRun: ActiveRun) => void
     publishRuntimeChunk: (activeRun: ActiveRun, chunk: UIMessageChunk) => void
   }
-  publishTerminalChunk: (
-    activeRun: ActiveRun,
-    chunk: UIMessageChunk,
-    profile?: ChatRuntimeProfile,
-  ) => Promise<boolean>
+  completeActiveTurn: ActiveTurnCompletionController['completeActiveTurn']
   recordSnapshotEvent: (
     activeRun: ActiveRun,
     input: {
@@ -114,9 +113,6 @@ export interface TurnExecutorDeps {
       profile: ChatRuntimeProfile
     },
   ) => void
-  releaseActiveRun: (activeRun: ActiveRun) => void
-  scheduleQueueDrain: (sessionId: string) => void
-  scheduleRuntimeGoalContinuation: (input: RuntimeGoalContinuationScheduleInput) => void
   pendingQueueItemCount: (sessionId: string) => number
   /**
    * Generic goal-continuation degradation options (see `RuntimeGoalContinuation` on
@@ -151,92 +147,104 @@ export async function executeRun(
   }, async (captureMode) => {
     const diagnostics = createTurnOutputDiagnostics()
     const profile = startChatRuntimeProfile()
-    let released = false
-
-    const releaseAndDrain = (): void => {
-      if (released) {
-        return
-      }
-      released = true
-      deps.releaseActiveRun(activeRun)
-      deps.scheduleQueueDrain(activeRun.sessionId)
-    }
-
-    try {
-      if (activeRun.internalContinuation !== 'runtimeGoal') {
-        await deps.captureTurnCheckpointStart({
+    if (activeRun.internalContinuation !== 'runtimeGoal') {
+      await deps.captureTurnCheckpointStart({
+        sessionId: activeRun.sessionId,
+        runId: activeRun.runId,
+        assistantMessageId: activeRun.messageId,
+        workspaceId: input.workspaceId ?? null,
+        workspacePath: input.workspacePath ?? null,
+      }).catch((error) => {
+        deps.warn('failed to capture turn-start checkpoint', {
+          error,
           sessionId: activeRun.sessionId,
           runId: activeRun.runId,
-          assistantMessageId: activeRun.messageId,
-          workspaceId: input.workspaceId ?? null,
-          workspacePath: input.workspacePath ?? null,
-        }).catch((error) => {
-          deps.warn('failed to capture turn-start checkpoint', {
-            error,
-            sessionId: activeRun.sessionId,
-            runId: activeRun.runId,
-          })
         })
-      }
-      const { finalChunk, failurePayload } = await pumpRuntimeStream(
-        activeRun,
-        input,
-        diagnostics,
-        profile,
-        deps,
-      )
-      const { actualModelId, shouldFinalizeDiagnostics } = await persistRunTerminalAndUsage(
-        activeRun,
-        finalChunk,
-        failurePayload,
-        diagnostics,
-        profile,
-        deps,
-      )
-      if (activeRun.internalContinuation !== 'runtimeGoal') {
-        await deps.captureTurnCheckpointEnd({
-          sessionId: activeRun.sessionId,
-          runId: activeRun.runId,
-        }).catch((error) => {
-          deps.warn('failed to capture turn-end checkpoint', {
-            error,
-            sessionId: activeRun.sessionId,
-            runId: activeRun.runId,
-          })
-        })
-      }
-      completeRun(
-        activeRun,
-        finalChunk,
-        diagnostics,
-        profile,
-        actualModelId,
-        shouldFinalizeDiagnostics,
-        deps,
-      )
-      const usage = activeRun.runtime.usageAccounting === 'provider-events'
-        ? activeRun.usageEventAggregate
-        : activeRun.runtime.totalUsage ?? activeRun.runtime.lastUsage ?? null
-      return {
-        modelId: actualModelId,
-        usage,
-        estimatedCostUsd: usage ? estimateRunUsageCost(actualModelId, usage) : null,
-        timeToFirstTokenMs: profile.firstTokenAtMs === null
-          ? null
-          : Math.max(0, profile.firstTokenAtMs - profile.startedAtMs),
-        outcome: toAiGenerationOutcome(finalChunk),
-        stopReason: readAiGenerationStopReason(finalChunk),
-        outputChoices: captureMode === 'full'
-          ? [{
-              role: 'assistant',
-              content: compactStoredMessageSnapshot(activeRun.finalMessage).parts,
-            }]
-          : [],
-        tools: captureMode === 'full' ? readAiObservationToolNames(activeRun.finalMessage) : [],
-      }
+      })
     }
-    finally {
-      releaseAndDrain()
+    const { finalChunk, failurePayload } = await pumpRuntimeStream(
+      activeRun,
+      input,
+      diagnostics,
+      profile,
+      deps,
+    )
+    const actualModelId = activeRun.runtime.lastModelId ?? activeRun.modelId
+    let handoff: ActiveTurnHandoff = { kind: 'queue' }
+    const completion = await deps.completeActiveTurn(activeRun, {
+      source: 'normal',
+      terminalChunk: finalChunk,
+      profile,
+      // Run snapshots are forensic/diagnostic. Once the durable terminal fact exists,
+      // snapshot failure must not suppress terminal notification or queue/goal handoff.
+      bestEffortBookkeeping: async (terminalChunk) => {
+        if (!activeRun.cancelRequested) {
+          try {
+            deps.finalizeSnapshot(activeRun, terminalChunk, {
+              modelId: actualModelId,
+              diagnostics,
+              profile,
+            })
+          }
+          catch (error) {
+            deps.warn('failed to finalize run snapshot after durable terminal', {
+              error,
+              sessionId: activeRun.sessionId,
+              runId: activeRun.runId,
+            })
+          }
+        }
+        recordRunUsageAndFailure(
+          activeRun,
+          terminalChunk,
+          failurePayload,
+          diagnostics,
+          actualModelId,
+          deps,
+        )
+        if (activeRun.internalContinuation !== 'runtimeGoal') {
+          await deps.captureTurnCheckpointEnd({
+            sessionId: activeRun.sessionId,
+            runId: activeRun.runId,
+          }).catch((error) => {
+            deps.warn('failed to capture turn-end checkpoint', {
+              error,
+              sessionId: activeRun.sessionId,
+              runId: activeRun.runId,
+            })
+          })
+        }
+        handoff = recordRunCompletion(
+          activeRun,
+          terminalChunk,
+          diagnostics,
+          profile,
+          actualModelId,
+          deps,
+        )
+      },
+      resolveHandoff: () => handoff,
+    })
+    const settledFinalChunk = completion.terminalChunk ?? finalChunk
+    const usage = activeRun.runtime.usageAccounting === 'provider-events'
+      ? activeRun.usageEventAggregate
+      : activeRun.runtime.totalUsage ?? activeRun.runtime.lastUsage ?? null
+    return {
+      modelId: actualModelId,
+      usage,
+      estimatedCostUsd: usage ? estimateRunUsageCost(actualModelId, usage) : null,
+      timeToFirstTokenMs: profile.firstTokenAtMs === null
+        ? null
+        : Math.max(0, profile.firstTokenAtMs - profile.startedAtMs),
+      outcome: toAiGenerationOutcome(settledFinalChunk),
+      stopReason: readAiGenerationStopReason(settledFinalChunk),
+      outputChoices: captureMode === 'full'
+        ? [{
+            role: 'assistant',
+            content: compactStoredMessageSnapshot(activeRun.finalMessage).parts,
+          }]
+        : [],
+      tools: captureMode === 'full' ? readAiObservationToolNames(activeRun.finalMessage) : [],
     }
   })
 }
@@ -252,9 +260,7 @@ async function pumpRuntimeStream(
   let failurePayload: SerializedChatError['payload'] | undefined
   const onProviderSyntheticTurnEvent = createProviderSyntheticTurnEventHandler(activeRun, {
     stream: deps.stream,
-    publishTerminalChunk: deps.publishTerminalChunk,
-    releaseActiveRun: deps.releaseActiveRun,
-    scheduleQueueDrain: deps.scheduleQueueDrain,
+    completeActiveTurn: deps.completeActiveTurn,
   })
 
   try {
@@ -429,22 +435,19 @@ async function pumpRuntimeStream(
   return { finalChunk, failurePayload }
 }
 
-async function persistRunTerminalAndUsage(
+function recordRunUsageAndFailure(
   activeRun: ActiveRun,
   finalChunk: UIMessageChunk,
   failurePayload: SerializedChatError['payload'] | undefined,
   diagnostics: TurnOutputDiagnostics,
-  profile: ChatRuntimeProfile,
+  actualModelId: string | null,
   deps: TurnExecutorDeps,
-): Promise<{ actualModelId: string | null, shouldFinalizeDiagnostics: boolean }> {
-  let actualModelId = activeRun.modelId
-  try {
-    if (!activeRun.cancelRequested) {
-      const finalized = await deps.publishTerminalChunk(activeRun, finalChunk, profile)
-      if (!finalized) {
-        return { actualModelId, shouldFinalizeDiagnostics: false }
-      }
+): void {
+  if (activeRun.cancelRequested) {
+    return
+  }
 
+  try {
       const finalFailureText = finalChunk.type === 'error' ? finalChunk.errorText : null
 
       if (finalFailureText) {
@@ -479,7 +482,6 @@ async function persistRunTerminalAndUsage(
       const usage = activeRun.runtime.usageAccounting === 'provider-events'
         ? activeRun.usageEventAggregate
         : activeRun.runtime?.totalUsage ?? activeRun.runtime?.lastUsage
-      actualModelId = activeRun.runtime?.lastModelId ?? activeRun.modelId
       if (usage) {
         if (activeRun.runtime.usageAccounting !== 'provider-events') {
           insertRunUsage({
@@ -526,14 +528,14 @@ async function persistRunTerminalAndUsage(
           })
         }
       }
-    }
   }
- catch (error) {
-    deps.error('failed to persist run finalization (session may have been deleted)', {
+  catch (error) {
+    deps.error('failed to persist best-effort run completion bookkeeping', {
       error,
+      sessionId: activeRun.sessionId,
+      runId: activeRun.runId,
     })
   }
-  return { actualModelId, shouldFinalizeDiagnostics: true }
 }
 
 function addTokenUsage(current: TokenUsage | null, next: TokenUsage): TokenUsage {
@@ -569,15 +571,14 @@ function recordUsageIngestionFailure(activeRun: ActiveRun, message: string): voi
   })
 }
 
-function completeRun(
+function recordRunCompletion(
   activeRun: ActiveRun,
   finalChunk: UIMessageChunk,
   diagnostics: TurnOutputDiagnostics,
   profile: ChatRuntimeProfile,
   actualModelId: string | null,
-  shouldFinalizeDiagnostics: boolean,
   deps: TurnExecutorDeps,
-): void {
+): ActiveTurnHandoff {
   try {
     attachBinding({
       sessionId: activeRun.sessionId,
@@ -613,13 +614,6 @@ function completeRun(
     pendingQueueItemCount: deps.pendingQueueItemCount(activeRun.sessionId),
     options: deps.readRuntimeGoalContinuationOptions(),
   })
-  if (shouldFinalizeDiagnostics) {
-    deps.finalizeSnapshot(activeRun, finalChunk, {
-      modelId: actualModelId,
-      diagnostics,
-      profile,
-    })
-  }
   recordChatRuntimeProfile({
     run: {
       sessionId: activeRun.sessionId,
@@ -637,15 +631,16 @@ function completeRun(
   })
   if (shouldContinueRuntimeGoal) {
     if (!activeRun.providerTargetId) {
-      return
+      return { kind: 'queue' }
     }
-    deps.scheduleRuntimeGoalContinuation({
-      sessionId: activeRun.sessionId,
+    return {
+      kind: 'runtime-goal',
       providerTargetId: activeRun.providerTargetId,
       modelId: actualModelId ?? undefined,
       options: deps.readRuntimeGoalContinuationOptions(),
-    })
+    }
   }
+  return { kind: 'queue' }
 }
 
 function isTokenDeltaChunk(chunk: UIMessageChunk): boolean {

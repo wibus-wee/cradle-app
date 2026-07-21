@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm'
 
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
+import { createDedupeKey, OBSERVABILITY_CODES } from '../observability/contract'
+import * as Observability from '../observability/service'
 import { isAppFeatureFlagEnabled } from '../preferences/service'
 import {
   readDurableProviderRuntimeBinding,
@@ -16,7 +18,7 @@ import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { invokeCodexAppServer } from './codex/host'
 import type { ChatContextPart } from './context-parts'
 import type { ChatRuntimeRecoveryResult } from './es/recovery'
-import { recoverChatRuntimeProjections } from './es/recovery'
+import { recoverChatRuntimeProjections, recoverChatRuntimeSession } from './es/recovery'
 import { resolveSessionSystemPrompt } from './harness/turn-context'
 import type { ExecuteBangCommandInput } from './interaction/bang-command-execution'
 import {
@@ -36,8 +38,7 @@ import {
   abortAllRuns as abortAllRunsFromLifecycle,
   abortRun as abortRunFromLifecycle,
   cancelSession as cancelSessionFromLifecycle,
-  finalizeInterruptedPersistedStreamingSessionIfIdle as finalizeInterruptedPersistedStreamingSessionIfIdleFromLifecycle,
-  releaseTerminalPersistedActiveRunForSession as releaseTerminalPersistedActiveRunForSessionFromLifecycle,
+  completeTerminalPersistedActiveRunForSession as completeTerminalPersistedActiveRunForSessionFromLifecycle,
 } from './lifecycle/cancel'
 import type { RollbackLastTurnDto, RollbackLastTurnOptions } from './lifecycle/rollback'
 import {
@@ -73,12 +74,14 @@ import type { CreateRunInput, RunCoordinatorDeps } from './run/run-coordinator'
 import {
   createRun as createRunFromCoordinator,
 } from './run/run-coordinator'
+import { readRunWriteFence } from './run/run-write-fence'
 import type { RuntimeGoalContinuationSchedulerDeps } from './run/runtime-goal-continuation'
 import {
   scheduleRuntimeGoalContinuation,
 } from './run/runtime-goal-continuation'
 import { isTerminalUIMessageChunk } from './run/stream-chunks'
-import { createTerminalRunFinalizer } from './run/terminal-finalizer'
+import { createTerminalRunFinalizer, terminalChunkForFence } from './run/terminal-finalizer'
+import { createActiveTurnCompletionController } from './run/turn-completion'
 import type { TurnExecutorDeps } from './run/turn-executor'
 import { executeRun as executeRunWithDeps } from './run/turn-executor'
 import type { ActiveRun } from './run-registry'
@@ -172,8 +175,7 @@ function readRuntimeGoalContinuationOptions(): RuntimeGoalContinuationOptions {
 }
 
 const activeRunStream = createActiveRunStreamController({
-  releaseStaleActiveRun: (activeRun, fence) =>
-    activeRunReleaseController.releaseStaleActiveRun(activeRun, fence),
+  handleStaleActiveRun: observeStaleActiveRunCompletion,
   error: (message, payload) => chatLogger.error(message, payload),
 })
 const {
@@ -189,7 +191,6 @@ export const flushAllActiveRunSnapshots = activeRunStream.flushAllActiveRunSnaps
 const activeRunReleaseController = createActiveRunReleaseController({
   stopSnapshotTimer,
   stopPendingRunDeltaFlush,
-  publishUIMessageChunk,
 })
 const terminalRunFinalizer = createTerminalRunFinalizer({
   stream: {
@@ -199,12 +200,87 @@ const terminalRunFinalizer = createTerminalRunFinalizer({
   },
   error: (message, payload) => chatLogger.error(message, payload),
 })
-const { publishTerminalChunk, settleActiveRun } = terminalRunFinalizer
+const { persistTerminalChunk, publishTerminalNotification } = terminalRunFinalizer
+const activeTurnCompletionController = createActiveTurnCompletionController({
+  persistTerminalChunk,
+  publishTerminalNotification,
+  recoverTerminalPersistenceFailure: async (activeRun) => {
+    await recoverChatRuntimeSession(activeRun.sessionId)
+    const fence = readRunWriteFence(activeRun.runId)
+    if (fence.status === 'streaming' || fence.status === 'missing') {
+      return null
+    }
+    activeRun.terminalStatus = fence.status
+    return {
+      durableTerminal: true,
+      notificationChunk: terminalChunkForFence(fence),
+    }
+  },
+  releaseActiveRun: activeRun => activeRunReleaseController.releaseActiveRun(activeRun),
+  performHandoff: (activeRun, handoff) => {
+    if (handoff.kind === 'none') {
+      return
+    }
+    if (handoff.kind === 'runtime-goal') {
+      scheduleRuntimeGoalContinuation({
+        sessionId: activeRun.sessionId,
+        providerTargetId: handoff.providerTargetId,
+        modelId: handoff.modelId,
+        options: handoff.options,
+      }, runtimeGoalContinuationDeps)
+      return
+    }
+    scheduleSessionQueueDrain(activeRun.sessionId, queueDrainDeps)
+  },
+  recordTerminalPersistenceIncident: ({
+    activeRun,
+    source,
+    terminalError,
+    recoveryError,
+  }) => {
+    Observability.record({
+      source: 'chat-engine',
+      code: OBSERVABILITY_CODES.turnStreamFailed,
+      severity: 'error',
+      category: 'chat',
+      message: 'Chat turn terminal persistence and recovery both failed',
+      chatSessionId: activeRun.sessionId,
+      runId: activeRun.runId,
+      messageId: activeRun.messageId,
+      dedupeKey: createDedupeKey({
+        code: OBSERVABILITY_CODES.turnStreamFailed,
+        chatSessionId: activeRun.sessionId,
+        runId: activeRun.runId,
+      }),
+      attrs: {
+        lifecycleStage: 'terminal-persistence-recovery',
+        source,
+        terminalError: terminalError instanceof Error ? terminalError.message : String(terminalError),
+        recoveryError: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+      },
+    })
+  },
+  warn: (message, payload) => chatLogger.warn(message, payload),
+})
+const { completeActiveTurn } = activeTurnCompletionController
 const activeRunLifecycleDeps: ActiveRunLifecycleDeps = {
   readRun: getRun,
-  settleActiveRun,
-  releaseActiveRun,
+  completeActiveTurn,
   warn: (message, payload) => chatLogger.warn(message, payload),
+}
+
+function observeStaleActiveRunCompletion(activeRun: ActiveRun, fence: Parameters<typeof terminalChunkForFence>[0]): void {
+  void completeActiveTurn(activeRun, {
+    source: 'stale-fence',
+    terminalChunk: terminalChunkForFence(fence),
+  }).catch((error) => {
+    chatLogger.error('stale chat run completion rejected', {
+      error,
+      sessionId: activeRun.sessionId,
+      runId: activeRun.runId,
+      fenceStatus: fence.status,
+    })
+  })
 }
 
 SessionService.onSessionArchived(releaseSideConversationsByParentSessionId)
@@ -328,25 +404,20 @@ const turnExecutorDeps: TurnExecutorDeps = {
     publishRunStartChunk,
     publishRuntimeChunk,
   },
-  publishTerminalChunk,
+  completeActiveTurn,
   recordSnapshotEvent: recordActiveRunSnapshotEvent,
   finalizeSnapshot: finalizeActiveRunSnapshot,
-  releaseActiveRun,
-  scheduleQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
-  scheduleRuntimeGoalContinuation: input =>
-    scheduleRuntimeGoalContinuation(input, runtimeGoalContinuationDeps),
   pendingQueueItemCount: sessionId => listPendingQueueRows(sessionId).length,
   readRuntimeGoalContinuationOptions,
   warn: (message, payload) => chatLogger.warn(message, payload),
   error: (message, payload) => chatLogger.error(message, payload),
 }
 const runCoordinatorDeps: RunCoordinatorDeps = {
-  finalizeInterruptedPersistedStreamingSessionIfIdle,
   startActiveRunSnapshot,
   startSnapshotTimer,
   scheduleQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   executeRun: (activeRun, input) => {
-    void executeRunWithDeps(activeRun, input, turnExecutorDeps)
+    return executeRunWithDeps(activeRun, input, turnExecutorDeps)
   },
   warn: (message, payload) => chatLogger.warn(message, payload),
 }
@@ -359,7 +430,7 @@ export async function getRuntimeSessionStatus(
   sessionId: string,
 ): Promise<ChatRuntimeSessionStatusDto> {
   return getRuntimeSessionStatusFromStatusApi(sessionId, {
-    releaseTerminalPersistedActiveRunForSession,
+    completeTerminalPersistedActiveRunForSession,
     readRuntimeGoalContinuationOptions,
     scheduleRuntimeGoalContinuation: input =>
       scheduleRuntimeGoalContinuation(input, runtimeGoalContinuationDeps),
@@ -381,7 +452,6 @@ export async function rollbackLastTurn(
   options: RollbackLastTurnOptions = {},
 ): Promise<RollbackLastTurnDto> {
   return rollbackLastTurnFromLifecycle(sessionId, {
-    finalizeInterruptedPersistedStreamingSessionIfIdle,
     scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   }, options)
 }
@@ -392,7 +462,6 @@ export async function rollbackTurns(
   options: RollbackLastTurnOptions = {},
 ): Promise<RollbackLastTurnDto> {
   return rollbackTurnsFromLifecycle(sessionId, numTurns, {
-    finalizeInterruptedPersistedStreamingSessionIfIdle,
     scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   }, options)
 }
@@ -442,7 +511,7 @@ export async function streamQuickQuestion(
 
 export async function openSessionRunStream(sessionId: string): Promise<ReadableStream<Uint8Array>> {
   assertStoredSession(sessionId)
-  await releaseTerminalPersistedActiveRunForSession(sessionId)
+  await completeTerminalPersistedActiveRunForSession(sessionId)
 
   const runId = runRegistry.getActiveRunIdForSession(sessionId)
   if (!runId) {
@@ -495,7 +564,6 @@ export async function enqueueSessionQueueItem(
   input: EnqueueSessionQueueItemInput,
 ): Promise<ChatSessionQueueItemDto> {
   return enqueueSessionQueueItemFromQueueApi(input, {
-    finalizeInterruptedPersistedStreamingSessionIfIdle,
     scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   })
 }
@@ -504,7 +572,6 @@ export async function submitSessionSteerTurn(
   input: SubmitSessionSteerTurnInput,
 ): Promise<SessionSteerTurnDto> {
   return submitSessionSteerTurnFromInteraction(input, {
-    finalizeInterruptedPersistedStreamingSessionIfIdle,
     scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
     warn: (message, payload) => chatLogger.warn(message, payload),
   })
@@ -544,19 +611,6 @@ export async function recoverPersistedRunProjections(): Promise<ChatRuntimeRecov
   return recovered
 }
 
-async function releaseTerminalPersistedActiveRunForSession(sessionId: string): Promise<boolean> {
-  return releaseTerminalPersistedActiveRunForSessionFromLifecycle(sessionId, activeRunLifecycleDeps)
-}
-
-async function finalizeInterruptedPersistedStreamingSessionIfIdle(
-  sessionId: string,
-): Promise<void> {
-  return finalizeInterruptedPersistedStreamingSessionIfIdleFromLifecycle(
-    sessionId,
-    activeRunLifecycleDeps,
-  )
-}
-
-function releaseActiveRun(activeRun: ActiveRun): void {
-  activeRunReleaseController.releaseActiveRun(activeRun)
+async function completeTerminalPersistedActiveRunForSession(sessionId: string): Promise<boolean> {
+  return completeTerminalPersistedActiveRunForSessionFromLifecycle(sessionId, activeRunLifecycleDeps)
 }

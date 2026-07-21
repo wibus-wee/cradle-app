@@ -30,6 +30,7 @@ function ChatTranscriptContent({
   editPreviousAction,
   messageTextTransform,
   compactInset,
+  historyControl,
 }: {
   sessionId: string | null
   messageIds: ChatSessionProjection['messageIds']
@@ -46,6 +47,7 @@ function ChatTranscriptContent({
   editPreviousAction?: MessageBubbleEditAction
   messageTextTransform?: MessageTextTransform
   compactInset?: boolean
+  historyControl?: ReactNode
 }) {
   const { t } = useTranslation('chat')
 
@@ -75,6 +77,9 @@ function ChatTranscriptContent({
         style={{ paddingBottom: 'var(--chat-composer-inset, 0px)' }}
       >
         <div className="flex-1">
+          {historyControl
+            ? <div className="flex justify-center pb-3">{historyControl}</div>
+            : null}
           {messageCount === 0 && isReady && (
             <div className="flex h-full items-center justify-center py-32">
               <p className="select-none text-sm text-muted-foreground">
@@ -142,6 +147,7 @@ export function ChatMessageListPane({
   hideMinimap,
   messageTextTransform,
   compactInset,
+  historyControl,
 }: {
   sessionId: string | null
   messageIds: ChatSessionProjection['messageIds']
@@ -166,6 +172,7 @@ export function ChatMessageListPane({
   hideMinimap?: boolean
   messageTextTransform?: MessageTextTransform
   compactInset?: boolean
+  historyControl?: ReactNode
 }) {
   return (
     <div ref={scrollContainerRef} className="relative min-h-0 flex-1 overflow-hidden">
@@ -185,6 +192,7 @@ export function ChatMessageListPane({
         editPreviousAction={editPreviousAction}
         messageTextTransform={messageTextTransform}
         compactInset={compactInset}
+        historyControl={historyControl}
       />
 
       <div ref={composerOverlayRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-10">

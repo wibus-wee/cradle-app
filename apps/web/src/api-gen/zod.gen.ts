@@ -2748,11 +2748,45 @@ export const zGetAcpRegistryByAgentIdDistributionTypesPath = z.object({
     agentId: z.string().min(1)
 });
 
+export const zPostAcpAgentsBody = z.object({
+    id: z.string().min(1).optional(),
+    name: z.string().min(1),
+    cmd: z.string().min(1),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.unknown()).optional(),
+    distributionType: z.enum([
+        'command',
+        'npx',
+        'uvx'
+    ]).optional(),
+    version: z.string().min(1).optional()
+});
+
 export const zDeleteAcpAgentsByAgentIdPath = z.object({
     agentId: z.string().min(1)
 });
 
 export const zGetAcpAgentsByAgentIdPath = z.object({
+    agentId: z.string().min(1)
+});
+
+export const zPatchAcpAgentsByAgentIdLaunchConfigBody = z.object({
+    name: z.string().min(1).optional(),
+    overrideCmd: z.string().nullish(),
+    overrideArgs: z.array(z.string()).nullish(),
+    overrideEnv: z.record(z.string(), z.unknown()).nullish(),
+    cmd: z.string().min(1).optional(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.unknown()).optional(),
+    distributionType: z.enum([
+        'command',
+        'npx',
+        'uvx'
+    ]).optional(),
+    version: z.string().min(1).optional()
+});
+
+export const zPatchAcpAgentsByAgentIdLaunchConfigPath = z.object({
     agentId: z.string().min(1)
 });
 
@@ -3545,6 +3579,11 @@ export const zGetChatSessionsBySessionIdMessagesPath = z.object({
     sessionId: z.string().min(1)
 });
 
+export const zGetChatSessionsBySessionIdMessagesQuery = z.object({
+    cursor: z.string().min(1).optional(),
+    limit: z.number().gte(1).lte(200).optional()
+});
+
 export const zGetChatRunsCompletedQuery = z.object({
     since: z.number().gte(0).optional(),
     limit: z.number().gte(1).lte(200).optional()
@@ -4307,6 +4346,10 @@ export const zPostTerminalSessionsBySessionIdStartOrAttachPath = z.object({
 });
 
 export const zDeleteTerminalSessionsBySessionIdPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetTerminalSessionsBySessionIdHostPath = z.object({
     sessionId: z.string().min(1)
 });
 

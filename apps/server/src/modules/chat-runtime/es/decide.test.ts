@@ -20,7 +20,11 @@ function stored(
   } as StoredChatSessionEvent
 }
 
-function runStarted(runId: string, messageId: string): Extract<ChatSessionEvent, { type: 'RunStarted' }> {
+function runStarted(
+  runId: string,
+  messageId: string,
+  origin: 'user' | 'issue-agent' | 'system' = 'user',
+): Extract<ChatSessionEvent, { type: 'RunStarted' }> {
   return {
     type: 'RunStarted',
     payload: {
@@ -29,7 +33,7 @@ function runStarted(runId: string, messageId: string): Extract<ChatSessionEvent,
         bindingId: null,
         chatSessionId: 'session-1',
         messageId,
-        origin: 'user',
+        origin,
         status: 'streaming',
         stopReason: null,
         errorText: null,
@@ -121,6 +125,24 @@ describe('decide', () => {
     const result = decide(state, {
       type: 'startRun',
       event: runStarted('run-2', 'assistant-2'),
+    })
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'run_already_active',
+        details: { activeRunId: 'run-1', runId: 'run-2' },
+      },
+    })
+  })
+
+  it('applies the single-active-run invariant to system runs', () => {
+    const state = createInitialChatSessionState('session-1')
+    evolveChatSessionState(state, stored(1, runStarted('run-1', 'assistant-1', 'system')))
+
+    const result = decide(state, {
+      type: 'startRun',
+      event: runStarted('run-2', 'assistant-2', 'system'),
     })
 
     expect(result).toMatchObject({

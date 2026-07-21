@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { index, int, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 import { messages, sessions } from './chat'
@@ -64,6 +65,9 @@ export const backendRuns = sqliteTable(
   table => ({
     byBinding: index('backend_runs_binding_id_idx').on(table.bindingId),
     byChatSession: index('backend_runs_chat_session_id_idx').on(table.chatSessionId),
+    oneStreamingRunPerSession: uniqueIndex('backend_runs_one_streaming_per_session_unique')
+      .on(table.chatSessionId)
+      .where(sql`${table.status} = 'streaming'`),
     byMessage: index('backend_runs_message_id_idx').on(table.messageId),
     byStartedAt: index('backend_runs_started_at_idx').on(table.startedAt),
   }),

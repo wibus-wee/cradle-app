@@ -1,6 +1,6 @@
 import { backendRuns, chatMessagePayloads, messages, sessions } from '@cradle/db'
 import type { UIMessage } from 'ai'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, lt, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
@@ -13,13 +13,13 @@ import {
 import { compactStoredMessageSnapshotForRead } from './message-snapshot-compaction'
 import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
-import { readRunStreamCheckpointsBySession } from './stream/checkpoint-store'
+import { readRunStreamCheckpointsByMessageIds } from './stream/checkpoint-store'
 import {
   extractMessageText,
   parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot,
 } from './ui-message'
 
-const messageInsertOrder = sql`messages.rowid`
+const messageInsertOrder = sql<number>`messages.rowid`
 
 export interface ChatMessageSnapshotRow {
   messageId: string
@@ -37,6 +37,12 @@ export interface ChatMessageSnapshotRow {
 export interface ChatMessageSnapshot {
   revision: number
   rows: ChatMessageSnapshotRow[]
+  nextCursor: string | null
+}
+
+export interface ChatMessagePageInput {
+  cursor?: string | null
+  limit?: number | null
 }
 
 export interface CompletedChatRunDto {
@@ -101,77 +107,138 @@ export function listCompletedRuns(input: {
   }
 }
 
-export async function getMessageGroups(sessionId: string): Promise<ChatMessageSnapshotRow[]> {
-  assertStoredSession(sessionId)
+export async function getMessageGroups(
+  sessionId: string,
+  input: ChatMessagePageInput = {},
+): Promise<ChatMessageSnapshotRow[]> {
+  return (await getMessagePage(sessionId, input)).rows
+}
 
-  const rows = db()
-    .select({ message: messages, payload: chatMessagePayloads })
+async function getMessagePage(
+  sessionId: string,
+  input: ChatMessagePageInput,
+): Promise<{ rows: ChatMessageSnapshotRow[], nextCursor: string | null }> {
+  assertStoredSession(sessionId)
+  const limit = Math.min(Math.max(Math.floor(input.limit ?? 100), 1), 200)
+  const beforeRowId = decodeMessageCursor(input.cursor ?? null)
+
+  const candidates = db()
+    .select({ rowId: messageInsertOrder, message: messages, payload: chatMessagePayloads })
     .from(messages)
     .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
-    .where(eq(messages.sessionId, sessionId))
-    .orderBy(messages.createdAt, messageInsertOrder)
+    .where(
+      beforeRowId === null
+        ? eq(messages.sessionId, sessionId)
+        : and(eq(messages.sessionId, sessionId), lt(messageInsertOrder, beforeRowId)),
+    )
+    .orderBy(desc(messageInsertOrder))
+    .limit(limit + 1)
     .all()
+  const hasOlderRows = candidates.length > limit
+  const page = candidates.slice(0, limit)
+  const nextCursor = hasOlderRows && page.length > 0
+    ? encodeMessageCursor(page.at(-1)!.rowId)
+    : null
+  const rows = page.reverse()
 
   // Overlay ephemeral streaming checkpoints onto projection rows. Checkpoints are
   // not projected into `messages` during streaming; this preserves ~10s partial
   // text freshness for passive window refresh without polluting the fact log.
   const checkpointByMessageId = new Map(
-    readRunStreamCheckpointsBySession(sessionId).map(checkpoint => [
+    readRunStreamCheckpointsByMessageIds(rows.map(row => row.message.id)).map(checkpoint => [
       checkpoint.messageId,
       checkpoint,
     ]),
   )
 
-  return rows.map(({ message: projected, payload }) => {
-    const row = hydrateMessage(projected, payload)
-    const role = row.role as 'user' | 'assistant'
-    const checkpoint
-      = row.status === 'streaming' ? checkpointByMessageId.get(row.id) : undefined
-    const messageJson = checkpoint?.messageJson ?? row.messageJson
-    const parsedMessage = parseStoredMessageSnapshot(
-      { ...row, messageJson },
-      role,
-    )
-    const message = compactStoredMessageSnapshotForRead({
-      rawJson: messageJson,
-      message: parsedMessage,
-    })
-    if (message.id !== row.id || message.role !== role) {
-      throw new AppError({
-        code: 'chat_message_snapshot_invalid',
-        status: 500,
-        message: 'Stored chat message snapshot is invalid',
-        details: {
-          messageId: row.id,
-          role,
-          reason:
-            message.id !== row.id
-              ? 'message_json.id must match messages.id'
-              : 'message_json.role must match messages.role',
-        },
+  return {
+    nextCursor,
+    rows: rows.map(({ message: projected, payload }) => {
+      const row = hydrateMessage(projected, payload)
+      const role = row.role as 'user' | 'assistant'
+      const checkpoint
+        = row.status === 'streaming' ? checkpointByMessageId.get(row.id) : undefined
+      const messageJson = checkpoint?.messageJson ?? row.messageJson
+      const parsedMessage = parseStoredMessageSnapshot(
+        { ...row, messageJson },
+        role,
+      )
+      const message = compactStoredMessageSnapshotForRead({
+        rawJson: messageJson,
+        message: parsedMessage,
       })
-    }
+      if (message.id !== row.id || message.role !== role) {
+        throw new AppError({
+          code: 'chat_message_snapshot_invalid',
+          status: 500,
+          message: 'Stored chat message snapshot is invalid',
+          details: {
+            messageId: row.id,
+            role,
+            reason:
+              message.id !== row.id
+                ? 'message_json.id must match messages.id'
+                : 'message_json.role must match messages.role',
+          },
+        })
+      }
 
-    return {
-      messageId: row.id,
-      role,
-      status: row.status as ChatMessageStatus,
-      errorText: row.errorText ?? undefined,
-      content: extractMessageText(message),
-      message,
-      parentMessageId: row.parentMessageId,
-      parentToolCallId: row.parentToolCallId,
-      taskId: row.taskId,
-      depth: row.depth,
-    }
-  })
+      return {
+        messageId: row.id,
+        role,
+        status: row.status as ChatMessageStatus,
+        errorText: row.errorText ?? undefined,
+        content: extractMessageText(message),
+        message,
+        parentMessageId: row.parentMessageId,
+        parentToolCallId: row.parentToolCallId,
+        taskId: row.taskId,
+        depth: row.depth,
+      }
+    }),
+  }
 }
 
-export async function getMessageSnapshot(sessionId: string): Promise<ChatMessageSnapshot> {
-  const rows = await getMessageGroups(sessionId)
+export async function getMessageSnapshot(
+  sessionId: string,
+  input: ChatMessagePageInput = {},
+): Promise<ChatMessageSnapshot> {
+  const page = await getMessagePage(sessionId, input)
   return {
     revision: readCurrentSessionEventVersion(db(), sessionId),
-    rows,
+    rows: page.rows,
+    nextCursor: page.nextCursor,
+  }
+}
+
+function encodeMessageCursor(beforeRowId: number): string {
+  return Buffer.from(JSON.stringify({ version: 1, beforeRowId })).toString('base64url')
+}
+
+function decodeMessageCursor(cursor: string | null): number | null {
+  if (!cursor) {
+    return null
+  }
+  try {
+    const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      version: number
+      beforeRowId: number
+    }
+    if (
+      decoded.version !== 1
+      || !Number.isSafeInteger(decoded.beforeRowId)
+      || decoded.beforeRowId < 1
+    ) {
+      throw new Error('Unsupported cursor payload')
+    }
+    return decoded.beforeRowId
+  }
+  catch {
+    throw new AppError({
+      code: 'chat_message_cursor_invalid',
+      status: 400,
+      message: 'Chat message cursor is invalid',
+    })
   }
 }
 

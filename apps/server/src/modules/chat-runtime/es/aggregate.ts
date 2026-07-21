@@ -70,13 +70,11 @@ export function evolveChatSessionState(
         event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null,
       )
       state.runStatusById.set(event.payload.run.id, 'streaming')
-      if (event.payload.run.origin !== 'system') {
-        state.activeRun = {
-          runId: event.payload.run.id,
-          messageId: event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null,
-          queueItemId: event.payload.queueItemId ?? null,
-          startedAt: event.payload.run.startedAt,
-        }
+      state.activeRun = {
+        runId: event.payload.run.id,
+        messageId: event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null,
+        queueItemId: event.payload.queueItemId ?? null,
+        startedAt: event.payload.run.startedAt,
       }
       if (event.payload.assistantMessage) {
         state.messageStatusById.set(event.payload.assistantMessage.id, 'streaming')

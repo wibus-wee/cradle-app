@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import {
   backendRuns,
@@ -14,11 +14,12 @@ import { eq, sql } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../src/infra'
+import { checkChatSessionProjectionParity } from '../src/modules/chat-runtime/es/parity'
 import {
   recoverChatRuntimeProjections,
   recoverChatRuntimeSession,
 } from '../src/modules/chat-runtime/es/recovery'
-import { getMessageGroups } from '../src/modules/chat-runtime/history-api'
+import { getMessageGroups, getMessageSnapshot } from '../src/modules/chat-runtime/history-api'
 import {
   hydrateMessage,
   putMessagePayload,
@@ -122,6 +123,7 @@ function seedBackendRun(input: {
   errorText?: string | null
   startedAt?: number
   finishedAt?: number | null
+  origin?: 'user' | 'issue-agent' | 'system'
 }): void {
   db()
     .insert(backendRuns)
@@ -130,7 +132,7 @@ function seedBackendRun(input: {
       bindingId: null,
       chatSessionId: input.sessionId,
       messageId: input.messageId,
-      origin: 'user',
+      origin: input.origin ?? 'user',
       status: input.status,
       stopReason: input.stopReason ?? null,
       errorText: input.errorText ?? null,
@@ -138,6 +140,13 @@ function seedBackendRun(input: {
       finishedAt: input.finishedAt ?? null,
     })
     .run()
+}
+
+function readMigrationStatements(name: string): string[] {
+  return readFileSync(resolve(process.cwd(), '../../packages/db/drizzle', name), 'utf8')
+    .split('--> statement-breakpoint')
+    .map(statement => statement.trim())
+    .filter(statement => statement.length > 0)
 }
 
 function seedQueueItem(input: {
@@ -183,6 +192,129 @@ function countSessionEvents(sessionId: string): number {
 }
 
 describe('chat runtime recovery', () => {
+  it('migrates a legacy multi-system-run storm before installing the streaming guard', async () => {
+    await withTempDataDir(async () => {
+      const sessionId = 'session-legacy-system-storm'
+      seedSession(sessionId)
+      db().run(sql`drop index backend_runs_one_streaming_per_session_unique`)
+
+      for (const index of [1, 2]) {
+        const messageId = `message-legacy-system-${index}`
+        seedAssistantMessage({
+          id: messageId,
+          sessionId,
+          status: 'streaming',
+          content: `legacy partial ${index}`,
+          createdAt: 1700000000 + index,
+          updatedAt: 1700000000 + index,
+        })
+        seedBackendRun({
+          id: `run-legacy-system-${index}`,
+          sessionId,
+          messageId,
+          origin: 'system',
+          status: 'streaming',
+          startedAt: 1700000000 + index,
+        })
+      }
+
+      for (const statement of readMigrationStatements('0042_sudden_pepper_potts.sql')) {
+        db().run(sql.raw(statement))
+      }
+
+      expect(
+        db().select().from(backendRuns).where(eq(backendRuns.chatSessionId, sessionId)).all(),
+      ).toEqual([
+        expect.objectContaining({
+          id: 'run-legacy-system-1',
+          origin: 'system',
+          status: 'failed',
+          stopReason: 'response.interrupted',
+          finishedAt: expect.any(Number),
+        }),
+        expect.objectContaining({
+          id: 'run-legacy-system-2',
+          origin: 'system',
+          status: 'failed',
+          stopReason: 'response.interrupted',
+          finishedAt: expect.any(Number),
+        }),
+      ])
+
+      expect(await recoverChatRuntimeSession(sessionId)).toEqual({
+        interruptedRunsFinalized: 0,
+        terminalFactsProjected: 2,
+        terminalProjectionDriftsRepaired: 0,
+      })
+      expect(
+        db()
+          .select({ eventType: sessionEvents.eventType, subjectRunId: sessionEvents.subjectRunId })
+          .from(sessionEvents)
+          .where(eq(sessionEvents.aggregateId, sessionId))
+          .orderBy(sessionEvents.version)
+          .all(),
+      ).toEqual([
+        { eventType: 'RunStarted', subjectRunId: 'run-legacy-system-1' },
+        { eventType: 'AssistantMessageCompleted', subjectRunId: null },
+        { eventType: 'RunFailed', subjectRunId: 'run-legacy-system-1' },
+        { eventType: 'RunStarted', subjectRunId: 'run-legacy-system-2' },
+        { eventType: 'AssistantMessageCompleted', subjectRunId: null },
+        { eventType: 'RunFailed', subjectRunId: 'run-legacy-system-2' },
+      ])
+      expect(checkChatSessionProjectionParity(sessionId)).toEqual(
+        expect.objectContaining({ diffCount: 0, unexplainedDiffs: [] }),
+      )
+
+      seedBackendRun({
+        id: 'run-streaming-guard-1',
+        sessionId,
+        messageId: null,
+        origin: 'system',
+        status: 'streaming',
+      })
+      expect(() => seedBackendRun({
+        id: 'run-streaming-guard-2',
+        sessionId,
+        messageId: null,
+        origin: 'system',
+        status: 'streaming',
+      })).toThrow(/UNIQUE constraint failed/)
+    })
+  })
+
+  it('bounds initial history hydration for a damaged 887-message session', async () => {
+    await withTempDataDir(async () => {
+      seedSession('session-bounded-history')
+      for (let index = 0; index < 887; index += 1) {
+        seedAssistantMessage({
+          id: `message-${String(index).padStart(4, '0')}`,
+          sessionId: 'session-bounded-history',
+          status: 'failed',
+          createdAt: 1700000000 + index,
+          updatedAt: 1700000000 + index,
+        })
+      }
+
+      const firstPage = await getMessageSnapshot('session-bounded-history')
+
+      expect(firstPage.rows).toHaveLength(100)
+      expect(firstPage.rows[0]?.messageId).toBe('message-0787')
+      expect(firstPage.rows.at(-1)?.messageId).toBe('message-0886')
+
+      const allIds = [...firstPage.rows.map(row => row.messageId)]
+      let cursor = firstPage.nextCursor
+      while (cursor) {
+        const page = await getMessageSnapshot('session-bounded-history', { cursor })
+        allIds.unshift(...page.rows.map(row => row.messageId))
+        cursor = page.nextCursor
+      }
+      expect(allIds).toHaveLength(887)
+      expect(new Set(allIds).size).toBe(887)
+      expect(allIds[0]).toBe('message-0000')
+      expect(allIds.at(-1)).toBe('message-0886')
+    })
+  })
+
   it('does not append session events from ordinary message reads', async () => {
     await withTempDataDir(async () => {
       seedSession('session-read-no-repair')

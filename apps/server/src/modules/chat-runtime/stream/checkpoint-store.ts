@@ -1,6 +1,6 @@
 import type { NewRunStreamCheckpoint, RunStreamCheckpoint } from '@cradle/db'
 import { runStreamCheckpoints } from '@cradle/db'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
 import { db } from '../../../infra'
 import type { ChatRuntimeWriteDb } from '../es/event-store'
@@ -50,6 +50,20 @@ export function readRunStreamCheckpointsBySession(
     .select()
     .from(runStreamCheckpoints)
     .where(eq(runStreamCheckpoints.sessionId, sessionId))
+    .all()
+}
+
+export function readRunStreamCheckpointsByMessageIds(
+  messageIds: string[],
+  d: Pick<CheckpointDb, 'select'> = db(),
+): RunStreamCheckpoint[] {
+  if (messageIds.length === 0) {
+    return []
+  }
+  return d
+    .select()
+    .from(runStreamCheckpoints)
+    .where(inArray(runStreamCheckpoints.messageId, messageIds))
     .all()
 }
 

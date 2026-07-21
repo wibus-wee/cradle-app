@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6c2fbe7d-38d6-4f45-9f88-78cd3815d27a",
-  "prevId": "dda026db-fec9-4e08-9a95-b912dc89d849",
+  "id": "78677c78-49fa-4fb5-8360-f5fd38badf32",
+  "prevId": "6c2fbe7d-38d6-4f45-9f88-78cd3815d27a",
   "tables": {
     "acp_agents": {
       "name": "acp_agents",
@@ -1745,6 +1745,14 @@
             "chat_session_id"
           ],
           "isUnique": false
+        },
+        "backend_runs_one_streaming_per_session_unique": {
+          "name": "backend_runs_one_streaming_per_session_unique",
+          "columns": [
+            "chat_session_id"
+          ],
+          "isUnique": true,
+          "where": "\"backend_runs\".\"status\" = 'streaming'"
         },
         "backend_runs_message_id_idx": {
           "name": "backend_runs_message_id_idx",

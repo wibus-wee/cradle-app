@@ -81,7 +81,6 @@ import { RuntimeResourceRegistry } from './runtime-resource-registry'
 
 interface CreateServerAppOptions {
   startBackgroundTasks?: boolean
-  recoverPersistedRunsOnCreate?: boolean
 }
 
 interface CreateServerContractAppOptions {
@@ -253,7 +252,6 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 
 export async function createServerApp(options: CreateServerAppOptions = {}) {
   const {
-    recoverPersistedRunsOnCreate = false,
     startBackgroundTasks = process.env.NODE_ENV !== 'test',
   } = options
   const downloadCenterService = new DownloadCenterService()
@@ -299,9 +297,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
     import('./modules/chat-runtime/run-snapshot-maintenance'),
   ])
-  if (recoverPersistedRunsOnCreate) {
-    recoverPersistedRunProjections()
-  }
+  await recoverPersistedRunProjections()
 
   const opencodeRuntimeInstallationService = new OpencodeRuntimeInstallationService({
     downloadCenter: downloadCenterService,
