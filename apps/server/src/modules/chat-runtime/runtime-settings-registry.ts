@@ -137,6 +137,14 @@ const RUNTIME_SETTINGS_REGISTRY: Partial<Record<RuntimeKind, RuntimeSettingsRegi
       { key: 'interactionMode', allowed: CODEX_INTERACTION_MODES },
     ],
   }),
+  'kimi': createProductSettingsEntry({
+    schema: CODEX_RUNTIME_SETTINGS_SCHEMA,
+    defaults: CODEX_DEFAULTS,
+    fields: [
+      { key: 'accessMode', allowed: CODEX_ACCESS_MODES },
+      { key: 'interactionMode', allowed: CODEX_INTERACTION_MODES },
+    ],
+  }),
   'opencode': createProductSettingsEntry({
     schema: OPENCODE_RUNTIME_SETTINGS_SCHEMA,
     defaults: CODEX_DEFAULTS,

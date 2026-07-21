@@ -20,6 +20,10 @@ import {
   CODEX_RUNTIME_METADATA,
 } from '../chat-runtime-providers/codex/metadata'
 import {
+  KIMI_RUNTIME_KIND,
+  KIMI_RUNTIME_METADATA,
+} from '../chat-runtime-providers/kimi/metadata'
+import {
   STANDARD_RUNTIME_KIND,
   STANDARD_RUNTIME_METADATA,
 } from '../chat-runtime-providers/openai-compatible/metadata'
@@ -68,6 +72,7 @@ const BUILTIN_RUNTIME_COMPATIBILITY: Array<{
   { runtimeKind: STANDARD_RUNTIME_KIND, metadata: STANDARD_RUNTIME_METADATA },
   { runtimeKind: CLAUDE_AGENT_RUNTIME_KIND, metadata: CLAUDE_AGENT_RUNTIME_METADATA },
   { runtimeKind: CODEX_RUNTIME_KIND, metadata: CODEX_RUNTIME_METADATA },
+  { runtimeKind: KIMI_RUNTIME_KIND, metadata: KIMI_RUNTIME_METADATA },
   {
     runtimeKind: OPENCODE_RUNTIME_KIND,
     metadata: OPENCODE_RUNTIME_METADATA,

@@ -11,6 +11,7 @@ export default defineConfig(
       '**/routeTree.gen.ts',
       '**/api-gen/**',
       'apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/**',
+      'apps/server/src/modules/chat-runtime-providers/kimi/protocol/rest/**',
       'apps/server/src/modules/chat-runtime-providers/codex/app-server-capabilities.ts',
       '.agents/**',
       '.claude/**',
