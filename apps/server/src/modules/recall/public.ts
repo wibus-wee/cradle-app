@@ -1,3 +1,4 @@
+export { forget, listAttunements, remember } from './attune-service'
 export type { RecallInvocationContext } from './evaluator'
 export { executeRecallQuery } from './evaluator'
 export type { RecallScope } from './query-service'

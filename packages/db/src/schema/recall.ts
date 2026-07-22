@@ -2,7 +2,7 @@ import { index, int, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-c
 
 import { backendRuns } from './backend-control-plane'
 import { messages, sessions } from './chat'
-import { createdAt, textPk, workspaces } from './shared'
+import { createdAt, textPk, timestamps, workspaces } from './shared'
 
 /**
  * Recall owns derived, disposable evidence projections. Source messages and run
@@ -108,9 +108,39 @@ export const recallRuns = sqliteTable(
   }),
 )
 
+export const recallAttunements = sqliteTable(
+  'recall_attunements',
+  {
+    id: textPk(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    evidenceIdsJson: text('evidence_ids_json').notNull().default('[]'),
+    status: text('status', { enum: ['active', 'archived'] })
+      .notNull()
+      .default('active'),
+    archivedAt: int('archived_at'),
+    ...timestamps(),
+  },
+  table => ({
+    byWorkspaceUpdated: index('recall_attunements_workspace_updated_at_idx').on(
+      table.workspaceId,
+      table.updatedAt,
+    ),
+    bySession: index('recall_attunements_session_id_idx').on(table.sessionId),
+    byStatus: index('recall_attunements_status_idx').on(table.workspaceId, table.status),
+  }),
+)
+
 export type RecallMessage = typeof recallMessages.$inferSelect
 export type NewRecallMessage = typeof recallMessages.$inferInsert
 export type RecallToolEvent = typeof recallToolEvents.$inferSelect
 export type NewRecallToolEvent = typeof recallToolEvents.$inferInsert
 export type RecallRun = typeof recallRuns.$inferSelect
 export type NewRecallRun = typeof recallRuns.$inferInsert
+export type RecallAttunement = typeof recallAttunements.$inferSelect
+export type NewRecallAttunement = typeof recallAttunements.$inferInsert
