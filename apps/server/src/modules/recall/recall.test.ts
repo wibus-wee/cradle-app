@@ -41,8 +41,10 @@ describe('recall query', () => {
     const workspaceOneId = randomUUID()
     const workspaceTwoId = randomUUID()
     const sessionOneId = randomUUID()
+    const sessionOneSiblingId = randomUUID()
     const sessionTwoId = randomUUID()
     const messageOneId = randomUUID()
+    const messageOneSiblingId = randomUUID()
     const messageTwoId = randomUUID()
     const now = Math.floor(Date.now() / 1000)
 
@@ -63,6 +65,7 @@ describe('recall query', () => {
     d.insert(sessions)
       .values([
         { id: sessionOneId, workspaceId: workspaceOneId, title: 'First Recall Session' },
+        { id: sessionOneSiblingId, workspaceId: workspaceOneId, title: 'Sibling Recall Session' },
         { id: sessionTwoId, workspaceId: workspaceTwoId, title: 'Second Recall Session' },
       ])
       .run()
@@ -84,6 +87,25 @@ describe('recall query', () => {
         updatedAt: now,
       },
       {
+        id: messageOneSiblingId,
+        sessionId: sessionOneSiblingId,
+        role: 'assistant',
+        status: 'complete',
+        content: 'The recall index found this sibling workspace deployment failure.',
+        messageJson: JSON.stringify({
+          id: messageOneSiblingId,
+          role: 'assistant',
+          parts: [
+            {
+              type: 'text',
+              text: 'The recall index found this sibling workspace deployment failure.',
+            },
+          ],
+        }),
+        createdAt: now + 1,
+        updatedAt: now + 1,
+      },
+      {
         id: messageTwoId,
         sessionId: sessionTwoId,
         role: 'assistant',
@@ -99,14 +121,16 @@ describe('recall query', () => {
             },
           ],
         }),
-        createdAt: now,
-        updatedAt: now,
+        createdAt: now + 2,
+        updatedAt: now + 2,
       },
     ])
     projectRecallMessage(d, { messageId: messageOneId })
+    projectRecallMessage(d, { messageId: messageOneSiblingId })
     projectRecallMessage(d, { messageId: messageTwoId })
 
     expect(search({ workspaceId: workspaceOneId }, 'deployment')).toEqual([
+      expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId }),
       expect.objectContaining({ id: messageOneId, sessionId: sessionOneId }),
     ])
 
@@ -119,7 +143,10 @@ describe('recall query', () => {
       kind: 'completed',
       result: {
         map: expect.objectContaining({ workspace: { id: workspaceOneId } }),
-        evidence: [expect.objectContaining({ id: messageOneId, sessionId: sessionOneId })],
+        evidence: [
+          expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId }),
+          expect.objectContaining({ id: messageOneId, sessionId: sessionOneId }),
+        ],
       },
     })
 
@@ -136,7 +163,10 @@ describe('recall query', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       kind: 'completed',
-      result: [expect.objectContaining({ id: messageOneId })],
+      result: [
+        expect.objectContaining({ id: messageOneSiblingId }),
+        expect.objectContaining({ id: messageOneId }),
+      ],
     })
   })
 })
