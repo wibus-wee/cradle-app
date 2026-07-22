@@ -64,11 +64,13 @@ async function main(): Promise<void> {
 
   const scope = {
     workspaceId: request.runnerInput.workspaceId,
-    sessionId: request.runnerInput.chatSessionId,
   }
   Object.assign(globalThis, {
     __cradleRecall: Object.freeze({
-      overview: (options?: { limit?: number }) => overview(scope, options),
+      overview: (options?: { limit?: number }) => ({
+        ...overview(scope, options),
+        currentSessionId: request.runnerInput.chatSessionId,
+      }),
       search: (
         text: string,
         options?: { limit?: number, includeSidechains?: boolean, includeMeta?: boolean },
