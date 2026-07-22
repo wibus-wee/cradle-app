@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -125,7 +126,7 @@ func TestHubCreateRoomIdempotentRenews(t *testing.T) {
 }
 
 func TestPeerSchedulerPrioritizesControlAndRoundRobinsDataStreams(t *testing.T) {
-	scheduler := newPeerScheduler(8, 4096)
+	scheduler := newPeerScheduler(8, 4096, 1024)
 	for _, item := range []struct{ stream, data string }{
 		{"a", "a1"}, {"a", "a2"}, {"b", "b1"},
 	} {
@@ -147,5 +148,41 @@ func TestPeerSchedulerPrioritizesControlAndRoundRobinsDataStreams(t *testing.T) 
 		if got := string(item.data); got != expected {
 			t.Fatalf("next() = %q, expected %q", got, expected)
 		}
+	}
+}
+
+func TestPeerSchedulerReservesCapacityForControlAndPrunesDrainedStreams(t *testing.T) {
+	scheduler := newPeerScheduler(4, 4096, 1024)
+	for index := 0; index < 3; index++ {
+		if err := scheduler.enqueue(queuedEnvelope{data: []byte("bulk"), size: 1024}, PriorityData, "bulk"); err != nil {
+			t.Fatalf("enqueue reserved data %d: %v", index, err)
+		}
+	}
+	if err := scheduler.enqueue(queuedEnvelope{data: []byte("overflow"), size: 1024}, PriorityData, "bulk"); !errors.Is(err, ErrSlowConsumer) {
+		t.Fatalf("enqueue data into control reserve = %v, expected ErrSlowConsumer", err)
+	}
+	if err := scheduler.enqueue(queuedEnvelope{data: []byte("ack"), size: 1024}, PriorityControl, ""); err != nil {
+		t.Fatalf("enqueue control into reserved capacity: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	first, err := scheduler.next(ctx)
+	if err != nil {
+		t.Fatalf("next control: %v", err)
+	}
+	if got := string(first.data); got != "ack" {
+		t.Fatalf("next control = %q, expected ack", got)
+	}
+	for range 3 {
+		if _, err := scheduler.next(ctx); err != nil {
+			t.Fatalf("drain data: %v", err)
+		}
+	}
+	if got := len(scheduler.streamOrder); got != 0 {
+		t.Fatalf("streamOrder retains drained streams: %d", got)
+	}
+	if got := len(scheduler.dataByStream); got != 0 {
+		t.Fatalf("dataByStream retains drained streams: %d", got)
 	}
 }

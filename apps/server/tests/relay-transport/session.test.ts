@@ -471,4 +471,51 @@ describe('relay session', () => {
     ).streams.get('c1')
     expect(flow?.creditBytes).toBeGreaterThan(512 * 1024)
   })
+
+  it('caps aggregate in-flight data across concurrent streams', () => {
+    const hostKeys = generateRelayKeyPair()
+    const controllerKeys = generateRelayKeyPair()
+    const roomId = 'room_connection_credit'
+    const host = new RelaySession(
+      'host',
+      hostKeys.privateKeyBase64,
+      { roomId, pairingCode: 'PAIR-CONNECTION-CREDIT', ourPublicKeyBase64: hostKeys.publicKeyBase64 },
+      { send: () => {}, onStreamOpen: () => {}, onStreamData: () => {} },
+    )
+    const controller = new RelaySession(
+      'controller',
+      controllerKeys.privateKeyBase64,
+      {
+        roomId,
+        pairingCode: 'PAIR-CONNECTION-CREDIT',
+        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
+        maxConnectionCreditBytes: 1024 * 1024,
+      },
+      { send: () => {} },
+    )
+    const wire = wireSessions(host, controller, roomId)
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
+    host.start()
+    controller.start()
+    controller.openStream('c1')
+    controller.openStream('c2')
+    controller.openStream('c3')
+
+    const window = new Uint8Array(512 * 1024)
+    controller.writeStreamData('c1', window)
+    controller.writeStreamData('c2', window)
+    controller.writeStreamData('c3', window)
+
+    const flows = (
+      controller as unknown as {
+        streams: Map<string, { sentBytes: number, peerAckedBytes: number, pendingData: Uint8Array[] }>
+      }
+    ).streams
+    const inFlight = [...flows.values()]
+      .reduce((total, flow) => total + flow.sentBytes - flow.peerAckedBytes, 0)
+    expect(inFlight).toBe(1024 * 1024)
+    expect(flows.get('c3')?.pendingData).toHaveLength(1)
+  })
 })

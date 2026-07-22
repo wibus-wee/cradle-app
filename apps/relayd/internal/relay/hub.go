@@ -86,20 +86,35 @@ type queuedEnvelope struct {
 // data round-robin by stream. relayd learns only the coarse priority and stream
 // id from the outer envelope; the payload remains opaque.
 type peerScheduler struct {
-	mu           sync.Mutex
-	control      []queuedEnvelope
-	dataByStream map[string][]queuedEnvelope
-	streamOrder  []string
-	nextStream   int
-	queuedBytes  int64
-	queuedCount  int
-	maxBytes     int64
-	maxCount     int
-	signal       chan struct{}
+	mu              sync.Mutex
+	control         []queuedEnvelope
+	dataByStream    map[string][]queuedEnvelope
+	streamOrder     []string
+	nextStream      int
+	queuedBytes     int64
+	queuedCount     int
+	queuedDataBytes int64
+	queuedDataCount int
+	maxBytes        int64
+	maxCount        int
+	maxDataBytes    int64
+	maxDataCount    int
+	signal          chan struct{}
 }
 
-func newPeerScheduler(maxCount int, maxBytes int64) *peerScheduler {
-	return &peerScheduler{dataByStream: map[string][]queuedEnvelope{}, maxCount: maxCount, maxBytes: maxBytes, signal: make(chan struct{}, 1)}
+func newPeerScheduler(maxCount int, maxBytes, maxFrameBytes int64) *peerScheduler {
+	controlReserveCount := max(1, maxCount/8)
+	controlReserveCount = min(controlReserveCount, maxCount)
+	controlReserveBytes := max(maxBytes/8, maxFrameBytes)
+	controlReserveBytes = min(controlReserveBytes, maxBytes)
+	return &peerScheduler{
+		dataByStream: map[string][]queuedEnvelope{},
+		maxCount:     maxCount,
+		maxBytes:     maxBytes,
+		maxDataCount: maxCount - controlReserveCount,
+		maxDataBytes: maxBytes - controlReserveBytes,
+		signal:       make(chan struct{}, 1),
+	}
 }
 
 func (s *peerScheduler) enqueue(item queuedEnvelope, priority, streamID string) error {
@@ -111,6 +126,12 @@ func (s *peerScheduler) enqueue(item queuedEnvelope, priority, streamID string) 
 	if priority == PriorityControl {
 		s.control = append(s.control, item)
 	} else {
+		// Data must leave space for at least one maximum-sized control frame.
+		// Without this separate budget, a bulk sender can fill the shared queue
+		// and force an ACK, close, or peer notification to be rejected.
+		if s.queuedDataBytes+item.size > s.maxDataBytes || s.queuedDataCount >= s.maxDataCount {
+			return ErrSlowConsumer
+		}
 		if streamID == "" {
 			streamID = "_unclassified"
 		}
@@ -118,6 +139,8 @@ func (s *peerScheduler) enqueue(item queuedEnvelope, priority, streamID string) 
 			s.streamOrder = append(s.streamOrder, streamID)
 		}
 		s.dataByStream[streamID] = append(s.dataByStream[streamID], item)
+		s.queuedDataBytes += item.size
+		s.queuedDataCount++
 	}
 	s.queuedBytes += item.size
 	s.queuedCount++
@@ -143,18 +166,26 @@ func (s *peerScheduler) next(ctx context.Context) (queuedEnvelope, error) {
 			index := s.nextStream % len(s.streamOrder)
 			streamID := s.streamOrder[index]
 			items := s.dataByStream[streamID]
-			s.nextStream = (index + 1) % len(s.streamOrder)
 			if len(items) == 0 {
 				continue
 			}
 			item := items[0]
 			if len(items) == 1 {
 				delete(s.dataByStream, streamID)
+				s.streamOrder = append(s.streamOrder[:index], s.streamOrder[index+1:]...)
+				if len(s.streamOrder) == 0 {
+					s.nextStream = 0
+				} else {
+					s.nextStream = index % len(s.streamOrder)
+				}
 			} else {
 				s.dataByStream[streamID] = items[1:]
+				s.nextStream = (index + 1) % len(s.streamOrder)
 			}
 			s.queuedBytes -= item.size
 			s.queuedCount--
+			s.queuedDataBytes -= item.size
+			s.queuedDataCount--
 			s.mu.Unlock()
 			return item, nil
 		}
@@ -303,7 +334,7 @@ func (h *Hub) register(role token.Role, assertion token.Assertion, ws *websocket
 		role:      role,
 		roomID:    assertion.RoomID,
 		conn:      ws,
-		scheduler: newPeerScheduler(h.cfg.MaxQueuedEnvelopes, h.cfg.MaxQueuedBytes),
+		scheduler: newPeerScheduler(h.cfg.MaxQueuedEnvelopes, h.cfg.MaxQueuedBytes, h.cfg.MaxFrameBytes),
 		done:      make(chan struct{}),
 		cfg:       h.cfg,
 		hub:       h,

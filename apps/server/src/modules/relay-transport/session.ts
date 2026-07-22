@@ -19,6 +19,7 @@ import {
   encodeInnerFrame,
   encodeRelayEnvelope,
   INNER_FRAME_KIND,
+  RELAY_CONNECTION_MAX_CREDIT_BYTES,
   RELAY_ENVELOPE_KIND,
   RELAY_MAX_STREAM_CHUNK_BYTES,
   RELAY_PROTOCOL_VERSION,
@@ -63,6 +64,8 @@ export interface RelaySessionOptions {
   initialStreamCreditBytes?: number
   /** Hard per-stream byte allowance. Defaults to 8 MiB. */
   maxStreamCreditBytes?: number
+  /** Hard aggregate byte allowance across all streams. Defaults to 16 MiB. */
+  maxConnectionCreditBytes?: number
 }
 
 export interface RelaySessionCallbacks {
@@ -170,6 +173,7 @@ export class RelaySession {
   private readonly isReconnect: boolean
   private readonly initialStreamCreditBytes: number
   private readonly maxStreamCreditBytes: number
+  private readonly maxConnectionCreditBytes: number
 
   constructor(
     role: RelaySessionRole,
@@ -196,16 +200,20 @@ export class RelaySession {
     this.initialStreamCreditBytes
       = options.initialStreamCreditBytes ?? RELAY_STREAM_MIN_CREDIT_BYTES
     this.maxStreamCreditBytes = options.maxStreamCreditBytes ?? RELAY_STREAM_MAX_CREDIT_BYTES
+    this.maxConnectionCreditBytes
+      = options.maxConnectionCreditBytes ?? RELAY_CONNECTION_MAX_CREDIT_BYTES
     if (
       !Number.isSafeInteger(this.initialStreamCreditBytes)
       || !Number.isSafeInteger(this.maxStreamCreditBytes)
+      || !Number.isSafeInteger(this.maxConnectionCreditBytes)
       || this.initialStreamCreditBytes < RELAY_STREAM_MIN_CREDIT_BYTES
       || this.maxStreamCreditBytes < this.initialStreamCreditBytes
+      || this.maxConnectionCreditBytes < this.initialStreamCreditBytes
     ) {
       throw new AppError({
         code: 'relay_credit_config_invalid',
         status: 500,
-        message: 'Relay stream credit bounds are invalid.',
+        message: 'Relay stream or connection credit bounds are invalid.',
       })
     }
   }
@@ -549,10 +557,9 @@ export class RelaySession {
    * Send data on a stream. The data is chunked to stay under the relayd frame
    * cap. The session always sends all of `data` (it does not partial-accept);
    * flow control is signaled back to the caller via onPauseStream/onResumeStream
-   * — the caller must pause reading its local source when asked. A brief
-   * overage of up to one chunk (≤ 256 KiB) past the credit window is absorbed
-   * by relayd's 4 MiB queue and the peer's receive buffer, which keeps the
-   * transport logic simple without risking a queue overrun.
+   * — the caller must pause reading its local source when asked. Per-stream
+   * and connection-wide credit bounds keep aggregate in-flight data within a
+   * fixed memory budget even when many streams are active.
    */
   writeStreamData(streamId: string, data: Uint8Array): void {
     const flow = this.streams.get(streamId)
@@ -560,7 +567,7 @@ export class RelaySession {
       return
     }
     flow.pendingData.push(data)
-    this.flushOutboundStream(streamId, flow)
+    this.flushOutboundStreams()
     if ((flow.pendingData.length > 0 || bytesInFlight(flow) >= flow.creditBytes) && !flow.paused) {
       flow.paused = true
       this.cb.onPauseStream?.(streamId)
@@ -643,6 +650,7 @@ export class RelaySession {
       streamId,
       ...(reason ? { reason } : {}),
     })
+    this.streams.delete(streamId)
   }
 
   private handleStreamOpen(streamId: string): void {
@@ -691,11 +699,8 @@ export class RelaySession {
       flow.creditBytes = Math.min(this.maxStreamCreditBytes, flow.creditBytes * 2)
       flow.ackedSinceCreditIncrease = 0
     }
-    this.flushOutboundStream(streamId, flow)
-    if (flow.paused && bytesInFlight(flow) < flow.creditBytes / 2) {
-      flow.paused = false
-      this.cb.onResumeStream?.(streamId)
-    }
+    this.flushOutboundStreams()
+    this.updatePausedStreams()
     this.cb.onStreamAck?.(streamId, ackedBytes)
   }
 
@@ -703,14 +708,41 @@ export class RelaySession {
     const flow = this.streams.get(streamId)
     if (flow) {
       flow.closed = true
+      this.streams.delete(streamId)
     }
     this.cb.onStreamClose?.(streamId, reason)
   }
 
+  private connectionBytesInFlight(): number {
+    let total = 0
+    for (const flow of this.streams.values()) {
+      if (!flow.closed) {
+        total += bytesInFlight(flow)
+      }
+    }
+    return total
+  }
+
+  private flushOutboundStreams(): void {
+    for (const [streamId, flow] of this.streams) {
+      this.flushOutboundStream(streamId, flow)
+      if (this.connectionBytesInFlight() >= this.maxConnectionCreditBytes) {
+        break
+      }
+    }
+  }
+
   private flushOutboundStream(streamId: string, flow: StreamFlowState): void {
-    while (flow.pendingData.length > 0 && bytesInFlight(flow) < flow.creditBytes) {
+    while (
+      flow.pendingData.length > 0
+      && bytesInFlight(flow) < flow.creditBytes
+      && this.connectionBytesInFlight() < this.maxConnectionCreditBytes
+    ) {
       const pending = flow.pendingData[0]
-      const capacity = flow.creditBytes - bytesInFlight(flow)
+      const capacity = Math.min(
+        flow.creditBytes - bytesInFlight(flow),
+        this.maxConnectionCreditBytes - this.connectionBytesInFlight(),
+      )
       const length = Math.min(pending.byteLength, capacity, RELAY_MAX_STREAM_CHUNK_BYTES)
       if (length <= 0) {
         break
@@ -725,6 +757,19 @@ export class RelaySession {
       const seq = flow.sentBytes
       flow.sentBytes += chunk.byteLength
       this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamData, streamId, seq, data: chunk })
+    }
+  }
+
+  private updatePausedStreams(): void {
+    for (const [streamId, flow] of this.streams) {
+      if (
+        flow.paused
+        && flow.pendingData.length === 0
+        && bytesInFlight(flow) < flow.creditBytes / 2
+      ) {
+        flow.paused = false
+        this.cb.onResumeStream?.(streamId)
+      }
     }
   }
 

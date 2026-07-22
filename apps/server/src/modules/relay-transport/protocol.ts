@@ -11,6 +11,7 @@ export const RELAY_MAX_FRAME_BYTES = 1 << 20 // 1 MiB
 export const RELAY_MAX_STREAM_CHUNK_BYTES = 64 * 1024 // 64 KiB
 export const RELAY_STREAM_MIN_CREDIT_BYTES = 512 * 1024
 export const RELAY_STREAM_MAX_CREDIT_BYTES = 8 * 1024 * 1024
+export const RELAY_CONNECTION_MAX_CREDIT_BYTES = 16 * 1024 * 1024
 
 export const RELAY_ENVELOPE_KIND = {
   dataFrame: 'relay_data_frame',

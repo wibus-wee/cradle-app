@@ -31,7 +31,9 @@ interface CodecSample {
 
 const OLD_CREDIT_BYTES = 512 * 1024
 const NEW_MAX_CREDIT_BYTES = 8 * 1024 * 1024
+const NEW_MAX_CONNECTION_CREDIT_BYTES = 16 * 1024 * 1024
 const BULK_FRAMES_AHEAD_OF_CONTROL = 65
+const RESERVED_MAX_CONTROL_FRAMES = 1
 
 interface SchedulingFrame {
   priority: 'control' | 'data'
@@ -125,6 +127,9 @@ function priorityRoundRobinOrder(queue: SchedulingFrame[]): SchedulingFrame[] {
 }
 
 function deltaPercent(old: number, next: number): string {
+  if (old === 0) {
+    return next === 0 ? '0.0%' : 'new guarantee'
+  }
   const delta = ((next - old) / old) * 100
   return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`
 }
@@ -145,7 +150,9 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
       newMaxStreamChunkBytes: RELAY_MAX_STREAM_CHUNK_BYTES,
       oldCreditBytes: OLD_CREDIT_BYTES,
       newCreditRangeBytes: [OLD_CREDIT_BYTES, NEW_MAX_CREDIT_BYTES],
+      newConnectionCreditBytes: NEW_MAX_CONNECTION_CREDIT_BYTES,
       bulkFramesAheadOfControl: BULK_FRAMES_AHEAD_OF_CONTROL,
+      reservedMaximumControlFrames: RESERVED_MAX_CONTROL_FRAMES,
     },
     codecSamples: codecSamples.map(sample => ({
       ...sample,
@@ -209,6 +216,14 @@ describe('relay Old/New performance comparison', () => {
         unit: 'bulk frames',
         evidence: 'exact scheduler model',
         conclusion: 'V2 control priority bypasses queued bulk transfer frames.',
+      },
+      {
+        checkpoint: 'maximum-size control frames admitted after bulk saturation',
+        old: 0,
+        new: RESERVED_MAX_CONTROL_FRAMES,
+        unit: 'frames',
+        evidence: 'exact scheduler model',
+        conclusion: 'V2 keeps a maximum-frame byte reserve for ACK, close, and peer-notification traffic.',
       },
       {
         checkpoint: 'window cap at 20 ms RTT',

@@ -99,7 +99,9 @@ other's windows. After sustained successful application acknowledgements, the
 sender may grow its bounded window up to 8 MiB. The receiver only emits
 cumulative `stream_ack` frames after the local transport has applied the bytes
 (TCP write success), typically every 64 KiB, so a slow consumer cannot inflate
-the peer's send window.
+the peer's send window. A separate 16 MiB connection-wide cap bounds the sum
+of all streams' in-flight data, so concurrent transfers cannot multiply the
+per-stream maximum without limit.
 
 ## Performance checkpoints and benchmark
 
