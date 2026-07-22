@@ -123,3 +123,29 @@ func TestHubCreateRoomIdempotentRenews(t *testing.T) {
 		t.Fatal("createdAt should be preserved across idempotent renewal")
 	}
 }
+
+func TestPeerSchedulerPrioritizesControlAndRoundRobinsDataStreams(t *testing.T) {
+	scheduler := newPeerScheduler(8, 4096)
+	for _, item := range []struct{ stream, data string }{
+		{"a", "a1"}, {"a", "a2"}, {"b", "b1"},
+	} {
+		if err := scheduler.enqueue(queuedEnvelope{data: []byte(item.data), size: int64(len(item.data))}, PriorityData, item.stream); err != nil {
+			t.Fatalf("enqueue data: %v", err)
+		}
+	}
+	if err := scheduler.enqueue(queuedEnvelope{data: []byte("ack"), size: 3}, PriorityControl, ""); err != nil {
+		t.Fatalf("enqueue control: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	want := []string{"ack", "a1", "b1", "a2"}
+	for _, expected := range want {
+		item, err := scheduler.next(ctx)
+		if err != nil {
+			t.Fatalf("next() error = %v", err)
+		}
+		if got := string(item.data); got != expected {
+			t.Fatalf("next() = %q, expected %q", got, expected)
+		}
+	}
+}

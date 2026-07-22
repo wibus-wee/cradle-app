@@ -67,11 +67,10 @@ type connState struct {
 	role         token.Role
 	roomID       string
 	conn         *websocket.Conn
-	outbound     chan queuedEnvelope
+	scheduler    *peerScheduler
 	done         chan struct{}
 	closeOnce    sync.Once
 	writeMu      sync.Mutex
-	pendingBytes atomic.Int64
 	lastSeenUnix atomic.Int64
 	cfg          HubConfig
 	hub          *Hub
@@ -81,6 +80,91 @@ type connState struct {
 type queuedEnvelope struct {
 	data []byte
 	size int64
+}
+
+// peerScheduler reserves queue capacity for control traffic and serves bulk
+// data round-robin by stream. relayd learns only the coarse priority and stream
+// id from the outer envelope; the payload remains opaque.
+type peerScheduler struct {
+	mu           sync.Mutex
+	control      []queuedEnvelope
+	dataByStream map[string][]queuedEnvelope
+	streamOrder  []string
+	nextStream   int
+	queuedBytes  int64
+	queuedCount  int
+	maxBytes     int64
+	maxCount     int
+	signal       chan struct{}
+}
+
+func newPeerScheduler(maxCount int, maxBytes int64) *peerScheduler {
+	return &peerScheduler{dataByStream: map[string][]queuedEnvelope{}, maxCount: maxCount, maxBytes: maxBytes, signal: make(chan struct{}, 1)}
+}
+
+func (s *peerScheduler) enqueue(item queuedEnvelope, priority, streamID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.queuedBytes+item.size > s.maxBytes || s.queuedCount >= s.maxCount {
+		return ErrSlowConsumer
+	}
+	if priority == PriorityControl {
+		s.control = append(s.control, item)
+	} else {
+		if streamID == "" {
+			streamID = "_unclassified"
+		}
+		if _, exists := s.dataByStream[streamID]; !exists {
+			s.streamOrder = append(s.streamOrder, streamID)
+		}
+		s.dataByStream[streamID] = append(s.dataByStream[streamID], item)
+	}
+	s.queuedBytes += item.size
+	s.queuedCount++
+	select {
+	case s.signal <- struct{}{}:
+	default:
+	}
+	return nil
+}
+
+func (s *peerScheduler) next(ctx context.Context) (queuedEnvelope, error) {
+	for {
+		s.mu.Lock()
+		if len(s.control) > 0 {
+			item := s.control[0]
+			s.control = s.control[1:]
+			s.queuedBytes -= item.size
+			s.queuedCount--
+			s.mu.Unlock()
+			return item, nil
+		}
+		for checked := 0; checked < len(s.streamOrder); checked++ {
+			index := s.nextStream % len(s.streamOrder)
+			streamID := s.streamOrder[index]
+			items := s.dataByStream[streamID]
+			s.nextStream = (index + 1) % len(s.streamOrder)
+			if len(items) == 0 {
+				continue
+			}
+			item := items[0]
+			if len(items) == 1 {
+				delete(s.dataByStream, streamID)
+			} else {
+				s.dataByStream[streamID] = items[1:]
+			}
+			s.queuedBytes -= item.size
+			s.queuedCount--
+			s.mu.Unlock()
+			return item, nil
+		}
+		s.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return queuedEnvelope{}, ctx.Err()
+		case <-s.signal:
+		}
+	}
 }
 
 func NewHub(cfg HubConfig) *Hub {
@@ -216,14 +300,14 @@ func (h *Hub) register(role token.Role, assertion token.Assertion, ws *websocket
 	}
 
 	state := &connState{
-		role:     role,
-		roomID:   assertion.RoomID,
-		conn:     ws,
-		outbound: make(chan queuedEnvelope, h.cfg.MaxQueuedEnvelopes),
-		done:     make(chan struct{}),
-		cfg:      h.cfg,
-		hub:      h,
-		logger:   h.logger,
+		role:      role,
+		roomID:    assertion.RoomID,
+		conn:      ws,
+		scheduler: newPeerScheduler(h.cfg.MaxQueuedEnvelopes, h.cfg.MaxQueuedBytes),
+		done:      make(chan struct{}),
+		cfg:       h.cfg,
+		hub:       h,
+		logger:    h.logger,
 	}
 	state.lastSeenUnix.Store(h.now().UnixNano())
 	// Renew the room's TTL on every (re)connect so a reconnecting peer never
@@ -312,7 +396,7 @@ func (h *Hub) forward(from *connState, env Envelope) error {
 	if peer == nil {
 		return ErrPeerNotConnected
 	}
-	if err := peer.enqueue(encoded); err != nil {
+	if err := peer.enqueue(encoded, env.Priority, env.StreamID); err != nil {
 		if h.cfg.Metrics != nil && errors.Is(err, ErrSlowConsumer) {
 			h.cfg.Metrics.SlowConsumerCloses.Add(1)
 		}
@@ -343,7 +427,7 @@ func (h *Hub) notifyPeerLocked(peer *connState, role token.Role, reason string) 
 		h.logger.Warn("encoding peer close envelope failed", "error", err)
 		return
 	}
-	if err := peer.enqueue(encoded); err != nil {
+	if err := peer.enqueue(encoded, PriorityControl, ""); err != nil {
 		peer.close(websocket.StatusPolicyViolation, "slow consumer")
 	}
 }
@@ -386,13 +470,18 @@ func (h *Hub) renewRoom(roomID string, now time.Time) {
 func (c *connState) readLoop(ctx context.Context, cancel context.CancelFunc) error {
 	c.conn.SetReadLimit(c.cfg.MaxFrameBytes)
 	for {
-		_, data, err := c.conn.Read(ctx)
+		messageType, data, err := c.conn.Read(ctx)
 		if err != nil {
 			cancel()
 			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
 				return nil
 			}
 			return fmt.Errorf("reading websocket: %w", err)
+		}
+		if messageType != websocket.MessageBinary {
+			c.close(websocket.StatusUnsupportedData, "relay frames must be binary")
+			cancel()
+			return ErrInvalidEnvelope
 		}
 		c.lastSeenUnix.Store(time.Now().UnixNano())
 		env, err := ParseEnvelope(data, c.cfg.MaxFrameBytes)
@@ -418,18 +507,16 @@ func (c *connState) readLoop(ctx context.Context, cancel context.CancelFunc) err
 
 func (c *connState) writeLoop(ctx context.Context, cancel context.CancelFunc) {
 	for {
-		select {
-		case <-ctx.Done():
+		item, err := c.scheduler.next(ctx)
+		if err != nil {
 			return
-		case item := <-c.outbound:
-			c.pendingBytes.Add(-item.size)
-			writeCtx, stop := context.WithTimeout(ctx, 10*time.Second)
-			err := c.write(writeCtx, item.data)
-			stop()
-			if err != nil {
-				cancel()
-				return
-			}
+		}
+		writeCtx, stop := context.WithTimeout(ctx, 10*time.Second)
+		err = c.write(writeCtx, item.data)
+		stop()
+		if err != nil {
+			cancel()
+			return
 		}
 	}
 }
@@ -477,7 +564,7 @@ func (c *connState) heartbeatLoop(ctx context.Context, cancel context.CancelFunc
 func (c *connState) write(ctx context.Context, data []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
-	return c.conn.Write(ctx, websocket.MessageText, data)
+	return c.conn.Write(ctx, websocket.MessageBinary, data)
 }
 
 func (c *connState) ping(ctx context.Context) error {
@@ -486,20 +573,9 @@ func (c *connState) ping(ctx context.Context) error {
 	return c.conn.Ping(ctx)
 }
 
-func (c *connState) enqueue(data []byte) error {
+func (c *connState) enqueue(data []byte, priority, streamID string) error {
 	size := int64(len(data))
-	nextBytes := c.pendingBytes.Add(size)
-	if nextBytes > c.cfg.MaxQueuedBytes {
-		c.pendingBytes.Add(-size)
-		return ErrSlowConsumer
-	}
-	select {
-	case c.outbound <- queuedEnvelope{data: data, size: size}:
-		return nil
-	default:
-		c.pendingBytes.Add(-size)
-		return ErrSlowConsumer
-	}
+	return c.scheduler.enqueue(queuedEnvelope{data: data, size: size}, priority, streamID)
 }
 
 func (c *connState) close(status websocket.StatusCode, reason string) {

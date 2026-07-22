@@ -125,7 +125,7 @@ func TestWebSocketRoutesEnvelopeBetweenHostAndController(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeEnvelope() error = %v", err)
 	}
-	if err := host.Write(t.Context(), websocket.MessageText, data); err != nil {
+	if err := host.Write(t.Context(), websocket.MessageBinary, data); err != nil {
 		t.Fatalf("host Write() error = %v", err)
 	}
 
@@ -192,7 +192,7 @@ func TestWebSocketHeartbeatKeepsIdleConnectionOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeEnvelope() error = %v", err)
 	}
-	if err := host.Write(t.Context(), websocket.MessageText, data); err != nil {
+	if err := host.Write(t.Context(), websocket.MessageBinary, data); err != nil {
 		t.Fatalf("host Write() error = %v", err)
 	}
 
@@ -239,7 +239,7 @@ func TestWebSocketRejectsRoomMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeEnvelope() error = %v", err)
 	}
-	if err := host.Write(t.Context(), websocket.MessageText, data); err != nil {
+	if err := host.Write(t.Context(), websocket.MessageBinary, data); err != nil {
 		t.Fatalf("host Write() error = %v", err)
 	}
 	readCtx, cancel := context.WithTimeout(t.Context(), time.Second)

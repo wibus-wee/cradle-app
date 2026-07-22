@@ -9,7 +9,7 @@ import type { SignedRelayAssertion } from '../relay-servers/relay-signature-serv
 import { relayAssertionHeaders } from '../relay-servers/relay-signature-service'
 import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
 import type { RelayEnvelope } from './protocol'
-import { relayEnvelopeSchema } from './protocol'
+import { decodeRelayEnvelope } from './protocol'
 import { RelaySession } from './session'
 
 /**
@@ -65,7 +65,8 @@ export async function startRelayControllerTransport(
   const keypair = options.controllerPrivateKeyBase64
     ? {
         privateKeyBase64: options.controllerPrivateKeyBase64,
-        publicKeyBase64: options.controllerPublicKeyBase64
+        publicKeyBase64:
+          options.controllerPublicKeyBase64
           ?? publicKeyFromPrivate(options.controllerPrivateKeyBase64),
       }
     : generateRelayKeyPair()
@@ -78,7 +79,10 @@ export async function startRelayControllerTransport(
 
 class ControllerTransport {
   private readonly streams = new Map<string, ActiveStream>()
-  private readonly exitListeners = new Set<(exit: { code: number | null, signal: NodeJS.Signals | null }) => void>()
+  private readonly exitListeners = new Set<
+    (exit: { code: number | null, signal: NodeJS.Signals | null }) => void
+  >()
+
   private session: RelaySession | null = null
   private ws: WebSocket | null = null
   private server: net.Server | null = null
@@ -104,7 +108,7 @@ class ControllerTransport {
         await this.startLocalServer()
         return
       }
-      catch (error) {
+ catch (error) {
         lastError = error
         await this.teardown()
         if (Date.now() >= deadline) {
@@ -124,13 +128,18 @@ class ControllerTransport {
     const wsUrl = toWebSocketUrl(this.options.relayUrl, '/ws/controller')
     return new Promise<void>((resolve, reject) => {
       let settled = false
-      const timeout = setTimeout(() => {
-        finish(new AppError({
-          code: 'relay_controller_handshake_timeout',
-          status: 503,
-          message: `Relay controller handshake did not complete within ${Math.max(0, Math.floor(remainingMs))}ms.`,
-        }))
-      }, Math.max(1, remainingMs))
+      const timeout = setTimeout(
+        () => {
+          finish(
+            new AppError({
+              code: 'relay_controller_handshake_timeout',
+              status: 503,
+              message: `Relay controller handshake did not complete within ${Math.max(0, Math.floor(remainingMs))}ms.`,
+            }),
+          )
+        },
+        Math.max(1, remainingMs),
+      )
       timeout.unref?.()
       const finish = (error?: Error) => {
         if (settled) {
@@ -141,7 +150,7 @@ class ControllerTransport {
         if (error) {
           reject(error)
         }
-        else {
+ else {
           resolve()
         }
       }
@@ -150,7 +159,7 @@ class ControllerTransport {
       try {
         ws = new WebSocket(wsUrl, { headers: relayAssertionHeaders(this.options.wsAssertion) })
       }
-      catch (error) {
+ catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)))
         return
       }
@@ -163,7 +172,9 @@ class ControllerTransport {
           roomId: this.options.roomId,
           ourPublicKeyBase64: this.keypair.publicKeyBase64,
           ...(this.options.pairingCode ? { pairingCode: this.options.pairingCode } : {}),
-          ...(this.options.pinnedHostPubkey ? { pinnedPeerPubkey: this.options.pinnedHostPubkey } : {}),
+          ...(this.options.pinnedHostPubkey
+            ? { pinnedPeerPubkey: this.options.pinnedHostPubkey }
+            : {}),
           ...(this.options.controllerName ? { ourName: this.options.controllerName } : {}),
           ourSigningPubkey: this.options.wsAssertion.assertion.pubkey,
         },
@@ -198,18 +209,22 @@ class ControllerTransport {
       ws.once('open', () => session.start())
       ws.on('message', (data: WebSocket.RawData) => {
         try {
-          const env = relayEnvelopeSchema.parse(JSON.parse(data.toString('utf8')))
-          session.handleEnvelope(env as RelayEnvelope)
+          session.handleEnvelope(
+            decodeRelayEnvelope(new Uint8Array(data as Buffer)) as RelayEnvelope,
+          )
         }
-        catch (error) {
+ catch (error) {
           finish(error instanceof Error ? error : new Error(String(error)))
         }
       })
-      ws.once('close', () => finish(new AppError({
-        code: 'relay_controller_ws_closed',
-        status: 503,
-        message: 'Relayd closed the controller websocket before the handshake completed.',
-      })))
+      ws.once('close', () =>
+        finish(
+          new AppError({
+            code: 'relay_controller_ws_closed',
+            status: 503,
+            message: 'Relayd closed the controller websocket before the handshake completed.',
+          }),
+        ))
       ws.once('error', error => finish(error))
     })
   }
@@ -360,7 +375,7 @@ function toWebSocketUrl(relayUrl: string, path: string): string {
   if (url.protocol === 'http:') {
     url.protocol = 'ws:'
   }
-  else if (url.protocol === 'https:') {
+ else if (url.protocol === 'https:') {
     url.protocol = 'wss:'
   }
   return url.toString()

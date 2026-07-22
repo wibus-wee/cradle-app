@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { generateRelayKeyPair } from '../../src/modules/relay-transport/crypto'
 import type { RelayEnvelope } from '../../src/modules/relay-transport/protocol'
-import { relayEnvelopeSchema } from '../../src/modules/relay-transport/protocol'
+import {
+  decodeInnerFrame,
+  decodeRelayEnvelope,
+  encodeInnerFrame,
+} from '../../src/modules/relay-transport/protocol'
 import { RelaySession } from '../../src/modules/relay-transport/session'
 
 /**
@@ -14,13 +18,13 @@ function wireSessions(
   host: RelaySession,
   controller: RelaySession,
   roomId: string,
-): { hostSend: (data: string) => void, controllerSend: (data: string) => void } {
-  const hostSend = (data: string) => {
-    const env = relayEnvelopeSchema.parse(JSON.parse(data))
+): { hostSend: (data: Uint8Array) => void, controllerSend: (data: Uint8Array) => void } {
+  const hostSend = (data: Uint8Array) => {
+    const env = decodeRelayEnvelope(data)
     controller.handleEnvelope({ ...env, roomId })
   }
-  const controllerSend = (data: string) => {
-    const env = relayEnvelopeSchema.parse(JSON.parse(data))
+  const controllerSend = (data: Uint8Array) => {
+    const env = decodeRelayEnvelope(data)
     host.handleEnvelope({ ...env, roomId })
   }
   return { hostSend, controllerSend }
@@ -58,8 +62,9 @@ describe('relay session', () => {
 
     // Rebind the send callbacks now that both sessions exist.
     const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
 
     host.start()
     controller.start()
@@ -94,19 +99,28 @@ describe('relay session', () => {
     const host = new RelaySession(
       'host',
       hostKeys.privateKeyBase64,
-      { roomId, pinnedPeerPubkey: controllerKeys.publicKeyBase64, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
+      {
+        roomId,
+        pinnedPeerPubkey: controllerKeys.publicKeyBase64,
+        ourPublicKeyBase64: hostKeys.publicKeyBase64,
+      },
       { send: () => {}, onReady: hostReady },
     )
     const controller = new RelaySession(
       'controller',
       controllerKeys.privateKeyBase64,
-      { roomId, pinnedPeerPubkey: hostKeys.publicKeyBase64, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
+      {
+        roomId,
+        pinnedPeerPubkey: hostKeys.publicKeyBase64,
+        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
+      },
       { send: () => {}, onReady: controllerReady },
     )
 
     const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
 
     host.start()
     controller.start()
@@ -127,14 +141,22 @@ describe('relay session', () => {
     const host = new RelaySession(
       'host',
       hostKeys.privateKeyBase64,
-      { roomId, pinnedPeerPubkey: controllerKeys.publicKeyBase64, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
+      {
+        roomId,
+        pinnedPeerPubkey: controllerKeys.publicKeyBase64,
+        ourPublicKeyBase64: hostKeys.publicKeyBase64,
+      },
       { send: () => {}, onError: hostError },
     )
     // Real controller, pinned to the host.
     const controller = new RelaySession(
       'controller',
       controllerKeys.privateKeyBase64,
-      { roomId, pinnedPeerPubkey: hostKeys.publicKeyBase64, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
+      {
+        roomId,
+        pinnedPeerPubkey: hostKeys.publicKeyBase64,
+        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
+      },
       { send: () => {}, onError: controllerError },
     )
 
@@ -142,17 +164,21 @@ describe('relay session', () => {
     // its own, so each honest peer sees the MITM's pubkey where it expects the
     // real peer's. At least one honest peer must reject (whichever receives the
     // rewritten hello first); in a real relay the detection is symmetric.
-    const wire = (b: RelaySession) => (data: string) => {
-      const env = relayEnvelopeSchema.parse(JSON.parse(data))
-      if (env.payload && typeof env.payload === 'object' && (env.payload as { kind?: string }).kind === 'hello') {
-        const rewritten = { ...(env.payload as object), pubkey: mitmKeys.publicKeyBase64 }
-        b.handleEnvelope({ ...env, roomId, payload: rewritten })
+    const wire = (b: RelaySession) => (data: Uint8Array) => {
+      const env = decodeRelayEnvelope(data)
+      const frame = decodeInnerFrame(env.payload)
+      if (frame.kind === 'hello') {
+        b.handleEnvelope({
+          ...env,
+          roomId,
+          payload: encodeInnerFrame({ ...frame, pubkey: mitmKeys.publicKeyBase64 }),
+        })
         return
       }
       b.handleEnvelope({ ...env, roomId })
     }
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire(controller)
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire(host)
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire(controller)
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire(host)
 
     host.start()
     controller.start()
@@ -184,8 +210,9 @@ describe('relay session', () => {
     )
 
     const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
 
     host.start()
     controller.start()
@@ -206,11 +233,12 @@ describe('relay session', () => {
 
     // A bare plaintext stream_open injected pre-handshake must be rejected.
     const malicious: RelayEnvelope = {
-      version: 1,
+      version: 2,
       roomId: 'r',
       seq: 99,
       kind: 'relay_data_frame',
-      payload: { kind: 'stream_open', streamId: 'evil' },
+      priority: 'control',
+      payload: encodeInnerFrame({ kind: 'stream_open', streamId: 'evil' }),
     }
     host.handleEnvelope(malicious)
     expect(host.isReady).toBe(false)
@@ -230,7 +258,10 @@ describe('relay session', () => {
       {
         send: () => {},
         onStreamOpen: () => {},
-        onStreamData: (_streamId, data) => hostStreamData.push(data),
+        onStreamData: (streamId, data) => {
+          hostStreamData.push(data)
+          host.reportStreamDataConsumed(streamId, data.byteLength)
+        },
       },
     )
     const controller = new RelaySession(
@@ -241,8 +272,9 @@ describe('relay session', () => {
     )
 
     const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
 
     host.start()
     controller.start()
@@ -295,15 +327,18 @@ describe('relay session', () => {
     )
 
     const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
 
     host.start()
     controller.start()
     controller.openStream('c1')
 
     // Hold acks on the host so the controller exhausts its 512 KiB window.
-    ;(host as unknown as { cb: { onStreamData: (s: string, d: Uint8Array) => void } }).cb.onStreamData = () => {}
+    ;(
+      host as unknown as { cb: { onStreamData: (s: string, d: Uint8Array) => void } }
+    ).cb.onStreamData = () => {}
 
     const payload = new Uint8Array(512 * 1024)
     controller.writeStreamData('c1', payload)
@@ -355,8 +390,9 @@ describe('relay session', () => {
     )
 
     const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: string) => void } }).cb.send = wire.controllerSend
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
 
     host.start()
     controller.start()
@@ -391,5 +427,48 @@ describe('relay session', () => {
       controller.reportStreamDataConsumed('c1', chunk.byteLength)
     }
     expect(hostResume).toHaveBeenCalledWith('c1')
+  })
+
+  it('grows a stream window only after the peer has applied a substantial window', () => {
+    const hostKeys = generateRelayKeyPair()
+    const controllerKeys = generateRelayKeyPair()
+    const roomId = 'room_adaptive_credit'
+    const host = new RelaySession(
+      'host',
+      hostKeys.privateKeyBase64,
+      {
+        roomId,
+        pairingCode: 'PAIR-ADAPTIVE',
+        ourPublicKeyBase64: hostKeys.publicKeyBase64,
+      },
+      {
+        send: () => {},
+        onStreamOpen: () => {},
+        onStreamData: (streamId, data) => host.reportStreamDataConsumed(streamId, data.byteLength),
+      },
+    )
+    const controller = new RelaySession(
+      'controller',
+      controllerKeys.privateKeyBase64,
+      {
+        roomId,
+        pairingCode: 'PAIR-ADAPTIVE',
+        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
+        maxStreamCreditBytes: 2 * 1024 * 1024,
+      },
+      { send: () => {} },
+    )
+    const wire = wireSessions(host, controller, roomId)
+    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
+    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
+      = wire.controllerSend
+    host.start()
+    controller.start()
+    controller.openStream('c1')
+    controller.writeStreamData('c1', new Uint8Array(1024 * 1024))
+    const flow = (
+      controller as unknown as { streams: Map<string, { creditBytes: number }> }
+    ).streams.get('c1')
+    expect(flow?.creditBytes).toBeGreaterThan(512 * 1024)
   })
 })

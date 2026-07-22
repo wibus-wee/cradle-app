@@ -85,7 +85,7 @@ export function computeRelaySharedSecret(
   try {
     return x25519.getSharedSecret(ourPrivate, peerPublic)
   }
-  catch (error) {
+ catch (error) {
     throw new AppError({
       code: 'relay_crypto_invalid_peer_public_key',
       status: 400,
@@ -108,7 +108,13 @@ export interface RelayDerivedKeys {
 }
 
 function deriveKey(secret: Uint8Array, pairingCode: string, label: string): Uint8Array {
-  return hkdf(sha512, secret, utf8ToBytes(pairingCode), utf8ToBytes(`${HKDF_INFO_PREFIX}/${label}`), KEY_BYTES)
+  return hkdf(
+    sha512,
+    secret,
+    utf8ToBytes(pairingCode),
+    utf8ToBytes(`${HKDF_INFO_PREFIX}/${label}`),
+    KEY_BYTES,
+  )
 }
 
 export function deriveRelayKeys(sharedSecret: Uint8Array, pairingCode: string): RelayDerivedKeys {
@@ -184,17 +190,16 @@ export class RelayCipher {
     this.key = key
   }
 
-  /** Encrypt plaintext → base64 `nonce(24) || ciphertext || tag(16)`. */
-  encrypt(plaintext: Uint8Array): string {
+  /** Encrypt plaintext → raw `nonce(24) || ciphertext || tag(16)` bytes. */
+  encrypt(plaintext: Uint8Array): Uint8Array {
     const nonce = randomBytes(XCHACHA_NONCE_BYTES)
     const cipher = xchacha20poly1305(this.key, nonce)
     const sealed = cipher.encrypt(plaintext)
-    return bytesToBase64(concatBytes(nonce, sealed))
+    return concatBytes(nonce, sealed)
   }
 
-  /** Decrypt a base64 blob produced by the peer's matching cipher. */
-  decrypt(blobBase64: string): Uint8Array {
-    const blob = base64ToBytes(blobBase64)
+  /** Decrypt a raw blob produced by the peer's matching cipher. */
+  decrypt(blob: Uint8Array): Uint8Array {
     if (blob.length < XCHACHA_NONCE_BYTES + 16) {
       throw new AppError({
         code: 'relay_crypto_decrypt_failed',
@@ -207,7 +212,7 @@ export class RelayCipher {
     try {
       return xchacha20poly1305(this.key, nonce).decrypt(sealed)
     }
-    catch (error) {
+ catch (error) {
       throw new AppError({
         code: 'relay_crypto_decrypt_failed',
         status: 400,
