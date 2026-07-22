@@ -866,7 +866,7 @@ export type ChatSessionTailEventPayload
       latestVersion: number
       latestSequenceId: number
     }
-    | { queueItemId: string, status?: string, startedRunId?: string | null, absorbedByRunId?: string | null }
+    | { queueItemId: string, status?: string, startedRunId?: string | null }
     | { queueItemId: string, position: number }
     | { queueItemId: string, updatedAt: number }
     | {

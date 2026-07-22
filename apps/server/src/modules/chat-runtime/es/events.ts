@@ -167,16 +167,10 @@ export interface QueueItemFailedPayload extends VersionedChatSessionPayload {
   updatedAt: number
 }
 
-/**
- * Completes a durable queue item without a dedicated Cradle run. Used when the
- * provider already absorbed the follow-up into a live turn (Claude Agent mid-turn
- * `queued_command`) so drain must not open an empty second run.
- */
+/** Completes a durable submitted-input row without a dedicated Cradle run. */
 export interface QueueItemCompletedPayload extends VersionedChatSessionPayload {
   queueItemId: string
   sessionId: string
-  /** Optional provider/run identity that already produced the follow-up answer. */
-  absorbedByRunId?: string | null
   updatedAt: number
 }
 

@@ -142,7 +142,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 060  | Rename agent tool to `manage_pull_request` + pre-PR branch rename | P2  | M      | branch `feat/enhance-work` | DONE (`dfe2fb88`..`a7aa8e93` on `feat/enhance-work`; advisor-reviewed)   |
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
-| 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | TODO |
+| 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

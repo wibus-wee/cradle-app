@@ -148,7 +148,7 @@ export async function enqueueSessionQueueItem(
   // before committing the Cradle queue row. Failure must surface — never pretend delivery.
   const live = liveRuntimeSessionRegistry.read(input.sessionId)
   const hasActiveRun = Boolean(runRegistry.getActiveRunIdForSession(input.sessionId))
-  if (hasActiveRun && live?.enqueueNativeFollowUp) {
+  if (hasActiveRun && live?.submitNativeInput) {
     const followUpMessage = createUserMessage(
       row.id,
       text,
@@ -156,7 +156,7 @@ export async function enqueueSessionQueueItem(
       contextParts as ChatContextPart[],
     )
     try {
-      await live.enqueueNativeFollowUp({
+      await live.submitNativeInput({
         queueItemId: row.id,
         message: followUpMessage,
       })
@@ -221,6 +221,44 @@ export async function cancelSessionQueueItem(
     })
   }
 
+  const nativeOutcome = liveRuntimeSessionRegistry.readTerminalNativeInput(sessionId, queueItemId)
+  if (nativeOutcome) {
+    throw new AppError({
+      code: 'chat_queue_item_not_pending',
+      status: 409,
+      message: 'Queue item already reached a terminal state in the native runtime',
+      details: { sessionId, queueItemId, status: nativeOutcome },
+    })
+  }
+
+  const live = liveRuntimeSessionRegistry.read(sessionId)
+  if (live?.hasNativeInput?.(queueItemId)) {
+    let cancelled = false
+    try {
+      cancelled = await live.cancelNativeInput?.(queueItemId) ?? false
+    }
+    catch (error) {
+      throw new AppError({
+        code: 'chat_queue_native_cancel_failed',
+        status: 409,
+        message: 'Native runtime did not cancel the submitted queue item',
+        details: {
+          sessionId,
+          queueItemId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+    if (!cancelled) {
+      throw new AppError({
+        code: 'chat_queue_native_cancel_failed',
+        status: 409,
+        message: 'Native runtime did not cancel the submitted queue item',
+        details: { sessionId, queueItemId },
+      })
+    }
+  }
+
   const updated = await cancelQueuedSessionItem(sessionId, queueItemId)
   if (!updated || updated.status !== 'cancelled') {
     const current = db()
@@ -240,10 +278,6 @@ export async function cancelSessionQueueItem(
       message: 'Only pending chat queue items can be cancelled',
       details: { sessionId, queueItemId, status: current?.status ?? 'missing' },
     })
-  }
-  const live = liveRuntimeSessionRegistry.read(sessionId)
-  if (live?.cancelNativeFollowUp) {
-    await live.cancelNativeFollowUp(queueItemId).catch(() => false)
   }
   await normalizeSessionQueuePositions(sessionId)
   return toQueueItemDto(runtimeKind, updated)

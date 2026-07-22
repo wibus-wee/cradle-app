@@ -1,11 +1,15 @@
+import type { UUID } from 'node:crypto'
+
 import type { UIMessage } from 'ai'
 
 import type { RuntimeSession, RuntimeSettings } from './runtime-provider-types'
 
-export interface LiveRuntimeNativeFollowUpInput {
-  queueItemId: string
+export interface LiveRuntimeNativeInput {
+  queueItemId: UUID
   message: UIMessage
 }
+
+export type LiveRuntimeNativeInputOutcome = 'completed' | 'failed' | 'cancelled'
 
 export interface LiveRuntimeSessionRecord {
   sessionId: string
@@ -18,28 +22,24 @@ export interface LiveRuntimeSessionRecord {
    * follow-up into the provider-native message queue (append, no interrupt). Throws if the
    * live query cannot accept input — callers must not treat the Cradle queue row as delivered.
    */
-  enqueueNativeFollowUp?: (input: LiveRuntimeNativeFollowUpInput) => Promise<void>
+  submitNativeInput?: (input: LiveRuntimeNativeInput) => Promise<void>
   /**
-   * Cancel a previously native-enqueued follow-up that has not been adopted by a Cradle run yet.
-   * Returns true when the provider dropped it from its pending adopt list.
+   * Cancel a previously submitted native input by its durable queue / SDK UUID.
+   * Returns true only when the native runtime confirms cancellation.
    */
-  cancelNativeFollowUp?: (queueItemId: string) => Promise<boolean>
-  /**
-   * Claim a native follow-up for the next Cradle `streamTurn` so the provider adopts without
-   * pushing the same content a second time. Returns true when the item was pending natively.
-   */
-  claimNativeFollowUp?: (queueItemId: string) => boolean
+  cancelNativeInput?: (queueItemId: string) => Promise<boolean>
+  /** Returns true while the UUID is still owned by the live native input channel. */
+  hasNativeInput?: (queueItemId: string) => boolean
 }
 
 class LiveRuntimeSessionRegistry {
   private readonly records = new Map<string, LiveRuntimeSessionRecord>()
-  /**
-   * Session-scoped queue item ids whose native follow-ups were absorbed into a live
-   * provider turn (Claude mid-turn `queued_command`). Survives live-query teardown so
-   * drain can complete without an empty second run after the provider releases its
-   * in-memory follow-up map.
-   */
-  private readonly midTurnAbsorbedNativeFollowUps = new Map<string, Set<string>>()
+  private readonly terminalNativeInputs = new Map<
+    string,
+    Map<string, LiveRuntimeNativeInputOutcome>
+  >()
+
+  private readonly nativeInputTerminalListeners = new Set<(sessionId: string) => void>()
 
   /**
    * Register mutable provider state that outlives a Chat Runtime run. This is
@@ -64,49 +64,72 @@ class LiveRuntimeSessionRegistry {
     return this.records.get(sessionId)
   }
 
-  markNativeFollowUpAbsorbedMidTurn(sessionId: string, queueItemId: string): void {
-    let set = this.midTurnAbsorbedNativeFollowUps.get(sessionId)
-    if (!set) {
-      set = new Set()
-      this.midTurnAbsorbedNativeFollowUps.set(sessionId, set)
+  markNativeInputsTerminal(
+    sessionId: string,
+    outcomes: Iterable<{ queueItemId: string, outcome: LiveRuntimeNativeInputOutcome }>,
+  ): void {
+    let terminal = this.terminalNativeInputs.get(sessionId)
+    if (!terminal) {
+      terminal = new Map()
+      this.terminalNativeInputs.set(sessionId, terminal)
     }
-    set.add(queueItemId)
+    let changed = false
+    for (const { queueItemId, outcome } of outcomes) {
+      terminal.set(queueItemId, outcome)
+      changed = true
+    }
+    if (changed) {
+      for (const listener of this.nativeInputTerminalListeners) {
+        listener(sessionId)
+      }
+    }
   }
 
-  isNativeFollowUpAbsorbedMidTurn(sessionId: string, queueItemId: string): boolean {
-    return Boolean(this.midTurnAbsorbedNativeFollowUps.get(sessionId)?.has(queueItemId))
+  subscribeNativeInputTerminals(listener: (sessionId: string) => void): () => void {
+    this.nativeInputTerminalListeners.add(listener)
+    return () => this.nativeInputTerminalListeners.delete(listener)
   }
 
-  /**
-   * Consume a mid-turn-absorbed follow-up so drain / adopt no longer treat it as pending.
-   * Returns true when the item was absorbed and removed.
-   */
-  consumeNativeFollowUpAbsorbedMidTurn(sessionId: string, queueItemId: string): boolean {
-    const set = this.midTurnAbsorbedNativeFollowUps.get(sessionId)
-    if (!set?.has(queueItemId)) {
-      return false
-    }
-    set.delete(queueItemId)
-    if (set.size === 0) {
-      this.midTurnAbsorbedNativeFollowUps.delete(sessionId)
-    }
-    return true
+  readTerminalNativeInput(
+    sessionId: string,
+    queueItemId: string,
+  ): LiveRuntimeNativeInputOutcome | undefined {
+    return this.terminalNativeInputs.get(sessionId)?.get(queueItemId)
   }
 
-  clearNativeFollowUpAbsorbedMidTurn(sessionId: string, queueItemId: string): void {
-    const set = this.midTurnAbsorbedNativeFollowUps.get(sessionId)
-    if (!set) {
+  consumeTerminalNativeInput(
+    sessionId: string,
+    queueItemId: string,
+  ): LiveRuntimeNativeInputOutcome | undefined {
+    const terminal = this.terminalNativeInputs.get(sessionId)
+    if (!terminal) {
+      return undefined
+    }
+    const outcome = terminal.get(queueItemId)
+    if (!outcome) {
+      return undefined
+    }
+    terminal.delete(queueItemId)
+    if (terminal.size === 0) {
+      this.terminalNativeInputs.delete(sessionId)
+    }
+    return outcome
+  }
+
+  discardTerminalNativeInput(sessionId: string, queueItemId: string): void {
+    const terminal = this.terminalNativeInputs.get(sessionId)
+    if (!terminal) {
       return
     }
-    set.delete(queueItemId)
-    if (set.size === 0) {
-      this.midTurnAbsorbedNativeFollowUps.delete(sessionId)
+    terminal.delete(queueItemId)
+    if (terminal.size === 0) {
+      this.terminalNativeInputs.delete(sessionId)
     }
   }
 
   clear(): void {
     this.records.clear()
-    this.midTurnAbsorbedNativeFollowUps.clear()
+    this.terminalNativeInputs.clear()
   }
 }
 

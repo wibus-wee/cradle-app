@@ -381,9 +381,6 @@ function projectQueueItemCompleted(d: ProjectorDb, payload: QueueItemCompletedPa
     .set({
       status: 'completed',
       errorText: null,
-      ...(payload.absorbedByRunId
-        ? { startedRunId: payload.absorbedByRunId }
-        : {}),
       updatedAt: payload.updatedAt,
     })
     .where(

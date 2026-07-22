@@ -148,10 +148,7 @@ export function evolveChatSessionState(
     case 'QueueItemCompleted':
       state.queueItemById.set(event.payload.queueItemId, {
         status: 'completed',
-        startedRunId:
-          event.payload.absorbedByRunId
-          ?? state.queueItemById.get(event.payload.queueItemId)?.startedRunId
-          ?? null,
+        startedRunId: state.queueItemById.get(event.payload.queueItemId)?.startedRunId ?? null,
       })
       break
     case 'QueueItemReordered':

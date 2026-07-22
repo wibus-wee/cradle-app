@@ -133,6 +133,14 @@ OpenAI-compatible and System Agent (`jar-core`) providers do not currently expos
 
 Claude Agent supports this hook through the Claude Agent SDK streaming-input query plus `interrupt()`. Codex supports this hook through the Codex app-server JSON-RPC protocol: the provider keeps the active app-server client, `threadId`, and `turnId`, then sends `turn/steer` with the expected active turn id. ACP, OpenAI-compatible, System Agent, and mock runtimes reject `/steer` unless their providers add a real side-channel later; callers that want deferred execution must submit a separate `/queue` request.
 
+## Claude Durable Queue Projection
+
+Claude Agent's long-lived SDK Query owns execution and native priority scheduling. A Cradle durable queue row submitted to that live Query is a UUID-keyed record, not an instruction for queue drain to create another Claude turn. Claude Code's feature-gated `msg_lifecycle_v1` events carry the original UUID as `command_uuid`; drain waits while the Query owns it and applies only the exact terminal `completed`, `failed`, or `cancelled` fact. `result` does not settle queue rows. Multiple submitted UUIDs may therefore map to one native turn and one projection UI Run without a one-to-one scheduler.
+
+Without `msg_lifecycle_v1`, live durable submit fails visibly instead of leaving a row permanently waiting. On Query loss, explicitly queued-but-not-started inputs may be retried by drain; started or lifecycle-unacknowledged inputs fail closed so Cradle cannot automatically repeat unknown side effects.
+
+The output pump may open a new system-origin UI Run for top-level assistant output after `result`. That Run remains subject to the shared lifecycle admission rules, but it is only a streaming/persistence projection and never gates the SDK input iterable. Queue cancellation is native-first: `cancelAsyncMessage(uuid)` must confirm cancellation before Cradle changes the durable row. Current-turn stop uses `interrupt()`; `still_queued` UUIDs remain pending because Claude reports that they will still execute.
+
 Chronicle registers a builtin `chronicle` MCP server from `../chronicle/mcp.ts`, exposing read-oriented memory, activity segment, and knowledge-card tools to the providers above. Chat Runtime remains a consumer of that registry and does not own Chronicle semantics or writes.
 
 ## Chronicle Context

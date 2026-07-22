@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, readlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -172,6 +173,7 @@ function createControllableQuery(
     },
     close: vi.fn(close),
     interrupt: vi.fn().mockResolvedValue(undefined),
+    cancelAsyncMessage: vi.fn().mockResolvedValue(true),
     setModel: vi.fn().mockResolvedValue(undefined),
     setPermissionMode: vi.fn().mockResolvedValue(undefined),
     supportedCommands: vi.fn().mockResolvedValue([]),
@@ -185,6 +187,41 @@ function createControllableQuery(
       account: {},
     }),
   }
+}
+
+function advertiseMessageLifecycle(
+  query: ReturnType<typeof createControllableQuery>,
+  commandUuid = 'initial-command-lifecycle-item-1',
+): void {
+  query.push({
+    type: 'command_lifecycle',
+    command_uuid: commandUuid,
+    state: 'started',
+    uuid: randomUUID(),
+    session_id: 'claude-session-message-lifecycle',
+  })
+}
+
+function advertiseNoMessageLifecycle(query: ReturnType<typeof createControllableQuery>): void {
+  query.push({
+    type: 'system',
+    subtype: 'init',
+    capabilities: [],
+    cwd: '/tmp',
+    session_id: 'claude-session-without-message-lifecycle',
+    tools: [],
+    mcp_servers: [],
+    model: 'claude-test',
+    permissionMode: 'default',
+    slash_commands: [],
+    apiKeySource: 'none',
+    claude_code_version: '2.1.206',
+    output_style: 'default',
+    agents: [],
+    skills: [],
+    plugins: [],
+    uuid: randomUUID(),
+  })
 }
 
 function createPromptDrivenQuery(
@@ -4452,7 +4489,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
   })
 
   it('enqueues native follow-ups into the live SDK input stream without interrupt', async () => {
-    const activeQuery = createPendingQuery()
+    const activeQuery = createControllableQuery()
     sdkMocks.query.mockReturnValue(activeQuery)
 
     const provider = new ClaudeAgentProvider({
@@ -4473,11 +4510,12 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
 
     await expect(readPromptText(0)).resolves.toBe('Initial task')
+    advertiseMessageLifecycle(activeQuery)
 
     const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)
-    expect(live?.enqueueNativeFollowUp).toBeTypeOf('function')
-    await live!.enqueueNativeFollowUp!({
-      queueItemId: 'queue-native-1',
+    expect(live?.submitNativeInput).toBeTypeOf('function')
+    await live!.submitNativeInput!({
+      queueItemId: 'queue-native-follow-up-1',
       message: createUserMessage('Follow up while busy'),
     })
 
@@ -4488,9 +4526,184 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await pendingNext
   })
 
-  it('adopts a native follow-up on the next streamTurn without double-push', async () => {
+  it('keeps submitted UUID tracking when native cancellation returns false', async () => {
+    const activeQuery = createControllableQuery()
+    activeQuery.cancelAsyncMessage.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-native-cancel',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Initial task'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
+
+    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await expect(readPromptText(0)).resolves.toBe('Initial task')
+    advertiseMessageLifecycle(activeQuery)
+
+    const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)!
+    const queueItemId = 'queue-cancel-native-item-1'
+    await live.submitNativeInput!({
+      queueItemId,
+      message: createUserMessage('Cancelable follow-up'),
+    })
+    await expect(readPromptText(0)).resolves.toBe('Cancelable follow-up')
+
+    await expect(live.cancelNativeInput!(queueItemId)).resolves.toBe(false)
+    expect(live.hasNativeInput!(queueItemId)).toBe(true)
+    await expect(live.cancelNativeInput!(queueItemId)).resolves.toBe(true)
+    expect(live.hasNativeInput!(queueItemId)).toBe(false)
+    expect(activeQuery.cancelAsyncMessage).toHaveBeenNthCalledWith(1, queueItemId)
+
+    activeQuery.close()
+    await pendingNext
+    await provider.dispose()
+  })
+
+  it('rejects durable native submission without msg_lifecycle_v1', async () => {
     const activeQuery = createControllableQuery()
     sdkMocks.query.mockReturnValue(activeQuery)
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-no-message-lifecycle',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Initial task'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
+
+    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await expect(readPromptText(0)).resolves.toBe('Initial task')
+    advertiseNoMessageLifecycle(activeQuery)
+
+    const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)!
+    await expect(live.submitNativeInput!({
+      queueItemId: 'queue-no-lifecycle-native-item-1',
+      message: createUserMessage('Must not become a ghost row'),
+    })).rejects.toThrow(/does not support msg_lifecycle_v1/i)
+
+    activeQuery.close()
+    await pendingNext
+    await provider.dispose()
+  })
+
+  it('fails a started native input when the query closes without a terminal lifecycle', async () => {
+    const activeQuery = createControllableQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-started-input-teardown',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Initial task'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
+
+    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await expect(readPromptText(0)).resolves.toBe('Initial task')
+    advertiseMessageLifecycle(activeQuery)
+    const queueItemId = 'queue-started-teardown-item-1'
+    const queuedItemId = 'queue-pending-teardown-item-1'
+    const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)!
+    await live.submitNativeInput!({
+      queueItemId,
+      message: createUserMessage('Started before teardown'),
+    })
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: queueItemId,
+      state: 'started',
+      uuid: randomUUID(),
+      session_id: 'claude-session-started-input-teardown',
+    })
+    await live.submitNativeInput!({
+      queueItemId: queuedItemId,
+      message: createUserMessage('Still queued at teardown'),
+    })
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: queuedItemId,
+      state: 'queued',
+      uuid: randomUUID(),
+      session_id: 'claude-session-started-input-teardown',
+    })
+    await vi.waitFor(() => expect(live.hasNativeInput!(queueItemId)).toBe(true))
+
+    activeQuery.close()
+    await pendingNext
+    await vi.waitFor(() => {
+      expect(liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)).toBeUndefined()
+    })
+    expect(
+      liveRuntimeSessionRegistry.consumeTerminalNativeInput(
+        runtimeSession.chatSessionId,
+        queueItemId,
+      ),
+    ).toBe('failed')
+    expect(
+      liveRuntimeSessionRegistry.consumeTerminalNativeInput(
+        runtimeSession.chatSessionId,
+        queuedItemId,
+      ),
+    ).toBeUndefined()
+    await provider.dispose()
+  })
+
+  it('interrupts the current native turn without closing still-queued inputs', async () => {
+    const activeQuery = createControllableQuery()
+    activeQuery.interrupt.mockResolvedValue({
+      still_queued: ['queue-interrupt-native-item-1'],
+    })
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-native-interrupt',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Initial task'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
+
+    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await expect(readPromptText(0)).resolves.toBe('Initial task')
+    advertiseMessageLifecycle(activeQuery)
+    const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)!
+    await live.submitNativeInput!({
+      queueItemId: 'queue-interrupt-native-item-1',
+      message: createUserMessage('Still queued'),
+    })
+
+    await provider.cancelTurn({ runtimeSession, profile: createProfile() })
+
+    expect(activeQuery.interrupt).toHaveBeenCalledOnce()
+    expect(activeQuery.close).not.toHaveBeenCalled()
+    expect(live.hasNativeInput!('queue-interrupt-native-item-1')).toBe(true)
+
+    activeQuery.close()
+    await pendingNext
+    await provider.dispose()
+  })
+
+  it('projects a submitted native follow-up after result without a second user streamTurn', async () => {
+    const activeQuery = createControllableQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+    const syntheticEvents: ProviderSyntheticTurnEvent[] = []
 
     const provider = new ClaudeAgentProvider({
       readSecret: () => 'sk-ant-test',
@@ -4505,6 +4718,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       profile: createProfile(),
       message: createUserMessage('First turn'),
       workspaceId: 'workspace-1',
+      onProviderSyntheticTurnEvent: async (event) => {
+        syntheticEvents.push(event)
+      },
     })
     const firstPending = firstStream.next()
     void firstPending.catch(() => undefined)
@@ -4513,13 +4729,21 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       expect(sdkMocks.query).toHaveBeenCalledOnce()
     })
     await expect(readPromptText(0)).resolves.toBe('First turn')
+    advertiseMessageLifecycle(activeQuery)
 
     const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)
-    await live!.enqueueNativeFollowUp!({
-      queueItemId: 'queue-adopt-1',
+    await live!.submitNativeInput!({
+      queueItemId: 'queue-adopt-native-item-1',
       message: createUserMessage('Queued next'),
     })
     await expect(readPromptText(0)).resolves.toBe('Queued next')
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: 'queue-adopt-native-item-1',
+      state: 'queued',
+      uuid: randomUUID(),
+      session_id: 'claude-session-native-adopt',
+    })
 
     activeQuery.push({
       type: 'assistant',
@@ -4535,7 +4759,13 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       // drain first turn
     }
 
-    // SDK already started the follow-up before Cradle adopts.
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: 'queue-adopt-native-item-1',
+      state: 'started',
+      uuid: randomUUID(),
+      session_id: 'claude-session-native-adopt',
+    })
     activeQuery.push({
       type: 'assistant',
       session_id: 'claude-session-native-adopt',
@@ -4546,29 +4776,34 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       session_id: 'claude-session-native-adopt',
       usage: { input_tokens: 1, output_tokens: 1 },
     })
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: 'queue-adopt-native-item-1',
+      state: 'completed',
+      uuid: randomUUID(),
+      session_id: 'claude-session-native-adopt',
+    })
 
-    const secondChunks: UIMessageChunk[] = []
-    for await (const chunk of provider.streamTurn({
-      runId: 'run-claude-agent-native-2',
-      runtimeSession,
-      profile: createProfile(),
-      message: createUserMessage('Queued next'),
-      queueItemId: 'queue-adopt-1',
-      workspaceId: 'workspace-1',
-    })) {
-      secondChunks.push(chunk)
-    }
-
-    expect(secondChunks).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: 'text-delta', delta: 'from queue' })]),
-    )
-    expect(live!.claimNativeFollowUp!('queue-adopt-1')).toBe(false)
+    await vi.waitFor(() => {
+      expect(syntheticEvents.flatMap(event => event.chunks)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'text-delta', delta: 'from queue' }),
+        ]),
+      )
+      expect(live!.hasNativeInput!('queue-adopt-native-item-1')).toBe(false)
+    })
+    expect(
+      liveRuntimeSessionRegistry.consumeTerminalNativeInput(
+        runtimeSession.chatSessionId,
+        'queue-adopt-native-item-1',
+      ),
+    ).toBe('completed')
 
     activeQuery.close()
     await provider.dispose()
   })
 
-  it('marks native follow-ups absorbed when Claude folds them into the current turn', async () => {
+  it('completes multiple submitted UUIDs from exact coalesced command lifecycles', async () => {
     const activeQuery = createControllableQuery()
     sdkMocks.query.mockReturnValue(activeQuery)
 
@@ -4592,28 +4827,32 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       expect(sdkMocks.query).toHaveBeenCalledOnce()
     })
     await expect(readPromptText(0)).resolves.toBe('First turn')
+    advertiseMessageLifecycle(activeQuery)
 
     const live = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)
-    await live!.enqueueNativeFollowUp!({
-      queueItemId: 'queue-midturn-1',
+    await live!.submitNativeInput!({
+      queueItemId: 'queue-midturn-native-item-1',
       message: createUserMessage('Follow-up folded mid-turn'),
     })
     await expect(readPromptText(0)).resolves.toBe('Follow-up folded mid-turn')
-    expect(liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(runtimeSession.chatSessionId, 'queue-midturn-1')).toBe(false)
+    await live!.submitNativeInput!({
+      queueItemId: 'queue-midturn-native-item-2',
+      message: createUserMessage('Second folded follow-up'),
+    })
+    await expect(readPromptText(0)).resolves.toBe('Second folded follow-up')
 
-    // Claude folds the follow-up into the current turn (queued_command attachment).
     activeQuery.push({
-      type: 'queue-operation',
-      operation: 'remove',
-      content: 'Follow-up folded mid-turn',
+      type: 'command_lifecycle',
+      command_uuid: 'queue-midturn-native-item-1',
+      state: 'started',
+      uuid: randomUUID(),
       session_id: 'claude-session-native-midturn',
     })
     activeQuery.push({
-      type: 'attachment',
-      attachment: {
-        type: 'queued_command',
-        prompt: 'Follow-up folded mid-turn',
-      },
+      type: 'command_lifecycle',
+      command_uuid: 'queue-midturn-native-item-2',
+      state: 'started',
+      uuid: randomUUID(),
       session_id: 'claude-session-native-midturn',
     })
     activeQuery.push({
@@ -4628,31 +4867,39 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       session_id: 'claude-session-native-midturn',
       usage: { input_tokens: 1, output_tokens: 1 },
     })
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: 'queue-midturn-native-item-1',
+      state: 'completed',
+      uuid: randomUUID(),
+      session_id: 'claude-session-native-midturn',
+    })
+    activeQuery.push({
+      type: 'command_lifecycle',
+      command_uuid: 'queue-midturn-native-item-2',
+      state: 'completed',
+      uuid: randomUUID(),
+      session_id: 'claude-session-native-midturn',
+    })
 
     for await (const _chunk of firstStream) {
       // drain the single merged turn
     }
 
-    // No separate post-result turn — absorption must stick for drain.
-    expect(liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(runtimeSession.chatSessionId, 'queue-midturn-1')).toBe(true)
-    expect(live!.claimNativeFollowUp!('queue-midturn-1')).toBe(false)
-
-    // Defensive streamTurn path: finish immediately without re-pushing.
-    const secondChunks: UIMessageChunk[] = []
-    for await (const chunk of provider.streamTurn({
-      runId: 'run-claude-agent-midturn-2',
-      runtimeSession,
-      profile: createProfile(),
-      message: createUserMessage('Follow-up folded mid-turn'),
-      queueItemId: 'queue-midturn-1',
-      workspaceId: 'workspace-1',
-    })) {
-      secondChunks.push(chunk)
-    }
-    expect(secondChunks).toEqual([
-      expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
-    ])
-    expect(liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(runtimeSession.chatSessionId, 'queue-midturn-1')).toBe(false)
+    expect(live!.hasNativeInput!('queue-midturn-native-item-1')).toBe(false)
+    expect(live!.hasNativeInput!('queue-midturn-native-item-2')).toBe(false)
+    expect(
+      liveRuntimeSessionRegistry.consumeTerminalNativeInput(
+        runtimeSession.chatSessionId,
+        'queue-midturn-native-item-1',
+      ),
+    ).toBe('completed')
+    expect(
+      liveRuntimeSessionRegistry.consumeTerminalNativeInput(
+        runtimeSession.chatSessionId,
+        'queue-midturn-native-item-2',
+      ),
+    ).toBe('completed')
 
     activeQuery.close()
     await provider.dispose()
@@ -4687,8 +4934,8 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
 
     await expect(
-      live!.enqueueNativeFollowUp!({
-        queueItemId: 'queue-dead-1',
+      live!.submitNativeInput!({
+        queueItemId: 'queue-dead-native-item-1',
         message: createUserMessage('Should fail'),
       }),
     ).rejects.toThrow(/no live query/i)

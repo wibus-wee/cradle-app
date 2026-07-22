@@ -3,6 +3,7 @@ import type { FileUIPart } from 'ai'
 import { AppError } from '../../../errors/app-error'
 import type { ChatContextPart } from '../context-parts'
 import {
+  cancelQueuedSessionItem,
   claimSessionQueueItem,
   completeSessionQueueItem,
   failSessionQueueItem,
@@ -27,14 +28,6 @@ import {
 
 const drainingSessionIds = new Set<string>()
 const requestedDrainSessionIds = new Set<string>()
-
-/**
- * Brief settle so a post-result separate-turn can clear mid-turn absorption
- * before we complete the queue item without a run. Claude's mid-turn
- * `queued_command` path never produces that output; the separate-turn path
- * usually buffers within this window.
- */
-const MID_TURN_ABSORPTION_SETTLE_MS = 150
 
 export interface QueueDrainDeps {
   hasActiveOrPendingRun: (sessionId: string) => boolean
@@ -76,6 +69,7 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
 
   drainingSessionIds.add(sessionId)
   requestedDrainSessionIds.delete(sessionId)
+  let waitingForNativeInput = false
   try {
     await recoverOrphanedQueueItemClaims(sessionId)
     while (!deps.hasActiveOrPendingRun(sessionId)) {
@@ -84,27 +78,42 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
         return
       }
 
-      // Claude Agent may fold a live native follow-up into the previous turn as
-      // mid-turn `queued_command`. Result-time absorption is tentative; wait briefly
-      // so a true separate-turn can clear it, then complete without an empty run.
-      if (liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(sessionId, next.id)) {
-        await sleep(MID_TURN_ABSORPTION_SETTLE_MS)
-        if (
-          !deps.hasActiveOrPendingRun(sessionId)
-          && liveRuntimeSessionRegistry.isNativeFollowUpAbsorbedMidTurn(sessionId, next.id)
-        ) {
-          try {
-            await completeAbsorbedMidTurnQueueItem(sessionId, next)
-            liveRuntimeSessionRegistry.consumeNativeFollowUpAbsorbedMidTurn(sessionId, next.id)
-            await normalizeSessionQueuePositions(sessionId)
-            continue
+      const nativeOutcome = liveRuntimeSessionRegistry.consumeTerminalNativeInput(
+        sessionId,
+        next.id,
+      )
+      if (nativeOutcome) {
+        try {
+          if (nativeOutcome === 'completed') {
+            await completeSubmittedNativeQueueItem(sessionId, next)
           }
-          catch (error) {
-            await failClaimedQueueItem(sessionId, next.id, deps.serializeError(error).text)
-            await normalizeSessionQueuePositions(sessionId)
-            continue
+          else if (nativeOutcome === 'failed') {
+            await failClaimedQueueItem(
+              sessionId,
+              next.id,
+              'Claude native input failed before a completed lifecycle fact',
+            )
           }
+          else {
+            await cancelQueuedSessionItem(sessionId, next.id)
+          }
+          await normalizeSessionQueuePositions(sessionId)
+          continue
         }
+        catch (error) {
+          await failClaimedQueueItem(sessionId, next.id, deps.serializeError(error).text)
+          await normalizeSessionQueuePositions(sessionId)
+          continue
+        }
+      }
+
+      // The input was already pushed into the provider's long-lived native queue.
+      // Wait for an exact command lifecycle terminal fact; never start a second run
+      // to claim or re-submit it.
+      const live = liveRuntimeSessionRegistry.read(sessionId)
+      if (live?.hasNativeInput?.(next.id)) {
+        waitingForNativeInput = true
+        return
       }
 
       const claimed = await claimQueueItem(sessionId, next.id)
@@ -150,7 +159,11 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
     drainingSessionIds.delete(sessionId)
     if (
       requestedDrainSessionIds.delete(sessionId)
-      || (!deps.hasActiveOrPendingRun(sessionId) && listPendingQueueRows(sessionId).length > 0)
+      || (
+        !waitingForNativeInput
+        && !deps.hasActiveOrPendingRun(sessionId)
+        && listPendingQueueRows(sessionId).length > 0
+      )
     ) {
       scheduleSessionQueueDrain(sessionId, deps)
     }
@@ -165,28 +178,21 @@ export function isDeferredQueueDrainError(error: unknown): boolean {
     )
 }
 
-async function completeAbsorbedMidTurnQueueItem(
+async function completeSubmittedNativeQueueItem(
   sessionId: string,
   row: ReturnType<typeof listPendingQueueRows>[number],
 ): Promise<void> {
-  // Persist the user bubble without starting a Cradle run — the previous live turn
-  // already produced the assistant answer. Product semantics are steer (mid-turn
-  // fold into the active turn), even when the entry arrived via the durable queue.
+  // Persist the submitted input without inventing a one-item Cradle execution.
+  // The provider's exact command UUID lifecycle completed natively already.
   const draft = createDraftTurn({
     sessionId,
     userText: row.text,
     files: parseQueueFiles(row.filesJson),
     contextParts: parseQueueContextParts(row.contextPartsJson),
-    continuation: { mode: 'steer', queueItemId: row.id },
+    continuation: { mode: 'queue', queueItemId: row.id },
   })
   await appendDraftUserMessage({ sessionId, userMessage: draft.userMessage })
-  await completeSessionQueueItem(sessionId, row.id, {
-    absorbedByRunId: row.sourceRunId,
-  })
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  await completeSessionQueueItem(sessionId, row.id)
 }
 
 async function claimQueueItem(sessionId: string, queueItemId: string) {

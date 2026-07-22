@@ -86,6 +86,7 @@ import type { TurnExecutorDeps } from './run/turn-executor'
 import { executeRun as executeRunWithDeps } from './run/turn-executor'
 import type { ActiveRun } from './run-registry'
 import { runRegistry } from './run-registry'
+import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
 import type {
   ChatThinkingEffort,
   RuntimeGoalContinuationOptions,
@@ -357,6 +358,9 @@ const queueDrainDeps: QueueDrainDeps = {
   },
   serializeError: error => serializeChatError(error),
 }
+liveRuntimeSessionRegistry.subscribeNativeInputTerminals((sessionId) => {
+  scheduleSessionQueueDrain(sessionId, queueDrainDeps)
+})
 const runtimeGoalContinuationDeps: RuntimeGoalContinuationSchedulerDeps = {
   hasActiveOrPendingRun: sessionId =>
     runRegistry.hasActiveRunForSession(sessionId)

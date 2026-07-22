@@ -4,7 +4,7 @@
  * Position: Claude Agent provider package type boundary.
  */
 
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { UIMessage } from 'ai'
 
 import type { ProviderContext, RuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
@@ -30,6 +30,26 @@ export interface ClaudeAgentSessionInfo {
 export type RuntimeMessageInput = UIMessage | string
 export type MessagePart = UIMessage['parts'][number]
 export type ClaudeAgentUserContent = SDKUserMessage['message']['content']
+export type ClaudeAgentCommandLifecycleState
+  = | 'queued'
+    | 'started'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+
+/**
+ * `msg_lifecycle_v1` wire event emitted by Claude Code 2.1.207. The matching
+ * Agent SDK release forwards it but does not yet include it in `SDKMessage`.
+ */
+export interface ClaudeAgentCommandLifecycleMessage {
+  type: 'command_lifecycle'
+  command_uuid: string
+  state: ClaudeAgentCommandLifecycleState
+  uuid: string
+  session_id: string
+}
+
+export type ClaudeAgentWireMessage = SDKMessage | ClaudeAgentCommandLifecycleMessage
 export type AnthropicImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 export type ClaudeAgentContentBlock
   = | { type: 'text', text: string }

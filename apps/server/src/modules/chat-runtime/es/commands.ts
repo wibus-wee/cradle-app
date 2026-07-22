@@ -367,14 +367,10 @@ export async function failSessionQueueItem(
   ])
 }
 
-/**
- * Mark a durable queue item complete without opening a Cradle run. Used when the
- * live provider already absorbed the follow-up into an in-flight turn.
- */
+/** Mark a durable submitted-input row complete without opening a Cradle run. */
 export async function completeSessionQueueItem(
   sessionId: string,
   queueItemId: string,
-  options: { absorbedByRunId?: string | null } = {},
 ): Promise<void> {
   const updatedAt = currentUnixSeconds()
   await commitSessionEvents(sessionId, [
@@ -383,7 +379,6 @@ export async function completeSessionQueueItem(
       payload: {
         queueItemId,
         sessionId,
-        absorbedByRunId: options.absorbedByRunId ?? null,
         updatedAt,
       },
     },
