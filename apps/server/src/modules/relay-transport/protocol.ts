@@ -459,15 +459,22 @@ export function relayPriorityForInnerFrame(frame: InnerFrame): RelayPriority {
 export function legacyV1WireBytesForStreamData(data: Uint8Array): number {
   const legacyInner = JSON.stringify({
     kind: 'stream_data',
-    streamId: 'c1',
+    streamId: 'benchmark',
     seq: 0,
     data: Buffer.from(data).toString('base64'),
   })
-  const legacyCiphertext = Buffer.from(legacyInner).toString('base64')
+  // V1 serialized nonce(24) || ciphertext || tag(16) as base64. The nonce
+  // and tag values are irrelevant to the exact wire length, so use zero bytes
+  // here instead of performing random encryption in a deterministic benchmark.
+  const legacyCiphertext = Buffer.concat([
+    Buffer.alloc(24),
+    Buffer.from(legacyInner),
+    Buffer.alloc(16),
+  ]).toString('base64')
   return Buffer.byteLength(
     JSON.stringify({
       version: 1,
-      roomId: 'room_compare',
+      roomId: 'room_benchmark',
       seq: 0,
       kind: 'relay_data_frame',
       payload: { ciphertext: legacyCiphertext },

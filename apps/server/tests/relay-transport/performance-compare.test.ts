@@ -23,10 +23,12 @@ interface BenchmarkRow {
 
 interface CodecSample {
   payloadBytes: number
-  oldWireBytes: number
-  newWireBytes: number
-  oldFrames: number
-  newFrames: number
+  v1WireBytes: number
+  previousV2WireBytes: number
+  currentV2WireBytes: number
+  v1Frames: number
+  previousV2Frames: number
+  currentV2Frames: number
 }
 
 const OLD_CREDIT_BYTES = 512 * 1024
@@ -75,13 +77,17 @@ function encodeV2Payload(payload: Uint8Array): { wireBytes: number, frames: numb
 
 function measureCodec(payloadBytes: number): CodecSample {
   const payload = makePayload(payloadBytes)
-  const current = encodeV2Payload(payload)
+  const v2 = encodeV2Payload(payload)
   return {
     payloadBytes,
-    oldWireBytes: legacyV1WireBytesForStreamData(payload),
-    newWireBytes: current.wireBytes,
-    oldFrames: 1,
-    newFrames: current.frames,
+    v1WireBytes: legacyV1WireBytesForStreamData(payload),
+    // Commit 01c39cd8 changes only relayd's forwarding ownership. The V2
+    // codec is deliberately identical before and after that change.
+    previousV2WireBytes: v2.wireBytes,
+    currentV2WireBytes: v2.wireBytes,
+    v1Frames: 1,
+    previousV2Frames: v2.frames,
+    currentV2Frames: v2.frames,
   }
 }
 
@@ -136,10 +142,10 @@ function deltaPercent(old: number, next: number): string {
 
 function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void {
   const report = {
-    kind: 'relay-old-new-benchmark',
+    kind: 'relay-three-generation-benchmark',
     run: {
-      id: 'relay-v2-deterministic-compare',
-      protocol: { old: 1, new: RELAY_PROTOCOL_VERSION },
+      id: 'relay-v1-v2-before-current-compare',
+      protocol: { v1: 1, previousV2: RELAY_PROTOCOL_VERSION, currentV2: RELAY_PROTOCOL_VERSION },
       measurementBoundary: 'same-process codec and scheduler model',
       payloadPattern: 'payload[index] = index & 0xff',
       loss: 'none',
@@ -156,20 +162,24 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
     },
     codecSamples: codecSamples.map(sample => ({
       ...sample,
-      wireByteDeltaPercent: deltaPercent(sample.oldWireBytes, sample.newWireBytes),
+      v1ToV2WireByteDeltaPercent: deltaPercent(sample.v1WireBytes, sample.currentV2WireBytes),
+      previousV2ToCurrentV2WireByteDeltaPercent: deltaPercent(
+        sample.previousV2WireBytes,
+        sample.currentV2WireBytes,
+      ),
     })),
     rows,
     caveat: 'Wire and scheduler rows are exact under the stated inputs. Throughput rows are window bounds, not Internet throughput measurements. Run benchmark:relay:runtime for a local real-relayd cold/warm timestamp sample.',
   }
   const markdown = [
-    `# Relay Old/New Benchmark — ${report.run.id}`,
+    `# Relay three-generation benchmark — ${report.run.id}`,
     '',
     '## Codec: exact byte measurements',
     '',
-    '| Logical payload | V1 wire bytes | V2 wire bytes | Delta | V1 frames | V2 frames |',
-    '| ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Logical payload | V1 wire bytes | V2 before pass-through | V2 current | V1 → current | V2 before → current | V1 frames | V2 before/current frames |',
+    '| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...report.codecSamples.map(sample =>
-      `| ${sample.payloadBytes} B | ${sample.oldWireBytes} | ${sample.newWireBytes} | ${sample.wireByteDeltaPercent} | ${sample.oldFrames} | ${sample.newFrames} |`),
+      `| ${sample.payloadBytes} B | ${sample.v1WireBytes} | ${sample.previousV2WireBytes} | ${sample.currentV2WireBytes} | ${sample.v1ToV2WireByteDeltaPercent} | ${sample.previousV2ToCurrentV2WireByteDeltaPercent} | ${sample.v1Frames} | ${sample.previousV2Frames}/${sample.currentV2Frames} |`),
     '',
     '## Checkpoints',
     '',
@@ -178,14 +188,14 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
     ...rows.map(row =>
       `| ${row.checkpoint} | ${row.old} ${row.unit} | ${row.new} ${row.unit} | ${deltaPercent(row.old, row.new)} | ${row.evidence} |`),
     '',
-    'The 8 MiB value is the bounded adaptive maximum after successful acknowledgements; new streams start at the same 512 KiB as V1.',
+    'V2-before and V2-current have identical wire bytes by design: pass-through removes Relay process work, not bytes on the network. The 8 MiB value is the bounded adaptive maximum after successful acknowledgements; new streams start at the same 512 KiB as V1.',
   ].join('\n')
   console.info(markdown)
   console.info(JSON.stringify(report))
 }
 
-describe('relay Old/New performance comparison', () => {
-  it('emits a reproducible before/after report and guards the material gains', () => {
+describe('relay three-generation performance comparison', () => {
+  it('emits a reproducible V1/V2-before/V2-current report and guards the gains', () => {
     const codecSamples = [
       measureCodec(1 * 1024),
       measureCodec(64 * 1024),
@@ -269,7 +279,8 @@ describe('relay Old/New performance comparison', () => {
     printBenchmark(codecSamples, rows)
 
     for (const sample of codecSamples) {
-      expect(sample.newWireBytes).toBeLessThan(sample.oldWireBytes * 0.7)
+      expect(sample.currentV2WireBytes).toBeLessThan(sample.v1WireBytes * 0.7)
+      expect(sample.previousV2WireBytes).toBe(sample.currentV2WireBytes)
     }
     expect(rows.find(row => row.checkpoint === 'control frames ahead of an interactive control frame')?.new).toBe(0)
     expect(rows.find(row => row.checkpoint === 'window cap at 200 ms RTT')?.new).toBe(40)
