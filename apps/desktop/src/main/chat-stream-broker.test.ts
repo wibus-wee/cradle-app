@@ -120,7 +120,16 @@ describe('chat stream broker', () => {
 
     expect(fetchFn).toHaveBeenCalledTimes(1)
     expect(firstHandle.runId).toBe('run-1')
+    expect(firstHandle).toMatchObject({
+      reusedUpstream: false,
+      upstreamMode: 'response',
+    })
     expect(secondHandle.runId).toBe('run-1')
+    expect(secondHandle).toMatchObject({
+      reusedUpstream: true,
+      upstreamRequestId: firstHandle.upstreamRequestId,
+      upstreamMode: 'response',
+    })
     expect(broker.diagnostics().streams).toMatchObject([
       {
         sessionId: 'session-1',
@@ -705,6 +714,67 @@ describe('chat stream broker', () => {
     })
   })
 
+  it('replaces an open response upstream for a second startResponse with a new POST', async () => {
+    const firstStream = createControlledSseResponse({ 'x-cradle-run-id': 'run-first' })
+    const secondStream = createControlledSseResponse({ 'x-cradle-run-id': 'run-second' })
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(firstStream.response)
+      .mockResolvedValueOnce(secondStream.response)
+    const broker = new ChatStreamBroker({
+      serverUrl: 'http://127.0.0.1:21423',
+      fetchFn: fetchFn as typeof fetch,
+    })
+    const first = new FakeWebContents()
+    const second = new FakeWebContents()
+
+    const firstHandle = await broker.startResponse(first as never, {
+      sessionId: 'session-response-replace',
+      body: { text: 'first' },
+    })
+    const secondHandle = await broker.startResponse(second as never, {
+      sessionId: 'session-response-replace',
+      body: { text: 'second must post' },
+    })
+
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      2,
+      new URL('http://127.0.0.1:21423/chat/sessions/session-response-replace/response'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ text: 'second must post' }),
+      }),
+    )
+    expect(firstHandle).toMatchObject({
+      runId: 'run-first',
+      reusedUpstream: false,
+      upstreamMode: 'response',
+    })
+    expect(secondHandle).toMatchObject({
+      runId: 'run-second',
+      reusedUpstream: false,
+      upstreamMode: 'response',
+    })
+    expect(secondHandle.upstreamRequestId).not.toBe(firstHandle.upstreamRequestId)
+    expect(readChannelPayloads(first, DESKTOP_CHAT_STREAM_CLOSED_CHANNEL)).toMatchObject([
+      { streamId: firstHandle.streamId, reason: 'aborted' },
+    ])
+    expect(broker.diagnostics().streams).toMatchObject([
+      {
+        sessionId: 'session-response-replace',
+        mode: 'response',
+        runId: 'run-second',
+        subscriberCount: 1,
+      },
+    ])
+
+    secondStream.controller.enqueue(encodeSse('[DONE]'))
+    await vi.waitFor(() => {
+      expect(broker.diagnostics().streams).toHaveLength(0)
+    })
+  })
+
   it('starts and drains a detached response stream without a renderer subscriber', async () => {
     const controlled = createControlledSseResponse({ 'x-cradle-run-id': 'run-detached' })
     const fetchFn = vi.fn(async () => controlled.response)
@@ -721,6 +791,8 @@ describe('chat stream broker', () => {
     expect(handle).toMatchObject({
       sessionId: 'session-detached',
       runId: 'run-detached',
+      reusedUpstream: false,
+      upstreamMode: 'response',
     })
     expect(fetchFn).toHaveBeenCalledWith(
       new URL('http://127.0.0.1:21423/chat/sessions/session-detached/response'),

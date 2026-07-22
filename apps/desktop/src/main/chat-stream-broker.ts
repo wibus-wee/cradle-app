@@ -40,6 +40,11 @@ export interface DesktopChatStreamHandle {
   telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
+  /** Broker upstream id shared by all subscribers on this session entry. */
+  upstreamRequestId: string
+  upstreamMode: DesktopChatStreamMode
+  /** True when this attach reused an open upstream (no new server POST/GET). */
+  reusedUpstream: boolean
 }
 
 export interface DesktopChatStreamChunkEvent {
@@ -206,7 +211,7 @@ export class ChatStreamBroker {
     webContents: WebContents | null,
     request: DesktopChatStartResponseRequest,
   ): Promise<DesktopChatStreamHandle> {
-    const entry = this.readOrCreateEntry({
+    const { entry, reusedUpstream } = this.readOrCreateEntry({
       sessionId: request.sessionId,
       mode: 'response',
       path: `/chat/sessions/${encodeURIComponent(request.sessionId)}/response`,
@@ -217,21 +222,21 @@ export class ChatStreamBroker {
         body: JSON.stringify(request.body),
       },
     })
-    return await this.attachSubscriber(entry, sink, webContents)
+    return await this.attachSubscriber(entry, sink, webContents, reusedUpstream)
   }
 
   async subscribeSession(
     webContents: WebContents,
     request: DesktopChatSubscribeSessionRequest,
   ): Promise<DesktopChatStreamHandle> {
-    const entry = this.readOrCreateEntry({
+    const { entry, reusedUpstream } = this.readOrCreateEntry({
       sessionId: request.sessionId,
       mode: 'session',
       path: `/chat/sessions/${encodeURIComponent(request.sessionId)}/stream`,
       keepAliveWithoutSubscribers: false,
       request: { method: 'GET' },
     })
-    return await this.attachSubscriber(entry, webContents, webContents)
+    return await this.attachSubscriber(entry, webContents, webContents, reusedUpstream)
   }
 
   abortStream(webContents: WebContents, request: DesktopChatAbortRequest): void {
@@ -273,11 +278,14 @@ export class ChatStreamBroker {
     this.entriesBySessionId.clear()
   }
 
-  private readOrCreateEntry(request: UpstreamRequest): UpstreamEntry {
+  private readOrCreateEntry(request: UpstreamRequest): {
+    entry: UpstreamEntry
+    reusedUpstream: boolean
+  } {
     const existing = this.entriesBySessionId.get(request.sessionId)
     if (existing && !existing.closed) {
       if (canReuseEntry(existing, request)) {
-        return existing
+        return { entry: existing, reusedUpstream: true }
       }
       // Suppress the expected AbortError from the replaced entry's in-flight fetch,
       // so it doesn't surface as an unhandled promise rejection.
@@ -310,13 +318,14 @@ export class ChatStreamBroker {
     }
     entry.handlePromise = this.openUpstream(entry, request)
     this.entriesBySessionId.set(request.sessionId, entry)
-    return entry
+    return { entry, reusedUpstream: false }
   }
 
   private async attachSubscriber(
     entry: UpstreamEntry,
     sink: ChatStreamSink,
     webContents: WebContents | null,
+    reusedUpstream: boolean,
   ): Promise<DesktopChatStreamHandle> {
     const streamId = this.createStreamId(entry.sessionId)
     const subscriber: StreamSubscriber = {
@@ -328,31 +337,45 @@ export class ChatStreamBroker {
     entry.subscribers.set(streamId, subscriber)
     this.attachWebContentsCleanup(entry, subscriber)
 
+    const toHandle = (
+      fields: Pick<
+        DesktopChatStreamHandle,
+        | 'sessionId'
+        | 'runId'
+        | 'telemetrySessionId'
+        | 'telemetryRunId'
+        | 'assistantMessageId'
+        | 'userMessageId'
+      >,
+    ): DesktopChatStreamHandle => ({
+      streamId,
+      sessionId: fields.sessionId,
+      runId: fields.runId,
+      telemetrySessionId: fields.telemetrySessionId,
+      telemetryRunId: fields.telemetryRunId,
+      assistantMessageId: fields.assistantMessageId,
+      userMessageId: fields.userMessageId,
+      upstreamRequestId: entry.upstreamRequestId,
+      upstreamMode: entry.mode,
+      reusedUpstream,
+    })
+
     try {
       const handle = await entry.handlePromise
       this.replayChunksToSubscriber(entry, subscriber)
-      return {
-        streamId,
-        sessionId: handle.sessionId,
-        runId: handle.runId,
-        telemetrySessionId: handle.telemetrySessionId,
-        telemetryRunId: handle.telemetryRunId,
-        assistantMessageId: handle.assistantMessageId,
-        userMessageId: handle.userMessageId,
-      }
+      return toHandle(handle)
     }
     catch (error) {
       this.removeSubscriber(entry, streamId)
       if (isExpectedEntryAbort(entry)) {
-        return {
-          streamId,
+        return toHandle({
           sessionId: entry.sessionId,
           runId: entry.runId,
           telemetrySessionId: entry.telemetrySessionId,
           telemetryRunId: entry.telemetryRunId,
           assistantMessageId: entry.assistantMessageId,
           userMessageId: entry.userMessageId,
-        }
+        })
       }
       throw error
     }
@@ -650,11 +673,11 @@ export class ChatStreamBroker {
   }
 }
 
-function canReuseEntry(existing: UpstreamEntry, request: UpstreamRequest): boolean {
-  if (request.mode === 'session') {
-    return true
-  }
-  return existing.mode === 'response' && existing.runId !== null
+function canReuseEntry(_existing: UpstreamEntry, request: UpstreamRequest): boolean {
+  // Passive session subscribers attach to whatever upstream is already open.
+  // A new user send (response mode) must always open a fresh POST: reusing an
+  // open response entry would drop the request body and replay the old turn.
+  return request.mode === 'session'
 }
 
 function createDetachedChatStreamSink(): ChatStreamSink {

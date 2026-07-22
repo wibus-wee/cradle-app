@@ -162,6 +162,11 @@ export interface DesktopChatStreamHandle {
   telemetryRunId: string | null
   assistantMessageId?: string
   userMessageId?: string
+  /** Broker upstream id shared by all subscribers on this session entry. */
+  upstreamRequestId: string
+  upstreamMode: 'response' | 'session'
+  /** True when this attach reused an open upstream (no new server POST/GET). */
+  reusedUpstream: boolean
 }
 
 export interface DesktopChatStreamChunkEvent {
@@ -190,6 +195,7 @@ export interface DesktopChatStreamDiagnostics {
   streams: Array<{
     sessionId: string
     mode: 'response' | 'session'
+    upstreamRequestId: string
     runId: string | null
     assistantMessageId?: string
     userMessageId?: string
@@ -208,10 +214,6 @@ export interface DesktopChatStreamBridge {
   onChunk: (handler: (event: DesktopChatStreamChunkEvent) => void) => () => void
   onClosed: (handler: (event: DesktopChatStreamClosedEvent) => void) => () => void
   onError: (handler: (event: DesktopChatStreamErrorEvent) => void) => () => void
-}
-
-export function readDesktopChatStreamBridge(): DesktopChatStreamBridge | null {
-  return window.cradle?.chatStream ?? null
 }
 
 // ── Desktop Chat Event Tail Bridge ───────────────────────────────────────────
@@ -279,10 +281,6 @@ export interface DesktopChatEventTailBridge {
   onEvent: (handler: (event: DesktopChatEventTailEvent) => void) => () => void
   onClosed: (handler: (event: DesktopChatEventTailClosedEvent) => void) => () => void
   onError: (handler: (event: DesktopChatEventTailErrorEvent) => void) => () => void
-}
-
-export function readDesktopChatEventTailBridge(): DesktopChatEventTailBridge | null {
-  return window.cradle?.chatEventTail ?? null
 }
 
 // ── IPC Proxy (typed) ─────────────────────────────────────────────────────────
@@ -672,6 +670,24 @@ interface MacCaptureServiceMethods {
   getAppshotFrontmostContext: () => Promise<MacAppshotFrontmostContext>
 }
 
+interface ChatStreamServiceMethods {
+  startResponse: (request: DesktopChatStartResponseRequest) => Promise<DesktopChatStreamHandle>
+  subscribeSession: (request: DesktopChatSubscribeSessionRequest) => Promise<DesktopChatStreamHandle>
+  abort: (request: DesktopChatAbortRequest) => Promise<void>
+  diagnostics: () => Promise<DesktopChatStreamDiagnostics>
+}
+
+interface ChatEventTailServiceMethods {
+  subscribeSessionEvents: (
+    request: DesktopChatSubscribeSessionEventsRequest,
+  ) => Promise<DesktopChatEventTailHandle>
+  subscribeGlobalSessionEvents: (
+    request: DesktopChatSubscribeGlobalSessionEventsRequest,
+  ) => Promise<DesktopChatEventTailHandle>
+  abort: (request: DesktopChatEventTailAbortRequest) => Promise<void>
+  diagnostics: () => Promise<DesktopChatEventTailDiagnostics>
+}
+
 interface CradleIpcServices {
   native: NativeServiceMethods
   nativeAuth: NativeAuthServiceMethods
@@ -679,6 +695,8 @@ interface CradleIpcServices {
   desktopUpdate: DesktopUpdateServiceMethods
   browserTabScripts: BrowserTabScriptsServiceMethods
   macCapture: MacCaptureServiceMethods
+  chatStream: ChatStreamServiceMethods
+  chatEventTail: ChatEventTailServiceMethods
 }
 
 /**
@@ -688,6 +706,45 @@ interface CradleIpcServices {
 export const nativeIpc = createIpcProxy<CradleIpcServices>(
   window.cradle?.ipc ?? null,
 )
+
+/**
+ * Desktop chat stream bridge.
+ * Invoke methods go through createIpcProxy so IPC Trace gets a real envelope and
+ * unique traceId; event subscriptions stay on the preload push channels.
+ */
+export function readDesktopChatStreamBridge(): DesktopChatStreamBridge | null {
+  const eventBridge = window.cradle?.chatStream
+  const methods = nativeIpc?.chatStream
+  if (!eventBridge || !methods) {
+    return null
+  }
+  return {
+    startResponse: request => methods.startResponse(request),
+    subscribeSession: request => methods.subscribeSession(request),
+    abort: request => methods.abort(request),
+    diagnostics: () => methods.diagnostics(),
+    onChunk: handler => eventBridge.onChunk(handler),
+    onClosed: handler => eventBridge.onClosed(handler),
+    onError: handler => eventBridge.onError(handler),
+  }
+}
+
+export function readDesktopChatEventTailBridge(): DesktopChatEventTailBridge | null {
+  const eventBridge = window.cradle?.chatEventTail
+  const methods = nativeIpc?.chatEventTail
+  if (!eventBridge || !methods) {
+    return null
+  }
+  return {
+    subscribeSessionEvents: request => methods.subscribeSessionEvents(request),
+    subscribeGlobalSessionEvents: request => methods.subscribeGlobalSessionEvents(request),
+    abort: request => methods.abort(request),
+    diagnostics: () => methods.diagnostics(),
+    onEvent: handler => eventBridge.onEvent(handler),
+    onClosed: handler => eventBridge.onClosed(handler),
+    onError: handler => eventBridge.onError(handler),
+  }
+}
 
 let lastSyncedWindowControlsOverlay: string | null = null
 
