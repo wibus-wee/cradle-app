@@ -179,7 +179,7 @@ export async function getRuntimeSessionStatus(
     })
     .from(chatSessionQueueItems)
     .where(
-      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue')),
+      and(eq(chatSessionQueueItems.sessionId, sessionId)),
     )
     .all()
   const queue = queueRows.reduce(

@@ -42,6 +42,7 @@ export interface QueueDrainDeps {
     thinkingEffort?: PersistedThinkingEffort
     runtimeSettings: RuntimeSettings
     queueItemId: string
+    continuationMode: 'queue' | 'steer'
   }) => Promise<{ runId: string }>
   serializeError: (error: unknown) => SerializedChatError
 }
@@ -135,6 +136,7 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
           thinkingEffort: readPersistedThinkingEffort(claimed.thinkingEffort) ?? undefined,
           runtimeSettings,
           queueItemId: claimed.id,
+          continuationMode: claimed.mode === 'steer' ? 'steer' : 'queue',
         })
         await normalizeSessionQueuePositions(sessionId)
         return
@@ -189,7 +191,10 @@ async function completeSubmittedNativeQueueItem(
     userText: row.text,
     files: parseQueueFiles(row.filesJson),
     contextParts: parseQueueContextParts(row.contextPartsJson),
-    continuation: { mode: 'queue', queueItemId: row.id },
+    continuation: {
+      mode: row.mode === 'steer' ? 'steer' : 'queue',
+      queueItemId: row.id,
+    },
   })
   await appendDraftUserMessage({ sessionId, userMessage: draft.userMessage })
   await completeSessionQueueItem(sessionId, row.id)

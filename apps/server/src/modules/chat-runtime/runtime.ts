@@ -351,7 +351,7 @@ const queueDrainDeps: QueueDrainDeps = {
       modelId: input.modelId,
       thinkingEffort: input.thinkingEffort,
       runtimeSettingsOverride: input.runtimeSettings,
-      continuationMode: 'queue',
+      continuationMode: input.continuationMode,
       queueItemId: input.queueItemId,
     })
     return { runId: run.runId }
@@ -577,6 +577,7 @@ export async function submitSessionSteerTurn(
 ): Promise<SessionSteerTurnDto> {
   return submitSessionSteerTurnFromInteraction(input, {
     scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
+    cancelActiveSessionRun: sessionId => cancelSessionFromLifecycle(sessionId, activeRunLifecycleDeps),
     warn: (message, payload) => chatLogger.warn(message, payload),
   })
 }

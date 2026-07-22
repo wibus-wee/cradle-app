@@ -289,7 +289,7 @@ function readBlockingQueueCounts(sessionId: string): { pending: number, running:
     .select({ status: chatSessionQueueItems.status })
     .from(chatSessionQueueItems)
     .where(
-      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue')),
+      and(eq(chatSessionQueueItems.sessionId, sessionId)),
     )
     .all()
 

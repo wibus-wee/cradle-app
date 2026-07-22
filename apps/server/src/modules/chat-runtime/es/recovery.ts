@@ -769,8 +769,7 @@ function readRunQueueItemId(sessionId: string, runId: string): string | null {
       .where(
         and(
           eq(chatSessionQueueItems.sessionId, sessionId),
-          eq(chatSessionQueueItems.mode, 'queue'),
-          eq(chatSessionQueueItems.startedRunId, runId),
+                    eq(chatSessionQueueItems.startedRunId, runId),
         ),
       )
       .get()
@@ -789,8 +788,7 @@ function readQueueItem(
       and(
         eq(chatSessionQueueItems.id, queueItemId),
         eq(chatSessionQueueItems.sessionId, sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .get()
 }

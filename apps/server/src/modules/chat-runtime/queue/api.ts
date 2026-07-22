@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
 import { chatSessionQueueItems } from '@cradle/db'
-import type { FileUIPart } from 'ai'
 import { and, eq } from 'drizzle-orm'
 
 import { AppError } from '../../../errors/app-error'
@@ -9,7 +8,6 @@ import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import { runtimeOwnsProviderTarget } from '../../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../../provider-contracts/types'
-import type { ChatContextPart } from '../context-parts'
 import {
   cancelQueuedSessionItem,
   commitSessionEvents,
@@ -28,7 +26,6 @@ import {
   readSessionRuntimeSettings,
   resolveRunRuntimeSettings,
 } from '../runtime-settings'
-import { createUserMessage } from '../ui-message'
 import type {
   ChatSessionQueueItemDto,
   EnqueueSessionQueueItemInput,
@@ -73,7 +70,7 @@ export function listSessionQueueItems(sessionId: string): ChatSessionQueueItemDt
     .select()
     .from(chatSessionQueueItems)
     .where(
-      and(eq(chatSessionQueueItems.sessionId, sessionId), eq(chatSessionQueueItems.mode, 'queue')),
+      and(eq(chatSessionQueueItems.sessionId, sessionId)),
     )
     .all()
     .sort(compareQueueRows)
@@ -110,8 +107,10 @@ export async function enqueueSessionQueueItem(
   }
 
   const pendingRows = listPendingQueueRows(input.sessionId)
-  const position
-    = pendingRows.reduce((maxPosition, row) => Math.max(maxPosition, row.position), 0) + 1
+  const mode = input.mode === 'steer' ? 'steer' as const : 'queue' as const
+  const position = input.placement === 'front' && pendingRows.length > 0
+    ? Math.min(...pendingRows.map(row => row.position)) - 1
+    : pendingRows.reduce((maxPosition, row) => Math.max(maxPosition, row.position), 0) + 1
   const now = currentUnixSeconds()
   const runtimeKind = readSessionRuntimeKind(context.session)
   const baseRuntimeSettings = readSessionRuntimeSettings(runtimeKind, context.session.configJson)
@@ -127,7 +126,7 @@ export async function enqueueSessionQueueItem(
   const row = {
     id: randomUUID(),
     sessionId: input.sessionId,
-    mode: 'queue' as const,
+    mode,
     status: 'pending' as const,
     text,
     filesJson: serializeQueueFiles(files),
@@ -144,36 +143,10 @@ export async function enqueueSessionQueueItem(
     updatedAt: now,
   }
 
-  // When the provider query is alive during an active run, append into the native SDK queue
-  // before committing the Cradle queue row. Failure must surface — never pretend delivery.
-  const live = liveRuntimeSessionRegistry.read(input.sessionId)
-  const hasActiveRun = Boolean(runRegistry.getActiveRunIdForSession(input.sessionId))
-  if (hasActiveRun && live?.submitNativeInput) {
-    const followUpMessage = createUserMessage(
-      row.id,
-      text,
-      files as FileUIPart[],
-      contextParts as ChatContextPart[],
-    )
-    try {
-      await live.submitNativeInput({
-        queueItemId: row.id,
-        message: followUpMessage,
-      })
-    }
-    catch (error) {
-      throw new AppError({
-        code: 'chat_queue_native_enqueue_failed',
-        status: 409,
-        message: 'Live runtime rejected native queue append; message was not delivered',
-        details: {
-          sessionId: input.sessionId,
-          queueItemId: row.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      })
-    }
-  }
+  // Synara-aligned durable queue: never mid-turn push into a live provider input stream.
+  // Composer Enter=queue and Cmd+Enter steer both wait for the active turn to settle (steer also
+  // interrupts), then drain creates a new run. Low-level Claude native UUID helpers remain on the
+  // live registry for tests / explicit cancel, but enqueue does not call them.
 
   await commitSessionEvents(input.sessionId, [
     {
@@ -200,8 +173,7 @@ export async function cancelSessionQueueItem(
       and(
         eq(chatSessionQueueItems.id, queueItemId),
         eq(chatSessionQueueItems.sessionId, sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .get()
   if (!row) {
@@ -268,8 +240,7 @@ export async function cancelSessionQueueItem(
         and(
           eq(chatSessionQueueItems.id, queueItemId),
           eq(chatSessionQueueItems.sessionId, sessionId),
-          eq(chatSessionQueueItems.mode, 'queue'),
-        ),
+                  ),
       )
       .get()
     throw new AppError({
@@ -329,8 +300,7 @@ export async function updateSessionQueueItem(
       and(
         eq(chatSessionQueueItems.id, input.queueItemId),
         eq(chatSessionQueueItems.sessionId, input.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .get()
   if (!row) {

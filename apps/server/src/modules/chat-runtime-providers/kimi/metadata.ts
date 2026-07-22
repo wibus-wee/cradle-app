@@ -15,7 +15,8 @@ export const KIMI_RUNTIME_METADATA = {
 } satisfies ChatRuntimeMetadata
 
 export const KIMI_RUNTIME_CAPABILITIES = {
-  steer: 'native',
+  // Synara-aligned: non-Codex steers interrupt + durable front-of-queue follow-up.
+  steer: 'queue-fallback',
   supportsShellExecution: false,
   supportsLastTurnRollback: false,
   supportsRuntimeSettings: true,

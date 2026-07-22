@@ -4,11 +4,13 @@ import type { FileUIPart, UIMessage } from 'ai'
 import {
   getSessionsByIdQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
+import { isSessionsQueryKey } from '~/features/workspace/use-session'
 import { useChatStore } from '~/store/chat'
 
 import { chatMessageSnapshotQueryKey } from '../api/messages'
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
 import type { ChatResponseRequestBody, ChatRuntimeSettingsPatch } from '../commands/chat-response-command'
+import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import { runtimeSettingsQueryKey } from '../commands/runtime-settings-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import { toOrderedUserMessageParts } from '../context/chat-context-parts'
@@ -198,6 +200,8 @@ function refreshChatResponseQueries(queryClient: QueryClient | undefined, sessio
   })
   void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(sessionId) })
   void queryClient.invalidateQueries({ queryKey: runtimeSettingsQueryKey(sessionId) })
+  void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(sessionId) })
+  void queryClient.invalidateQueries({ predicate: query => isSessionsQueryKey(query.queryKey) })
 }
 
 function isAbortError(error: unknown): boolean {

@@ -120,6 +120,11 @@ describe('enqueueSessionQueueItem', () => {
         { sessionId, text: 'native submitted input' },
         { scheduleSessionQueueDrain: () => {} },
       )
+      // Product enqueue is durable-only; simulate an explicit native submit for cancel coverage.
+      await liveRuntimeSessionRegistry.read(sessionId)!.submitNativeInput!({
+        queueItemId: item.id,
+        message: { id: item.id, role: 'user', parts: [{ type: 'text', text: 'native submitted input' }] },
+      })
 
       await expect(cancelSessionQueueItem(sessionId, item.id)).rejects.toMatchObject({
         code: 'chat_queue_native_cancel_failed',

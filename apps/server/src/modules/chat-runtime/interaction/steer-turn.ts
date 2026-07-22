@@ -19,14 +19,17 @@ import { createUserMessage, projectLightOcrMessage } from '../ui-message'
 
 export interface SubmitSessionSteerTurnDeps {
   scheduleSessionQueueDrain: (sessionId: string) => void
+  /**
+   * Synara non-Codex steer: interrupt the live turn so the front-of-queue steer
+   * drains as the next run. Optional so unit tests can omit cancel.
+   */
+  cancelActiveSessionRun?: (sessionId: string) => Promise<void>
   warn: (message: string, payload: Record<string, unknown>) => void
 }
 
 /**
- * Enqueue the steer request as a regular queue item instead of live-steering. Used both when the
- * target runtime's `steer` capability is `'queue-fallback'`/`'unsupported'`... no: `'unsupported'`
- * rejects outright before this is called; this path handles `'queue-fallback'` runtimes and
- * `'native'` runtimes with no matching active run to steer.
+ * Enqueue the steer request as a durable queue item (Synara non-Codex path / queue-fallback).
+ * When a live turn is active, interrupt it so the steer jumps ahead after settlement.
  */
 async function enqueueSteerRequestAsQueueItem(
   input: SubmitSessionSteerTurnInput,
@@ -38,10 +41,28 @@ async function enqueueSteerRequestAsQueueItem(
     files: input.files,
     contextParts: input.contextParts,
     providerTargetId: input.providerTargetId,
+    mode: 'steer',
+    placement: 'front',
   }
   const queueItem: ChatSessionQueueItemDto = await enqueueSessionQueueItem(enqueueInput, {
     scheduleSessionQueueDrain: deps.scheduleSessionQueueDrain,
   })
+
+  const runId = runRegistry.getActiveRunIdForSession(input.sessionId)
+  if (runId && deps.cancelActiveSessionRun) {
+    try {
+      await deps.cancelActiveSessionRun(input.sessionId)
+    }
+    catch (error) {
+      deps.warn('steer queue interrupt failed after enqueue', {
+        error,
+        sessionId: input.sessionId,
+        runId,
+        queueItemId: queueItem.id,
+      })
+    }
+  }
+
   return {
     mode: 'queued',
     ok: true,
@@ -100,10 +121,8 @@ export async function submitSessionSteerTurn(
       && !!steerHook
       && (!requestedProviderTargetId || requestedProviderTargetId === activeRun.providerTargetId)
 
-  // Server-side auto-fallback (doc §3.4): the client never branches on a fallback error code.
-  // `queue-fallback` runtimes always queue; `native` runtimes queue only when there's no active
-  // run they can actually steer (not started yet, already finished, or targeting a different
-  // provider context) rather than rejecting the request outright.
+  // Synara: only Codex (native) live-steers. queue-fallback and missing/mismatched runs
+  // enqueue at the front and interrupt the live turn when present.
   if (
     runtime.capabilities.steer === 'queue-fallback'
     || !activeRun
@@ -126,7 +145,7 @@ export async function submitSessionSteerTurn(
       message: projectLightOcrMessage(steerMessage),
     })
   }
- catch (error) {
+  catch (error) {
     deps.warn('runtime live steer failed', {
       error,
       sessionId: input.sessionId,
@@ -152,7 +171,7 @@ export async function submitSessionSteerTurn(
       parentMessageId: sourceMessageId,
     })
   }
- catch (error) {
+  catch (error) {
     deps.warn('runtime live steer was applied but history persistence failed', {
       error,
       sessionId: input.sessionId,

@@ -19,7 +19,7 @@ import {
 
 export type PersistedThinkingEffort = ChatThinkingEffort
 export type ChatSessionContinuationMode = 'queue' | 'steer'
-export type ChatSessionQueueMode = 'queue'
+export type ChatSessionQueueMode = ChatSessionContinuationMode
 export type ChatSessionQueueStatus = 'pending' | 'running' | 'cancelled' | 'completed' | 'failed'
 
 export interface ChatSessionQueueItemDto {
@@ -51,6 +51,10 @@ export interface EnqueueSessionQueueItemInput {
   modelId?: string | null
   thinkingEffort?: PersistedThinkingEffort
   runtimeSettings?: RuntimeSettingsPatch
+  /** Durable follow-up label. `steer` jumps the queue and is annotated on the drained turn. */
+  mode?: ChatSessionQueueMode
+  /** Synara-style steer placement: front of the pending queue. */
+  placement?: 'append' | 'front'
 }
 
 export interface UpdateSessionQueueItemInput extends EnqueueSessionQueueItemInput {
@@ -267,7 +271,6 @@ export function listPendingQueueRows(sessionId: string): QueueItemRow[] {
     .where(
       and(
         eq(chatSessionQueueItems.sessionId, sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
         eq(chatSessionQueueItems.status, 'pending'),
       ),
     )

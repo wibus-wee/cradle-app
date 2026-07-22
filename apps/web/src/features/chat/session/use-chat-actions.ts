@@ -369,8 +369,8 @@ export function useChatActions(input: UseChatActionsInput) {
         refreshQueue()
         toastManager.add({
           type: 'info',
-          title: 'Added to queue',
-          description: 'This runtime applies guidance on the next turn instead of redirecting the active one, so it was queued instead.',
+          title: 'Steering next turn',
+          description: 'Interrupted the live turn and queued this guidance to run next.',
         })
         return
       }

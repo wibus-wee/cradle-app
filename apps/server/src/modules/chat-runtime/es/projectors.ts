@@ -304,8 +304,7 @@ function projectQueueItemCancelled(d: ProjectorDb, payload: QueueItemCancelledPa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-        or(
+                or(
           eq(chatSessionQueueItems.status, 'pending'),
           and(
             eq(chatSessionQueueItems.status, 'running'),
@@ -332,8 +331,7 @@ function projectQueueItemClaimed(d: ProjectorDb, payload: QueueItemClaimedPayloa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -351,8 +349,7 @@ function projectQueueItemReleased(d: ProjectorDb, payload: QueueItemReleasedPayl
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -369,8 +366,7 @@ function projectQueueItemFailed(d: ProjectorDb, payload: QueueItemFailedPayload)
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -387,8 +383,7 @@ function projectQueueItemCompleted(d: ProjectorDb, payload: QueueItemCompletedPa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-        or(
+                or(
           eq(chatSessionQueueItems.status, 'pending'),
           and(
             eq(chatSessionQueueItems.status, 'running'),
@@ -412,8 +407,7 @@ function projectQueueItemReordered(d: ProjectorDb, payload: QueueItemReorderedPa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -438,8 +432,7 @@ function projectQueueItemUpdated(d: ProjectorDb, payload: QueueItemUpdatedPayloa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-        eq(chatSessionQueueItems.status, 'pending'),
+                eq(chatSessionQueueItems.status, 'pending'),
       ),
     )
     .run()
@@ -459,8 +452,7 @@ function projectQueueItemProviderTargetCleared(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-        eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId),
+                eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId),
       ),
     )
     .run()
@@ -496,8 +488,7 @@ function projectRunTerminalQueueItem(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.mode, 'queue'),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)

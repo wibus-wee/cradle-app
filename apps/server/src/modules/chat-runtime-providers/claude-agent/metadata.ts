@@ -37,11 +37,9 @@ export const CLAUDE_AGENT_RUNTIME_METADATA = {
 } satisfies ChatRuntimeMetadata
 
 export const CLAUDE_AGENT_RUNTIME_CAPABILITIES = {
-  // Claude Agent implements live steer by pushing into the long-lived SDK input stream
-  // (`priority: 'next'`, no interrupt). The SDK usually folds that into the current turn as
-  // mid-turn `queued_command` — product-equivalent to Codex same-turn steer. When there is no
-  // live query, Cradle falls back to the durable session queue.
-  steer: 'native',
+  // Synara-aligned: non-Codex steers interrupt the live turn and drain a durable front-of-queue
+  // follow-up (continuation.mode = steer). No mid-turn SDK input push for product steer.
+  steer: 'queue-fallback',
   supportsShellExecution: false,
   supportsLastTurnRollback: false,
   supportsRuntimeSettings: true,

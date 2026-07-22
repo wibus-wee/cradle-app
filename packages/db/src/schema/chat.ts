@@ -164,7 +164,7 @@ export const chatSessionQueueItems = sqliteTable('chat_session_queue_items', {
   sessionId: text('session_id')
     .notNull()
     .references(() => sessions.id, { onDelete: 'cascade' }),
-  mode: text('mode', { enum: ['queue'] }).notNull(),
+  mode: text('mode', { enum: ['queue', 'steer'] }).notNull(),
   status: text('status', {
     enum: ['pending', 'running', 'cancelled', 'completed', 'failed'],
   }).notNull().default('pending'),

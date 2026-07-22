@@ -200,8 +200,7 @@ export async function claimSessionQueueItem(
           and(
             eq(chatSessionQueueItems.id, queueItemId),
             eq(chatSessionQueueItems.sessionId, sessionId),
-            eq(chatSessionQueueItems.mode, 'queue'),
-            eq(chatSessionQueueItems.status, 'pending'),
+                        eq(chatSessionQueueItems.status, 'pending'),
           ),
         )
         .get()
@@ -394,8 +393,7 @@ export async function recoverOrphanedQueueItemClaims(sessionId: string): Promise
         .where(
           and(
             eq(chatSessionQueueItems.sessionId, sessionId),
-            eq(chatSessionQueueItems.mode, 'queue'),
-            eq(chatSessionQueueItems.status, 'running'),
+                        eq(chatSessionQueueItems.status, 'running'),
             isNull(chatSessionQueueItems.startedRunId),
           ),
         )
@@ -433,8 +431,7 @@ export async function normalizeSessionQueuePositions(sessionId: string): Promise
         .where(
           and(
             eq(chatSessionQueueItems.sessionId, sessionId),
-            eq(chatSessionQueueItems.mode, 'queue'),
-            eq(chatSessionQueueItems.status, 'pending'),
+                        eq(chatSessionQueueItems.status, 'pending'),
           ),
         )
         .orderBy(chatSessionQueueItems.position, chatSessionQueueItems.createdAt)
@@ -480,8 +477,7 @@ export async function cancelQueuedSessionItem(
           and(
             eq(chatSessionQueueItems.id, queueItemId),
             eq(chatSessionQueueItems.sessionId, sessionId),
-            eq(chatSessionQueueItems.mode, 'queue'),
-          ),
+                      ),
         )
         .get()
       const cancellable

@@ -88,7 +88,7 @@ export interface BackendRunStartedFact {
 export interface QueueItemFact {
   id: string
   sessionId: string
-  mode: 'queue'
+  mode: 'queue' | 'steer'
   status: QueueProjectionStatus
   text: string
   filesJson: string
