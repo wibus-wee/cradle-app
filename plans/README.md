@@ -150,7 +150,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 059  | Programmable JavaScript Session Awaits via worker-thread cells | P1       | L      | —         | DONE (`cc7c1e9`; reviewed in `tmp/worktree-plan-059`)                                 |
 | 060  | Rename agent tool to `manage_pull_request` + pre-PR branch rename | P2  | M      | branch `feat/enhance-work` | DONE (`dfe2fb88`..`a7aa8e93` on `feat/enhance-work`; advisor-reviewed)   |
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
-| 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
+| 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | IN PROGRESS (Phase A merged; Phase B requires a runtime-bound invocation bridge) |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
 | 063  | Eliminate Desktop-owned Server sockets with one multiplexed IPC transport | P0 | XL | 038, 040, 054 | TODO (M0 packaged Electron feasibility gate first; coordinate transport files with 061) |
 
