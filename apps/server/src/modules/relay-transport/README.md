@@ -90,13 +90,38 @@ The controller side opens a local listener on `127.0.0.1:<port>` and returns
 socket; they become encrypted `stream_data` frames over relayd and exit on the
 host side as a TCP connection to the host Cradle Server's own local HTTP port.
 
-The stream protocol uses 256 KiB chunks and a 512 KiB unacknowledged credit
-window. Send-side credit (`peerAckedBytes` / `bytesInFlight`) and receive-side
-progress (`appliedBytes` / `ackedToPeerBytes`) are tracked separately on each
-stream — HTTP request and response share one `streamId` and must not corrupt
-each other's windows. The receiver only emits cumulative `stream_ack` frames
-after the local transport has applied the bytes (TCP write success), typically
-every 64 KiB, so a slow consumer cannot inflate the peer's send window.
+The binary v2 stream protocol uses 64 KiB maximum data chunks and starts each
+stream at a 512 KiB unacknowledged credit window. Send-side credit
+(`peerAckedBytes` / `bytesInFlight`) and receive-side progress
+(`appliedBytes` / `ackedToPeerBytes`) are tracked separately on each stream —
+HTTP request and response share one `streamId` and must not corrupt each
+other's windows. After sustained successful application acknowledgements, the
+sender may grow its bounded window up to 8 MiB. The receiver only emits
+cumulative `stream_ack` frames after the local transport has applied the bytes
+(TCP write success), typically every 64 KiB, so a slow consumer cannot inflate
+the peer's send window.
+
+## Performance checkpoints and benchmark
+
+`RelayControllerTransportHandle.getPerformanceSnapshot()` records a bounded,
+in-memory timeline for each controller tunnel: connection attempt start,
+WebSocket open, encrypted handshake ready, local listener ready, and the
+open/first-request-byte/first-response-byte/close timestamps for recent
+streams. It retains no HTTP path, header, or payload bytes.
+
+`GET /remote-hosts/:hostId/cradle-server/health` exposes this timeline as
+`relayPerformance` for Relay transports; other transports return `null`. A
+remote host is `warming` while its startup connection promise is pending.
+
+Run the reproducible Old/New model with:
+
+    pnpm --filter @cradle/server benchmark:relay
+
+It prints a named Run, Markdown table, and machine-readable JSON for codec
+bytes, FIFO-versus-priority scheduling, and bounded-window behavior at several
+RTTs. Run `pnpm --filter @cradle/server benchmark:relay:runtime` for the
+separate real-relayd cold/warm timestamp sample. The latter is a local sample,
+not an Internet-latency forecast.
 
 Pairing codes are returned on create (as `pairingString`) and may be re-read
 only via `GET .../pairing-string` while the enrollment is still pairable.

@@ -19,7 +19,13 @@ import {
   relayAssertionHeaders,
   signRelayAssertion,
 } from '../../src/modules/relay-servers/relay-signature-service'
-import { startRelayControllerTransport } from '../../src/modules/relay-transport/controller-transport'
+import type {
+  RelayControllerPerformanceSnapshot,
+  RelayStreamCheckpoint,
+} from '../../src/modules/relay-transport/controller-transport'
+import {
+  startRelayControllerTransport,
+} from '../../src/modules/relay-transport/controller-transport'
 import {
   generateRelayKeyPair,
   relayPublicKeyFingerprint,
@@ -455,6 +461,47 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     expect(json.path).toBe('/hello')
     expect(fakeHost.requests).toContain('POST /hello ping')
 
+    const coldSnapshot = handle.getPerformanceSnapshot()
+    const coldAttempt = coldSnapshot.connectionAttempts.at(-1)
+    const coldStream = latestRelayStream(coldSnapshot)
+    expect(coldAttempt?.websocketOpenedAt).not.toBeNull()
+    expect(coldAttempt?.handshakeReadyAt).not.toBeNull()
+    expect(coldSnapshot.localListenerReadyAt).not.toBeNull()
+    expect(coldStream?.firstRequestByteAt).not.toBeNull()
+    expect(coldStream?.firstResponseByteAt).not.toBeNull()
+
+    // This request reuses the listener/session above: it must not open another
+    // WebSocket or perform a second relay handshake before proxying bytes.
+    const attemptsBeforeWarmRequest = coldSnapshot.connectionAttempts.length
+    const warmResponse = await fetch(`${handle.localBaseUrl}/warm`, { method: 'GET' })
+    expect(warmResponse.status).toBe(200)
+    await warmResponse.json()
+    const warmSnapshot = handle.getPerformanceSnapshot()
+    const warmStream = latestRelayStream(warmSnapshot)
+    expect(warmSnapshot.connectionAttempts).toHaveLength(attemptsBeforeWarmRequest)
+    expect(warmStream?.streamId).not.toBe(coldStream?.streamId)
+    expect(warmStream?.firstRequestByteAt).not.toBeNull()
+    expect(warmStream?.firstResponseByteAt).not.toBeNull()
+
+    if (coldAttempt && coldSnapshot.localListenerReadyAt !== null && coldStream && warmStream) {
+      console.info(JSON.stringify({
+        kind: 'relay-cold-warm-checkpoints',
+        conditions: { relayd: 'local subprocess', transport: 'binary-v2' },
+        cold: {
+          connectToWebSocketOpenMs: nonNegativeDuration(coldAttempt.websocketOpenedAt, coldAttempt.startedAt),
+          connectToHandshakeReadyMs: nonNegativeDuration(coldAttempt.handshakeReadyAt, coldAttempt.startedAt),
+          connectToLocalListenerReadyMs: nonNegativeDuration(coldSnapshot.localListenerReadyAt, coldAttempt.startedAt),
+          streamToFirstResponseByteMs: nonNegativeDuration(coldStream.firstResponseByteAt, coldStream.openedAt),
+        },
+        warm: {
+          connectionAttemptsBeforeRequest: attemptsBeforeWarmRequest,
+          connectionAttemptsAfterRequest: warmSnapshot.connectionAttempts.length,
+          additionalWebSocketOrHandshake: 0,
+          streamToFirstResponseByteMs: nonNegativeDuration(warmStream.firstResponseByteAt, warmStream.openedAt),
+        },
+      }))
+    }
+
     await handle.close()
     await hostBridge.stop()
 
@@ -515,6 +562,15 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     await hostBridgeReconnect.stop()
   }, 60_000)
 })
+
+function latestRelayStream(snapshot: RelayControllerPerformanceSnapshot): RelayStreamCheckpoint | undefined {
+  return [...snapshot.activeStreams, ...snapshot.completedStreams]
+    .sort((left, right) => right.openedAt - left.openedAt)[0]
+}
+
+function nonNegativeDuration(end: number | null, start: number): number | null {
+  return end === null ? null : Math.max(0, end - start)
+}
 
 // Pinned-pubkey variant of startHostBridge for the reconnect phase.
 async function startHostBridgePinned(opts: {

@@ -8,45 +8,52 @@ import {
   encodeRelayEnvelope,
   legacyV1WireBytesForStreamData,
   RELAY_ENVELOPE_KIND,
+  RELAY_MAX_STREAM_CHUNK_BYTES,
   RELAY_PROTOCOL_VERSION,
 } from '../../src/modules/relay-transport/protocol'
 
-interface ComparisonCheckpoint {
+interface BenchmarkRow {
   checkpoint: string
   old: number
   new: number
   unit: string
-  interpretation: string
+  evidence: 'exact codec measurement' | 'exact scheduler model' | 'bounded-window model'
+  conclusion: string
 }
 
-function printComparison(checkpoints: ComparisonCheckpoint[]): void {
-  console.info(
-    JSON.stringify({
-      kind: 'relay-latency-compare',
-      protocol: { old: 1, new: RELAY_PROTOCOL_VERSION },
-      conditions: {
-        payloadBytes: 64 * 1024,
-        oldCreditBytes: 512 * 1024,
-        newCreditRangeBytes: [512 * 1024, 8 * 1024 * 1024],
-        syntheticRttMs: 200,
-      },
-      checkpoints,
-    }),
-  )
+interface CodecSample {
+  payloadBytes: number
+  oldWireBytes: number
+  newWireBytes: number
+  oldFrames: number
+  newFrames: number
 }
 
-describe('relay Old/New performance comparison', () => {
-  it('reports deterministic wire, round-trip, queue, and BDP checkpoints', () => {
-    const payload = new Uint8Array(64 * 1024)
-    payload.forEach((_, index) => {
-      payload[index] = index & 0xFF
-    })
-    const frame = { kind: 'stream_data' as const, streamId: 'c1', seq: 0, data: payload }
-    const cipher = new RelayCipher(new Uint8Array(32).fill(7))
+const OLD_CREDIT_BYTES = 512 * 1024
+const NEW_MAX_CREDIT_BYTES = 8 * 1024 * 1024
+const BULK_FRAMES_AHEAD_OF_CONTROL = 65
+
+interface SchedulingFrame {
+  priority: 'control' | 'data'
+  streamId: string
+  sequence: number
+}
+
+function makePayload(length: number): Uint8Array {
+  return Uint8Array.from({ length }, (_, index) => index & 0xFF)
+}
+
+function encodeV2Payload(payload: Uint8Array): { wireBytes: number, frames: number } {
+  const cipher = new RelayCipher(new Uint8Array(32).fill(7))
+  let wireBytes = 0
+  let frames = 0
+  for (let offset = 0; offset < payload.byteLength; offset += RELAY_MAX_STREAM_CHUNK_BYTES) {
+    const chunk = payload.slice(offset, offset + RELAY_MAX_STREAM_CHUNK_BYTES)
+    const frame = { kind: 'stream_data' as const, streamId: 'benchmark', seq: offset, data: chunk }
     const encoded = encodeRelayEnvelope({
       version: RELAY_PROTOCOL_VERSION,
-      roomId: 'room_compare',
-      seq: 0,
+      roomId: 'room_benchmark',
+      seq: frames,
       kind: RELAY_ENVELOPE_KIND.dataFrame,
       priority: 'data',
       streamId: frame.streamId,
@@ -54,47 +61,202 @@ describe('relay Old/New performance comparison', () => {
     })
     const decoded = decodeRelayEnvelope(encoded)
     const decodedFrame = decodeInnerFrame(cipher.decrypt(decoded.payload))
-    expect(decodedFrame.kind).toBe('stream_data')
+    expect(decodedFrame).toMatchObject({ kind: 'stream_data', streamId: frame.streamId, seq: offset })
     if (decodedFrame.kind === 'stream_data') {
-      expect(decodedFrame.data).toEqual(payload)
+      expect(decodedFrame.data).toEqual(chunk)
     }
+    wireBytes += encoded.byteLength
+    frames += 1
+  }
+  return { wireBytes, frames }
+}
 
-    const oldWireBytes = legacyV1WireBytesForStreamData(payload)
-    const newWireBytes = encoded.byteLength
-    const checkpoints: ComparisonCheckpoint[] = [
+function measureCodec(payloadBytes: number): CodecSample {
+  const payload = makePayload(payloadBytes)
+  const current = encodeV2Payload(payload)
+  return {
+    payloadBytes,
+    oldWireBytes: legacyV1WireBytesForStreamData(payload),
+    newWireBytes: current.wireBytes,
+    oldFrames: 1,
+    newFrames: current.frames,
+  }
+}
+
+function windowCapMiBps(windowBytes: number, rttMs: number): number {
+  return windowBytes / (1024 * 1024) / (rttMs / 1_000)
+}
+
+function legacyFifoControlPosition(bulkFrameCount: number): number {
+  const queue: SchedulingFrame[] = [
+    ...Array.from({ length: bulkFrameCount }, (_, sequence) => ({
+      priority: 'data' as const,
+      streamId: 'bulk',
+      sequence,
+    })),
+    { priority: 'control', streamId: 'control', sequence: 0 },
+  ]
+  return queue.findIndex(frame => frame.priority === 'control')
+}
+
+function priorityRoundRobinOrder(queue: SchedulingFrame[]): SchedulingFrame[] {
+  const control = queue.filter(frame => frame.priority === 'control')
+  const streams = new Map<string, SchedulingFrame[]>()
+  for (const frame of queue) {
+    if (frame.priority === 'data') {
+      const frames = streams.get(frame.streamId) ?? []
+      frames.push(frame)
+      streams.set(frame.streamId, frames)
+    }
+  }
+  const order = [...control]
+  while (streams.size > 0) {
+    for (const [streamId, frames] of [...streams]) {
+      const frame = frames.shift()
+      if (frame) {
+        order.push(frame)
+      }
+      if (frames.length === 0) {
+        streams.delete(streamId)
+      }
+    }
+  }
+  return order
+}
+
+function deltaPercent(old: number, next: number): string {
+  const delta = ((next - old) / old) * 100
+  return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`
+}
+
+function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void {
+  const report = {
+    kind: 'relay-old-new-benchmark',
+    run: {
+      id: 'relay-v2-deterministic-compare',
+      protocol: { old: 1, new: RELAY_PROTOCOL_VERSION },
+      measurementBoundary: 'same-process codec and scheduler model',
+      payloadPattern: 'payload[index] = index & 0xff',
+      loss: 'none',
+      randomSeed: 'not applicable',
+    },
+    conditions: {
+      oldMaxStreamChunkBytes: 256 * 1024,
+      newMaxStreamChunkBytes: RELAY_MAX_STREAM_CHUNK_BYTES,
+      oldCreditBytes: OLD_CREDIT_BYTES,
+      newCreditRangeBytes: [OLD_CREDIT_BYTES, NEW_MAX_CREDIT_BYTES],
+      bulkFramesAheadOfControl: BULK_FRAMES_AHEAD_OF_CONTROL,
+    },
+    codecSamples: codecSamples.map(sample => ({
+      ...sample,
+      wireByteDeltaPercent: deltaPercent(sample.oldWireBytes, sample.newWireBytes),
+    })),
+    rows,
+    caveat: 'Wire and scheduler rows are exact under the stated inputs. Throughput rows are window bounds, not Internet throughput measurements. Run benchmark:relay:runtime for a local real-relayd cold/warm timestamp sample.',
+  }
+  const markdown = [
+    `# Relay Old/New Benchmark — ${report.run.id}`,
+    '',
+    '## Codec: exact byte measurements',
+    '',
+    '| Logical payload | V1 wire bytes | V2 wire bytes | Delta | V1 frames | V2 frames |',
+    '| ---: | ---: | ---: | ---: | ---: | ---: |',
+    ...report.codecSamples.map(sample =>
+      `| ${sample.payloadBytes} B | ${sample.oldWireBytes} | ${sample.newWireBytes} | ${sample.wireByteDeltaPercent} | ${sample.oldFrames} | ${sample.newFrames} |`),
+    '',
+    '## Checkpoints',
+    '',
+    '| Checkpoint | Old | New | Delta | Evidence |',
+    '| --- | ---: | ---: | ---: | --- |',
+    ...rows.map(row =>
+      `| ${row.checkpoint} | ${row.old} ${row.unit} | ${row.new} ${row.unit} | ${deltaPercent(row.old, row.new)} | ${row.evidence} |`),
+    '',
+    'The 8 MiB value is the bounded adaptive maximum after successful acknowledgements; new streams start at the same 512 KiB as V1.',
+  ].join('\n')
+  console.info(markdown)
+  console.info(JSON.stringify(report))
+}
+
+describe('relay Old/New performance comparison', () => {
+  it('emits a reproducible before/after report and guards the material gains', () => {
+    const codecSamples = [
+      measureCodec(1 * 1024),
+      measureCodec(64 * 1024),
+      measureCodec(256 * 1024),
+    ]
+    const oldControlPosition = legacyFifoControlPosition(BULK_FRAMES_AHEAD_OF_CONTROL)
+    const newSchedule = priorityRoundRobinOrder([
+      ...Array.from({ length: BULK_FRAMES_AHEAD_OF_CONTROL }, (_, sequence) => ({
+        priority: 'data' as const,
+        streamId: 'bulk',
+        sequence,
+      })),
+      { priority: 'control' as const, streamId: 'control', sequence: 0 },
+    ])
+    const newControlPosition = newSchedule.findIndex(frame => frame.priority === 'control')
+    const fairDataOrder = priorityRoundRobinOrder([
+      { priority: 'data', streamId: 'a', sequence: 1 },
+      { priority: 'data', streamId: 'a', sequence: 2 },
+      { priority: 'data', streamId: 'b', sequence: 1 },
+    ]).map(frame => `${frame.streamId}${frame.sequence}`)
+    expect(fairDataOrder).toEqual(['a1', 'b1', 'a2'])
+
+    const rows: BenchmarkRow[] = [
       {
-        checkpoint: 'wireBytes.streamData.64KiB',
-        old: oldWireBytes,
-        new: newWireBytes,
-        unit: 'bytes',
-        interpretation: 'V2 carries raw encrypted bytes instead of nested Base64 and JSON.',
+        checkpoint: 'control frames ahead of an interactive control frame',
+        old: oldControlPosition,
+        new: newControlPosition,
+        unit: 'bulk frames',
+        evidence: 'exact scheduler model',
+        conclusion: 'V2 control priority bypasses queued bulk transfer frames.',
       },
       {
-        checkpoint: 'readyRoundTrips.reconnect',
-        old: 1,
-        new: 1,
-        unit: 'round trips',
-        interpretation:
-          'Protocol encoding does not add a reconnect handshake round trip; warming removes it from a user request.',
+        checkpoint: 'window cap at 20 ms RTT',
+        old: windowCapMiBps(OLD_CREDIT_BYTES, 20),
+        new: windowCapMiBps(NEW_MAX_CREDIT_BYTES, 20),
+        unit: 'MiB/s',
+        evidence: 'bounded-window model',
+        conclusion: 'The new cap is reached only after ACK-driven credit growth.',
       },
       {
-        checkpoint: 'controlQueuePosition.behindBulk',
-        old: 65,
-        new: 0,
-        unit: 'bulk frames ahead',
-        interpretation:
-          'The legacy FIFO can place a control frame behind the full queue; V2 reserves control priority.',
+        checkpoint: 'window cap at 100 ms RTT',
+        old: windowCapMiBps(OLD_CREDIT_BYTES, 100),
+        new: windowCapMiBps(NEW_MAX_CREDIT_BYTES, 100),
+        unit: 'MiB/s',
+        evidence: 'bounded-window model',
+        conclusion: 'A fixed 512 KiB window is increasingly restrictive as delay rises.',
       },
       {
-        checkpoint: 'creditThroughputCap.200msRtt',
-        old: 2.5,
-        new: 40,
-        unit: 'MiB/s theoretical window cap',
-        interpretation:
-          'Old is 512 KiB / 200 ms; new may grow to 8 MiB after successful application acknowledgements.',
+        checkpoint: 'window cap at 200 ms RTT',
+        old: windowCapMiBps(OLD_CREDIT_BYTES, 200),
+        new: windowCapMiBps(NEW_MAX_CREDIT_BYTES, 200),
+        unit: 'MiB/s',
+        evidence: 'bounded-window model',
+        conclusion: 'High-delay transfers can use 16x more in-flight bytes, bounded at 8 MiB per stream.',
+      },
+      {
+        checkpoint: 'window cap at 400 ms RTT',
+        old: windowCapMiBps(OLD_CREDIT_BYTES, 400),
+        new: windowCapMiBps(NEW_MAX_CREDIT_BYTES, 400),
+        unit: 'MiB/s',
+        evidence: 'bounded-window model',
+        conclusion: 'The gain scales with delay only when the path and receiver can sustain it.',
+      },
+      {
+        checkpoint: 'bounded in-flight bytes per stream',
+        old: OLD_CREDIT_BYTES / (1024 * 1024),
+        new: NEW_MAX_CREDIT_BYTES / (1024 * 1024),
+        unit: 'MiB',
+        evidence: 'bounded-window model',
+        conclusion: 'This is the deliberate high-BDP trade-off; the new sender remains capped at 8 MiB per stream.',
       },
     ]
-    printComparison(checkpoints)
-    expect(newWireBytes).toBeLessThan(oldWireBytes * 0.7)
+    printBenchmark(codecSamples, rows)
+
+    for (const sample of codecSamples) {
+      expect(sample.newWireBytes).toBeLessThan(sample.oldWireBytes * 0.7)
+    }
+    expect(rows.find(row => row.checkpoint === 'control frames ahead of an interactive control frame')?.new).toBe(0)
+    expect(rows.find(row => row.checkpoint === 'window cap at 200 ms RTT')?.new).toBe(40)
   })
 })

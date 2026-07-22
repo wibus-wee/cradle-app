@@ -31,7 +31,9 @@
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit && pnpm check:boundaries",
     "check:boundaries": "tsx scripts/check-module-boundaries.ts",
     "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter \"../../plugins/*\" build && vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "benchmark:relay": "vitest run tests/relay-transport/performance-compare.test.ts --reporter=verbose",
+    "benchmark:relay:runtime": "vitest run tests/relay-transport/e2e.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.76",

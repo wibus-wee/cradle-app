@@ -238,6 +238,7 @@ describe('remote Cradle Server hosts', () => {
         state: 'connected',
         localBaseUrl: fakeRemote.baseUrl,
         lastError: null,
+        relayPerformance: null,
       })
       expect(fakeRemote.healthRequestCount()).toBe(1)
 

@@ -51,12 +51,44 @@ export interface RelayControllerTransportHandle extends LocalTunnelHandle {
   readonly controllerPublicKeyBase64: string
   /** The host public key learned during the handshake (pin it for reconnect). */
   readonly hostPublicKeyBase64: string | null
+  /**
+   * In-memory timestamps for the current tunnel. These contain no request
+   * contents; callers can use them to compare cold setup with warm streams.
+   */
+  getPerformanceSnapshot: () => RelayControllerPerformanceSnapshot
 }
 
 interface ActiveStream {
   socket: net.Socket
   streamId: string
+  checkpoint: RelayStreamCheckpoint
 }
+
+export interface RelayConnectionAttemptCheckpoint {
+  attempt: number
+  startedAt: number
+  websocketOpenedAt: number | null
+  handshakeReadyAt: number | null
+  failedAt: number | null
+}
+
+export interface RelayStreamCheckpoint {
+  streamId: string
+  openedAt: number
+  firstRequestByteAt: number | null
+  firstResponseByteAt: number | null
+  closedAt: number | null
+}
+
+export interface RelayControllerPerformanceSnapshot {
+  connectionAttempts: RelayConnectionAttemptCheckpoint[]
+  localListenerReadyAt: number | null
+  activeStreams: RelayStreamCheckpoint[]
+  completedStreams: RelayStreamCheckpoint[]
+}
+
+const MAX_RELAY_CONNECTION_ATTEMPTS = 16
+const MAX_RELAY_COMPLETED_STREAMS = 32
 
 export async function startRelayControllerTransport(
   options: RelayControllerTransportOptions,
@@ -89,6 +121,9 @@ class ControllerTransport {
   private streamCounter = 0
   private closed = false
   private hostPublicKeyBase64: string | null = null
+  private readonly connectionAttempts: RelayConnectionAttemptCheckpoint[] = []
+  private readonly completedStreams: RelayStreamCheckpoint[] = []
+  private localListenerReadyAt: number | null = null
 
   constructor(
     private readonly options: RelayControllerTransportOptions,
@@ -110,6 +145,7 @@ class ControllerTransport {
       }
  catch (error) {
         lastError = error
+        this.failCurrentConnectionAttempt()
         await this.teardown()
         if (Date.now() >= deadline) {
           break
@@ -125,6 +161,7 @@ class ControllerTransport {
   }
 
   private connectAndHandshake(remainingMs: number): Promise<void> {
+    const checkpoint = this.startConnectionAttempt()
     const wsUrl = toWebSocketUrl(this.options.relayUrl, '/ws/controller')
     return new Promise<void>((resolve, reject) => {
       let settled = false
@@ -185,6 +222,7 @@ class ControllerTransport {
             }
           },
           onReady: () => {
+            checkpoint.handshakeReadyAt = Date.now()
             // Swap the handshake close handler for a post-ready one: a drop
             // after ready is a tunnel exit, not a handshake failure.
             ws.removeAllListeners('close')
@@ -206,7 +244,10 @@ class ControllerTransport {
       )
       this.session = session
 
-      ws.once('open', () => session.start())
+      ws.once('open', () => {
+        checkpoint.websocketOpenedAt = Date.now()
+        session.start()
+      })
       ws.on('message', (data: WebSocket.RawData) => {
         try {
           session.handleEnvelope(
@@ -242,6 +283,7 @@ class ControllerTransport {
       }
       const onListening = () => {
         server.off('error', onError)
+        this.localListenerReadyAt = Date.now()
         resolve()
       }
       server.once('error', onError)
@@ -257,19 +299,27 @@ class ControllerTransport {
       return
     }
     const streamId = `c${++this.streamCounter}`
-    this.streams.set(streamId, { socket, streamId })
+    const checkpoint: RelayStreamCheckpoint = {
+      streamId,
+      openedAt: Date.now(),
+      firstRequestByteAt: null,
+      firstResponseByteAt: null,
+      closedAt: null,
+    }
+    this.streams.set(streamId, { socket, streamId, checkpoint })
     session.openStream(streamId)
 
     socket.on('data', (chunk: Buffer) => {
+      checkpoint.firstRequestByteAt ??= Date.now()
       session.writeStreamData(streamId, new Uint8Array(chunk))
     })
     socket.on('close', () => {
       session.closeStream(streamId, 'local socket closed')
-      this.streams.delete(streamId)
+      this.completeStream(streamId)
     })
     socket.on('error', () => {
       session.closeStream(streamId, 'local socket error')
-      this.streams.delete(streamId)
+      this.completeStream(streamId)
     })
   }
 
@@ -279,6 +329,7 @@ class ControllerTransport {
     if (!stream || !session) {
       return
     }
+    stream.checkpoint.firstResponseByteAt ??= Date.now()
     const chunk = Buffer.from(data)
     const accepted = stream.socket.write(chunk, (error) => {
       if (error) {
@@ -306,7 +357,7 @@ class ControllerTransport {
       return
     }
     stream.socket.destroy()
-    this.streams.delete(streamId)
+    this.completeStream(streamId)
   }
 
   private fireExit(code: number | null, signal: NodeJS.Signals | null): void {
@@ -340,7 +391,53 @@ class ControllerTransport {
     for (const { socket } of this.streams.values()) {
       socket.destroy()
     }
-    this.streams.clear()
+    for (const streamId of [...this.streams.keys()]) {
+      this.completeStream(streamId)
+    }
+  }
+
+  private startConnectionAttempt(): RelayConnectionAttemptCheckpoint {
+    const checkpoint: RelayConnectionAttemptCheckpoint = {
+      attempt: this.connectionAttempts.length + 1,
+      startedAt: Date.now(),
+      websocketOpenedAt: null,
+      handshakeReadyAt: null,
+      failedAt: null,
+    }
+    this.connectionAttempts.push(checkpoint)
+    if (this.connectionAttempts.length > MAX_RELAY_CONNECTION_ATTEMPTS) {
+      this.connectionAttempts.shift()
+    }
+    return checkpoint
+  }
+
+  private failCurrentConnectionAttempt(): void {
+    const checkpoint = this.connectionAttempts.at(-1)
+    if (checkpoint && !checkpoint.handshakeReadyAt && !checkpoint.failedAt) {
+      checkpoint.failedAt = Date.now()
+    }
+  }
+
+  private completeStream(streamId: string): void {
+    const stream = this.streams.get(streamId)
+    if (!stream) {
+      return
+    }
+    stream.checkpoint.closedAt ??= Date.now()
+    this.streams.delete(streamId)
+    this.completedStreams.push(stream.checkpoint)
+    if (this.completedStreams.length > MAX_RELAY_COMPLETED_STREAMS) {
+      this.completedStreams.shift()
+    }
+  }
+
+  getPerformanceSnapshot(): RelayControllerPerformanceSnapshot {
+    return {
+      connectionAttempts: this.connectionAttempts.map(checkpoint => ({ ...checkpoint })),
+      localListenerReadyAt: this.localListenerReadyAt,
+      activeStreams: Array.from(this.streams.values(), stream => ({ ...stream.checkpoint })),
+      completedStreams: this.completedStreams.map(checkpoint => ({ ...checkpoint })),
+    }
   }
 
   toHandle(): RelayControllerTransportHandle {
@@ -359,6 +456,7 @@ class ControllerTransport {
         return keypair.publicKeyBase64
       },
       hostPublicKeyBase64: this.hostPublicKeyBase64,
+      getPerformanceSnapshot: () => this.getPerformanceSnapshot(),
       onExit: (listener) => {
         exitListeners.add(listener)
       },
