@@ -2,7 +2,16 @@ import { writeFile } from 'node:fs/promises'
 
 import { z } from 'zod'
 
-import { context, failures, fileHistory, overview, runs, search, thread } from './query-service'
+import {
+  context,
+  failures,
+  fileHistory,
+  memories,
+  overview,
+  runs,
+  search,
+  thread,
+} from './query-service'
 
 const RunnerInputSchema = z.object({
   chatSessionId: z.string().min(1),
@@ -71,7 +80,7 @@ async function main(): Promise<void> {
       fileHistory: (path: string, options?: { limit?: number }) =>
         fileHistory(scope, path, options),
       runs: (options?: { limit?: number }) => runs(scope, options),
-      memories: () => [],
+      memories: (options?: { query?: string, limit?: number }) => memories(scope, options),
     }),
   })
 

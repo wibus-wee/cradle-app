@@ -2,6 +2,7 @@ import { recallMessages, recallRuns, recallToolEvents, sessions } from '@cradle/
 import { and, asc, desc, eq, like, or } from 'drizzle-orm'
 
 import { db } from '../../infra'
+import { searchChronicle } from '../search/chronicle-search.engine'
 
 const DEFAULT_LIMIT = 8
 const MAX_LIMIT = 50
@@ -261,6 +262,23 @@ export function fileHistory(
     .orderBy(desc(recallToolEvents.occurredAt))
     .limit(limit(options.limit))
     .all()
+}
+
+export function memories(scope: RecallScope, options: { query?: string, limit?: number } = {}) {
+  const query = options.query?.trim()
+  if (!query) {
+    return []
+  }
+  return searchChronicle({
+    query,
+    workspaceId: scope.workspaceId,
+    limit: limit(options.limit),
+  }).map(memory => ({
+    id: memory.id,
+    type: memory.type,
+    summary: memory.snippet.text,
+    updatedAt: memory.updatedAt,
+  }))
 }
 
 function escapeLike(value: string): string {
