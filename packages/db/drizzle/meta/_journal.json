@@ -316,6 +316,13 @@
       "when": 1784884258670,
       "tag": "0044_romantic_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1784904614000,
+      "tag": "0045_magenta_sabretooth",
+      "breakpoints": true
     }
   ]
 }
