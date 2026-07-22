@@ -1,5 +1,5 @@
 ---
-name: observability-debugger
+name: cradle-observability-debugger
 description: Debug Cradle local observability data by querying SQLite events/incidents/timeline, runtime snapshots, metrics, and server logs.
 ---
 
@@ -48,7 +48,7 @@ The `logs` command tries:
 
 Use:
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py --help
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py --help
 
 Use the generated Cradle CLI first when the server is running; it exercises the same HTTP API used by agents and preserves server-side redaction/export behavior:
 
@@ -61,7 +61,7 @@ Use the SQLite script when the server is down, the HTTP API is suspect, or you n
 
 ### summary — snapshot health
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py summary --since-min 120
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py summary --since-min 120
 
 Prints counts by code/severity and top open incidents.
 There is no generated CLI equivalent for this aggregate summary.
@@ -71,16 +71,16 @@ There is no generated CLI equivalent for this aggregate summary.
     pnpm --filter @cradle/cli cradle observability events --code CHAT_EMPTY_OUTPUT_COMPLETION --limit 50
     pnpm --filter @cradle/cli cradle observability events --chat-session-id <id> --limit 200
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py events --code CHAT_EMPTY_OUTPUT_COMPLETION --limit 50
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py events --chat-session-id <id> --limit 200
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py events --code CHAT_EMPTY_OUTPUT_COMPLETION --limit 50
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py events --chat-session-id <id> --limit 200
 
 ### incidents — query incidents
 
     pnpm --filter @cradle/cli cradle observability incidents --status open --limit 50
     pnpm --filter @cradle/cli cradle observability incidents --code TURN_STREAM_FAILED --limit 200
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py incidents --status open --limit 50
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py incidents --chat-session-id <id> --limit 200
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py incidents --status open --limit 50
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py incidents --chat-session-id <id> --limit 200
 
 ### error-patterns — query grouped failure signatures
 
@@ -92,8 +92,8 @@ There is no generated CLI equivalent for this aggregate summary.
     pnpm --filter @cradle/cli cradle chat snapshot run <runId>
     pnpm --filter @cradle/cli cradle chat snapshot session <sessionId>
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py timeline --run-id <runId> --limit 500
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py timeline --chat-session-id <id> --since-min 240
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py timeline --run-id <runId> --limit 500
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py timeline --chat-session-id <id> --since-min 240
 
 Timeline output is an array of `backend_run_snapshots`; each item includes parsed `summary_json` plus ordered `events` from `backend_run_snapshot_events`. Snapshot/event timestamps are milliseconds.
 
@@ -145,9 +145,9 @@ Do not spend time teaching telemetry setup from this skill. If metrics are unava
 
 ### logs — server log
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py logs --tail --lines 50
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py logs --filter "mapper" --lines 200
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py logs --filter "error" --tail --lines 30
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py logs --tail --lines 50
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py logs --filter "mapper" --lines 200
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py logs --filter "error" --tail --lines 30
 
 Logs are pino-structured JSON. Pipe through `python3 -m json.tool` to pretty-print individual lines.
 
@@ -157,7 +157,7 @@ Logs are pino-structured JSON. Pipe through `python3 -m json.tool` to pretty-pri
       --chat-session-id <chatSessionId> \
       --since-unix <unixSeconds>
 
-    python3 resources/skills/observability-debugger/scripts/obs_debug.py bundle \
+    python3 resources/skills/cradle-observability-debugger/scripts/obs_debug.py bundle \
       --chat-session-id <chatSessionId> \
       --since-min 240 \
       --out /tmp/cradle-obs-bundle.json

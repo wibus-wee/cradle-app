@@ -17,7 +17,7 @@ function createSkillPackage(root: string): string {
   fs.mkdirSync(skillDir, { recursive: true })
   fs.writeFileSync(join(skillDir, 'SKILL.md'), [
     '---',
-    'name: runtime-demo',
+    'name: cradle-plugin-runtime-demo',
     'description: Runtime demo skill',
     '---',
     '',
@@ -59,15 +59,16 @@ describe('codex runtime context native skill projection', () => {
     try {
       const skillDir = createSkillPackage(tempHome)
       registerPluginSkill('@cradle/runtime-demo', {
-        name: 'runtime-demo',
+        name: 'cradle-plugin-runtime-demo',
         description: 'Runtime demo skill',
         skillFile: join(skillDir, 'SKILL.md'),
       })
 
       const context = resolveCodexRuntimeContext('/tmp/workspace', 'agent-a')
       const agentHome = join(tempHome, '.cradle', 'agents', 'agent-a')
-      const projection = join(agentHome, 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
-      const compatibilityProjection = join(agentHome, '.agents', 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
+      // Agent skills root is flat for Claude compatibility; basename === skill name
+      const projection = join(agentHome, 'skills', 'cradle-plugin-runtime-demo', 'SKILL.md')
+      const compatibilityProjection = join(agentHome, '.agents', 'skills', 'cradle-plugin-runtime-demo', 'SKILL.md')
 
       expect(context.agentHome).toBe(agentHome)
       expect(fs.existsSync(projection)).toBe(true)
@@ -93,13 +94,13 @@ describe('codex runtime context native skill projection', () => {
     try {
       const skillDir = createSkillPackage(tempHome)
       registerPluginSkill('@cradle/runtime-demo', {
-        name: 'runtime-demo',
+        name: 'cradle-plugin-runtime-demo',
         description: 'Runtime demo skill',
         skillFile: join(skillDir, 'SKILL.md'),
       })
 
       const context = resolveCodexRuntimeContext('/tmp/workspace', null)
-      const projection = join(tempHome, '.codex', 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
+      const projection = join(tempHome, '.codex', 'skills', 'cradle', 'cradle-plugin-runtime-demo', 'SKILL.md')
 
       expect(context.agentHome).toBeNull()
       expect(fs.existsSync(projection)).toBe(false)
@@ -134,7 +135,7 @@ describe('codex runtime context native skill projection', () => {
       process.env.CRADLE_BUILTIN_SKILLS_DIR = builtinRoot
       const skillDir = createSkillPackage(tempHome)
       registerPluginSkill('@cradle/runtime-demo', {
-        name: 'runtime-demo',
+        name: 'cradle-plugin-runtime-demo',
         description: 'Runtime demo skill',
         skillFile: join(skillDir, 'SKILL.md'),
       })
@@ -149,7 +150,8 @@ describe('codex runtime context native skill projection', () => {
       })
 
       const context = resolveCodexRuntimeContext('/tmp/workspace', null)
-      const projection = join(tempHome, '.codex', 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
+      // Nested Codex: cradle/{skillName} (skill name already carries cradle-plugin-)
+      const projection = join(tempHome, '.codex', 'skills', 'cradle', 'cradle-plugin-runtime-demo', 'SKILL.md')
       const builtinProjection = join(tempHome, '.codex', 'skills', 'cradle', 'builtin-demo', 'SKILL.md')
 
       expect(context.agentHome).toBeNull()

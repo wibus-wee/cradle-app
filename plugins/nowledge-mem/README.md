@@ -20,7 +20,7 @@ Nowledge Mem gives agents access to persistent memories, saved threads, Working 
 - Creates explicit memories when requested.
 - Searches, reads, creates, and appends Nowledge threads.
 - Optionally registers Nowledge's streamable HTTP MCP endpoint when configured.
-- Registers a `nowledge-mem` skill so agents know how to use the plugin routes.
+- Registers a `cradle-plugin-nowledge-mem` skill so agents know how to use the plugin routes (invoke as `/cradle-plugin-nowledge-mem`).
 - Keeps API keys out of plugin storage and public config responses.
 
 ## Current Scope
@@ -143,7 +143,7 @@ Thread search uses `query`, not `q`.
 
 ## Skill
 
-The plugin registers `SKILL.md` as the `nowledge-mem` skill during activation.
+The plugin registers `SKILL.md` as the `cradle-plugin-nowledge-mem` skill during activation.
 
 The skill teaches agents to:
 

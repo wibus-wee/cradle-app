@@ -19,10 +19,11 @@ export function activate(ctx: ServerPluginContext): void {
     })
   }
 
-  // Register the browser-use skill for agent discovery
+  // Register the browser-use skill for agent discovery.
+  // Name matches Claude flat projection basename so /cradle-plugin-browser-use works.
   const skillFile = resolve(__dirname, 'SKILL.md')
   ctx.skills.register({
-    name: 'browser-use',
+    name: 'cradle-plugin-browser-use',
     description: 'Browser automation CLI for AI agents. Use when the user needs to interact with websites.',
     skillFile,
   })

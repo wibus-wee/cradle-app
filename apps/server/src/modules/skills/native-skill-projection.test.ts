@@ -21,7 +21,7 @@ async function createTempDir(): Promise<string> {
   return tempDir
 }
 
-async function createSkillPackage(root: string, name = 'demo'): Promise<string> {
+async function createSkillPackage(root: string, name = 'cradle-plugin-demo'): Promise<string> {
   const skillDir = path.join(root, name)
   fs.mkdirSync(path.join(skillDir, 'references'), { recursive: true })
   fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
@@ -38,7 +38,7 @@ async function createSkillPackage(root: string, name = 'demo'): Promise<string> 
 
 function source(
   skillDir: string,
-  skillName = 'demo',
+  skillName = 'cradle-plugin-demo',
   sourceKind: NativeSkillProjectionSource['sourceKind'] = 'plugin',
 ): NativeSkillProjectionSource {
   return {
@@ -65,7 +65,7 @@ describe('native skill projection', () => {
     }
   })
 
-  it('projects a full skill package into the nested cradle namespace', async () => {
+  it('projects a full skill package into the nested cradle namespace using the skill name', async () => {
     const root = await createTempDir()
     const skillDir = await createSkillPackage(root)
     const skillRoot = path.join(root, 'native-skills')
@@ -73,13 +73,13 @@ describe('native skill projection', () => {
 
     const projectionPath = projectNativeSkill(projectionTarget, source(skillDir))
 
-    expect(projectionPath).toBe(path.join(skillRoot, 'cradle', 'plugin-demo'))
+    expect(projectionPath).toBe(path.join(skillRoot, 'cradle', 'cradle-plugin-demo'))
     expect(fs.existsSync(path.join(projectionPath, 'SKILL.md'))).toBe(true)
     expect(fs.readFileSync(path.join(projectionPath, 'references', 'guide.md'), 'utf8')).toBe('# Guide')
     expect(fs.lstatSync(projectionPath).isSymbolicLink()).toBe(true)
   })
 
-  it('projects a full skill package into the flat cradle namespace', async () => {
+  it('projects a full skill package into the flat root using the skill name as basename', async () => {
     const root = await createTempDir()
     const skillDir = await createSkillPackage(root)
     const skillRoot = path.join(root, 'native-skills')
@@ -87,9 +87,24 @@ describe('native skill projection', () => {
 
     const projectionPath = projectNativeSkill(projectionTarget, source(skillDir))
 
+    // basename === skill name so Claude /skill invoke ids match Cradle inventory
     expect(projectionPath).toBe(path.join(skillRoot, 'cradle-plugin-demo'))
     expect(fs.existsSync(path.join(projectionPath, 'SKILL.md'))).toBe(true)
     expect(fs.readFileSync(path.join(projectionPath, 'references', 'guide.md'), 'utf8')).toBe('# Guide')
+  })
+
+  it('projects builtin skills under their true names without stacking cradle-', async () => {
+    const root = await createTempDir()
+    const skillDir = await createSkillPackage(root, 'cradle-cli')
+    const skillRoot = path.join(root, 'native-skills')
+    const projectionTarget = target(skillRoot, 'flat')
+
+    const projectionPath = projectNativeSkill(
+      projectionTarget,
+      source(skillDir, 'cradle-cli', 'builtin'),
+    )
+
+    expect(projectionPath).toBe(path.join(skillRoot, 'cradle-cli'))
   })
 
   it('does not overwrite an existing non-symlink target path', async () => {
@@ -109,11 +124,11 @@ describe('native skill projection', () => {
 
   it('removes stale Cradle projection symlinks during reconciliation', async () => {
     const root = await createTempDir()
-    const firstSkillDir = await createSkillPackage(root, 'first')
-    const secondSkillDir = await createSkillPackage(root, 'second')
+    const firstSkillDir = await createSkillPackage(root, 'cradle-plugin-first')
+    const secondSkillDir = await createSkillPackage(root, 'cradle-plugin-second')
     const projectionTarget = target(path.join(root, 'native-skills'), 'nested')
-    const firstSource = source(firstSkillDir, 'first')
-    const secondSource = source(secondSkillDir, 'second')
+    const firstSource = source(firstSkillDir, 'cradle-plugin-first')
+    const secondSource = source(secondSkillDir, 'cradle-plugin-second')
 
     reconcileNativeSkillProjections([firstSource, secondSource], [projectionTarget])
     expect(fs.existsSync(resolveNativeSkillProjectionPath(projectionTarget, firstSource))).toBe(true)
@@ -128,13 +143,13 @@ describe('native skill projection', () => {
 
   it('filters projected and stale paths by target source kind ownership', async () => {
     const root = await createTempDir()
-    const pluginSkillDir = await createSkillPackage(root, 'plugin-demo')
+    const pluginSkillDir = await createSkillPackage(root, 'cradle-plugin-demo')
     const builtinSkillDir = await createSkillPackage(root, 'builtin-demo')
     const projectionTarget: NativeSkillProjectionTarget = {
       ...target(path.join(root, 'native-skills'), 'nested'),
       sourceKinds: ['plugin'],
     }
-    const pluginSource = source(pluginSkillDir, 'plugin-demo', 'plugin')
+    const pluginSource = source(pluginSkillDir, 'cradle-plugin-demo', 'plugin')
     const builtinSource = source(builtinSkillDir, 'builtin-demo', 'builtin')
 
     const result = reconcileNativeSkillProjections([pluginSource, builtinSource], [projectionTarget])
@@ -169,9 +184,9 @@ describe('native skill projection', () => {
     const flatTarget = target(skillRoot, 'flat')
     const projSource = source(skillDir)
 
-    // Simulate old nested layout: cradle/plugin-demo symlink
+    // Simulate old nested layout: cradle/cradle-plugin-demo symlink
     projectNativeSkill(nestedTarget, projSource)
-    const nestedPath = path.join(skillRoot, 'cradle', 'plugin-demo')
+    const nestedPath = path.join(skillRoot, 'cradle', 'cradle-plugin-demo')
     expect(fs.lstatSync(nestedPath).isSymbolicLink()).toBe(true)
 
     // Reconcile with flat layout — should migrate
@@ -180,9 +195,28 @@ describe('native skill projection', () => {
     // Old nested symlink removed, legacy cradle/ directory gone
     expect(fs.existsSync(nestedPath)).toBe(false)
     expect(fs.existsSync(path.join(skillRoot, 'cradle'))).toBe(false)
-    // New flat symlink created
+    // New flat symlink created with true skill name
     expect(fs.existsSync(path.join(skillRoot, 'cradle-plugin-demo'))).toBe(true)
     expect(result.errors).toEqual([])
+  })
+
+  it('migrates legacy cradle- double-prefix flat paths to true skill names', async () => {
+    const root = await createTempDir()
+    const skillDir = await createSkillPackage(root, 'cradle-cli')
+    const skillRoot = path.join(root, 'native-skills')
+    const flatTarget = target(skillRoot, 'flat')
+    const builtinSource = source(skillDir, 'cradle-cli', 'builtin')
+
+    // Simulate legacy flat path cradle-cradle-cli
+    const legacyPath = path.join(skillRoot, 'cradle-cradle-cli')
+    fs.mkdirSync(skillRoot, { recursive: true })
+    fs.symlinkSync(skillDir, legacyPath, 'dir')
+
+    const result = reconcileNativeSkillProjections([builtinSource], [flatTarget])
+
+    expect(result.errors).toEqual([])
+    expect(fs.existsSync(legacyPath)).toBe(false)
+    expect(fs.existsSync(path.join(skillRoot, 'cradle-cli'))).toBe(true)
   })
 
   it('removes an exact projection without touching non-symlink conflicts', async () => {

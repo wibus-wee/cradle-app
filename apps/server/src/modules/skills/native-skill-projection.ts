@@ -72,11 +72,14 @@ export function resolveNativeSkillPackageDir(skillFile: string): string {
   return candidateDir
 }
 
+/**
+ * Invocable skill id for scanners that key off directory basename (Claude).
+ * Must equal the Cradle skill registry / SKILL.md `name` — no layout or
+ * sourceKind decoration. Ownership is expressed by symlink + reconcile, not by
+ * stacking prefixes into the invoke name.
+ */
 export function resolveNativeSkillProjectionEntryName(source: NativeSkillProjectionSource): string {
-  const skillName = sanitizeNativeSkillProjectionName(source.skillName)
-  return source.sourceKind === 'builtin'
-    ? skillName
-    : `${source.sourceKind}-${skillName}`
+  return sanitizeNativeSkillProjectionName(source.skillName)
 }
 
 export function resolveNativeSkillProjectionPath(
@@ -85,9 +88,11 @@ export function resolveNativeSkillProjectionPath(
 ): string {
   const skillRoot = path.resolve(target.skillRoot)
   const targetName = resolveNativeSkillProjectionEntryName(source)
+  // nested: ownership namespace for recursive scanners (Codex)
+  // flat: basename === skill name for leaf-only scanners (Claude)
   const projectionPath = target.layout === 'nested'
     ? path.join(skillRoot, 'cradle', targetName)
-    : path.join(skillRoot, `cradle-${targetName}`)
+    : path.join(skillRoot, targetName)
   assertPathInside(skillRoot, projectionPath)
   return projectionPath
 }
@@ -156,10 +161,12 @@ export function resetNativeSkillProjectionTargets(): void {
 
 export function createAgentNativeSkillProjectionTarget(agentHome: string): NativeSkillProjectionTarget {
   const skillRoot = path.join(agentHome, 'skills')
+  // Shared agent skills root is also exposed via `.claude/skills` (leaf-only).
+  // Flat + true skill names keep Claude invoke ids identical to Cradle names.
   return {
     id: `agent:${path.resolve(agentHome)}:skills`,
     skillRoot,
-    layout: 'nested',
+    layout: 'flat',
     sourceKinds: ['plugin', 'resource'],
   }
 }
@@ -292,7 +299,10 @@ function removeStaleProjectionSymlinks(
 
   for (const entry of fs.readdirSync(candidateParent, { withFileTypes: true })) {
     const candidatePath = path.join(candidateParent, entry.name)
-    if (!isCradleProjectionEntryName(target.layout, entry.name, sourceKinds) || desiredPaths.has(candidatePath)) {
+    if (desiredPaths.has(candidatePath)) {
+      continue
+    }
+    if (!isCradleManagedProjectionEntry(target.layout, entry.name, candidatePath, sourceKinds)) {
       continue
     }
     if (removeProjectionSymlink(candidatePath)) {
@@ -303,36 +313,80 @@ function removeStaleProjectionSymlinks(
   return removed
 }
 
-function isCradleProjectionEntryName(
+/**
+ * Decide whether a non-desired entry is a Cradle-managed projection we may
+ * remove. Nested cradle/ children are all ours. Flat entries use skill-name
+ * ownership conventions (cradle-plugin-*) plus symlink-target checks so
+ * true-name builtins (e.g. cradle-observability-debugger → resources/skills/...) are
+ * cleaned without touching user skill directories or foreign symlinks.
+ */
+function isCradleManagedProjectionEntry(
   layout: NativeSkillProjectionLayout,
   name: string,
+  candidatePath: string,
   sourceKinds: ReadonlySet<NativeSkillProjectionSourceKind>,
 ): boolean {
-  if (sourceKinds.has('plugin') && matchesProjectionPrefix(layout, name, 'plugin')) {
+  // Nested layout lives under cradle/; every child there is Cradle-managed.
+  if (layout === 'nested') {
     return true
   }
-  if (sourceKinds.has('resource') && matchesProjectionPrefix(layout, name, 'resource')) {
+
+  // Flat: only touch symlinks we created. Real dirs (user skills) stay.
+  try {
+    if (!fs.lstatSync(candidatePath).isSymbolicLink()) {
+      return false
+    }
+  }
+  catch {
+    return false
+  }
+
+  // Plugin/resource: registry names should already be cradle-plugin-*.
+  // Also match legacy stacked prefixes for migration.
+  if (sourceKinds.has('plugin') && (
+    name.startsWith('cradle-plugin-')
+    || name.startsWith('plugin-')
+  )) {
     return true
   }
+  if (sourceKinds.has('resource') && (
+    name.startsWith('cradle-resource-')
+    || name.startsWith('resource-')
+  )) {
+    return true
+  }
+
   if (!sourceKinds.has('builtin')) {
     return false
   }
 
-  return layout === 'nested'
-    ? !matchesProjectionPrefix(layout, name, 'plugin') && !matchesProjectionPrefix(layout, name, 'resource')
-    : name.startsWith('cradle-')
-      && !matchesProjectionPrefix(layout, name, 'plugin')
-      && !matchesProjectionPrefix(layout, name, 'resource')
+  // Legacy flat wrappers: cradle-{builtinName} (including cradle-cradle-cli)
+  if (
+    name.startsWith('cradle-')
+    && !name.startsWith('cradle-plugin-')
+    && !name.startsWith('cradle-resource-')
+  ) {
+    return true
+  }
+
+  // True-name builtins: symlink into Cradle's builtin skills root.
+  try {
+    const linkTarget = resolveSymlinkTarget(candidatePath)
+    const builtinRoot = path.resolve(resolveScopeRoot('builtin', {}))
+    if (fs.existsSync(builtinRoot) && isPathInside(builtinRoot, linkTarget)) {
+      return true
+    }
+  }
+  catch {
+    // ignore broken links — still only remove if prefix matched above
+  }
+
+  return false
 }
 
-function matchesProjectionPrefix(
-  layout: NativeSkillProjectionLayout,
-  name: string,
-  sourceKind: NativeSkillProjectionSourceKind,
-): boolean {
-  return layout === 'nested'
-    ? name.startsWith(`${sourceKind}-`)
-    : name.startsWith(`cradle-${sourceKind}-`)
+function isPathInside(root: string, child: string): boolean {
+  const relative = path.relative(root, child)
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
 }
 
 function removeLegacyNestedCradleDirectory(target: NativeSkillProjectionTarget): string[] {

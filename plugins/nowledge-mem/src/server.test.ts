@@ -174,7 +174,7 @@ describe('nowledge mem server plugin', () => {
     ])
     expect(skills).toEqual([
       expect.objectContaining({
-        name: 'nowledge-mem',
+        name: 'cradle-plugin-nowledge-mem',
         skillFile: expect.stringContaining('SKILL.md'),
       }),
     ])

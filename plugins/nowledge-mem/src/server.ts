@@ -73,7 +73,7 @@ export async function activate(ctx: ServerPluginContext): Promise<void> {
   await syncNowledgeMcpServer(ctx)
 
   ctx.skills.register({
-    name: 'nowledge-mem',
+    name: 'cradle-plugin-nowledge-mem',
     description: 'Guided Nowledge Mem access for Working Memory, Context Bundle, memory search, memory writes, and thread lookup through Cradle plugin routes.',
     skillFile: resolve(__dirname, 'SKILL.md'),
   })

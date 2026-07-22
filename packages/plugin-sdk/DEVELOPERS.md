@@ -358,14 +358,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export function activate(ctx: ServerPluginContext): void {
   ctx.skills.register({
-    name: 'browser-automation',
+    name: 'cradle-plugin-browser-automation',
     description: 'Browser automation for AI agents via CDP',
     skillFile: resolve(__dirname, 'SKILL.md'),
   })
 }
 ```
 
-`skillFile` should point at the real packaged `SKILL.md` that ships with the plugin. Cradle projects the full containing skill package directory into known runtime-native skill roots under a reserved path such as `cradle/plugin-browser-automation`. Agent-scoped runtime homes receive this projection automatically. Provider-specific global roots like `~/.codex/skills` or `~/.claude/skills` receive it only when the app feature flag `nativeProviderSkillProjection` is enabled for no-agent provider starts. Bundled `references/`, `scripts/`, and `assets/` remain available to agents that load skills from the filesystem. The projection is removed when the plugin registration is disposed or the plugin is disabled.
+`skillFile` should point at the real packaged `SKILL.md` that ships with the plugin. Set skill `name` (and `SKILL.md` frontmatter `name`) to the invocable id agents will call — prefer `cradle-plugin-{name}` so Claude leaf scanners, Cradle inventory, and on-disk basenames stay identical. Cradle projects the full containing skill package directory using that name as the basename (agent / Claude flat: `{skillName}`; Codex nested: `cradle/{skillName}`). Agent-scoped runtime homes receive this projection automatically. Provider-specific global roots like `~/.codex/skills` or `~/.claude/skills` receive it only when the app feature flag `nativeProviderSkillProjection` is enabled for no-agent provider starts. Bundled `references/`, `scripts/`, and `assets/` remain available to agents that load skills from the filesystem. The projection is removed when the plugin registration is disposed or the plugin is disabled.
 
 ### `ctx.providers.externalSources.register(source)` — External Provider Source
 

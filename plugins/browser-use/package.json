@@ -20,7 +20,7 @@
           "permissions": ["desktop.browser-webview"]
         },
         {
-          "id": "skill.browser-use",
+          "id": "skill.cradle-plugin-browser-use",
           "type": "skill",
           "layer": "server",
           "label": "Browser automation skill",

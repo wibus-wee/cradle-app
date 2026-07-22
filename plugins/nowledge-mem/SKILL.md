@@ -1,6 +1,6 @@
 ---
-name: nowledge-mem
-description: Use Cradle's official Nowledge Mem plugin for guided Working Memory, Context Bundle, memory search, explicit memory writes, and thread lookup or append. Use when the task needs prior Nowledge memories, saved conversation context, or a durable memory distillation through Cradle plugin routes.
+name: cradle-plugin-nowledge-mem
+description: Use Cradle's official Nowledge Mem plugin for guided Working Memory, Context Bundle, memory search, explicit memory writes, and thread lookup or append. Use when the task needs prior Nowledge memories, saved conversation context, or a durable memory distillation through Cradle plugin routes. Invoke as /cradle-plugin-nowledge-mem.
 ---
 
 # Nowledge Mem

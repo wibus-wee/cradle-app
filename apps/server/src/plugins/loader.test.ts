@@ -645,7 +645,7 @@ describe('server plugin loader lifecycle', () => {
         'export function activate(ctx) {',
         '  ctx.mcp.registerServer({ transport: "stdio", name: "loader-cleanup", command: "node", args: ["server.mjs"] })',
         '  ctx.routes.register({ method: "GET", path: "/status", handler: () => ({ ok: true }) })',
-        '  ctx.skills.register({ name: "loader-cleanup-skill", description: "A skill", skillFile: fileURLToPath(new URL("./SKILL.md", import.meta.url)) })',
+        '  ctx.skills.register({ name: "cradle-plugin-loader-cleanup-skill", description: "A skill", skillFile: fileURLToPath(new URL("./SKILL.md", import.meta.url)) })',
         '}',
       ].join('\n'),
     })
@@ -660,7 +660,8 @@ describe('server plugin loader lifecycle', () => {
       expect((await app.handle(new Request('http://localhost/api/plugins/loader-cleanup/status'))).status).toBe(200)
 
       const runtimeContext = resolveCodexRuntimeContext('/tmp/workspace', 'loader-agent')
-      const projectedSkill = join(runtimeContext.agentHome ?? '', 'skills', 'cradle', 'plugin-loader-cleanup-skill', 'SKILL.md')
+      // Agent flat: basename === skill name
+      const projectedSkill = join(runtimeContext.agentHome ?? '', 'skills', 'cradle-plugin-loader-cleanup-skill', 'SKILL.md')
       expect(existsSync(projectedSkill)).toBe(true)
 
       await setAppPreferences({
@@ -673,7 +674,8 @@ describe('server plugin loader lifecycle', () => {
         },
       })
       const globalRuntimeContext = resolveCodexRuntimeContext('/tmp/workspace', null)
-      const globalProjectedSkill = join(homeDir, '.codex', 'skills', 'cradle', 'plugin-loader-cleanup-skill', 'SKILL.md')
+      // Codex nested: cradle/{skillName}
+      const globalProjectedSkill = join(homeDir, '.codex', 'skills', 'cradle', 'cradle-plugin-loader-cleanup-skill', 'SKILL.md')
       const globalBuiltinSkill = join(homeDir, '.codex', 'skills', 'cradle', 'builtin-loader-skill', 'SKILL.md')
       expect(globalRuntimeContext.agentHome).toBeNull()
       expect(existsSync(globalProjectedSkill)).toBe(true)

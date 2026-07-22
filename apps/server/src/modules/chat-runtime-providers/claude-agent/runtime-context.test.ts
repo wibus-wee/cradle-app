@@ -17,7 +17,7 @@ function createSkillPackage(root: string): string {
   fs.mkdirSync(skillDir, { recursive: true })
   fs.writeFileSync(join(skillDir, 'SKILL.md'), [
     '---',
-    'name: runtime-demo',
+    'name: cradle-plugin-runtime-demo',
     'description: Runtime demo skill',
     '---',
     '',
@@ -59,15 +59,16 @@ describe('claude agent runtime context native skill projection', () => {
     try {
       const skillDir = createSkillPackage(tempHome)
       registerPluginSkill('@cradle/runtime-demo', {
-        name: 'runtime-demo',
+        name: 'cradle-plugin-runtime-demo',
         description: 'Runtime demo skill',
         skillFile: join(skillDir, 'SKILL.md'),
       })
 
       const context = resolveClaudeAgentRuntimeContext('/tmp/workspace', 'agent-a')
       const agentHome = join(tempHome, '.cradle', 'agents', 'agent-a')
-      const projection = join(agentHome, 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
-      const compatibilityProjection = join(agentHome, '.claude', 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
+      // Agent skills root is flat: basename === skill name (Claude leaf scanner)
+      const projection = join(agentHome, 'skills', 'cradle-plugin-runtime-demo', 'SKILL.md')
+      const compatibilityProjection = join(agentHome, '.claude', 'skills', 'cradle-plugin-runtime-demo', 'SKILL.md')
 
       expect(context.agentHome).toBe(agentHome)
       expect(fs.existsSync(projection)).toBe(true)
@@ -93,7 +94,7 @@ describe('claude agent runtime context native skill projection', () => {
     try {
       const skillDir = createSkillPackage(tempHome)
       registerPluginSkill('@cradle/runtime-demo', {
-        name: 'runtime-demo',
+        name: 'cradle-plugin-runtime-demo',
         description: 'Runtime demo skill',
         skillFile: join(skillDir, 'SKILL.md'),
       })
@@ -134,7 +135,7 @@ describe('claude agent runtime context native skill projection', () => {
       process.env.CRADLE_BUILTIN_SKILLS_DIR = builtinRoot
       const skillDir = createSkillPackage(tempHome)
       registerPluginSkill('@cradle/runtime-demo', {
-        name: 'runtime-demo',
+        name: 'cradle-plugin-runtime-demo',
         description: 'Runtime demo skill',
         skillFile: join(skillDir, 'SKILL.md'),
       })
@@ -149,14 +150,17 @@ describe('claude agent runtime context native skill projection', () => {
       })
 
       const context = resolveClaudeAgentRuntimeContext('/tmp/workspace', null)
+      // Flat basename === skill name (no extra cradle- stacking)
       const projection = join(tempHome, '.claude', 'skills', 'cradle-plugin-runtime-demo', 'SKILL.md')
-      const builtinProjection = join(tempHome, '.claude', 'skills', 'cradle-builtin-demo', 'SKILL.md')
+      const builtinProjection = join(tempHome, '.claude', 'skills', 'builtin-demo', 'SKILL.md')
       const legacyProjection = join(tempHome, '.claude', 'skills', 'cradle', 'plugin-runtime-demo', 'SKILL.md')
+      const legacyDoublePrefix = join(tempHome, '.claude', 'skills', 'cradle-builtin-demo', 'SKILL.md')
 
       expect(context.agentHome).toBeNull()
       expect(fs.existsSync(projection)).toBe(true)
       expect(fs.existsSync(builtinProjection)).toBe(true)
       expect(fs.existsSync(legacyProjection)).toBe(false)
+      expect(fs.existsSync(legacyDoublePrefix)).toBe(false)
     }
     finally {
       if (previousHome === undefined) {

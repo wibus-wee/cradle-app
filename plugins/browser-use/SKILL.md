@@ -1,6 +1,6 @@
 ---
-name: browser-use
-description: Control Cradle's in-app browser via MCP tools. Use when the Claude Agent needs to navigate websites, click elements, type text, take screenshots, read page content, or inspect DOM structure within the Cradle desktop app's embedded browser panel. Triggers on "open URL", "navigate to", "click the button", "fill the form", "take a screenshot", "what's on the page", "scroll down", "wait for element", "press Enter". This is for the IN-APP browser only — not for external browser automation.
+name: cradle-plugin-browser-use
+description: Control Cradle's in-app browser via MCP tools. Use when the Claude Agent needs to navigate websites, click elements, type text, take screenshots, read page content, or inspect DOM structure within the Cradle desktop app's embedded browser panel. Triggers on "open URL", "navigate to", "click the button", "fill the form", "take a screenshot", "what's on the page", "scroll down", "wait for element", "press Enter". This is for the IN-APP browser only — not for external browser automation. Invoke as /cradle-plugin-browser-use.
 ---
 
 # Browser Use — Cradle In-App Browser Control

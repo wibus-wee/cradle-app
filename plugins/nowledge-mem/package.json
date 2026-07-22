@@ -119,7 +119,7 @@
           "permissions": ["nowledge.network"]
         },
         {
-          "id": "skill.nowledge-mem",
+          "id": "skill.cradle-plugin-nowledge-mem",
           "type": "skill",
           "layer": "server",
           "label": "Nowledge Mem skill",

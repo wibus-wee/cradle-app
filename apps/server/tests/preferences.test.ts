@@ -142,14 +142,14 @@ describe('preferences capability', () => {
       mkdirSync(pluginSkillDir, { recursive: true })
       writeFileSync(join(pluginSkillDir, 'SKILL.md'), [
         '---',
-        'name: native-enable-plugin-demo',
+        'name: cradle-plugin-native-enable-plugin-demo',
         'description: Native enable plugin demo',
         '---',
         '',
         '# Native Enable Plugin Demo',
       ].join('\n'))
       registerPluginSkill('@cradle/native-enable-demo', {
-        name: 'native-enable-plugin-demo',
+        name: 'cradle-plugin-native-enable-plugin-demo',
         description: 'Native enable plugin demo',
         skillFile: join(pluginSkillDir, 'SKILL.md'),
       })
@@ -181,10 +181,12 @@ describe('preferences capability', () => {
 
       expect(enableRes.status).toBe(200)
       const expectedProjectionPaths = [
-        join(dataDir, '.codex', 'skills', 'cradle', 'plugin-native-enable-plugin-demo', 'SKILL.md'),
+        // Codex nested: cradle/{skillName}
+        join(dataDir, '.codex', 'skills', 'cradle', 'cradle-plugin-native-enable-plugin-demo', 'SKILL.md'),
         join(dataDir, '.codex', 'skills', 'cradle', 'native-enable-builtin-demo', 'SKILL.md'),
+        // Claude flat: basename === skill name (no extra cradle- stacking)
         join(dataDir, '.claude', 'skills', 'cradle-plugin-native-enable-plugin-demo', 'SKILL.md'),
-        join(dataDir, '.claude', 'skills', 'cradle-native-enable-builtin-demo', 'SKILL.md'),
+        join(dataDir, '.claude', 'skills', 'native-enable-builtin-demo', 'SKILL.md'),
       ]
       for (const projectionPath of expectedProjectionPaths) {
         expect(existsSync(projectionPath)).toBe(true)
@@ -229,7 +231,7 @@ describe('preferences capability', () => {
       mkdirSync(skillDir, { recursive: true })
       writeFileSync(join(skillDir, 'SKILL.md'), [
         '---',
-        'name: native-cleanup-demo',
+        'name: cradle-plugin-native-cleanup-demo',
         'description: Native cleanup demo',
         '---',
         '',
@@ -238,7 +240,7 @@ describe('preferences capability', () => {
 
       const source = {
         sourceKind: 'plugin' as const,
-        skillName: 'native-cleanup-demo',
+        skillName: 'cradle-plugin-native-cleanup-demo',
         skillFile: join(skillDir, 'SKILL.md'),
       }
       const codexProjection = projectNativeSkill(createCodexGlobalNativeSkillProjectionTarget(dataDir), source)
