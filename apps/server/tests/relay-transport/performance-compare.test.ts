@@ -169,7 +169,7 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
       ),
     })),
     rows,
-    caveat: 'Wire and scheduler rows are exact under the stated inputs. Throughput rows are window bounds, not Internet throughput measurements. Run benchmark:relay:runtime for a local real-relayd cold/warm timestamp sample.',
+    caveat: 'Wire and scheduler rows are exact under the stated inputs. Throughput rows are window bounds, not Internet throughput measurements. Run benchmark:relay:runtime for virtual-session RTT and local real-relayd cold/warm/concurrency samples.',
   }
   const markdown = [
     `# Relay three-generation benchmark — ${report.run.id}`,

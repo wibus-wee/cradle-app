@@ -7,6 +7,7 @@ import type { AddressInfo, Socket } from 'node:net'
 import { connect, createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -483,6 +484,57 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     expect(warmStream?.firstRequestByteAt).not.toBeNull()
     expect(warmStream?.firstResponseByteAt).not.toBeNull()
 
+    const concurrentBody = 'x'.repeat(64 * 1024)
+    const concurrencyRows = []
+    for (const concurrency of [1, 8]) {
+      const batchStartedAt = performance.now()
+      const durations = await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
+        const startedAt = performance.now()
+        const concurrentResponse = await fetch(`${handle.localBaseUrl}/benchmark/${concurrency}/${index}`, {
+          method: 'POST',
+          headers: { 'content-type': 'text/plain' },
+          body: concurrentBody,
+        })
+        expect(concurrentResponse.status).toBe(200)
+        const body = (await concurrentResponse.json()) as { ok: boolean, echo: string }
+        expect(body.ok).toBe(true)
+        expect(body.echo).toBe(concurrentBody)
+        return performance.now() - startedAt
+      }))
+      const batchElapsedMs = performance.now() - batchStartedAt
+      concurrencyRows.push({
+        concurrency,
+        requestBodyBytes: Buffer.byteLength(concurrentBody),
+        p50Ms: percentile(durations, 0.5),
+        p95Ms: percentile(durations, 0.95),
+        maxMs: Math.max(...durations),
+        aggregateUsefulMiBps:
+          (concurrency * Buffer.byteLength(concurrentBody) * 2) / (1024 * 1024) / (batchElapsedMs / 1_000),
+      })
+    }
+    expect(handle.getPerformanceSnapshot().connectionAttempts).toHaveLength(attemptsBeforeWarmRequest)
+    console.info([
+      '# Relay local-relayd concurrent-stream matrix',
+      '',
+      'This exercises real loopback WebSocket, relayd scheduler, E2EE session, TCP bridge, and HTTP streams. It is not a WAN, Tailscale, or injected-RTT measurement.',
+      '',
+      '| Concurrent streams | Request body | p50 complete | p95 complete | max complete | Aggregate useful throughput |',
+      '| ---: | ---: | ---: | ---: | ---: | ---: |',
+      ...concurrencyRows.map(row =>
+        `| ${row.concurrency} | ${row.requestBodyBytes} B | ${row.p50Ms.toFixed(2)} ms | ${row.p95Ms.toFixed(2)} ms | ${row.maxMs.toFixed(2)} ms | ${row.aggregateUsefulMiBps.toFixed(2)} MiB/s |`),
+    ].join('\n'))
+    console.info(JSON.stringify({
+      kind: 'relay-local-e2e-concurrency',
+      conditions: {
+        relayd: 'local subprocess',
+        transport: 'binary-v2',
+        logicalUsefulBytesPerRequest: Buffer.byteLength(concurrentBody) * 2,
+        connectionAttemptsBeforeMatrix: attemptsBeforeWarmRequest,
+        connectionAttemptsAfterMatrix: handle.getPerformanceSnapshot().connectionAttempts.length,
+      },
+      rows: concurrencyRows,
+    }))
+
     if (coldAttempt && coldSnapshot.localListenerReadyAt !== null && coldStream && warmStream) {
       console.info(JSON.stringify({
         kind: 'relay-cold-warm-checkpoints',
@@ -570,6 +622,12 @@ function latestRelayStream(snapshot: RelayControllerPerformanceSnapshot): RelayS
 
 function nonNegativeDuration(end: number | null, start: number): number | null {
   return end === null ? null : Math.max(0, end - start)
+}
+
+function percentile(samples: number[], percentileValue: number): number {
+  const ordered = [...samples].sort((left, right) => left - right)
+  const index = Math.min(ordered.length - 1, Math.ceil(ordered.length * percentileValue) - 1)
+  return ordered[index]!
 }
 
 // Pinned-pubkey variant of startHostBridge for the reconnect phase.
