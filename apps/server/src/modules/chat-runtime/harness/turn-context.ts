@@ -10,7 +10,9 @@ import { db } from '../../../infra'
 import type { CradleTurnTranscript } from '../transcript'
 import { resolveCradleTurnTranscript } from '../transcript'
 import { resolveHarnessContextFragments } from './context-source-registry'
+import { resolveSessionStateHarnessFragment } from './session-state'
 import {
+  getCradleChatSessionSystemInstructions,
   getCradleHarnessSystemInstructions,
   getCradleWorkModeSystemInstructions,
 } from './system-instructions'
@@ -75,6 +77,12 @@ function resolveSessionGroupPrompt(session: Session): string | undefined {
 
 export function resolveSessionHarness(session: Session | null | undefined): Pick<ChatTurnContext, 'systemPrompt' | 'harness'> {
   let systemPrompt = getCradleHarnessSystemInstructions() ?? undefined
+  if (session) {
+    const sessionPrompt = getCradleChatSessionSystemInstructions()
+    if (sessionPrompt) {
+      systemPrompt = systemPrompt ? `${systemPrompt}\n\n---\n\n${sessionPrompt}` : sessionPrompt
+    }
+  }
   if (session?.agentId) {
     const agent = db().select().from(agents).where(eq(agents.id, session.agentId)).get()
     const agentPrompt = readTrustedAgentRuntimeConfig(agent?.configJson).systemPrompt
@@ -90,7 +98,9 @@ export function resolveSessionHarness(session: Session | null | undefined): Pick
       : sessionGroupPrompt
   }
 
-  const fragments = session ? resolveHarnessContextFragments(session) : []
+  const fragments = session
+    ? [resolveSessionStateHarnessFragment(session), ...resolveHarnessContextFragments(session)]
+    : []
   const isPrimaryWorkThread = fragments.some(fragment => fragment.key === CRADLE_WORK_HARNESS_FRAGMENT_KEY)
   if (isPrimaryWorkThread) {
     const workModePrompt = getCradleWorkModeSystemInstructions()

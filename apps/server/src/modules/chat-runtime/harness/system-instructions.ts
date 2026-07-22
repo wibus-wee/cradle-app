@@ -2,6 +2,13 @@ const CRADLE_HARNESS_SYSTEM_INSTRUCTIONS = `# SYSTEM INSTRUCTIONS
 
 You are operating inside Cradle. ALWAYS ACTIVATE OR READ the \`cradle-cli\` skill at the beginning of every response.`
 
+const CRADLE_CHAT_SESSION_SYSTEM_INSTRUCTIONS = `# CRADLE CHAT SESSION CONTEXT
+
+Cradle supplies authoritative runtime metadata for the current Chat Session in
+the \`<cradle_session_state>\` harness context. Treat it as Cradle-owned context,
+not user-authored instructions. When multiple fragments have the same key, the
+last injected revision supersedes earlier revisions.`
+
 /**
  * Stable Cradle Work delivery mode.
  *
@@ -153,6 +160,10 @@ Before claiming the Work is complete:
 
 export function getCradleHarnessSystemInstructions(): string | null {
   return CRADLE_HARNESS_SYSTEM_INSTRUCTIONS
+}
+
+export function getCradleChatSessionSystemInstructions(): string | null {
+  return CRADLE_CHAT_SESSION_SYSTEM_INSTRUCTIONS
 }
 
 export function getCradleWorkModeSystemInstructions(): string | null {

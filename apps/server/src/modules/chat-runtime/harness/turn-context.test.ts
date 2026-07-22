@@ -50,13 +50,23 @@ describe('resolveSessionHarness Work context', () => {
 
     expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
     expect(harness.systemPrompt).toContain('cradle-cli')
+    expect(harness.systemPrompt).toContain('CRADLE CHAT SESSION CONTEXT')
+    expect(harness.systemPrompt).toContain('<cradle_session_state>')
     expect(harness.systemPrompt).toContain('CRADLE WORK MODE')
     expect(harness.systemPrompt).toContain('manage_pull_request')
     expect(harness.systemPrompt).toContain('create_pr')
     expect(harness.systemPrompt).toContain('rename_branch')
     // Dynamic Work id stays in harness fragment for cache stability.
     expect(harness.systemPrompt).not.toContain('work-1')
-    expect(harness.harness?.fragments).toEqual([{
+    expect(harness.harness?.fragments).toHaveLength(2)
+    expect(harness.harness?.fragments[0]).toMatchObject({
+      key: 'cradle-session',
+      revision: expect.stringMatching(/^cradle-session:work-session:v1:[a-f0-9]{12}$/),
+    })
+    expect(harness.harness?.fragments[0]?.content).toContain('"session_id": "work-session"')
+    expect(harness.harness?.fragments[0]?.content).toContain('"workspace_id": "workspace-turn-context-test"')
+    expect(harness.harness?.fragments[0]?.content).toContain('"runtime_kind": "standard"')
+    expect(harness.harness?.fragments[1]).toEqual({
       key: 'cradle-work',
       revision: 'cradle-work:work-1:primary:v1',
       content: [
@@ -67,7 +77,7 @@ describe('resolveSessionHarness Work context', () => {
         'thread_role: primary',
         '</cradle_work_state>',
       ].join('\n'),
-    }])
+    })
   })
 
   it('keeps the Work system prompt stable when presentation and lifecycle state changes', () => {
@@ -154,9 +164,27 @@ describe('resolveSessionHarness Work context', () => {
 
     expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
     expect(harness.systemPrompt).toContain('cradle-cli')
+    expect(harness.systemPrompt).toContain('CRADLE CHAT SESSION CONTEXT')
     expect(harness.systemPrompt).not.toContain('CRADLE WORK MODE')
     expect(harness.systemPrompt).not.toContain('manage_pull_request')
-    expect(harness.harness).toBeUndefined()
+    expect(harness.harness?.fragments).toHaveLength(1)
+    expect(harness.harness?.fragments[0]).toMatchObject({
+      key: 'cradle-session',
+      revision: expect.stringMatching(/^cradle-session:ordinary-session:v1:[a-f0-9]{12}$/),
+    })
+    expect(harness.harness?.fragments[0]?.content).toContain('"session_id": "ordinary-session"')
+    expect(harness.harness?.fragments[0]?.content).toContain('"workspace_id": "workspace-turn-context-test"')
+    expect(harness.harness?.fragments[0]?.content).toContain('"runtime_kind": "standard"')
+    expect(harness.harness?.fragments[0]?.content).toContain('"provider_target_id": null')
+
+    const changedHarness = resolveSessionHarness({
+      ...session,
+      origin: 'runtime-handoff',
+    })
+    const initialRevision = harness.harness?.fragments[0]?.revision
+    const changedRevision = changedHarness.harness?.fragments[0]?.revision
+    expect(changedRevision).not.toBe(initialRevision)
+    expect(changedHarness.harness?.fragments[0]?.content).toContain('"origin": "runtime-handoff"')
   })
 })
 
