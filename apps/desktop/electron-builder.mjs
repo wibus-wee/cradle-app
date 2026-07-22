@@ -46,12 +46,6 @@ function resolveElectronUpdaterFeedUrl(url) {
   if (url.endsWith('/appcast.xml')) {
     return url.slice(0, -'appcast.xml'.length)
   }
-  if (url.endsWith('/manifest.json')) {
-    return url.slice(0, -'manifest.json'.length)
-  }
-  if (url.endsWith('.xml') || url.endsWith('.json') || url.endsWith('.yml') || url.endsWith('.yaml')) {
-    return url.slice(0, url.lastIndexOf('/') + 1)
-  }
   return url.endsWith('/') ? url : `${url}/`
 }
 
@@ -61,12 +55,6 @@ function resolveSparkleAppcastUrlForBuild(url) {
   }
   if (url.endsWith('.xml')) {
     return url
-  }
-  if (url.endsWith('/manifest.json')) {
-    return `${url.slice(0, -'manifest.json'.length)}appcast.xml`
-  }
-  if (url.endsWith('.json') || url.endsWith('.yml') || url.endsWith('.yaml')) {
-    return `${url.slice(0, url.lastIndexOf('/') + 1)}appcast.xml`
   }
   return url.endsWith('/') ? `${url}appcast.xml` : `${url}/appcast.xml`
 }

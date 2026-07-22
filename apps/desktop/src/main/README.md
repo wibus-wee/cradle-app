@@ -33,7 +33,7 @@
 - `native-services.test.ts`：覆盖 Appshot parity target synthesis，确保 research probe 的默认 destination 不等于 frontmost window fallback。
 - `update-manager.ts`：拥有 renderer-visible Desktop Updates workflow；按平台编排 macOS Sparkle updater 或 Windows NSIS updater 的检查、下载、安装触发和状态事件。
 - `update-manager.test.ts`：覆盖 Desktop Updates 手动 Check/Download/Apply 编排、macOS Sparkle install、Windows NSIS updater apply、quit hook，以及没有 prepared update 时的 apply error。
-- `macos-sparkle-update-adapter.ts`：拥有 macOS `electron-sparkle-updater` / Sparkle bridge adapter，负责 appcast 初始化、原生检查 UI、appcast 探测和 `installUpdateNow`。
+- `macos-sparkle-update-adapter.ts`：拥有 macOS `electron-sparkle-updater` / Sparkle bridge adapter，只负责 appcast 初始化、自动检查开关和原生检查 UI。
 - `update-feed.ts`：拥有 shared feed URL helpers（Windows generic root / macOS appcast 推导、public Ed key 读取）。
 - `windows-update-adapter.ts`：拥有 Windows `electron-updater` adapter，把 GitHub release feed 中的 `latest.yml`、NSIS installer 和 blockmap 投影到统一的 desktop update 状态模型。
 - `mac-bridge-manager.ts`：拥有 desktop-owned `cradle-mac-bridge` 子进程生命周期、NDJSON request/response 协议、hotkey event 投影、显式 parity-test synthetic hotkey helper、dev/packaged binary 路径解析，以及缺少 binary 时的非阻塞状态。
@@ -62,7 +62,7 @@
 
 ## Desktop update ownership
 
-`update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart on Windows. On macOS, Check opens Sparkle's native update UI (download is owned by Sparkle), and Restart calls `installUpdateNow` after preparing desktop runtime shutdown.
+`update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart on Windows. On macOS, Cradle only opens Sparkle's native update UI; Sparkle exclusively owns discovery, download, installation, relaunch, and their state.
 
 Updates are available only in packaged macOS and Windows builds with update feeds configured:
 - macOS: `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` (or derive `appcast.xml` from `CRADLE_DESKTOP_UPDATE_URL`) plus `SPARKLE_ED_PUBLIC_KEY`
@@ -70,7 +70,7 @@ Updates are available only in packaged macOS and Windows builds with update feed
 
 macOS uses `electron-sparkle-updater` (Sparkle) with ad-hoc or Developer ID codesigning. Packaging re-signs the staged `.app` ad-hoc after pack so `generate_appcast` can verify the archive. Sparkle owns download/install/relaunch; Cradle does not stage zip replacement through Download Center on macOS. Release CI uses `Innei/electron-sparkle-updater/action@v1` to sign the appcast, pull prior release zips as delta bases, and emit `appcast.xml` + optional `*.delta` patches (full zip remains the fallback when no base matches).
 
-Windows uses `electron-updater` with the NSIS target. The same `CRADLE_DESKTOP_UPDATE_URL` may point at a feed root that also hosts `appcast.xml` / legacy `manifest.json`; Windows normalizes to the feed directory and reads `latest.yml`. Restart prepares the desktop runtime shutdown, then delegates quit/install/relaunch to the downloaded NSIS installer through `quitAndInstall`.
+Windows uses `electron-updater` with the NSIS target. `CRADLE_DESKTOP_UPDATE_URL` points at the feed directory containing `latest.yml`. Restart prepares the desktop runtime shutdown, then delegates quit/install/relaunch to the downloaded NSIS installer through `quitAndInstall`.
 
 ## Desktop Download Center ownership
 

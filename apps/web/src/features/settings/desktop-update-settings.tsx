@@ -107,10 +107,8 @@ export function DesktopUpdateSettings() {
   const busy = loading || status.isCheckingForUpdates || !!updateDownload || status.isPreparingUpdate
   const isSparkle = status.provider === 'sparkle'
   const canCheck = isElectron && !!nativeIpc && !status.unsupported && !busy
-  // Sparkle owns download inside its native UI after Check.
   const canDownload = canCheck && !isSparkle && !!status.updateInfo && !status.updateDownloaded
-  // Restart on Sparkle maps to installUpdateNow; enable when an update is known.
-  const canApply = canCheck && (isSparkle ? !!status.updateInfo || status.updateDownloaded : status.updateDownloaded)
+  const canApply = canCheck && !isSparkle && status.updateDownloaded
 
   const updateStatusLabel = useMemo(() => {
     if (status.unsupported) {
@@ -330,12 +328,6 @@ export function DesktopUpdateSettings() {
               {status.errorMessage && (
                 <p className="text-[11px] text-muted-foreground">{status.errorMessage}</p>
               )}
-              {isSparkle && !status.unsupported && (
-                <p className="text-[11px] text-muted-foreground">
-                  macOS updates use Sparkle. Check opens the native update UI; download and install are handled there. Restart installs an already-downloaded update.
-                </p>
-              )}
-
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
                   type="button"
@@ -359,27 +351,30 @@ export function DesktopUpdateSettings() {
                     : <PackageCheckIcon className="size-3.5" aria-hidden="true" />}
                   {t('desktop.updates.actions.check' as SettingsKey)}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.downloadUpdate())}
-                  disabled={!canDownload}
-                  className={isSparkle ? 'hidden' : undefined}
-                >
-                  <DownloadIcon className="size-3.5" aria-hidden="true" />
-                  {t('desktop.updates.actions.download' as SettingsKey)}
-                </Button>
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.applyUpdate())}
-                  disabled={!canApply}
-                >
-                  <RefreshCwIcon className="size-3.5" aria-hidden="true" />
-                  {t('desktop.updates.actions.restart' as SettingsKey)}
-                </Button>
+                {!isSparkle && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.downloadUpdate())}
+                      disabled={!canDownload}
+                    >
+                      <DownloadIcon className="size-3.5" aria-hidden="true" />
+                      {t('desktop.updates.actions.download' as SettingsKey)}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.applyUpdate())}
+                      disabled={!canApply}
+                    >
+                      <RefreshCwIcon className="size-3.5" aria-hidden="true" />
+                      {t('desktop.updates.actions.restart' as SettingsKey)}
+                    </Button>
+                  </>
+                )}
               </div>
             </OperationsCard>
 

@@ -695,14 +695,6 @@ export async function startDesktopApp(): Promise<void> {
         stopServerRuntime: true,
       })
     },
-    requestQuitForUpdate: () => {
-      quitGuard.allowNextQuit()
-      requestDesktopExit({
-        reason: 'desktop update',
-        exitCode: 0,
-        stopServerRuntime: true,
-      })
-    },
   })
   const appBadgeManager = new DesktopAppBadgeManager()
   desktopAppBadgeManager = appBadgeManager

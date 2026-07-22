@@ -4,12 +4,8 @@
  * Windows electron-updater reads `latest.yml` from a generic feed root.
  * macOS Sparkle reads an appcast XML feed.
  *
- * `CRADLE_DESKTOP_UPDATE_URL` may be any of:
- * - a feed directory (`…/`, `…/feed`)
- * - a legacy Cradle manifest (`…/manifest.json`)
- * - a Sparkle appcast (`…/appcast.xml`)
- *
- * Optional `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` overrides the macOS appcast.
+ * `CRADLE_DESKTOP_UPDATE_URL` is the shared feed directory. Optional
+ * `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` overrides its macOS appcast.
  */
 
 declare const __CRADLE_DESKTOP_UPDATE_URL__: string
@@ -44,12 +40,6 @@ export function resolveElectronUpdaterFeedUrl(updateFeedUrl: string): string {
   if (url.endsWith('/appcast.xml')) {
     return url.slice(0, -'appcast.xml'.length)
   }
-  if (url.endsWith('/manifest.json')) {
-    return url.slice(0, -'manifest.json'.length)
-  }
-  if (url.endsWith('.xml') || url.endsWith('.json') || url.endsWith('.yml') || url.endsWith('.yaml')) {
-    return url.slice(0, url.lastIndexOf('/') + 1)
-  }
   return url.endsWith('/') ? url : `${url}/`
 }
 
@@ -57,12 +47,6 @@ export function resolveSparkleAppcastUrl(updateFeedUrl: string): string {
   const url = updateFeedUrl.trim()
   if (url.endsWith('.xml')) {
     return url
-  }
-  if (url.endsWith('/manifest.json')) {
-    return `${url.slice(0, -'manifest.json'.length)}${DEFAULT_APPCAST_FILE}`
-  }
-  if (url.endsWith('.json') || url.endsWith('.yml') || url.endsWith('.yaml')) {
-    return `${url.slice(0, url.lastIndexOf('/') + 1)}${DEFAULT_APPCAST_FILE}`
   }
   const baseUrl = url.endsWith('/') ? url : `${url}/`
   return new URL(DEFAULT_APPCAST_FILE, baseUrl).toString()

@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { DesktopUpdateInfo } from './update-types'
-
 const electronMocks = vi.hoisted(() => ({
   app: {
     getVersion: vi.fn(() => '1.2.2'),
@@ -13,13 +11,10 @@ const sparkleMocks = vi.hoisted(() => {
   const state = {
     ready: true,
     initError: null as string | null,
-    updateInfo: null as DesktopUpdateInfo | null,
     instances: [] as Array<{
       initialize: ReturnType<typeof vi.fn>
       setAutomaticChecks: ReturnType<typeof vi.fn>
       checkForUpdatesWithUI: ReturnType<typeof vi.fn>
-      probeForUpdate: ReturnType<typeof vi.fn>
-      installUpdateNow: ReturnType<typeof vi.fn>
       isReady: boolean
       lastInitError: string | null
     }>,
@@ -29,8 +24,6 @@ const sparkleMocks = vi.hoisted(() => {
     initialize = vi.fn(async () => ({ ready: state.ready, errorMessage: state.initError }))
     setAutomaticChecks = vi.fn()
     checkForUpdatesWithUI = vi.fn()
-    probeForUpdate = vi.fn(async () => state.updateInfo)
-    installUpdateNow = vi.fn()
 
     get isReady() {
       return state.ready
@@ -127,7 +120,6 @@ describe('desktopUpdateManager', () => {
     electronMocks.app.isPackaged = true
     sparkleMocks.state.ready = true
     sparkleMocks.state.initError = null
-    sparkleMocks.state.updateInfo = null
     sparkleMocks.state.instances = []
     electronUpdaterMocks.autoUpdater.reset()
     Object.defineProperty(process, 'platform', { value: 'darwin' })
@@ -145,14 +137,6 @@ describe('desktopUpdateManager', () => {
   })
 
   it('checks for macOS Sparkle updates and opens the native UI', async () => {
-    sparkleMocks.state.updateInfo = {
-      version: '1.2.3',
-      releaseName: 'Cradle 1.2.3',
-      releaseNotes: 'notes',
-      releaseDate: '2026-07-19T00:00:00.000Z',
-      files: [{ url: 'https://updates.example.com/Cradle-mac-arm64.zip', size: 10, sha512: null }],
-    }
-
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
       updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
@@ -160,17 +144,16 @@ describe('desktopUpdateManager', () => {
 
     await expect(manager.checkForUpdates()).resolves.toMatchObject({
       provider: 'sparkle',
-      updateInfo: { version: '1.2.3' },
+      updateInfo: null,
       updateDownloaded: false,
       isCheckingForUpdates: false,
     })
 
     const adapter = sparkleMocks.state.instances[0]
-    expect(adapter.probeForUpdate).toHaveBeenCalled()
     expect(adapter.checkForUpdatesWithUI).toHaveBeenCalled()
   })
 
-  it('installs a macOS Sparkle update after preparing quit', async () => {
+  it('does not mirror Sparkle installation into the desktop update facade', async () => {
     const prepareQuitForUpdate = vi.fn(async () => undefined)
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
@@ -178,20 +161,14 @@ describe('desktopUpdateManager', () => {
       prepareQuitForUpdate,
     })
 
+    await manager.checkForUpdates({ quiet: true })
     await manager.applyUpdate()
 
-    expect(prepareQuitForUpdate).toHaveBeenCalled()
-    expect(sparkleMocks.state.instances[0].installUpdateNow).toHaveBeenCalled()
+    expect(prepareQuitForUpdate).not.toHaveBeenCalled()
+    expect(manager.status.errorMessage).toContain('Sparkle manages installation')
   })
 
   it('does not open Sparkle UI during quiet background checks', async () => {
-    sparkleMocks.state.updateInfo = {
-      version: '1.2.3',
-      releaseName: null,
-      releaseNotes: null,
-      releaseDate: null,
-      files: [],
-    }
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
       updateFeedUrl: 'https://updates.example.com/cradle/appcast.xml',
@@ -199,7 +176,7 @@ describe('desktopUpdateManager', () => {
 
     await manager.checkForUpdates({ quiet: true })
     expect(sparkleMocks.state.instances[0].checkForUpdatesWithUI).not.toHaveBeenCalled()
-    expect(manager.status.updateInfo?.version).toBe('1.2.3')
+    expect(manager.status.updateInfo).toBeNull()
   })
 
   it('marks Sparkle as unsupported when the bridge fails to initialize', async () => {
@@ -253,7 +230,7 @@ describe('desktopUpdateManager', () => {
     const prepareQuitForUpdate = vi.fn(async () => undefined)
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
-      updateFeedUrl: 'https://github.com/wibus-wee/cradle-app/releases/download/feed-dev/manifest.json',
+      updateFeedUrl: 'https://github.com/wibus-wee/cradle-app/releases/download/feed-dev/',
       prepareQuitForUpdate,
     })
 
@@ -273,7 +250,7 @@ describe('desktopUpdateManager', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' })
     const { DesktopUpdateManager } = await import('./update-manager')
     const manager = new DesktopUpdateManager({
-      updateFeedUrl: 'https://updates.example.com/manifest.json',
+      updateFeedUrl: 'https://updates.example.com/',
     })
     await manager.applyUpdate()
     expect(manager.status.errorMessage).toBe('No prepared desktop update is available')

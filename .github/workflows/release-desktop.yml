@@ -625,7 +625,6 @@ jobs:
           RELEASE_CHANNEL: ${{ needs.resolve.outputs.channel }}
           DESKTOP_VERSION: ${{ needs.resolve.outputs.desktop_version }}
           DISPLAY_VERSION: ${{ needs.resolve.outputs.display_version }}
-          UPDATE_MANIFEST_URL: ${{ needs.resolve.outputs.update_url }}
           RELEASE_DOWNLOAD_URL: ${{ needs.resolve.outputs.release_download_url }}
         run: |
           set -euo pipefail
@@ -655,7 +654,6 @@ jobs:
           const releaseChannel = process.env.RELEASE_CHANNEL
           const desktopVersion = process.env.DESKTOP_VERSION
           const displayVersion = process.env.DISPLAY_VERSION
-          const updateManifestUrl = process.env.UPDATE_MANIFEST_URL
           const releaseDownloadUrl = process.env.RELEASE_DOWNLOAD_URL
 
           function readChangelog(locale) {
@@ -680,14 +678,6 @@ jobs:
             } catch {
               return null
             }
-          }
-
-          function readChangelogBody() {
-            for (const locale of ['zh', 'en']) {
-              const ch = readChangelog(locale)
-              if (ch && ch.body) return ch.body
-            }
-            return null
           }
 
           function generateReleaseBody() {
@@ -803,77 +793,6 @@ jobs:
             fs.writeFileSync(file, `${lines.join('\n')}\n`, 'utf8')
           }
 
-          function dirnameUrl(url) {
-            return url.slice(0, url.lastIndexOf('/') + 1)
-          }
-
-          function readArtifactArch(fileName) {
-            if (fileName.includes('arm64')) {
-              return 'arm64'
-            }
-            if (fileName.includes('x64')) {
-              return 'x64'
-            }
-            if (fileName.includes('universal')) {
-              return 'universal'
-            }
-            return null
-          }
-
-          function writeLegacyCradleUpdateManifest() {
-            // Optional dual-publish for already-shipped custom macOS clients during transition.
-            // New macOS clients consume appcast.xml generated on the macOS build runner.
-            if (!desktopVersion) {
-              throw new Error('DESKTOP_VERSION is required')
-            }
-
-            const rawAssetBaseUrl = (releaseChannel === 'dev' || releaseChannel === 'bleeding-edge')
-              ? releaseDownloadUrl
-              : (updateManifestUrl || releaseDownloadUrl)
-            const assetBaseUrl = rawAssetBaseUrl.endsWith('/') ? rawAssetBaseUrl : `${rawAssetBaseUrl}/`
-            const updateFiles = []
-            for (const artifactName of fs.readdirSync(outputRoot).filter(entry => (
-              (entry.startsWith('Cradle-mac-') || entry.includes('-mac-'))
-              && entry.endsWith('.zip')
-              && !entry.includes('.delta')
-            )).sort()) {
-              const artifactPath = path.join(outputRoot, artifactName)
-              if (!fs.existsSync(artifactPath)) {
-                continue
-              }
-
-              const artifactBytes = fs.readFileSync(artifactPath)
-              updateFiles.push({
-                url: `${assetBaseUrl}${artifactName}`,
-                size: fs.statSync(artifactPath).size,
-                sha256: crypto.createHash('sha256').update(artifactBytes).digest('hex'),
-                platform: 'darwin',
-                arch: readArtifactArch(artifactName),
-              })
-            }
-
-            if (updateFiles.length === 0) {
-              console.warn('Skipping legacy Cradle manifest.json: no macOS zip artifacts found')
-              return
-            }
-
-            const updateManifest = {
-              version: desktopVersion,
-              releaseName: `Cradle ${desktopVersion}`,
-              releaseNotes: readChangelogBody() || (releaseChannel === 'bleeding-edge' && fs.existsSync('release-body.md') ? fs.readFileSync('release-body.md', 'utf8').trim() : null),
-              releaseDate: new Date().toISOString(),
-              minSupportedVersion: null,
-              files: updateFiles,
-            }
-
-            fs.writeFileSync(
-              path.join(outputRoot, 'manifest.json'),
-              `${JSON.stringify(updateManifest, null, 2)}\n`,
-              'utf8',
-            )
-            console.log('Wrote legacy manifest.json for transitional macOS clients')
-          }
-
           function assertSparkleAppcastPresent() {
             const appcastPath = path.join(outputRoot, 'appcast.xml')
             if (!fs.existsSync(appcastPath)) {
@@ -910,7 +829,6 @@ jobs:
             )
           }
 
-          writeLegacyCradleUpdateManifest()
           assertSparkleAppcastPresent()
 
           function writeLatestYml() {
@@ -953,9 +871,6 @@ jobs:
             mkdir -p feed-assets
             if [ -f release-assets/appcast.xml ]; then
               cp release-assets/appcast.xml feed-assets/
-            fi
-            if [ -f release-assets/manifest.json ]; then
-              cp release-assets/manifest.json feed-assets/
             fi
             if [ -f release-assets/latest.yml ]; then
               cp release-assets/latest.yml feed-assets/

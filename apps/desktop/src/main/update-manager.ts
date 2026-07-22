@@ -10,8 +10,6 @@ import {
   resolveElectronUpdaterFeedUrl,
 } from './update-feed'
 import type {
-  DesktopUpdateCandidate,
-  DesktopUpdateInfo,
   DesktopUpdatePreferences,
   DesktopUpdateStatus,
 } from './update-types'
@@ -39,7 +37,6 @@ export type DesktopUpdateManagerOptions = {
   updateFeedUrl?: string | null
   preferences?: Partial<DesktopUpdatePreferences>
   prepareQuitForUpdate?: () => void | Promise<void>
-  requestQuitForUpdate?: () => void | Promise<void>
   downloadCenter?: Pick<DesktopDownloadCenterService, 'execute' | 'release'>
   sparkleAdapter?: MacOSSparkleUpdateAdapter
   windowsUpdater?: WindowsDesktopUpdateAdapter
@@ -75,7 +72,6 @@ async function retryWithBackoff<T>(
 export class DesktopUpdateManager {
   private readonly events = new EventEmitter()
   private readonly prepareQuitForUpdate: (() => void | Promise<void>) | null
-  private readonly requestQuitForUpdate: (() => void | Promise<void>) | null
   private readonly sparkleAdapter: MacOSSparkleUpdateAdapter | null
   private readonly windowsUpdater: WindowsDesktopUpdateAdapter | null
   private preferences: DesktopUpdatePreferences
@@ -93,12 +89,10 @@ export class DesktopUpdateManager {
     const updatePlatform = unsupportedReason ? null : readUpdatePlatform()
 
     this.prepareQuitForUpdate = options.prepareQuitForUpdate ?? null
-    this.requestQuitForUpdate = options.requestQuitForUpdate ?? null
     this.downloadCenter = options.downloadCenter ?? null
     this.sparkleAdapter = updatePlatform === 'darwin'
       ? (options.sparkleAdapter ?? new MacOSSparkleUpdateAdapter({
           updateFeedUrl,
-          currentVersion,
         }))
       : null
     this.windowsUpdater = updatePlatform === 'win32'
@@ -261,19 +255,7 @@ export class DesktopUpdateManager {
     }
 
     if (this.sparkleAdapter) {
-      // Sparkle owns download after checkForUpdates(). Keep the IPC method so the
-      // Settings UI contract stays stable, but surface that no separate download
-      // step is needed on macOS.
-      if (this.statusSnapshot.updateInfo) {
-        this.setStatus({
-          errorMessage: null,
-        })
-      }
-      else {
-        this.setStatus({
-          errorMessage: 'On macOS, use Check for Updates. Sparkle downloads inside its update UI.',
-        })
-      }
+      this.setStatus({ errorMessage: 'Sparkle manages download and installation in its native update window' })
       return this.statusSnapshot
     }
 
@@ -286,34 +268,11 @@ export class DesktopUpdateManager {
       return
     }
 
-    if (!this.sparkleAdapter) {
-      this.setStatus({
-        errorMessage: 'No prepared desktop update is available',
-      })
-      return
-    }
-
-    try {
-      await this.ensureSparkleReady()
-      if (!this.sparkleAdapter.isReady) {
-        throw new Error(this.sparkleAdapter.lastInitError ?? 'Sparkle bridge is not ready')
-      }
-
-      // Stop the desktop-owned server runtime before Sparkle replaces the bundle.
-      if (this.prepareQuitForUpdate) {
-        await this.prepareQuitForUpdate()
-      }
-      else if (this.requestQuitForUpdate) {
-        await this.requestQuitForUpdate()
-      }
-
-      this.sparkleAdapter.installUpdateNow()
-    }
-    catch (error) {
-      this.setStatus({
-        errorMessage: readErrorMessage(error),
-      })
-    }
+    this.setStatus({
+      errorMessage: this.sparkleAdapter
+        ? 'Sparkle manages installation in its native update window'
+        : 'No prepared desktop update is available',
+    })
   }
 
   private async initializeSparkle(): Promise<void> {
@@ -355,27 +314,15 @@ export class DesktopUpdateManager {
         throw new Error(this.sparkleAdapter!.lastInitError ?? 'Sparkle bridge is not ready')
       }
 
-      // Best-effort metadata for Settings before opening Sparkle UI.
-      let updateInfo: DesktopUpdateInfo | null = null
-      try {
-        updateInfo = await retryWithBackoff(() => this.sparkleAdapter!.probeForUpdate())
-      }
-      catch (probeError) {
-        if (!options.quiet) {
-          this.logSparkleProbeFailure(probeError)
-        }
-      }
-
-      // Manual checks always open Sparkle UI; quiet background probes only refresh status.
+      // Manual checks open Sparkle's canonical UI. Scheduled checks are owned by
+      // Sparkle through setAutomaticChecks and never mirrored into Cradle state.
       if (!options.quiet) {
         this.sparkleAdapter!.checkForUpdatesWithUI()
       }
 
       this.setStatus({
         isCheckingForUpdates: false,
-        updateInfo,
-        // Sparkle may already have a downloaded package; the bridge cannot report it.
-        // Keep false so Restart remains an explicit installUpdateNow action.
+        updateInfo: null,
         updateDownloaded: false,
       })
     }
@@ -389,10 +336,6 @@ export class DesktopUpdateManager {
     }
 
     return this.statusSnapshot
-  }
-
-  private logSparkleProbeFailure(error: unknown): void {
-    console.warn(`[desktop-update] Sparkle appcast probe failed: ${readErrorMessage(error)}`)
   }
 
   private setStatus(patch: Partial<DesktopUpdateStatus>): void {
@@ -513,7 +456,4 @@ function readUpdatePlatform(): 'darwin' | 'win32' | null {
   return null
 }
 
-// Re-export feed helper for packaging scripts and tests that previously imported
-// resolve logic for packaging scripts and tests.
 export { readUpdateFeedUrl, resolveElectronUpdaterFeedUrl }
-export type { DesktopUpdateCandidate }
