@@ -22,6 +22,7 @@ export interface CaptureCodexCliSessionInput {
   workspacePath: string
   startedAt: number
   codexSessionsRoot?: string
+  env?: Record<string, string>
   now?: () => number
 }
 
@@ -58,14 +59,15 @@ const CodexSessionMetaLineJsonSchema = z.string()
 const CaptureCodexCliSessionInputSchema = z.object({
   workspacePath: z.string(),
   startedAt: z.number().finite(),
-  codexSessionsRoot: z.string().default(defaultCodexSessionsRoot),
+  codexSessionsRoot: z.string().optional(),
+  env: z.record(z.string(), z.string()).optional(),
   now: z.custom<() => number>().default(() => Date.now),
 })
 
 export async function captureCodexCliSession(rawInput: CaptureCodexCliSessionInput): Promise<CodexCliSessionBinding | null> {
   const input = CaptureCodexCliSessionInputSchema.parse(rawInput)
   const files = await listRecentSessionFiles({
-    root: input.codexSessionsRoot,
+    root: input.codexSessionsRoot ?? defaultCodexSessionsRoot(input.env),
     startedAt: input.startedAt,
   })
 
@@ -105,8 +107,8 @@ export async function captureCodexCliSession(rawInput: CaptureCodexCliSessionInp
   }
 }
 
-function defaultCodexSessionsRoot(): string {
-  return join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions')
+function defaultCodexSessionsRoot(env: Record<string, string> | undefined): string {
+  return join(env?.CODEX_HOME ?? process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions')
 }
 
 async function listRecentSessionFiles(input: {

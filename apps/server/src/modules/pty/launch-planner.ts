@@ -10,6 +10,7 @@ export type CliTuiLaunchMode = 'live-attach' | 'resume' | 'fresh'
 export type CliTuiAgent
   = | 'claude'
     | 'codex'
+    | 'kimi'
     | 'opencode'
     | 'cursor'
     | 'gemini'
@@ -43,7 +44,7 @@ export interface CliTuiLaunchPlan {
   env?: Record<string, string>
   agent: CliTuiAgent
   needsCapture: boolean
-  captureDriver?: 'codex-filesystem'
+  captureDriver?: 'codex-filesystem' | 'kimi-filesystem'
   dedupeKey?: string
 }
 
@@ -71,6 +72,7 @@ const CODEX_VALUE_OPTIONS = new Set([
 const OFFICIAL_SOURCES = new Set([
   'cradle:claude',
   'cradle:codex',
+  'cradle:kimi',
   'cradle:opencode',
   'cradle:cursor',
   'cradle:gemini',
@@ -118,6 +120,9 @@ export function detectAgent(executable: string): CliTuiAgent {
   if (command === 'codex' || command.startsWith('codex-')) {
     return 'codex'
   }
+  if (command === 'kimi' || command.startsWith('kimi-')) {
+    return 'kimi'
+  }
   if (command === 'opencode' || command.startsWith('opencode-')) {
     return 'opencode'
   }
@@ -159,6 +164,9 @@ export function resolveProviderSessionBinding(input: {
 }): ProviderSessionBinding | null {
   if (input.providerSession) {
     if (input.providerSession.workspacePath !== input.workspacePath) {
+      return null
+    }
+    if (!isOfficialProviderSource(input.providerSession.source, input.providerSession.agent)) {
       return null
     }
     if (input.expectedAgent && input.expectedAgent !== 'generic' && input.providerSession.agent !== input.expectedAgent) {
@@ -218,14 +226,35 @@ export function hasCodexPositionalArg(args: string[]): boolean {
   return false
 }
 
+export function hasCodexResumeArg(args: string[]): boolean {
+  return args.some(arg => arg === 'resume' || arg === '--resume' || arg.startsWith('--resume='))
+}
+
+export function hasKimiResumeArg(args: string[]): boolean {
+  return args.some(arg => (
+    arg === '-S'
+    || arg === '-r'
+    || arg === '--session'
+    || arg.startsWith('--session=')
+    || arg === '--resume'
+    || arg.startsWith('--resume=')
+    || arg === '--continue'
+  ))
+}
+
 export function buildProviderResumeArgs(agent: CliTuiAgent, binding: ProviderSessionBinding): string[] | null {
   if (binding.agent !== agent && !(agent === 'cursor' && binding.agent === 'cursor')) {
+    return null
+  }
+  if (binding.value.startsWith('-') || binding.value.split('').some(char => char.charCodeAt(0) < 32)) {
     return null
   }
 
   switch (agent) {
     case 'codex':
       return binding.kind === 'id' ? ['resume', binding.value] : null
+    case 'kimi':
+      return binding.kind === 'id' ? ['--session', binding.value] : null
     case 'opencode':
     case 'kilo':
       return ['--session', binding.value]
@@ -293,16 +322,18 @@ function planCodexLaunch(
   baseArgs: string[],
 ): CliTuiLaunchPlan {
   const args = [...baseArgs]
-  const autoResumeAllowed = !hasCodexPositionalArg(args)
+  const autoResumeAllowed = !hasCodexPositionalArg(args) && !hasCodexResumeArg(args)
   const binding = resolveProviderSessionBinding({
     providerSession: input.providerSession,
     codexCliSession: input.codexCliSession,
     workspacePath: input.workspacePath,
     expectedAgent: 'codex',
   })
+
   const canResume = autoResumeAllowed
     && binding?.agent === 'codex'
     && binding.kind === 'id'
+    && Boolean(binding && buildProviderResumeArgs('codex', binding))
 
   if (canResume && binding) {
     args.push(...(buildProviderResumeArgs('codex', binding) ?? []))
@@ -339,8 +370,9 @@ function planBoundProviderResume(
     workspacePath: input.workspacePath,
     expectedAgent: agent,
   })
+  const explicitResume = agent === 'kimi' && hasKimiResumeArg(baseArgs)
 
-  if (binding && agent !== 'generic') {
+  if (binding && agent !== 'generic' && !explicitResume) {
     const resumeArgs = buildProviderResumeArgs(agent, binding)
     if (resumeArgs) {
       return {
@@ -361,7 +393,8 @@ function planBoundProviderResume(
     args: baseArgs,
     env: input.env,
     agent,
-    needsCapture: false,
+    needsCapture: agent === 'kimi' && !explicitResume,
+    captureDriver: agent === 'kimi' && !explicitResume ? 'kimi-filesystem' : undefined,
   }
 }
 

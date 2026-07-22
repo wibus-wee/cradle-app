@@ -2,10 +2,9 @@ import { sessions, worktrees } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
-import type { CodexCliSessionBinding, ProviderSessionBinding } from '../../helpers/agent-runtime-config'
+import type { ProviderSessionBinding } from '../../helpers/agent-runtime-config'
 import {
   SessionRuntimeConfigJsonSchema,
-  writeCodexCliSessionBindingToSessionConfig,
   writeProviderSessionBindingToSessionConfig,
 } from '../../helpers/agent-runtime-config'
 import { db } from '../../infra'
@@ -27,6 +26,7 @@ import {
   terminalHistoryEnabled,
   writeTerminalHistory,
 } from './history'
+import { captureKimiCliSession } from './kimi-session-capture'
 import type { CliTuiLaunchMode } from './launch-planner'
 import { isOfficialProviderSource, planCliTuiLaunch } from './launch-planner'
 import type { PtyClientEvent, PtyRestoreInfo } from './protocol'
@@ -37,7 +37,7 @@ import { PtySocketHub } from './pty.socket'
 import { ptyTimeline } from './pty.timeline'
 import { getDefaultShell } from './pty-platform'
 
-const codexCaptureTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const providerCaptureTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellLeaseTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellSocketCounts = new Map<string, number>()
 const pendingTitleOscBuffers = new Map<string, string>()
@@ -114,7 +114,7 @@ function detachShellSocket(ptyId: string): void {
 }
 
 SessionService.onSessionCleanup((sessionId) => {
-  cancelCodexSessionCapture(sessionId)
+  cancelProviderSessionCapture(sessionId)
   persistTimelineHistory(sessionId)
   deleteTerminalHistory(sessionId)
   ptyRuntime.destroy(sessionId)
@@ -307,11 +307,14 @@ export function startOrAttach(input: { sessionId: string, cols: number, rows: nu
       .run()
   }
 
-  if (plan.needsCapture && plan.captureDriver === 'codex-filesystem') {
-    scheduleCodexSessionCapture({
+  if (plan.needsCapture && plan.captureDriver) {
+    scheduleProviderSessionCapture({
       sessionId: input.sessionId,
       workspacePath: context.workspacePath,
       startedAt,
+      agent: plan.agent,
+      captureDriver: plan.captureDriver,
+      env: plan.env,
     })
   }
 
@@ -387,7 +390,7 @@ export function closeSocket(ws: PtyLiveSocket): void {
 
 export function stop(sessionId: string): void {
   requireSession(sessionId)
-  cancelCodexSessionCapture(sessionId)
+  cancelProviderSessionCapture(sessionId)
   persistTimelineHistory(sessionId)
   ptyRuntime.destroy(sessionId)
 }
@@ -594,7 +597,7 @@ export function shellStop(ptyId: string): void {
 }
 
 export function destroyPtySession(sessionId: string): void {
-  cancelCodexSessionCapture(sessionId)
+  cancelProviderSessionCapture(sessionId)
   persistTimelineHistory(sessionId)
   ptyRuntime.destroy(sessionId)
 }
@@ -607,10 +610,10 @@ function persistTimelineHistory(sessionId: string): void {
 }
 
 export function shutdownPtyModule(): void {
-  for (const timer of codexCaptureTimers.values()) {
+  for (const timer of providerCaptureTimers.values()) {
     clearTimeout(timer)
   }
-  codexCaptureTimers.clear()
+  providerCaptureTimers.clear()
   for (const timer of shellLeaseTimers.values()) {
     clearTimeout(timer)
   }
@@ -665,24 +668,47 @@ export async function listResources() {
   }
 }
 
-function scheduleCodexSessionCapture(input: {
+function scheduleProviderSessionCapture(input: {
   sessionId: string
   workspacePath: string
   startedAt: number
+  agent: string
+  captureDriver: 'codex-filesystem' | 'kimi-filesystem'
+  env?: Record<string, string>
 }): void {
-  cancelCodexSessionCapture(input.sessionId)
+  cancelProviderSessionCapture(input.sessionId)
   let attempts = 0
 
   const runCapture = async () => {
     attempts += 1
     try {
-      const binding = await captureCodexCliSession({
-        workspacePath: input.workspacePath,
-        startedAt: input.startedAt,
-      })
+      const captured = input.captureDriver === 'codex-filesystem'
+        ? await captureCodexCliSession({
+            workspacePath: input.workspacePath,
+            startedAt: input.startedAt,
+            env: input.env,
+          })
+        : await captureKimiCliSession({
+            workspacePath: input.workspacePath,
+            startedAt: input.startedAt,
+            env: input.env,
+          })
+      const binding = captured
+        ? {
+            source: `cradle:${input.agent}`,
+            agent: input.agent,
+            kind: 'id' as const,
+            value: captured.sessionId,
+            workspacePath: captured.workspacePath,
+            capturedAt: captured.capturedAt,
+            startedAt: captured.startedAt,
+            sourcePath: captured.sourcePath,
+            confidence: 'exact' as const,
+          } satisfies ProviderSessionBinding
+        : null
       if (binding) {
-        persistCodexSessionBinding(input.sessionId, binding)
-        codexCaptureTimers.delete(input.sessionId)
+        persistProviderSessionBinding(input.sessionId, binding)
+        providerCaptureTimers.delete(input.sessionId)
         return
       }
     }
@@ -690,28 +716,28 @@ function scheduleCodexSessionCapture(input: {
       // Capture is opportunistic; a failed scan should not break the PTY session.
     }
 
-    if (attempts >= CODEX_CAPTURE_ATTEMPTS || !ptyRuntime.hasSession(input.sessionId)) {
-      codexCaptureTimers.delete(input.sessionId)
+    if (attempts >= CODEX_CAPTURE_ATTEMPTS) {
+      providerCaptureTimers.delete(input.sessionId)
       return
     }
 
     const timer = setTimeout(() => {
       void runCapture()
     }, CODEX_CAPTURE_RETRY_MS)
-    codexCaptureTimers.set(input.sessionId, timer)
+    providerCaptureTimers.set(input.sessionId, timer)
   }
 
   void runCapture()
 }
 
-function cancelCodexSessionCapture(sessionId: string): void {
-  const timer = codexCaptureTimers.get(sessionId)
+function cancelProviderSessionCapture(sessionId: string): void {
+  const timer = providerCaptureTimers.get(sessionId)
   if (!timer) {
     return
   }
 
   clearTimeout(timer)
-  codexCaptureTimers.delete(sessionId)
+  providerCaptureTimers.delete(sessionId)
 }
 
 function publishCliTuiTitle(sessionId: string, role: PtyRuntimeRole, data: string): void {
@@ -774,23 +800,23 @@ function getPendingOscSuffix(data: string): string {
   return suffix.slice(-MAX_OSC_LOOKBEHIND_CHARS)
 }
 
-function persistCodexSessionBinding(
+function persistProviderSessionBinding(
   sessionId: string,
-  binding: CodexCliSessionBinding,
+  binding: ProviderSessionBinding,
 ): void {
   const session = getSession(sessionId)
   if (!session) {
     return
   }
-  const existing = SessionRuntimeConfigJsonSchema.parse(session.configJson).codexCliSession
-  if (existing?.workspacePath === binding.workspacePath) {
+  const existing = SessionRuntimeConfigJsonSchema.parse(session.configJson).providerSession
+  if (existing?.agent === binding.agent && existing.value === binding.value && existing.workspacePath === binding.workspacePath) {
     return
   }
 
   db()
     .update(sessions)
     .set({
-      configJson: writeCodexCliSessionBindingToSessionConfig({
+      configJson: writeProviderSessionBindingToSessionConfig({
         configJson: session.configJson,
         binding,
       }),

@@ -153,6 +153,124 @@ describe('planCliTuiLaunch', () => {
     expect(plan.args).toEqual(['exec', 'do something'])
     expect(plan.needsCapture).toBe(false)
   })
+
+  it('does not duplicate an explicit Codex resume selector', () => {
+    const plan = planCliTuiLaunch({
+      sessionId: SESSION_ID,
+      executable: 'codex',
+      args: [`--resume=${CODEX_SESSION_ID}`],
+      running: false,
+      ptyStartedAt: 1_700_000_000,
+      workspacePath: WORKSPACE,
+      providerSession: {
+        source: 'cradle:codex',
+        agent: 'codex',
+        kind: 'id',
+        value: CODEX_SESSION_ID,
+        workspacePath: WORKSPACE,
+        capturedAt: 1_700_000_100,
+        startedAt: 1_700_000_000,
+        confidence: 'exact',
+      },
+    })
+
+    expect(plan.mode).toBe('fresh')
+    expect(plan.args).toEqual([`--resume=${CODEX_SESSION_ID}`])
+    expect(plan.needsCapture).toBe(false)
+  })
+
+  it('does not claim resume for an unsafe stored provider value', () => {
+    const plan = planCliTuiLaunch({
+      sessionId: SESSION_ID,
+      executable: 'codex',
+      args: [],
+      running: false,
+      ptyStartedAt: 1_700_000_000,
+      workspacePath: WORKSPACE,
+      providerSession: {
+        source: 'cradle:codex',
+        agent: 'codex',
+        kind: 'id',
+        value: '--help',
+        workspacePath: WORKSPACE,
+        capturedAt: 1_700_000_100,
+        startedAt: 1_700_000_000,
+        confidence: 'exact',
+      },
+    })
+
+    expect(plan.mode).toBe('fresh')
+    expect(plan.needsCapture).toBe(true)
+  })
+
+  it('captures a fresh Kimi session and resumes it with --session', () => {
+    const fresh = planCliTuiLaunch({
+      sessionId: SESSION_ID,
+      executable: 'kimi',
+      args: ['--model', 'kimi-k2'],
+      running: false,
+      ptyStartedAt: null,
+      workspacePath: WORKSPACE,
+    })
+    expect(fresh).toMatchObject({
+      mode: 'fresh',
+      agent: 'kimi',
+      needsCapture: true,
+      captureDriver: 'kimi-filesystem',
+    })
+
+    const resume = planCliTuiLaunch({
+      sessionId: SESSION_ID,
+      executable: 'kimi',
+      args: ['--model', 'kimi-k2'],
+      running: false,
+      ptyStartedAt: 1_700_000_000,
+      workspacePath: WORKSPACE,
+      providerSession: {
+        source: 'cradle:kimi',
+        agent: 'kimi',
+        kind: 'id',
+        value: 'session_8823d99b-b299-4e12-a7b7-9af282e37cd0',
+        workspacePath: WORKSPACE,
+        capturedAt: 1_700_000_100,
+        startedAt: 1_700_000_000,
+        confidence: 'exact',
+      },
+    })
+    expect(resume.mode).toBe('resume')
+    expect(resume.args).toEqual([
+      '--model',
+      'kimi-k2',
+      '--session',
+      'session_8823d99b-b299-4e12-a7b7-9af282e37cd0',
+    ])
+    expect(resume.needsCapture).toBe(false)
+  })
+
+  it('does not append Kimi resume args when the launch already selects a session', () => {
+    const plan = planCliTuiLaunch({
+      sessionId: SESSION_ID,
+      executable: 'kimi',
+      args: ['--continue'],
+      running: false,
+      ptyStartedAt: 1_700_000_000,
+      workspacePath: WORKSPACE,
+      providerSession: {
+        source: 'cradle:kimi',
+        agent: 'kimi',
+        kind: 'id',
+        value: 'session_existing',
+        workspacePath: WORKSPACE,
+        capturedAt: 1_700_000_100,
+        startedAt: 1_700_000_000,
+        confidence: 'exact',
+      },
+    })
+
+    expect(plan.mode).toBe('fresh')
+    expect(plan.args).toEqual(['--continue'])
+    expect(plan.needsCapture).toBe(false)
+  })
 })
 
 describe('resolveProviderSessionBinding', () => {
