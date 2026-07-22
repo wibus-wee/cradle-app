@@ -10,6 +10,7 @@ import { insertMessageFixtures } from '../../../tests/helpers/message-fixture'
 import { workspaceFixture } from '../../../tests/helpers/workspace-fixture'
 import { createServerApp } from '../../app'
 import { db, shutdownInfra } from '../../infra'
+import { forget, listAttunements, remember } from './attune-service'
 import { executeRecallQuery } from './evaluator'
 import { search } from './query-service'
 import { projectRecallMessage } from './service'
@@ -168,5 +169,40 @@ describe('recall query', () => {
         expect.objectContaining({ id: messageOneId }),
       ],
     })
+  })
+
+  it('requires evidence anchors and archives attunements without deleting them', async () => {
+    process.env.CRADLE_DATA_DIR = tempDirectory('cradle-recall-data-', dataDirs)
+    await createServerApp()
+    const d = db()
+    const workspaceId = randomUUID()
+    const sessionId = randomUUID()
+    d.insert(workspaces)
+      .values(
+        workspaceFixture({
+          id: workspaceId,
+          name: 'Attune Workspace',
+          path: tempDirectory('cradle-attune-', workspaceRoots),
+        }),
+      )
+      .run()
+    d.insert(sessions).values({ id: sessionId, workspaceId, title: 'Attune Session' }).run()
+    const context = { chatSessionId: sessionId, workspaceId, workId: null }
+
+    expect(() => remember({ context, content: 'No anchor', evidenceIds: [] })).toThrow(
+      'evidence ID',
+    )
+    const record = remember({
+      context,
+      content: 'Deployment uses bounded recall.',
+      evidenceIds: ['message-1'],
+    })
+    expect(listAttunements(context)).toEqual([
+      expect.objectContaining({ id: record.id, status: 'active' }),
+    ])
+    expect(forget({ context, id: record.id })).toEqual(
+      expect.objectContaining({ id: record.id, status: 'archived' }),
+    )
+    expect(listAttunements(context)).toEqual([])
   })
 })
