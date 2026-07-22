@@ -39,7 +39,23 @@ type Envelope struct {
 	Payload  []byte
 }
 
+// ParseEnvelope decodes a v2 envelope and returns an owned payload copy. Use
+// ParseEnvelopeView when the caller owns data for the returned envelope's full
+// lifetime and only needs to inspect its routing metadata.
 func ParseEnvelope(data []byte, maxBytes int64) (Envelope, error) {
+	env, err := ParseEnvelopeView(data, maxBytes)
+	if err != nil {
+		return Envelope{}, err
+	}
+	env.Payload = append([]byte(nil), env.Payload...)
+	return env, nil
+}
+
+// ParseEnvelopeView decodes and validates a v2 envelope without copying its
+// opaque payload. The returned payload aliases data, so callers must retain
+// data unchanged for as long as they retain the Envelope. relayd uses this to
+// validate one WebSocket message and forward that exact message to the peer.
+func ParseEnvelopeView(data []byte, maxBytes int64) (Envelope, error) {
 	if maxBytes > 0 && int64(len(data)) > maxBytes {
 		return Envelope{}, ErrFrameTooLarge
 	}
@@ -82,7 +98,7 @@ func ParseEnvelope(data []byte, maxBytes int64) (Envelope, error) {
 		env.StreamID = string(data[offset : offset+streamLen])
 		offset += streamLen
 	}
-	env.Payload = append([]byte(nil), data[offset:]...)
+	env.Payload = data[offset:]
 	if err := env.Validate(maxBytes); err != nil {
 		return Envelope{}, err
 	}

@@ -99,6 +99,48 @@ func TestHubRenewRoomExtendsExpiry(t *testing.T) {
 	}
 }
 
+func TestHubForwardQueuesOriginalValidatedFrame(t *testing.T) {
+	now := time.Unix(1000, 0)
+	hub := newTestHub(func() time.Time { return now })
+	frame, err := EncodeEnvelope(Envelope{
+		Version:  ProtocolVersion,
+		RoomID:   "room_forward",
+		Seq:      7,
+		Kind:     KindRelayDataFrame,
+		Priority: PriorityData,
+		StreamID: "stream_1",
+		Payload:  []byte("opaque ciphertext"),
+	}, hub.cfg.MaxFrameBytes)
+	if err != nil {
+		t.Fatalf("EncodeEnvelope() error = %v", err)
+	}
+	env, err := ParseEnvelopeView(frame, hub.cfg.MaxFrameBytes)
+	if err != nil {
+		t.Fatalf("ParseEnvelopeView() error = %v", err)
+	}
+	from := &connState{role: RoleHost, roomID: env.RoomID, cfg: hub.cfg}
+	peer := &connState{
+		role:      RoleController,
+		roomID:    env.RoomID,
+		scheduler: newPeerScheduler(hub.cfg.MaxQueuedEnvelopes, hub.cfg.MaxQueuedBytes, hub.cfg.MaxFrameBytes),
+	}
+	hub.rooms[env.RoomID] = &room{id: env.RoomID, host: from, controller: peer}
+
+	if err := hub.forward(from, frame, env); err != nil {
+		t.Fatalf("forward() error = %v", err)
+	}
+	item, err := peer.scheduler.next(t.Context())
+	if err != nil {
+		t.Fatalf("scheduler.next() error = %v", err)
+	}
+	if string(item.data) != string(frame) {
+		t.Fatalf("forwarded bytes differ from original frame")
+	}
+	if &item.data[0] != &frame[0] {
+		t.Fatal("forwarded frame does not retain the original byte slice")
+	}
+}
+
 func TestHubCreateRoomIdempotentRenews(t *testing.T) {
 	now := time.Unix(1000, 0)
 	hub := newTestHub(func() time.Time { return now })

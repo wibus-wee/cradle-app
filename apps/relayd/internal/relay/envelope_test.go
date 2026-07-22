@@ -27,6 +27,37 @@ func TestParseEnvelope(t *testing.T) {
 	}
 }
 
+func TestParseEnvelopeViewAliasesPayloadWhileParseEnvelopeOwnsCopy(t *testing.T) {
+	data, err := EncodeEnvelope(Envelope{
+		Version:  ProtocolVersion,
+		RoomID:   "room_1",
+		Seq:      1,
+		Kind:     KindRelayDataFrame,
+		Priority: PriorityControl,
+		Payload:  []byte("hello"),
+	}, 1024)
+	if err != nil {
+		t.Fatalf("EncodeEnvelope() error = %v", err)
+	}
+
+	view, err := ParseEnvelopeView(data, 1024)
+	if err != nil {
+		t.Fatalf("ParseEnvelopeView() error = %v", err)
+	}
+	owned, err := ParseEnvelope(data, 1024)
+	if err != nil {
+		t.Fatalf("ParseEnvelope() error = %v", err)
+	}
+
+	data[len(data)-1] = 'X'
+	if got := string(view.Payload); got != "hellX" {
+		t.Fatalf("view payload = %q, expected alias to mutated input", got)
+	}
+	if got := string(owned.Payload); got != "hello" {
+		t.Fatalf("owned payload = %q, expected detached copy", got)
+	}
+}
+
 func TestParseEnvelopeRejectsInvalidVersion(t *testing.T) {
 	data, err := EncodeEnvelope(Envelope{
 		Version:  99,

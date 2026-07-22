@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build:desktop-resource": "node scripts/build-desktop-resource.mjs",
+    "benchmark:forward": "go test -run '^$' -bench BenchmarkRelayForwardPath -benchmem ./internal/relay",
     "test": "go test ./..."
   }
 }

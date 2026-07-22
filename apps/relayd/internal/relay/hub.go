@@ -403,13 +403,9 @@ func (h *Hub) unregister(state *connState) {
 	}
 }
 
-func (h *Hub) forward(from *connState, env Envelope) error {
+func (h *Hub) forward(from *connState, data []byte, env Envelope) error {
 	if env.RoomID != from.roomID {
 		return fmt.Errorf("%w: room mismatch", ErrInvalidEnvelope)
-	}
-	encoded, err := EncodeEnvelope(env, from.cfg.MaxFrameBytes)
-	if err != nil {
-		return err
 	}
 
 	h.mu.Lock()
@@ -427,7 +423,11 @@ func (h *Hub) forward(from *connState, env Envelope) error {
 	if peer == nil {
 		return ErrPeerNotConnected
 	}
-	if err := peer.enqueue(encoded, env.Priority, env.StreamID); err != nil {
+	// data is the completed WebSocket message returned by Conn.Read. It has
+	// already passed the same V2 validation as env and is not mutated, so queue
+	// the original bytes instead of copying the opaque payload and re-encoding
+	// an equivalent envelope.
+	if err := peer.enqueue(data, env.Priority, env.StreamID); err != nil {
 		if h.cfg.Metrics != nil && errors.Is(err, ErrSlowConsumer) {
 			h.cfg.Metrics.SlowConsumerCloses.Add(1)
 		}
@@ -436,7 +436,7 @@ func (h *Hub) forward(from *connState, env Envelope) error {
 	}
 	if h.cfg.Metrics != nil {
 		h.cfg.Metrics.ForwardedEnvelopes.Add(1)
-		h.cfg.Metrics.ForwardedBytes.Add(int64(len(encoded)))
+		h.cfg.Metrics.ForwardedBytes.Add(int64(len(data)))
 	}
 	return nil
 }
@@ -515,7 +515,7 @@ func (c *connState) readLoop(ctx context.Context, cancel context.CancelFunc) err
 			return ErrInvalidEnvelope
 		}
 		c.lastSeenUnix.Store(time.Now().UnixNano())
-		env, err := ParseEnvelope(data, c.cfg.MaxFrameBytes)
+		env, err := ParseEnvelopeView(data, c.cfg.MaxFrameBytes)
 		if err != nil {
 			if c.cfg.Metrics != nil {
 				c.cfg.Metrics.ValidationFailures.Add(1)
@@ -524,7 +524,7 @@ func (c *connState) readLoop(ctx context.Context, cancel context.CancelFunc) err
 			cancel()
 			return err
 		}
-		if err := c.hub.forward(c, env); err != nil {
+		if err := c.hub.forward(c, data, env); err != nil {
 			status := websocket.StatusPolicyViolation
 			if errors.Is(err, ErrPeerNotConnected) {
 				status = websocket.StatusTryAgainLater
