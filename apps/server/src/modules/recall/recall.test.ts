@@ -36,7 +36,7 @@ function tempDirectory(prefix: string, target: string[]): string {
 describe('recall query', () => {
   it('projects evidence and executes workspace-scoped CodeAct helpers', async () => {
     process.env.CRADLE_DATA_DIR = tempDirectory('cradle-recall-data-', dataDirs)
-    await createServerApp()
+    const app = await createServerApp()
     const d = db()
     const workspaceOneId = randomUUID()
     const workspaceTwoId = randomUUID()
@@ -121,6 +121,22 @@ describe('recall query', () => {
         map: expect.objectContaining({ workspace: { id: workspaceOneId } }),
         evidence: [expect.objectContaining({ id: messageOneId, sessionId: sessionOneId })],
       },
+    })
+
+    const response = await app.handle(
+      new Request('http://localhost/recall/query', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chatSessionId: sessionOneId,
+          code: 'async () => search("deployment")',
+        }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      kind: 'completed',
+      result: [expect.objectContaining({ id: messageOneId })],
     })
   })
 })
