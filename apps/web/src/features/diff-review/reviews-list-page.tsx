@@ -27,6 +27,7 @@ import {
 import { Input } from '~/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Spinner } from '~/components/ui/spinner'
+import { toastManager } from '~/components/ui/toast'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 
@@ -81,6 +82,11 @@ export function ReviewsListPage({
       void queryClient.invalidateQueries({ queryKey: reviewListQueryKey(workspaceId) })
       navigateToReview(workspaceId, data.id, { repositoryPath })
     },
+    onError: (error: Error) => toastManager.add({
+      type: 'error',
+      title: 'Branch comparison failed',
+      description: error.message,
+    }),
   })
 
   const commitMutation = useMutation({
@@ -99,6 +105,11 @@ export function ReviewsListPage({
       void queryClient.invalidateQueries({ queryKey: reviewListQueryKey(workspaceId) })
       navigateToReview(workspaceId, data.id, { repositoryPath })
     },
+    onError: (error: Error) => toastManager.add({
+      type: 'error',
+      title: 'Open commit failed',
+      description: error.message,
+    }),
   })
 
   const visibleGroups = useMemo(() => {

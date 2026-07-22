@@ -21,6 +21,7 @@ import {
   putWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanId,
   putWorkspacesByWorkspaceIdDiffReviewsPreferences,
 } from '~/api-gen/sdk.gen'
+import { toastManager } from '~/components/ui/toast'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { getI18n } from '~/i18n/instance'
 import type { SupportedLocale } from '~/i18n/locales'
@@ -55,6 +56,16 @@ function currentOutputLocale(): SupportedLocale {
   }
 }
 
+function reportMutationError(action: string) {
+  return (error: Error) => {
+    toastManager.add({
+      type: 'error',
+      title: `${action} failed`,
+      description: error.message,
+    })
+  }
+}
+
 /**
  * Owns the active review document and every mutation that updates it. All mutations write the
  * fresh review back into the cache so the diff stage, threads, and rail stay in sync without a
@@ -67,6 +78,19 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
   const applyReview = (review: CradleDiffReview) => {
     queryClient.setQueryData(reviewQueryKey(workspaceId, review.repositoryPath, review.id), review)
     queryClient.setQueryData(queryKey, review)
+  }
+
+  const applyPreferences = (preferences: CradleDiffReview['preferences']) => {
+    const update = (current: CradleDiffReview | undefined) => current
+      ? { ...current, preferences }
+      : current
+    queryClient.setQueryData<CradleDiffReview>(queryKey, update)
+
+    const current = reviewQuery.data
+    if (current) {
+      const canonicalKey = reviewQueryKey(workspaceId, current.repositoryPath, current.id)
+      queryClient.setQueryData<CradleDiffReview>(canonicalKey, update)
+    }
   }
 
   const invalidateList = () => {
@@ -123,6 +147,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Refresh'),
   })
 
   const viewedMutation = useMutation({
@@ -139,6 +164,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       return data
     },
     onSuccess: applyReview,
+    onError: reportMutationError('Mark file viewed'),
   })
 
   const createThreadMutation = useMutation({
@@ -162,6 +188,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Create thread'),
   })
 
   const replyMutation = useMutation({
@@ -178,6 +205,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       return data
     },
     onSuccess: applyReview,
+    onError: reportMutationError('Reply'),
   })
 
   const resolveThreadMutation = useMutation({
@@ -193,6 +221,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       return data
     },
     onSuccess: applyReview,
+    onError: reportMutationError('Resolve thread'),
   })
 
   const submitMutation = useMutation({
@@ -212,6 +241,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Submit review'),
   })
 
   const closeReviewMutation = useMutation({
@@ -230,6 +260,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Close review'),
   })
 
   const preferenceMutation = useMutation({
@@ -247,12 +278,8 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       })
       return data
     },
-    onSuccess: (preferences) => {
-      const review = reviewQuery.data
-      if (review) {
-        applyReview({ ...review, preferences })
-      }
-    },
+    onSuccess: applyPreferences,
+    onError: reportMutationError('Update display preferences'),
   })
 
   const commitPlanUpdateMutation = useMutation({
@@ -289,6 +316,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Update commit plan'),
   })
 
   const commitPlanApplyMutation = useMutation({
@@ -308,6 +336,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Apply commit plan'),
   })
 
   const createAgentFixMutation = useMutation({
@@ -339,6 +368,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Create agent fix'),
   })
 
   const startAgentFixMutation = useMutation({
@@ -371,6 +401,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Start agent fix'),
   })
 
   const cancelAgentFixMutation = useMutation({
@@ -390,6 +421,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Cancel agent fix'),
   })
 
   const rerunAgentFixMutation = useMutation({
@@ -422,6 +454,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Rerun agent fix'),
   })
 
   const deleteAgentFixMutation = useMutation({
@@ -440,6 +473,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Delete agent fix'),
   })
 
   /**
@@ -469,6 +503,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Generate guide'),
   })
 
   const cancelGuideMutation = useMutation({
@@ -487,6 +522,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
       applyReview(data)
       invalidateList()
     },
+    onError: reportMutationError('Cancel guide'),
   })
 
   return {
