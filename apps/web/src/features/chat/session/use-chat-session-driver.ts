@@ -5,7 +5,6 @@ import { getServerUrl } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
 import { chatMessageHistoryInfiniteOptions } from '../api/messages'
-import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
 import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import { useRuntimeSessionStatus } from '../runtime/use-runtime-session-status'
 import { createChatSessionEventSource } from '../transport/chat-event-tail-transport'
@@ -66,10 +65,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     && !runtimeStatus.activeRun,
   )
   const syncEngineRef = useRef<SessionSyncEngine | null>(null)
-  const pendingTerminalReleaseRef = useRef<{
-    run: RuntimeSessionRunStatus
-    requestedDataUpdatedAt: number
-  } | null>(null)
   const pendingPassiveStreamLeaseReleaseRef = useRef<{
     messageId: string
     requestedDataUpdatedAt: number
@@ -242,19 +237,6 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       scheduleSnapshotRefresh(0)
     }
 
-    const pendingTerminalRelease = pendingTerminalReleaseRef.current
-    if (
-      pendingTerminalRelease
-      && !snapshotRowsQuery.isFetching
-      && snapshotRowsQuery.dataUpdatedAt > pendingTerminalRelease.requestedDataUpdatedAt
-    ) {
-      pendingTerminalReleaseRef.current = null
-      const released = releaseSessionStreamingStateForTerminalRun(chatSessionId, pendingTerminalRelease.run)
-      if (released) {
-        refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
-      }
-    }
-
     const pendingPassiveStreamLeaseRelease = pendingPassiveStreamLeaseReleaseRef.current
     if (
       pendingPassiveStreamLeaseRelease
@@ -328,12 +310,14 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     }
 
     if (action.terminalRunReleaseCandidate) {
-      pendingTerminalReleaseRef.current = {
-        run: action.terminalRunReleaseCandidate,
-        requestedDataUpdatedAt: snapshotRowsQuery.dataUpdatedAt,
-      }
+      const released = releaseSessionStreamingStateForTerminalRun(
+        chatSessionId,
+        action.terminalRunReleaseCandidate,
+      )
       scheduleSnapshotRefresh(0)
-      refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
+      if (released) {
+        refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
+      }
     }
 
     if (action.requestQueueRefresh) {

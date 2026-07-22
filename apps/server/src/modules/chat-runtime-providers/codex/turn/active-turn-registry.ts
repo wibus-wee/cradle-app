@@ -17,11 +17,22 @@ export class CodexActiveTurnRegistry {
     return entry?.turnId ? entry : null
   }
 
-  release(sessionId: string, entry: ActiveCodexTurn): boolean {
+  /**
+   * Drop map ownership without releasing the host lease. Cancel uses this so a
+   * concurrent streamTurn can register while interrupt still holds the lease.
+   */
+  detach(sessionId: string, entry: ActiveCodexTurn): boolean {
     if (this.entries.get(sessionId) !== entry) {
       return false
     }
     this.entries.delete(sessionId)
+    return true
+  }
+
+  release(sessionId: string, entry: ActiveCodexTurn): boolean {
+    if (!this.detach(sessionId, entry)) {
+      return false
+    }
     entry.hostLease.release()
     return true
   }

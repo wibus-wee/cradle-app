@@ -1630,13 +1630,22 @@ export class CodexProvider implements ChatRuntime {
       pauseCodexGoalSnapshot(input.runtimeSession)
     }
     entry.abortController.abort()
-    if (entry.turnId) {
-      await entry.client.request('turn/interrupt', {
-        threadId: entry.threadId,
-        turnId: entry.turnId,
-      }).catch(() => undefined)
+    const { client, threadId, turnId, hostLease } = entry
+    // Detach before awaiting interrupt. Product cancel releases the session claim early so
+    // the next turn can start; if we stayed in the map, that streamTurn would overwrite this
+    // entry and leak the host lease (or interrupt against the wrong turn).
+    this.activeTurns.detach(sessionId, entry)
+    try {
+      if (turnId) {
+        await client.request('turn/interrupt', {
+          threadId,
+          turnId,
+        }).catch(() => undefined)
+      }
     }
-    this.activeTurns.release(sessionId, entry)
+    finally {
+      hostLease.release()
+    }
   }
 
   private createAppServerBridge(): CodexAppServerBridge {

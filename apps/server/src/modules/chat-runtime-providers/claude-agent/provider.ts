@@ -203,6 +203,11 @@ type ActiveClaudeQuery = {
   resolveMessageLifecycleSupport: (supported: boolean) => void
   closed: boolean
   pumpRunning: boolean
+  /**
+   * LinkCode `cancelling`: set while `cancelTurn` awaits `interrupt()`. Cleared when a native
+   * terminal `result`/pump EOF settles the interrupted turn, or when cancel finishes detach.
+   */
+  cancelling: boolean
   stderrSink: ClaudeStderrSink
   ultracodeEnabled: boolean
 }
@@ -609,6 +614,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         resolveMessageLifecycleSupport,
         closed: false,
         pumpRunning: true,
+        cancelling: false,
         stderrSink,
         ultracodeEnabled,
       }
@@ -626,6 +632,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
             settings,
           })
         },
+        // Product Composer queue/steer no longer auto-calls these (Synara durable wait).
+        // Hooks remain for low-level lifecycle tests and explicit native cancel of in-flight UUIDs.
         submitNativeInput: async ({ queueItemId, message }) => {
           await this.submitNativeInput(sessionId, queueItemId, message)
         },
@@ -808,8 +816,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
         turn.queue.fail(failure)
       }
     }
- finally {
+    finally {
       entry.pumpRunning = false
+      // LinkCode consume unwind: EOF while cancelling settles the interrupted turn.
+      entry.cancelling = false
       const turn = entry.currentTurn
       if (turn) {
         this.completeClaudeProviderThreadTurns(entry, turn)
@@ -932,6 +942,9 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
 
     if (message.type === 'result' && !readClaudeMessageParentToolUseId(message)) {
+      // LinkCode `handleResult`: a terminal result can beat `interrupt()`'s control ack. Clear the
+      // cancel gate so `cancelTurn` sees the turn as settled and does not detach a healthy Query.
+      entry.cancelling = false
       if (turn) {
         this.completeClaudeProviderThreadTurns(entry, turn)
         await this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(
@@ -1539,10 +1552,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
   }
 
   /**
-   * Live steer for Claude Agent: append into the long-lived SDK input stream without interrupt.
-   * Claude typically absorbs this as a mid-turn `queued_command` on the active turn (product
-   * steer). Unlike durable queue follow-ups, steer does not create a Cradle queue row or a
-   * second run — Chat Runtime persists the user bubble via `SteerApplied`.
+   * Legacy mid-turn SDK push. Product steer is Synara-aligned queue-fallback (interrupt +
+   * durable front-of-queue). Kept for direct unit coverage of the input stream primitive.
    */
   async steerTurn(input: SteerTurnInput): Promise<void> {
     const sessionId = input.runtimeSession.chatSessionId
@@ -1565,18 +1576,57 @@ export class ClaudeAgentProvider implements ChatRuntime {
   async cancelTurn(input: CancelTurnInput): Promise<void> {
     const sessionId = input.runtimeSession.chatSessionId
     const entry = this.activeQueries.get(sessionId)
-    if (!entry) {
+    if (!entry || entry.closed) {
       return
     }
-    const receipt = await entry.query.interrupt()
-    if (receipt && receipt.still_queued.length > 0) {
-      const submittedStillQueued = receipt.still_queued.filter(messageUuid =>
-        entry.submittedInputs.has(messageUuid))
-      this.deps.logger?.info?.('Claude Agent interrupted current turn with native inputs still queued', {
+
+    // LinkCode `onCancel`: clear local turn ownership first, await interrupt, then detach the Query
+    // when the interrupt ack precedes the cancelled turn's terminal result/EOF. Keeping a half-dead
+    // Query after interrupt is what produced empty post-cancel turns (zombie reuse).
+    const hadTurn = entry.currentTurn !== null
+    let interruptFailed = false
+    entry.cancelling = true
+
+    try {
+      const receipt = await entry.query.interrupt()
+      if (receipt && receipt.still_queued.length > 0) {
+        const submittedStillQueued = receipt.still_queued.filter(messageUuid =>
+          entry.submittedInputs.has(messageUuid))
+        this.deps.logger?.info?.('Claude Agent interrupted current turn with native inputs still queued', {
+          sessionId,
+          messageUuids: submittedStillQueued,
+        })
+      }
+    }
+    catch (error) {
+      // No ack can delimit this turn's fallout — fall through to detach.
+      interruptFailed = true
+      entry.cancelling = false
+      this.deps.logger?.warn?.('Claude Agent interrupt failed; closing live query', {
+        error,
         sessionId,
-        messageUuids: submittedStillQueued,
       })
     }
+
+    if (entry.closed || this.activeQueries.get(sessionId) !== entry) {
+      entry.cancelling = false
+      return
+    }
+
+    // Result/EOF cleared `cancelling` (or replaced the entry) while we awaited interrupt — the
+    // turn already settled; do not detach a Query that is ready for the next prompt.
+    const settledWhileInterrupting = hadTurn && !interruptFailed && !entry.cancelling
+    if (settledWhileInterrupting) {
+      return
+    }
+
+    if (hadTurn) {
+      entry.cancelling = false
+      this.closeSessionQuery(sessionId, entry)
+      return
+    }
+
+    entry.cancelling = false
   }
 
   async dispose(): Promise<void> {

@@ -39,7 +39,7 @@ function activeRun(): ActiveRun {
 }
 
 describe('active turn completion owner', () => {
-  it('orders durable terminal, required and best-effort bookkeeping, notification, release, and handoff', async () => {
+  it('orders durable terminal, required bookkeeping, release, notification, best-effort, and handoff', async () => {
     const order: string[] = []
     const terminalChunk: UIMessageChunk = { type: 'finish', finishReason: 'stop' }
     const controller = createActiveTurnCompletionController({
@@ -70,9 +70,61 @@ describe('active turn completion owner', () => {
     expect(order).toEqual([
       'durable-terminal',
       'required',
-      'best-effort',
-      'notification',
       'release',
+      'notification',
+      'best-effort',
+      'handoff',
+    ])
+  })
+
+  it('releases and notifies before best-effort bookkeeping that never settles', async () => {
+    const order: string[] = []
+    const terminalChunk: UIMessageChunk = { type: 'abort', reason: 'user' }
+    let resolveBestEffort: (() => void) | undefined
+    const bestEffortGate = new Promise<void>((resolve) => {
+      resolveBestEffort = resolve
+    })
+    const controller = createActiveTurnCompletionController({
+      persistTerminalChunk: vi.fn(async () => {
+        order.push('durable-terminal')
+        return { durableTerminal: true, notificationChunk: terminalChunk }
+      }),
+      publishTerminalNotification: vi.fn(() => order.push('notification')),
+      recoverTerminalPersistenceFailure: vi.fn(),
+      releaseActiveRun: vi.fn(() => order.push('release')),
+      performHandoff: vi.fn(() => order.push('handoff')),
+      recordTerminalPersistenceIncident: vi.fn(),
+      warn: vi.fn(),
+    })
+
+    const completion = controller.completeActiveTurn(activeRun(), {
+      source: 'cancel',
+      terminalChunk,
+      bestEffortBookkeeping: async () => {
+        order.push('best-effort-started')
+        await bestEffortGate
+        order.push('best-effort-done')
+      },
+      resolveHandoff: () => ({ kind: 'none' }),
+    })
+
+    await vi.waitFor(() => {
+      expect(order).toEqual([
+        'durable-terminal',
+        'release',
+        'notification',
+        'best-effort-started',
+      ])
+    })
+
+    resolveBestEffort?.()
+    await completion
+    expect(order).toEqual([
+      'durable-terminal',
+      'release',
+      'notification',
+      'best-effort-started',
+      'best-effort-done',
       'handoff',
     ])
   })
@@ -153,7 +205,7 @@ describe('active turn completion owner', () => {
     })
 
     expect(result).toEqual({ durableTerminal: true, terminalChunk: recoveredTerminal })
-    expect(order).toEqual(['recovery', 'required', 'best-effort', 'notification', 'release', 'handoff'])
+    expect(order).toEqual(['recovery', 'required', 'release', 'notification', 'best-effort', 'handoff'])
   })
 
   it('blocks notification and handoff when required bookkeeping fails', async () => {
