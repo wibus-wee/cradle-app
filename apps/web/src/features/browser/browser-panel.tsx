@@ -10,7 +10,6 @@ import {
   Chat1Line as MessageSquarePlusIcon,
   CloseLine as XIcon,
   Dashboard2Line as GaugeIcon,
-  DeleteLine as Trash2Icon,
   FileLine as FileTextIcon,
   GitCompareLine as FileDiffIcon,
   GitPullRequestLine as PullRequestIcon,
@@ -20,11 +19,10 @@ import {
   PlusLine as PlusIcon,
   Refresh1Line as RefreshCwIcon,
   RobotLine as BotIcon,
-  SendLine as SendIcon,
   TerminalBoxLine as SquareTerminalIcon,
 } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
-import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import {
   lazy,
   Suspense,
@@ -74,6 +72,11 @@ import { useLayoutStore } from '~/store/layout'
 import { releaseSideConversation } from '../chat/commands/chat-response-command'
 import type { BrowserAnnotationAdjustmentApplyDetail } from './browser-annotation-adjustment-panel'
 import { BROWSER_ANNOTATION_ADJUSTMENT_APPLY_EVENT } from './browser-annotation-adjustment-panel'
+import {
+  countBrowserAnnotationDesignChanges,
+  formatBrowserAnnotationAnchor,
+} from './browser-annotation-presenter'
+import { BrowserAnnotationRailView } from './browser-annotation-rail-view'
 import { BrowserNewTabSurfaceView } from './browser-new-tab-surface-view'
 import type { BrowserAddressSuggestion } from './browser-panel.logic'
 import {
@@ -637,20 +640,6 @@ async function captureBrowserAnnotationScreenshot(input: {
   }
 }
 
-function formatBrowserAnnotationAnchor(anchor: BrowserAnnotationAnchor): string {
-  if (anchor.kind === 'point') {
-    return `point (${Math.round(anchor.x)}, ${Math.round(anchor.y)})`
-  }
-  if (anchor.kind === 'element') {
-    const rect = anchor.element.rect
-    return `element <${anchor.element.tagName.toLowerCase()}> (${Math.round(rect.x)}, ${Math.round(rect.y)}, ${Math.round(rect.width)} x ${Math.round(rect.height)})`
-  }
-  if (anchor.kind === 'text') {
-    return `text "${anchor.text.slice(0, 96)}${anchor.text.length > 96 ? '...' : ''}" (${Math.round(anchor.x)}, ${Math.round(anchor.y)}, ${Math.round(anchor.width)} x ${Math.round(anchor.height)})`
-  }
-  return `region (${Math.round(anchor.x)}, ${Math.round(anchor.y)}, ${Math.round(anchor.width)} x ${Math.round(anchor.height)})`
-}
-
 function getBrowserAnnotationCropRect(
   anchor: BrowserAnnotationAnchor,
 ): BrowserAnnotationCropRect | null {
@@ -827,62 +816,10 @@ function formatBrowserAnnotationDesignChange(
   return rows.length > 0 ? ['Requested design changes:', ...rows] : []
 }
 
-function formatBrowserAnnotationSummary(annotation: BrowserAnnotationRecord): string {
-  if (annotation.body) {
-    return annotation.body
-  }
-  if (annotation.designChange) {
-    return 'Design change'
-  }
-  if (annotation.attachedImages.length > 0) {
-    return `${annotation.attachedImages.length} attached image${annotation.attachedImages.length === 1 ? '' : 's'}`
-  }
-  return formatBrowserAnnotationAnchor(annotation.anchor)
-}
-
-function countBrowserAnnotationDesignChanges(
-  designChange: BrowserAnnotationDesignChange | null,
-): number {
-  if (!designChange) {
-    return 0
-  }
-  return Object.values(designChange).filter(value => Boolean(value?.trim())).length
-}
-
 function hasBrowserAnnotationDesignChanges(
   designChange: BrowserAnnotationDesignChange | null | undefined,
 ): boolean {
   return countBrowserAnnotationDesignChanges(designChange ?? null) > 0
-}
-
-function getBrowserAnnotationPreviewTarget(
-  annotation: BrowserAnnotationRecord,
-): { style: CSSProperties, mode: 'point' | 'rect' } | null {
-  const { width, height } = annotation.surfaceSize
-  if (width <= 0 || height <= 0) {
-    return null
-  }
-  if (annotation.anchor.kind === 'point') {
-    return {
-      mode: 'point',
-      style: {
-        left: `${(annotation.anchor.x / width) * 100}%`,
-        top: `${(annotation.anchor.y / height) * 100}%`,
-      },
-    }
-  }
-
-  const rect
-    = annotation.anchor.kind === 'element' ? annotation.anchor.element.rect : annotation.anchor
-  return {
-    mode: 'rect',
-    style: {
-      left: `${(rect.x / width) * 100}%`,
-      top: `${(rect.y / height) * 100}%`,
-      width: `${(rect.width / width) * 100}%`,
-      height: `${(rect.height / height) * 100}%`,
-    },
-  }
 }
 
 function createBrowserAnnotationPrompt(input: {
@@ -911,203 +848,6 @@ function createBrowserAnnotationPrompt(input: {
   ]
     .filter(line => line !== null)
     .join('\n')
-}
-
-interface BrowserAnnotationRailProps {
-  annotations: BrowserAnnotationRecord[]
-  collapsed: boolean
-  onCollapsedChange: (collapsed: boolean) => void
-  onClear: () => void
-  onEdit: (annotation: BrowserAnnotationRecord) => void
-  onDelete: (annotationId: string) => void
-  onSend: (annotation: BrowserAnnotationRecord) => void
-}
-
-function BrowserAnnotationRail({
-  annotations,
-  collapsed,
-  onCollapsedChange,
-  onClear,
-  onEdit,
-  onDelete,
-  onSend,
-}: BrowserAnnotationRailProps) {
-  if (annotations.length === 0) {
-    return null
-  }
-
-  if (collapsed) {
-    return (
-      <div
-        {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
-        className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] items-start justify-end"
-      >
-        <Button
-          type="button"
-          size="icon"
-          className="relative size-10 animate-[browser-annotation-popup-enter_200ms_cubic-bezier(0.34,1.56,0.64,1)_both] rounded-full bg-primary text-primary-foreground shadow-[0_10px_34px_rgba(0,0,0,0.16),inset_0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur-md hover:scale-105 hover:bg-primary/90 active:scale-[0.96] motion-reduce:animate-none dark:shadow-[0_12px_40px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-          onClick={() => onCollapsedChange(false)}
-          aria-label={`Show ${annotations.length} browser annotations`}
-          aria-expanded="false"
-        >
-          <MessageSquarePlusIcon className="size-4" />
-          <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-background px-1.5 text-[10px] font-medium text-primary tabular-nums shadow-sm ring-2 ring-primary">
-            {annotations.length}
-          </span>
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
-      className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] items-start justify-end"
-    >
-      <div className="flex max-h-full w-72 origin-top-right animate-[browser-annotation-popup-enter_200ms_cubic-bezier(0.34,1.56,0.64,1)_both] flex-col overflow-hidden rounded-2xl bg-popover/95 text-popover-foreground shadow-[0_4px_24px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)] backdrop-blur-md motion-reduce:animate-none dark:bg-[#1a1a1a]/95 dark:shadow-[0_4px_24px_rgba(0,0,0,0.34),0_0_0_1px_rgba(255,255,255,0.08)]">
-        <div className="flex h-10 shrink-0 items-center justify-between gap-2 px-2">
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-auto min-w-0 justify-start gap-2 rounded-md px-2 py-1 text-left text-xs text-popover-foreground hover:bg-foreground/5"
-            onClick={() => onCollapsedChange(true)}
-            aria-label="Collapse browser annotations"
-            aria-expanded="true"
-          >
-            <MessageSquarePlusIcon className="size-3.5 shrink-0 !text-primary" />
-            <span className="truncate">Annotations</span>
-            <span className="rounded bg-foreground/7 px-1.5 py-0.5 text-[10px] text-muted-foreground tabular-nums">
-              {annotations.length}
-            </span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground"
-            onClick={onClear}
-            title="Clear all browser annotations"
-            aria-label="Clear all browser annotations"
-          >
-            <Trash2Icon className="size-3.5" />
-          </Button>
-        </div>
-        <div className="min-h-0 overflow-y-auto px-1.5 pb-1.5">
-          {annotations.map((annotation, index) => {
-            const previewTarget = getBrowserAnnotationPreviewTarget(annotation)
-            const designChangeCount = countBrowserAnnotationDesignChanges(annotation.designChange)
-            return (
-              <div
-                key={annotation.id}
-                className="group mb-1.5 grid grid-cols-[44px_minmax(0,1fr)] gap-2 rounded-lg p-1.5 transition-[background-color,scale] duration-150 ease-out last:mb-0 hover:bg-foreground/5 active:scale-[0.99]"
-              >
-                <div className="relative h-11 overflow-hidden rounded-md bg-muted ring-1 ring-border/60">
-                  <img
-                    src={annotation.screenshot.url}
-                    alt=""
-                    className="size-full object-cover"
-                    draggable={false}
-                  />
-                  <div className="absolute inset-0 bg-black/5" aria-hidden="true" />
-                  {previewTarget?.mode === 'rect' && (
-                    <span
-                      className="absolute rounded-[2px] border border-primary bg-primary/15 shadow-[0_0_0_1px_rgba(255,255,255,0.45)]"
-                      style={previewTarget.style}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {previewTarget?.mode === 'point' && (
-                    <span
-                      className="absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.7)]"
-                      style={previewTarget.style}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    className="absolute left-3 top-3 flex size-5 -translate-x-1/2 -translate-y-1/2 animate-[browser-annotation-marker-in_250ms_cubic-bezier(0.22,1,0.36,1)_both] items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.20),inset_0_0_0_1px_rgba(0,0,0,0.04)] motion-reduce:animate-none"
-                    style={{ animationDelay: `${index * 20}ms` }}
-                    aria-hidden="true"
-                  >
-                    {index + 1}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-popover-foreground">
-                      {formatBrowserAnnotationAnchor(annotation.anchor)}
-                    </span>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded px-1.5 py-0.5 text-[10px] tabular-nums',
-                        annotation.status === 'sent'
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-foreground/7 text-muted-foreground',
-                      )}
-                    >
-                      {annotation.status}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                    {formatBrowserAnnotationSummary(annotation)}
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-1">
-                    <span className="truncate text-[10px] text-muted-foreground/80">
-                      {designChangeCount > 0
-                        ? `${designChangeCount} ${designChangeCount === 1 ? 'adjustment' : 'adjustments'}`
-                        : 'Browser note'}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-0.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                        onClick={() => onEdit(annotation)}
-                        title="Edit browser annotation"
-                        aria-label="Edit browser annotation"
-                      >
-                        <PencilIcon className="size-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                        onClick={() => onDelete(annotation.id)}
-                        title="Delete browser annotation"
-                        aria-label="Delete browser annotation"
-                      >
-                        <Trash2Icon className="size-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                        onClick={() => onSend(annotation)}
-                        title={
-                          annotation.status === 'sent'
-                            ? 'Resend browser annotation'
-                            : 'Send browser annotation'
-                        }
-                        aria-label={
-                          annotation.status === 'sent'
-                            ? 'Resend browser annotation'
-                            : 'Send browser annotation'
-                        }
-                      >
-                        <SendIcon className="size-3" />
-                      </Button>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function BrowserPanel({
@@ -3109,7 +2849,7 @@ export function BrowserPanel({
                 />
               )}
               {!hasActiveAnnotationSession && (
-                <BrowserAnnotationRail
+                <BrowserAnnotationRailView
                   annotations={activeBrowserAnnotations}
                   collapsed={annotationTrayCollapsed}
                   onCollapsedChange={collapsed =>
