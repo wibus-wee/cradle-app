@@ -1,28 +1,15 @@
 import {
-  CalendarTimeAddLine as CalendarClockIcon,
-  ChartBar2Line as BarChart3Icon,
-  Chat1Line as MessageSquarePlusIcon,
   CopyLine as ClipboardCopyIcon,
   CopyLine as CopyIcon,
   DeleteLine as Trash2Icon,
-  DownSmallLine as ChevronDownIcon,
   ExternalLinkLine as ExternalLinkIcon,
   FileNewLine as FilePlusIcon,
-  FilterLine as ListFilterIcon,
-  FolderLine as FolderClosedIcon,
   FolderOpenLine as FolderOpenIcon,
-  GitCompareLine as FileDiffIcon,
-  GitPullRequestLine as WorkIcon,
-  LoadingLine,
-  MailOpenLine as MailOpenIcon,
   NewFolderLine as FolderPlusIcon,
   PencilLine as PencilIcon,
   PinLine as PinIcon,
   PinLine as PinOffIcon,
-  PlusLine as PlusIcon,
   Refresh1Line as RefreshCwIcon,
-  SearchLine as SearchIcon,
-  Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
 } from '@mingcute/react'
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
@@ -49,22 +36,8 @@ import {
   postWorkspacesByWorkspaceIdFilesFolderMutation,
   postWorkspacesMultiFolderMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
-import { Button } from '~/components/ui/button'
-import {
-  Menu,
-  MenuCheckboxItem,
-  MenuGroup,
-  MenuGroupLabel,
-  MenuItem,
-  MenuPopup,
-  MenuRadioGroup,
-  MenuRadioItem,
-  MenuSeparator,
-  MenuTrigger,
-} from '~/components/ui/menu'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { toastManager } from '~/components/ui/toast'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { runtimeSessionStatusQueryOptions } from '~/features/chat/commands/runtime-session-status-command'
 import { prefetchChatSession } from '~/features/chat/session/chat-session-prefetch'
@@ -120,6 +93,7 @@ import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
 import {
   WorkspaceMultiFolderDialog,
 } from './workspace-multi-folder-dialog'
+import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
 import {
   WorkspaceRecognitionDialogView,
 } from './workspace-recognition-dialog-view'
@@ -141,9 +115,9 @@ import type {
 import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
 import { WorkspaceSessionListSection } from './workspace-session-list-section'
 import { isWorkspaceSessionRunning } from './workspace-session-status'
+import { WorkspaceSidebarNavigationView } from './workspace-sidebar-navigation-view'
 import type {
   WorkspaceSidebarProjectFilter,
-  WorkspaceSidebarProjectSortDirection,
   WorkspaceSidebarProjectSortKey,
 } from './workspace-sidebar-ui-store'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
@@ -156,24 +130,6 @@ const DEFAULT_WORKSPACE_FILE_NAME = 'untitled'
 const DEFAULT_WORKSPACE_FOLDER_NAME = 'untitled-folder'
 const EMPTY_WORKSPACE_SESSIONS: WorkspaceSession[] = []
 const EMPTY_SESSION_ID_SET = new Set<string>()
-
-const PROJECT_FILTER_OPTIONS: readonly WorkspaceSidebarProjectFilter[] = [
-  'all',
-  'pinned',
-  'unpinned',
-  'unread',
-  'running',
-  'recent',
-]
-const PROJECT_SORT_OPTIONS: readonly WorkspaceSidebarProjectSortKey[] = [
-  'name',
-  'updatedAt',
-  'createdAt',
-]
-const PROJECT_SORT_DIRECTION_OPTIONS: readonly WorkspaceSidebarProjectSortDirection[] = [
-  'asc',
-  'desc',
-]
 
 function formatToastError(error: unknown): string {
   if (error instanceof Error) {
@@ -1011,85 +967,6 @@ const WorkspaceGroup = memo(
 )
 WorkspaceGroup.displayName = 'WorkspaceGroup'
 
-// ── Top nav items ─────────────────────────────────────────────────────────────
-
-interface NavItemProps {
-  active?: boolean
-  icon: React.ReactNode
-  label: string
-  shortcut?: string
-  collapsed?: boolean
-  onClick?: () => void
-  dataTestId?: string
-}
-
-function TopNavItem({
-  active = false,
-  icon,
-  label,
-  shortcut,
-  collapsed,
-  onClick,
-  dataTestId,
-}: NavItemProps) {
-  const className = cn(
-    'group flex h-7 w-full items-center gap-2 overflow-hidden rounded-lg px-2.5 py-1.5 text-xs text-sidebar-foreground/80 hover:bg-accent/50 hover:text-sidebar-foreground',
-    active && 'bg-accent/70 text-sidebar-foreground',
-  )
-  const iconNode = (
-    <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground/70">
-      {icon}
-    </span>
-  )
-
-  const content = (
-    <>
-      {collapsed
-? (
-        <Tooltip>
-          <TooltipTrigger asChild>{iconNode}</TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>
-            {label}
-          </TooltipContent>
-        </Tooltip>
-      )
-: (
-        iconNode
-      )}
-      <span
-        className={cn(
-          'flex-1 overflow-hidden text-left whitespace-nowrap',
-          collapsed ? 'opacity-0' : 'opacity-100',
-        )}
-      >
-        {label}
-      </span>
-      {shortcut && (
-        <span
-          className={cn(
-            'shrink-0 overflow-hidden font-mono text-[10px] text-muted-foreground/40 whitespace-nowrap',
-            collapsed ? 'opacity-0' : 'opacity-0 group-hover:opacity-100',
-          )}
-        >
-          {shortcut}
-        </span>
-      )}
-    </>
-  )
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      data-testid={dataTestId}
-      className={className}
-      aria-current={active ? 'page' : undefined}
-    >
-      {content}
-    </button>
-  )
-}
-
 function workspaceHasUnreadSession(sessions: readonly WorkspaceSession[]): boolean {
   return sessions.some(session => session.unread)
 }
@@ -1201,7 +1078,6 @@ const WorkspaceSidebarBody = memo(
     onDelete,
     onTogglePin,
   }: WorkspaceSidebarBodyProps) => {
-    const { t } = useTranslation('workspace')
     const pruneWorkspaceSidebarState = useWorkspaceSidebarUiStore(
       state => state.pruneWorkspaceSidebarState,
     )
@@ -1273,7 +1149,7 @@ const WorkspaceSidebarBody = memo(
       sessionsByWorkspaceId,
       workspaces,
     ])
-    const hasFilteredWorkspaces = workspaces.length > 0 && visibleWorkspaces.length === 0
+    const filteredEmpty = workspaces.length > 0 && visibleWorkspaces.length === 0
 
     useEffect(() => {
       if (!workspacesReady) {
@@ -1290,252 +1166,26 @@ const WorkspaceSidebarBody = memo(
         {/* ── Plugins section ── */}
         <PluginsSidebar collapsed={false} />
 
-        {/* ── Projects section ── */}
-        <div className="flex min-w-0 flex-col">
-          <div className="flex items-center px-2.5 py-1.5">
-            <span className="flex-1 text-[11px] font-medium text-muted-foreground select-none">
-              {t('sidebar.projects.title')}
-            </span>
-            <div className="flex items-center gap-0.5">
-              {hasUnreadWorkspaceSessions && (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="size-6 text-muted-foreground/60 hover:bg-fill/70 hover:text-foreground"
-                  onClick={onMarkAllAsRead}
-                  disabled={markingAllSessionsRead}
-                  title={t('sidebar.action.markAllRead')}
-                  aria-label={t('sidebar.action.markAllRead')}
-                  data-testid="workspace-mark-all-read-btn"
-                >
-                  {markingAllSessionsRead
-                    ? <LoadingLine className="size-3 animate-spin" />
-                    : <MailOpenIcon className="size-3" />}
-                </Button>
-              )}
-              <Menu>
-                <MenuTrigger
-                  render={(
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className={cn(
-                        'size-6 text-muted-foreground/60 hover:bg-fill/70 hover:text-foreground',
-                        (projectSortKey !== 'name'
-                          || projectSortDirection !== 'asc'
-                          || !projectPinnedFirst)
-                        && 'text-foreground',
-                      )}
-                      title={t('sidebar.action.sort')}
-                      aria-label={t('sidebar.action.sort')}
-                      data-testid="workspace-sort-menu-trigger"
-                    />
-                  )}
-                >
-                  <ArrowUpDownIcon className="size-3" />
-                </MenuTrigger>
-                <MenuPopup align="end" side="bottom" sideOffset={4} className="w-48">
-                  <MenuGroup>
-                    <MenuGroupLabel>{t('sidebar.sort.by')}</MenuGroupLabel>
-                    <MenuRadioGroup
-                      value={projectSortKey}
-                      onValueChange={value =>
-                        setProjectSortKey(value as WorkspaceSidebarProjectSortKey)}
-                    >
-                      {PROJECT_SORT_OPTIONS.map(sortKey => (
-                        <MenuRadioItem key={sortKey} value={sortKey}>
-                          {t(`sidebar.sort.option.${sortKey}`)}
-                        </MenuRadioItem>
-                      ))}
-                    </MenuRadioGroup>
-                  </MenuGroup>
-                  <MenuSeparator />
-                  <MenuGroup>
-                    <MenuGroupLabel>{t('sidebar.sort.direction')}</MenuGroupLabel>
-                    <MenuRadioGroup
-                      value={projectSortDirection}
-                      onValueChange={value =>
-                        setProjectSortDirection(value as WorkspaceSidebarProjectSortDirection)}
-                    >
-                      {PROJECT_SORT_DIRECTION_OPTIONS.map(direction => (
-                        <MenuRadioItem key={direction} value={direction}>
-                          {t(`sidebar.sort.direction.${direction}`)}
-                        </MenuRadioItem>
-                      ))}
-                    </MenuRadioGroup>
-                  </MenuGroup>
-                  <MenuSeparator />
-                  <MenuCheckboxItem
-                    checked={projectPinnedFirst}
-                    onCheckedChange={checked => setProjectPinnedFirst(checked)}
-                  >
-                    {t('sidebar.sort.pinnedFirst')}
-                  </MenuCheckboxItem>
-                </MenuPopup>
-              </Menu>
-              <Menu>
-                <MenuTrigger
-                  render={(
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className={cn(
-                        'size-6 text-muted-foreground/60 hover:bg-fill/70 hover:text-foreground',
-                        projectFilter !== 'all' && 'text-foreground',
-                      )}
-                      title={t('sidebar.action.filter')}
-                      aria-label={t('sidebar.action.filter')}
-                      data-testid="workspace-filter-menu-trigger"
-                    />
-                  )}
-                >
-                  <ListFilterIcon className="size-3" />
-                </MenuTrigger>
-                <MenuPopup align="end" side="bottom" sideOffset={4} className="w-44">
-                  <MenuGroup>
-                    <MenuGroupLabel>{t('sidebar.filter.show')}</MenuGroupLabel>
-                    <MenuRadioGroup
-                      value={projectFilter}
-                      onValueChange={value =>
-                        setProjectFilter(value as WorkspaceSidebarProjectFilter)}
-                    >
-                      {PROJECT_FILTER_OPTIONS.map(filter => (
-                        <MenuRadioItem key={filter} value={filter}>
-                          {t(`sidebar.filter.option.${filter}`)}
-                        </MenuRadioItem>
-                      ))}
-                    </MenuRadioGroup>
-                  </MenuGroup>
-                </MenuPopup>
-              </Menu>
-              {multiWorkspaceEnabled
-? (
-                <Menu>
-                  <MenuTrigger
-                    render={(
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="size-6 text-muted-foreground/60 hover:text-foreground hover:bg-fill/70"
-                        disabled={adding}
-                        title={t('sidebar.action.addProject')}
-                        data-testid="add-workspace-menu-btn"
-                      />
-                    )}
-                  >
-                    <ChevronDownIcon className="size-3" />
-                  </MenuTrigger>
-                  <MenuPopup align="end" side="bottom" sideOffset={4} className="w-52">
-                    <MenuItem onClick={onAddFromPicker} disabled={adding}>
-                      <FolderPlusIcon className="size-3" />
-                      {t('sidebar.action.addProject')}
-                    </MenuItem>
-                    <MenuItem onClick={onOpenMultiWorkspaceDialog}>
-                      <FolderClosedIcon className="size-3" />
-                      {t('sidebar.action.addMultiWorkspace')}
-                    </MenuItem>
-                  </MenuPopup>
-                </Menu>
-              )
-: (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="size-6 text-muted-foreground/60 hover:text-foreground hover:bg-fill/70"
-                  onClick={onAddFromPicker}
-                  disabled={adding}
-                  title={t('sidebar.action.addProject')}
-                  data-testid="add-workspace-btn"
-                >
-                  <PlusIcon className="size-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Workspace list */}
-          <nav className="flex min-w-0 flex-col gap-0.5 px-2 pb-2" data-testid="workspace-list">
-            {workspaces.length === 0 && (
-              <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60">
-                  <FolderOpenIcon className="size-5 !text-muted-foreground/50" aria-hidden="true" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {t('sidebar.projects.empty.title')}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {t('sidebar.projects.empty.description')}
-                  </p>
-                </div>
-                {multiWorkspaceEnabled
-? (
-                  <Menu>
-                    <MenuTrigger
-                      render={(
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          disabled={adding}
-                          className="mt-1 border-dashed"
-                          data-testid="add-workspace-empty-menu-btn"
-                        />
-                      )}
-                    >
-                      <PlusIcon />
-                      {t('sidebar.action.addProject')}
-                    </MenuTrigger>
-                    <MenuPopup align="center" side="bottom" sideOffset={4} className="w-52">
-                      <MenuItem onClick={onAddFromPicker} disabled={adding}>
-                        <FolderPlusIcon className="size-3" />
-                        {t('sidebar.action.addProject')}
-                      </MenuItem>
-                      <MenuItem onClick={onOpenMultiWorkspaceDialog}>
-                        <FolderClosedIcon className="size-3" />
-                        {t('sidebar.action.addMultiWorkspace')}
-                      </MenuItem>
-                    </MenuPopup>
-                  </Menu>
-                )
-: (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={onAddFromPicker}
-                    disabled={adding}
-                    className="mt-1 border-dashed"
-                    data-testid="add-workspace-empty-btn"
-                  >
-                    <PlusIcon />
-                    {t('sidebar.action.addProject')}
-                  </Button>
-                )}
-              </div>
-            )}
-            {hasFilteredWorkspaces && (
-              <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-muted/60">
-                  <ListFilterIcon className="size-4 !text-muted-foreground/50" aria-hidden="true" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {t('sidebar.projects.filteredEmpty.title')}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {t('sidebar.projects.filteredEmpty.description')}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setProjectFilter('all')}
-                  data-testid="workspace-filter-clear-btn"
-                >
-                  {t('sidebar.filter.clear')}
-                </Button>
-              </div>
-            )}
-            {visibleWorkspaces.map(workspace => (
+        <WorkspaceProjectsSectionView
+          hasWorkspaces={workspaces.length > 0}
+          filteredEmpty={filteredEmpty}
+          projectFilter={projectFilter}
+          projectSortKey={projectSortKey}
+          projectSortDirection={projectSortDirection}
+          projectPinnedFirst={projectPinnedFirst}
+          adding={adding}
+          multiWorkspaceEnabled={multiWorkspaceEnabled}
+          hasUnreadWorkspaceSessions={hasUnreadWorkspaceSessions}
+          markingAllSessionsRead={markingAllSessionsRead}
+          onProjectFilterChange={setProjectFilter}
+          onProjectSortKeyChange={setProjectSortKey}
+          onProjectSortDirectionChange={setProjectSortDirection}
+          onProjectPinnedFirstChange={setProjectPinnedFirst}
+          onAddFromPicker={onAddFromPicker}
+          onOpenMultiWorkspaceDialog={onOpenMultiWorkspaceDialog}
+          onMarkAllAsRead={onMarkAllAsRead}
+        >
+          {visibleWorkspaces.map(workspace => (
               <WorkspaceGroup
                 key={workspace.id}
                 workspace={workspace}
@@ -1546,8 +1196,7 @@ const WorkspaceSidebarBody = memo(
                 onTogglePin={onTogglePin}
               />
             ))}
-          </nav>
-        </div>
+        </WorkspaceProjectsSectionView>
       </PreviewCardProvider>
     )
   },
@@ -1743,70 +1392,18 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* ── Top navigation ── */}
-      <TooltipProvider delayDuration={collapsed ? 0 : 600}>
-        <nav className="flex flex-col gap-0.5 px-2 pt-1 pb-2">
-          <TopNavItem
-            icon={<WorkIcon className="size-3.5" />}
-            label={t('nav.newWork')}
-            collapsed={collapsed}
-            onClick={openNewWork}
-            dataTestId="nav-new-work"
-          />
-          <TopNavItem
-            icon={<MessageSquarePlusIcon className="size-3.5" />}
-            label={t('nav.newChat')}
-            collapsed={collapsed}
-            onClick={openNewChat}
-            dataTestId="nav-new-chat"
-          />
-          <TopNavItem
-            icon={<SearchIcon className="size-3.5" />}
-            label={t('nav.search')}
-            shortcut="⌘P"
-            collapsed={collapsed}
-            onClick={openSearch}
-            dataTestId="nav-search"
-          />
-          <TopNavItem
-            icon={<FileDiffIcon className="size-3.5" />}
-            label={t('nav.diffs')}
-            collapsed={collapsed}
-            onClick={openDiff}
-            dataTestId="nav-diffs"
-          />
-          <TopNavItem
-            icon={<WorkIcon className="size-3.5" />}
-            label={t('nav.pullRequests')}
-            collapsed={collapsed}
-            active={pullRequestsActive}
-            onClick={openPullRequests}
-            dataTestId="nav-pull-requests"
-          />
-          <TopNavItem
-            icon={<CalendarClockIcon className="size-3.5" />}
-            label={t('nav.automation')}
-            collapsed={collapsed}
-            onClick={openAutomation}
-            dataTestId="nav-automation"
-          />
-          <TopNavItem
-            icon={<BarChart3Icon className="size-3.5" />}
-            label={t('nav.usage')}
-            collapsed={collapsed}
-            onClick={openUsage}
-            dataTestId="nav-usage"
-          />
-          <TopNavItem
-            icon={<SettingsIcon className="size-3.5" />}
-            label={t('nav.settings')}
-            shortcut="⌘,"
-            collapsed={collapsed}
-            onClick={handleOpenSettings}
-            dataTestId="settings-btn"
-          />
-        </nav>
-      </TooltipProvider>
+      <WorkspaceSidebarNavigationView
+        collapsed={collapsed}
+        pullRequestsActive={pullRequestsActive}
+        onNewWork={openNewWork}
+        onNewChat={openNewChat}
+        onSearch={openSearch}
+        onDiff={openDiff}
+        onPullRequests={openPullRequests}
+        onAutomation={openAutomation}
+        onUsage={openUsage}
+        onSettings={handleOpenSettings}
+      />
 
       <ScrollArea
         scrollFade
