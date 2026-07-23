@@ -1,8 +1,9 @@
-import { recallMessages, recallRuns, recallToolEvents, sessions } from '@cradle/db'
-import { and, asc, desc, eq, like, sql } from 'drizzle-orm'
+import { recallFileTouches, recallMessages, recallRuns, recallToolEvents, sessions } from '@cradle/db'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
 import { searchChronicle } from '../search/chronicle-search.engine'
+import { normalizeRecallFilePath } from './file-touch-extractor'
 
 const DEFAULT_LIMIT = 8
 const MAX_LIMIT = 50
@@ -265,7 +266,7 @@ export function fileHistory(
   path: string,
   options: RecallSessionOptions = {},
 ): RecallToolEventHit[] {
-  const query = path.trim()
+  const query = normalizeRecallFilePath(path)
   const scoped = narrowScope(scope, options.sessionId)
   if (!query || !scoped) {
     return []
@@ -281,12 +282,13 @@ export function fileHistory(
       summary: recallToolEvents.summary,
       occurredAt: recallToolEvents.occurredAt,
     })
-    .from(recallToolEvents)
+    .from(recallFileTouches)
+    .innerJoin(recallToolEvents, eq(recallToolEvents.id, recallFileTouches.toolEventId))
     .where(
       and(
-        eq(recallToolEvents.workspaceId, scoped.workspaceId),
-        scoped.sessionId ? eq(recallToolEvents.sessionId, scoped.sessionId) : undefined,
-        like(recallToolEvents.summary, `%${escapeLike(query)}%`),
+        eq(recallFileTouches.workspaceId, scoped.workspaceId),
+        scoped.sessionId ? eq(recallFileTouches.sessionId, scoped.sessionId) : undefined,
+        eq(recallFileTouches.path, query),
       ),
     )
     .orderBy(desc(recallToolEvents.occurredAt))
@@ -309,8 +311,4 @@ export function memories(scope: RecallScope, options: { query?: string, limit?: 
     summary: memory.snippet.text,
     updatedAt: memory.updatedAt,
   }))
-}
-
-function escapeLike(value: string): string {
-  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
 }

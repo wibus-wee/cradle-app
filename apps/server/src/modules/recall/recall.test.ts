@@ -3,16 +3,22 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { sessions, workspaces } from '@cradle/db'
+import { recallFileTouches, recallToolEvents, sessions, workspaces } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { insertMessageFixtures } from '../../../tests/helpers/message-fixture'
 import { workspaceFixture } from '../../../tests/helpers/workspace-fixture'
 import { createServerApp } from '../../app'
 import { db, shutdownInfra } from '../../infra'
-import { forget, listAttunements, remember } from './attune-service'
+import {
+  forget,
+  listAttunements,
+  remember,
+  requestAttunement,
+  resolveAttunementRequest,
+} from './attune-service'
 import { executeRecallQuery } from './evaluator'
-import { search } from './query-service'
+import { fileHistory, search } from './query-service'
 import { projectRecallMessage } from './service'
 
 const dataDirs: string[] = []
@@ -133,6 +139,33 @@ describe('recall query', () => {
     projectRecallMessage(d, { messageId: messageOneSiblingId })
     projectRecallMessage(d, { messageId: messageTwoId })
 
+    const toolEventId = randomUUID()
+    d.insert(recallToolEvents)
+      .values({
+        id: toolEventId,
+        runId: null,
+        sessionId: sessionOneId,
+        workspaceId: workspaceOneId,
+        sourceEventId: randomUUID(),
+        toolCallId: 'tool-file-change',
+        toolName: 'file_change',
+        phase: 'tool_call_input_available',
+        isFailure: 0,
+        summary: 'file_change src/recall.ts',
+        occurredAt: now,
+      })
+      .run()
+    d.insert(recallFileTouches)
+      .values({
+        id: `${toolEventId}:src/recall.ts`,
+        toolEventId,
+        sessionId: sessionOneId,
+        workspaceId: workspaceOneId,
+        path: 'src/recall.ts',
+        occurredAt: now,
+      })
+      .run()
+
     expect(search({ workspaceId: workspaceOneId }, 'deployment')).toEqual([
       expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId }),
       expect.objectContaining({ id: messageOneId, sessionId: sessionOneId }),
@@ -144,6 +177,10 @@ describe('recall query', () => {
     expect(
       search({ workspaceId: workspaceOneId }, 'deployment', { sessionId: sessionOneSiblingId }),
     ).toEqual([expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId })])
+    expect(fileHistory({ workspaceId: workspaceOneId }, 'src/recall.ts')).toEqual([
+      expect.objectContaining({ id: toolEventId, sessionId: sessionOneId }),
+    ])
+    expect(fileHistory({ workspaceId: workspaceOneId }, 'src')).toEqual([])
 
     const outcome = await executeRecallQuery({
       context: { chatSessionId: sessionOneId, workspaceId: workspaceOneId, workId: null },
@@ -203,6 +240,20 @@ describe('recall query', () => {
       .run()
     d.insert(sessions).values({ id: sessionId, workspaceId, title: 'Attune Session' }).run()
     const context = { chatSessionId: sessionId, workspaceId, workId: null }
+    const evidenceId = randomUUID()
+    d.insert(recallToolEvents).values({
+      id: evidenceId,
+      runId: null,
+      sessionId,
+      workspaceId,
+      sourceEventId: randomUUID(),
+      toolCallId: 'attune-evidence-tool',
+      toolName: 'read_file',
+      phase: 'tool_call_input_available',
+      isFailure: 0,
+      summary: 'read_file src/recall.ts',
+      occurredAt: Math.floor(Date.now() / 1000),
+    }).run()
 
     expect(() => remember({ context, content: 'No anchor', evidenceIds: [] })).toThrow(
       'evidence ID',
@@ -210,7 +261,7 @@ describe('recall query', () => {
     const record = remember({
       context,
       content: 'Deployment uses bounded recall.',
-      evidenceIds: ['message-1'],
+      evidenceIds: [evidenceId],
     })
     expect(listAttunements(context)).toEqual([
       expect.objectContaining({ id: record.id, status: 'active' }),
@@ -219,5 +270,17 @@ describe('recall query', () => {
       expect.objectContaining({ id: record.id, status: 'archived' }),
     )
     expect(listAttunements(context)).toEqual([])
+
+    const pending = requestAttunement({
+      context,
+      intent: { operation: 'remember', content: 'Approved through an explicit request.', evidenceIds: [evidenceId] },
+    })
+    expect(listAttunements(context)).toEqual([])
+    expect(resolveAttunementRequest({ context, requestId: pending.id, approved: true })).toEqual(
+      expect.objectContaining({ requestId: pending.id, status: 'executed' }),
+    )
+    expect(listAttunements(context)).toEqual([
+      expect.objectContaining({ content: 'Approved through an explicit request.' }),
+    ])
   })
 })

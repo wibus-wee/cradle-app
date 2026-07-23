@@ -330,6 +330,20 @@
       "when": 1784904702000,
       "tag": "0046_boring_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1784904863000,
+      "tag": "0047_orange_dracula",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1784904863001,
+      "tag": "0048_green_barracuda",
+      "breakpoints": true
     }
   ]
 }

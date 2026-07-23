@@ -79,6 +79,43 @@ export const recallToolEvents = sqliteTable(
   }),
 )
 
+/**
+ * Normalized paths emitted by provider tool-input contracts. Unlike tool-event
+ * summaries, these rows are suitable for an exact file-history lookup.
+ */
+export const recallFileTouches = sqliteTable(
+  'recall_file_touches',
+  {
+    id: textPk(),
+    toolEventId: text('tool_event_id')
+      .notNull()
+      .references(() => recallToolEvents.id, { onDelete: 'cascade' }),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    occurredAt: int('occurred_at').notNull(),
+    ...createdAt(),
+  },
+  table => ({
+    byToolEventPath: uniqueIndex('recall_file_touches_tool_event_path_unique').on(
+      table.toolEventId,
+      table.path,
+    ),
+    byWorkspacePathOccurred: index('recall_file_touches_workspace_path_occurred_at_idx').on(
+      table.workspaceId,
+      table.path,
+      table.occurredAt,
+    ),
+    bySessionPathOccurred: index('recall_file_touches_session_path_occurred_at_idx').on(
+      table.sessionId,
+      table.path,
+      table.occurredAt,
+    ),
+  }),
+)
+
 export const recallRuns = sqliteTable(
   'recall_runs',
   {
@@ -136,11 +173,50 @@ export const recallAttunements = sqliteTable(
   }),
 )
 
+export const recallAttunementRequests = sqliteTable(
+  'recall_attunement_requests',
+  {
+    id: textPk(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    operation: text('operation', { enum: ['remember', 'forget'] }).notNull(),
+    content: text('content'),
+    evidenceIdsJson: text('evidence_ids_json').notNull().default('[]'),
+    attunementId: text('attunement_id').references(() => recallAttunements.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: ['pending', 'approved', 'denied', 'executed'] })
+      .notNull()
+      .default('pending'),
+    resolvedAt: int('resolved_at'),
+    executedAt: int('executed_at'),
+    ...timestamps(),
+  },
+  table => ({
+    bySessionStatus: index('recall_attunement_requests_session_status_idx').on(
+      table.sessionId,
+      table.status,
+      table.updatedAt,
+    ),
+    byWorkspaceStatus: index('recall_attunement_requests_workspace_status_idx').on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+  }),
+)
+
 export type RecallMessage = typeof recallMessages.$inferSelect
 export type NewRecallMessage = typeof recallMessages.$inferInsert
 export type RecallToolEvent = typeof recallToolEvents.$inferSelect
 export type NewRecallToolEvent = typeof recallToolEvents.$inferInsert
+export type RecallFileTouch = typeof recallFileTouches.$inferSelect
+export type NewRecallFileTouch = typeof recallFileTouches.$inferInsert
 export type RecallRun = typeof recallRuns.$inferSelect
 export type NewRecallRun = typeof recallRuns.$inferInsert
 export type RecallAttunement = typeof recallAttunements.$inferSelect
 export type NewRecallAttunement = typeof recallAttunements.$inferInsert
+export type RecallAttunementRequest = typeof recallAttunementRequests.$inferSelect
+export type NewRecallAttunementRequest = typeof recallAttunementRequests.$inferInsert

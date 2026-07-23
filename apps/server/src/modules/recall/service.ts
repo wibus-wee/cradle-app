@@ -3,6 +3,7 @@ import {
   backendRunSnapshotEvents,
   chatMessagePayloads,
   messages,
+  recallFileTouches,
   recallMessages,
   recallRuns,
   recallToolEvents,
@@ -12,10 +13,11 @@ import { and, eq } from 'drizzle-orm'
 
 import type { ChatRuntimeWriteDb } from '../chat-runtime/es/event-store'
 import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
+import { extractRecallFileTouchPaths } from './file-touch-extractor'
 
 const MAX_EXCERPT_LENGTH = 8_000
 
-type RecallProjectionDb = Pick<ChatRuntimeWriteDb, 'insert' | 'select'>
+type RecallProjectionDb = Pick<ChatRuntimeWriteDb, 'delete' | 'insert' | 'select'>
 
 export interface RecallMessageProjectionInput {
   messageId: string
@@ -164,9 +166,31 @@ export function projectRecallToolEvent(
       },
     })
     .run()
+
+  d.delete(recallFileTouches).where(eq(recallFileTouches.toolEventId, row.event.id)).run()
+  const paths = extractRecallFileTouchPaths(row.event)
+  if (paths.length === 0) {
+    return
+  }
+  d.insert(recallFileTouches)
+    .values(paths.map(path => ({
+      id: `${row.event.id}:${path}`,
+      toolEventId: row.event.id,
+      sessionId: row.event.chatSessionId!,
+      workspaceId: row.workspaceId,
+      path,
+      occurredAt: row.event.occurredAt,
+    })))
+    .onConflictDoNothing()
+    .run()
 }
 
 export function rebuildRecallProjection(d: RecallProjectionDb): void {
+  d.delete(recallFileTouches).run()
+  d.delete(recallToolEvents).run()
+  d.delete(recallRuns).run()
+  d.delete(recallMessages).run()
+
   const messageIds = d
     .select({ id: messages.id })
     .from(messages)
