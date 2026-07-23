@@ -1,19 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import { Spinner } from '~/components/ui/spinner'
 import { ChatSessionRouteContent } from '~/features/chat/session/chat-session-route-content'
-import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { workSurfaceId } from '~/navigation/surface-identity'
 import { useSurfaceStore } from '~/navigation/surface-store'
-import { useLayoutStore } from '~/store/layout'
 
 import { useWorkDetail } from './use-work'
 
 export function WorkPage({ workId }: { workId: string }) {
-  const active = useSurfaceActive()
-  const initializedAsideRef = useRef(false)
   const updateSurfaceTitle = useSurfaceStore(state => state.updateSurfaceTitle)
-  const openAsideTab = useLayoutStore(state => state.openAsideTab)
   const workQuery = useWorkDetail(workId)
 
   useEffect(() => {
@@ -22,14 +17,6 @@ export function WorkPage({ workId }: { workId: string }) {
     }
     updateSurfaceTitle(workSurfaceId(workId), workQuery.data.work.title)
   }, [updateSurfaceTitle, workId, workQuery.data])
-
-  useEffect(() => {
-    if (!active || !workQuery.data || initializedAsideRef.current) {
-      return
-    }
-    initializedAsideRef.current = true
-    openAsideTab('work')
-  }, [active, openAsideTab, workQuery.data])
 
   if (workQuery.error) {
     throw workQuery.error
