@@ -35,14 +35,6 @@ export const sessionAwaits = sqliteTable('session_awaits', {
   index('idx_session_awaits_session').on(table.chatSessionId),
 ]))
 
-export const sessionAwaitLiveStatusSnapshots = sqliteTable('session_await_live_status_snapshots', {
-  awaitId: text('await_id')
-    .primaryKey()
-    .references(() => sessionAwaits.id, { onDelete: 'cascade' }),
-  statusJson: text('status_json').notNull(),
-  capturedAt: int('captured_at').notNull(),
-})
-
 export const githubApiCache = sqliteTable('github_api_cache', {
   cacheKey: text('cache_key').primaryKey(),
   dataJson: text('data_json').notNull(),

@@ -6,7 +6,7 @@
 
 - **index.ts**: Elysia routes under `/session-awaits`, poller startup, registration wake-up, live status dispatch for supported sources, and CLI metadata for create/list/get/cancel/trigger/retry/summary routes.
 - **model.ts**: TypeBox request/response schemas for create, list, get, cancel, trigger, delivery retry, and summary routes.
-- **service.ts**: Durable await writes, supported-source validation, GitHub target preflight validation, available-checks error normalization, pending queries, persisted GitHub live-status snapshots, idempotent trigger handling, delivery failure marking, retry delivery, tracked evaluation error counting for javascript (`recordTrackedEvaluationCheck`), and chat runtime queue dispatch for resume messages.
+- **service.ts**: Durable await writes, supported-source validation, GitHub target preflight validation, available-checks error normalization, pending queries, idempotent trigger handling, delivery failure marking, retry delivery, tracked evaluation error counting for javascript (`recordTrackedEvaluationCheck`), and chat runtime queue dispatch for resume messages.
 - **poller.ts**: Source registry, light single-cycle runner, immediate run requests, interval tick, expiry handling, timer awaits, inline source checks, and enqueue of queued (heavy) sources onto the heavy-check queue so slow evaluations cannot block fast sources.
 - **heavy-check-queue.ts**: Bounded concurrent queue for `execution: 'queued'` sources (javascript). Dedupes in-flight await IDs, honors per-source `pollIntervalMs` via `lastCheckedAt`, and applies check results (trigger / fail / tracked error counts) off the poller critical path.
 - **types.ts**: Source adapter and await lifecycle TypeScript contracts; matched source results must carry non-empty resume text. Adapters may set `execution: 'queued'`, `tracksConsecutiveErrors`, and `resumeOnFailure`.
@@ -35,7 +35,7 @@ Evaluation failures are classified differently from invalid results. A syntax or
 
 GitHub await creation performs a read-only preflight against the target repo plus PR or commit. GitHub 404 and 422 responses are treated as non-retryable missing or inaccessible targets, so the create route returns `github_await_target_invalid` instead of registering an await that would poll forever. Other GitHub API failures return `github_await_validation_unavailable` and do not create the await. Existing pending awaits use the same missing-target classification in the poller and live-status route, then move to `failed` rather than remaining pending indefinitely.
 
-The `github-ci` live-status route also reads GitHub Actions workflow runs for the resolved head SHA and projects workflow jobs plus job steps when available. Each successful live projection is persisted per await. If GitHub is temporarily unavailable, the route returns that last known server-side snapshot as explicitly stale rather than surfacing a transient adapter failure. This is a display enhancement: await completion remains owned by the check-run and commit-status aggregate so legacy status contexts and branch-protection-facing checks stay part of the decision.
+The `github-ci` live-status route also reads GitHub Actions workflow runs for the resolved head SHA and projects workflow jobs plus job steps when available. This is a read-only display enhancement: await completion remains owned by the check-run and commit-status aggregate so legacy status contexts and branch-protection-facing checks stay part of the decision.
 
 `github-review` waits for PR review state on the PR head SHA. Modes are:
 

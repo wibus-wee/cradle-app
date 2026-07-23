@@ -11,41 +11,6 @@ import { fetchLiveCIStatus, githubCISource } from './sources/github-ci'
 import { fetchLiveReviewStatus, githubReviewSource } from './sources/github-review'
 import { javascriptAwaitSource } from './sources/javascript'
 
-function readLiveStatusSnapshot(awaitId: string): { status: Record<string, unknown>, capturedAt: number } | null {
-  const snapshot = SessionAwait.getLiveStatusSnapshot(awaitId)
-  if (!snapshot) {
-    return null
-  }
-  try {
-    const status = JSON.parse(snapshot.statusJson)
-    return status && typeof status === 'object' && !Array.isArray(status)
-      ? { status: status as Record<string, unknown>, capturedAt: snapshot.capturedAt }
-      : null
-  }
-  catch {
-    return null
-  }
-}
-
-function liveStatusUnavailable(awaitId: string) {
-  const snapshot = readLiveStatusSnapshot(awaitId)
-  if (snapshot) {
-    return {
-      supported: true as const,
-      ...snapshot.status,
-      stale: true,
-      snapshotAt: snapshot.capturedAt,
-    }
-  }
-  return {
-    supported: false as const,
-    error: {
-      code: 'github_await_status_unavailable',
-      message: 'GitHub status is temporarily unavailable. Retrying automatically.',
-    },
-  }
-}
-
 export const sessionAwait = new Elysia({
   prefix: '/session-awaits',
   detail: { tags: ['session-await'] },
@@ -202,19 +167,11 @@ export const sessionAwait = new Elysia({
     try {
       if (row.source === 'github-ci') {
         const status = await fetchLiveCIStatus(row.filterJson)
-        if (!status) {
-          return liveStatusUnavailable(row.id)
-        }
-        const snapshot = SessionAwait.saveLiveStatusSnapshot(row.id, JSON.stringify(status))
-        return { supported: true as const, ...status, stale: false, snapshotAt: snapshot.capturedAt }
+        return status ? { supported: true as const, ...status } : { supported: false as const }
       }
       if (row.source === 'github-review') {
         const status = await fetchLiveReviewStatus(row.filterJson)
-        if (!status) {
-          return liveStatusUnavailable(row.id)
-        }
-        const snapshot = SessionAwait.saveLiveStatusSnapshot(row.id, JSON.stringify(status))
-        return { supported: true as const, ...status, stale: false, snapshotAt: snapshot.capturedAt }
+        return status ? { supported: true as const, ...status } : { supported: false as const }
       }
     }
     catch (err) {
@@ -228,7 +185,7 @@ export const sessionAwait = new Elysia({
           },
         }
       }
-      return liveStatusUnavailable(row.id)
+      throw err
     }
     return { supported: false as const }
   }, {
