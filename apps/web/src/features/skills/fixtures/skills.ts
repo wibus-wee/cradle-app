@@ -1,4 +1,4 @@
-import type { SkillDocument, SkillInventoryEntry } from '../types'
+import type { DiscoveredSkill, SkillDocument, SkillInventoryEntry } from '../types'
 
 export const workspaceSkillFixture = {
   name: 'release-checklist',
@@ -55,3 +55,24 @@ export const workspaceSkillDocumentFixture = {
     description: workspaceSkillFixture.description,
   },
 } satisfies SkillDocument
+
+export const discoveredSkillFixtures = [
+  {
+    name: 'release-checklist',
+    description: 'Prepare a release, validate artifacts, and summarize final verification.',
+    skillDir: '/tmp/skill-source/release-checklist',
+    relativePath: 'skills/release-checklist',
+  },
+  {
+    name: 'frontend-review',
+    description: 'Review frontend behavior, accessibility, and visual regressions.',
+    skillDir: '/tmp/skill-source/frontend-review',
+    relativePath: 'skills/frontend-review',
+  },
+  {
+    name: 'incident-triage',
+    description: 'Collect runtime evidence and narrow an incident to its owning subsystem.',
+    skillDir: '/tmp/skill-source/incident-triage',
+    relativePath: 'skills/incident-triage',
+  },
+] satisfies DiscoveredSkill[]

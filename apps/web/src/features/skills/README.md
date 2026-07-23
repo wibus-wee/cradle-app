@@ -11,7 +11,8 @@ Skills import flow copy is owned by the `skills` i18n namespace; discovered skil
 ## Files
 
 - **index.ts**: Skills 功能模块的 barrel export
-- **skill-import-dialog.tsx**: 多步骤 Skills 导入对话框，支持 GitHub/GitLab/git URL 与本地路径，并暴露稳定的导入测试锚点给 E2E；loading indicator 使用 transform 动画而不是 left/width 布局动画，所有流程文案通过 `skills` namespace 读取
+- **skill-import-dialog.tsx / skill-import-dialog-view.tsx**: source-import mutation/reducer 容器与 fixture-driven 多步骤 View，支持 GitHub/GitLab/git URL 与本地路径；移动端使用单栏主流程，桌面端保留信息侧栏。
+- **skill-import-*-view.tsx**: 输入、加载、选择、完成和信息侧栏的独立展示组件；loading indicator 使用 transform 动画而不是 left/width 布局动画，所有流程文案通过 `skills` namespace 读取。
 - **skill-manager.tsx**: 通用 Skills 容器，负责 inventory query、层级过滤、目录选择、mutation 与对话框编排；Workspace Skills 首屏在 inventory query 成功后记录 performance gate。
 - **skill-manager-view.tsx**: fixture-driven 主列表 View，接收 owner 类型的 inventory 与 callbacks，不读取 query、route、store 或 Electron。
 - **skill-detail-container.tsx / skill-detail-view.tsx**: 详情 document query 与纯展示边界。
