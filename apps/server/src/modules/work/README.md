@@ -17,6 +17,9 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
   WIP.
 - Work stores facts only. Activity labels are derived and no Work status machine
   exists.
+- Listing Work detects the current state of each bound pull request through the
+  Pull Request owner, so sidebar summaries reflect GitHub merges without
+  opening the individual Work surface.
 - Preparing a handoff saves metadata locally. When an open Draft PR already exists, prepare also pushes the branch and updates the PR automatically.
 - The builtin `cradle` MCP server exposes `manage_pull_request` as the required
   Agent-facing closed-loop finalization tool; the tool delegates to this module's
