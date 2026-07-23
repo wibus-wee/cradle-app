@@ -20,6 +20,7 @@ interface WorkspaceDiffViewerProps {
   ownerId?: string | null
   tabId: string
   workspaceId: string
+  sessionId?: string | null
   repositoryPath?: string | null
   paths?: string[]
 }
@@ -32,8 +33,8 @@ export function WorkspaceDiffViewer(props: WorkspaceDiffViewerProps) {
   )
 }
 
-function WorkspaceDiffViewerContent({ ownerId, tabId, workspaceId, repositoryPath, paths }: WorkspaceDiffViewerProps) {
-  const { data: patch, isLoading, isError } = useGitDiff(workspaceId, repositoryPath, paths)
+function WorkspaceDiffViewerContent({ ownerId, tabId, workspaceId, sessionId, repositoryPath, paths }: WorkspaceDiffViewerProps) {
+  const { data: patch, isLoading, isError } = useGitDiff(workspaceId, repositoryPath, paths, sessionId)
   const deferredPatch = useDeferredValue(patch)
   const [diffStyle, setDiffStyle] = useState<DiffStyle>('split')
   const [isDiffStylePending, startDiffStyleTransition] = useTransition()

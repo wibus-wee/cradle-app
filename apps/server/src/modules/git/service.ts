@@ -477,8 +477,10 @@ export async function getDiff(
   workspaceId: string,
   paths?: string[],
   repositoryPath?: string,
+  sessionId?: string,
 ): Promise<string> {
-  const { repository } = await resolveRepository(workspaceId, repositoryPath)
+  const cwdOverride = sessionId ? resolveGitCwd(workspaceId, sessionId) : undefined
+  const { repository } = await resolveRepository(workspaceId, repositoryPath, cwdOverride)
   try {
     const selectedPaths = normalizeDiffPaths(paths)
     const status = await simpleGit(repository.absolutePath).status()

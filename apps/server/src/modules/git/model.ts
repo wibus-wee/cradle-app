@@ -50,6 +50,7 @@ export const GitModel = {
   diffQuery: t.Object({
     repo: t.Optional(t.String({ minLength: 1 })),
     paths: t.Optional(t.String()),
+    sessionId: t.Optional(t.String({ minLength: 1 })),
   }),
 
   mergeBaseQuery: t.Object({

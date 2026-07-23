@@ -155,7 +155,10 @@ describe('changesPanel type interactions', () => {
       isSuccess: true,
     })
 
-    renderWithQueryClient(createElement(ChangesPanel, { workspaceId: 'workspace-1' }))
+    renderWithQueryClient(createElement(ChangesPanel, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-worktree-1',
+    }))
 
     const rows = screen.getAllByTestId('changes-file-row')
     fireEvent.click(rows[0]!)
@@ -166,6 +169,7 @@ describe('changesPanel type interactions', () => {
     expect(state.tabs[0]).toMatchObject({
       kind: 'workspace-diff',
       workspaceId: 'workspace-1',
+      sessionId: 'session-worktree-1',
       repositoryPath: undefined,
       paths: undefined,
       title: 'All Changes',
@@ -181,7 +185,10 @@ describe('changesPanel type interactions', () => {
 
 describe('changesPanel tree interactions', () => {
   it('opens the All Changes browser panel tab for the double-clicked tree file', () => {
-    renderWithQueryClient(createElement(ChangesPanel, { workspaceId: 'workspace-1' }))
+    renderWithQueryClient(createElement(ChangesPanel, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-worktree-1',
+    }))
 
     fireEvent.click(screen.getByRole('radio', { name: 'Show changes as tree' }))
     fireEvent.doubleClick(screen.getByText('src/app.tsx'))
@@ -193,6 +200,7 @@ describe('changesPanel tree interactions', () => {
     expect(state.tabs[0]).toMatchObject({
       kind: 'workspace-diff',
       workspaceId: 'workspace-1',
+      sessionId: 'session-worktree-1',
       repositoryPath: undefined,
       paths: undefined,
       title: 'All Changes',

@@ -76,6 +76,7 @@ export function ChangesPanel({ workspaceId, workspacePath, sessionId }: ChangesP
     }
     const tabId = openWorkspaceDiffTab({
       workspaceId,
+      sessionId,
       repositoryPath: getWorkspaceDiffRepositoryPath(repository.path, gitRepositories.length),
       title: 'All Changes',
     })

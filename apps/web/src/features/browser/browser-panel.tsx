@@ -3317,6 +3317,7 @@ export function BrowserPanel({
             ownerId={resolvedOwnerId}
             tabId={activePanelTab.id}
             workspaceId={activePanelTab.workspaceId}
+            sessionId={activePanelTab.sessionId}
             repositoryPath={activePanelTab.repositoryPath}
             paths={activePanelTab.paths}
           />

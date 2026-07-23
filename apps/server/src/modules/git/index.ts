@@ -110,7 +110,7 @@ export const git = new Elysia({
   })
   .get('/:workspaceId/git/diff', async ({ params, query }) => {
     const paths = query.paths ? query.paths.split(',').map(p => p.trim()).filter(Boolean) : undefined
-    return await Git.getDiff(params.workspaceId, paths, query.repo)
+    return await Git.getDiff(params.workspaceId, paths, query.repo, query.sessionId)
   }, {
     detail: {
       'summary': 'Get git diff',

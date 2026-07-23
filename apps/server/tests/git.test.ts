@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { workspaces } from '@cradle/db'
+import { sessions, workspaces, worktrees } from '@cradle/db'
 import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
@@ -131,6 +131,67 @@ function createGitWorkspaceFixture(dir: string): void {
 }
 
 describe('git capability', () => {
+  it('reads diffs from an isolated session worktree', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-git-workspace-')
+    const worktreePath = makeTempDir('cradle-git-worktree-')
+    const previousEnv = useIsolatedTestInfra(dataDir)
+
+    try {
+      createGitWorkspaceFixture(workspaceRoot)
+      rmSync(worktreePath, { recursive: true, force: true })
+      await addGitWorktree({
+        repoPath: workspaceRoot,
+        worktreePath,
+        branch: 'cradle/wt/git-diff-session',
+      })
+      writeFileSync(join(worktreePath, 'worktree-only.txt'), 'worktree change\n', 'utf8')
+
+      const app = await createServerApp({ startBackgroundTasks: false })
+      const now = Date.now()
+      db().insert(workspaces).values(workspaceFixture({
+        id: 'workspace-git-session',
+        name: 'Workspace Git Session',
+        path: workspaceRoot,
+      })).run()
+      db().insert(worktrees).values({
+        id: 'worktree-git-session',
+        sourceWorkspaceId: 'workspace-git-session',
+        name: 'git-diff-session',
+        path: worktreePath,
+        branch: 'cradle/wt/git-diff-session',
+        baseRef: 'HEAD',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      }).run()
+      db().insert(sessions).values({
+        id: 'session-git-worktree',
+        workspaceId: 'workspace-git-session',
+        worktreeId: 'worktree-git-session',
+        title: 'Git Worktree Session',
+        runtimeKind: 'standard',
+        configJson: '{}',
+        pinned: 0,
+        createdAt: now,
+        updatedAt: now,
+      }).run()
+
+      const response = await app.handle(
+        new Request('http://localhost/workspaces/workspace-git-session/git/diff?sessionId=session-git-worktree'),
+      )
+
+      expect(response.status).toBe(200)
+      expect(await response.text()).toContain('worktree-only.txt')
+    }
+    finally {
+      restoreTestInfra(previousEnv)
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+      rmSync(worktreePath, { recursive: true, force: true })
+    }
+  })
+
   it('returns workspace-owned status, branches, and commit graph for a real git repository', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-git-workspace-')

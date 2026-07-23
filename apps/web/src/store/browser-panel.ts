@@ -132,6 +132,7 @@ export interface BrowserWorkspaceDiffTab {
   kind: 'workspace-diff'
   id: string
   workspaceId: string
+  sessionId?: string
   repositoryPath?: string
   paths?: string[]
   title: string
@@ -391,6 +392,7 @@ const workspaceDiffTabSchema = z.object({
   kind: z.literal('workspace-diff'),
   id: z.string(),
   workspaceId: z.string(),
+  sessionId: z.string().optional(),
   repositoryPath: z.string().optional(),
   paths: z.array(z.string()).optional(),
   title: z.string(),
@@ -861,6 +863,7 @@ interface BrowserPanelState {
   }) => string
   openWorkspaceDiffTab: (input: {
     workspaceId: string
+    sessionId?: string | null
     repositoryPath?: string | null
     paths?: string[]
     title?: string
@@ -1596,12 +1599,13 @@ function createBrowserPanelStore() {
         return commitOpenTab(set, ownerId, tab)
       },
 
-      openWorkspaceDiffTab: ({ workspaceId, repositoryPath, paths, title, ownerId: ownerIdInput }) => {
+      openWorkspaceDiffTab: ({ workspaceId, sessionId, repositoryPath, paths, title, ownerId: ownerIdInput }) => {
         const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
         const tab: BrowserWorkspaceDiffTab = {
           kind: 'workspace-diff',
           id: `legacy-workspace-diff-${++localTabCounter}`,
           workspaceId,
+          sessionId: sessionId ?? undefined,
           repositoryPath: repositoryPath ?? undefined,
           paths,
           title:
