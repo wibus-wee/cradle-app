@@ -12,6 +12,7 @@ interface DiffSearch {
   view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
+  github?: string
 }
 
 export const Route = createFileRoute('/diff')({
@@ -23,6 +24,7 @@ export const Route = createFileRoute('/diff')({
     view: search.view === 'commit' || search.view === 'guide' ? search.view : undefined,
     line: parsePositiveInt(search.line),
     side: parseAnchorSide(search.side),
+    github: typeof search.github === 'string' && search.github.length > 0 ? search.github : undefined,
   }),
   errorComponent: RouteErrorFallback,
   component: DiffRoute,
@@ -30,7 +32,7 @@ export const Route = createFileRoute('/diff')({
 
 function DiffRoute() {
   const navigate = Route.useNavigate()
-  const { workspace, repo, path, review, view, line, side } = Route.useSearch()
+  const { workspace, repo, path, review, view, line, side, github } = Route.useSearch()
 
   return (
     <DiffHomePage
@@ -41,6 +43,7 @@ function DiffRoute() {
       view={view}
       line={line}
       side={side}
+      github={github}
       onWorkspaceSelect={(workspaceId) => {
         void navigate({
           search: {

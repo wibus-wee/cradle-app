@@ -16,6 +16,56 @@ const sourceKind = t.Union([
   t.Literal('github-pull-request'),
   t.Literal('external-import'),
 ])
+const githubActor = t.Object({
+  login: t.String(),
+  avatarUrl: t.Nullable(t.String()),
+  url: t.Nullable(t.String()),
+})
+const githubPullRequestDetail = t.Object({
+  url: t.String(),
+  title: t.String(),
+  body: t.Nullable(t.String()),
+  isDraft: t.Boolean(),
+  state: t.Union([t.Literal('open'), t.Literal('closed')]),
+  merged: t.Boolean(),
+  mergeable: t.Nullable(t.Boolean()),
+  mergeableState: t.String(),
+  headRef: t.String(),
+  baseRef: t.String(),
+  headSha: t.Nullable(t.String()),
+  author: t.Nullable(githubActor),
+  reviewers: t.Array(githubActor),
+  assignees: t.Array(githubActor),
+  labels: t.Array(t.Object({ name: t.String(), color: t.String() })),
+  checksState: t.Union([
+    t.Literal('success'),
+    t.Literal('failure'),
+    t.Literal('pending'),
+    t.Literal('neutral'),
+  ]),
+  checks: t.Array(t.Object({
+    id: t.String(),
+    name: t.String(),
+    status: t.Union([t.Literal('queued'), t.Literal('in_progress'), t.Literal('completed')]),
+    conclusion: t.Nullable(t.String()),
+    url: t.Nullable(t.String()),
+  })),
+  timeline: t.Array(t.Object({
+    id: t.String(),
+    kind: t.Union([t.Literal('comment'), t.Literal('review')]),
+    author: t.Nullable(githubActor),
+    body: t.Nullable(t.String()),
+    state: t.Nullable(t.String()),
+    createdAt: t.String(),
+    url: t.Nullable(t.String()),
+  })),
+})
+const githubPullRequestBinding = t.Object({
+  owner: t.String(),
+  repo: t.String(),
+  number: t.Integer({ minimum: 1 }),
+  detail: t.Optional(githubPullRequestDetail),
+})
 const fileStatus = t.Union([
   t.Literal('added'),
   t.Literal('modified'),
@@ -84,14 +134,6 @@ const comment = t.Object({
   updatedAt: t.Number(),
 })
 
-const reaction = t.Object({
-  id: t.String(),
-  threadId: t.String(),
-  userId: t.String(),
-  reaction: t.String(),
-  createdAt: t.Number(),
-})
-
 const thread = t.Object({
   id: t.String(),
   reviewId: t.String(),
@@ -106,7 +148,6 @@ const thread = t.Object({
   resolvedBy: t.Nullable(t.String()),
   resolvedAt: t.Nullable(t.Number()),
   comments: t.Array(comment),
-  reactions: t.Array(reaction),
 })
 
 const submission = t.Object({
@@ -324,6 +365,16 @@ export const DiffReviewModel = {
     commitRef: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
+  githubPullRequestBody: t.Object({
+    owner: t.String({
+      minLength: 1,
+      maxLength: 39,
+      pattern: '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$',
+    }),
+    repo: t.String({ minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9_.-]+$' }),
+    number: t.Integer({ minimum: 1 }),
+  }, { additionalProperties: false }),
+
   setViewedBody: t.Object({
     viewed: t.Boolean(),
   }, { additionalProperties: false }),
@@ -338,13 +389,13 @@ export const DiffReviewModel = {
     bodyMarkdown: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
-  addReactionBody: t.Object({
-    reaction: t.String({ minLength: 1 }),
-  }, { additionalProperties: false }),
-
   submitBody: t.Object({
     decision: t.Union([t.Literal('approve'), t.Literal('request-changes'), t.Literal('comment')]),
     bodyMarkdown: t.Optional(t.Nullable(t.String())),
+  }, { additionalProperties: false }),
+
+  mergeBody: t.Object({
+    mergeMethod: t.Union([t.Literal('merge'), t.Literal('squash'), t.Literal('rebase')]),
   }, { additionalProperties: false }),
 
   updatePreferencesBody: t.Object({
@@ -420,6 +471,7 @@ export const DiffReviewModel = {
     sourceId: t.Nullable(t.String()),
     repositoryPath: t.String(),
     sourceKind,
+    githubPullRequest: t.Nullable(githubPullRequestBinding),
     title: t.String(),
     status: reviewStatus,
     reviewState,

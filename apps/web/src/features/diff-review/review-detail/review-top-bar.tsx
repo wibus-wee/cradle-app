@@ -1,6 +1,7 @@
 import {
   CheckLine as CheckIcon,
   CloseLine as CloseIcon,
+  ExternalLinkLine as ExternalLinkIcon,
   GitCommitLine as GitCommitHorizontalIcon,
   Message1Line as MessageSquareIcon,
   Refresh1Line as RefreshCwIcon,
@@ -20,6 +21,7 @@ import { cn } from '~/lib/cn'
 
 import { formatChangeStats, sourceLabel } from '../shared/diff-items'
 import type { CradleDiffReview, DiffStyle, ReviewDecision } from '../shared/types'
+import { GitHubReviewContext } from './github-review-context'
 
 type DiffReviewKey = keyof typeof import('~/locales/default').default['diff-review']
 
@@ -27,10 +29,12 @@ interface ReviewTopBarProps {
   review: CradleDiffReview
   diffStyle: DiffStyle
   onDiffStyleChange: (style: DiffStyle) => void
-  onPreference: (input: { hideWhitespaceOnly?: boolean, collapseGeneratedFiles?: boolean }) => void
+  onPreference: (input: { hideWhitespaceOnly?: boolean, structuralHighlighting?: boolean, collapseGeneratedFiles?: boolean }) => void
   preferencePending: boolean
   onSubmit: (decision: ReviewDecision, bodyMarkdown: string) => void
   submitPending: boolean
+  onMerge: (method: 'merge' | 'squash' | 'rebase') => void
+  mergePending: boolean
   onCloseReview: () => void
   closeReviewPending: boolean
   onRefresh: () => void
@@ -64,6 +68,8 @@ export function ReviewTopBar({
   preferencePending,
   onSubmit,
   submitPending,
+  onMerge,
+  mergePending,
   onCloseReview,
   closeReviewPending,
   onRefresh,
@@ -80,9 +86,12 @@ export function ReviewTopBar({
   openThreadCount,
   agentFixCount,
 }: ReviewTopBarProps) {
+  const { t } = useTranslation('diff-review')
   const [isDiffStylePending, startDiffStyleTransition] = useTransition()
   const refreshing = refreshPending || isFetching
-  const canCloseReview = review.status === 'open' && review.sourceKind !== 'local-working-tree'
+  const canCloseReview = review.status === 'open'
+    && review.sourceKind !== 'local-working-tree'
+    && review.sourceKind !== 'github-pull-request'
 
   return (
     <header className="flex h-10 shrink-0 items-center gap-2 px-3" data-testid="review-top-bar">
@@ -90,7 +99,9 @@ export function ReviewTopBar({
       <div className="min-w-0">
         <h1 className="truncate text-[13px] font-medium leading-tight text-foreground">{review.title}</h1>
         <p className="truncate text-[12px] tabular-nums text-muted-foreground/70">
-          {sourceLabel(review.sourceKind)}
+          {review.githubPullRequest?.detail
+            ? `${review.githubPullRequest.owner}/${review.githubPullRequest.repo}#${review.githubPullRequest.number} · ${review.githubPullRequest.detail.headRef} to ${review.githubPullRequest.detail.baseRef}`
+            : sourceLabel(review.sourceKind)}
           {' · '}
           {formatChangeStats(review)}
         </p>
@@ -108,9 +119,11 @@ export function ReviewTopBar({
       {/* Display filters — secondary, icon popover. */}
       <DisplayPopover
         hideWhitespaceOnly={review.preferences.hideWhitespaceOnly}
+        structuralHighlighting={review.preferences.structuralHighlighting}
         collapseGeneratedFiles={review.preferences.collapseGeneratedFiles}
         pending={preferencePending}
         onToggleWhitespace={() => onPreference({ hideWhitespaceOnly: !review.preferences.hideWhitespaceOnly })}
+        onToggleStructural={() => onPreference({ structuralHighlighting: !review.preferences.structuralHighlighting })}
         onToggleGenerated={() => onPreference({ collapseGeneratedFiles: !review.preferences.collapseGeneratedFiles })}
       />
 
@@ -168,8 +181,27 @@ export function ReviewTopBar({
       <ReviewPopover
         pending={submitPending}
         state={review.reviewState}
+        requireBodyForFeedback={review.sourceKind === 'github-pull-request'}
         onSubmit={onSubmit}
       />
+
+      {review.githubPullRequest && (
+        <GitHubReviewContext pullRequest={review.githubPullRequest} onMerge={onMerge} mergePending={mergePending} />
+      )}
+
+      {review.githubPullRequest && (
+        <Button variant="ghost" size="icon" className="size-7" asChild>
+          <a
+            href={`https://github.com/${review.githubPullRequest.owner}/${review.githubPullRequest.repo}/pull/${review.githubPullRequest.number}`}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t('review.github.open' as DiffReviewKey)}
+            title={t('review.github.open' as DiffReviewKey)}
+          >
+            <ExternalLinkIcon className="size-3.5" />
+          </a>
+        </Button>
+      )}
 
       {canCloseReview
         ? (
@@ -206,15 +238,19 @@ export function ReviewTopBar({
 
 function DisplayPopover({
   hideWhitespaceOnly,
+  structuralHighlighting,
   collapseGeneratedFiles,
   pending,
   onToggleWhitespace,
+  onToggleStructural,
   onToggleGenerated,
 }: {
   hideWhitespaceOnly: boolean
+  structuralHighlighting: boolean
   collapseGeneratedFiles: boolean
   pending: boolean
   onToggleWhitespace: () => void
+  onToggleStructural: () => void
   onToggleGenerated: () => void
 }) {
   return (
@@ -231,6 +267,9 @@ function DisplayPopover({
         <MenuCheck active={hideWhitespaceOnly} onClick={onToggleWhitespace} disabled={pending}>
           Hide whitespace-only
         </MenuCheck>
+        <MenuCheck active={structuralHighlighting} onClick={onToggleStructural} disabled={pending}>
+          Highlight changed words
+        </MenuCheck>
         <MenuCheck active={collapseGeneratedFiles} onClick={onToggleGenerated} disabled={pending}>
           Collapse generated
         </MenuCheck>
@@ -242,17 +281,23 @@ function DisplayPopover({
 function ReviewPopover({
   pending,
   state,
+  requireBodyForFeedback,
   onSubmit,
 }: {
   pending: boolean
   state: CradleDiffReview['reviewState']
+  requireBodyForFeedback: boolean
   onSubmit: (decision: ReviewDecision, bodyMarkdown: string) => void
 }) {
   const { t } = useTranslation('diff-review')
   const [open, setOpen] = useState(false)
   const [body, setBody] = useState('')
+  const hasBody = body.trim().length > 0
 
   const handleDecision = (decision: ReviewDecision) => {
+    if (requireBodyForFeedback && decision !== 'approve' && !hasBody) {
+      return
+    }
     onSubmit(decision, body.trim())
     setBody('')
     setOpen(false)
@@ -282,7 +327,9 @@ function ReviewPopover({
         <Textarea
           value={body}
           onChange={event => setBody(event.target.value)}
-          placeholder={t('review.summary.placeholder' as DiffReviewKey)}
+          placeholder={t(
+            (requireBodyForFeedback ? 'review.summary.githubPlaceholder' : 'review.summary.placeholder') as DiffReviewKey,
+          )}
           className="min-h-[88px] resize-none text-[12px] leading-relaxed"
           autoFocus
           onKeyDown={(event) => {
@@ -296,7 +343,7 @@ function ReviewPopover({
           <DecisionButton
             onClick={() => handleDecision('comment')}
             icon={<MessageSquareIcon className="size-3.5" />}
-            disabled={pending}
+            disabled={pending || (requireBodyForFeedback && !hasBody)}
             tone="ghost"
           >
             Comment
@@ -304,7 +351,7 @@ function ReviewPopover({
           <DecisionButton
             onClick={() => handleDecision('request-changes')}
             icon={<SendIcon className="size-3.5" />}
-            disabled={pending}
+            disabled={pending || (requireBodyForFeedback && !hasBody)}
             tone="warn"
           >
             Request changes

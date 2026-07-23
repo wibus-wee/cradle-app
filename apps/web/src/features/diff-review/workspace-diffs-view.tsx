@@ -1,10 +1,14 @@
-import { useMemo } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { postWorkspacesByWorkspaceIdDiffReviewsGithubPullRequest } from '~/api-gen/sdk.gen'
 import { BetaNotice } from '~/components/common/beta-notice'
 import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
+import { Spinner } from '~/components/ui/spinner'
 import { CommitPlanPage } from '~/features/diff-review/commit-plan-page'
+import { parseGitHubPullRequestReference } from '~/features/diff-review/github-pull-request-reference'
 import { GuideView } from '~/features/diff-review/review-detail/guide-view'
 import { ReviewDetailPage } from '~/features/diff-review/review-detail/review-detail-page'
 import { ReviewsListPage } from '~/features/diff-review/reviews-list-page'
@@ -18,6 +22,7 @@ export interface WorkspaceDiffsViewProps {
   view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
+  github?: string
 }
 
 /**
@@ -40,6 +45,7 @@ export function WorkspaceDiffsView({
   view,
   line,
   side,
+  github,
 }: WorkspaceDiffsViewProps) {
   const { t } = useTranslation('diff-review')
 
@@ -63,6 +69,7 @@ export function WorkspaceDiffsView({
             view={view}
             line={line}
             side={side}
+            github={github}
           />
         </div>
       </div>
@@ -78,6 +85,7 @@ function WorkspaceDiffsContent({
   view,
   line,
   side,
+  github,
 }: WorkspaceDiffsViewProps) {
   if (review && view === 'commit') {
     return <CommitPlanPage workspaceId={workspaceId} repositoryPath={repo} reviewId={review} />
@@ -108,6 +116,10 @@ function WorkspaceDiffsContent({
     )
   }
 
+  if (github) {
+    return <GitHubPullRequestDeepLink workspaceId={workspaceId} reference={github} />
+  }
+
   if (path) {
     return (
       <ReviewDetailPage
@@ -123,4 +135,42 @@ function WorkspaceDiffsContent({
   }
 
   return <ReviewsListPage workspaceId={workspaceId} repositoryPath={repo} />
+}
+
+function GitHubPullRequestDeepLink({ workspaceId, reference }: { workspaceId: string, reference: string }) {
+  const pullRequest = useMemo(() => parseGitHubPullRequestReference(reference), [reference])
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!pullRequest) {
+        throw new Error('Invalid GitHub pull request reference')
+      }
+      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsGithubPullRequest({
+        path: { workspaceId },
+        body: pullRequest,
+        throwOnError: true,
+      })
+      return data
+    },
+    onSuccess: review => navigateToReview(workspaceId, review.id, { replace: true }),
+  })
+
+  useEffect(() => {
+    mutation.mutate()
+  // The URL reference is the operation identity; rerun only when it changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reference])
+
+  if (!pullRequest || mutation.isError) {
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-[12px] text-muted-foreground">
+        {mutation.error?.message ?? 'Invalid GitHub pull request reference'}
+      </div>
+    )
+  }
+  return (
+    <div className="flex h-full items-center justify-center gap-2 p-4 text-[12px] text-muted-foreground">
+      <Spinner className="size-3.5" />
+      <span>{`Opening ${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number}`}</span>
+    </div>
+  )
 }

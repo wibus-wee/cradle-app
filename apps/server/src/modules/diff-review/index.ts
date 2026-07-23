@@ -83,6 +83,26 @@ export const diffReview = new Elysia({
     body: DiffReviewModel.localCommitBody,
     response: { 200: DiffReviewModel.review },
   })
+  .post('/:workspaceId/diff-reviews/github-pull-request', ({ params, body }) => {
+    const input = body as { owner: string, repo: string, number: number }
+    return DiffReview.refreshGitHubPullRequest({
+      workspaceId: params.workspaceId,
+      owner: input.owner,
+      repo: input.repo,
+      number: input.number,
+    })
+  }, {
+    detail: {
+      'summary': 'Create or refresh a GitHub pull request diff review',
+      'x-cradle-cli': {
+        command: ['workspace', 'diffs', 'github-pull-request'],
+        defaultWorkspaceId: true,
+      },
+    },
+    params: DiffReviewModel.workspaceParams,
+    body: DiffReviewModel.githubPullRequestBody,
+    response: { 200: DiffReviewModel.review },
+  })
   .get('/:workspaceId/diff-reviews/:reviewId', ({ params }) => DiffReview.get(params.workspaceId, params.reviewId), {
     detail: {
       'summary': 'Get diff review',
@@ -186,26 +206,6 @@ export const diffReview = new Elysia({
     body: DiffReviewModel.addCommentBody,
     response: { 200: DiffReviewModel.review },
   })
-  .post('/:workspaceId/diff-reviews/:reviewId/threads/:threadId/reactions', ({ params, body }) => {
-    const input = body as { reaction: string }
-    return DiffReview.addReaction({
-      workspaceId: params.workspaceId,
-      reviewId: params.reviewId,
-      threadId: params.threadId,
-      reaction: input.reaction,
-    })
-  }, {
-    detail: {
-      'summary': 'Add diff review thread reaction',
-      'x-cradle-cli': {
-        command: ['workspace', 'diffs', 'thread', 'reaction'],
-        defaultWorkspaceId: true,
-      },
-    },
-    params: DiffReviewModel.threadParams,
-    body: DiffReviewModel.addReactionBody,
-    response: { 200: DiffReviewModel.review },
-  })
   .post('/:workspaceId/diff-reviews/:reviewId/threads/:threadId/resolve', ({ params }) => {
     return DiffReview.resolveThread(params.workspaceId, params.reviewId, params.threadId)
   }, {
@@ -229,7 +229,7 @@ export const diffReview = new Elysia({
     })
   }, {
     detail: {
-      'summary': 'Submit local diff review decision',
+      'summary': 'Submit a diff review decision',
       'x-cradle-cli': {
         command: ['workspace', 'diffs', 'submit'],
         defaultWorkspaceId: true,
@@ -237,6 +237,25 @@ export const diffReview = new Elysia({
     },
     params: DiffReviewModel.reviewParams,
     body: DiffReviewModel.submitBody,
+    response: { 200: DiffReviewModel.review },
+  })
+  .post('/:workspaceId/diff-reviews/:reviewId/merge', ({ params, body }) => {
+    const input = body as { mergeMethod: 'merge' | 'squash' | 'rebase' }
+    return DiffReview.mergeGitHubReview({
+      workspaceId: params.workspaceId,
+      reviewId: params.reviewId,
+      mergeMethod: input.mergeMethod,
+    })
+  }, {
+    detail: {
+      'summary': 'Merge a GitHub pull request diff review',
+      'x-cradle-cli': {
+        command: ['workspace', 'diffs', 'merge'],
+        defaultWorkspaceId: true,
+      },
+    },
+    params: DiffReviewModel.reviewParams,
+    body: DiffReviewModel.mergeBody,
     response: { 200: DiffReviewModel.review },
   })
   .put('/:workspaceId/diff-reviews/preferences', ({ params, body }) => {

@@ -51,6 +51,7 @@ export function ReviewDetailPage({
     replyMutation,
     resolveThreadMutation,
     submitMutation,
+    mergeMutation,
     closeReviewMutation,
     preferenceMutation,
     createAgentFixMutation,
@@ -181,6 +182,64 @@ export function ReviewDetailPage({
     }
   }, [selectedFileId, visibleFiles])
 
+  const selectFile = (file: ReviewFile) => {
+    setSelectedFileId(file.id)
+    setSelectedLineSelection(null)
+    stageHandleRef.current?.scrollToPath(file.path)
+  }
+
+  // Keep review navigation keyboard-first, matching the dense browsing workflow users expect
+  // from Linear-style review surfaces. Shortcuts are ignored while editing a text control.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const typing = target?.tagName === 'INPUT'
+        || target?.tagName === 'TEXTAREA'
+        || target?.isContentEditable
+      if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+        event.preventDefault()
+        const nextStyle = diffStyle === 'split' ? 'unified' : 'split'
+        setDiffStyle(nextStyle)
+        preferenceMutation.mutate({ diffStyle: nextStyle })
+        return
+      }
+      if (typing || event.metaKey || event.ctrlKey || event.altKey) {
+        return
+      }
+      if (event.key === 'Escape') {
+        if (composerAnchor || selectedLineSelection) {
+          event.preventDefault()
+          setComposerAnchor(null)
+          setSelectedLineSelection(null)
+        }
+        return
+      }
+      if (visibleFiles.length === 0) {
+        return
+      }
+      const currentIndex = selectedFileId
+        ? visibleFiles.findIndex(file => file.id === selectedFileId)
+        : -1
+      const direction = event.key === 'j' || event.key === 'ArrowDown'
+        ? 1
+        : event.key === 'k' || event.key === 'ArrowUp'
+          ? -1
+          : 0
+      if (direction === 0) {
+        return
+      }
+      const nextIndex = Math.min(Math.max(currentIndex + direction, 0), visibleFiles.length - 1)
+      const nextFile = visibleFiles[nextIndex]
+      if (!nextFile || nextIndex === currentIndex) {
+        return
+      }
+      event.preventDefault()
+      selectFile(nextFile)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [composerAnchor, diffStyle, preferenceMutation, selectedFileId, selectedLineSelection, visibleFiles])
+
   useEffect(() => {
     if (visibleItems.length === 0 || !pendingScrollRef.current) {
       return
@@ -196,12 +255,6 @@ export function ReviewDetailPage({
       stageHandleRef.current?.scrollToPath(path)
     }
   }, [visibleItems])
-
-  const selectFile = (file: ReviewFile) => {
-    setSelectedFileId(file.id)
-    setSelectedLineSelection(null)
-    stageHandleRef.current?.scrollToPath(file.path)
-  }
 
   const jumpToThread = (thread: ReviewThread) => {
     stageHandleRef.current?.scrollToThread(thread)
@@ -258,6 +311,8 @@ export function ReviewDetailPage({
         preferencePending={preferenceMutation.isPending}
         onSubmit={(decision, bodyMarkdown) => submitMutation.mutate({ decision, bodyMarkdown })}
         submitPending={submitMutation.isPending}
+        onMerge={method => mergeMutation.mutate(method)}
+        mergePending={mergeMutation.isPending}
         onCloseReview={() => closeReviewMutation.mutate(undefined, {
           onSuccess: () => navigateToReviewsList(workspaceId, repositoryPath),
         })}

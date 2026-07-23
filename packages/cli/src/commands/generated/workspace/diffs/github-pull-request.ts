@@ -1,5 +1,5 @@
-import { registerOperationCommand } from '../../../../../runtime/operation-command'
-import type { CliOperationSpec } from '../../../../../runtime/types'
+import { registerOperationCommand } from '../../../../runtime/operation-command'
+import type { CliOperationSpec } from '../../../../runtime/types'
 import type { Command } from 'commander'
 
 const spec = {
@@ -13,37 +13,36 @@ const spec = {
       "flagName": "workspace",
       "resolver": "workspace",
       "resolverAmbient": true
-    },
-    {
-      "name": "reviewId",
-      "required": true,
-      "target": "path.reviewId",
-      "type": "string"
-    },
-    {
-      "name": "threadId",
-      "required": true,
-      "target": "path.threadId",
-      "type": "string"
     }
   ],
   "command": [
     "workspace",
     "diffs",
-    "thread",
-    "reaction"
+    "github-pull-request"
   ],
-  "description": "Add diff review thread reaction",
+  "description": "Create or refresh a GitHub pull request diff review",
   "flags": [
     {
-      "name": "reaction",
+      "name": "owner",
       "required": true,
-      "target": "body.reaction",
+      "target": "body.owner",
+      "type": "string"
+    },
+    {
+      "name": "repo",
+      "required": true,
+      "target": "body.repo",
+      "type": "string"
+    },
+    {
+      "name": "number",
+      "required": true,
+      "target": "body.number",
       "type": "string"
     }
   ],
   "method": "post",
-  "path": "/workspaces/{workspaceId}/diff-reviews/{reviewId}/threads/{threadId}/reactions"
+  "path": "/workspaces/{workspaceId}/diff-reviews/github-pull-request"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

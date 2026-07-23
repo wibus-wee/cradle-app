@@ -206,8 +206,7 @@ export function reviewAuthoredByLocalUser(review: CradleDiffReview): boolean {
 export function reviewParticipatedByLocalUser(review: CradleDiffReview): boolean {
   return review.threads.some(thread =>
     thread.createdBy === LOCAL_REVIEW_USER_ID
-    || thread.comments.some(comment => comment.authorId === LOCAL_REVIEW_USER_ID)
-    || thread.reactions.some(reaction => reaction.userId === LOCAL_REVIEW_USER_ID))
+    || thread.comments.some(comment => comment.authorId === LOCAL_REVIEW_USER_ID))
   || review.submissions.some(submission => submission.actorId === LOCAL_REVIEW_USER_ID)
   || review.commitPlans.some(plan => plan.actorId === LOCAL_REVIEW_USER_ID)
 }

@@ -24,30 +24,24 @@ const spec = {
   "command": [
     "workspace",
     "diffs",
-    "submit"
+    "merge"
   ],
-  "description": "Submit a diff review decision",
+  "description": "Merge a GitHub pull request diff review",
   "flags": [
     {
-      "name": "decision",
+      "name": "mergeMethod",
       "required": true,
-      "target": "body.decision",
+      "target": "body.mergeMethod",
       "type": "string",
       "values": [
-        "approve",
-        "request-changes",
-        "comment"
+        "merge",
+        "squash",
+        "rebase"
       ]
-    },
-    {
-      "name": "bodyMarkdown",
-      "required": false,
-      "target": "body.bodyMarkdown",
-      "type": "string"
     }
   ],
   "method": "post",
-  "path": "/workspaces/{workspaceId}/diff-reviews/{reviewId}/submit"
+  "path": "/workspaces/{workspaceId}/diff-reviews/{reviewId}/merge"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

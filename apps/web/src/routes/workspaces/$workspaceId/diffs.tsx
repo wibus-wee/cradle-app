@@ -11,6 +11,7 @@ interface WorkspaceDiffsSearch {
   view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
+  github?: string
 }
 
 export const Route = createFileRoute('/workspaces/$workspaceId/diffs')({
@@ -21,6 +22,7 @@ export const Route = createFileRoute('/workspaces/$workspaceId/diffs')({
     view: search.view === 'commit' || search.view === 'guide' ? search.view : undefined,
     line: parsePositiveInt(search.line),
     side: parseAnchorSide(search.side),
+    github: typeof search.github === 'string' && search.github.length > 0 ? search.github : undefined,
   }),
   errorComponent: RouteErrorFallback,
   component: WorkspaceDiffsRoute,
@@ -28,7 +30,7 @@ export const Route = createFileRoute('/workspaces/$workspaceId/diffs')({
 
 function WorkspaceDiffsRoute() {
   const { workspaceId } = Route.useParams()
-  const { repo, path, review, view, line, side } = Route.useSearch()
+  const { repo, path, review, view, line, side, github } = Route.useSearch()
   return (
     <WorkspaceDiffsView
       workspaceId={workspaceId}
@@ -38,6 +40,7 @@ function WorkspaceDiffsRoute() {
       view={view}
       line={line}
       side={side}
+      github={github}
     />
   )
 }

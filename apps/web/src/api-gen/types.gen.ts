@@ -1349,6 +1349,30 @@ export type GetFilesystemFavoritesResponses = {
 
 export type GetFilesystemFavoritesResponse = GetFilesystemFavoritesResponses[keyof GetFilesystemFavoritesResponses];
 
+export type PostUsageReconcileClaudeData = {
+    body?: never;
+    path?: never;
+    query?: {
+        maxBindings?: string | number;
+    };
+    url: '/usage/reconcile/claude';
+};
+
+export type PostUsageReconcileClaudeResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        bindings: number;
+        transcripts: number;
+        inserted: number;
+        duplicates: number;
+        incidents: number;
+    };
+};
+
+export type PostUsageReconcileClaudeResponse = PostUsageReconcileClaudeResponses[keyof PostUsageReconcileClaudeResponses];
+
 export type GetUsageDailyData = {
     body?: never;
     path?: never;
@@ -12968,6 +12992,64 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -13032,13 +13114,6 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -13219,6 +13294,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalWorkingTreeResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -13283,13 +13416,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalWorkingTreeResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -13445,6 +13571,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompareResponses = 
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -13509,13 +13693,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompareResponses = 
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -13670,6 +13847,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -13734,13 +13969,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -13873,17 +14101,20 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses = {
 
 export type PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponse = PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses[keyof PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses];
 
-export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdData = {
-    body?: never;
+export type PostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestData = {
+    body: {
+        owner: string;
+        repo: string;
+        number: string | number;
+    };
     path: {
         workspaceId: string;
-        reviewId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceId}/diff-reviews/{reviewId}';
+    url: '/workspaces/{workspaceId}/diff-reviews/github-pull-request';
 };
 
-export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdResponses = {
+export type PostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestResponses = {
     /**
      * Response for status 200
      */
@@ -13893,6 +14124,64 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -13958,12 +14247,279 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdResponses = {
                 createdAt: number;
                 updatedAt: number;
             }>;
-            reactions: Array<{
+        }>;
+        submissions: Array<{
+            id: string;
+            reviewId: string;
+            revisionId: string;
+            actorId: string;
+            decision: 'approve' | 'request-changes' | 'comment';
+            bodyMarkdown: string | null;
+            submittedAt: number;
+            sourceSyncState: 'local-only' | 'pending' | 'synced' | 'failed';
+        }>;
+        events: Array<{
+            id: string;
+            reviewId: string;
+            eventKind: string;
+            actorKind: 'user' | 'agent' | 'external' | 'system';
+            actorId: string | null;
+            payload: unknown;
+            createdAt: number;
+        }>;
+        preferences: {
+            id: string;
+            workspaceId: string;
+            userId: string;
+            diffStyle: 'split' | 'unified';
+            codeTheme: string;
+            fontSize: number;
+            lineHeight: number;
+            hideWhitespaceOnly: boolean;
+            structuralHighlighting: boolean;
+            collapseGeneratedFiles: boolean;
+            notificationMode: 'all-activity' | 'all-activity-by-people' | 'reviews-and-comments' | 'reviews-and-comments-by-people' | 'none';
+            createdAt: number;
+            updatedAt: number;
+        };
+        guide: {
+            revisionId: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
+            providerTargetId: string | null;
+            runtimeKind: string | null;
+            modelId: string | null;
+            sessionId: string | null;
+            runId: string | null;
+            errorMessage: string | null;
+            createdAt: number | null;
+            updatedAt: number | null;
+            title: string | null;
+            steps: Array<{
+                id: string;
+                title: string;
+                rationale: string;
+                fileIds: Array<string>;
+                threadIds: Array<string>;
+                anchors: Array<{
+                    revisionId: string;
+                    fileId: string;
+                    path: string;
+                    side: 'base' | 'head';
+                    startLine: number;
+                    endLine: number;
+                    startColumn?: number;
+                    endColumn?: number;
+                    hunkHeader: string;
+                    lineHash: string;
+                    contextBeforeHash?: string;
+                    contextAfterHash?: string;
+                }>;
+                order: number;
+            }>;
+        };
+        agentFixes: Array<{
+            id: string;
+            reviewId: string;
+            targetRevisionId: string | null;
+            threadId: string | null;
+            anchor: {
+                revisionId: string;
+                fileId: string;
+                path: string;
+                side: 'base' | 'head';
+                startLine: number;
+                endLine: number;
+                startColumn?: number;
+                endColumn?: number;
+                hunkHeader: string;
+                lineHash: string;
+                contextBeforeHash?: string;
+                contextAfterHash?: string;
+            } | null;
+            instruction: string;
+            profileId: string | null;
+            expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact';
+            status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+            sessionId: string | null;
+            runId: string | null;
+            artifactId: string | null;
+            resultRevisionId: string | null;
+            errorMessage: string | null;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+        commitPlans: Array<{
+            id: string;
+            reviewId: string;
+            revisionId: string;
+            actorId: string;
+            strategy: string;
+            status: 'draft' | 'accepted' | 'applied' | 'abandoned';
+            groups: Array<{
+                id: string;
+                title: string;
+                message: string;
+                rationale: string;
+                fileIds: Array<string>;
+                paths: Array<string>;
+                dependsOn: Array<string>;
+            }>;
+            conflicts: Array<{
+                fileId: string;
+                path: string;
+                groupIds: Array<string>;
+            }>;
+            rationale: string;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+    };
+};
+
+export type PostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestResponse = PostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestResponses[keyof PostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestResponses];
+
+export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdData = {
+    body?: never;
+    path: {
+        workspaceId: string;
+        reviewId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceId}/diff-reviews/{reviewId}';
+};
+
+export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        sourceId: string | null;
+        repositoryPath: string;
+        sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
+        title: string;
+        status: 'open' | 'merged' | 'closed' | 'abandoned';
+        reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
+        currentRevisionId: string | null;
+        createdAt: number;
+        updatedAt: number;
+        currentRevision: {
+            id: string;
+            reviewId: string;
+            sourceVersion: string;
+            patchHash: string;
+            fileCount: number;
+            additions: number;
+            deletions: number;
+            generatedAt: number;
+            patch: string;
+        } | null;
+        files: Array<{
+            id: string;
+            revisionId: string;
+            path: string;
+            previousPath: string | null;
+            status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
+            additions: number;
+            deletions: number;
+            isGenerated: boolean;
+            isBinary: boolean;
+            isViewed: boolean;
+        }>;
+        threads: Array<{
+            id: string;
+            reviewId: string;
+            originalRevisionId: string;
+            currentRevisionId: string | null;
+            fileId: string | null;
+            anchor: {
+                revisionId: string;
+                fileId: string;
+                path: string;
+                side: 'base' | 'head';
+                startLine: number;
+                endLine: number;
+                startColumn?: number;
+                endColumn?: number;
+                hunkHeader: string;
+                lineHash: string;
+                contextBeforeHash?: string;
+                contextAfterHash?: string;
+            } | null;
+            state: 'open' | 'resolved' | 'stale';
+            createdBy: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedBy: string | null;
+            resolvedAt: number | null;
+            comments: Array<{
                 id: string;
                 threadId: string;
-                userId: string;
-                reaction: string;
+                authorKind: 'user' | 'agent' | 'external';
+                authorId: string;
+                bodyMarkdown: string;
+                externalUrl: string | null;
                 createdAt: number;
+                updatedAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -14116,6 +14672,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdRefreshResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -14180,13 +14794,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdRefreshResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -14339,6 +14946,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCloseResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -14403,13 +15068,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCloseResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -14565,6 +15223,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdFilesByFileIdViewedR
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -14629,13 +15345,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdFilesByFileIdViewedR
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -14799,6 +15508,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -14863,13 +15630,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -15025,6 +15785,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCom
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -15089,13 +15907,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCom
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -15228,232 +16039,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCom
 
 export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCommentsResponse = PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCommentsResponses[keyof PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCommentsResponses];
 
-export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsData = {
-    body: {
-        reaction: string;
-    };
-    path: {
-        workspaceId: string;
-        reviewId: string;
-        threadId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceId}/diff-reviews/{reviewId}/threads/{threadId}/reactions';
-};
-
-export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        workspaceId: string;
-        sourceId: string | null;
-        repositoryPath: string;
-        sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
-        title: string;
-        status: 'open' | 'merged' | 'closed' | 'abandoned';
-        reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
-        currentRevisionId: string | null;
-        createdAt: number;
-        updatedAt: number;
-        currentRevision: {
-            id: string;
-            reviewId: string;
-            sourceVersion: string;
-            patchHash: string;
-            fileCount: number;
-            additions: number;
-            deletions: number;
-            generatedAt: number;
-            patch: string;
-        } | null;
-        files: Array<{
-            id: string;
-            revisionId: string;
-            path: string;
-            previousPath: string | null;
-            status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
-            additions: number;
-            deletions: number;
-            isGenerated: boolean;
-            isBinary: boolean;
-            isViewed: boolean;
-        }>;
-        threads: Array<{
-            id: string;
-            reviewId: string;
-            originalRevisionId: string;
-            currentRevisionId: string | null;
-            fileId: string | null;
-            anchor: {
-                revisionId: string;
-                fileId: string;
-                path: string;
-                side: 'base' | 'head';
-                startLine: number;
-                endLine: number;
-                startColumn?: number;
-                endColumn?: number;
-                hunkHeader: string;
-                lineHash: string;
-                contextBeforeHash?: string;
-                contextAfterHash?: string;
-            } | null;
-            state: 'open' | 'resolved' | 'stale';
-            createdBy: string;
-            createdAt: number;
-            updatedAt: number;
-            resolvedBy: string | null;
-            resolvedAt: number | null;
-            comments: Array<{
-                id: string;
-                threadId: string;
-                authorKind: 'user' | 'agent' | 'external';
-                authorId: string;
-                bodyMarkdown: string;
-                externalUrl: string | null;
-                createdAt: number;
-                updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
-            }>;
-        }>;
-        submissions: Array<{
-            id: string;
-            reviewId: string;
-            revisionId: string;
-            actorId: string;
-            decision: 'approve' | 'request-changes' | 'comment';
-            bodyMarkdown: string | null;
-            submittedAt: number;
-            sourceSyncState: 'local-only' | 'pending' | 'synced' | 'failed';
-        }>;
-        events: Array<{
-            id: string;
-            reviewId: string;
-            eventKind: string;
-            actorKind: 'user' | 'agent' | 'external' | 'system';
-            actorId: string | null;
-            payload: unknown;
-            createdAt: number;
-        }>;
-        preferences: {
-            id: string;
-            workspaceId: string;
-            userId: string;
-            diffStyle: 'split' | 'unified';
-            codeTheme: string;
-            fontSize: number;
-            lineHeight: number;
-            hideWhitespaceOnly: boolean;
-            structuralHighlighting: boolean;
-            collapseGeneratedFiles: boolean;
-            notificationMode: 'all-activity' | 'all-activity-by-people' | 'reviews-and-comments' | 'reviews-and-comments-by-people' | 'none';
-            createdAt: number;
-            updatedAt: number;
-        };
-        guide: {
-            revisionId: string | null;
-            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
-            providerTargetId: string | null;
-            runtimeKind: string | null;
-            modelId: string | null;
-            sessionId: string | null;
-            runId: string | null;
-            errorMessage: string | null;
-            createdAt: number | null;
-            updatedAt: number | null;
-            title: string | null;
-            steps: Array<{
-                id: string;
-                title: string;
-                rationale: string;
-                fileIds: Array<string>;
-                threadIds: Array<string>;
-                anchors: Array<{
-                    revisionId: string;
-                    fileId: string;
-                    path: string;
-                    side: 'base' | 'head';
-                    startLine: number;
-                    endLine: number;
-                    startColumn?: number;
-                    endColumn?: number;
-                    hunkHeader: string;
-                    lineHash: string;
-                    contextBeforeHash?: string;
-                    contextAfterHash?: string;
-                }>;
-                order: number;
-            }>;
-        };
-        agentFixes: Array<{
-            id: string;
-            reviewId: string;
-            targetRevisionId: string | null;
-            threadId: string | null;
-            anchor: {
-                revisionId: string;
-                fileId: string;
-                path: string;
-                side: 'base' | 'head';
-                startLine: number;
-                endLine: number;
-                startColumn?: number;
-                endColumn?: number;
-                hunkHeader: string;
-                lineHash: string;
-                contextBeforeHash?: string;
-                contextAfterHash?: string;
-            } | null;
-            instruction: string;
-            profileId: string | null;
-            expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact';
-            status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-            sessionId: string | null;
-            runId: string | null;
-            artifactId: string | null;
-            resultRevisionId: string | null;
-            errorMessage: string | null;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-        commitPlans: Array<{
-            id: string;
-            reviewId: string;
-            revisionId: string;
-            actorId: string;
-            strategy: string;
-            status: 'draft' | 'accepted' | 'applied' | 'abandoned';
-            groups: Array<{
-                id: string;
-                title: string;
-                message: string;
-                rationale: string;
-                fileIds: Array<string>;
-                paths: Array<string>;
-                dependsOn: Array<string>;
-            }>;
-            conflicts: Array<{
-                fileId: string;
-                path: string;
-                groupIds: Array<string>;
-            }>;
-            rationale: string;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-    };
-};
-
-export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsResponse = PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsResponses[keyof PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsResponses];
-
 export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdResolveData = {
     body?: never;
     path: {
@@ -15475,6 +16060,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdRes
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -15539,13 +16182,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdRes
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -15701,6 +16337,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses = {
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -15765,13 +16459,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses = {
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -15904,6 +16591,282 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses = {
 
 export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponse = PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses[keyof PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses];
 
+export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeData = {
+    body: {
+        mergeMethod: 'merge' | 'squash' | 'rebase';
+    };
+    path: {
+        workspaceId: string;
+        reviewId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceId}/diff-reviews/{reviewId}/merge';
+};
+
+export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string;
+        sourceId: string | null;
+        repositoryPath: string;
+        sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
+        title: string;
+        status: 'open' | 'merged' | 'closed' | 'abandoned';
+        reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
+        currentRevisionId: string | null;
+        createdAt: number;
+        updatedAt: number;
+        currentRevision: {
+            id: string;
+            reviewId: string;
+            sourceVersion: string;
+            patchHash: string;
+            fileCount: number;
+            additions: number;
+            deletions: number;
+            generatedAt: number;
+            patch: string;
+        } | null;
+        files: Array<{
+            id: string;
+            revisionId: string;
+            path: string;
+            previousPath: string | null;
+            status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
+            additions: number;
+            deletions: number;
+            isGenerated: boolean;
+            isBinary: boolean;
+            isViewed: boolean;
+        }>;
+        threads: Array<{
+            id: string;
+            reviewId: string;
+            originalRevisionId: string;
+            currentRevisionId: string | null;
+            fileId: string | null;
+            anchor: {
+                revisionId: string;
+                fileId: string;
+                path: string;
+                side: 'base' | 'head';
+                startLine: number;
+                endLine: number;
+                startColumn?: number;
+                endColumn?: number;
+                hunkHeader: string;
+                lineHash: string;
+                contextBeforeHash?: string;
+                contextAfterHash?: string;
+            } | null;
+            state: 'open' | 'resolved' | 'stale';
+            createdBy: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedBy: string | null;
+            resolvedAt: number | null;
+            comments: Array<{
+                id: string;
+                threadId: string;
+                authorKind: 'user' | 'agent' | 'external';
+                authorId: string;
+                bodyMarkdown: string;
+                externalUrl: string | null;
+                createdAt: number;
+                updatedAt: number;
+            }>;
+        }>;
+        submissions: Array<{
+            id: string;
+            reviewId: string;
+            revisionId: string;
+            actorId: string;
+            decision: 'approve' | 'request-changes' | 'comment';
+            bodyMarkdown: string | null;
+            submittedAt: number;
+            sourceSyncState: 'local-only' | 'pending' | 'synced' | 'failed';
+        }>;
+        events: Array<{
+            id: string;
+            reviewId: string;
+            eventKind: string;
+            actorKind: 'user' | 'agent' | 'external' | 'system';
+            actorId: string | null;
+            payload: unknown;
+            createdAt: number;
+        }>;
+        preferences: {
+            id: string;
+            workspaceId: string;
+            userId: string;
+            diffStyle: 'split' | 'unified';
+            codeTheme: string;
+            fontSize: number;
+            lineHeight: number;
+            hideWhitespaceOnly: boolean;
+            structuralHighlighting: boolean;
+            collapseGeneratedFiles: boolean;
+            notificationMode: 'all-activity' | 'all-activity-by-people' | 'reviews-and-comments' | 'reviews-and-comments-by-people' | 'none';
+            createdAt: number;
+            updatedAt: number;
+        };
+        guide: {
+            revisionId: string | null;
+            status: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled' | null;
+            providerTargetId: string | null;
+            runtimeKind: string | null;
+            modelId: string | null;
+            sessionId: string | null;
+            runId: string | null;
+            errorMessage: string | null;
+            createdAt: number | null;
+            updatedAt: number | null;
+            title: string | null;
+            steps: Array<{
+                id: string;
+                title: string;
+                rationale: string;
+                fileIds: Array<string>;
+                threadIds: Array<string>;
+                anchors: Array<{
+                    revisionId: string;
+                    fileId: string;
+                    path: string;
+                    side: 'base' | 'head';
+                    startLine: number;
+                    endLine: number;
+                    startColumn?: number;
+                    endColumn?: number;
+                    hunkHeader: string;
+                    lineHash: string;
+                    contextBeforeHash?: string;
+                    contextAfterHash?: string;
+                }>;
+                order: number;
+            }>;
+        };
+        agentFixes: Array<{
+            id: string;
+            reviewId: string;
+            targetRevisionId: string | null;
+            threadId: string | null;
+            anchor: {
+                revisionId: string;
+                fileId: string;
+                path: string;
+                side: 'base' | 'head';
+                startLine: number;
+                endLine: number;
+                startColumn?: number;
+                endColumn?: number;
+                hunkHeader: string;
+                lineHash: string;
+                contextBeforeHash?: string;
+                contextAfterHash?: string;
+            } | null;
+            instruction: string;
+            profileId: string | null;
+            expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact';
+            status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+            sessionId: string | null;
+            runId: string | null;
+            artifactId: string | null;
+            resultRevisionId: string | null;
+            errorMessage: string | null;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+        commitPlans: Array<{
+            id: string;
+            reviewId: string;
+            revisionId: string;
+            actorId: string;
+            strategy: string;
+            status: 'draft' | 'accepted' | 'applied' | 'abandoned';
+            groups: Array<{
+                id: string;
+                title: string;
+                message: string;
+                rationale: string;
+                fileIds: Array<string>;
+                paths: Array<string>;
+                dependsOn: Array<string>;
+            }>;
+            conflicts: Array<{
+                fileId: string;
+                path: string;
+                groupIds: Array<string>;
+            }>;
+            rationale: string;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+    };
+};
+
+export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeResponse = PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeResponses[keyof PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeResponses];
+
 export type PutWorkspacesByWorkspaceIdDiffReviewsPreferencesData = {
     body: {
         diffStyle?: 'split' | 'unified';
@@ -15971,6 +16934,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateRespons
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -16035,13 +17056,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateRespons
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -16194,6 +17208,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancelResponses
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -16258,13 +17330,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancelResponses
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -16430,6 +17495,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesResponses 
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -16494,13 +17617,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesResponses 
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -16660,6 +17776,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -16724,13 +17898,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -16917,6 +18084,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -16981,13 +18206,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -17147,6 +18365,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -17211,13 +18487,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -17371,6 +18640,64 @@ export type DeleteWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentF
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -17435,13 +18762,6 @@ export type DeleteWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentF
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -17607,6 +18927,64 @@ export type PutWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPl
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -17671,13 +19049,6 @@ export type PutWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPl
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
@@ -17833,6 +19204,64 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitP
         sourceId: string | null;
         repositoryPath: string;
         sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import';
+        githubPullRequest: {
+            owner: string;
+            repo: string;
+            number: string | number;
+            detail?: {
+                url: string;
+                title: string;
+                body: string | null;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                mergeable: boolean | null;
+                mergeableState: string;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                author: {
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                } | null;
+                reviewers: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                assignees: Array<{
+                    login: string;
+                    avatarUrl: string | null;
+                    url: string | null;
+                }>;
+                labels: Array<{
+                    name: string;
+                    color: string;
+                }>;
+                checksState: 'success' | 'failure' | 'pending' | 'neutral';
+                checks: Array<{
+                    id: string;
+                    name: string;
+                    status: 'queued' | 'in_progress' | 'completed';
+                    conclusion: string | null;
+                    url: string | null;
+                }>;
+                timeline: Array<{
+                    id: string;
+                    kind: 'comment' | 'review';
+                    author: {
+                        login: string;
+                        avatarUrl: string | null;
+                        url: string | null;
+                    } | null;
+                    body: string | null;
+                    state: string | null;
+                    createdAt: string;
+                    url: string | null;
+                }>;
+            };
+        } | null;
         title: string;
         status: 'open' | 'merged' | 'closed' | 'abandoned';
         reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented';
@@ -17897,13 +19326,6 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitP
                 externalUrl: string | null;
                 createdAt: number;
                 updatedAt: number;
-            }>;
-            reactions: Array<{
-                id: string;
-                threadId: string;
-                userId: string;
-                reaction: string;
-                createdAt: number;
             }>;
         }>;
         submissions: Array<{
