@@ -26,12 +26,10 @@ import {
   PinLine as PinOffIcon,
   PlusLine as PlusIcon,
   Refresh1Line as RefreshCwIcon,
-  SafeShieldLine as SafeShieldIcon,
   SearchLine as SearchIcon,
   Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
   UpSmallLine as ChevronUpIcon,
-  UserQuestionLine as UserQuestionIcon,
 } from '@mingcute/react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
@@ -74,7 +72,6 @@ import type {
   PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
-import { RuntimeIcon } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
 import {
   ContextMenu,
@@ -113,11 +110,6 @@ import { prefetchChatSession } from '~/features/chat/session/chat-session-prefet
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
-import {
-  STATUS_ICON,
-  STATUS_ICON_CLASS,
-  statusKind,
-} from '~/features/pull-requests/status-meta'
 import {
   fetchRemoteUpstreamJson,
   remoteHostUpstreamQueryKey,
@@ -161,7 +153,6 @@ import { useTitleRegenerationStore } from '~/store/title-regeneration'
 import { usePreviewCard } from './preview-card/preview-card-context'
 import { PreviewCardProvider } from './preview-card/preview-card-provider'
 import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
-import { SessionRenameInput } from './session-rename-input'
 import type { WorkspaceSession } from './use-session'
 import { isManualSession, sessionsQueryKey, updateSessionReadState, useAllSessions } from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
@@ -187,6 +178,11 @@ import {
   WorkspaceSessionGroupSection,
 } from './workspace-session-groups'
 import type {
+  WorkspaceSessionAttentionKind,
+  WorkspaceSessionMenuAnchor,
+} from './workspace-session-item-view'
+import { WorkspaceSessionItemView } from './workspace-session-item-view'
+import type {
   WorkspaceSidebarProjectFilter,
   WorkspaceSidebarProjectSortDirection,
   WorkspaceSidebarProjectSortKey,
@@ -194,7 +190,6 @@ import type {
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
 
 type WorkspaceTranslation = TFunction<'workspace'>
-type WorkTranslation = TFunction<'work'>
 
 const SESSION_REVEAL_BATCH_SIZE = 64
 const SESSION_REVEAL_DELAY_MS = 16
@@ -280,7 +275,7 @@ function isSessionRunning(
   return session.status === 'streaming' || locallyStreamingSessionIds.has(session.id)
 }
 
-type SessionAttentionKind = 'userInput' | 'toolApproval'
+type SessionAttentionKind = WorkspaceSessionAttentionKind
 
 function useSessionAttentionBySessionId(
   sessions: readonly WorkspaceSession[],
@@ -366,11 +361,7 @@ type WorkspaceMenuAction = {
   separatorBefore?: boolean
 }
 
-type SessionMenuAnchor
-  = | HTMLElement
-    | {
-      getBoundingClientRect: () => DOMRect
-    }
+type SessionMenuAnchor = WorkspaceSessionMenuAnchor
 
 type RuntimeIconByKind = ReadonlyMap<RuntimeKind, RuntimeIconDescriptor>
 
@@ -392,12 +383,6 @@ const CLOSED_SESSION_MENU_STATE: SessionMenuState = {
   sessionId: null,
   workId: null,
   anchor: null,
-}
-
-function createPointMenuAnchor(clientX: number, clientY: number): SessionMenuAnchor {
-  return {
-    getBoundingClientRect: () => new DOMRect(clientX, clientY, 0, 0),
-  }
 }
 
 function SessionMenuActionItems({
@@ -1657,33 +1642,6 @@ function WorkspaceAddDialog({
   )
 }
 
-const SessionActiveBackground = memo(({ active }: { active: boolean }) => {
-  return (
-    <div
-      className={cn(
-        'pointer-events-none absolute inset-0 rounded-lg transition-colors',
-        active ? 'bg-accent/80' : 'bg-transparent',
-      )}
-      aria-hidden="true"
-      data-session-active={active ? 'true' : 'false'}
-    />
-  )
-})
-SessionActiveBackground.displayName = 'SessionActiveBackground'
-
-const SessionUnreadIndicator = memo(
-  ({ show, active, label }: { show: boolean, active: boolean, label: string }) => {
-    if (!show || active) {
-      return null
-    }
-
-    return <span className="shrink-0 size-1.5 rounded-full bg-primary" aria-label={label} />
-  },
-)
-SessionUnreadIndicator.displayName = 'SessionUnreadIndicator'
-
-// ── Session item ──────────────────────────────────────────────────────────────
-
 const SessionItem = memo(
   ({
     session,
@@ -1694,7 +1652,6 @@ const SessionItem = memo(
     isRenaming,
     runtimeIcon,
     t,
-    tWork,
     onPrepareSessionOpen,
     onPrefetchSession,
     onRenameCommit,
@@ -1709,7 +1666,6 @@ const SessionItem = memo(
     isRenaming: boolean
     runtimeIcon: RuntimeIconDescriptor | undefined
     t: WorkspaceTranslation
-    tWork: WorkTranslation
     onPrepareSessionOpen: (session: WorkspaceSession) => void
     onPrefetchSession: (sessionId: string) => void
     onRenameCommit: (session: WorkspaceSession, nextTitle: string) => Promise<void>
@@ -1719,83 +1675,13 @@ const SessionItem = memo(
     const previewCard = usePreviewCard()
     const sessionSurfaceId = work ? workSurfaceId(work.id) : chatSurfaceId(session.id)
     const active = useIsActiveSurfaceId(sessionSurfaceId)
-    const isUnread = session.unread
-    // System-generated sessions (anything other than `manual`) are always
-    // de-emphasized so they don't compete with the user's own chats.
-    // Running/error/unread states only affect the right-side indicators,
-    // not the row opacity. The exception is the currently active session.
-    const isManual = isManualSession(session)
-    const dimmed = !work && !isManual && !active
+    const dimmed = !work && !isManualSession(session) && !active
     const isRegeneratingTitle = useTitleRegenerationStore(state =>
       state.regeneratingSessionIds.has(session.id))
     const dragScreenPointerRef = useRef<ScreenCoordinates | null>(null)
     const dragCleanupRef = useRef<(() => void) | null>(null)
     const dragWasTornOffRef = useRef(false)
     const sessionTitle = session.title?.trim() || work?.title || t('session.fallbackTitle')
-    const workActivityLabel = work ? tWork(`aside.activity.${work.activity}`) : null
-    const workPullRequestLabel = work?.pullRequest
-      ? work.pullRequest.merged
-        ? tWork('sidebar.merged', { number: work.pullRequest.number })
-        : work.pullRequest.isDraft
-          ? tWork('sidebar.draft', { number: work.pullRequest.number })
-          : tWork('sidebar.ready', { number: work.pullRequest.number })
-      : null
-    const workPullRequestStatus = work?.pullRequest ? statusKind(work.pullRequest) : null
-    const WorkLeadingIcon = workPullRequestStatus ? STATUS_ICON[workPullRequestStatus] : WorkIcon
-    const workLeadingIconClass = workPullRequestStatus
-      ? STATUS_ICON_CLASS[workPullRequestStatus]
-      : 'text-muted-foreground'
-    const workActivityDotClass
-      = work?.activity === 'blocked'
-        ? 'bg-destructive'
-        : work?.activity === 'waiting'
-          ? 'bg-warning'
-          : null
-    const workStateLabel = work && workActivityLabel
-      ? workPullRequestLabel
-        ? work.activity === 'idle'
-          ? workPullRequestLabel
-          : `${workPullRequestLabel} · ${workActivityLabel}`
-        : workActivityLabel
-      : null
-    const trailingIndicator = isStreaming
-      ? attentionKind === 'userInput'
-        ? (
-            <span
-              className="grid size-3.5 shrink-0 place-items-center text-amber-500/85 [contain:layout_paint]"
-              aria-label={t('session.aria.waitingForUserInput')}
-              role="status"
-              data-testid={`session-waiting-user-input-indicator-${session.id}`}
-            >
-              <UserQuestionIcon className="size-3.5" aria-hidden="true" />
-            </span>
-          )
-        : attentionKind === 'toolApproval'
-          ? (
-              <span
-                className="grid size-3.5 shrink-0 place-items-center text-amber-500/85 [contain:layout_paint]"
-                aria-label={t('session.aria.waitingForToolApproval')}
-                role="status"
-                data-testid={`session-waiting-tool-approval-indicator-${session.id}`}
-              >
-                <SafeShieldIcon className="size-3.5" aria-hidden="true" />
-              </span>
-            )
-          : (
-              <span
-                className="grid size-3.5 shrink-0 animate-spin place-items-center text-muted-foreground/70 [contain:layout_paint] [will-change:transform] motion-reduce:animate-none"
-                aria-label={t('session.aria.running')}
-                role="status"
-                data-testid={`session-running-indicator-${session.id}`}
-              >
-                <LoadingLine className="size-3.5" aria-hidden="true" />
-              </span>
-            )
-      : (
-          <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-            {formatRelativeTime(session.listActivityAt, t)}
-          </span>
-        )
 
     const prepareSessionOpen = useCallback(() => {
       onPrepareSessionOpen(session)
@@ -1814,7 +1700,6 @@ const SessionItem = memo(
 
     const recordDragPosition = useCallback((event: Event) => {
       const screenPointer = getEventScreenCoordinates(event, window)
-
       if (
         screenPointer
         && event.type.startsWith('drag')
@@ -1824,16 +1709,15 @@ const SessionItem = memo(
       ) {
         return
       }
-
       if (screenPointer) {
         dragScreenPointerRef.current = screenPointer
       }
     }, [])
-    const handleOpenInNewWindow = useCallback(() => {
+
+    const openInNewWindow = useCallback(() => {
       if (!isElectron) {
         return
       }
-
       prepareSessionOpen()
       const screenX = window.screenX + Math.round(window.outerWidth / 2)
       const screenY = window.screenY + Math.round(window.outerHeight / 2)
@@ -1848,25 +1732,21 @@ const SessionItem = memo(
         }, { screenX, screenY, detachSurface: true })
         return
       }
-      void openTearoffChatSessionWindow(session.id, { screenX, screenY, detachSurface: true })
+      void openTearoffChatSessionWindow(session.id, {
+        screenX,
+        screenY,
+        detachSurface: true,
+      })
     }, [prepareSessionOpen, session.id, sessionTitle, work])
-
-    function handleSessionDoubleClick(e: React.MouseEvent<HTMLButtonElement>) {
-      e.preventDefault()
-      e.stopPropagation()
-      handleOpenInNewWindow()
-    }
 
     const checkSessionTearOff = useCallback(() => {
       if (dragWasTornOffRef.current || !isElectron) {
         return false
       }
-
       const pointer = dragScreenPointerRef.current
       if (!pointer || !isPointerOutsideWindow(pointer, window)) {
         return false
       }
-
       dragWasTornOffRef.current = true
       dragCleanupRef.current?.()
       dragCleanupRef.current = null
@@ -1879,251 +1759,98 @@ const SessionItem = memo(
           dragWasTornOffRef.current = false
         }
       })
-
       return true
     }, [session.id])
 
-    const handleDragStart = useCallback(
-      (e: React.DragEvent) => {
-        e.dataTransfer.setData(SESSION_DRAG_MIME_TYPE, session.id)
-        e.dataTransfer.effectAllowed = 'move'
-        recordDragPosition(e.nativeEvent)
-        dragWasTornOffRef.current = false
-        dragCleanupRef.current?.()
+    const handleDragStart = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+      event.dataTransfer.setData(SESSION_DRAG_MIME_TYPE, session.id)
+      event.dataTransfer.effectAllowed = 'move'
+      recordDragPosition(event.nativeEvent)
+      dragWasTornOffRef.current = false
+      dragCleanupRef.current?.()
+      const handleDragMove = (
+        moveEvent: DragEvent | MouseEvent | PointerEvent | TouchEvent,
+      ) => recordDragPosition(moveEvent)
+      window.addEventListener('dragover', handleDragMove, true)
+      window.addEventListener('mousemove', handleDragMove, true)
+      window.addEventListener('pointermove', handleDragMove, true)
+      window.addEventListener('touchmove', handleDragMove, true)
+      dragCleanupRef.current = () => {
+        window.removeEventListener('dragover', handleDragMove, true)
+        window.removeEventListener('mousemove', handleDragMove, true)
+        window.removeEventListener('pointermove', handleDragMove, true)
+        window.removeEventListener('touchmove', handleDragMove, true)
+      }
+    }, [recordDragPosition, session.id])
 
-        const handleDragMove = (event: DragEvent | MouseEvent | PointerEvent | TouchEvent) => {
-          recordDragPosition(event)
-        }
+    const handleDrag = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+      recordDragPosition(event.nativeEvent)
+    }, [recordDragPosition])
 
-        window.addEventListener('dragover', handleDragMove, true)
-        window.addEventListener('mousemove', handleDragMove, true)
-        window.addEventListener('pointermove', handleDragMove, true)
-        window.addEventListener('touchmove', handleDragMove, true)
-        dragCleanupRef.current = () => {
-          window.removeEventListener('dragover', handleDragMove, true)
-          window.removeEventListener('mousemove', handleDragMove, true)
-          window.removeEventListener('pointermove', handleDragMove, true)
-          window.removeEventListener('touchmove', handleDragMove, true)
-        }
-      },
-      [recordDragPosition, session.id],
-    )
+    const handleDragEnd = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+      recordDragPosition(event.nativeEvent)
+      if (!dragWasTornOffRef.current) {
+        checkSessionTearOff()
+      }
+      releaseSessionDrag()
+    }, [checkSessionTearOff, recordDragPosition, releaseSessionDrag])
 
-    const handleDrag = useCallback(
-      (e: React.DragEvent) => {
-        recordDragPosition(e.nativeEvent)
-      },
-      [recordDragPosition],
-    )
+    useEffect(() => releaseSessionDrag, [releaseSessionDrag])
 
-    const handleDragEnd = useCallback(
-      (e: React.DragEvent) => {
-        recordDragPosition(e.nativeEvent)
-        if (!dragWasTornOffRef.current) {
-          checkSessionTearOff()
-        }
-        releaseSessionDrag()
-      },
-      [checkSessionTearOff, recordDragPosition, releaseSessionDrag],
-    )
-
-    useEffect(() => {
-      return releaseSessionDrag
-    }, [releaseSessionDrag])
-
-    const openSessionMenu = (anchor: SessionMenuAnchor) => {
+    const openSessionMenu = useCallback((anchor: SessionMenuAnchor) => {
       onOpenSessionMenu({
         sessionId: session.id,
         workId: work?.id ?? null,
         anchor,
       })
-    }
+    }, [onOpenSessionMenu, session.id, work?.id])
 
-    const handleOpenButtonMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault()
-      event.stopPropagation()
-      openSessionMenu(event.currentTarget)
-    }
-
-    const handleSessionContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      event.stopPropagation()
-      openSessionMenu(createPointMenuAnchor(event.clientX, event.clientY))
-    }
-
-    const handleSessionKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) {
-        return
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-      const rect = event.currentTarget.getBoundingClientRect()
-      openSessionMenu(createPointMenuAnchor(rect.left + 24, rect.top + rect.height / 2))
-    }
-
-    const itemContent = (
-      <div
+    return (
+      <WorkspaceSessionItemView
+        session={session}
+        work={work}
+        active={active}
+        dimmed={dimmed}
+        isStreaming={isStreaming}
+        attentionKind={attentionKind}
+        hasError={hasError}
+        isRenaming={isRenaming}
+        isRegeneratingTitle={isRegeneratingTitle}
+        runtimeIcon={runtimeIcon}
+        relativeTime={formatRelativeTime(session.listActivityAt, t)}
         draggable={!isRenaming && !work}
+        canOpenInNewWindow={isElectron}
+        onOpen={() => {
+          previewCard.dismiss()
+          prepareSessionOpen()
+          if (work) {
+            openWork(work.id)
+          }
+          else {
+            openChatSession(session.id)
+          }
+        }}
+        onPrepareOpen={() => {
+          previewCard.dismiss()
+          prepareSessionOpen()
+        }}
+        onPrefetch={prefetchSession}
+        onPreview={anchor => previewCard.show({
+          kind: 'session',
+          session,
+          anchor,
+          placement: 'right',
+        })}
+        onPreviewLeave={previewCard.hide}
+        onOpenInNewWindow={openInNewWindow}
+        onRenameCommit={nextTitle => onRenameCommit(session, nextTitle)}
+        onRenameCancel={onRenameCancel}
+        onOpenMenu={openSessionMenu}
         onDragStart={handleDragStart}
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}
-        onContextMenu={isRenaming ? undefined : handleSessionContextMenu}
-        onKeyDown={isRenaming ? undefined : handleSessionKeyDown}
-        onPointerEnter={isRenaming
-          ? undefined
-            : (event) => {
-                prefetchSession()
-                previewCard.show({ kind: 'session', session, anchor: event.currentTarget, placement: 'right' })
-              }}
-        onPointerLeave={isRenaming ? undefined : previewCard.hide}
-        className={cn(
-          'group relative isolate flex min-w-0 w-full items-center rounded-lg text-left text-xs hover:bg-accent/50 [content-visibility:auto] [contain-intrinsic-block-size:30px]',
-          !isRenaming && !work && 'cursor-grab active:cursor-grabbing',
-        )}
-        data-testid={`session-item-${session.id}`}
-        data-session-pinned={session.pinned ? 'true' : 'false'}
-      >
-        <SessionActiveBackground active={active} />
-        {isRenaming
-? (
-          <SessionRenameInput
-            key={`${session.id}:${sessionTitle}`}
-            initialTitle={sessionTitle}
-            sessionId={session.id}
-            pinned={Boolean(session.pinned)}
-            trailingLabel={formatRelativeTime(session.listActivityAt, t)}
-            onCommit={nextTitle => onRenameCommit(session, nextTitle)}
-            onCancel={onRenameCancel}
-          />
-        )
-: (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                previewCard.dismiss()
-                prepareSessionOpen()
-                if (work) {
-                  openWork(work.id)
-                }
-                else {
-                  openChatSession(session.id)
-                }
-              }}
-              onDoubleClick={isElectron ? handleSessionDoubleClick : undefined}
-              onFocus={prefetchSession}
-              onPointerDown={() => {
-                previewCard.dismiss()
-                prepareSessionOpen()
-              }}
-              data-testid={`session-open-${session.id}`}
-              className={cn(
-                'relative z-10 flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5 py-1.5 text-sidebar-foreground/80',
-                // System-generated sessions recede at rest; restore on any
-                // engagement (hover/focus) so the row stays fully legible the
-                // moment the user interacts with it.
-                dimmed
-                && 'opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
-              )}
-            >
-              {work
-                ? (
-                    <span
-                      className={cn(
-                        'relative shrink-0',
-                        workLeadingIconClass,
-                        work.pullRequest && 'mr-1.5',
-                      )}
-                      title={workStateLabel ?? undefined}
-                      data-testid={`work-status-${work.id}`}
-                    >
-                      <WorkLeadingIcon className="size-3.5" aria-hidden="true" />
-                      {workActivityDotClass
-                        ? (
-                            <span
-                              className={cn(
-                                'absolute -right-0.5 -top-0.5 size-1.5 rounded-full outline outline-2 outline-background',
-                                workActivityDotClass,
-                              )}
-                              aria-hidden="true"
-                            />
-                          )
-                        : null}
-                      {work.pullRequest
-                        ? (
-                            <span className="absolute -right-2 -bottom-0.5 min-w-3 rounded-full bg-gray-200 dark:bg-gray-800 px-0.5 text-center text-[7px] font-medium leading-2.5 text-muted-foreground tabular-nums">
-                              #
-{work.pullRequest.number}
-                            </span>
-                          )
-                        : null}
-                      {workStateLabel ? <span className="sr-only">{workStateLabel}</span> : null}
-                    </span>
-                  )
-                : hasError
-                  ? (
-                <CircleAlertIcon
-                  className="size-3.5 shrink-0 !text-destructive/80"
-                  aria-label={t('session.aria.error')}
-                  data-testid={`session-error-indicator-${session.id}`}
-                />
-                    )
-                  : (
-                <RuntimeIcon
-                  icon={runtimeIcon}
-                  className="size-3.5 shrink-0 text-muted-foreground/70"
-                />
-                    )}
-              {session.pinned
-? (
-                <PinIcon
-                  className="size-3 shrink-0 !text-primary/60"
-                  aria-label={t('session.aria.pinned')}
-                  data-testid={`session-pin-indicator-${session.id}`}
-                />
-              )
-: null}
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate text-left',
-                  isRegeneratingTitle && [
-                    'text-sidebar-foreground',
-                    '[mask-image:linear-gradient(90deg,rgba(0,0,0,0.35)_0%,black_36%,black_64%,rgba(0,0,0,0.35)_100%)] [mask-size:220%_100%]',
-                    '[-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,0.35)_0%,black_36%,black_64%,rgba(0,0,0,0.35)_100%)] [-webkit-mask-size:220%_100%]',
-                    'animate-[shimmer_1.6s_linear_infinite]',
-                  ],
-                )}
-                data-testid={`session-title-${session.id}`}
-                data-regenerating={isRegeneratingTitle ? 'true' : undefined}
-              >
-                {sessionTitle}
-              </span>
-              <SessionUnreadIndicator
-                show={isUnread && !isStreaming}
-                active={active}
-                label={t('session.aria.newReply')}
-              />
-              {trailingIndicator}
-            </button>
-            <div className="group/menu relative z-10 mr-0.5 size-6 shrink-0">
-              <button
-                type="button"
-                className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
-                onClick={handleOpenButtonMenu}
-                aria-haspopup="menu"
-                aria-label={t('session.aria.menu')}
-                data-testid={`session-menu-trigger-${session.id}`}
-              >
-                <MoreHorizontalIcon className="size-3" aria-hidden="true" />
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      />
     )
-
-    return itemContent
   },
 )
 SessionItem.displayName = 'SessionItem'
@@ -2137,7 +1864,6 @@ interface SessionListProps {
   locallyErroredSessionIds: Set<string>
   runtimeIconByKind: RuntimeIconByKind
   t: WorkspaceTranslation
-  tWork: WorkTranslation
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onPrefetchSession: (sessionId: string) => void
   onRenameCommit: (session: WorkspaceSession, nextTitle: string) => Promise<void>
@@ -2155,7 +1881,6 @@ const SessionListRows = memo(
     locallyErroredSessionIds,
     runtimeIconByKind,
     t,
-    tWork,
     onPrepareSessionOpen,
     onPrefetchSession,
     onRenameCommit,
@@ -2179,7 +1904,6 @@ const SessionListRows = memo(
             isRenaming={session.id === renamingSessionId}
             runtimeIcon={runtimeIconByKind.get(session.runtimeKind)}
             t={t}
-            tWork={tWork}
             onPrepareSessionOpen={onPrepareSessionOpen}
             onPrefetchSession={onPrefetchSession}
             onRenameCommit={onRenameCommit}
@@ -2323,7 +2047,6 @@ function WorkspaceSessionListSection({
   locallyErroredSessionIds,
   runtimeIconByKind,
   t,
-  tWork,
   onPrepareSessionOpen,
   onPrefetchSession,
   onRenameCommit,
@@ -2340,7 +2063,6 @@ function WorkspaceSessionListSection({
   locallyErroredSessionIds: Set<string>
   runtimeIconByKind: RuntimeIconByKind
   t: WorkspaceTranslation
-  tWork: WorkTranslation
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onPrefetchSession: (sessionId: string) => void
   onRenameCommit: (session: WorkspaceSession, nextTitle: string) => Promise<void>
@@ -2440,7 +2162,6 @@ function WorkspaceSessionListSection({
           locallyErroredSessionIds={locallyErroredSessionIds}
           runtimeIconByKind={runtimeIconByKind}
           t={t}
-          tWork={tWork}
           onPrepareSessionOpen={onPrepareSessionOpen}
           onPrefetchSession={onPrefetchSession}
           onRenameCommit={onRenameCommit}
@@ -2492,7 +2213,6 @@ const WorkspaceGroup = memo(
     onTogglePin: (id: string, pinned: boolean) => void
   }) => {
     const { t } = useTranslation('workspace')
-    const { t: tWork } = useTranslation('work')
     const queryClient = useQueryClient()
     const { selectDirectory } = useDirectoryPicker()
     const [renameOpen, setRenameOpen] = useState(false)
@@ -3212,7 +2932,6 @@ const WorkspaceGroup = memo(
                 locallyErroredSessionIds={locallyErroredSessionIds}
                 runtimeIconByKind={runtimeIconByKind}
                 t={t}
-                tWork={tWork}
                 onPrepareSessionOpen={handlePrepareSessionOpen}
                 onPrefetchSession={prefetchSession}
                 onRenameCommit={handleRenameSession}
@@ -3233,7 +2952,6 @@ const WorkspaceGroup = memo(
               locallyErroredSessionIds={locallyErroredSessionIds}
               runtimeIconByKind={runtimeIconByKind}
               t={t}
-              tWork={tWork}
               onPrepareSessionOpen={handlePrepareSessionOpen}
               onPrefetchSession={prefetchSession}
               onRenameCommit={handleRenameSession}
