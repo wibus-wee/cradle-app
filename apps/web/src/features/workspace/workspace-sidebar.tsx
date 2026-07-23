@@ -28,14 +28,11 @@ import {
   SearchLine as SearchIcon,
   Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
-  UpSmallLine as ChevronUpIcon,
 } from '@mingcute/react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { TFunction } from 'i18next'
 import {
   Fragment,
   memo,
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -69,7 +66,6 @@ import type {
   GetRemoteHostsResponse,
   PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
-import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -94,7 +90,6 @@ import {
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
-import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { runtimeSessionStatusQueryOptions } from '~/features/chat/commands/runtime-session-status-command'
 import { prefetchChatSession } from '~/features/chat/session/chat-session-prefetch'
@@ -133,19 +128,15 @@ import {
   openWork,
   openWorkspaceDetail,
 } from '~/navigation/navigation-commands'
-import type { ScreenCoordinates } from '~/navigation/screen-coordinates'
-import { getEventScreenCoordinates, isPointerOutsideWindow } from '~/navigation/screen-coordinates'
 import { chatSurfaceId, workSurfaceId } from '~/navigation/surface-identity'
 import { openTearoffChatSessionWindow, openTearoffSurfaceWindow } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
-import { usePreviewCard } from './preview-card/preview-card-context'
 import { PreviewCardProvider } from './preview-card/preview-card-provider'
-import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
 import type { WorkspaceSession } from './use-session'
-import { isManualSession, sessionsQueryKey, updateSessionReadState, useAllSessions } from './use-session'
+import { sessionsQueryKey, updateSessionReadState, useAllSessions } from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
 import {
   useAddSessionGroupMembers,
@@ -170,11 +161,14 @@ import {
   SessionGroupMenuItems,
   WorkspaceSessionGroupSection,
 } from './workspace-session-groups'
+import type { WorkspaceSessionItemMenuRequest } from './workspace-session-item'
 import type {
   WorkspaceSessionAttentionKind,
   WorkspaceSessionMenuAnchor,
 } from './workspace-session-item-view'
-import { WorkspaceSessionItemView } from './workspace-session-item-view'
+import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
+import { WorkspaceSessionListSection } from './workspace-session-list-section'
+import { isWorkspaceSessionRunning } from './workspace-session-status'
 import type {
   WorkspaceSidebarProjectFilter,
   WorkspaceSidebarProjectSortDirection,
@@ -182,10 +176,6 @@ import type {
 } from './workspace-sidebar-ui-store'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
 
-type WorkspaceTranslation = TFunction<'workspace'>
-
-const SESSION_REVEAL_BATCH_SIZE = 64
-const SESSION_REVEAL_DELAY_MS = 16
 const RECENT_SESSION_WINDOW_SECONDS = 60 * 60
 const DEFAULT_WORKSPACE_FILE_NAME = 'untitled'
 const DEFAULT_WORKSPACE_FOLDER_NAME = 'untitled-folder'
@@ -262,13 +252,6 @@ function formatRegenerateTitleError(error: unknown): string {
   return JSON.stringify(error)
 }
 
-function isSessionRunning(
-  session: WorkspaceSession,
-  locallyStreamingSessionIds: Set<string>,
-): boolean {
-  return session.status === 'streaming' || locallyStreamingSessionIds.has(session.id)
-}
-
 type SessionAttentionKind = WorkspaceSessionAttentionKind
 
 function useSessionAttentionBySessionId(
@@ -277,7 +260,7 @@ function useSessionAttentionBySessionId(
 ): Map<string, SessionAttentionKind> {
   const activeSessionIds = useMemo(
     () => sessions
-      .filter(session => isSessionRunning(session, locallyStreamingSessionIds))
+      .filter(session => isWorkspaceSessionRunning(session, locallyStreamingSessionIds))
       .map(session => session.id),
     [locallyStreamingSessionIds, sessions],
   )
@@ -313,24 +296,6 @@ function isSessionRecent(session: WorkspaceSession, currentUnixTimestamp: number
   return session.listActivityAt >= currentUnixTimestamp - RECENT_SESSION_WINDOW_SECONDS
 }
 
-function formatRelativeTime(unixTimestamp: number, t: WorkspaceTranslation): string {
-  const now = Math.floor(Date.now() / 1000)
-  const diff = now - unixTimestamp
-  if (diff < 60) {
-    return t('session.relative.now')
-  }
-  if (diff < 3600) {
-    return t('session.relative.minutes', { count: Math.floor(diff / 60) })
-  }
-  if (diff < 86400) {
-    return t('session.relative.hours', { count: Math.floor(diff / 3600) })
-  }
-  if (diff < 2592000) {
-    return t('session.relative.days', { count: Math.floor(diff / 86400) })
-  }
-  return t('session.relative.months', { count: Math.floor(diff / 2592000) })
-}
-
 type SessionMenuAction = {
   key: string
   label: string
@@ -347,13 +312,9 @@ type SessionMenuActionGroup = {
 
 type SessionMenuAnchor = WorkspaceSessionMenuAnchor
 
-type RuntimeIconByKind = ReadonlyMap<RuntimeKind, RuntimeIconDescriptor>
+type RuntimeIconByKind = WorkspaceRuntimeIconByKind
 
-type SessionMenuRequest = {
-  sessionId: string
-  workId: string | null
-  anchor: SessionMenuAnchor
-}
+type SessionMenuRequest = WorkspaceSessionItemMenuRequest
 
 type SessionMenuState = {
   open: boolean
@@ -1577,441 +1538,6 @@ function WorkspaceAddDialog({
   )
 }
 
-const SessionItem = memo(
-  ({
-    session,
-    work,
-    isStreaming,
-    attentionKind,
-    hasError,
-    isRenaming,
-    runtimeIcon,
-    t,
-    onPrepareSessionOpen,
-    onPrefetchSession,
-    onRenameCommit,
-    onRenameCancel,
-    onOpenSessionMenu,
-  }: {
-    session: WorkspaceSession
-    work: WorkSummary | null
-    isStreaming: boolean
-    attentionKind: SessionAttentionKind | null
-    hasError: boolean
-    isRenaming: boolean
-    runtimeIcon: RuntimeIconDescriptor | undefined
-    t: WorkspaceTranslation
-    onPrepareSessionOpen: (session: WorkspaceSession) => void
-    onPrefetchSession: (sessionId: string) => void
-    onRenameCommit: (session: WorkspaceSession, nextTitle: string) => Promise<void>
-    onRenameCancel: () => void
-    onOpenSessionMenu: (request: SessionMenuRequest) => void
-  }) => {
-    const previewCard = usePreviewCard()
-    const sessionSurfaceId = work ? workSurfaceId(work.id) : chatSurfaceId(session.id)
-    const active = useIsActiveSurfaceId(sessionSurfaceId)
-    const dimmed = !work && !isManualSession(session) && !active
-    const isRegeneratingTitle = useTitleRegenerationStore(state =>
-      state.regeneratingSessionIds.has(session.id))
-    const dragScreenPointerRef = useRef<ScreenCoordinates | null>(null)
-    const dragCleanupRef = useRef<(() => void) | null>(null)
-    const dragWasTornOffRef = useRef(false)
-    const sessionTitle = session.title?.trim() || work?.title || t('session.fallbackTitle')
-
-    const prepareSessionOpen = useCallback(() => {
-      onPrepareSessionOpen(session)
-    }, [onPrepareSessionOpen, session])
-
-    const prefetchSession = useCallback(() => {
-      onPrefetchSession(session.id)
-    }, [onPrefetchSession, session.id])
-
-    const releaseSessionDrag = useCallback(() => {
-      dragCleanupRef.current?.()
-      dragCleanupRef.current = null
-      dragScreenPointerRef.current = null
-      dragWasTornOffRef.current = false
-    }, [])
-
-    const recordDragPosition = useCallback((event: Event) => {
-      const screenPointer = getEventScreenCoordinates(event, window)
-      if (
-        screenPointer
-        && event.type.startsWith('drag')
-        && screenPointer.screenX === 0
-        && screenPointer.screenY === 0
-        && dragScreenPointerRef.current
-      ) {
-        return
-      }
-      if (screenPointer) {
-        dragScreenPointerRef.current = screenPointer
-      }
-    }, [])
-
-    const openInNewWindow = useCallback(() => {
-      if (!isElectron) {
-        return
-      }
-      prepareSessionOpen()
-      const screenX = window.screenX + Math.round(window.outerWidth / 2)
-      const screenY = window.screenY + Math.round(window.outerHeight / 2)
-      if (work) {
-        void openTearoffSurfaceWindow({
-          id: workSurfaceId(work.id),
-          kind: 'work',
-          title: sessionTitle,
-          route: { to: '/work/$workId', params: { workId: work.id } },
-          order: 0,
-          closable: true,
-        }, { screenX, screenY, detachSurface: true })
-        return
-      }
-      void openTearoffChatSessionWindow(session.id, {
-        screenX,
-        screenY,
-        detachSurface: true,
-      })
-    }, [prepareSessionOpen, session.id, sessionTitle, work])
-
-    const checkSessionTearOff = useCallback(() => {
-      if (dragWasTornOffRef.current || !isElectron) {
-        return false
-      }
-      const pointer = dragScreenPointerRef.current
-      if (!pointer || !isPointerOutsideWindow(pointer, window)) {
-        return false
-      }
-      dragWasTornOffRef.current = true
-      dragCleanupRef.current?.()
-      dragCleanupRef.current = null
-      void openTearoffChatSessionWindow(session.id, {
-        screenX: pointer.screenX,
-        screenY: pointer.screenY,
-        detachSurface: true,
-      }).then((opened) => {
-        if (!opened) {
-          dragWasTornOffRef.current = false
-        }
-      })
-      return true
-    }, [session.id])
-
-    const handleDragStart = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-      event.dataTransfer.setData(SESSION_DRAG_MIME_TYPE, session.id)
-      event.dataTransfer.effectAllowed = 'move'
-      recordDragPosition(event.nativeEvent)
-      dragWasTornOffRef.current = false
-      dragCleanupRef.current?.()
-      const handleDragMove = (
-        moveEvent: DragEvent | MouseEvent | PointerEvent | TouchEvent,
-      ) => recordDragPosition(moveEvent)
-      window.addEventListener('dragover', handleDragMove, true)
-      window.addEventListener('mousemove', handleDragMove, true)
-      window.addEventListener('pointermove', handleDragMove, true)
-      window.addEventListener('touchmove', handleDragMove, true)
-      dragCleanupRef.current = () => {
-        window.removeEventListener('dragover', handleDragMove, true)
-        window.removeEventListener('mousemove', handleDragMove, true)
-        window.removeEventListener('pointermove', handleDragMove, true)
-        window.removeEventListener('touchmove', handleDragMove, true)
-      }
-    }, [recordDragPosition, session.id])
-
-    const handleDrag = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-      recordDragPosition(event.nativeEvent)
-    }, [recordDragPosition])
-
-    const handleDragEnd = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-      recordDragPosition(event.nativeEvent)
-      if (!dragWasTornOffRef.current) {
-        checkSessionTearOff()
-      }
-      releaseSessionDrag()
-    }, [checkSessionTearOff, recordDragPosition, releaseSessionDrag])
-
-    useEffect(() => releaseSessionDrag, [releaseSessionDrag])
-
-    const openSessionMenu = useCallback((anchor: SessionMenuAnchor) => {
-      onOpenSessionMenu({
-        sessionId: session.id,
-        workId: work?.id ?? null,
-        anchor,
-      })
-    }, [onOpenSessionMenu, session.id, work?.id])
-
-    return (
-      <WorkspaceSessionItemView
-        session={session}
-        work={work}
-        active={active}
-        dimmed={dimmed}
-        isStreaming={isStreaming}
-        attentionKind={attentionKind}
-        hasError={hasError}
-        isRenaming={isRenaming}
-        isRegeneratingTitle={isRegeneratingTitle}
-        runtimeIcon={runtimeIcon}
-        relativeTime={formatRelativeTime(session.listActivityAt, t)}
-        draggable={!isRenaming && !work}
-        canOpenInNewWindow={isElectron}
-        onOpen={() => {
-          previewCard.dismiss()
-          prepareSessionOpen()
-          if (work) {
-            openWork(work.id)
-          }
-          else {
-            openChatSession(session.id)
-          }
-        }}
-        onPrepareOpen={() => {
-          previewCard.dismiss()
-          prepareSessionOpen()
-        }}
-        onPrefetch={prefetchSession}
-        onPreview={anchor => previewCard.show({
-          kind: 'session',
-          session,
-          anchor,
-          placement: 'right',
-        })}
-        onPreviewLeave={previewCard.hide}
-        onOpenInNewWindow={openInNewWindow}
-        onRenameCommit={nextTitle => onRenameCommit(session, nextTitle)}
-        onRenameCancel={onRenameCancel}
-        onOpenMenu={openSessionMenu}
-        onDragStart={handleDragStart}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
-      />
-    )
-  },
-)
-SessionItem.displayName = 'SessionItem'
-
-interface SessionListProps {
-  sessions: WorkspaceSession[]
-  workByPrimarySessionId: ReadonlyMap<string, WorkSummary>
-  renamingSessionId: string | null
-  locallyStreamingSessionIds: Set<string>
-  sessionAttentionBySessionId: Map<string, SessionAttentionKind>
-  locallyErroredSessionIds: Set<string>
-  runtimeIconByKind: RuntimeIconByKind
-  t: WorkspaceTranslation
-  onPrepareSessionOpen: (session: WorkspaceSession) => void
-  onPrefetchSession: (sessionId: string) => void
-  onRenameCommit: (session: WorkspaceSession, nextTitle: string) => Promise<void>
-  onRenameCancel: () => void
-  onOpenSessionMenu: (request: SessionMenuRequest) => void
-}
-
-const SessionListRows = memo(
-  ({
-    sessions,
-    workByPrimarySessionId,
-    renamingSessionId,
-    locallyStreamingSessionIds,
-    sessionAttentionBySessionId,
-    locallyErroredSessionIds,
-    runtimeIconByKind,
-    t,
-    onPrepareSessionOpen,
-    onPrefetchSession,
-    onRenameCommit,
-    onRenameCancel,
-    onOpenSessionMenu,
-  }: SessionListProps) => {
-    return (
-      sessions.map((session) => {
-        const isStreaming = isSessionRunning(session, locallyStreamingSessionIds)
-        return (
-          <SessionItem
-            key={session.id}
-            session={session}
-            work={workByPrimarySessionId.get(session.id) ?? null}
-            isStreaming={isStreaming}
-            attentionKind={sessionAttentionBySessionId.get(session.id) ?? null}
-            hasError={
-              !isStreaming
-              && (session.status === 'error' || locallyErroredSessionIds.has(session.id))
-            }
-            isRenaming={session.id === renamingSessionId}
-            runtimeIcon={runtimeIconByKind.get(session.runtimeKind)}
-            t={t}
-            onPrepareSessionOpen={onPrepareSessionOpen}
-            onPrefetchSession={onPrefetchSession}
-            onRenameCommit={onRenameCommit}
-            onRenameCancel={onRenameCancel}
-            onOpenSessionMenu={onOpenSessionMenu}
-          />
-        )
-      })
-    )
-  },
-)
-SessionListRows.displayName = 'SessionListRows'
-
-function WorkspaceSessionListSection({
-  workspaceId,
-  sortedSessions,
-  workByPrimarySessionId,
-  renamingSessionId,
-  retainedSessionIds,
-  locallyStreamingSessionIds,
-  sessionAttentionBySessionId,
-  locallyErroredSessionIds,
-  runtimeIconByKind,
-  t,
-  onPrepareSessionOpen,
-  onPrefetchSession,
-  onRenameCommit,
-  onRenameCancel,
-  onOpenSessionMenu,
-}: {
-  workspaceId: string
-  sortedSessions: WorkspaceSession[]
-  workByPrimarySessionId: ReadonlyMap<string, WorkSummary>
-  renamingSessionId: string | null
-  retainedSessionIds: Set<string>
-  locallyStreamingSessionIds: Set<string>
-  sessionAttentionBySessionId: Map<string, SessionAttentionKind>
-  locallyErroredSessionIds: Set<string>
-  runtimeIconByKind: RuntimeIconByKind
-  t: WorkspaceTranslation
-  onPrepareSessionOpen: (session: WorkspaceSession) => void
-  onPrefetchSession: (sessionId: string) => void
-  onRenameCommit: (session: WorkspaceSession, nextTitle: string) => Promise<void>
-  onRenameCancel: () => void
-  onOpenSessionMenu: (request: SessionMenuRequest) => void
-}) {
-  'use no memo'
-
-  const sessionListExpanded = useWorkspaceSidebarUiStore(
-    state => state.expandedSessionListWorkspaceIds[workspaceId] === true,
-  )
-  const setWorkspaceSessionListExpanded = useWorkspaceSidebarUiStore(
-    state => state.setWorkspaceSessionListExpanded,
-  )
-  const sessionPreviewLimit = useWorkspaceSidebarUiStore(
-    state => state.sessionPreviewLimit,
-  )
-  const [expandedSessionRenderCount, setExpandedSessionRenderCount]
-    = useState(sessionPreviewLimit)
-  const requiredPreviewCount = useMemo(() => {
-    let highestRequiredIndex = -1
-    for (const [index, session] of sortedSessions.entries()) {
-      if (
-        session.pinned
-        || isSessionRunning(session, locallyStreamingSessionIds)
-        || retainedSessionIds.has(session.id)
-      ) {
-        highestRequiredIndex = index
-      }
-    }
-    return highestRequiredIndex + 1
-  }, [locallyStreamingSessionIds, retainedSessionIds, sortedSessions])
-  const collapsedSessionPreviewLimit = Math.max(sessionPreviewLimit, requiredPreviewCount)
-  const hasHiddenSessions = sortedSessions.length > collapsedSessionPreviewLimit
-  const hiddenSessionCount = Math.max(sortedSessions.length - collapsedSessionPreviewLimit, 0)
-  const renderedSessionCount = sessionListExpanded
-    ? Math.min(
-        Math.max(expandedSessionRenderCount, collapsedSessionPreviewLimit),
-        sortedSessions.length,
-      )
-    : collapsedSessionPreviewLimit
-  const visibleSessions = useMemo(
-    () => sortedSessions.slice(0, renderedSessionCount),
-    [renderedSessionCount, sortedSessions],
-  )
-
-  useEffect(() => {
-    if (!sessionListExpanded) {
-      setExpandedSessionRenderCount(current =>
-        current === collapsedSessionPreviewLimit ? current : collapsedSessionPreviewLimit)
-      return
-    }
-
-    if (expandedSessionRenderCount >= sortedSessions.length) {
-      return
-    }
-
-    const timeout = window.setTimeout(() => {
-      startTransition(() => {
-        setExpandedSessionRenderCount(current =>
-          Math.min(
-            Math.max(current, collapsedSessionPreviewLimit) + SESSION_REVEAL_BATCH_SIZE,
-            sortedSessions.length,
-          ))
-      })
-    }, SESSION_REVEAL_DELAY_MS)
-
-    return () => window.clearTimeout(timeout)
-  }, [
-    collapsedSessionPreviewLimit,
-    expandedSessionRenderCount,
-    sessionListExpanded,
-    sortedSessions.length,
-  ])
-
-  const toggleSessionListExpanded = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault()
-      event.stopPropagation()
-      setWorkspaceSessionListExpanded(workspaceId, !sessionListExpanded)
-    },
-    [sessionListExpanded, setWorkspaceSessionListExpanded, workspaceId],
-  )
-
-  return (
-    <div className="min-w-0 overflow-hidden">
-      <div className="ml-4.25 flex min-w-0 flex-col gap-0.5 border-l border-sidebar-border/50 pl-2 py-0.5">
-        {sortedSessions.length === 0 && (
-          <p className="px-2.5 py-1.5 text-xs text-muted-foreground">{t('session.empty')}</p>
-        )}
-        <SessionListRows
-          sessions={visibleSessions}
-          workByPrimarySessionId={workByPrimarySessionId}
-          renamingSessionId={renamingSessionId}
-          locallyStreamingSessionIds={locallyStreamingSessionIds}
-          sessionAttentionBySessionId={sessionAttentionBySessionId}
-          locallyErroredSessionIds={locallyErroredSessionIds}
-          runtimeIconByKind={runtimeIconByKind}
-          t={t}
-          onPrepareSessionOpen={onPrepareSessionOpen}
-          onPrefetchSession={onPrefetchSession}
-          onRenameCommit={onRenameCommit}
-          onRenameCancel={onRenameCancel}
-          onOpenSessionMenu={onOpenSessionMenu}
-        />
-        {hasHiddenSessions && (
-          <button
-            type="button"
-            onClick={toggleSessionListExpanded}
-            className="mt-0.5 flex h-6 min-w-0 items-center gap-1.5 rounded-lg px-2.5 text-left text-[11px] text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            aria-expanded={sessionListExpanded}
-            data-testid={`workspace-sessions-toggle-${workspaceId}`}
-          >
-            {sessionListExpanded
-? (
-              <ChevronUpIcon className="size-3 shrink-0" aria-hidden="true" />
-            )
-: (
-              <ChevronDownIcon className="size-3 shrink-0" aria-hidden="true" />
-            )}
-            <span className="min-w-0 truncate">
-              {sessionListExpanded
-                ? t('session.action.showLess')
-                : t('session.action.showAll', { count: hiddenSessionCount })}
-            </span>
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-WorkspaceSessionListSection.displayName = 'WorkspaceSessionListSection'
-
 const WorkspaceGroup = memo(
   ({
     workspace,
@@ -2126,8 +1652,8 @@ const WorkspaceGroup = memo(
           return pinDiff
         }
         const runningDiff
-          = (isSessionRunning(b, locallyStreamingSessionIds) ? 1 : 0)
-            - (isSessionRunning(a, locallyStreamingSessionIds) ? 1 : 0)
+          = (isWorkspaceSessionRunning(b, locallyStreamingSessionIds) ? 1 : 0)
+            - (isWorkspaceSessionRunning(a, locallyStreamingSessionIds) ? 1 : 0)
         if (runningDiff !== 0) {
           return runningDiff
         }
@@ -2167,8 +1693,8 @@ const WorkspaceGroup = memo(
           return pinDiff
         }
         const runningDiff
-          = (isSessionRunning(b, locallyStreamingSessionIds) ? 1 : 0)
-            - (isSessionRunning(a, locallyStreamingSessionIds) ? 1 : 0)
+          = (isWorkspaceSessionRunning(b, locallyStreamingSessionIds) ? 1 : 0)
+            - (isWorkspaceSessionRunning(a, locallyStreamingSessionIds) ? 1 : 0)
         if (runningDiff !== 0) {
           return runningDiff
         }
@@ -2292,7 +1818,7 @@ const WorkspaceGroup = memo(
 
         for (const session of sessions) {
           if (
-            isSessionRunning(session, locallyStreamingSessionIds)
+            isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
             && !acknowledgedSessionIdsRef.current!.has(session.id)
             && !next.has(session.id)
           ) {
@@ -2371,7 +1897,10 @@ const WorkspaceGroup = memo(
 
       for (const sessionId of acknowledgedSessionIdsRef.current!) {
         const session = sessionsById.get(sessionId)
-        if (session && isSessionRunning(session, locallyStreamingSessionIds)) {
+        if (
+          session
+          && isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
+        ) {
           next.add(sessionId)
         }
       }
@@ -2747,7 +2276,6 @@ const WorkspaceGroup = memo(
                 sessionAttentionBySessionId={sessionAttentionBySessionId}
                 locallyErroredSessionIds={locallyErroredSessionIds}
                 runtimeIconByKind={runtimeIconByKind}
-                t={t}
                 onPrepareSessionOpen={handlePrepareSessionOpen}
                 onPrefetchSession={prefetchSession}
                 onRenameCommit={handleRenameSession}
@@ -2767,7 +2295,6 @@ const WorkspaceGroup = memo(
               sessionAttentionBySessionId={sessionAttentionBySessionId}
               locallyErroredSessionIds={locallyErroredSessionIds}
               runtimeIconByKind={runtimeIconByKind}
-              t={t}
               onPrepareSessionOpen={handlePrepareSessionOpen}
               onPrefetchSession={prefetchSession}
               onRenameCommit={handleRenameSession}
@@ -2869,7 +2396,8 @@ function workspaceHasRunningSession(
   sessions: readonly WorkspaceSession[],
   locallyStreamingSessionIds: Set<string>,
 ): boolean {
-  return sessions.some(session => isSessionRunning(session, locallyStreamingSessionIds))
+  return sessions.some(session =>
+    isWorkspaceSessionRunning(session, locallyStreamingSessionIds))
 }
 
 function workspaceHasRecentSession(
@@ -2889,7 +2417,7 @@ function sessionMatchesProjectFilter(
     case 'unread':
       return session.unread
     case 'running':
-      return isSessionRunning(session, locallyStreamingSessionIds)
+      return isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
     case 'recent':
       return isSessionRecent(session, currentUnixTimestamp)
     case 'pinned':

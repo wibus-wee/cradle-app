@@ -29,8 +29,13 @@ them to the Work surface.
 - **workspace-group-disclosure.tsx**: Thin adapter that owns persisted collapse state and workspace-detail navigation for a project group.
 - **workspace-group-disclosure-view.tsx**: Pure props project-group rendering seam for local, missing, and remote workspaces. It owns the disclosure header, button menu, context menu, pinned/missing state, and child composition without reading routes or stores.
 - **workspace-group-disclosure-view.stories.tsx**: Fixture-driven Storybook catalog for expanded, missing, and remote project groups, including composed Session rows and interactive menu/disclosure callbacks.
-- **workspace-session-item-view.tsx**: Pure props rendering seam for sidebar Session and Work rows. It owns the row's visual and local interaction semantics while `workspace-sidebar.tsx` adapts route, store, preview-card, drag, and Electron dependencies into typed data and callbacks.
+- **workspace-session-item.tsx**: Runtime adapter for a sidebar Session or Work row. It owns active-surface lookup, title-regeneration state, preview-card orchestration, navigation, and Electron drag/tear-off behavior before rendering the pure row View.
+- **workspace-session-item-view.tsx**: Pure props rendering seam for sidebar Session and Work rows. It owns the row's visual and local interaction semantics without reading route, store, preview-card, drag, or Electron dependencies.
 - **workspace-session-item-view.stories.tsx**: Fixture-driven Storybook catalog covering active, unread, running, user-input, tool-approval, error, automation, title-regeneration, Work/PR, and rename states without mounting the workspace runtime.
+- **workspace-session-list-section.tsx**: Session-list runtime adapter that owns persisted expansion state, running-session retention, progressive row rendering, and composition of individual Session adapters.
+- **workspace-session-list-view.tsx**: Pure props rendering seam for the sidebar Session list track, empty state, and show-more/show-fewer control.
+- **workspace-session-list-view.stories.tsx**: Interactive fixture-driven Storybook catalog for bounded, expanded, and empty Session lists.
+- **workspace-session-status.ts**: Shared owner-typed running-status predicate used by sidebar sorting, retention, filters, and Session-list composition.
 - **fixtures/workspace-sidebar.ts**: Owner-typed Workspace, Session, and Work fixtures shared by workspace rendering previews.
 - **fixtures/screenshots/**: Desktop and mobile golden captures for workspace fixture-driven rendering surfaces.
 - **preview-card/**: Sidebar preview-card lifecycle and type-specific renderers. The shared provider keeps the interaction warm while crossing rows without previews, and `session/` owns transcript-backed session preview content.
