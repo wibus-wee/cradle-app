@@ -714,6 +714,26 @@ export async function getViewerIdentity(): Promise<GitHubViewer> {
 }
 
 /**
+ * A review approval is unnecessary only for a user-owned repository that
+ * belongs to the authenticated GitHub user. Organizations keep the review
+ * gate even when the current user has administrative access.
+ */
+export async function isViewerPersonalRepositoryOwner(owner: string, repo: string): Promise<boolean> {
+  requireGitHubToken()
+  try {
+    const [repository, viewer] = await Promise.all([
+      fetchRepo(owner, repo),
+      fetchAuthenticatedUser(),
+    ])
+    return repository?.owner?.type === 'User'
+      && repository.owner.login.toLowerCase() === viewer.login.toLowerCase()
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to resolve GitHub repository ownership.')
+  }
+}
+
+/**
  * Pull requests authored by `login`, most recently updated first. Not
  * bounded to any Cradle session - Work-bound PRs are a separate, optional
  * overlay resolved client-side by matching owner/repo/number. Paginated via

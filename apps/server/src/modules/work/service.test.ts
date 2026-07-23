@@ -93,7 +93,8 @@ afterEach(() => {
   db().delete(workspaces).run()
 })
 
-function mockSessionAwaitRegister() {
+function mockSessionAwaitRegister(viewerOwnsPersonalRepository = false) {
+  vi.spyOn(PullRequest, 'isViewerPersonalRepositoryOwner').mockResolvedValue(viewerOwnsPersonalRepository)
   return vi.spyOn(SessionAwait, 'register').mockImplementation(async input => ({
     id: `mock-await-${input.source}`,
     chatSessionId: input.chatSessionId,
@@ -497,6 +498,32 @@ describe('work delivery control', () => {
     }))
   })
 
+  it('only registers CI when the viewer owns the personal repository', async () => {
+    seedWork()
+    mockHealthyDetailReads()
+    db().update(works).set({
+      handoffTitle: 'Draft title',
+      handoffSummary: 'Implemented the flow.',
+      handoffTestPlan: 'Run focused tests.',
+      preparedAt: 10,
+    }).run()
+    vi.spyOn(PullRequest, 'createDraftPullRequest').mockResolvedValue(OPEN_PULL_REQUEST)
+    const registerSpy = mockSessionAwaitRegister(true)
+
+    await Work.submit({ id: WORK_ID })
+
+    expect(registerSpy).toHaveBeenCalledTimes(1)
+    expect(registerSpy).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'github-ci',
+      filterJson: JSON.stringify({
+        repo: 'acme/cradle',
+        pr: 42,
+        headSha: 'head-sha',
+        workId: WORK_ID,
+      }),
+    }))
+  })
+
   it('does not re-register Session Awaits for the same Work submission', async () => {
     seedWork()
     mockHealthyDetailReads()
@@ -534,6 +561,7 @@ describe('work delivery control', () => {
         }),
       },
     ]).run()
+    vi.spyOn(PullRequest, 'isViewerPersonalRepositoryOwner').mockResolvedValue(false)
     const registerSpy = vi.spyOn(SessionAwait, 'register')
 
     await Work.submit({ id: WORK_ID })

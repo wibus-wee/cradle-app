@@ -447,6 +447,7 @@ async function registerWorkAwaits(
   pr: { owner: string, repo: string, number: number, headSha: string },
 ): Promise<void> {
   const existing = SessionAwait.listBySession(sessionId)
+  const viewerOwnsPersonalRepository = await PullRequest.isViewerPersonalRepositoryOwner(pr.owner, pr.repo)
   const ciFilter = JSON.stringify({
     repo: `${pr.owner}/${pr.repo}`,
     pr: pr.number,
@@ -463,7 +464,9 @@ async function registerWorkAwaits(
 
   const desired = [
     { source: 'github-ci', filterJson: ciFilter, reason: `CI checks for PR #${pr.number}` },
-    { source: 'github-review', filterJson: reviewFilter, reason: `Review approval for PR #${pr.number}` },
+    ...(!viewerOwnsPersonalRepository
+      ? [{ source: 'github-review' as const, filterJson: reviewFilter, reason: `Review approval for PR #${pr.number}` }]
+      : []),
   ] as const
 
   const pending = existing.filter(row => row.status === 'pending')

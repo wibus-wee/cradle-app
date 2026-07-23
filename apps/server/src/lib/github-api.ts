@@ -1227,9 +1227,16 @@ export async function fetchWorkflowRunJobs(owner: string, repo: string, runId: n
 
 const GitHubRepoSchema = z.object({
   default_branch: z.string(),
+  owner: z.object({
+    login: z.string(),
+    type: z.string(),
+  }).optional(),
 }).passthrough()
 
-export function fetchRepo(owner: string, repo: string): Promise<{ default_branch: string } | null> {
+export function fetchRepo(owner: string, repo: string): Promise<{
+  default_branch: string
+  owner?: { login: string, type: string }
+} | null> {
   return cachedFetch({
     cacheKey: `repo:${owner}/${repo}`,
     ttlS: 3600,
