@@ -19,7 +19,6 @@ import {
   LoadingLine,
   MailLine as MailIcon,
   MailOpenLine as MailOpenIcon,
-  More2Line as MoreHorizontalIcon,
   NewFolderLine as FolderPlusIcon,
   PencilLine as PencilIcon,
   PinLine as PinIcon,
@@ -33,7 +32,6 @@ import {
 } from '@mingcute/react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
-import { FolderSymlink as FolderSymlinkIcon } from 'lucide-react'
 import {
   Fragment,
   memo,
@@ -73,13 +71,6 @@ import type {
 } from '~/api-gen/types.gen'
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '~/components/ui/context-menu'
 import {
   Dialog,
   DialogContent,
@@ -124,7 +115,7 @@ import { useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import { ensureRemoteWorkspaceForPath } from '~/features/workspace/remote-workspace-import'
 import type { Workspace } from '~/features/workspace/types'
-import { getLocalWorkspacePath, getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
+import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
 import { useNow } from '~/hooks/use-now'
 import { cn } from '~/lib/cn'
 import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
@@ -172,6 +163,8 @@ import {
   useWorkspaces,
   WORKSPACES_QUERY_KEY,
 } from './use-workspace'
+import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
+import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
 import {
   partitionWorkspaceSessions,
   SessionGroupMenuItems,
@@ -196,6 +189,7 @@ const SESSION_REVEAL_DELAY_MS = 16
 const RECENT_SESSION_WINDOW_SECONDS = 60 * 60
 const DEFAULT_WORKSPACE_FILE_NAME = 'untitled'
 const DEFAULT_WORKSPACE_FOLDER_NAME = 'untitled-folder'
+const EMPTY_WORKSPACES: Workspace[] = []
 const EMPTY_WORKSPACE_SESSIONS: WorkspaceSession[] = []
 const EMPTY_SESSION_ID_SET = new Set<string>()
 
@@ -349,16 +343,6 @@ type SessionMenuAction = {
 type SessionMenuActionGroup = {
   key: string
   actions: SessionMenuAction[]
-}
-
-type WorkspaceMenuAction = {
-  key: string
-  label: string
-  icon: React.ReactNode
-  testId: string
-  invoke: () => void | Promise<void>
-  variant?: 'default' | 'destructive'
-  separatorBefore?: boolean
 }
 
 type SessionMenuAnchor = WorkspaceSessionMenuAnchor
@@ -760,55 +744,6 @@ function SessionActionsMenu({
 : null}
     </Menu>
   )
-}
-
-function WorkspaceMenuActionItems({
-  actions,
-  surface,
-}: {
-  actions: WorkspaceMenuAction[]
-  surface: 'button' | 'context'
-}) {
-  return actions.map((action) => {
-    const content = (
-      <>
-        {action.icon}
-        {action.label}
-      </>
-    )
-
-    if (surface === 'context') {
-      return (
-        <Fragment key={action.key}>
-          {action.separatorBefore && <ContextMenuSeparator />}
-          <ContextMenuItem
-            variant={action.variant}
-            onSelect={() => {
-              void action.invoke()
-            }}
-            data-testid={`${action.testId}-context`}
-          >
-            {content}
-          </ContextMenuItem>
-        </Fragment>
-      )
-    }
-
-    return (
-      <Fragment key={action.key}>
-        {action.separatorBefore && <MenuSeparator />}
-        <MenuItem
-          variant={action.variant}
-          onClick={() => {
-            void action.invoke()
-          }}
-          data-testid={action.testId}
-        >
-          {content}
-        </MenuItem>
-      </Fragment>
-    )
-  })
 }
 
 function WorkspaceTextInputDialog({
@@ -1311,7 +1246,7 @@ function RemoteWorkspaceBrowser({
     queryFn: () => fetchRemoteUpstreamJson<RemoteWorkspace[]>(host.id, '/workspaces'),
     retry: false,
   })
-  const workspaces = workspacesQuery.data ?? []
+  const workspaces = workspacesQuery.data ?? EMPTY_WORKSPACES
   const selectedWorkspace = useMemo(() => {
     return workspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? workspaces[0] ?? null
   }, [selectedWorkspaceId, workspaces])
@@ -1916,125 +1851,6 @@ const SessionListRows = memo(
   },
 )
 SessionListRows.displayName = 'SessionListRows'
-
-// ── Workspace group ───────────────────────────────────────────────────────────
-
-function WorkspaceGroupDisclosure({
-  workspace,
-  workspacePinned,
-  workspaceActions,
-  overlays,
-  children,
-}: {
-  workspace: Workspace
-  workspacePinned: boolean
-  workspaceActions: WorkspaceMenuAction[]
-  overlays: React.ReactNode
-  children: React.ReactNode
-}) {
-  'use no memo'
-
-  const { t } = useTranslation('workspace')
-  const expanded = useWorkspaceSidebarUiStore(
-    state => state.collapsedWorkspaceIds[workspace.id] !== true,
-  )
-  const setWorkspaceExpanded = useWorkspaceSidebarUiStore(state => state.setWorkspaceExpanded)
-  const toggleExpanded = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setWorkspaceExpanded(workspace.id, !expanded)
-  }
-
-  const headerContent = (
-    <div className="group flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-accent/50">
-      <button
-        type="button"
-        onClick={toggleExpanded}
-        onPointerDown={event => event.stopPropagation()}
-        aria-label={t('workspace.aria.toggleExpanded')}
-        aria-expanded={expanded}
-        className="-ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 hover:bg-fill/70 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        data-testid={`workspace-toggle-${workspace.id}`}
-      >
-        {isLocalWorkspace(workspace)
-          ? expanded
-            ? (
-                <FolderOpenIcon className="size-3.5" aria-hidden="true" />
-              )
-            : (
-                <FolderClosedIcon className="size-3.5" aria-hidden="true" />
-              )
-          : (
-              <FolderSymlinkIcon className="size-3.5" aria-hidden="true" />
-            )}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => openWorkspaceDetail(workspace.id)}
-        data-testid={`workspace-open-${workspace.id}`}
-        className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-      >
-        {workspacePinned
-? (
-          <PinIcon
-            className="size-3 shrink-0 !text-primary/60"
-            aria-label={t('workspace.aria.pinned')}
-            data-testid={`workspace-pin-indicator-${workspace.id}`}
-          />
-        )
-: null}
-        <span className="truncate text-xs font-medium text-sidebar-foreground/80">
-          {workspace.name}
-        </span>
-        {workspace.availability === 'missing'
-? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">
-            <CircleAlertIcon className="size-2.5" aria-hidden="true" />
-            {t('workspace.state.missing')}
-          </span>
-        )
-: null}
-      </button>
-
-      <Menu>
-        <MenuTrigger
-          render={(
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="opacity-0 group-hover:opacity-100 -mr-1"
-              onClick={e => e.stopPropagation()}
-            />
-          )}
-        >
-          <MoreHorizontalIcon />
-        </MenuTrigger>
-        <MenuPopup align="start" side="bottom" sideOffset={4}>
-          <WorkspaceMenuActionItems actions={workspaceActions} surface="button" />
-        </MenuPopup>
-      </Menu>
-    </div>
-  )
-
-  return (
-    <div
-      className="flex min-w-0 flex-col"
-      data-testid={`workspace-group-${workspace.id}`}
-      data-workspace-pinned={workspacePinned ? 'true' : 'false'}
-    >
-      <ContextMenu>
-        <ContextMenuTrigger asChild>{headerContent}</ContextMenuTrigger>
-        <ContextMenuContent className="w-48">
-          <WorkspaceMenuActionItems actions={workspaceActions} surface="context" />
-        </ContextMenuContent>
-      </ContextMenu>
-      {overlays}
-      {expanded ? children : null}
-    </div>
-  )
-}
-WorkspaceGroupDisclosure.displayName = 'WorkspaceGroupDisclosure'
 
 function WorkspaceSessionListSection({
   workspaceId,

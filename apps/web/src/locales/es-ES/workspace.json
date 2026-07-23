@@ -196,6 +196,7 @@
   "workspace.migrate.toast.successDesc": "Se movieron {{count}} elementos a {{target}}.",
   "workspace.migrate.toast.failed": "Migración fallida",
   "workspace.migrate.toast.previewFailed": "Vista previa fallida",
+  "workspace.aria.menu": "Menú del espacio de trabajo",
   "workspace.aria.pinned": "Proyecto fijado",
   "workspace.aria.toggleExpanded": "Alternar colapso del espacio de trabajo",
   "workspace.dialog.addProject": "Agregar proyecto",

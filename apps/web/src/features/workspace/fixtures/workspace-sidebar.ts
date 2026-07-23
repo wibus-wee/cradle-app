@@ -1,8 +1,72 @@
 import type { WorkSummary } from '~/features/work/use-work'
+import type { Workspace } from '~/features/workspace/types'
 
 import type { WorkspaceSession } from '../use-session'
 
 export const workspaceSidebarFixtureNow = 1_784_836_800
+
+export const workspaceFixtures = {
+  local: {
+    id: 'workspace-cradle',
+    name: 'Cradle',
+    locator: {
+      hostId: 'local',
+      path: '/Users/demo/cradle',
+      kind: 'project',
+    },
+    gitIdentity: {
+      originUrl: 'https://github.com/wibus-wee/cradle-app.git',
+      repoRoot: '/Users/demo/cradle',
+      headSha: '0123456789abcdef',
+      branch: 'cradle/wt/chat-transcript-storybook',
+    },
+    identifier: 'local:/Users/demo/cradle',
+    availability: 'available',
+    pinned: 1,
+    createdAt: workspaceSidebarFixtureNow - 86_400,
+    updatedAt: workspaceSidebarFixtureNow - 30,
+  },
+  missing: {
+    id: 'workspace-missing',
+    name: 'Archived client project',
+    locator: {
+      hostId: 'local',
+      path: '/Users/demo/archived-client',
+      kind: 'project',
+    },
+    gitIdentity: {
+      originUrl: null,
+      repoRoot: null,
+      headSha: null,
+      branch: null,
+    },
+    identifier: 'local:/Users/demo/archived-client',
+    availability: 'missing',
+    pinned: 0,
+    createdAt: workspaceSidebarFixtureNow - 172_800,
+    updatedAt: workspaceSidebarFixtureNow - 7_200,
+  },
+  remote: {
+    id: 'workspace-remote',
+    name: 'Remote release environment',
+    locator: {
+      hostId: 'remote-host-staging',
+      path: '/srv/cradle-release',
+      kind: 'project',
+    },
+    gitIdentity: {
+      originUrl: 'https://github.com/wibus-wee/cradle-app.git',
+      repoRoot: '/srv/cradle-release',
+      headSha: 'fedcba9876543210',
+      branch: 'main',
+    },
+    identifier: 'remote-host-staging:/srv/cradle-release',
+    availability: 'remote',
+    pinned: 0,
+    createdAt: workspaceSidebarFixtureNow - 43_200,
+    updatedAt: workspaceSidebarFixtureNow - 300,
+  },
+} satisfies Record<string, Workspace>
 
 export const workspaceSessionFixtures = {
   active: {
