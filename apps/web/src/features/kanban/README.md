@@ -13,7 +13,9 @@ User-facing board, issue, filter, status, and label-management copy is owned by 
 - **issue-context-menu.tsx**: Shared right-click issue actions for board cards and list rows.
 - **issue-detail/**: Issue detail 子视图，包含属性、活动、关系、子 issue、milestone 横幅、workspace label 管理，以及独立于 human assignee 的 agent delegation 控制；activity/comment/header/properties 面板通过 memoized row/pane 与稳定 action handler 控制渲染预算。
 - **kanban-board.tsx**: Board layout and drag/drop composition; forwards resolved parent issue refs to cards and drag overlays.
-- **kanban-card.tsx**: Board card rendering for individual issues; issue cards expose native named buttons for opening detail views and separate parent issue quick-jump affordances while preserving drag wiring.
+- **kanban-card.tsx**: Drag/context/query adapter for individual issue cards; it resolves workspace/agent runtime data and preserves native issue-open controls.
+- **kanban-card-view.tsx**: Fixture-driven issue card rendering contract with explicit issue, status, workspace, agent, selection, and callback props.
+- **kanban-surfaces.stories.tsx**: Storybook catalog for card states, group headers, status/priority icons, labels, assignees, and parent issue links.
 - **kanban-column.tsx**: Board column rendering and drop targets; inline create mounts without height animation so board layout work stays immediate, and issue maps forward stable open/hover handlers plus parent issue refs.
 - **kanban-context.ts**: Kanban-owned renderer context provider factory for selected, open, peeked, focused, hovered, filtered, and visible issue attention state; app composition owns provider installation.
 - **kanban-context.test.ts**: Unit coverage for Kanban attention context publication and stable issue references.
