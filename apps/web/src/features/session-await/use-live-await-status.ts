@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useQueries, useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
 
 import { getSessionAwaitsByIdLiveStatusOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
@@ -184,6 +184,53 @@ export function useLiveAwaitStatus(awaitId: string | null, active: boolean) {
   }, [awaitId, query.data])
 
   return query
+}
+
+export interface LiveAwaitStatusTarget {
+  awaitId: string
+  active: boolean
+}
+
+export function useLiveAwaitStatuses(
+  targets: readonly LiveAwaitStatusTarget[],
+): ReadonlyMap<string, LiveAwaitStatus | UnsupportedLiveAwaitStatus | undefined> {
+  const queries = useQueries({
+    queries: targets.map(target => ({
+      ...getSessionAwaitsByIdLiveStatusOptions({
+        path: { id: target.awaitId },
+      }),
+      ...queryRefreshPolicy(
+        target.active ? 'active' : 'static',
+        target.active
+          ? { refetchInterval: 20_000 }
+          : { staleTime: 60_000 },
+      ),
+      initialData: () => readCachedLiveAwaitStatus(target.awaitId),
+    })),
+  })
+
+  useEffect(() => {
+    targets.forEach((target, index) => {
+      writeCachedLiveAwaitStatus(
+        target.awaitId,
+        queries[index]?.data as
+        | LiveAwaitStatus
+        | UnsupportedLiveAwaitStatus
+        | undefined,
+      )
+    })
+  }, [queries, targets])
+
+  return useMemo(
+    () => new Map(targets.map((target, index) => [
+      target.awaitId,
+      queries[index]?.data as
+      | LiveAwaitStatus
+      | UnsupportedLiveAwaitStatus
+      | undefined,
+    ])),
+    [queries, targets],
+  )
 }
 
 export async function prefetchLiveAwaitStatus(queryClient: QueryClient, awaitId: string): Promise<void> {
