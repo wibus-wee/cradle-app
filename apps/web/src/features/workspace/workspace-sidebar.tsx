@@ -1,5 +1,4 @@
 import {
-  AlertLine as CircleAlertIcon,
   CalendarTimeAddLine as CalendarClockIcon,
   ChartBar2Line as BarChart3Icon,
   Chat1Line as MessageSquarePlusIcon,
@@ -53,17 +52,14 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
   GetRemoteHostsResponse,
-  PostWorkspacesMultiFolderData,
 } from '~/api-gen/types.gen'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { Input } from '~/components/ui/input'
 import {
   Menu,
   MenuCheckboxItem,
@@ -90,8 +86,6 @@ import {
   remoteHostUpstreamQueryKey,
 } from '~/features/remote-hosts/upstream-fetch'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
-import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
-import { SettingsRow } from '~/features/settings/settings-row'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
@@ -137,6 +131,9 @@ import {
 } from './use-workspace'
 import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
 import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
+import {
+  WorkspaceMultiFolderDialog,
+} from './workspace-multi-folder-dialog'
 import {
   WorkspaceRecognitionDialogView,
 } from './workspace-recognition-dialog-view'
@@ -253,237 +250,6 @@ function isSessionRecent(session: WorkspaceSession, currentUnixTimestamp: number
 type RuntimeIconByKind = WorkspaceRuntimeIconByKind
 
 type SessionMenuRequest = WorkspaceSessionItemMenuRequest
-
-type MultiFolderWorkspaceBody = PostWorkspacesMultiFolderData['body']
-type MultiFolderWorkspaceFolder = MultiFolderWorkspaceBody['folders'][number]
-type MultiFolderWorkspaceFolderDraft = MultiFolderWorkspaceFolder & { id: string }
-
-function createMultiFolderWorkspaceFolderDraft(): MultiFolderWorkspaceFolderDraft {
-  return {
-    id: `${Date.now()}-${Math.random()}`,
-    name: '',
-    path: '',
-  }
-}
-
-function normalizeMultiFolderWorkspaceFolders(
-  rows: MultiFolderWorkspaceFolderDraft[],
-): MultiFolderWorkspaceFolder[] | null {
-  const folders = rows.map(row => ({
-    name: row.name.trim(),
-    path: row.path.trim(),
-  }))
-
-  if (
-    folders.length === 0
-    || folders.some(folder => !folder.name || !folder.path.startsWith('/'))
-  ) {
-    return null
-  }
-
-  return folders
-}
-
-function WorkspaceMultiFolderDialog({
-  open,
-  creating,
-  onOpenChange,
-  onCommit,
-}: {
-  open: boolean
-  creating: boolean
-  onOpenChange: (open: boolean) => void
-  onCommit: (input: MultiFolderWorkspaceBody) => Promise<void>
-}) {
-  const { t } = useTranslation('workspace')
-  const { selectDirectory } = useDirectoryPicker()
-  const [name, setName] = useState('')
-  const [folderRows, setFolderRows] = useState<MultiFolderWorkspaceFolderDraft[]>(() => [
-    createMultiFolderWorkspaceFolderDraft(),
-  ])
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (open) {
-      setName('')
-      setFolderRows([createMultiFolderWorkspaceFolderDraft()])
-      setError(null)
-    }
-  }, [open])
-
-  const updateFolderRow = useCallback((id: string, patch: Partial<MultiFolderWorkspaceFolder>) => {
-    setFolderRows(rows => rows.map(row => (row.id === id ? { ...row, ...patch } : row)))
-    setError(null)
-  }, [])
-
-  const addFolderRow = useCallback(() => {
-    setFolderRows(rows => [...rows, createMultiFolderWorkspaceFolderDraft()])
-    setError(null)
-  }, [])
-
-  const removeFolderRow = useCallback((id: string) => {
-    setFolderRows((rows) => {
-      if (rows.length === 1) {
-        return rows
-      }
-      return rows.filter(row => row.id !== id)
-    })
-    setError(null)
-  }, [])
-
-  const browseFolderPath = useCallback(
-    async (id: string) => {
-      const path = await selectDirectory({
-        title: t('workspace.dialog.multiFolderBrowseTitle'),
-        description: t('workspace.dialog.multiFolderBrowseDescription'),
-      })
-      if (!path) {
-        return
-      }
-      updateFolderRow(id, { path })
-    },
-    [selectDirectory, t, updateFolderRow],
-  )
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-2xl">
-        <DialogTitle className="sr-only">{t('workspace.dialog.multiFolderTitle')}</DialogTitle>
-        <form
-          className="grid gap-0"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const workspaceName = name.trim()
-            const folders = normalizeMultiFolderWorkspaceFolders(folderRows)
-            if (!workspaceName || !folders) {
-              setError(t('workspace.toast.multiFolderInvalidEntry'))
-              return
-            }
-            const folderNames = new Set(folders.map(folder => folder.name))
-            if (folderNames.size !== folders.length) {
-              setError(t('workspace.toast.multiFolderDuplicateName'))
-              return
-            }
-            void onCommit({ name: workspaceName, folders })
-          }}
-        >
-          <SettingsPage
-            title={t('workspace.dialog.multiFolderTitle')}
-            description={t('workspace.dialog.multiFolderDescription')}
-            className="max-w-none gap-5 px-5 pt-5 pb-4"
-          >
-            <SettingsGroup>
-              <SettingsRow
-                label={t('workspace.dialog.nameLabel')}
-                description={t('workspace.dialog.multiFolderNameDescription')}
-              >
-                <Input
-                  id="multi-folder-workspace-name"
-                  autoFocus
-                  value={name}
-                  onChange={(event) => {
-                    setName(event.currentTarget.value)
-                    setError(null)
-                  }}
-                  placeholder={t('workspace.dialog.multiFolderNamePlaceholder')}
-                  className="h-8 w-64"
-                />
-              </SettingsRow>
-
-              <SettingsRow
-                label={t('workspace.dialog.multiFolderEntriesLabel')}
-                description={t('workspace.dialog.multiFolderEntriesDescription')}
-                vertical
-              >
-                <div id="multi-folder-workspace-folders" className="grid gap-2">
-                  {folderRows.map((row, index) => (
-                    <div
-                      key={row.id}
-                      className="grid gap-2 rounded-lg bg-muted/40 p-2 sm:grid-cols-[minmax(7rem,0.42fr)_minmax(0,1fr)_2rem_2rem]"
-                    >
-                      <Input
-                        id={`multi-folder-name-${row.id}`}
-                        aria-label={t('workspace.dialog.multiFolderFolderNameLabel')}
-                        value={row.name}
-                        onChange={event =>
-                          updateFolderRow(row.id, { name: event.currentTarget.value })}
-                        placeholder={
-                          index === 0
-                            ? t('workspace.dialog.multiFolderFolderNamePlaceholder')
-                            : undefined
-                        }
-                        className="h-8 bg-background"
-                      />
-                      <Input
-                        id={`multi-folder-path-${row.id}`}
-                        aria-label={t('workspace.dialog.multiFolderFolderPathLabel')}
-                        value={row.path}
-                        onChange={event =>
-                          updateFolderRow(row.id, { path: event.currentTarget.value })}
-                        placeholder={
-                          index === 0
-                            ? t('workspace.dialog.multiFolderFolderPathPlaceholder')
-                            : undefined
-                        }
-                        className="h-8 bg-background font-mono text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        aria-label={t('workspace.dialog.multiFolderBrowseFolder')}
-                        onClick={() => void browseFolderPath(row.id)}
-                      >
-                        <FolderOpenIcon />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t('workspace.dialog.multiFolderRemoveFolder')}
-                        disabled={folderRows.length === 1}
-                        onClick={() => removeFolderRow(row.id)}
-                      >
-                        <Trash2Icon />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-fit"
-                    onClick={addFolderRow}
-                  >
-                    <PlusIcon data-icon="inline-start" />
-                    {t('workspace.dialog.multiFolderAddFolder')}
-                  </Button>
-                </div>
-              </SettingsRow>
-            </SettingsGroup>
-
-            {error && (
-              <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                <CircleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-          </SettingsPage>
-
-          <DialogFooter variant="bare" className="border-t px-5 py-3">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t('workspace.dialog.cancel')}
-            </Button>
-            <Button type="submit" disabled={creating}>
-              {creating && <LoadingLine className="animate-spin" />}
-              {t('workspace.dialog.create')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 type RemoteHost = GetRemoteHostsResponse[number]
 
