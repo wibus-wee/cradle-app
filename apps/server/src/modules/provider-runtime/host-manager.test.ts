@@ -12,6 +12,7 @@ describe('provider runtime host manager', () => {
       providerTargetId: 'target-1',
       scopeId: 'chat-session:session-1',
       ttlMs: 30_000,
+      retainOnRelease: true,
       createResource,
       disposeResource,
     }

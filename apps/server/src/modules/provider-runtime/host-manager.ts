@@ -52,6 +52,7 @@ export type ProviderRuntimeResourceFactory<Resource> = () => Resource | Promise<
 export type ProviderRuntimeResourceDisposer<Resource> = (resource: Resource) => void | Promise<void>
 
 interface RuntimeHostEntry extends ProviderRuntimeHostSnapshot {
+  retainOnRelease: boolean
   resource?: unknown
   resourcePromise?: Promise<unknown>
   disposeResource?: ProviderRuntimeResourceDisposer<unknown>
@@ -70,6 +71,7 @@ export class ProviderRuntimeHostManager {
   acquireLease(input: ProviderRuntimeHostKey & {
     ttlMs?: number
     pinned?: boolean
+    retainOnRelease?: boolean
   }): ProviderRuntimeLease {
     const retained = this.retainHost(input)
     return new ProviderRuntimeLease(this, retained.hostId, retained.pinned, undefined, retained.ttlMs)
@@ -78,6 +80,7 @@ export class ProviderRuntimeHostManager {
   async acquireResource<Resource>(input: ProviderRuntimeHostKey & {
     ttlMs?: number
     pinned?: boolean
+    retainOnRelease?: boolean
     resourceFingerprint?: string
     createResource: ProviderRuntimeResourceFactory<Resource>
     disposeResource: ProviderRuntimeResourceDisposer<Resource>
@@ -150,7 +153,7 @@ export class ProviderRuntimeHostManager {
     }
     const now = Date.now()
     entry.updatedAt = now
-    if (entry.refCount === 0 && entry.expiresAt <= now) {
+    if (entry.refCount === 0 && (!entry.retainOnRelease || entry.expiresAt <= now)) {
       this.removeHost(hostId, entry)
     }
   }
@@ -266,6 +269,7 @@ export class ProviderRuntimeHostManager {
   private retainHost(input: ProviderRuntimeHostKey & {
     ttlMs?: number
     pinned?: boolean
+    retainOnRelease?: boolean
   }): { hostId: string, pinned: boolean, ttlMs: number, entry: RuntimeHostEntry } {
     this.reapIdleHosts()
     const hostId = this.readHostId(input)
@@ -280,9 +284,11 @@ export class ProviderRuntimeHostManager {
       hasResource: false,
       expiresAt: now,
       updatedAt: now,
+      retainOnRelease: false,
     }
 
     const pinned = input.pinned ?? false
+    entry.retainOnRelease ||= input.retainOnRelease ?? false
     entry.refCount += 1
     if (pinned) {
       entry.pinnedCount += 1

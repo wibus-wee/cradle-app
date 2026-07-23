@@ -70,6 +70,7 @@ export async function acquireCodexAppServerHostLease(
     scopeId: input.scopeId,
     pinned: input.pinned ?? false,
     ttlMs: input.idleTimeoutMs ?? CODEX_APP_SERVER_IDLE_TIMEOUT_MS,
+    retainOnRelease: input.idleTimeoutMs !== 0,
     resourceFingerprint: createCodexAppServerHostFingerprint({
       options: hostClientOptions,
       chatgptAuth: input.chatgptAuth,
