@@ -21,6 +21,7 @@ export default {
   'nav.remoteHosts': 'Remote Hosts',
   'nav.support': 'Support',
   'nav.about': 'About',
+  'nav.whatsNew': 'What\'s New',
   'about.analytics.description': 'Share anonymous usage data to help improve Cradle.',
   'about.analytics.share.description': 'Shares manually defined navigation and feature outcomes. Cradle never includes prompts, responses, code, file paths, resource IDs, raw errors, or screen recordings.',
   'about.analytics.share.label': 'Share anonymous product usage',

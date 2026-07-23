@@ -512,6 +512,7 @@
   "jarvis.thinking.xhigh.description": "難しいタスク向けの最大推論予算。",
   "jarvis.thinking.xhigh.label": "最高",
   "nav.about": "About",
+  "nav.whatsNew": "新機能",
   "nav.agents": "エージェント",
   "nav.appearance": "外観",
   "nav.await": "Await",

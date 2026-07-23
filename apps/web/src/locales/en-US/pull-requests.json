@@ -1,4 +1,7 @@
 {
+  "auth.emptyDescription": "Install the GitHub CLI and run `gh auth login` to load your pull requests.",
+  "auth.emptyTitle": "Connect GitHub to view pull requests",
+  "auth.install": "Install GitHub CLI",
   "check.failed": "Failed",
   "check.passed": "Passed",
   "check.pending": "Pending",
@@ -17,9 +20,6 @@
   "empty.filteredDescription": "Try another search or filter.",
   "empty.filteredTitle": "No matching pull requests",
   "empty.title": "No pull requests yet",
-  "auth.emptyDescription": "Install the GitHub CLI and run `gh auth login` to load your pull requests.",
-  "auth.emptyTitle": "Connect GitHub to view pull requests",
-  "auth.install": "Install GitHub CLI",
   "filter.all": "All",
   "filter.authored": "Authored",
   "filter.label": "Filter pull requests",

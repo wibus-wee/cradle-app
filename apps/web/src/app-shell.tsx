@@ -8,7 +8,8 @@ import { AppSidebar, AppSidebarSheet } from '~/components/layout/app-sidebar'
 import { useSidebarSheetMode } from '~/components/layout/layout-responsive'
 import { useSyncLayoutSlotScope } from '~/components/layout/use-layout-slots'
 import { useSuppressNativeBrowserSurface } from '~/features/browser/native-surface-suppression'
-import { WhatsNewTrigger } from '~/features/changelog/whats-new-trigger'
+import { WhatsNewContainer } from '~/features/changelog/whats-new-container'
+import { WhatsNewPopup } from '~/features/changelog/whats-new-popup'
 import { useChatSplitFocusedSessionId, useChatSplitWorkspaceStore } from '~/features/chat/split-workspace/chat-split-workspace-store'
 import { useDesktopTrayActionBridge } from '~/features/desktop-tray/use-desktop-tray-action-bridge'
 import { CredentialSetupDialog } from '~/features/onboarding/credential-setup-dialog'
@@ -315,7 +316,8 @@ function MainAppRuntime() {
         </div>
       </AppLayout>
       <StreamingChatRetentionBoundary />
-      <WhatsNewTrigger />
+      <WhatsNewContainer />
+      <WhatsNewPopup />
     </div>
   )
 }

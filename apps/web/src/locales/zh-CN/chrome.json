@@ -74,5 +74,11 @@
   "update.tooltip.title": "Cradle 更新",
   "aside.localServers.scanning": "正在扫描 localhost…",
   "aside.notes.placeholder": "在这里记录会话笔记…",
-  "whatsNew.dismiss": "知道了"
+  "whatsNew.dismiss": "知道了",
+  "whatsNew.eyebrow": "新版亮点",
+  "whatsNew.history": "历史版本",
+  "whatsNew.seeDetails": "查看详情",
+  "whatsNew.later": "稍后",
+  "featureTip.eyebrow": "功能小贴士",
+  "featureTip.tryIt": "试一下"
 }

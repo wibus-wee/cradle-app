@@ -512,6 +512,7 @@
   "jarvis.thinking.xhigh.description": "Presupuesto máximo de razonamiento para tareas difíciles.",
   "jarvis.thinking.xhigh.label": "Extra alto",
   "nav.about": "Acerca de",
+  "nav.whatsNew": "Novedades",
   "nav.agents": "Agentes",
   "nav.appearance": "Apariencia",
   "nav.await": "Await",

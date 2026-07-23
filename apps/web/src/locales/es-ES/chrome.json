@@ -74,5 +74,11 @@
   "update.tooltip.title": "Actualizaciones de Cradle",
   "aside.localServers.scanning": "Analizando localhost…",
   "aside.notes.placeholder": "Escribe notas de la sesión aquí…",
-  "whatsNew.dismiss": "¡Entendido!"
+  "whatsNew.dismiss": "¡Entendido!",
+  "whatsNew.eyebrow": "Novedades",
+  "whatsNew.history": "Historial de versiones",
+  "whatsNew.seeDetails": "Ver detalles",
+  "whatsNew.later": "Más tarde",
+  "featureTip.eyebrow": "Consejo de función",
+  "featureTip.tryIt": "Probar"
 }

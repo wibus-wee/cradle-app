@@ -571,6 +571,7 @@
   "nav.serverEndpoint": "Server Endpoint",
   "nav.shortcut": "Shortcuts",
   "nav.support": "Support",
+  "nav.whatsNew": "What's New",
   "nav.worktrees": "Worktrees",
   "network.custom.error.invalid": "Enter a valid proxy URL.",
   "network.custom.url.description": "HTTP, HTTPS, and SOCKS5 proxy URLs are supported.",

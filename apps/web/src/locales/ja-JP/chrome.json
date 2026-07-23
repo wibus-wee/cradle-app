@@ -74,5 +74,11 @@
   "update.tooltip.title": "Cradle の更新",
   "aside.localServers.scanning": "localhost をスキャン中…",
   "aside.notes.placeholder": "ここにセッションメモを残す…",
-  "whatsNew.dismiss": "了解"
+  "whatsNew.dismiss": "了解",
+  "whatsNew.eyebrow": "新機能",
+  "whatsNew.history": "リリース履歴",
+  "whatsNew.seeDetails": "詳細を見る",
+  "whatsNew.later": "後で",
+  "featureTip.eyebrow": "機能のヒント",
+  "featureTip.tryIt": "試してみる"
 }

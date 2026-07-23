@@ -66,6 +66,9 @@ The English version uses `title: Daily Build` (or descriptive title) and English
 | `version` | Yes | Must match the release tag exactly. `dev-YYYYMMDD.N` for dev, `X.Y.Z` for release. |
 | `date` | Yes | ISO date `YYYY-MM-DD`. |
 | `title` | Yes | Short descriptive title summarizing the release. Both dev and release versions use descriptive titles (e.g. `Remote Runtime 与 Claude 订阅登录`). |
+| `summary` | No | One-line highlight shown on the in-app corner announcement card. Falls back to the `>` blockquote style: keep it under ~80 characters. |
+| `announce` | No | `true` to push this release as a timed corner popup (bottom-right card) in the desktop app, shown once per user until dismissed. |
+| `showAfter` | No | ISO date `YYYY-MM-DD`. The corner popup only appears on/after this date; defaults to `date`. |
 
 ### Body conventions
 
@@ -175,7 +178,9 @@ changelog/*.md
   ↓ (Vite plugin at build time)
 index.json + *.md → deployed to app.cradle.wibus.ren/changelog/
   ↓ (Desktop app fetches on startup)
-index.json → version check → fetch *.md → What's New Dialog
+index.json → version check → fetch *.md → What's New Dialog (with version rail)
+  ↓ (entries with `announce: true`)
+timed bottom-right popup card → once per user → "See details" opens the Dialog
   ↓ (CI also reads *.md)
 manifest.json releaseNotes field → Settings page display
 ```

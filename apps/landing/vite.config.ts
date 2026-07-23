@@ -10,6 +10,9 @@ interface ChangelogEntry {
   version: string
   date: string
   title: Record<string, string>
+  summary?: Record<string, string>
+  announce?: boolean
+  showAfter?: string
   languages: string[]
 }
 
@@ -47,7 +50,14 @@ function changelogIndexPlugin(): Plugin {
       const files = readdirSync(changelogDir).filter(f => f.endsWith('.md'))
 
       // Group files by version: version.zh.md / version.en.md → version
-      const versionMap = new Map<string, { languages: string[], title: Record<string, string>, date: string }>()
+      const versionMap = new Map<string, {
+        languages: string[]
+        title: Record<string, string>
+        summary?: Record<string, string>
+        announce?: boolean
+        showAfter?: string
+        date: string
+      }>()
 
       mkdirSync(outDir, { recursive: true })
 
@@ -64,12 +74,21 @@ function changelogIndexPlugin(): Plugin {
         if (existing) {
           existing.languages.push(locale)
           existing.title[locale] = meta.title || ''
+          if (meta.summary) {
+            existing.summary = existing.summary || {}
+            existing.summary[locale] = meta.summary
+          }
+          if (meta.announce === 'true') { existing.announce = true }
+          if (meta.showAfter) { existing.showAfter = meta.showAfter }
         }
         else {
           versionMap.set(meta.version, {
             date: meta.date,
             languages: [locale],
             title: { [locale]: meta.title || '' },
+            summary: meta.summary ? { [locale]: meta.summary } : undefined,
+            announce: meta.announce === 'true' ? true : undefined,
+            showAfter: meta.showAfter || undefined,
           })
         }
 
@@ -180,8 +199,33 @@ ${items}
   }
 }
 
+/**
+ * Feature tips for the in-app corner popup. The source is a hand-maintained
+ * JSON file (`tips/index.json`); this copies it to `public/tips/` so the
+ * desktop app can fetch it alongside the changelog.
+ */
+function tipsIndexPlugin(): Plugin {
+  const tipsFile = resolve(__dirname, 'tips', 'index.json')
+  const outDir = resolve(__dirname, 'public', 'tips')
+
+  return {
+    name: 'tips-index',
+    buildStart() {
+      mkdirSync(outDir, { recursive: true })
+      let content = '[]'
+      try {
+        content = readFileSync(tipsFile, 'utf-8')
+      }
+      catch {
+        // No tips defined — serve an empty index.
+      }
+      writeFileSync(join(outDir, 'index.json'), content)
+    },
+  }
+}
+
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss(), changelogIndexPlugin(), blogIndexPlugin()],
+  plugins: [react(), tailwindcss(), changelogIndexPlugin(), blogIndexPlugin(), tipsIndexPlugin()],
   define: command === 'build'
 ? {
     'process.env.NODE_ENV': JSON.stringify('production'),

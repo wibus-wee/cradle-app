@@ -7,6 +7,7 @@ import {
   Cursor2Line as MousePointer2Icon,
   CylinderLine as DatabaseIcon,
   Flag2Line as FlagIcon,
+  GiftLine as GiftIcon,
   GitBranchLine as GitBranchIcon,
   HeartbeatLine as ActivityIcon,
   InformationLine as InfoIcon,
@@ -27,6 +28,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
+import { openWhatsNewDialog } from '~/features/changelog/whats-new-store'
 import { cn } from '~/lib/cn'
 import { openPluginCenter } from '~/navigation/navigation-commands'
 
@@ -243,6 +245,12 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
           'about.storage.database.label',
           'about.storage.applicationSupport.label',
         ],
+      },
+      {
+        id: 'whatsNew',
+        labelKey: 'nav.whatsNew',
+        icon: GiftIcon,
+        onActivate: () => openWhatsNewDialog(),
       },
     ],
   },

@@ -36,6 +36,8 @@
   "download.status.queued": "Queued",
   "download.status.verifying": "Verifying",
   "download.title": "Downloads",
+  "featureTip.eyebrow": "Feature tip",
+  "featureTip.tryIt": "Try it",
   "footer.action.askJarvis": "Ask Jarvis",
   "header.action.closeSidebar": "Close sidebar",
   "header.action.collapseSidebar": "Collapse sidebar",
@@ -74,5 +76,9 @@
   "update.toast.availableTitle": "Cradle {{version}} is available",
   "update.tooltip.available": "Available: {{version}}",
   "update.tooltip.title": "Cradle updates",
-  "whatsNew.dismiss": "Got it!"
+  "whatsNew.dismiss": "Got it!",
+  "whatsNew.eyebrow": "What's New",
+  "whatsNew.history": "Release history",
+  "whatsNew.later": "Later",
+  "whatsNew.seeDetails": "See details"
 }

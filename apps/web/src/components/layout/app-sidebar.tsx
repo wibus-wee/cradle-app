@@ -1,4 +1,4 @@
-import { DownloadLine as DownloadIcon, SparklesLine as SparklesIcon } from '@mingcute/react'
+import { DownloadLine as DownloadIcon, GiftLine as GiftIcon, SparklesLine as SparklesIcon } from '@mingcute/react'
 import { m } from 'motion/react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -10,6 +10,7 @@ import { ResizeHandle } from '~/components/layout/resize-handle'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
+import { openWhatsNewDialog, usePendingAnnouncement } from '~/features/changelog/whats-new-store'
 import { isActiveDownload } from '~/features/download-center/types'
 import { useDownloadCenterOwner } from '~/features/download-center/use-download-center'
 import { SettingsSidebar } from '~/features/settings/settings-sidebar'
@@ -118,11 +119,59 @@ const AppSidebarContent = memo(({
           <WorkspaceSidebar collapsed={collapsed} />
         </m.div>
       </div>
+      <SidebarWhatsNewButton collapsed={collapsed} />
       <SidebarUpdateButton collapsed={collapsed} />
     </>
   )
 })
 AppSidebarContent.displayName = 'AppSidebarContent'
+
+function SidebarWhatsNewButton({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation('chrome')
+  const announcement = usePendingAnnouncement()
+
+  return (
+    <TooltipProvider delayDuration={collapsed ? 0 : 500}>
+      <div className="shrink-0 px-2 pb-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size={collapsed ? 'icon-sm' : 'sm'}
+              onClick={() => openWhatsNewDialog()}
+              className={cn(
+                'relative w-full justify-start gap-2 overflow-hidden text-sidebar-foreground/75 hover:bg-fill/80 hover:text-sidebar-foreground',
+                'active:scale-[0.96]',
+                collapsed && 'pl-1.5',
+              )}
+              aria-label={t('whatsNew.eyebrow')}
+              data-testid="sidebar-whats-new-button"
+            >
+              <span className="relative flex size-4 shrink-0 items-center justify-center">
+                <GiftIcon className="size-3.5" aria-hidden="true" />
+                {announcement && (
+                  <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-info ring-2 ring-sidebar" />
+                )}
+              </span>
+              <span className={cn('min-w-0 flex-1 truncate text-left text-[12px]', collapsed && 'sr-only')}>
+                {t('whatsNew.eyebrow')}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8} className="mb-1 max-w-72 flex-col items-start gap-1 p-2.5">
+            <span className="font-medium">{t('whatsNew.eyebrow')}</span>
+            {announcement && (
+              <span className="font-mono text-[11px] tabular-nums text-background/70">
+                {announcement.version}
+              </span>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
+  )
+}
 
 function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation('chrome')
