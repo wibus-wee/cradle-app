@@ -3,8 +3,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   getWorkspacesByWorkspaceIdGitBranchesOptions,
   getWorkspacesByWorkspaceIdGitBranchesQueryKey,
-  getWorkspacesByWorkspaceIdGitDiffOptions,
-  getWorkspacesByWorkspaceIdGitDiffQueryKey,
   getWorkspacesByWorkspaceIdGitGraphOptions,
   getWorkspacesByWorkspaceIdGitGraphQueryKey,
   getWorkspacesByWorkspaceIdGitRemotesOptions,
@@ -13,6 +11,7 @@ import {
   getWorkspacesByWorkspaceIdGitStatusOptions,
   getWorkspacesByWorkspaceIdGitStatusQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
+import { client } from '~/api-gen/client.gen'
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
 
 // ─── Re-export generated query key builders so callers don't import from api-gen ──
@@ -21,7 +20,15 @@ export { getWorkspacesByWorkspaceIdGitStatusQueryKey as gitStatusQueryKey }
 export { getWorkspacesByWorkspaceIdGitRepositoriesQueryKey as gitRepositoriesQueryKey }
 export { getWorkspacesByWorkspaceIdGitBranchesQueryKey as gitBranchesQueryKey }
 export { getWorkspacesByWorkspaceIdGitGraphQueryKey as gitGraphQueryKey }
-export { getWorkspacesByWorkspaceIdGitDiffQueryKey as gitDiffQueryKey }
+
+export function gitDiffQueryKey(
+  workspaceId: string,
+  repositoryPath?: string | null,
+  paths?: string[],
+  sessionId?: string | null,
+) {
+  return ['git-diff', workspaceId, repositoryPath ?? null, paths?.join(',') ?? null, sessionId ?? null] as const
+}
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
@@ -141,23 +148,27 @@ export function useGitDiff(
   workspaceId: string | null | undefined,
   repositoryPath?: string | null,
   paths?: string[],
+  sessionId?: string | null,
 ) {
   const pathsStr = paths?.length ? paths.join(',') : undefined
   return useQuery({
-    ...getWorkspacesByWorkspaceIdGitDiffOptions({
-      path: { workspaceId: workspaceId! },
-      ...(repositoryPath || pathsStr
-        ? {
-            query: {
-              ...(repositoryPath ? { repo: repositoryPath } : {}),
-              ...(pathsStr ? { paths: pathsStr } : {}),
-            },
-          }
-        : {}),
-    }),
+    queryKey: gitDiffQueryKey(workspaceId ?? '', repositoryPath, paths, sessionId),
+    queryFn: async () => {
+      const { data, error } = await client.get<string>({
+        url: `/workspaces/${workspaceId}/git/diff`,
+        query: {
+          ...(repositoryPath ? { repo: repositoryPath } : {}),
+          ...(pathsStr ? { paths: pathsStr } : {}),
+          ...(sessionId ? { sessionId } : {}),
+        },
+      })
+      if (error) {
+        throw error
+      }
+      return data ?? ''
+    },
     ...queryRefreshPolicies.active,
     enabled: !!workspaceId,
     retry: false,
-    select: data => (typeof data === 'string' ? data : ''),
   })
 }

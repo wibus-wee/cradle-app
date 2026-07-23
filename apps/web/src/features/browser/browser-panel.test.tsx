@@ -142,6 +142,7 @@ vi.mock('./workspace-diff-viewer', () => ({
   WorkspaceDiffViewer: (props: {
     tabId: string
     workspaceId: string
+    sessionId?: string | null
     repositoryPath?: string | null
     paths?: string[]
   }) => {
@@ -212,6 +213,21 @@ describe('browserPanel rendering', () => {
     })
 
     expect(diffViewerRender).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes the worktree session to workspace diff tabs', () => {
+    useBrowserPanelStore.getState().openWorkspaceDiffTab({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-worktree-1',
+      title: 'All Changes',
+    })
+
+    render(<BrowserPanel />)
+
+    expect(diffViewerRender).toHaveBeenLastCalledWith(expect.objectContaining({
+      sessionId: 'session-worktree-1',
+      workspaceId: 'workspace-1',
+    }))
   })
 
   it('renders pull request details as a Browser Panel tab', () => {

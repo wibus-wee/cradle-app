@@ -34,6 +34,7 @@ import {
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { Skeleton } from '~/components/ui/skeleton'
 import { useChatSplitFocusedSessionId } from '~/features/chat/split-workspace/chat-split-workspace-store'
+import { useSessionIsolationState } from '~/features/session/use-session-isolation'
 import { useJarvisUiStore } from '~/features/system-agent/jarvis-ui-store'
 import { useGlobalEventListeners } from '~/hooks/use-global-event-listeners'
 import { useShortcut } from '~/hooks/use-shortcut'
@@ -637,6 +638,8 @@ function AppLayoutContent({
   const activeChromeOwnerId = activeSurface?.id ?? null
   const activeBrowserPanelOwnerId = activeChromeOwnerId
   const activeSessionLayout = useChatSessionLayoutRecord(activeSessionId)
+  const { data: activeSessionIsolation, isLoading: isActiveSessionIsolationLoading }
+    = useSessionIsolationState(activeSessionId)
   const layoutContract = deriveActiveLayoutContract({
     activeTab,
     slots,
@@ -658,6 +661,11 @@ function AppLayoutContent({
       ?? (activeSessionLayout?.workspaceId === resolvedAsideWorkspaceId
       ? activeSessionLayout.workspacePath
       : null)
+  const resolvedTerminalCwd = activeSessionId && isActiveSessionIsolationLoading
+    ? null
+    : activeSessionIsolation?.isIsolated && activeSessionIsolation.worktreePath
+      ? activeSessionIsolation.worktreePath
+      : resolvedAsideWorkspacePath
   const resolvedAsideWorkspaceName = resolvedWorkspaceLayout?.workspaceName ?? null
   const jarvisExpanded = useJarvisUiStore(s => s.expanded)
 
@@ -901,7 +909,7 @@ function AppLayoutContent({
                 ownerId={activeBrowserPanelOwnerId}
                 activeSessionId={activeSessionId}
                 activeSessionTitle={activeSessionTitle}
-                terminalCwd={resolvedAsideWorkspacePath}
+                terminalCwd={resolvedTerminalCwd}
                 nativeBoundsPaused={browserPanelNativeBoundsPaused}
                 onCloseLastTab={handleCloseLastBrowserPanelTab}
                 validOwnerIds={validChromeOwnerIds}

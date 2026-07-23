@@ -403,6 +403,7 @@ describe('browser panel shortcuts', () => {
     })
     const reopenedTabId = useBrowserPanelStore.getState().openWorkspaceDiffTab({
       workspaceId: 'workspace-2',
+      sessionId: 'session-worktree-2',
       repositoryPath: 'packages/web',
       paths: ['src/app.tsx'],
       title: 'app.tsx',
@@ -414,6 +415,7 @@ describe('browser panel shortcuts', () => {
         id: firstTabId,
         kind: 'workspace-diff',
         workspaceId: 'workspace-2',
+        sessionId: 'session-worktree-2',
         repositoryPath: 'packages/web',
         paths: ['src/app.tsx'],
         title: 'app.tsx',
