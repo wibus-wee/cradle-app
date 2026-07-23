@@ -7,6 +7,8 @@
     "dev": "vite --port 5174",
     "build": "pnpm --filter @cradle/plugin-sdk build && vite build",
     "preview": "vite preview",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build",
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit",
     "test": "NODE_ENV=test vitest run --config vite.config.ts --environment jsdom src",
     "i18n": "tsx ./scripts/i18n-workflow/index.ts",
@@ -121,6 +123,8 @@
     "zustand": "^5.0.4"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "^10.5.3",
+    "@storybook/react-vite": "^10.5.3",
     "@hey-api/openapi-ts": "^0.97.0",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/devtools-vite": "^0.6.0",
@@ -133,6 +137,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "react-grab": "^0.1.33",
     "react-scan": "^0.5.6",
+    "storybook": "^10.5.3",
     "typescript": "~5.8.3",
     "vite": "^8.0.0"
   }

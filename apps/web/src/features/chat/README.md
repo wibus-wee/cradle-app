@@ -57,6 +57,10 @@ AI SDK wire validation is intentionally limited to the SSE boundary through `uiM
 - **use-session-await.ts**: Session await summary hook used by the chat view to reflect pending await state with the shared interactive query refresh policy.
 - **sse-chat-transport.ts**: Thin web/runtime HTTP SSE parser using `parseJsonEventStream` and `uiMessageChunkSchema`; also emits lightweight run activity notifications for app chrome and terminal run-settled events for unread reconciliation.
 - **chat-view.tsx**: Read-only chat view — reads low-frequency session state from useChatSession, renders MessageBubbles by per-message store subscriptions + Composer, shows pending Chat Session queue items and the runtime settings control near the Composer, accepts workspace file drops into the composer, exposes host-owned composer addons plus send preparation/display text hooks for embedded surfaces such as Jarvis, consumes scroll/composer/Appshot runtimes for virtua, minimap, attention snapshots, send actions, slash commands, token usage, attachment capability, desktop capture, side chat creation handoff, the slash-triggered ChatGPT usage rail, the provider-owned Codex plan rail, and the composer-adjacent Codex review selector, and records the global Chat first-render performance measure once per module lifetime.
+- **ui/chat-transcript-view.tsx**: Props-only transcript surface that owns virtualized layout plus empty/error presentation. Storybook and screenshot fixtures render it with props-only `MessageBubble` rows.
+- **ui/chat-transcript-pane.tsx**: Runtime adapter that supplies store-backed `MessageBubbleById` rows, scroll refs, minimap data, and composer overlay orchestration to `ChatTranscriptView`.
+- **fixtures/chat-transcript.ts**: Server-free `UIMessage` fixtures for stable transcript stories and screenshot scenes.
+- **fixtures/screenshots/chat-transcript-long-thread.png**: 1440×900 golden image captured from the server-free Long Thread story.
 - **codex-review-mode.ts**: Pure Codex review-mode prompt and branch ordering helpers; mirrors the native review guidelines, uncommitted/base-branch request messages, and merge-base diff instruction instead of sending raw `/review` text.
 - **codex-review-mode.test.ts**: Regression coverage for Codex review-mode prompt construction and base branch ordering.
 - **use-chat-scroll-runtime.ts**: Chat-owned scroll controller hook for ScrollArea and virtua refs, streaming keep-mounted indices, bottom-follow auto-scroll that detaches on manual upward scroll, transcript content resize observation, minimap progress writes, click/drag scroll actions, and Jarvis attention viewport snapshots.
@@ -100,3 +104,10 @@ AI SDK wire validation is intentionally limited to the SSE boundary through `uiM
 - **chat-streaming-handler.ts**: AI SDK chunk-to-store bridge that feeds `ReadableStream<UIMessageChunk>` into `readUIMessageStream`, receives full `UIMessage` snapshots after chunks, ignores hydrated snapshots for passive full-replay joins, and replaces the corresponding Zustand message through a bounded rAF-aligned flush cadence so high-frequency provider deltas do not force full store normalization on every frame.
 - **chat-streaming-handler.test.ts**: Regression coverage for passive replay consumption rebuilding reasoning parts from protocol starts instead of appending to stale hydrated snapshots.
 - **index.ts**: Barrel file re-exporting public API
+
+## Presentation Boundaries
+
+- New screenshotable chat surfaces export a props-only `*View`; routes, queries, stores, Electron APIs, and session lifecycle stay in `*Container`, `*Pane`, or `*ById` adapters.
+- Storybook stories render View exports from fixtures. Do not mount routes or runtime containers in stories, and do not recreate the application provider stack in decorators.
+- Runtime-only UI is passed into Views as data, callbacks, or bounded render slots. A View may own local interaction state such as expanded, copied, or selected.
+- Run Storybook with `pnpm --filter @cradle/web storybook`; verify the static bundle with `pnpm --filter @cradle/web storybook:build`.

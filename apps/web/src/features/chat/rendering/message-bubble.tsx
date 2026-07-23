@@ -7,6 +7,7 @@ import {
   PencilLine as PencilIcon,
 } from '@mingcute/react'
 import type { UIMessage } from 'ai'
+import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
@@ -130,6 +131,7 @@ interface MessageBubbleProps {
   presentation?: 'thread' | 'export'
   sessionId?: string
   onToolApprovalResponse?: MessageToolApprovalHandler
+  debugCaption?: ReactNode
 }
 
 const MessageThinkingPlaceholderById = ({
@@ -765,6 +767,7 @@ function MessageBubbleView({
   presentation = 'thread',
   sessionId,
   onToolApprovalResponse,
+  debugCaption,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
@@ -865,7 +868,6 @@ function MessageBubbleView({
             key={item.key}
             items={item.items}
             uiKind={item.uiKind}
-            sessionId={sessionId}
           />
         )
 
@@ -963,7 +965,7 @@ function MessageBubbleView({
           {showThinkingPlaceholder && <ThinkingPlaceholder />}
         </div>
 
-        {isAssistant && <RunDebugCaption messageId={message.id} />}
+        {isAssistant && debugCaption}
 
         {/* Action bar — appears on hover for all messages */}
         {!isExportPresentation && !isStreaming && plainText.length > 0 && (
