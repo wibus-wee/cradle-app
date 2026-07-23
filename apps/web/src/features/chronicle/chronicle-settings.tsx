@@ -3,7 +3,6 @@ import {
   CheckCircleLine as CheckCircle2Icon,
   ChipLine as CpuIcon,
   ClockLine as ClockIcon,
-  DownloadLine as DownloadIcon,
   DriveLine as HardDriveIcon,
   EyeLine as EyeIcon,
   FileMusicLine as FileAudioIcon,
@@ -34,8 +33,6 @@ import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-mo
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
 import type { ProviderModelOption } from '~/features/composer-toolbar/types'
-import type { DownloadTask } from '~/features/download-center/types'
-import { useDownloadCenterProgressByOwner } from '~/features/download-center/use-download-center-progress'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
@@ -44,6 +41,12 @@ import { formatPercentFromRatio, formatShortDurationMs } from '~/lib/number-form
 import type { ChronicleFocusTarget } from '~/store/settings-overlay'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
+import {
+  ChronicleEmptyState,
+} from './chronicle-empty-state'
+import {
+  ChronicleResourceGridContainer,
+} from './chronicle-resource-grid-container'
 import type {
   ChronicleAccessibilityEvent,
   ChronicleAccessibilitySnapshot,
@@ -54,7 +57,6 @@ import type {
   ChronicleDreamRun,
   ChronicleKnowledgeCard,
   ChronicleMessageSource,
-  ChronicleModelResource,
   ChroniclePipelineRun,
   ChronicleSlackSourceDraft,
   ChronicleSpeakerProfile,
@@ -78,7 +80,6 @@ import {
   useChronicleMemory,
   useChronicleMemorySearch,
   useChronicleMessageSources,
-  useChronicleModelResourceActions,
   useChronicleModelResources,
   useChroniclePipelineRuns,
   useChronicleSlackSourceActions,
@@ -91,17 +92,6 @@ import {
 const MEMORY_SEARCH_LIMIT = 50
 const PRIVACY_RULE_LINE_SPLIT_RE = /\r?\n/
 type ChronicleTranslate = TFunction<'chronicle'>
-const MODEL_RESOURCE_CATEGORIES: readonly ChronicleModelResource['category'][] = ['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii']
-
-function modelResourceCategoryForDownload(task: DownloadTask): ChronicleModelResource['category'] | null {
-  if (task.scope !== 'server') { return null }
-  const separator = task.owner.resourceId.indexOf(':')
-  if (separator === -1) { return null }
-  const category = task.owner.resourceId.slice(0, separator)
-  return MODEL_RESOURCE_CATEGORIES.includes(category as ChronicleModelResource['category'])
-    ? category as ChronicleModelResource['category']
-    : null
-}
 
 const AccessibilityTreeNodeSchema = z.object({
   role: z.string().nullable().optional().transform(value => value?.trim() || 'AXElement'),
@@ -116,11 +106,6 @@ const AccessibilityTreeNodeSchema = z.object({
   depth: node.depth,
   path: node.path ?? `${node.role}:${node.label}:${node.depth}`,
 }))
-const ModelResourceManifestSchema = z.object({
-  files: z.array(z.object({
-    sourceUrl: z.string(),
-  }).passthrough()).default([]),
-}).passthrough().default({ files: [] })
 const AccessibilitySnapshotMetadataSchema = z.object({
   artifactPath: z.string().optional(),
 }).passthrough()
@@ -162,42 +147,6 @@ function formatRelativeTime(t: ChronicleTranslate, value: string | number | null
   }
   const days = Math.floor(hours / 24)
   return t('time.daysAgo', { count: days })
-}
-
-function getResourceTone(resource: ChronicleModelResource): 'ready' | 'optional' | 'warning' | 'error' | 'loading' {
-  if (resource.state === 'available') {
-    return 'ready'
-  }
-  if (resource.state === 'installing') {
-    return 'loading'
-  }
-  if (resource.state === 'error') {
-    return 'error'
-  }
-  if (resource.required) {
-    return 'warning'
-  }
-  return 'optional'
-}
-
-function hasVerifiedManifestDownload(resource: ChronicleModelResource): boolean {
-  return ModelResourceManifestSchema.parse(resource.metadata?.manifest).files.length > 0
-}
-
-function getResourceStateLabel(t: ChronicleTranslate, resource: ChronicleModelResource): string {
-  if (resource.state === 'available') {
-    return t('resource.state.available')
-  }
-  if (resource.state === 'installing') {
-    return t('resource.state.installing')
-  }
-  if (resource.state === 'error') {
-    return t('common.status.error')
-  }
-  if (resource.required) {
-    return t('resource.state.missing')
-  }
-  return t('resource.state.optional')
 }
 
 interface ChronicleSetupNotice {
@@ -668,9 +617,9 @@ export function ChronicleSettings() {
       >
         <SettingsRow label={t('recentActivity.title')} description={t('recentActivity.description')} vertical>
           {timelineLoading
-            ? <EmptyState icon={<ImageIcon className="size-4" />} title={t('recentActivity.loading')} />
+            ? <ChronicleEmptyState icon={<ImageIcon className="size-4" />} title={t('recentActivity.loading')} />
             : timelineEntries.length === 0
-              ? <EmptyState icon={<ImageIcon className="size-4" />} title={t('recentActivity.empty')} />
+              ? <ChronicleEmptyState icon={<ImageIcon className="size-4" />} title={t('recentActivity.empty')} />
               : <TimelineRecordFeed entries={timelineEntries} />}
         </SettingsRow>
 
@@ -687,10 +636,10 @@ export function ChronicleSettings() {
                 />
               </div>
               {memoriesLoading || searchingMemories || focusedMemoryLoading
-                ? <EmptyState icon={<BrainIcon className="size-4" />} title={t('memorySearch.loading')} />
+                ? <ChronicleEmptyState icon={<BrainIcon className="size-4" />} title={t('memorySearch.loading')} />
                 : visibleMemoryEntries.length === 0
                   ? (
-                      <EmptyState
+                      <ChronicleEmptyState
                         icon={<BrainIcon className="size-4" />}
                         title={hasSearchQuery ? t('memorySearch.noMatches') : t('memorySearch.empty')}
                       />
@@ -708,18 +657,18 @@ export function ChronicleSettings() {
         <div ref={knowledgeSectionRef}>
           <SettingsRow label={t('knowledge.title')} description={t('knowledge.description')} vertical>
             {knowledgeCardsLoading || focusedKnowledgeLoading
-              ? <EmptyState icon={<BrainIcon className="size-4" />} title={t('knowledge.loading')} />
+              ? <ChronicleEmptyState icon={<BrainIcon className="size-4" />} title={t('knowledge.loading')} />
               : visibleKnowledgeCards.length === 0
-                ? <EmptyState icon={<BrainIcon className="size-4" />} title={t('knowledge.empty')} />
+                ? <ChronicleEmptyState icon={<BrainIcon className="size-4" />} title={t('knowledge.empty')} />
                 : <KnowledgeCardList cards={visibleKnowledgeCards} focusTarget={chronicleFocusTarget} />}
           </SettingsRow>
         </div>
 
         <SettingsRow label={t('speakers.title')} description={t('speakers.description')} vertical>
           {speakerProfilesLoading
-            ? <EmptyState icon={<UserRoundIcon className="size-4" />} title={t('speakers.loading')} />
+            ? <ChronicleEmptyState icon={<UserRoundIcon className="size-4" />} title={t('speakers.loading')} />
             : speakerProfiles.length === 0
-              ? <EmptyState icon={<UserRoundIcon className="size-4" />} title={t('speakers.empty')} />
+              ? <ChronicleEmptyState icon={<UserRoundIcon className="size-4" />} title={t('speakers.empty')} />
               : <SpeakerProfileList profiles={speakerProfiles} />}
         </SettingsRow>
       </SettingsGroup>
@@ -785,51 +734,54 @@ export function ChronicleSettings() {
           <div className="border-t border-border/60" />
 
           <AdvancedDiagnosticSection title={t('advanced.resources.title')} description={t('advanced.resources.description')}>
-            <ResourceGrid loading={resourcesLoading} resources={resources} />
+            <ChronicleResourceGridContainer
+              loading={resourcesLoading}
+              resources={resources}
+            />
           </AdvancedDiagnosticSection>
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.accessibilitySnapshots.title')} description={t('advanced.accessibilitySnapshots.description')} vertical>
             {accessibilitySnapshotsLoading
-              ? <EmptyState icon={<EyeIcon className="size-4" />} title={t('advanced.accessibilitySnapshots.loading')} />
+              ? <ChronicleEmptyState icon={<EyeIcon className="size-4" />} title={t('advanced.accessibilitySnapshots.loading')} />
               : accessibilitySnapshots.length === 0
-                ? <EmptyState icon={<EyeIcon className="size-4" />} title={t('advanced.accessibilitySnapshots.empty')} />
+                ? <ChronicleEmptyState icon={<EyeIcon className="size-4" />} title={t('advanced.accessibilitySnapshots.empty')} />
                 : <AccessibilitySnapshotList snapshots={accessibilitySnapshots} />}
           </SettingsRow>
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.accessibilityEvents.title')} description={t('advanced.accessibilityEvents.description')} vertical>
             {accessibilityEventsLoading
-              ? <EmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.accessibilityEvents.loading')} />
+              ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.accessibilityEvents.loading')} />
               : accessibilityEvents.length === 0
-                ? <EmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.accessibilityEvents.empty')} />
+                ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.accessibilityEvents.empty')} />
                 : <AccessibilityEventList events={accessibilityEvents} />}
           </SettingsRow>
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.audioSegments.title')} description={t('advanced.audioSegments.description')} vertical>
             {audioRawSegmentsLoading
-              ? <EmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.audioSegments.loading')} />
+              ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.audioSegments.loading')} />
               : audioRawSegments.length === 0
-                ? <EmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.audioSegments.empty')} />
+                ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.audioSegments.empty')} />
                 : <AudioRawSegmentList segments={audioRawSegments} />}
           </SettingsRow>
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.transcripts.title')} description={t('advanced.transcripts.description')} vertical>
             {audioTranscriptsLoading
-              ? <EmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.transcripts.loading')} />
+              ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.transcripts.loading')} />
               : audioTranscripts.length === 0
-                ? <EmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.transcripts.empty')} />
+                ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.transcripts.empty')} />
                 : <AudioTranscriptList transcripts={audioTranscripts} />}
           </SettingsRow>
           <div className="border-t border-border/60" />
 
           <AdvancedDiagnosticSection title={t('advanced.activitySegments.title')} description={t('advanced.activitySegments.description')}>
             {activitySegmentsLoading || pipelineRunsLoading
-              ? <EmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.activitySegments.loading')} />
+              ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.activitySegments.loading')} />
               : activitySegments.length === 0
-                ? <EmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.activitySegments.empty')} />
+                ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.activitySegments.empty')} />
                 : <ActivityPipelinePanel segments={activitySegments} runs={pipelineRuns} />}
           </AdvancedDiagnosticSection>
           <div className="border-t border-border/60" />
@@ -1313,9 +1265,9 @@ function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: Chr
       </div>
 
       {loading
-        ? <EmptyState icon={<MessageSquareIcon className="size-4" />} title={t('slack.loading')} />
+        ? <ChronicleEmptyState icon={<MessageSquareIcon className="size-4" />} title={t('slack.loading')} />
         : sources.length === 0
-          ? <EmptyState icon={<MessageSquareIcon className="size-4" />} title={t('slack.empty')} />
+          ? <ChronicleEmptyState icon={<MessageSquareIcon className="size-4" />} title={t('slack.empty')} />
           : (
               <div className="flex flex-col gap-2">
                 {sources.map(source => (
@@ -1372,207 +1324,6 @@ function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: Chr
 
       {lastSyncMessage && <p className="text-[12px] text-muted-foreground">{lastSyncMessage}</p>}
     </div>
-  )
-}
-
-function ResourceGrid({ loading, resources }: { loading: boolean, resources: ChronicleModelResource[] }) {
-  const { t } = useTranslation('chronicle')
-  const {
-    reconcileResources,
-    installAllResources,
-    verifyResource,
-    installResource,
-    reconciling,
-    installingAll,
-    verifying,
-    installing,
-  } = useChronicleModelResourceActions()
-  const downloadProgress = useDownloadCenterProgressByOwner(
-    { namespace: 'chronicle', resourceType: 'model-resource-file' },
-    installingAll || installing,
-    modelResourceCategoryForDownload,
-  )
-
-  if (loading) {
-    return <EmptyState icon={<CpuIcon className="size-4" />} title={t('resources.loading')} />
-  }
-
-  const busy = reconciling || installingAll || verifying || installing
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <Button
-          type="button"
-          variant="default"
-          size="default"
-          className="w-full sm:w-auto"
-          disabled={busy}
-          onClick={() => void installAllResources()}
-        >
-          <DownloadIcon className="size-4" />
-          {t('resources.installAll')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full sm:w-auto"
-          disabled={busy}
-          onClick={() => void reconcileResources()}
-        >
-          <RefreshCwIcon className="size-3.5" />
-          {t('resources.recheck')}
-        </Button>
-      </div>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        {resources.map(resource => (
-          <ResourceItem
-            key={resource.category}
-            resource={resource}
-            busy={busy || resource.state === 'installing'}
-            installResource={installResource}
-            verifyResource={verifyResource}
-            downloadProgress={downloadProgress}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ResourceItem({
-  resource,
-  busy,
-  installResource,
-  verifyResource,
-  downloadProgress,
-}: {
-  resource: ChronicleModelResource
-  busy: boolean
-  installResource: ReturnType<typeof useChronicleModelResourceActions>['installResource']
-  verifyResource: ReturnType<typeof useChronicleModelResourceActions>['verifyResource']
-  downloadProgress: Partial<Record<ChronicleModelResource['category'], number>>
-}) {
-  const { t } = useTranslation('chronicle')
-  const tone = getResourceTone(resource)
-  const [message, setMessage] = useState<string | null>(null)
-  const canInstall = resource.category !== 'ocr'
-  const canDownload = canInstall && hasVerifiedManifestDownload(resource)
-  const progress = downloadProgress[resource.category]
-
-  return (
-    <div className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-      <div className="flex items-start gap-2">
-        <ResourceIcon tone={tone} />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[13px] font-medium text-foreground">{resource.label}</span>
-            <ResourceBadge resource={resource} />
-          </div>
-          <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">
-            {resource.message ?? resource.provider ?? t('resources.defaultMessage')}
-          </p>
-          {resource.path && (
-            <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground/70">{resource.path}</p>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {resource.version && (
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{resource.version}</span>
-            )}
-            {resource.sizeBytes !== null && resource.sizeBytes > 0 && (
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                {(resource.sizeBytes / 1024 / 1024).toFixed(1)}
-                {' '}
-                MB
-              </span>
-            )}
-          </div>
-          {canInstall && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {canDownload && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  disabled={busy}
-                  onClick={() => {
-                    setMessage(null)
-                    void installResource({ category: resource.category, source: 'manifest' }).then((updated) => {
-                      setMessage(updated?.message ?? t('resources.downloaded'))
-                    })
-                  }}
-                >
-                  <DownloadIcon className="size-3" />
-                  {t('common.action.download')}
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                disabled={busy}
-                onClick={() => {
-                    setMessage(null)
-                    void verifyResource(resource.category).then((updated) => {
-                      setMessage(updated?.message ?? t('resources.verified'))
-                    })
-                  }}
-              >
-                  <RefreshCwIcon className="size-3" />
-                  {t('common.action.verify')}
-              </Button>
-            </div>
-          )}
-          {message && <p className="mt-1 text-[11px] text-muted-foreground">{message}</p>}
-          {progress !== undefined && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {t('resources.downloadProgress', { progress })}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ResourceIcon({ tone }: { tone: ReturnType<typeof getResourceTone> }) {
-  return (
-    <span
-      className={cn(
-        'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md',
-        {
-          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300': tone === 'ready',
-          'bg-muted text-muted-foreground': tone === 'optional',
-          'bg-amber-500/10 text-amber-700 dark:text-amber-300': tone === 'warning' || tone === 'loading',
-          'bg-destructive/10 text-destructive': tone === 'error',
-        },
-      )}
-    >
-      {tone === 'ready' ? <CheckCircle2Icon className="size-3.5" /> : <CpuIcon className="size-3.5" />}
-    </span>
-  )
-}
-
-function ResourceBadge({ resource }: { resource: ChronicleModelResource }) {
-  const { t } = useTranslation('chronicle')
-  const tone = getResourceTone(resource)
-
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        'ml-auto text-[11px]',
-        {
-          'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300': tone === 'ready',
-          'border-foreground/10 bg-muted text-muted-foreground': tone === 'optional',
-          'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300': tone === 'warning' || tone === 'loading',
-          'border-destructive/20 bg-destructive/10 text-destructive': tone === 'error',
-        },
-      )}
-    >
-      {getResourceStateLabel(t, resource)}
-    </Badge>
   )
 }
 
@@ -1647,7 +1398,7 @@ function TimelineRecordFeed({ entries }: { entries: TimelineEntry[] }) {
 
       <div className="max-h-[420px] overflow-y-auto overscroll-contain pr-1">
         {filteredEntries.length === 0
-          ? <EmptyState icon={<ImageIcon className="size-4" />} title={t('timeline.filteredEmpty')} />
+          ? <ChronicleEmptyState icon={<ImageIcon className="size-4" />} title={t('timeline.filteredEmpty')} />
           : (
               <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
                 {filteredEntries.map(entry => (
@@ -2218,9 +1969,9 @@ function DreamRunPanel({ loading, runs }: { loading: boolean, runs: ChronicleDre
       </div>
 
       {loading
-        ? <EmptyState icon={<ClockIcon className="size-4" />} title={t('dreamRun.loading')} />
+        ? <ChronicleEmptyState icon={<ClockIcon className="size-4" />} title={t('dreamRun.loading')} />
         : runs.length === 0
-          ? <EmptyState icon={<ClockIcon className="size-4" />} title={t('dreamRun.empty')} />
+          ? <ChronicleEmptyState icon={<ClockIcon className="size-4" />} title={t('dreamRun.empty')} />
           : (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {runs.slice(0, 8).map(run => (
@@ -2646,7 +2397,7 @@ function StatusPanel({
   const { t } = useTranslation('chronicle')
 
   if (loading) {
-    return <EmptyState icon={<ActivityIcon className="size-4" />} title={t('status.loading')} />
+    return <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('status.loading')} />
   }
 
   return (
@@ -2791,17 +2542,6 @@ function StatusItem({
       </div>
       <span className="mt-1 block truncate text-[13px] font-medium tabular-nums text-foreground">{value}</span>
       {detail && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground/70">{detail}</span>}
-    </div>
-  )
-}
-
-function EmptyState({ icon, title }: { icon: ReactNode, title: string }) {
-  return (
-    <div className="flex min-h-24 items-center justify-center rounded-lg border border-dashed border-foreground/10 bg-muted/20 px-4 py-6 text-muted-foreground">
-      <div className="flex items-center gap-2 text-[13px]">
-        {icon}
-        <span>{title}</span>
-      </div>
     </div>
   )
 }
