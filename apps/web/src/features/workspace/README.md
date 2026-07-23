@@ -41,6 +41,11 @@ them to the Work surface.
 - **workspace-session-list-view.tsx**: Pure props rendering seam for the sidebar Session list track, empty state, and show-more/show-fewer control.
 - **workspace-session-list-view.stories.tsx**: Interactive fixture-driven Storybook catalog for bounded, expanded, and empty Session lists.
 - **workspace-session-status.ts**: Shared owner-typed running-status predicate used by sidebar sorting, retention, filters, and Session-list composition.
+- **workspace-text-input-dialog-view.tsx**: Pure props dialog for workspace, Session-group, file, and folder naming flows.
+- **workspace-text-input-dialog-view.stories.tsx**: Fixture-driven rename and create variants for the shared workspace text input dialog.
+- **workspace-recognition-dialog-view.tsx**: Pure props rendering seam for valid, invalid, experimental, already-imported, and busy Cradle Workspace recognition states.
+- **workspace-recognition-dialog-view.stories.tsx**: Owner-typed Storybook variants for the workspace recognition decision surface.
+- **fixtures/workspace-recognition.ts**: Owner-typed recognition results covering the supported inspection outcomes.
 - **fixtures/workspace-sidebar.ts**: Owner-typed Workspace, Session, and Work fixtures shared by workspace rendering previews.
 - **fixtures/screenshots/**: Desktop and mobile golden captures for workspace fixture-driven rendering surfaces.
 - **preview-card/**: Sidebar preview-card lifecycle and type-specific renderers. The shared provider keeps the interaction warm while crossing rows without previews, and `session/` owns transcript-backed session preview content.

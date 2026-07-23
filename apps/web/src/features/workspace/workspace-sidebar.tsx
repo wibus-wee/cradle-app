@@ -127,7 +127,7 @@ import {
   useSessionGroups,
   useUpdateSessionGroup,
 } from './use-session-group'
-import type { CreateWorkspaceInput, WorkspaceRecognition } from './use-workspace'
+import type { CreateWorkspaceInput } from './use-workspace'
 import {
   useAddWorkspace,
   useDeleteWorkspace,
@@ -137,6 +137,9 @@ import {
 } from './use-workspace'
 import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
 import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
+import {
+  WorkspaceRecognitionDialogView,
+} from './workspace-recognition-dialog-view'
 import { WorkspaceSessionActionsMenu } from './workspace-session-actions-menu'
 import type {
   WorkspaceSessionActionsMenuState,
@@ -161,6 +164,9 @@ import type {
   WorkspaceSidebarProjectSortKey,
 } from './workspace-sidebar-ui-store'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
+import {
+  WorkspaceTextInputDialogView,
+} from './workspace-text-input-dialog-view'
 
 const RECENT_SESSION_WINDOW_SECONDS = 60 * 60
 const DEFAULT_WORKSPACE_FILE_NAME = 'untitled'
@@ -247,64 +253,6 @@ function isSessionRecent(session: WorkspaceSession, currentUnixTimestamp: number
 type RuntimeIconByKind = WorkspaceRuntimeIconByKind
 
 type SessionMenuRequest = WorkspaceSessionItemMenuRequest
-
-function WorkspaceTextInputDialog({
-  open,
-  title,
-  initialValue,
-  label,
-  confirmLabel,
-  onOpenChange,
-  onCommit,
-}: {
-  open: boolean
-  title: string
-  initialValue: string
-  label: string
-  confirmLabel: string
-  onOpenChange: (open: boolean) => void
-  onCommit: (value: string) => Promise<void>
-}) {
-  const { t } = useTranslation('workspace')
-  const [value, setValue] = useState(initialValue)
-
-  useEffect(() => {
-    if (open) {
-      setValue(initialValue)
-    }
-  }, [initialValue, open])
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xs">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <form
-          className="grid gap-3"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void onCommit(value)
-          }}
-        >
-          <Input
-            autoFocus
-            value={value}
-            onChange={event => setValue(event.currentTarget.value)}
-            onFocus={event => event.currentTarget.select()}
-            aria-label={label}
-          />
-          <DialogFooter variant="bare">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t('workspace.dialog.cancel')}
-            </Button>
-            <Button type="submit">{confirmLabel}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 type MultiFolderWorkspaceBody = PostWorkspacesMultiFolderData['body']
 type MultiFolderWorkspaceFolder = MultiFolderWorkspaceBody['folders'][number]
@@ -532,119 +480,6 @@ function WorkspaceMultiFolderDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function WorkspaceRecognitionDialog({
-  recognition,
-  busy,
-  onOpenChange,
-  onOpenAsCradleWorkspace,
-  onAddAsSingleFolder,
-}: {
-  recognition: WorkspaceRecognition | null
-  busy: boolean
-  onOpenChange: (open: boolean) => void
-  onOpenAsCradleWorkspace: () => Promise<void>
-  onAddAsSingleFolder: () => Promise<void>
-}) {
-  const { t } = useTranslation('workspace')
-  const open = recognition !== null
-  const inspection = recognition?.inspection
-  const invalid = inspection ? !inspection.configValid : false
-  const needsFlagEnable = inspection ? !inspection.featureFlagEnabled : false
-  const alreadyImported = inspection?.alreadyImported ?? false
-  const config = inspection?.config ?? null
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="px-5 pt-5">
-          <DialogTitle>
-            {invalid
-              ? t('workspace.dialog.recognitionInvalidTitle')
-              : t('workspace.dialog.recognitionTitle')}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3 px-5 pb-4">
-          <p className="text-sm text-muted-foreground">
-            {invalid
-              ? t('workspace.dialog.recognitionInvalidDescription')
-              : t('workspace.dialog.recognitionDescription')}
-          </p>
-
-          {invalid && inspection?.configError && (
-            <pre className="max-h-24 overflow-auto rounded-lg bg-muted/50 p-2 font-mono text-xs text-muted-foreground">
-              {inspection.configError}
-            </pre>
-          )}
-
-          {config && !invalid && (
-            <SettingsGroup>
-              <SettingsRow
-                label={t('workspace.dialog.recognitionNameLabel')}
-              >
-                <span className="text-sm font-medium">{config.name}</span>
-              </SettingsRow>
-              <SettingsRow
-                label={t('workspace.dialog.recognitionFoldersLabel')}
-                vertical
-              >
-                <ul className="grid gap-1">
-                  {config.folders.map(folder => (
-                    <li
-                      key={`${folder.name}:${folder.path}`}
-                      className="grid grid-cols-[minmax(5rem,0.3fr)_minmax(0,1fr)] gap-2 rounded-lg bg-muted/40 px-2 py-1.5 text-xs"
-                    >
-                      <span className="font-medium">{folder.name}</span>
-                      <span className="truncate font-mono text-muted-foreground" title={folder.path}>
-                        {folder.path}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </SettingsRow>
-            </SettingsGroup>
-          )}
-
-          {needsFlagEnable && !invalid && (
-            <p className="text-xs text-muted-foreground">
-              {t('workspace.dialog.recognitionExperimentalNote')}
-            </p>
-          )}
-          {alreadyImported && (
-            <p className="text-xs text-muted-foreground">
-              {t('workspace.dialog.recognitionAlreadyImported')}
-            </p>
-          )}
-        </div>
-        <DialogFooter variant="bare" className="border-t px-5 py-3">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t('workspace.dialog.cancel')}
-          </Button>
-          {!invalid && (
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => void onOpenAsCradleWorkspace()}
-            >
-              {busy && <LoadingLine className="animate-spin" />}
-              {needsFlagEnable
-                ? t('workspace.dialog.recognitionOpenExperimental')
-                : t('workspace.dialog.recognitionOpen')}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant={invalid ? 'default' : 'ghost'}
-            disabled={busy}
-            onClick={() => void onAddAsSingleFolder()}
-          >
-            {t('workspace.dialog.recognitionAddSingle')}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -1726,7 +1561,7 @@ const WorkspaceGroup = memo(
         workspaceActions={workspaceActions}
         overlays={(
           <>
-            <WorkspaceTextInputDialog
+            <WorkspaceTextInputDialogView
               open={renameOpen}
               title={t('workspace.dialog.renameTitle')}
               initialValue={workspace.name}
@@ -1740,7 +1575,7 @@ const WorkspaceGroup = memo(
               onOpenChange={setMigrateOpen}
               sourceWorkspaceId={workspace.id}
             />
-            <WorkspaceTextInputDialog
+            <WorkspaceTextInputDialogView
               open={createRequest !== null}
               title={
                 createRequest?.kind === 'folder'
@@ -1757,7 +1592,7 @@ const WorkspaceGroup = memo(
               onOpenChange={handleOpenCreateDialogChange}
               onCommit={handleCreateWorkspaceChild}
             />
-            <WorkspaceTextInputDialog
+            <WorkspaceTextInputDialogView
               open={createGroupOpen}
               title={t('sessionGroup.dialog.createTitle')}
               initialValue=""
@@ -1771,7 +1606,7 @@ const WorkspaceGroup = memo(
               }}
               onCommit={handleCreateSessionGroup}
             />
-            <WorkspaceTextInputDialog
+            <WorkspaceTextInputDialogView
               open={renameGroupTarget !== null}
               title={t('sessionGroup.dialog.renameTitle')}
               initialValue={renameGroupTarget?.title ?? ''}
@@ -2688,7 +2523,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
         onAddLocal={addFromPicker}
         onCreateRemote={handleCreateRemoteWorkspace}
       />
-      <WorkspaceRecognitionDialog
+      <WorkspaceRecognitionDialogView
         recognition={recognition}
         busy={adding}
         onOpenChange={(open) => {
