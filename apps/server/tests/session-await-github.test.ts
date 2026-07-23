@@ -242,6 +242,85 @@ describe('gitHub session-await sources', () => {
     expect(JSON.parse(result.resumePayloadJson ?? '{}')).toMatchObject({ outcome: 'merged' })
   })
 
+  it('serializes a CI head update with the canonical full repository name', async () => {
+    installGitHubFetch({
+      '/repos/acme/app/pulls/42': {
+        number: 42,
+        title: 'Ship feature',
+        state: 'open',
+        merged: false,
+        mergeable: true,
+        head: { sha: 'new-head-sha', ref: 'feature' },
+        base: { ref: 'main' },
+      },
+    })
+
+    const [result] = await githubCISource.checkPending([
+      awaitRow({ repo: 'acme/app', pr: 42, headSha: 'old-head-sha', workId: 'work-1' }),
+    ])
+
+    expect(result).toEqual({
+      awaitId: 'await-1',
+      matched: false,
+      filterUpdate: JSON.stringify({
+        repo: 'acme/app',
+        pr: 42,
+        headSha: 'new-head-sha',
+        workId: 'work-1',
+      }),
+    })
+  })
+
+  it('normalizes a malformed pending CI await from the old head-update serializer', async () => {
+    installGitHubFetch({
+      '/repos/acme/app/pulls/42': {
+        number: 42,
+        title: 'Ship feature',
+        state: 'open',
+        merged: false,
+        mergeable: true,
+        head: { sha: 'head-sha', ref: 'feature' },
+        base: { ref: 'main' },
+      },
+      '/repos/acme/app/commits/head-sha/check-runs?per_page=100&page=1': {
+        total_count: 0,
+        check_runs: [],
+      },
+      '/repos/acme/app/commits/head-sha/status': {
+        state: 'success',
+        total_count: 0,
+        statuses: [],
+      },
+      '/repos/acme/app/actions/runs?head_sha=head-sha&per_page=100&page=1': {
+        total_count: 0,
+        workflow_runs: [],
+      },
+    })
+
+    const [result] = await githubCISource.checkPending([
+      awaitRow({
+        owner: 'acme',
+        repo: 'app',
+        pr: 42,
+        headSha: 'head-sha',
+        workId: 'work-1',
+        statusRef: '',
+        targetUrl: null,
+      }),
+    ])
+
+    expect(result).toEqual({
+      awaitId: 'await-1',
+      matched: false,
+      filterUpdate: JSON.stringify({
+        repo: 'acme/app',
+        pr: 42,
+        headSha: 'head-sha',
+        workId: 'work-1',
+      }),
+    })
+  })
+
   it('resumes with a failure payload when any check or status fails', async () => {
     installGitHubFetch({
       '/repos/acme/app/commits/bad-sha/check-runs?per_page=100&page=1': {

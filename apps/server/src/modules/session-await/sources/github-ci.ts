@@ -136,8 +136,7 @@ const GitHubRepoSchema = z.string().min(1).regex(/^[^/]+\/[^/]+$/).transform((re
     return { owner, repo }
   })
 
-const GitHubCIFilterSchema = z.object({
-  repo: GitHubRepoSchema,
+const GitHubCIFilterFieldsSchema = z.object({
   pr: z.number().int().positive().optional(),
   sha: z.string().min(1).optional(),
   runs_id: z.number().int().positive().optional(),
@@ -147,25 +146,69 @@ const GitHubCIFilterSchema = z.object({
   headSha: z.string().min(1).optional(),
   workId: z.string().min(1).optional(),
   allowNoChecksAfterSeconds: z.number().int().nonnegative().default(DEFAULT_NO_CHECKS_GRACE_SECONDS),
-}).transform((filter) => {
+})
+
+const GitHubCIFilterSchema = z.union([
+  GitHubCIFilterFieldsSchema.extend({ repo: GitHubRepoSchema })
+    .transform(({ repo, ...filter }) => ({ ...filter, owner: repo.owner, repo: repo.repo })),
+  // A previous head-update serializer persisted the parsed representation.
+  // Continue checking those pending awaits, then replace it with the canonical
+  // `{ repo: "owner/repo" }` representation below.
+  GitHubCIFilterFieldsSchema.extend({
+    owner: z.string().min(1),
+    repo: z.string().min(1).regex(/^[^/]+$/),
+  }),
+]).transform((filter) => {
   const checkRunId = filter.runs_id ?? filter.checkRunId ?? filter.runId
   return { ...filter, checkRunId }
 }).refine(filter => [filter.pr, filter.sha, filter.checkRunId].filter(value => value !== undefined).length === 1, {
   message: 'GitHub CI filter requires exactly one of pr, sha, or runs_id',
 }).refine(filter => filter.headSha === undefined || filter.pr !== undefined, {
   message: 'GitHub CI headSha requires a PR target',
-}).transform(({ repo, ...filter }) => ({
+}).transform(filter => ({
   ...filter,
-  owner: repo.owner,
-  repo: repo.repo,
   statusRef: filter.sha ?? '',
 }))
+
+const LegacyGitHubCIFilterSchema = z.object({
+  owner: z.string().min(1),
+  repo: z.string().min(1).regex(/^[^/]+$/),
+})
+
+function isLegacyGitHubCIFilter(filterJson: string): boolean {
+  return LegacyGitHubCIFilterSchema.safeParse(JSON.parse(filterJson)).success
+}
 
 export const GitHubCIFilterJsonSchema = z.string()
   .transform(raw => JSON.parse(raw))
   .pipe(GitHubCIFilterSchema)
 
 type GitHubCIFilter = z.infer<typeof GitHubCIFilterSchema>
+
+function serializeGitHubCIFilter(filter: GitHubCIFilter): string {
+  const target = filter.pr !== undefined
+    ? { pr: filter.pr }
+    : filter.sha !== undefined
+      ? { sha: filter.sha }
+      : { runs_id: filter.checkRunId }
+
+  return JSON.stringify({
+    repo: `${filter.owner}/${filter.repo}`,
+    ...target,
+    ...(filter.mode === undefined ? {} : { mode: filter.mode }),
+    ...(filter.headSha === undefined ? {} : { headSha: filter.headSha }),
+    ...(filter.workId === undefined ? {} : { workId: filter.workId }),
+    ...(filter.allowNoChecksAfterSeconds === DEFAULT_NO_CHECKS_GRACE_SECONDS
+      ? {}
+      : { allowNoChecksAfterSeconds: filter.allowNoChecksAfterSeconds }),
+  })
+}
+
+function pendingResult(awaitId: string, filter: GitHubCIFilter, needsNormalization: boolean): CheckResult {
+  return needsNormalization
+    ? { awaitId, matched: false, filterUpdate: serializeGitHubCIFilter(filter) }
+    : { awaitId, matched: false }
+}
 
 async function resolveTarget(filter: GitHubCIFilter): Promise<ResolvedCITarget | null> {
   let ref = filter.sha
@@ -220,8 +263,11 @@ function buildTerminalResult(awaitId: string, target: ResolvedCITarget, filter: 
   // headSha mismatch means the await is stale (new push happened).
   // Silently update the filter to track the new head instead of resuming.
   if (target.currentHeadSha !== target.ref) {
-    const updatedFilter = { ...filter, headSha: target.currentHeadSha, targetUrl: null }
-    return { awaitId, matched: false, filterUpdate: JSON.stringify(updatedFilter) }
+    return {
+      awaitId,
+      matched: false,
+      filterUpdate: serializeGitHubCIFilter({ ...filter, headSha: target.currentHeadSha }),
+    }
   }
 
   const outcome = target.merged
@@ -528,6 +574,7 @@ export const githubCISource: SessionAwaitSource = {
 
     for (const row of awaits) {
       const filter = GitHubCIFilterJsonSchema.parse(row.filterJson)
+      const needsNormalization = isLegacyGitHubCIFilter(row.filterJson)
       const perAwaitBypassed = row.bypassedChecksJson ? JSON.parse(row.bypassedChecksJson) as string[] : []
 
       let target: ResolvedCITarget | null
@@ -579,7 +626,7 @@ export const githubCISource: SessionAwaitSource = {
       }
 
       if (workflowAggregate.pendingCount) {
-        results.push({ awaitId: row.id, matched: false })
+        results.push(pendingResult(row.id, filter, needsNormalization))
         continue
       }
 
@@ -601,13 +648,13 @@ export const githubCISource: SessionAwaitSource = {
           })
         }
         else {
-          results.push({ awaitId: row.id, matched: false })
+          results.push(pendingResult(row.id, filter, needsNormalization))
         }
         continue
       }
 
       if (!aggregate.allCompleted) {
-        results.push({ awaitId: row.id, matched: false })
+        results.push(pendingResult(row.id, filter, needsNormalization))
         continue
       }
 
