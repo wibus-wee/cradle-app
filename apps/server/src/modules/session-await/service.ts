@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { awaitBypassRules, sessionAwaits, sessions, workspaces } from '@cradle/db'
+import { awaitBypassRules, sessionAwaitLiveStatusSnapshots, sessionAwaits, sessions, workspaces } from '@cradle/db'
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -554,6 +554,35 @@ export function getBypassedChecks(awaitId: string): string[] {
 
 export function get(awaitId: string): SessionAwait | null {
   return db().select().from(sessionAwaits).where(eq(sessionAwaits.id, awaitId)).get() ?? null
+}
+
+export interface SessionAwaitLiveStatusSnapshot {
+  statusJson: string
+  capturedAt: number
+}
+
+export function saveLiveStatusSnapshot(awaitId: string, statusJson: string): SessionAwaitLiveStatusSnapshot {
+  const capturedAt = Math.floor(Date.now() / 1000)
+  return db()
+    .insert(sessionAwaitLiveStatusSnapshots)
+    .values({ awaitId, statusJson, capturedAt })
+    .onConflictDoUpdate({
+      target: sessionAwaitLiveStatusSnapshots.awaitId,
+      set: { statusJson, capturedAt },
+    })
+    .returning()
+    .get()
+}
+
+export function getLiveStatusSnapshot(awaitId: string): SessionAwaitLiveStatusSnapshot | null {
+  return db()
+    .select({
+      statusJson: sessionAwaitLiveStatusSnapshots.statusJson,
+      capturedAt: sessionAwaitLiveStatusSnapshots.capturedAt,
+    })
+    .from(sessionAwaitLiveStatusSnapshots)
+    .where(eq(sessionAwaitLiveStatusSnapshots.awaitId, awaitId))
+    .get() ?? null
 }
 
 export function listBySession(sessionId: string): SessionAwait[] {

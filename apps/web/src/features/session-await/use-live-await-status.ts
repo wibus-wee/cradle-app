@@ -67,6 +67,8 @@ export interface LiveCommitStatus {
 
 export interface LiveCIStatus {
   supported: true
+  stale: boolean
+  snapshotAt: number
   kind: 'github-ci'
   owner: string
   repo: string
@@ -95,6 +97,8 @@ export interface LiveReview {
 
 export interface LiveReviewStatus {
   supported: true
+  stale: boolean
+  snapshotAt: number
   kind: 'github-review'
   owner: string
   repo: string
@@ -203,33 +207,36 @@ export function describeLiveAwaitStatus(status: LiveAwaitStatus | UnsupportedLiv
   if (!status.supported) {
     return status.error?.message ?? null
   }
+  const withFreshness = (message: string) => status.stale
+    ? `Last known status (GitHub temporarily unavailable): ${message}`
+    : message
   if (status.kind === 'github-ci') {
     if (!status.hasToken) {
-      return 'GitHub token not available'
+      return withFreshness('GitHub token not available')
     }
     if (status.noCIConfigured || status.totalCount === 0) {
-      return 'No checks or statuses found yet'
+      return withFreshness('No checks or statuses found yet')
     }
     if (status.allCompleted && status.allPassed) {
-      return `All ${status.totalCount} checks/statuses passed`
+      return withFreshness(`All ${status.totalCount} checks/statuses passed`)
     }
     if (status.allCompleted) {
-      return `Completed with ${status.failureCount} failing`
+      return withFreshness(`Completed with ${status.failureCount} failing`)
     }
     if (status.failureCount > 0) {
-      return `${status.pendingCount} pending, ${status.failureCount} failing`
+      return withFreshness(`${status.pendingCount} pending, ${status.failureCount} failing`)
     }
-    return `${status.pendingCount} pending`
+    return withFreshness(`${status.pendingCount} pending`)
   }
 
   if (!status.hasToken) {
-    return 'GitHub token not available'
+    return withFreshness('GitHub token not available')
   }
   if (status.changesRequestedCount > 0) {
-    return `${status.changesRequestedCount} changes requested`
+    return withFreshness(`${status.changesRequestedCount} changes requested`)
   }
   if (status.approvedCount > 0) {
-    return `${status.approvedCount} approvals`
+    return withFreshness(`${status.approvedCount} approvals`)
   }
-  return status.reviews.length > 0 ? `${status.reviews.length} reviews` : 'Waiting for review'
+  return withFreshness(status.reviews.length > 0 ? `${status.reviews.length} reviews` : 'Waiting for review')
 }

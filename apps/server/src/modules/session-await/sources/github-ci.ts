@@ -584,9 +584,16 @@ export const githubCISource: SessionAwaitSource = {
       }
 
       const workspacePatterns = getMatchingBypassPatterns(row.workspaceId, `${target.owner}/${target.repo}`)
-      const requiredContexts = target.baseBranch
-        ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))?.requiredContexts ?? []
-        : []
+      let requiredContexts: string[]
+      try {
+        requiredContexts = target.baseBranch
+          ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))?.requiredContexts ?? []
+          : []
+      }
+      catch {
+        results.push({ awaitId: row.id, matched: false, transientError: 'GitHub branch protection API unavailable' })
+        continue
+      }
       aggregate = filterBypassedCI(aggregate, perAwaitBypassed, workspacePatterns, new Set(requiredContexts))
 
       if (aggregate.totalCount === 0) {

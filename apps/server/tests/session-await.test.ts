@@ -29,10 +29,12 @@ import {
 } from '../src/modules/session-await/poller'
 import {
   fetchAvailableChecks,
+  getLiveStatusSnapshot,
   getSessionSummary,
   listBySession,
   register,
   retryDelivery,
+  saveLiveStatusSnapshot,
   trigger,
 } from '../src/modules/session-await/service'
 import {
@@ -739,6 +741,18 @@ describe('session-await trigger', () => {
       }),
     )
     expect(listBySession(sessionId).map(row => row.id)).toEqual(['await-newer', 'await-older'])
+  })
+
+  it('keeps the latest live status snapshot for an await', () => {
+    const { awaitId } = seedAwait()
+
+    saveLiveStatusSnapshot(awaitId, JSON.stringify({ kind: 'github-ci', pendingCount: 2 }))
+    saveLiveStatusSnapshot(awaitId, JSON.stringify({ kind: 'github-ci', pendingCount: 1 }))
+
+    expect(getLiveStatusSnapshot(awaitId)).toEqual(expect.objectContaining({
+      statusJson: JSON.stringify({ kind: 'github-ci', pendingCount: 1 }),
+      capturedAt: expect.any(Number),
+    }))
   })
 
   it('rejects GitHub CI registration when the commit target is not found', async () => {
