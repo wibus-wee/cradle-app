@@ -920,7 +920,6 @@ const WorkspaceGroup = memo(
               group={group}
               sessions={groupSessions}
               workspaceId={workspace.id}
-              t={t}
               onRenameGroup={setRenameGroupTarget}
               onDeleteGroup={handleDeleteSessionGroup}
             >
