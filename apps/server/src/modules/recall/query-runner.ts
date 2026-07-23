@@ -71,17 +71,19 @@ async function main(): Promise<void> {
         ...overview(scope, options),
         currentSessionId: request.runnerInput.chatSessionId,
       }),
-      search: (
-        text: string,
-        options?: { limit?: number, includeSidechains?: boolean, includeMeta?: boolean },
-      ) => search(scope, text, options),
+      search: (text: string, options?: {
+        sessionId?: string
+        limit?: number
+        includeSidechains?: boolean
+        includeMeta?: boolean
+      }) => search(scope, text, options),
       context: (messageId: string) => context(scope, messageId),
       thread: (sessionId: string, options?: { limit?: number, includeSidechains?: boolean }) =>
         thread(scope, sessionId, options),
-      failures: (options?: { limit?: number }) => failures(scope, options),
-      fileHistory: (path: string, options?: { limit?: number }) =>
+      failures: (options?: { sessionId?: string, limit?: number }) => failures(scope, options),
+      fileHistory: (path: string, options?: { sessionId?: string, limit?: number }) =>
         fileHistory(scope, path, options),
-      runs: (options?: { limit?: number }) => runs(scope, options),
+      runs: (options?: { sessionId?: string, limit?: number }) => runs(scope, options),
       memories: (options?: { query?: string, limit?: number }) => memories(scope, options),
     }),
   })

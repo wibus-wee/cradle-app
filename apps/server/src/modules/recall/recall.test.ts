@@ -76,12 +76,15 @@ describe('recall query', () => {
         sessionId: sessionOneId,
         role: 'assistant',
         status: 'complete',
-        content: 'The recall index found this workspace-only deployment failure.',
+        content: 'The recall index found this workspace-only deployment after an unexpected provider failure.',
         messageJson: JSON.stringify({
           id: messageOneId,
           role: 'assistant',
           parts: [
-            { type: 'text', text: 'The recall index found this workspace-only deployment failure.' },
+            {
+              type: 'text',
+              text: 'The recall index found this workspace-only deployment after an unexpected provider failure.',
+            },
           ],
         }),
         createdAt: now,
@@ -134,10 +137,21 @@ describe('recall query', () => {
       expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId }),
       expect.objectContaining({ id: messageOneId, sessionId: sessionOneId }),
     ])
+    expect(search({ workspaceId: workspaceOneId }, 'deployment failure')).toEqual([
+      expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId }),
+      expect.objectContaining({ id: messageOneId, sessionId: sessionOneId }),
+    ])
+    expect(
+      search({ workspaceId: workspaceOneId }, 'deployment', { sessionId: sessionOneSiblingId }),
+    ).toEqual([expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId })])
 
     const outcome = await executeRecallQuery({
       context: { chatSessionId: sessionOneId, workspaceId: workspaceOneId, workId: null },
-      code: 'async () => ({ map: overview(), evidence: search("deployment") })',
+      code: `async () => ({
+        map: overview(),
+        evidence: search('deployment failure'),
+        sibling: search('deployment', { sessionId: ${JSON.stringify(sessionOneSiblingId)} }),
+      })`,
     })
 
     expect(outcome).toEqual({
@@ -148,6 +162,7 @@ describe('recall query', () => {
           expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId }),
           expect.objectContaining({ id: messageOneId, sessionId: sessionOneId }),
         ],
+        sibling: [expect.objectContaining({ id: messageOneSiblingId, sessionId: sessionOneSiblingId })],
       },
     })
 

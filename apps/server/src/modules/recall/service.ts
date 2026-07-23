@@ -127,7 +127,9 @@ export function projectRecallToolEvent(
     .where(eq(backendRunSnapshotEvents.id, input.sourceEventId))
     .get()
 
-  if (!row || !row.event.chatSessionId) {
+  // A run snapshot also records text, lifecycle, and usage events. Recall's
+  // tool-event read model only owns events tied to a concrete tool invocation.
+  if (!row || !row.event.chatSessionId || !row.event.toolCallId) {
     return
   }
 

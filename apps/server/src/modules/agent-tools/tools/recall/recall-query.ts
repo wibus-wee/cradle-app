@@ -61,7 +61,7 @@ function registerRecallQueryTool(server: McpServer): void {
     {
       title: 'Recall Query',
       description:
-        'Explicitly retrieve citable execution evidence from the current Cradle workspace. Code may call overview, search, context, thread, failures, fileHistory, and runs. Results are read-only and scope is bound by the active runtime session.',
+        'Explicitly retrieve citable execution evidence from the current Cradle workspace. Code may call overview, search, context, thread, failures, fileHistory, and runs. search, failures, fileHistory, and runs may narrow to a sessionId, but cannot broaden beyond the bound workspace. Results are read-only and scope is bound by the active runtime session.',
       inputSchema: {
         code: z
           .string()
