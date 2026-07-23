@@ -168,3 +168,27 @@ function Button({ variant = 'primary', size = 'md', className, ...props }: Butto
 
 - **Always use Drizzle**: For database interactions, use Drizzle ORM to ensure type safety and consistency. Avoid raw SQL queries or other database libraries. Use drizzle-kit for schema management and migrations.
 - **During code review**: Check for missing or outdated documentation
+
+## Cursor Cloud specific instructions
+
+Scope set up here: the core Cradle product in **web mode** — the `@cradle/server` backend (Elysia, `:21423`) + `@cradle/web` frontend (Vite, `:5174`). Dependencies install via the update script (`pnpm install`). Standard lint/test/build/dev commands live in root `package.json` and are documented in `README.md` / per-package `AGENTS.md`; reference those rather than duplicating.
+
+### Node version (important, non-obvious)
+
+- The VM's default `node` on `PATH` is `/exec-daemon/node` (v22.14.0), which is **missing `node:zlib` `zstdCompressSync`** (added in Node 22.15). This makes `relay-transport` compression code and its tests fail with `TypeError: zstdCompressSync is not a function`.
+- A newer Node is installed via nvm (`v22.22.2`, has zstd) but it sits **after** `/exec-daemon` on `PATH`, so `nvm use` alone does not win. To use it, prepend its bin explicitly in the shell that runs the server/tests:
+  `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH" && hash -r`
+- Run tests and dev servers with this newer Node for CI parity. The core web+server app also boots on the default v22.14.0, but relay/zstd paths will error.
+
+### Running the app (web mode)
+
+- The server needs env vars (it does NOT auto-load `.env`; the schema throws without them): set `CRADLE_DATA_DIR=<writable dir>` and `CRADLE_CREDENTIAL_SECRET=<any string>` before starting.
+- Start both dev servers: `CRADLE_DATA_DIR=/workspace/.dev-data CRADLE_CREDENTIAL_SECRET=dev-secret pnpm dev:fullstack`. Web → `http://localhost:5174`, API → `http://127.0.0.1:21423` (e.g. `GET /workspaces`). SQLite is embedded and auto-migrates on boot.
+- On startup the server tries to auto-start the optional Go `relayd` daemon and logs `local relayd did not become ready ... ECONNREFUSED` when Go isn't installed. This is harmless for core dev; set `CRADLE_RELAYD_AUTOSTART=0` to silence it.
+- The in-app folder picker for "Add project" is restricted to allowed roots = the home dir plus already-added workspaces. To add a repo via the UI picker, place it under `$HOME` (e.g. `~/dev/<repo>`); the picker has a "dev" shortcut. Sending chat messages requires a configured LLM provider (API key) — not available by default, so provider-dependent flows can't be exercised end-to-end without credentials.
+
+### Tests
+
+- `pnpm test` (root unit) and `pnpm test:server` mostly pass (2200+ tests). With the newer Node, remaining failures are a handful of agent/chat-runtime **streaming tests that time out at 5000ms** (e.g. in `apps/server/tests/chat-runtime.test.ts`, `sdk-providers.test.ts`) — these use mocked SDKs but are timing-sensitive and also fail in isolation on this VM; treat as environment/timing flakiness, not a setup regression.
+- `pnpm lint` runs but reports 2 pre-existing repo errors (missing EOL newline in `apps/landing/public/{blog,changelog}/index.json`) unrelated to setup.
+- Desktop mode (`pnpm dev:desktop`, Electron) is not exercised here (no display); web mode is the supported path in this environment.
