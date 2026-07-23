@@ -19,6 +19,8 @@ const SessionStateSchema = z.object({
   cwd: z.string().min(1).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
+  title: z.string().optional(),
+  lastPrompt: z.string().optional(),
 })
 
 export interface CaptureKimiCliSessionInput {
@@ -39,6 +41,7 @@ interface Candidate {
   sessionId: string
   statePath: string
   timestampMs: number
+  title: string | undefined
 }
 
 export interface KimiCliSessionBinding {
@@ -47,6 +50,7 @@ export interface KimiCliSessionBinding {
   startedAt: number
   workspacePath: string
   sourcePath: string
+  title?: string
 }
 
 export async function captureKimiCliSession(rawInput: CaptureKimiCliSessionInput): Promise<KimiCliSessionBinding | null> {
@@ -79,7 +83,7 @@ export async function captureKimiCliSession(rawInput: CaptureKimiCliSessionInput
     if (timestampMs === null || timestampMs < lowerBound || timestampMs > upperBound) {
       continue
     }
-    matches.push({ sessionId: entry.sessionId, statePath, timestampMs })
+    matches.push({ sessionId: entry.sessionId, statePath, timestampMs, title: sessionTitle(state) })
   }
 
   if (matches.length !== 1) {
@@ -93,6 +97,7 @@ export async function captureKimiCliSession(rawInput: CaptureKimiCliSessionInput
     startedAt: Math.floor(input.startedAt / 1000),
     workspacePath,
     sourcePath: match.statePath,
+    ...(match.title ? { title: match.title } : {}),
   }
 }
 
@@ -143,6 +148,18 @@ function sessionTimestampMs(state: z.infer<typeof SessionStateSchema> | null): n
   return timestamps.length > 0 ? Math.max(...timestamps) : null
 }
 
+function sessionTitle(state: z.infer<typeof SessionStateSchema> | null): string | undefined {
+  if (!state) {
+    return undefined
+  }
+  const title = state.title?.trim()
+  if (title && title !== 'New Session') {
+    return title.slice(0, 200)
+  }
+  const lastPrompt = state.lastPrompt?.trim()
+  return lastPrompt ? lastPrompt.slice(0, 200) : undefined
+}
+
 function isDeletion(value: unknown): value is { sessionId: string, deleted: true } {
   return typeof value === 'object'
     && value !== null
@@ -159,4 +176,5 @@ export const __kimiSessionCaptureTestUtils = {
   readSessionIndex,
   readSessionState,
   sessionTimestampMs,
+  sessionTitle,
 }

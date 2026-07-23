@@ -78,6 +78,18 @@ export class TerminalLifetimeController {
     record.phase = 'parked'
   }
 
+  /** Release the renderer view while keeping the server-owned PTY alive. */
+  releaseView(terminalId: string): void {
+    const record = this.records.get(terminalId)
+    if (!record || record.phase === 'stopping' || record.phase === 'stopped' || record.phase === 'exited') {
+      return
+    }
+    record.phase = 'parked'
+    if (record.adapterKind === 'cli-tui') {
+      this.disposeCliTuiRuntime(terminalId)
+    }
+  }
+
   recordExited(terminalId: string): void {
     const record = this.records.get(terminalId)
     if (!record) {

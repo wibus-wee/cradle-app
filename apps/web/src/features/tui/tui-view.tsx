@@ -15,8 +15,9 @@ interface TuiViewProps {
  *
  * The xterm runtime lives in tuiRuntimeRegistry, independently from this React mount.
  * Surface changes park the runtime instead of disposing it, preserving the terminal's
- * renderer, selection, scrollback, socket, and CLI process until the surface is closed.
- * Process stop is owned by terminal-lifetime-controller on surface dispose.
+ * renderer, selection, scrollback, socket, and CLI process while the surface is hidden.
+ * Closing the surface releases the renderer view but leaves the server-owned CLI PTY
+ * available for a later live attach.
  */
 export function TuiView({ sessionId, visible = true }: TuiViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)

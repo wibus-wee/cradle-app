@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, normalize } from 'node:path'
+import { dirname, join, normalize } from 'node:path'
 import { createInterface } from 'node:readline'
 
 import { z } from 'zod'
@@ -14,6 +14,7 @@ const CAPTURE_LOOKBACK_MS = 5_000
 const CAPTURE_LOOKAHEAD_MS = 120_000
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ROLLOUT_FILENAME_RE = /^rollout-.+\.jsonl$/
+const SESSION_INDEX_FILENAME = 'session_index.jsonl'
 const TimestampMsTextSchema = z.string()
   .transform(value => Date.parse(value))
   .pipe(z.number().finite())
@@ -36,6 +37,10 @@ interface CodexSessionMeta {
   timestampMs: number
   cwd: string
   originator: string
+}
+
+export interface CapturedCodexCliSession extends CodexCliSessionBinding {
+  title?: string
 }
 
 const CodexSessionMetaLineSchema = z.object({
@@ -64,10 +69,11 @@ const CaptureCodexCliSessionInputSchema = z.object({
   now: z.custom<() => number>().default(() => Date.now),
 })
 
-export async function captureCodexCliSession(rawInput: CaptureCodexCliSessionInput): Promise<CodexCliSessionBinding | null> {
+export async function captureCodexCliSession(rawInput: CaptureCodexCliSessionInput): Promise<CapturedCodexCliSession | null> {
   const input = CaptureCodexCliSessionInputSchema.parse(rawInput)
+  const sessionsRoot = input.codexSessionsRoot ?? defaultCodexSessionsRoot(input.env)
   const files = await listRecentSessionFiles({
-    root: input.codexSessionsRoot ?? defaultCodexSessionsRoot(input.env),
+    root: sessionsRoot,
     startedAt: input.startedAt,
   })
 
@@ -98,12 +104,18 @@ export async function captureCodexCliSession(rawInput: CaptureCodexCliSessionInp
   }
 
   const match = matches[0]!
+  const title = await readCodexSessionTitle({
+    codexHome: dirname(sessionsRoot),
+    sessionId: match.id,
+  })
+
   return {
     sessionId: match.id,
     capturedAt: Math.floor(input.now() / 1000),
     startedAt: Math.floor(input.startedAt / 1000),
     workspacePath,
     sourcePath: match.sourcePath,
+    ...(title ? { title } : {}),
   }
 }
 
@@ -200,6 +212,35 @@ async function readFirstLine(path: string): Promise<string | null> {
   try {
     for await (const line of reader) {
       return line
+    }
+    return null
+  }
+  finally {
+    reader.close()
+    stream.destroy()
+  }
+}
+
+async function readCodexSessionTitle(input: { codexHome: string, sessionId: string }): Promise<string | null> {
+  const path = join(input.codexHome, SESSION_INDEX_FILENAME)
+  const stream = createReadStream(path, { encoding: 'utf8' })
+  const reader = createInterface({ input: stream, crlfDelay: Infinity })
+
+  try {
+    for await (const line of reader) {
+      try {
+        const record = JSON.parse(line) as { id?: unknown, thread_name?: unknown }
+        if (record.id !== input.sessionId || typeof record.thread_name !== 'string') {
+          continue
+        }
+        const title = record.thread_name.trim()
+        if (title) {
+          return title.slice(0, 200)
+        }
+      }
+      catch {
+        // Ignore malformed append-only index lines.
+      }
     }
     return null
   }

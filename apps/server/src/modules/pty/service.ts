@@ -41,8 +41,8 @@ const providerCaptureTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellLeaseTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellSocketCounts = new Map<string, number>()
 const pendingTitleOscBuffers = new Map<string, string>()
-const CODEX_CAPTURE_ATTEMPTS = 12
-const CODEX_CAPTURE_RETRY_MS = 500
+const PROVIDER_CAPTURE_ATTEMPTS = 120
+const PROVIDER_CAPTURE_RETRY_MS = 500
 const MAX_OSC_LOOKBEHIND_CHARS = 1_000
 const OSC_SEQUENCE_RE = /\u001B\](\d+);([^\u0007\u001B]*(?:\u001B(?!\\)[^\u0007\u001B]*)*)(?:\u0007|\u001B\\)/g
 const TITLE_OSC_CODES = new Set(['0', '2'])
@@ -708,22 +708,28 @@ function scheduleProviderSessionCapture(input: {
         : null
       if (binding) {
         persistProviderSessionBinding(input.sessionId, binding)
-        providerCaptureTimers.delete(input.sessionId)
-        return
+        if (captured?.title) {
+          void reportRuntimeSessionTitle({
+            sessionId: input.sessionId,
+            title: captured.title,
+          }).catch(() => {})
+          providerCaptureTimers.delete(input.sessionId)
+          return
+        }
       }
     }
     catch {
       // Capture is opportunistic; a failed scan should not break the PTY session.
     }
 
-    if (attempts >= CODEX_CAPTURE_ATTEMPTS) {
+    if (attempts >= PROVIDER_CAPTURE_ATTEMPTS) {
       providerCaptureTimers.delete(input.sessionId)
       return
     }
 
     const timer = setTimeout(() => {
       void runCapture()
-    }, CODEX_CAPTURE_RETRY_MS)
+    }, PROVIDER_CAPTURE_RETRY_MS)
     providerCaptureTimers.set(input.sessionId, timer)
   }
 

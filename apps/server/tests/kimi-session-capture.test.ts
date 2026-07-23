@@ -21,6 +21,8 @@ function writeKimiSession(input: {
   workDir: string
   createdAtMs: number
   suffix?: string
+  title?: string
+  lastPrompt?: string
 }): string {
   const sessionDir = join(input.home, 'sessions', `wd_fixture${input.suffix ?? ''}`, input.id)
   mkdirSync(sessionDir, { recursive: true })
@@ -28,7 +30,8 @@ function writeKimiSession(input: {
     createdAt: new Date(input.createdAtMs).toISOString(),
     updatedAt: new Date(input.createdAtMs + 1_000).toISOString(),
     workDir: input.workDir,
-    title: 'Fixture session',
+    ...(input.title ? { title: input.title } : {}),
+    ...(input.lastPrompt ? { lastPrompt: input.lastPrompt } : {}),
   }))
   return sessionDir
 }
@@ -140,6 +143,53 @@ describe('kimi cli session capture', () => {
         workspacePath: WORKSPACE_PATH,
         startedAt: STARTED_AT,
       })).resolves.toBeNull()
+    }
+    finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('returns the provider title and falls back to the first prompt for untitled sessions', async () => {
+    const home = tempHome()
+    try {
+      const titledDir = writeKimiSession({
+        home,
+        id: MATCH_ID,
+        workDir: WORKSPACE_PATH,
+        createdAtMs: STARTED_AT + 1_000,
+        title: 'Refactor PTY resume',
+      })
+      const untitledDir = writeKimiSession({
+        home,
+        id: OTHER_ID,
+        workDir: '/tmp/other-workspace',
+        createdAtMs: STARTED_AT + 1_000,
+        lastPrompt: 'Inspect session persistence',
+        suffix: '-other',
+      })
+      writeIndex(home, [
+        { id: MATCH_ID, sessionDir: titledDir, workDir: WORKSPACE_PATH },
+        { id: OTHER_ID, sessionDir: untitledDir, workDir: '/tmp/other-workspace' },
+      ])
+
+      await expect(captureKimiCliSession({
+        kimiCodeHome: home,
+        workspacePath: WORKSPACE_PATH,
+        startedAt: STARTED_AT,
+      })).resolves.toMatchObject({ title: 'Refactor PTY resume' })
+
+      writeFileSync(join(titledDir, 'state.json'), JSON.stringify({
+        createdAt: new Date(STARTED_AT + 1_000).toISOString(),
+        updatedAt: new Date(STARTED_AT + 2_000).toISOString(),
+        workDir: WORKSPACE_PATH,
+        title: 'New Session',
+        lastPrompt: 'Inspect session persistence',
+      }))
+      await expect(captureKimiCliSession({
+        kimiCodeHome: home,
+        workspacePath: WORKSPACE_PATH,
+        startedAt: STARTED_AT,
+      })).resolves.toMatchObject({ title: 'Inspect session persistence' })
     }
     finally {
       rmSync(home, { recursive: true, force: true })

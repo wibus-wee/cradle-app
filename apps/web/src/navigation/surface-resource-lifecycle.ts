@@ -12,7 +12,7 @@ import { useSurfaceStore } from './surface-store'
 
 type TerminalPanelStopper = (ownerIds: string[]) => void
 type BrowserPanelOwnerReleaser = (ownerIds: string[]) => void
-type TuiRuntimeDisposer = (sessionIds: string[]) => void
+type TuiRuntimeReleaser = (sessionIds: string[]) => void
 type BrowserPanelOwners = ReturnType<typeof useBrowserPanelStore.getState>['owners']
 
 function readTerminalPanelOwnerId(surface: Pick<AppSurface, 'kind' | 'route'>): string | null {
@@ -80,7 +80,7 @@ export function selectClosedChatSessionIds(
   ))
 }
 
-function disposeTuiRuntimes(sessionIds: string[]): void {
+function releaseTuiRuntimes(sessionIds: string[]): void {
   const lifetime = getTerminalLifetimeController()
   for (const sessionId of sessionIds) {
     lifetime.register({
@@ -88,7 +88,7 @@ function disposeTuiRuntimes(sessionIds: string[]): void {
       adapterKind: 'cli-tui',
       ownerId: `chat:${sessionId}`,
     })
-    void lifetime.stop(sessionId).catch(() => {})
+    lifetime.releaseView(sessionId)
   }
 }
 
@@ -158,7 +158,7 @@ export function releaseSurfaceResources(
   nextSurfaces: readonly AppSurface[],
   stopOwners: TerminalPanelStopper = stopTerminalPanelOwners,
   releaseBrowserOwners: BrowserPanelOwnerReleaser = releaseBrowserPanelOwners,
-  disposeTuiSessions: TuiRuntimeDisposer = disposeTuiRuntimes,
+  releaseTuiSessions: TuiRuntimeReleaser = releaseTuiRuntimes,
 ): void {
   const closedTerminalOwnerIds = selectClosedTerminalPanelOwnerIds(previousSurfaces, nextSurfaces)
   if (closedTerminalOwnerIds.length > 0) {
@@ -172,7 +172,7 @@ export function releaseSurfaceResources(
 
   const closedChatSessionIds = selectClosedChatSessionIds(previousSurfaces, nextSurfaces)
   if (closedChatSessionIds.length > 0) {
-    disposeTuiSessions(closedChatSessionIds)
+    releaseTuiSessions(closedChatSessionIds)
   }
 
   cleanupClosedComposerDrafts(previousSurfaces, nextSurfaces)

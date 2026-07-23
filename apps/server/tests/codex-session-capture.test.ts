@@ -64,6 +64,10 @@ describe('codex cli session capture', () => {
         cwd: '/tmp/other-workspace',
         suffix: '-other-cwd',
       })
+      writeFileSync(join(dirname(root), 'session_index.jsonl'), `${JSON.stringify({
+        id: MATCH_ID,
+        thread_name: 'Resume Codex session',
+      })}\n`)
 
       const binding = await captureCodexCliSession({
         codexSessionsRoot: root,
@@ -78,6 +82,7 @@ describe('codex cli session capture', () => {
         startedAt: Math.floor(STARTED_AT / 1000),
         workspacePath: WORKSPACE_PATH,
         sourcePath: path,
+        title: 'Resume Codex session',
       })
     }
     finally {

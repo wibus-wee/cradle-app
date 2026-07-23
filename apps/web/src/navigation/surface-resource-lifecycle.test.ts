@@ -25,17 +25,17 @@ describe('surface resource lifecycle', () => {
     )).toEqual(['one'])
   })
 
-  it('disposes retained TUI runtimes when their chat surface closes', () => {
-    const disposeTuiSessions = vi.fn()
+  it('releases retained TUI runtimes without stopping their server PTYs', () => {
+    const releaseTuiSessions = vi.fn()
 
     releaseSurfaceResources(
       [chatSurface('one', 0), chatSurface('two', 1)],
       [chatSurface('two', 0)],
       vi.fn(),
       vi.fn(),
-      disposeTuiSessions,
+      releaseTuiSessions,
     )
 
-    expect(disposeTuiSessions).toHaveBeenCalledWith(['one'])
+    expect(releaseTuiSessions).toHaveBeenCalledWith(['one'])
   })
 })

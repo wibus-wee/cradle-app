@@ -66,6 +66,24 @@ describe('terminalLifetimeController', () => {
     expect(controller.getPhase('terminal:chat:1:3')).toBe('stopped')
   })
 
+  it('releases a CLI TUI view without stopping its server PTY', () => {
+    const stopCliTui = vi.fn(async () => {})
+    const disposeCliTuiRuntime = vi.fn()
+    const controller = new TerminalLifetimeController({ stopCliTui, disposeCliTuiRuntime })
+
+    controller.register({
+      terminalId: 'session-parked',
+      adapterKind: 'cli-tui',
+      ownerId: 'chat:session-parked',
+    })
+    controller.attach('session-parked')
+    controller.releaseView('session-parked')
+
+    expect(controller.getPhase('session-parked')).toBe('parked')
+    expect(disposeCliTuiRuntime).toHaveBeenCalledWith('session-parked')
+    expect(stopCliTui).not.toHaveBeenCalled()
+  })
+
   it('disposes an owner by stopping each live terminal once', async () => {
     const stopShell = vi.fn(async () => {})
     const stopCliTui = vi.fn(async () => {})
