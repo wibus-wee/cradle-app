@@ -10,7 +10,6 @@ import { useState } from 'react'
 import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
-import { useBrowserPanelStore } from '~/store/browser-panel'
 
 import { hasTerminalDetails } from '../terminal-tool-details'
 import { PLURAL_TITLES, STATUS_LABELS, TOOL_ICON_MAP } from '../tool-block-constants'
@@ -88,24 +87,25 @@ function OverallStatusIcon({ state, animated = true }: { state: ToolState, anima
   return <ClockIcon className={cn('size-3.5 !text-amber-500 dark:!text-amber-400', animated && 'animate-pulse')} aria-hidden />
 }
 
-export function GroupedToolCallBlock({
-  items,
-  uiKind,
-  animated = true,
-  workspaceDiffTarget,
-}: {
+export interface GroupedToolCallBlockViewProps {
   items: ToolCallItem[]
   uiKind: ToolUiKind
   animated?: boolean
-  workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
-}) {
+  onOpenWorkspaceDiff?: (path: string) => void
+}
+
+/** Props-only grouped tool surface. Browser-panel orchestration stays in the adapter. */
+export function GroupedToolCallBlockView({
+  items,
+  uiKind,
+  animated = true,
+  onOpenWorkspaceDiff,
+}: GroupedToolCallBlockViewProps) {
   const firstDescriptor = describeToolCall(items[0].part)
   const Icon = TOOL_ICON_MAP[uiKind]
   const overallState = getOverallState(items)
   const isRunning = overallState === 'input-available'
   const groupTitle = PLURAL_TITLES[uiKind] ?? firstDescriptor.title
-  const openWorkspaceDiffTab = useBrowserPanelStore(s => s.openWorkspaceDiffTab)
-  const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
     return new Set(
       items
@@ -128,15 +128,7 @@ export function GroupedToolCallBlock({
   }
 
   const openWorkspaceDiff = (path: string) => {
-    if (!workspaceDiffTarget) {
-      return
-    }
-    const tabId = openWorkspaceDiffTab({
-      workspaceId: workspaceDiffTarget.workspaceId,
-      title: 'All Changes',
-      ownerId: workspaceDiffTarget.ownerId,
-    })
-    requestScrollToFilePath({ path, tabId })
+    onOpenWorkspaceDiff?.(path)
   }
 
   const content = (
@@ -198,7 +190,7 @@ export function GroupedToolCallBlock({
           const workspaceDiffPath = isDiffKind(uiKind)
             ? readFileDiffTarget(item.part.input, item.part.output, item.part.argumentsText)
             : null
-          const canOpenWorkspaceDiff = !!workspaceDiffTarget && !!workspaceDiffPath
+          const canOpenWorkspaceDiff = !!onOpenWorkspaceDiff && !!workspaceDiffPath
           const interactive = expandable || canOpenWorkspaceDiff
           const expanded = expandedItems.has(item.key)
           const handleItemClick = () => {

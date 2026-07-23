@@ -61,6 +61,11 @@ AI SDK wire validation is intentionally limited to the SSE boundary through `uiM
 - **ui/chat-transcript-pane.tsx**: Runtime adapter that supplies store-backed `MessageBubbleById` rows, scroll refs, minimap data, and composer overlay orchestration to `ChatTranscriptView`.
 - **fixtures/chat-transcript.ts**: Server-free `UIMessage` fixtures for stable transcript stories and screenshot scenes.
 - **fixtures/screenshots/chat-transcript-long-thread.png**: 1440×900 golden image captured from the server-free Long Thread story.
+- **rendering/blocks/tool-call-block.tsx**: Props-only `ToolCallBlockView` for canonical tool envelopes, local expand/detail state, approval callbacks, and bounded open-surface actions.
+- **rendering/blocks/tool-call-block-container.tsx**: Runtime `ToolCallBlock` adapter that owns browser-panel subscriptions and translates View actions into workspace diff, subagent, and workflow tabs.
+- **rendering/blocks/grouped-tool-call-block.tsx**: Props-only grouped terminal/file activity View; the matching container owns browser-panel diff handoff.
+- **fixtures/chat-tools.ts**: Server-free fixtures covering all 15 canonical Cradle tool kinds, all seven lifecycle states, approvals, errors, and grouped activity.
+- **fixtures/screenshots/chat-tools-gallery.png**: Golden image captured from the props-only All Tool Kinds story.
 - **codex-review-mode.ts**: Pure Codex review-mode prompt and branch ordering helpers; mirrors the native review guidelines, uncommitted/base-branch request messages, and merge-base diff instruction instead of sending raw `/review` text.
 - **codex-review-mode.test.ts**: Regression coverage for Codex review-mode prompt construction and base branch ordering.
 - **use-chat-scroll-runtime.ts**: Chat-owned scroll controller hook for ScrollArea and virtua refs, streaming keep-mounted indices, bottom-follow auto-scroll that detaches on manual upward scroll, transcript content resize observation, minimap progress writes, click/drag scroll actions, and Jarvis attention viewport snapshots.

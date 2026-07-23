@@ -19,6 +19,8 @@ export function hasHeroContent(
     case 'file-diff':
     case 'notebook-diff':
       return hasDiffHeroContent(input, output)
+    case 'search':
+      return output.filenames.length > 0 || output.contentText !== null
     case 'web':
       return output.results.some(item => item.content.length > 0)
     case 'subagent':
@@ -53,6 +55,8 @@ export function hasHeroContent(
         ?? output.rawText
         ?? input.rawText
       )
+    case 'question':
+      return output.answers !== null
     case 'mcp':
       return !!(
         output.contentBlocks.length > 0

@@ -19,7 +19,6 @@ import {
 } from '~/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
-import { useBrowserPanelStore } from '~/store/browser-panel'
 
 import { readBuiltinToolCallInputPayload } from '../chat-tool-entities'
 import { readTerminalOutputSections } from '../terminal-tool-details'
@@ -309,7 +308,31 @@ function WorkflowExecutionDetails({ input, output }: { input: ToolPayload, outpu
 // ToolCallBlock (main export)
 // ---------------------------------------------------------------------------
 
-export function ToolCallBlock({
+type WorkflowSurface = ReturnType<typeof readWorkflowSurfaceSnapshot>
+
+export type ToolCallBlockViewProps = Omit<
+  ToolCallBlockProps,
+  'sessionId' | 'workspaceDiffTarget'
+> & {
+  onOpenWorkspaceDiff?: (path: string) => void
+  onOpenSubagentOutput?: (input: {
+    toolCallId: string
+    agentName: string
+    agentRole: string | null
+  }) => void
+  onOpenWorkflowSurface?: (input: {
+    toolCallId: string
+    title: string
+    surface: WorkflowSurface
+  }) => void
+  onWorkflowSurfaceChange?: (input: {
+    toolCallId: string
+    surface: WorkflowSurface
+  }) => void
+}
+
+/** Props-only tool surface. Browser-panel orchestration stays in ToolCallBlock. */
+export function ToolCallBlockView({
   toolName,
   toolCallId,
   state,
@@ -319,11 +342,13 @@ export function ToolCallBlock({
   input,
   output,
   errorText,
-  sessionId,
-  workspaceDiffTarget,
   onApprovalResponse,
+  onOpenWorkspaceDiff,
+  onOpenSubagentOutput,
+  onOpenWorkflowSurface,
+  onWorkflowSurfaceChange,
   children,
-}: ToolCallBlockProps) {
+}: ToolCallBlockViewProps) {
   const inputPayload = readToolInputPayload(input, argumentsText)
   const outputPayload = readToolPayload(output)
   const descriptor = (() => {
@@ -361,12 +386,7 @@ export function ToolCallBlock({
     = descriptor.kind === 'file-diff' || descriptor.kind === 'notebook-diff'
       ? readFileDiffTarget(input, output, argumentsText)
       : null
-  const canOpenWorkspaceDiff = !!workspaceDiffTarget && !!workspaceDiffPath
-  const openWorkspaceDiffTab = useBrowserPanelStore(s => s.openWorkspaceDiffTab)
-  const openSubagentTab = useBrowserPanelStore(s => s.openSubagentTab)
-  const openWorkflowTab = useBrowserPanelStore(s => s.openWorkflowTab)
-  const updateWorkflowTab = useBrowserPanelStore(s => s.updateWorkflowTab)
-  const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
+  const canOpenWorkspaceDiff = !!onOpenWorkspaceDiff && !!workspaceDiffPath
   const hasChildren = hasRenderableChildren(children)
   const expandable = hasStructuredPanel || hasChildren
   const interactive = expandable || canOpenWorkspaceDiff
@@ -381,7 +401,8 @@ export function ToolCallBlock({
   const workflowSurface = hasWorkflowPanel
     ? readWorkflowSurfaceSnapshot(inputPayload, outputPayload)
     : null
-  const canOpenSubagentThread = descriptor.kind === 'subagent' && !!sessionId && !hasWorkflowPanel
+  const canOpenSubagentThread
+    = descriptor.kind === 'subagent' && !!onOpenSubagentOutput && !hasWorkflowPanel
   const subagentPanelName = canOpenSubagentThread
     ? readSubagentPanelName(inputPayload, outputPayload, descriptor)
     : null
@@ -396,52 +417,42 @@ export function ToolCallBlock({
   }, [errored, hasStructuredPanel])
 
   useEffect(() => {
-    if (!workflowSurface) {
+    if (!workflowSurface || !onWorkflowSurfaceChange) {
       return
     }
-    updateWorkflowTab({
-      sessionId,
+    onWorkflowSurfaceChange({
       toolCallId,
       surface: workflowSurface,
     })
-  }, [sessionId, toolCallId, updateWorkflowTab, workflowSurface])
+  }, [onWorkflowSurfaceChange, toolCallId, workflowSurface])
 
   const openWorkspaceDiff = () => {
-    if (!workspaceDiffTarget || !workspaceDiffPath) {
+    if (!onOpenWorkspaceDiff || !workspaceDiffPath) {
       return
     }
-    const tabId = openWorkspaceDiffTab({
-      workspaceId: workspaceDiffTarget.workspaceId,
-      title: 'All Changes',
-      ownerId: workspaceDiffTarget.ownerId,
-    })
-    requestScrollToFilePath({ path: workspaceDiffPath, tabId })
+    onOpenWorkspaceDiff(workspaceDiffPath)
   }
 
   const openSubagentOutput = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    if (!sessionId || !subagentPanelName) {
+    if (!onOpenSubagentOutput || !subagentPanelName) {
       return
     }
-    const ownerId = useBrowserPanelStore.getState().activeOwnerId
-    openSubagentTab({
-      sessionId,
-      threadId: toolCallId,
+    onOpenSubagentOutput({
+      toolCallId,
       agentName: subagentPanelName,
       agentRole: subagentPanelRole,
-      ownerId,
     })
   }
 
   const openWorkflowSurface = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    if (!workflowSurface) {
+    if (!workflowSurface || !onOpenWorkflowSurface) {
       return
     }
-    openWorkflowTab({
-      sessionId,
+    onOpenWorkflowSurface({
       toolCallId,
       title: workflowSurface.workflowName ?? descriptor.title,
       surface: workflowSurface,
@@ -614,13 +625,13 @@ export function ToolCallBlock({
 
         {state === 'approval-requested' && approval && onApprovalResponse && (
           <div
-            className="flex items-center justify-between gap-3 border-t border-border/60 px-3 py-2"
+            className="flex flex-col items-stretch gap-2 border-t border-border/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             data-testid="approval-card"
           >
             <div className="min-w-0 text-xs leading-snug text-muted-foreground">
               {approvalReason ?? 'Approval required'}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center justify-end gap-1.5">
               <Button
                 type="button"
                 variant="ghost"
