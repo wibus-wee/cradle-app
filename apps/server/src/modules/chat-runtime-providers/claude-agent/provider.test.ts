@@ -549,6 +549,35 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await expect(readPromptText(0)).resolves.toBe('Open the browser')
   })
 
+  it('preserves a failed native result as the turn terminal', async () => {
+    sdkMocks.query.mockReturnValue(
+      createAsyncQuery([
+        {
+          type: 'result',
+          subtype: 'error_during_execution',
+          session_id: 'claude-session-result-error',
+          errors: ['gateway rejected the request'],
+          usage: { input_tokens: 1, output_tokens: 0 },
+        },
+      ]),
+    )
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const chunks: UIMessageChunk[] = []
+    for await (const chunk of provider.streamTurn({
+      runId: 'run-claude-agent-result-error',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Run the task'),
+      workspaceId: 'workspace-1',
+    })) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual([{ type: 'error', errorText: 'gateway rejected the request' }])
+    await provider.dispose()
+  })
+
   it('passes plugin-registered streamable HTTP MCP server config to the Claude Agent SDK', async () => {
     addHostMcpServer({
       transport: 'streamable-http',
@@ -4661,7 +4690,69 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.dispose()
   })
 
-  it('detaches the live query when interrupt ack precedes the turn terminal', async () => {
+  it('releases the Claude turn before yielding its native result terminal chunk', async () => {
+    const activeQuery = createControllableQuery()
+    let resolveContextUsage: ((value: SDKControlGetContextUsageResponse) => void) | undefined
+    activeQuery.getContextUsage.mockImplementation(
+      () => new Promise<SDKControlGetContextUsageResponse>((resolve) => {
+        resolveContextUsage = resolve
+      }),
+    )
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const firstStream = provider.streamTurn({
+      runId: 'run-claude-agent-result-release-1',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('First task'),
+      workspaceId: 'workspace-1',
+    })
+    const firstTerminal = firstStream.next()
+
+    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await expect(readPromptText(0)).resolves.toBe('First task')
+    activeQuery.push({
+      type: 'result',
+      subtype: 'success',
+      uuid: randomUUID(),
+      session_id: 'claude-session-result-release',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+    await expect(firstTerminal).resolves.toEqual(
+      expect.objectContaining({ value: expect.objectContaining({ type: 'finish' }) }),
+    )
+
+    const secondStream = provider.streamTurn({
+      runId: 'run-claude-agent-result-release-2',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Second task'),
+      workspaceId: 'workspace-1',
+    })
+    const secondTerminal = secondStream.next()
+
+    await expect(readPromptText(0)).resolves.toBe('Second task')
+    activeQuery.push({
+      type: 'result',
+      subtype: 'success',
+      uuid: randomUUID(),
+      session_id: 'claude-session-result-release',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+    await expect(secondTerminal).resolves.toEqual(
+      expect.objectContaining({ value: expect.objectContaining({ type: 'finish' }) }),
+    )
+
+    resolveContextUsage?.(createContextUsageResponse())
+    await firstStream.return(undefined)
+    await secondStream.return(undefined)
+    activeQuery.close()
+    await provider.dispose()
+  })
+
+  it('keeps the live query active after interrupt acknowledgement until the native terminal', async () => {
     const activeQuery = createControllableQuery()
     activeQuery.interrupt.mockResolvedValue({
       still_queued: ['queue-interrupt-native-item-1'],
@@ -4692,12 +4783,13 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.cancelTurn({ runtimeSession, profile: createProfile() })
 
     expect(activeQuery.interrupt).toHaveBeenCalledOnce()
-    // LinkCode: interrupt ack before terminal → detach so late fallout cannot pin the next turn.
-    expect(activeQuery.close).toHaveBeenCalledOnce()
-    // Detach clears in-flight submitted tracking; `queued`-only rows stay re-submittable via drain.
-    expect(live.hasNativeInput!('queue-interrupt-native-item-1')).toBe(false)
+    expect(activeQuery.close).not.toHaveBeenCalled()
+    expect(live.hasNativeInput!('queue-interrupt-native-item-1')).toBe(true)
 
-    await pendingNext
+    activeQuery.close()
+    await expect(pendingNext).resolves.toEqual(
+      expect.objectContaining({ value: expect.objectContaining({ type: 'abort' }) }),
+    )
     await provider.dispose()
   })
 
@@ -4719,9 +4811,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       workspaceId: 'workspace-1',
     })
     const drainPromise = (async () => {
-      for await (const _chunk of stream) {
-        // Drain until the terminal result closes the turn queue.
+      const chunks: UIMessageChunk[] = []
+      for await (const chunk of stream) {
+        chunks.push(chunk)
       }
+      return chunks
     })()
 
     await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
@@ -4730,7 +4824,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     const cancelPromise = provider.cancelTurn({ runtimeSession, profile: createProfile() })
     await vi.waitFor(() => expect(activeQuery.interrupt).toHaveBeenCalledOnce())
 
-    // Terminal result arrives while interrupt is still open — LinkCode keeps the Query.
+    // The native terminal, not the interrupt acknowledgement, settles the turn.
     activeQuery.push({
       type: 'assistant',
       uuid: randomUUID(),
@@ -4748,16 +4842,17 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       session_id: 'claude-session-interrupt-settled',
       usage: { input_tokens: 1, output_tokens: 1 },
     })
-    await drainPromise
+    const chunks = await drainPromise
 
     resolveInterrupt!({ still_queued: [] })
     await cancelPromise
 
     expect(activeQuery.close).not.toHaveBeenCalled()
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'finish' }))
     await provider.dispose()
   })
 
-  it('closes the live query when interrupt rejects', async () => {
+  it('surfaces an interrupt failure without closing the live query', async () => {
     const activeQuery = createControllableQuery()
     activeQuery.interrupt.mockRejectedValue(new Error('interrupt transport down'))
     sdkMocks.query.mockReturnValue(activeQuery)
@@ -4777,11 +4872,14 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
     await expect(readPromptText(0)).resolves.toBe('Initial task')
 
-    await provider.cancelTurn({ runtimeSession, profile: createProfile() })
+    await expect(provider.cancelTurn({ runtimeSession, profile: createProfile() })).rejects.toThrow(
+      'interrupt transport down',
+    )
 
     expect(activeQuery.interrupt).toHaveBeenCalledOnce()
-    expect(activeQuery.close).toHaveBeenCalledOnce()
+    expect(activeQuery.close).not.toHaveBeenCalled()
 
+    activeQuery.close()
     await pendingNext
     await provider.dispose()
   })

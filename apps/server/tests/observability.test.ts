@@ -315,7 +315,7 @@ describe('observability capability', () => {
     }
   })
 
-  it('records empty-output failures, opens an incident at threshold, and exports the related bundle', async () => {
+  it('accepts native empty completions without manufacturing failures', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-observability-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -359,71 +359,23 @@ describe('observability capability', () => {
         }))
         expect(runRes.status).toBe(200)
 
-        const timeline = await waitForLatestAssistantStatus(app, 'session-observability', 'failed', attempt)
+        const timeline = await waitForLatestAssistantStatus(app, 'session-observability', 'complete', attempt)
         const latestAssistant = timeline.filter(group => group.role === 'assistant').at(-1)
-        expect(latestAssistant).toEqual(expect.objectContaining({ status: 'failed' }))
-        expect(latestAssistant?.errorText).toBeTruthy()
+        expect(latestAssistant).toEqual(expect.objectContaining({ status: 'complete' }))
+        expect(latestAssistant?.errorText).toBeUndefined()
       }
 
       await flushObservability(app)
 
-      const eventsRes = await app.handle(new Request('http://localhost/observability/events?chatSessionId=session-observability&code=CHAT_EMPTY_OUTPUT_COMPLETION'))
+      const eventsRes = await app.handle(new Request('http://localhost/observability/events?chatSessionId=session-observability'))
       expect(eventsRes.status).toBe(200)
       const events = await eventsRes.json() as Array<{ code: string, runId?: string, severity: string }>
-      expect(events).toHaveLength(3)
-      expect(events.every(event => event.code === 'CHAT_EMPTY_OUTPUT_COMPLETION')).toBe(true)
-      expect(events.every(event => event.severity === 'error')).toBe(true)
-      const finalRunId = events.at(-1)?.runId ?? ''
-      expect(finalRunId).not.toBe('')
+      expect(events.filter(event => event.severity === 'error')).toEqual([])
 
-      const incidentsRes = await app.handle(new Request('http://localhost/observability/incidents?chatSessionId=session-observability&code=CHAT_EMPTY_OUTPUT_COMPLETION'))
+      const incidentsRes = await app.handle(new Request('http://localhost/observability/incidents?chatSessionId=session-observability'))
       expect(incidentsRes.status).toBe(200)
       const incidents = await incidentsRes.json() as Array<{ code: string, status: string, attrs?: { occurrences?: number } }>
-      expect(incidents).toHaveLength(1)
-      expect(incidents[0]).toEqual(expect.objectContaining({
-        code: 'CHAT_EMPTY_OUTPUT_COMPLETION',
-        status: 'open',
-      }))
-      expect(incidents[0].attrs?.occurrences).toBe(3)
-
-      const exportRes = await app.handle(new Request(`http://localhost/observability/export?runId=${encodeURIComponent(finalRunId)}`))
-      expect(exportRes.status).toBe(200)
-      const bundle = await exportRes.json() as {
-        events: Array<{ runId?: string, code: string }>
-        incidents: Array<{ runId?: string, code: string }>
-        errorPatterns: Array<{ code: string, count: number, sampleRunIds: string[], sampleTraceIds: string[] }>
-        timeline: Array<{ runId: string, schema: string, status: string, events: Array<{ phase: string }> }>
-      }
-      expect(bundle.events).toEqual(expect.arrayContaining([
-        expect.objectContaining({ runId: finalRunId, code: 'CHAT_EMPTY_OUTPUT_COMPLETION' }),
-      ]))
-      expect(bundle.incidents).toEqual([])
-      expect(bundle.errorPatterns).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          code: 'CHAT_EMPTY_OUTPUT_COMPLETION',
-          count: 1,
-          sampleRunIds: [finalRunId],
-        }),
-        expect.objectContaining({
-          code: 'RUN_RESPONSE_FAILED',
-          count: 1,
-          sampleRunIds: [finalRunId],
-          sampleTraceIds: [finalRunId],
-        }),
-      ]))
-      expect(bundle.timeline).toEqual([
-        expect.objectContaining({
-          schema: 'cradle.backend-run-snapshot.v1',
-          runId: finalRunId,
-          status: 'failed',
-          events: expect.arrayContaining([
-            expect.objectContaining({ phase: 'run_started' }),
-            expect.objectContaining({ phase: 'model_stream_started' }),
-            expect.objectContaining({ phase: 'model_stream_finished' }),
-            expect.objectContaining({ phase: 'run_finalized' }),
-          ]),
-        }),
-      ])
+      expect(incidents).toEqual([])
       expect(fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/chat/completions'))).toHaveLength(3)
     }
     finally {

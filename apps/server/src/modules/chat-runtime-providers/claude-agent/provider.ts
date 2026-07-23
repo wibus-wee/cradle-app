@@ -203,11 +203,6 @@ type ActiveClaudeQuery = {
   resolveMessageLifecycleSupport: (supported: boolean) => void
   closed: boolean
   pumpRunning: boolean
-  /**
-   * LinkCode `cancelling`: set while `cancelTurn` awaits `interrupt()`. Cleared when a native
-   * terminal `result`/pump EOF settles the interrupted turn, or when cancel finishes detach.
-   */
-  cancelling: boolean
   stderrSink: ClaudeStderrSink
   ultracodeEnabled: boolean
 }
@@ -222,6 +217,7 @@ type ActiveClaudeTurn = {
   shouldGenerateTitle: boolean
   outputTextCollector: ReturnType<typeof createBoundedTextCollector>
   endGeneration: (error?: unknown) => void
+  interruptRequested: boolean
 }
 
 type ActiveClaudeSyntheticTurn = {
@@ -614,7 +610,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
         resolveMessageLifecycleSupport,
         closed: false,
         pumpRunning: true,
-        cancelling: false,
         stderrSink,
         ultracodeEnabled,
       }
@@ -732,6 +727,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
       shouldGenerateTitle,
       outputTextCollector,
       endGeneration,
+      interruptRequested: false,
     }
     activeEntry.currentTurn = turn
 
@@ -818,14 +814,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
     }
     finally {
       entry.pumpRunning = false
-      // LinkCode consume unwind: EOF while cancelling settles the interrupted turn.
-      entry.cancelling = false
       const turn = entry.currentTurn
       if (turn) {
         this.completeClaudeProviderThreadTurns(entry, turn)
         turn.endGeneration()
-        turn.queue.close()
         entry.currentTurn = null
+        if (turn.interruptRequested) {
+          turn.queue.push({ type: 'abort', reason: 'user' })
+        }
+        turn.queue.close()
       }
       await this.completeClaudeSyntheticTurns(entry)
       entry.closed = true
@@ -929,8 +926,16 @@ export class ClaudeAgentProvider implements ChatRuntime {
       })
     }
 
+    const isMainTurnResult = message.type === 'result' && !readClaudeMessageParentToolUseId(message)
+    const terminalChunk = isMainTurnResult
+      ? result.chunks.find(chunk => chunk.type === 'finish' || chunk.type === 'error' || chunk.type === 'abort')
+      : undefined
+    const streamedChunks = isMainTurnResult
+      ? result.chunks.filter(chunk => chunk.type !== 'finish' && chunk.type !== 'error' && chunk.type !== 'abort')
+      : result.chunks
+
     if (turn) {
-      for (const chunk of result.chunks) {
+      for (const chunk of streamedChunks) {
         if (chunk.type === 'text-delta' && 'delta' in chunk) {
           turn.outputTextCollector.append((chunk as { delta: string }).delta)
         }
@@ -941,18 +946,20 @@ export class ClaudeAgentProvider implements ChatRuntime {
       await this.handleClaudeSyntheticSessionMessage(entry, message)
     }
 
-    if (message.type === 'result' && !readClaudeMessageParentToolUseId(message)) {
-      // LinkCode `handleResult`: a terminal result can beat `interrupt()`'s control ack. Clear the
-      // cancel gate so `cancelTurn` sees the turn as settled and does not detach a healthy Query.
-      entry.cancelling = false
+    if (isMainTurnResult) {
       if (turn) {
         this.completeClaudeProviderThreadTurns(entry, turn)
-        await this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(
-          () => undefined,
-        )
         turn.endGeneration()
         entry.currentTurn = null
+        if (terminalChunk) {
+          turn.queue.push(
+            turn.interruptRequested && message.subtype === 'error_during_execution'
+              ? { type: 'abort', reason: 'user' }
+              : terminalChunk,
+          )
+        }
         turn.queue.close()
+        void this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(() => undefined)
       }
       resetClaudeAgentChunkMapperForTurn(entry.mapperState)
     }
@@ -1576,57 +1583,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
   async cancelTurn(input: CancelTurnInput): Promise<void> {
     const sessionId = input.runtimeSession.chatSessionId
     const entry = this.activeQueries.get(sessionId)
-    if (!entry || entry.closed) {
+    const turn = entry?.currentTurn
+    if (!entry || entry.closed || !turn) {
       return
     }
 
-    // LinkCode `onCancel`: clear local turn ownership first, await interrupt, then detach the Query
-    // when the interrupt ack precedes the cancelled turn's terminal result/EOF. Keeping a half-dead
-    // Query after interrupt is what produced empty post-cancel turns (zombie reuse).
-    const hadTurn = entry.currentTurn !== null
-    let interruptFailed = false
-    entry.cancelling = true
-
-    try {
-      const receipt = await entry.query.interrupt()
-      if (receipt && receipt.still_queued.length > 0) {
-        const submittedStillQueued = receipt.still_queued.filter(messageUuid =>
-          entry.submittedInputs.has(messageUuid))
-        this.deps.logger?.info?.('Claude Agent interrupted current turn with native inputs still queued', {
-          sessionId,
-          messageUuids: submittedStillQueued,
-        })
-      }
-    }
-    catch (error) {
-      // No ack can delimit this turn's fallout — fall through to detach.
-      interruptFailed = true
-      entry.cancelling = false
-      this.deps.logger?.warn?.('Claude Agent interrupt failed; closing live query', {
-        error,
-        sessionId,
-      })
-    }
-
-    if (entry.closed || this.activeQueries.get(sessionId) !== entry) {
-      entry.cancelling = false
-      return
-    }
-
-    // Result/EOF cleared `cancelling` (or replaced the entry) while we awaited interrupt — the
-    // turn already settled; do not detach a Query that is ready for the next prompt.
-    const settledWhileInterrupting = hadTurn && !interruptFailed && !entry.cancelling
-    if (settledWhileInterrupting) {
-      return
-    }
-
-    if (hadTurn) {
-      entry.cancelling = false
-      this.closeSessionQuery(sessionId, entry)
-      return
-    }
-
-    entry.cancelling = false
+    // Match Synara's provider lifecycle: the interrupt request does not settle
+    // the turn. The native result or query exit remains the terminal authority.
+    turn.interruptRequested = true
+    await entry.query.interrupt()
   }
 
   async dispose(): Promise<void> {

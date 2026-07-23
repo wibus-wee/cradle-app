@@ -25,12 +25,11 @@ import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace
 import { reportRuntimeSessionTitle } from '../title-service'
 import type { CradleTurnTranscript } from '../transcript'
 import type { SerializedChatError } from './errors'
-import { resolveTurnFailureObservabilityCode, serializeChatError } from './errors'
+import { serializeChatError } from './errors'
 import type { TurnOutputDiagnostics } from './output-diagnostics'
 import {
   accumulateDiagnostics,
   createTurnOutputDiagnostics,
-  resolveTerminalChunkWithDiagnostics,
 } from './output-diagnostics'
 import type { ChatRuntimeProfile } from './profile'
 import { recordChatRuntimeProfile, startChatRuntimeProfile } from './profile'
@@ -386,18 +385,11 @@ async function pumpRuntimeStream(
     ) {
       recordUsageIngestionFailure(activeRun, 'Provider-event accounting completed without a usage event.')
     }
-    // If `activeRun.terminalStatus` is already set here, the loop above hit
-    // `if (activeRun.terminalStatus) break` before the runtime produced (or
-    // we processed) a real terminal chunk for *this* turn — a concurrent
-    // cancel/abort flow already decided the outcome. Trust that outcome
-    // instead of running the stale default `finalChunk` (still
-    // `{ type: 'finish', ... }`) through empty-output validation, which
-    // would otherwise mislabel an early-cancelled turn as a failure.
+    // A concurrent cancellation may settle the run before its provider stream
+    // produces a terminal chunk. That lifecycle fact takes precedence.
     finalChunk = activeRun.terminalStatus
       ? terminalChunkForStatus(activeRun.terminalStatus)
-      : resolveTerminalChunkWithDiagnostics(finalChunk, diagnostics, {
-          allowEmptyAssistantOutput: isRuntimeGoalNoOutputCommandTurn(activeRun, input.message),
-        })
+      : finalChunk
     deps.recordSnapshotEvent(activeRun, {
       phase: 'stream_finished',
       chunk: finalChunk,
@@ -449,24 +441,15 @@ function recordRunUsageAndFailure(
       const finalFailureText = finalChunk.type === 'error' ? finalChunk.errorText : null
 
       if (finalFailureText) {
-        const observabilityCode = resolveTurnFailureObservabilityCode(finalChunk)
         Observability.record({
           source: 'chat-engine',
-          code: observabilityCode,
+          code: OBSERVABILITY_CODES.turnStreamFailed,
           severity: 'error',
           category: 'chat',
           message: finalFailureText,
           chatSessionId: activeRun.sessionId,
           runId: activeRun.runId,
           messageId: activeRun.messageId,
-          dedupeKey:
-            observabilityCode === OBSERVABILITY_CODES.chatEmptyOutputCompletion
-              ? createDedupeKey({
-                  code: observabilityCode,
-                  chatSessionId: activeRun.sessionId,
-                  runId: null,
-                })
-              : undefined,
           attrs: {
             providerTargetId: activeRun.providerTargetId,
             runtimeKind: activeRun.runtimeSession.runtimeKind,
@@ -723,15 +706,4 @@ function isNamedAbortError(error: unknown): boolean {
     && 'name' in error
     && (error as { name?: unknown }).name === 'AbortError'
   )
-}
-
-function isRuntimeGoalNoOutputCommandTurn(activeRun: ActiveRun, message: UIMessage): boolean {
-  const goalContinuation = activeRun.runtime.goalContinuation
-  if (!goalContinuation) {
-    return false
-  }
-  if (activeRun.internalContinuation === 'runtimeGoal') {
-    return true
-  }
-  return goalContinuation.allowsEmptyResponse({ message })
 }

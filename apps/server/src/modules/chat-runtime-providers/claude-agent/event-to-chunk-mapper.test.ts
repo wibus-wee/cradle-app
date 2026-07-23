@@ -84,6 +84,26 @@ describe('mapClaudeAgentMessageToChunks', () => {
     ])
   })
 
+  it('maps an unsuccessful result to its native error', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const message = {
+      type: 'result',
+      subtype: 'error_during_execution',
+      session_id: 'claude-session-1',
+      errors: ['gateway rejected the request'],
+      usage: {
+        input_tokens: 300,
+        output_tokens: 0,
+      },
+    } as unknown as SDKMessage
+
+    const result = await mapClaudeAgentMessageToChunks(message, state)
+
+    expect(result.chunks).toEqual([
+      { type: 'error', errorText: 'gateway rejected the request' },
+    ])
+  })
+
   it('does not duplicate an active thinking stream when the assistant snapshot arrives before content_block_stop', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
 

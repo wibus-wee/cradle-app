@@ -34,11 +34,7 @@ export async function abortRun(runId: string, deps: ActiveRunLifecycleDeps): Pro
   }
 
   active.cancelRequested = true
-  await deps.completeActiveTurn(active, {
-    source: 'cancel',
-    terminalChunk: { type: 'abort', reason: 'user' },
-    bestEffortBookkeeping: () => requestRuntimeCancel(active, deps),
-  })
+  await requestRuntimeCancel(active, deps)
 }
 
 export async function cancelSession(
@@ -149,12 +145,13 @@ async function requestRuntimeCancel(
       profile: context.profile,
     })
   }
- catch (error) {
-    deps.warn('runtime turn cancellation failed after chat run was marked aborted', {
+  catch (error) {
+    deps.warn('runtime turn cancellation failed before native turn settlement', {
       error,
       sessionId: activeRun.sessionId,
       runId: activeRun.runId,
     })
+    throw error
   }
  finally {
     try {

@@ -16,11 +16,6 @@ export interface TurnOutputDiagnostics {
   otherOutputEventCount: number
 }
 
-interface TurnOutputValidationResult {
-  ok: boolean
-  errorText: string | null
-}
-
 export function createTurnOutputDiagnostics(): TurnOutputDiagnostics {
   return {
     emittedEventCount: 0,
@@ -74,47 +69,5 @@ export function accumulateDiagnostics(
         diagnostics.otherOutputEventCount += 1
       }
       break
-  }
-}
-
-export function resolveTerminalChunkWithDiagnostics(
-  chunk: UIMessageChunk,
-  diagnostics: TurnOutputDiagnostics,
-  options: { allowEmptyAssistantOutput?: boolean } = {},
-): UIMessageChunk {
-  if (chunk.type !== 'finish') {
-    return chunk
-  }
-
-  const validation = validateTurnOutput(diagnostics, options)
-  if (validation.ok) {
-    return chunk
-  }
-
-  const errorText = validation.errorText ?? 'Provider finished without assistant output events'
-  return { type: 'error', errorText }
-}
-
-function validateTurnOutput(
-  diagnostics: TurnOutputDiagnostics,
-  options: { allowEmptyAssistantOutput?: boolean } = {},
-): TurnOutputValidationResult {
-  const hasTextOutput
-    = diagnostics.assistantTextCharCount > 0 || diagnostics.reasoningTextCharCount > 0
-  const hasToolOutput = diagnostics.toolEventCount > 0
-  const hasOtherOutput = diagnostics.otherOutputEventCount > 0
-
-  if (
-    hasTextOutput
-    || hasToolOutput
-    || hasOtherOutput
-    || options.allowEmptyAssistantOutput
-  ) {
-    return { ok: true, errorText: null }
-  }
-
-  return {
-    ok: false,
-    errorText: `Provider finished without any assistant output events (events=${diagnostics.emittedEventCount}, assistant_boundaries=${diagnostics.assistantBoundaryCount}, assistant_text_chars=${diagnostics.assistantTextCharCount}, reasoning_chars=${diagnostics.reasoningTextCharCount}, tool_events=${diagnostics.toolEventCount}, other_output_events=${diagnostics.otherOutputEventCount})`,
   }
 }

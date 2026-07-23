@@ -1081,7 +1081,9 @@ function mapResult(msg: SDKResultMessage, state: ClaudeAgentChunkMapperState): C
   return {
     chunks: [
       ...finishOpenTextBlocks(state),
-      providerChunk.finish('stop'),
+      isFailedClaudeResult(msg)
+        ? { type: 'error', errorText: msg.errors[0] ?? 'Claude turn failed.' }
+        : providerChunk.finish('stop'),
     ],
     sessionId: msg.session_id,
     usage,
@@ -1091,6 +1093,13 @@ function mapResult(msg: SDKResultMessage, state: ClaudeAgentChunkMapperState): C
     capturedCrewCalls: [],
     capturedTaskActivity: [],
   }
+}
+
+function isFailedClaudeResult(msg: SDKResultMessage): msg is Extract<SDKResultMessage, { subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd' | 'error_max_structured_output_retries' }> {
+  return msg.subtype === 'error_during_execution'
+    || msg.subtype === 'error_max_turns'
+    || msg.subtype === 'error_max_budget_usd'
+    || msg.subtype === 'error_max_structured_output_retries'
 }
 
 function emitAssistantTextSegment(

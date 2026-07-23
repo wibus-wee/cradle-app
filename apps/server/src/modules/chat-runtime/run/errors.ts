@@ -1,5 +1,3 @@
-import type { UIMessageChunk } from 'ai'
-
 import { AppError } from '../../../errors/app-error'
 import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contract'
 import * as Observability from '../../observability/service'
@@ -15,18 +13,6 @@ export interface SerializedChatError {
     data?: unknown
     stack?: string
   }
-}
-
-export function resolveTurnFailureObservabilityCode(chunk: UIMessageChunk): string {
-  if (chunk.type !== 'error') {
-    return OBSERVABILITY_CODES.turnStreamFailed
-  }
-
-  if (chunk.errorText.includes('without any assistant output')) {
-    return OBSERVABILITY_CODES.chatEmptyOutputCompletion
-  }
-
-  return OBSERVABILITY_CODES.turnStreamFailed
 }
 
 export function createSessionTitleGenerationError(input: {
