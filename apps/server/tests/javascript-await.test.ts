@@ -49,6 +49,7 @@ describe('javascript session await', () => {
   })
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     unregisterSource(JAVASCRIPT_AWAIT_SOURCE)
     await flushHeavyCheckQueue()
     shutdownInfra()
@@ -125,9 +126,7 @@ describe('javascript session await', () => {
         source: JAVASCRIPT_AWAIT_SOURCE,
         filterJson: JSON.stringify({ program: 'export default async () => {' }),
       }),
-    ).rejects.toEqual(
-      expect.objectContaining({ code: 'session_await_program_invalid' }),
-    )
+    ).rejects.toEqual(expect.objectContaining({ code: 'session_await_program_invalid' }))
     expect(db().select().from(sessionAwaits).all()).toHaveLength(0)
   })
 
@@ -137,12 +136,14 @@ describe('javascript session await', () => {
     expect(program.length).toBeLessThan(64 * 1024)
     expect(Buffer.byteLength(program, 'utf8')).toBeGreaterThan(64 * 1024)
 
-    await expect(register({
-      chatSessionId: sessionId,
-      workspaceId,
-      source: JAVASCRIPT_AWAIT_SOURCE,
-      filterJson: JSON.stringify({ program }),
-    })).rejects.toEqual(expect.objectContaining({ code: 'session_await_program_invalid' }))
+    await expect(
+      register({
+        chatSessionId: sessionId,
+        workspaceId,
+        source: JAVASCRIPT_AWAIT_SOURCE,
+        filterJson: JSON.stringify({ program }),
+      }),
+    ).rejects.toEqual(expect.objectContaining({ code: 'session_await_program_invalid' }))
   })
 
   it('keeps the await pending and the error counter at zero while the cell returns false', async () => {
@@ -233,6 +234,48 @@ describe('javascript session await', () => {
     })
   })
 
+  it('fails instead of remaining active after five unexpected source adapter errors', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    const row = await register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({ program: PENDING_PROGRAM }),
+    })
+    vi.spyOn(javascriptAwaitSource, 'checkPending').mockRejectedValue(
+      new Error('evaluator process unavailable'),
+    )
+
+    for (let cycle = 1; cycle <= 4; cycle++) {
+      makeDue(row.id)
+      await runOnceAndFlush()
+      expect(readAwait(row.id)).toEqual(
+        expect.objectContaining({
+          status: 'pending',
+          consecutiveErrorCount: cycle,
+          lastErrorText: 'Source adapter threw: evaluator process unavailable',
+        }),
+      )
+    }
+
+    makeDue(row.id)
+    await runOnceAndFlush()
+
+    expect(readAwait(row.id)).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        failureKind: 'source',
+        consecutiveErrorCount: 5,
+        lastErrorText:
+          'Evaluation failed 5 times consecutively; last error: Source adapter threw: evaluator process unavailable',
+      }),
+    )
+    expect(mockedEnqueueSessionQueueItem).toHaveBeenCalledWith({
+      sessionId,
+      text: expect.stringContaining('Session await (javascript) failed'),
+    })
+  })
+
   it('fails immediately and enqueues a failure resume when the cell result is invalid', async () => {
     const { workspaceId, sessionId } = seedSession()
     const row = await register({
@@ -269,11 +312,13 @@ describe('javascript session await', () => {
 
     await runOnceAndFlush()
 
-    expect(readAwait(row.id)).toEqual(expect.objectContaining({
-      status: 'failed',
-      failureKind: 'source',
-      consecutiveErrorCount: 0,
-    }))
+    expect(readAwait(row.id)).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        failureKind: 'source',
+        consecutiveErrorCount: 0,
+      }),
+    )
     expect(readAwait(row.id)?.lastErrorText).toContain('Program must export a default function')
     expect(mockedEnqueueSessionQueueItem).toHaveBeenCalledTimes(1)
   })
@@ -296,7 +341,11 @@ describe('javascript session await', () => {
         `,
       }),
     })
-    const workspacePath = db().select({ locatorJson: workspaces.locatorJson }).from(workspaces).where(eq(workspaces.id, workspaceId)).get()!
+    const workspacePath = db()
+      .select({ locatorJson: workspaces.locatorJson })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .get()!
     const markerPath = join(JSON.parse(workspacePath.locatorJson).path, markerName)
 
     // Enqueue without awaiting the heavy check so cancel can win mid-evaluation.

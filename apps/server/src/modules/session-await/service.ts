@@ -53,6 +53,7 @@ const SupportedAwaitSourceSchema = z.enum([
 const NonBlankResumeTextSchema = z
   .string()
   .refine(value => value.trim().length > 0, 'resumeText must include non-whitespace content')
+const MAX_CONSECUTIVE_TRACKED_EVALUATION_ERRORS = 5
 
 const RegisterAwaitInputSchema = z.object({
   chatSessionId: z.string(),
@@ -89,6 +90,11 @@ async function enqueueResume(row: SessionAwait, resumeText: string): Promise<voi
 
 function readDeliveryErrorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
+}
+
+export function describeSourceAdapterFailure(err: unknown): string {
+  const detail = readDeliveryErrorText(err).trim()
+  return detail.length > 0 ? `Source adapter threw: ${detail}` : 'Source adapter threw'
 }
 
 function markDeliveryFailed(
@@ -396,22 +402,28 @@ export async function retryDelivery(
   return updated
 }
 
-export function markFailed(awaitId: string, errorText: string, incrementErrorCount = false): SessionAwait | null {
+export function markFailed(
+  awaitId: string,
+  errorText: string,
+  incrementErrorCount = false,
+): SessionAwait | null {
   const now = Math.floor(Date.now() / 1000)
-  return db()
-    .update(sessionAwaits)
-    .set({
-      status: 'failed',
-      failureKind: 'source',
-      lastErrorText: errorText,
-      lastCheckedAt: now,
-      ...(incrementErrorCount
-        ? { consecutiveErrorCount: sql`${sessionAwaits.consecutiveErrorCount} + 1` }
-        : {}),
-    })
-    .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
-    .returning()
-    .get() ?? null
+  return (
+    db()
+      .update(sessionAwaits)
+      .set({
+        status: 'failed',
+        failureKind: 'source',
+        lastErrorText: errorText,
+        lastCheckedAt: now,
+        ...(incrementErrorCount
+          ? { consecutiveErrorCount: sql`${sessionAwaits.consecutiveErrorCount} + 1` }
+          : {}),
+      })
+      .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
+      .returning()
+      .get() ?? null
+  )
 }
 
 // Wakes the chat session when a source adapter opts into resumeOnFailure and the
@@ -422,17 +434,19 @@ export async function resumeFailedAwait(row: SessionAwait, errorText: string): P
   try {
     await enqueueResume(row, text)
   }
-  catch (err) {
+ catch (err) {
     db()
       .update(sessionAwaits)
       .set({
         lastErrorText: `${row.lastErrorText ?? errorText} (failure resume delivery failed: ${readDeliveryErrorText(err)})`,
       })
-      .where(and(
-        eq(sessionAwaits.id, row.id),
-        eq(sessionAwaits.status, 'failed'),
-        eq(sessionAwaits.failureKind, 'source'),
-      ))
+      .where(
+        and(
+          eq(sessionAwaits.id, row.id),
+          eq(sessionAwaits.status, 'failed'),
+          eq(sessionAwaits.failureKind, 'source'),
+        ),
+      )
       .run()
   }
 }
@@ -472,12 +486,36 @@ export function recordTrackedEvaluationCheck(awaitId: string, errorText?: string
     .set({
       lastCheckedAt: now,
       lastErrorText: input.errorText,
-      consecutiveErrorCount: input.errorText === null
-        ? 0
-        : sql`${sessionAwaits.consecutiveErrorCount} + 1`,
+      consecutiveErrorCount:
+        input.errorText === null ? 0 : sql`${sessionAwaits.consecutiveErrorCount} + 1`,
     })
     .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
     .run()
+}
+
+// A tracked source (currently javascript) can still fail outside its normal
+// result mapping, for example when its evaluator process boundary rejects. Do
+// not leave that await pending forever: it follows the same five-consecutive-
+// failures contract as a result-level evaluation error.
+export function recordTrackedEvaluationFailure(
+  awaitId: string,
+  errorText: string,
+): SessionAwait | null {
+  const row = get(awaitId)
+  if (!row || row.status !== 'pending') {
+    return null
+  }
+
+  if (row.consecutiveErrorCount + 1 >= MAX_CONSECUTIVE_TRACKED_EVALUATION_ERRORS) {
+    return markFailed(
+      awaitId,
+      `Evaluation failed ${MAX_CONSECUTIVE_TRACKED_EVALUATION_ERRORS} times consecutively; last error: ${errorText}`,
+      true,
+    )
+  }
+
+  recordTrackedEvaluationCheck(awaitId, errorText)
+  return get(awaitId)
 }
 
 export function bypassCheck(awaitId: string, checkName: string): SessionAwait | null {
