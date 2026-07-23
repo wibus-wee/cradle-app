@@ -148,11 +148,19 @@ function toSummary(work: Work, primaryThread: Session.SessionView): WorkSummary 
   }
 }
 
-export function list(input: {
+async function toLiveSummary(work: Work, primaryThread: Session.SessionView): Promise<WorkSummary> {
+  const summary = toSummary(work, primaryThread)
+  return {
+    ...summary,
+    pullRequest: await PullRequest.getPullRequest(primaryThread.id),
+  }
+}
+
+export async function list(input: {
   workspaceId?: string
   linkedIssueId?: string
   archived?: boolean
-} = {}): WorkSummary[] {
+} = {}): Promise<WorkSummary[]> {
   const predicates = [
     input.linkedIssueId ? eq(works.linkedIssueId, input.linkedIssueId) : undefined,
     input.archived ? isNotNull(works.archivedAt) : isNull(works.archivedAt),
@@ -161,13 +169,14 @@ export function list(input: {
   const query = db().select().from(works).orderBy(desc(works.updatedAt), desc(works.createdAt))
   const rows = where ? query.where(where).all() : query.all()
 
-  return rows.flatMap((work) => {
+  const visibleWorks = rows.flatMap((work) => {
     const primaryThread = requirePrimaryThread(work.id)
     if (input.workspaceId && primaryThread.workspaceId !== input.workspaceId) {
       return []
     }
-    return [toSummary(work, primaryThread)]
+    return [{ work, primaryThread }]
   })
+  return Promise.all(visibleWorks.map(({ work, primaryThread }) => toLiveSummary(work, primaryThread)))
 }
 
 export async function get(id: string): Promise<WorkDetail | null> {

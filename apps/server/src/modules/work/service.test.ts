@@ -158,13 +158,29 @@ describe('work delivery control', () => {
     seedWork()
     mockHealthyDetailReads()
 
-    const [summary] = Work.list({ workspaceId: WORKSPACE_ID })
+    const [summary] = await Work.list({ workspaceId: WORKSPACE_ID })
     const detail = await Work.get(WORK_ID)
 
     expect(summary?.title).toBe('Primary Work Session')
     expect(detail?.work.title).toBe('Primary Work Session')
     expect(db().select({ title: works.title }).from(works).where(eq(works.id, WORK_ID)).get()?.title)
       .toBe('Implement Work')
+  })
+
+  it('detects the live pull request state when listing Work', async () => {
+    seedWork()
+    const { pullRequest } = mockHealthyDetailReads()
+    pullRequest.mockResolvedValue({
+      ...OPEN_PULL_REQUEST,
+      isDraft: false,
+      state: 'closed',
+      merged: true,
+    })
+
+    const [summary] = await Work.list({ workspaceId: WORKSPACE_ID })
+
+    expect(pullRequest).toHaveBeenCalledWith(SESSION_ID)
+    expect(summary?.pullRequest).toMatchObject({ state: 'closed', merged: true })
   })
 
   it('creates a primary Session in a healthy managed Worktree from a clean repository', async () => {

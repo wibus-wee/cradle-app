@@ -21,6 +21,12 @@ export type WorkDetail = GetWorksByIdResponse
 export type WorkSummary = GetWorksResponse[number]
 export type SessionWorkResolution = GetSessionsByIdWorkResponse
 
+export const WORK_PULL_REQUEST_REFRESH_INTERVAL_MS = 30_000
+
+export function hasOpenWorkPullRequest(works: readonly WorkSummary[] | undefined): boolean {
+  return works?.some(work => work.pullRequest?.state === 'open' && !work.pullRequest.merged) ?? false
+}
+
 export function useWorkDetail(workId: string | null | undefined) {
   return useQuery({
     ...getWorksByIdOptions({ path: { id: workId ?? '' } }),
@@ -34,6 +40,10 @@ export function useWorkspaceWorks(workspaceId: string | null | undefined) {
     ...getWorksOptions({ query: workspaceId ? { workspaceId } : undefined }),
     enabled: !!workspaceId,
     staleTime: 5_000,
+    refetchInterval: query => hasOpenWorkPullRequest(query.state.data)
+      ? WORK_PULL_REQUEST_REFRESH_INTERVAL_MS
+      : false,
+    refetchIntervalInBackground: true,
   })
 }
 
