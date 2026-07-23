@@ -246,7 +246,8 @@ export function appendRunSnapshotEvent(
  */
 export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPayloadInput): void {
   try {
-    db()
+    const d = db()
+    const result = d
       .update(backendRunSnapshotEvents)
       .set({
         payloadJson: stringifySnapshotRecord(input.payload),
@@ -255,6 +256,9 @@ export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPaylo
       })
       .where(eq(backendRunSnapshotEvents.id, input.eventId))
       .run()
+    if (result.changes > 0) {
+      projectRecallToolEvent(d, { sourceEventId: input.eventId })
+    }
   }
  catch (error) {
     logger.error('failed to update run snapshot event payload', { input, error })
