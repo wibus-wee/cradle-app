@@ -202,7 +202,6 @@ interface DiffReviewResponse {
     } | null
     state: 'open' | 'resolved' | 'stale'
     comments: Array<{ bodyMarkdown: string }>
-    reactions: Array<{ reaction: string }>
   }>
   submissions: Array<{
     decision: 'approve' | 'request-changes' | 'comment'
@@ -544,7 +543,6 @@ describe('diff-review capability', () => {
         createdAt: '2026-07-21T10:00:00Z',
         updatedAt: '2026-07-21T10:00:00Z',
         author: { login: 'reviewer' },
-        reactionGroups: [],
       }
       const importedThread = {
         id: 'PRRT_imported',
@@ -610,35 +608,6 @@ describe('diff-review capability', () => {
         }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({
           data: { addPullRequestReviewThreadReply: { thread: repliedThread } },
-        }), { status: 200 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({
-          data: { addReaction: { subject: { id: 'PRRC_created' } } },
-        }), { status: 200 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({
-          data: {
-            repository: {
-              pullRequest: {
-                id: 'PR_70',
-                reviewThreads: {
-                  nodes: [importedThread, {
-                    ...repliedThread,
-                    comments: {
-                      nodes: repliedThread.comments.nodes.map((comment, index) => index === 0
-                        ? {
-                            ...comment,
-                            reactionGroups: [{
-                              content: 'EYES',
-                              users: { nodes: [{ login: 'local-user' }] },
-                            }],
-                          }
-                        : comment),
-                    },
-                  }],
-                  pageInfo: { hasNextPage: false, endCursor: null },
-                },
-              },
-            },
-          },
         }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({
           data: { resolveReviewThread: { thread: { ...repliedThread, isResolved: true } } },
@@ -728,15 +697,6 @@ describe('diff-review capability', () => {
       )
       expect(replied.threads.at(-1)?.comments).toHaveLength(2)
 
-      const reacted = await postJson<DiffReviewResponse>(
-        app,
-        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/threads/github-review-thread:PRRT_created/reactions`,
-        { reaction: '👀' },
-      )
-      expect(reacted.threads.at(-1)?.reactions).toEqual([
-        expect.objectContaining({ userId: 'local-user', reaction: '👀' }),
-      ])
-
       const resolved = await postJson<DiffReviewResponse>(
         app,
         `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/threads/github-review-thread:PRRT_created/resolve`,
@@ -751,7 +711,7 @@ describe('diff-review capability', () => {
         400,
       )
       expect(missingBody.code).toBe('diff_review_github_body_required')
-      expect(fetchMock).toHaveBeenCalledTimes(13)
+      expect(fetchMock).toHaveBeenCalledTimes(11)
 
       const submitted = await postJson<DiffReviewResponse>(
         app,
@@ -763,8 +723,8 @@ describe('diff-review capability', () => {
         decision: 'approve',
         sourceSyncState: 'synced',
       })
-      expect(fetchMock).toHaveBeenCalledTimes(14)
-      const [submitUrl, submitInit] = fetchMock.mock.calls[13]!
+      expect(fetchMock).toHaveBeenCalledTimes(12)
+      const [submitUrl, submitInit] = fetchMock.mock.calls[11]!
       expect(submitUrl).toBe('https://api.github.com/repos/cradle/app/pulls/70/reviews')
       expect(submitInit).toMatchObject({ method: 'POST' })
       expect(JSON.parse(String(submitInit?.body))).toEqual({
@@ -906,15 +866,6 @@ describe('diff-review capability', () => {
         { bodyMarkdown: 'Follow-up note.' },
       )
       expect(replied.threads[0]?.comments).toHaveLength(2)
-
-      const reacted = await postJson<DiffReviewResponse>(
-        app,
-        `/workspaces/workspace-diff-review-lifecycle/diff-reviews/${review.id}/threads/${threadId}/reactions`,
-        { reaction: '+1' },
-      )
-      expect(reacted.threads[0]?.reactions).toEqual([
-        expect.objectContaining({ reaction: '+1' }),
-      ])
 
       const resolved = await postJson<DiffReviewResponse>(
         app,

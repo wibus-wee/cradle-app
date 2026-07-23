@@ -38,8 +38,6 @@ interface DiffStageProps {
   createPending: boolean
   onReply: (threadId: string, bodyMarkdown: string) => void
   replyPending: boolean
-  onReact: (threadId: string, reaction: string) => void
-  reactionPending: boolean
   onResolve: (threadId: string) => void
   resolvePending: boolean
   onAskAgentForThread?: (threadId: string) => void
@@ -89,8 +87,6 @@ export function DiffStage({
   createPending,
   onReply,
   replyPending,
-  onReact,
-  reactionPending,
   onResolve,
   resolvePending,
   onAskAgentForThread,
@@ -247,8 +243,6 @@ export function DiffStage({
         thread={thread}
         onReply={onReply}
         replyPending={replyPending}
-        onReact={onReact}
-        reactionPending={reactionPending}
         onResolve={onResolve}
         resolvePending={resolvePending}
         onAskAgent={onAskAgentForThread}

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  addPullRequestReviewCommentReaction,
   createPullRequestReviewThread,
   fetchPullRequestDetail,
   fetchPullRequestFiles,
@@ -192,7 +191,7 @@ describe('pull request review threads', () => {
     vi.unstubAllGlobals()
   })
 
-  it('reads remote threads with inline anchors, replies, and reactions', async () => {
+  it('reads remote threads with inline anchors and replies', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: {
         repository: {
@@ -216,10 +215,6 @@ describe('pull request review threads', () => {
                     createdAt: '2026-07-21T10:00:00Z',
                     updatedAt: '2026-07-21T11:00:00Z',
                     author: { login: 'reviewer' },
-                    reactionGroups: [{
-                      content: 'EYES',
-                      users: { nodes: [{ login: 'author' }] },
-                    }],
                   }],
                 },
               }],
@@ -247,7 +242,6 @@ describe('pull request review threads', () => {
         createdAt: '2026-07-21T10:00:00Z',
         updatedAt: '2026-07-21T11:00:00Z',
         author: { login: 'reviewer' },
-        reactionGroups: [{ content: 'EYES', users: [{ login: 'author' }] }],
       }],
     }])
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
@@ -255,7 +249,7 @@ describe('pull request review threads', () => {
     expect(request.query).toContain('reviewThreads(first: 100')
   })
 
-  it('uses GraphQL mutations for create, reply, resolve, and reaction operations', async () => {
+  it('uses GraphQL mutations for create, reply, and resolve operations', async () => {
     const thread = {
       id: 'PRRT_thread',
       isResolved: false,
@@ -278,9 +272,6 @@ describe('pull request review threads', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({
         data: { resolveReviewThread: { thread: { ...thread, isResolved: true } } },
       }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        data: { addReaction: { subject: { id: 'PRRC_comment' } } },
-      }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
     await createPullRequestReviewThread({
@@ -294,7 +285,6 @@ describe('pull request review threads', () => {
     })
     await replyToPullRequestReviewThread({ threadId: 'PRRT_thread', body: 'Reply' })
     await resolvePullRequestReviewThread('PRRT_thread')
-    await addPullRequestReviewCommentReaction({ commentId: 'PRRC_comment', content: 'EYES' })
 
     const requests = fetchMock.mock.calls.slice(1).map(call => JSON.parse(String(call[1]?.body)))
     expect(requests[0]).toMatchObject({
@@ -310,7 +300,6 @@ describe('pull request review threads', () => {
     })
     expect(requests[1].variables.input).toEqual({ pullRequestReviewThreadId: 'PRRT_thread', body: 'Reply' })
     expect(requests[2].variables.input).toEqual({ threadId: 'PRRT_thread' })
-    expect(requests[3].variables.input).toEqual({ subjectId: 'PRRC_comment', content: 'EYES' })
   })
 })
 

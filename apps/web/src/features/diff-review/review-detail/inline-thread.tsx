@@ -14,8 +14,6 @@ interface InlineThreadProps {
   thread: ReviewThread
   onReply: (threadId: string, bodyMarkdown: string) => void
   replyPending: boolean
-  onReact: (threadId: string, reaction: string) => void
-  reactionPending: boolean
   onResolve: (threadId: string) => void
   resolvePending: boolean
   onAskAgent?: (threadId: string) => void
@@ -26,8 +24,6 @@ export function InlineThread({
   thread,
   onReply,
   replyPending,
-  onReact,
-  reactionPending,
   onResolve,
   resolvePending,
   onAskAgent,
@@ -159,25 +155,6 @@ export function InlineThread({
                 )
               : (
                   <div className="flex items-center gap-2 pt-0.5">
-                    {(['👍', '👀', '❤️'] as const).map((reaction) => {
-                      const count = thread.reactions.filter(item => item.reaction === reaction).length
-                      return (
-                        <Button
-                          key={reaction}
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onReact(thread.id, reaction)}
-                          disabled={reactionPending}
-                          className="h-6 gap-1 rounded px-1.5 text-[12px] font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
-                          aria-label={`React ${reaction}`}
-                          title={`React ${reaction}`}
-                        >
-                          <span aria-hidden>{reaction}</span>
-                          {count > 0 && <span className="tabular-nums">{count}</span>}
-                        </Button>
-                      )
-                    })}
                     <Button
                       type="button"
                       variant="ghost"

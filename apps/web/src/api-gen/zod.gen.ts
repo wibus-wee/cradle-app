@@ -2574,16 +2574,6 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdC
     threadId: z.string().min(1)
 });
 
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsBody = z.object({
-    reaction: z.string().min(1)
-});
-
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactionsPath = z.object({
-    workspaceId: z.string().min(1),
-    reviewId: z.string().min(1),
-    threadId: z.string().min(1)
-});
-
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdResolvePath = z.object({
     workspaceId: z.string().min(1),
     reviewId: z.string().min(1),

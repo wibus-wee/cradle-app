@@ -134,14 +134,6 @@ const comment = t.Object({
   updatedAt: t.Number(),
 })
 
-const reaction = t.Object({
-  id: t.String(),
-  threadId: t.String(),
-  userId: t.String(),
-  reaction: t.String(),
-  createdAt: t.Number(),
-})
-
 const thread = t.Object({
   id: t.String(),
   reviewId: t.String(),
@@ -156,7 +148,6 @@ const thread = t.Object({
   resolvedBy: t.Nullable(t.String()),
   resolvedAt: t.Nullable(t.Number()),
   comments: t.Array(comment),
-  reactions: t.Array(reaction),
 })
 
 const submission = t.Object({
@@ -396,10 +387,6 @@ export const DiffReviewModel = {
 
   addCommentBody: t.Object({
     bodyMarkdown: t.String({ minLength: 1 }),
-  }, { additionalProperties: false }),
-
-  addReactionBody: t.Object({
-    reaction: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
   submitBody: t.Object({

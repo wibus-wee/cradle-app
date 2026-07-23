@@ -326,7 +326,6 @@ import { register as registerWorkspaceDiffsRefresh } from './workspace/diffs/ref
 import { register as registerWorkspaceDiffsSubmit } from './workspace/diffs/submit'
 import { register as registerWorkspaceDiffsThreadComment } from './workspace/diffs/thread/comment'
 import { register as registerWorkspaceDiffsThreadCreate } from './workspace/diffs/thread/create'
-import { register as registerWorkspaceDiffsThreadReaction } from './workspace/diffs/thread/reaction'
 import { register as registerWorkspaceDiffsThreadResolve } from './workspace/diffs/thread/resolve'
 import { register as registerWorkspaceFileCreate } from './workspace/file/create'
 import { register as registerWorkspaceFileRead } from './workspace/file/read'
@@ -683,7 +682,6 @@ export function registerGeneratedCommands(program: Command): void {
   registerWorkspaceDiffsSubmit(program)
   registerWorkspaceDiffsThreadComment(program)
   registerWorkspaceDiffsThreadCreate(program)
-  registerWorkspaceDiffsThreadReaction(program)
   registerWorkspaceDiffsThreadResolve(program)
   registerWorkspaceFileCreate(program)
   registerWorkspaceFileRead(program)

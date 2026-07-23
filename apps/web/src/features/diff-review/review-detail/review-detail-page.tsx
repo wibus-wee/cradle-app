@@ -49,7 +49,6 @@ export function ReviewDetailPage({
     viewedMutation,
     createThreadMutation,
     replyMutation,
-    reactionMutation,
     resolveThreadMutation,
     submitMutation,
     mergeMutation,
@@ -389,8 +388,6 @@ export function ReviewDetailPage({
             createPending={createThreadMutation.isPending}
             onReply={(threadId, body) => replyMutation.mutate({ threadId, bodyMarkdown: body })}
             replyPending={replyMutation.isPending}
-            onReact={(threadId, reaction) => reactionMutation.mutate({ threadId, reaction })}
-            reactionPending={reactionMutation.isPending}
             onResolve={threadId => resolveThreadMutation.mutate(threadId)}
             resolvePending={resolveThreadMutation.isPending}
             onAskAgentForThread={askAgentForThread}

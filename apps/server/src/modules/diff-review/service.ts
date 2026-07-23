@@ -14,7 +14,6 @@ import type {
   DiffReviewSourceOperation,
   DiffReviewSubmission,
   DiffReviewThread,
-  DiffReviewThreadReaction,
 } from '@cradle/db'
 import {
   agents,
@@ -31,7 +30,6 @@ import {
   diffReviewSourceOperations,
   diffReviewSources,
   diffReviewSubmissions,
-  diffReviewThreadReactions,
   diffReviewThreads,
 } from '@cradle/db'
 import { and, asc, desc, eq, ne } from 'drizzle-orm'
@@ -41,11 +39,9 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import type {
   GitHubPullRequestReviewThread,
-  GitHubReactionContent,
   MergePullRequestResult,
 } from '../../lib/github-api'
 import {
-  addPullRequestReviewCommentReaction,
   createPullRequestReviewThread,
   fetchPullRequestReviewThreads,
   hasGitHubToken,
@@ -103,7 +99,6 @@ import type {
   ReviewSourceKind,
   ReviewSourceReadinessView,
   ReviewSubmissionView,
-  ReviewThreadReactionView,
   ReviewThreadView,
 } from './types'
 import { hashText, jsonStringify, safeJsonParse, shortHash, titleForRepository } from './utils'
@@ -125,7 +120,6 @@ export type {
   ReviewRangeAnchorView,
   ReviewSourceReadinessView,
   ReviewSubmissionView,
-  ReviewThreadReactionView,
   ReviewThreadView,
 } from './types'
 
@@ -199,16 +193,6 @@ function toCommentView(row: DiffReviewComment): ReviewCommentView {
     externalUrl: row.externalUrl,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  }
-}
-
-function toReactionView(row: DiffReviewThreadReaction): ReviewThreadReactionView {
-  return {
-    id: row.id,
-    threadId: row.threadId,
-    userId: row.userId,
-    reaction: row.reaction,
-    createdAt: row.createdAt,
   }
 }
 
@@ -436,11 +420,6 @@ function loadThreads(reviewId: string): ReviewThreadView[] {
     .from(diffReviewComments)
     .orderBy(asc(diffReviewComments.createdAt))
     .all()
-  const reactions = db()
-    .select()
-    .from(diffReviewThreadReactions)
-    .orderBy(asc(diffReviewThreadReactions.createdAt))
-    .all()
   return threads.map(thread => ({
     id: thread.id,
     reviewId: thread.reviewId,
@@ -455,7 +434,6 @@ function loadThreads(reviewId: string): ReviewThreadView[] {
     resolvedBy: thread.resolvedBy,
     resolvedAt: thread.resolvedAt,
     comments: comments.filter(comment => comment.threadId === thread.id).map(toCommentView),
-    reactions: reactions.filter(reaction => reaction.threadId === thread.id).map(toReactionView),
   }))
 }
 
@@ -1235,28 +1213,6 @@ function githubStatus(status: string): Git.GitFileStatusKind {
   return 'modified'
 }
 
-const GITHUB_REACTION_TO_LOCAL: Record<GitHubReactionContent, string> = {
-  THUMBS_UP: '👍',
-  THUMBS_DOWN: '👎',
-  LAUGH: '😄',
-  HOORAY: '🎉',
-  CONFUSED: '😕',
-  HEART: '❤️',
-  ROCKET: '🚀',
-  EYES: '👀',
-}
-
-const LOCAL_REACTION_TO_GITHUB: Partial<Record<string, GitHubReactionContent>> = {
-  '👍': 'THUMBS_UP',
-  '👎': 'THUMBS_DOWN',
-  '😄': 'LAUGH',
-  '🎉': 'HOORAY',
-  '😕': 'CONFUSED',
-  '❤️': 'HEART',
-  '🚀': 'ROCKET',
-  '👀': 'EYES',
-}
-
 function githubThreadId(remoteId: string): string {
   return `${GITHUB_REVIEW_THREAD_PREFIX}${remoteId}`
 }
@@ -1351,7 +1307,6 @@ function syncGitHubReviewThreads(input: {
       .run()
 
     db().delete(diffReviewComments).where(eq(diffReviewComments.threadId, id)).run()
-    db().delete(diffReviewThreadReactions).where(eq(diffReviewThreadReactions.threadId, id)).run()
     for (const comment of remoteThread.comments) {
       db().insert(diffReviewComments).values({
         id: githubCommentId(comment.id),
@@ -1363,17 +1318,6 @@ function syncGitHubReviewThreads(input: {
         createdAt: githubTimestamp(comment.createdAt),
         updatedAt: githubTimestamp(comment.updatedAt),
       }).run()
-      for (const group of comment.reactionGroups) {
-        for (const user of group.users) {
-          db().insert(diffReviewThreadReactions).values({
-            id: `${githubCommentId(comment.id)}:reaction:${group.content}:${user.login}`,
-            threadId: id,
-            userId: user.login,
-            reaction: GITHUB_REACTION_TO_LOCAL[group.content],
-            createdAt: githubTimestamp(comment.updatedAt),
-          }).onConflictDoNothing().run()
-        }
-      }
     }
   }
 
@@ -1944,71 +1888,6 @@ export async function addComment(input: {
     payload: { threadId: thread.id },
     createdAt: now,
   })
-  return loadReviewView(review, { userId })
-}
-
-export async function addReaction(input: {
-  workspaceId: string
-  reviewId: string
-  threadId: string
-  reaction: string
-  userId?: string
-}): Promise<DiffReviewView> {
-  const review = getReviewRow(input.workspaceId, input.reviewId)
-  const thread = getThreadForReview(review.id, input.threadId)
-  const userId = input.userId ?? LOCAL_USER_ID
-  if (review.sourceKind === 'github-pull-request') {
-    const reaction = LOCAL_REACTION_TO_GITHUB[input.reaction]
-    if (!reaction) {
-      throw new AppError({
-        code: 'diff_review_github_reaction_unsupported',
-        status: 400,
-        message: 'This reaction is not supported by GitHub.',
-        details: { reviewId: review.id, threadId: thread.id, reaction: input.reaction },
-      })
-    }
-    const rootComment = db()
-      .select()
-      .from(diffReviewComments)
-      .where(eq(diffReviewComments.threadId, thread.id))
-      .orderBy(asc(diffReviewComments.createdAt))
-      .get()
-    const commentId = rootComment ? remoteId(rootComment.id, GITHUB_REVIEW_COMMENT_PREFIX) : null
-    if (!commentId) {
-      throw new AppError({
-        code: 'diff_review_github_comment_not_synced',
-        status: 409,
-        message: 'The GitHub review comment is not synchronized. Refresh the review and try again.',
-        details: { reviewId: review.id, threadId: thread.id },
-      })
-    }
-    await addPullRequestReviewCommentReaction({ commentId, content: reaction })
-    const binding = readSourceBinding<GitHubPullRequestBinding>(getReviewSource(review))
-    const remoteThreads = await fetchPullRequestReviewThreads(binding.owner, binding.repo, binding.number)
-    const remoteThreadId = requireGitHubThreadId(review, thread)
-    const remoteThread = remoteThreads.find(candidate => candidate.id === remoteThreadId)
-    if (remoteThread) {
-      syncGitHubThreadResult(review, remoteThread)
-    }
-    return loadReviewView(review, { userId })
-  }
-  db()
-    .insert(diffReviewThreadReactions)
-    .values({
-      id: randomUUID(),
-      threadId: thread.id,
-      userId,
-      reaction: input.reaction,
-      createdAt: currentUnixSeconds(),
-    })
-    .onConflictDoNothing({
-      target: [
-        diffReviewThreadReactions.threadId,
-        diffReviewThreadReactions.userId,
-        diffReviewThreadReactions.reaction,
-      ],
-    })
-    .run()
   return loadReviewView(review, { userId })
 }
 

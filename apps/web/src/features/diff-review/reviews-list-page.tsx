@@ -28,6 +28,7 @@ import {
 } from '~/components/ui/empty'
 import { Input } from '~/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import type { CradlePullRequest } from '~/features/pull-requests/use-pull-requests'
@@ -64,6 +65,95 @@ const LIST_TABS: Array<{ id: ReviewsListTab, label: string }> = [
   { id: 'all', label: 'All' },
 ]
 
+type ReviewStatusFilter = 'open' | 'draft' | 'closed' | 'all'
+type ReviewGroupBy = 'status' | 'repository' | 'author'
+type ReviewSort = 'updated' | 'created' | 'title'
+
+interface ReviewsDisplaySettings {
+  status: ReviewStatusFilter
+  groupBy: ReviewGroupBy
+  sort: ReviewSort
+}
+
+const DEFAULT_DISPLAY_SETTINGS: ReviewsDisplaySettings = {
+  status: 'open',
+  groupBy: 'status',
+  sort: 'updated',
+}
+
+function displaySettingsKey(workspaceId: string): string {
+  return `cradle-diffs:reviews-display:${workspaceId}`
+}
+
+function readDisplaySettings(workspaceId: string): ReviewsDisplaySettings {
+  if (typeof window === 'undefined') {
+    return DEFAULT_DISPLAY_SETTINGS
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(displaySettingsKey(workspaceId)) ?? '{}') as Partial<ReviewsDisplaySettings>
+    return {
+      status: parsed.status === 'all' || parsed.status === 'closed' || parsed.status === 'draft' ? parsed.status : 'open',
+      groupBy: parsed.groupBy === 'repository' || parsed.groupBy === 'author' ? parsed.groupBy : 'status',
+      sort: parsed.sort === 'created' || parsed.sort === 'title' ? parsed.sort : 'updated',
+    }
+  }
+  catch {
+    return DEFAULT_DISPLAY_SETTINGS
+  }
+}
+
+function reviewMatchesStatus(review: CradleDiffReview, status: ReviewStatusFilter): boolean {
+  if (status === 'all') { return true }
+  if (status === 'draft') { return review.status === 'open' && review.githubPullRequest?.detail?.isDraft === true }
+  return status === 'open' ? review.status === 'open' : review.status !== 'open'
+}
+
+function pullRequestMatchesStatus(entry: CradlePullRequest, status: ReviewStatusFilter): boolean {
+  if (status === 'all') { return true }
+  if (status === 'draft') { return entry.pullRequest.state === 'open' && entry.pullRequest.isDraft }
+  return status === 'open'
+    ? entry.pullRequest.state === 'open' && !entry.pullRequest.merged
+    : entry.pullRequest.state === 'closed' || entry.pullRequest.merged
+}
+
+function compareReviews(left: CradleDiffReview, right: CradleDiffReview, sort: ReviewSort): number {
+  if (sort === 'title') {
+    return left.title.localeCompare(right.title)
+  }
+  return sort === 'created' ? right.createdAt - left.createdAt : right.updatedAt - left.updatedAt
+}
+
+function groupIdentity(review: CradleDiffReview, groupBy: ReviewGroupBy): { id: string, label: string } {
+  if (groupBy === 'status') {
+    if (review.status === 'open' && review.githubPullRequest?.detail?.isDraft) {
+      return { id: 'status:draft', label: 'Draft' }
+    }
+    const label = review.status === 'open'
+      ? 'Open'
+      : review.status === 'merged' ? 'Merged' : review.status === 'closed' ? 'Closed' : 'Abandoned'
+    return { id: `status:${review.status}`, label }
+  }
+  if (groupBy === 'repository') {
+    const repository = review.githubPullRequest
+      ? `${review.githubPullRequest.owner}/${review.githubPullRequest.repo}`
+      : review.repositoryPath === '.' ? 'Workspace root' : review.repositoryPath
+    return { id: `repository:${repository}`, label: repository }
+  }
+  const author = review.githubPullRequest?.detail?.author?.login ?? 'You'
+  return { id: `author:${author}`, label: author }
+}
+
+function groupReviews(reviews: CradleDiffReview[], groupBy: ReviewGroupBy) {
+  const groups = new Map<string, { id: string, label: string, reviews: CradleDiffReview[] }>()
+  for (const review of reviews) {
+    const identity = groupIdentity(review, groupBy)
+    const group = groups.get(identity.id) ?? { ...identity, reviews: [] }
+    group.reviews.push(review)
+    groups.set(identity.id, group)
+  }
+  return [...groups.values()]
+}
+
 export function ReviewsListPage({
   workspaceId,
   repositoryPath,
@@ -76,13 +166,29 @@ export function ReviewsListPage({
     ])),
     [pullRequests.entries],
   )
-  const { reviews, isLoading, isError, countForTab, groupsForTab } = useReviewList(
+  const { reviews, isLoading, isError, countForTab, reviewsForTab } = useReviewList(
     workspaceId,
     githubRolesByRef,
   )
   const [tab, setTab] = useState<ReviewsListTab>('for-me')
   const [query, setQuery] = useState('')
+  const [display, setDisplay] = useState<ReviewsDisplaySettings>(() => readDisplaySettings(workspaceId))
   const queryClient = useQueryClient()
+
+  useEffect(() => setDisplay(readDisplaySettings(workspaceId)), [workspaceId])
+
+  const updateDisplay = (next: Partial<ReviewsDisplaySettings>) => {
+    setDisplay((current) => {
+      const updated = { ...current, ...next }
+      try {
+        window.localStorage.setItem(displaySettingsKey(workspaceId), JSON.stringify(updated))
+      }
+      catch {
+        // Display settings remain available for this session when persistence is unavailable.
+      }
+      return updated
+    })
+  }
 
   const compareMutation = useMutation({
     mutationFn: async (input: { baseRef: string, headRef: string }) => {
@@ -172,35 +278,40 @@ export function ReviewsListPage({
   const remoteEntries = useMemo(() => {
     const trimmed = query.trim().toLowerCase()
     return remoteEntriesByTab[tab].filter((entry) => {
-      if (!trimmed) {
-        return true
+      if (!pullRequestMatchesStatus(entry, display.status)) {
+        return false
       }
+      if (!trimmed) { return true }
       const pullRequest = entry.pullRequest
       return pullRequest.title.toLowerCase().includes(trimmed)
         || githubPullRequestReferenceKey(pullRequest).includes(trimmed)
         || pullRequest.headRef.toLowerCase().includes(trimmed)
+    }).toSorted((left, right) => {
+      if (display.sort === 'title') {
+        return left.pullRequest.title.localeCompare(right.pullRequest.title)
+      }
+      return display.sort === 'created'
+        ? right.pullRequest.createdAt - left.pullRequest.createdAt
+        : right.pullRequest.updatedAt - left.pullRequest.updatedAt
     })
-  }, [query, remoteEntriesByTab, tab])
+  }, [display.sort, display.status, query, remoteEntriesByTab, tab])
 
   const visibleGroups = useMemo(() => {
-    const groups = groupsForTab(tab)
     const trimmed = query.trim().toLowerCase()
-    if (!trimmed) {
-      return groups
-    }
-    return groups
-      .map(group => ({
-        ...group,
-        reviews: group.reviews.filter(review =>
-          review.title.toLowerCase().includes(trimmed)
-          || sourceLabel(review.sourceKind).toLowerCase().includes(trimmed)),
-      }))
-      .filter(group => group.reviews.length > 0)
-  }, [groupsForTab, tab, query])
+    const filtered = reviewsForTab(tab)
+      .filter(review => reviewMatchesStatus(review, display.status))
+      .filter(review => !trimmed
+        || review.title.toLowerCase().includes(trimmed)
+        || sourceLabel(review.sourceKind).toLowerCase().includes(trimmed)
+        || review.repositoryPath.toLowerCase().includes(trimmed)
+        || review.githubPullRequest?.detail?.author?.login.toLowerCase().includes(trimmed))
+      .toSorted((left, right) => compareReviews(left, right, display.sort))
+    return groupReviews(filtered, display.groupBy)
+  }, [display.groupBy, display.sort, display.status, query, reviewsForTab, tab])
 
   const workingTreePresent = reviews.some(review => review.sourceKind === 'local-working-tree')
   const hasAnyReviews = reviews.length > 0 || pullRequests.entries.length > 0 || pullRequests.isPending
-  const isFiltering = query.trim().length > 0
+  const isFiltering = query.trim().length > 0 || display.status !== 'all'
   const totalCount = reviews.length + remoteEntriesByTab.all.length
   const countForVisibleTab = (selectedTab: ReviewsListTab) => (
     countForTab(selectedTab) + remoteEntriesByTab[selectedTab].length
@@ -224,6 +335,8 @@ export function ReviewsListPage({
 
       <div className="flex shrink-0 items-center gap-1 border-b border-border/60 px-4">
         <TextTabs tab={tab} onChange={setTab} countForTab={countForVisibleTab} />
+        <div className="flex-1" />
+        <ReviewsDisplayControls settings={display} onChange={updateDisplay} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -420,6 +533,50 @@ function TextTabs({
   )
 }
 
+function ReviewsDisplayControls({
+  settings,
+  onChange,
+}: {
+  settings: ReviewsDisplaySettings
+  onChange: (next: Partial<ReviewsDisplaySettings>) => void
+}) {
+  return (
+    <div className="flex items-center gap-1.5 py-1">
+      <Select value={settings.status} onValueChange={value => onChange({ status: value as ReviewStatusFilter })}>
+        <SelectTrigger size="sm" className="w-[88px] border-0 bg-transparent text-[11px] shadow-none">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="end">
+          <SelectItem value="open">Open</SelectItem>
+          <SelectItem value="draft">Draft</SelectItem>
+          <SelectItem value="closed">Closed</SelectItem>
+          <SelectItem value="all">All status</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={settings.groupBy} onValueChange={value => onChange({ groupBy: value as ReviewGroupBy })}>
+        <SelectTrigger size="sm" className="w-[122px] border-0 bg-transparent text-[11px] shadow-none">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="end">
+          <SelectItem value="status">Group: Status</SelectItem>
+          <SelectItem value="repository">Group: Repository</SelectItem>
+          <SelectItem value="author">Group: Author</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={settings.sort} onValueChange={value => onChange({ sort: value as ReviewSort })}>
+        <SelectTrigger size="sm" className="w-[118px] border-0 bg-transparent text-[11px] shadow-none">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="end">
+          <SelectItem value="updated">Sort: Updated</SelectItem>
+          <SelectItem value="created">Sort: Created</SelectItem>
+          <SelectItem value="title">Sort: Title</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
 function ReviewsContent({
   workspaceId,
   repositoryPath,
@@ -481,7 +638,7 @@ function ReviewsContent({
         />
       )}
 
-      {visibleGroups.length === 0 && isFiltering
+      {visibleGroups.length === 0 && remoteEntries.length === 0 && !remoteEntriesPending && isFiltering
         ? (
             <div className="py-16 text-center">
               <SearchIcon className="mx-auto size-5 text-muted-foreground/30" aria-hidden />

@@ -402,8 +402,6 @@ export interface MergePullRequestResult {
 }
 
 export type GitHubReviewThreadSide = 'LEFT' | 'RIGHT'
-export type GitHubReactionContent = 'THUMBS_UP' | 'THUMBS_DOWN' | 'LAUGH' | 'HOORAY' | 'CONFUSED' | 'HEART' | 'ROCKET' | 'EYES'
-
 export interface GitHubPullRequestReviewThreadComment {
   id: string
   body: string
@@ -411,10 +409,6 @@ export interface GitHubPullRequestReviewThreadComment {
   createdAt: string
   updatedAt: string
   author: { login: string } | null
-  reactionGroups: Array<{
-    content: GitHubReactionContent
-    users: Array<{ login: string }>
-  }>
 }
 
 export interface GitHubPullRequestReviewThread {
@@ -650,17 +644,6 @@ const MergePullRequestResultSchema = z.object({
   message: z.string(),
 }).passthrough()
 
-const GitHubReviewThreadReactionContentSchema = z.enum([
-  'THUMBS_UP',
-  'THUMBS_DOWN',
-  'LAUGH',
-  'HOORAY',
-  'CONFUSED',
-  'HEART',
-  'ROCKET',
-  'EYES',
-])
-
 const GitHubReviewThreadCommentSchema = z.object({
   id: z.string(),
   body: z.string(),
@@ -668,12 +651,6 @@ const GitHubReviewThreadCommentSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   author: z.object({ login: z.string() }).nullable(),
-  reactionGroups: z.array(z.object({
-    content: GitHubReviewThreadReactionContentSchema,
-    users: z.object({
-      nodes: z.array(z.object({ login: z.string() })),
-    }),
-  })),
 })
 
 const GitHubReviewThreadSchema = z.object({
@@ -720,12 +697,6 @@ const PullRequestReviewThreadReplyMutationDataSchema = z.object({
 const ResolveReviewThreadMutationDataSchema = z.object({
   resolveReviewThread: z.object({
     thread: GitHubReviewThreadSchema,
-  }),
-})
-
-const AddReactionMutationDataSchema = z.object({
-  addReaction: z.object({
-    subject: z.object({ id: z.string() }),
   }),
 })
 
@@ -1304,10 +1275,6 @@ const REVIEW_THREAD_FRAGMENT = `
         createdAt
         updatedAt
         author { login }
-        reactionGroups {
-          content
-          users(first: 100) { nodes { login } }
-        }
       }
     }
   }
@@ -1318,13 +1285,7 @@ function toReviewThread(
 ): GitHubPullRequestReviewThread {
   return {
     ...thread,
-    comments: thread.comments.nodes.map(comment => ({
-      ...comment,
-      reactionGroups: comment.reactionGroups.map(group => ({
-        content: group.content,
-        users: group.users.nodes,
-      })),
-    })),
+    comments: thread.comments.nodes,
   }
 }
 
@@ -1432,19 +1393,6 @@ export async function resolvePullRequestReviewThread(
     ResolveReviewThreadMutationDataSchema,
   )
   return toReviewThread(data.resolveReviewThread.thread)
-}
-
-export async function addPullRequestReviewCommentReaction(input: {
-  commentId: string
-  content: GitHubReactionContent
-}): Promise<void> {
-  await githubGraphQL(
-    `mutation AddPullRequestReviewCommentReaction($input: AddReactionInput!) {
-      addReaction(input: $input) { subject { id } }
-    }`,
-    { input: { subjectId: input.commentId, content: input.content } },
-    AddReactionMutationDataSchema,
-  )
 }
 
 export async function markPullRequestReady(

@@ -26,14 +26,6 @@ export interface ReviewFileDiffView {
   isViewed: boolean
 }
 
-export interface ReviewThreadReactionView {
-  id: string
-  threadId: string
-  userId: string
-  reaction: string
-  createdAt: number
-}
-
 export interface ReviewRangeAnchorView {
   revisionId: string
   fileId: string
@@ -74,7 +66,6 @@ export interface ReviewThreadView {
   resolvedBy: string | null
   resolvedAt: number | null
   comments: ReviewCommentView[]
-  reactions: ReviewThreadReactionView[]
 }
 
 export interface ReviewSubmissionView {

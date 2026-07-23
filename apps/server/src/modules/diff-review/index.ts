@@ -206,26 +206,6 @@ export const diffReview = new Elysia({
     body: DiffReviewModel.addCommentBody,
     response: { 200: DiffReviewModel.review },
   })
-  .post('/:workspaceId/diff-reviews/:reviewId/threads/:threadId/reactions', ({ params, body }) => {
-    const input = body as { reaction: string }
-    return DiffReview.addReaction({
-      workspaceId: params.workspaceId,
-      reviewId: params.reviewId,
-      threadId: params.threadId,
-      reaction: input.reaction,
-    })
-  }, {
-    detail: {
-      'summary': 'Add diff review thread reaction',
-      'x-cradle-cli': {
-        command: ['workspace', 'diffs', 'thread', 'reaction'],
-        defaultWorkspaceId: true,
-      },
-    },
-    params: DiffReviewModel.threadParams,
-    body: DiffReviewModel.addReactionBody,
-    response: { 200: DiffReviewModel.review },
-  })
   .post('/:workspaceId/diff-reviews/:reviewId/threads/:threadId/resolve', ({ params }) => {
     return DiffReview.resolveThread(params.workspaceId, params.reviewId, params.threadId)
   }, {
