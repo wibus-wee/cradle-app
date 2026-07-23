@@ -975,7 +975,7 @@ importers:
         version: 5.7.284
       posthog-js:
         specifier: ^1.396.5
-        version: 1.399.1(preact-render-to-string@6.6.5(preact@10.29.1))
+        version: 1.399.1(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))
       pretty-bytes:
         specifier: ^7.1.0
         version: 7.1.0
@@ -5724,8 +5724,8 @@ packages:
     resolution: {integrity: sha512-1ln28VkVHUbd5qy+ccXG68voWc0mgZMhBnwG0umxfD+wbkXUcvRzVrLjSqao7N8hCrDqp+Pt5j9Tsqef+9yQQQ==}
     hasBin: true
 
-  '@react-grab/cli@0.1.48':
-    resolution: {integrity: sha512-KXRZFN0b78BeVa4Tq1FC9kiXPpC5lS4pQp/mvQ1azy9dZUJ3zfc7Ei84+yvGh+WoYdceMCFxXfBp6qhU/G056g==}
+  '@react-grab/cli@0.1.49':
+    resolution: {integrity: sha512-fIxIj/uBx+CrF/Tzx5P4q8t9dkKKPvHuvAvVuKBNbzeqWyin7sDIvKDyI+DjjMh+uIZBkXCBBuBYKWdQ8n9drg==}
     hasBin: true
 
   '@reduxjs/toolkit@2.11.2':
@@ -7662,8 +7662,8 @@ packages:
     peerDependencies:
       react: '>=17.0.1'
 
-  bippy@0.5.43:
-    resolution: {integrity: sha512-Tvu7b1M7+d8b9/YHaCeODEsi2CgbuoBql+dWSBrNnCuqJ1gMUeY3i0r+319hvjjl5GVBP6FFWxrKnq3fhZER0w==}
+  bippy@0.6.1:
+    resolution: {integrity: sha512-ky4m94Y/KfsddjGkKTsV4uFjZqkJjpOjQ2t5gKPdX6XH1MNxMNX5FrVefsxV4lpjemEmEdwe0e0YbzAMNs3oUQ==}
     peerDependencies:
       react: '>=17.0.1'
 
@@ -11737,8 +11737,8 @@ packages:
       react:
         optional: true
 
-  react-grab@0.1.48:
-    resolution: {integrity: sha512-p3WnmK9LLvXE/c4ITPLlXcP1fkXo2VFEQqK94tIfcHIWKNdqdhYYFyNVioO50HR+uyHIwT63Z4txZDqJlVcD/Q==}
+  react-grab@0.1.49:
+    resolution: {integrity: sha512-D5scfacyKHlEwNIyJVYiwuH2/L5g73vdKrZ49UqhQzfNV1ytdioloKrImW2KIuyPZfRAgYI6WpQrGEXlhov/yQ==}
     hasBin: true
     peerDependencies:
       react: '>=17.0.0'
@@ -18022,7 +18022,7 @@ snapshots:
       smol-toml: 1.6.1
       tinyexec: 1.2.4
 
-  '@react-grab/cli@0.1.48':
+  '@react-grab/cli@0.1.49':
     dependencies:
       agent-install: 0.0.6
       commander: 14.0.3
@@ -20388,7 +20388,7 @@ snapshots:
     dependencies:
       react: 19.2.5
 
-  bippy@0.5.43(react@19.2.5):
+  bippy@0.6.1(react@19.2.5):
     dependencies:
       react: 19.2.5
 
@@ -24972,14 +24972,14 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  posthog-js@1.399.1(preact-render-to-string@6.6.5(preact@10.29.1)):
+  posthog-js@1.399.1(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)):
     dependencies:
       '@posthog/core': 1.40.1
       '@posthog/types': 1.393.0
       core-js: 3.49.0
       dompurify: 3.4.11
       fflate: 0.4.8
-      preact: 10.29.7(preact-render-to-string@6.6.5(preact@10.29.1))
+      preact: 10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))
       query-selector-shadow-dom: 1.0.1
       web-vitals: 5.3.0
     transitivePeerDependencies:
@@ -24992,20 +24992,15 @@ snapshots:
 
   powershell-utils@0.1.0: {}
 
-  preact-render-to-string@6.6.5(preact@10.29.1):
-    dependencies:
-      preact: 10.29.1
-    optional: true
-
   preact-render-to-string@6.6.5(preact@11.0.0-beta.0):
     dependencies:
       preact: 11.0.0-beta.0
 
   preact@10.29.1: {}
 
-  preact@10.29.7(preact-render-to-string@6.6.5(preact@10.29.1)):
+  preact@10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)):
     optionalDependencies:
-      preact-render-to-string: 6.6.5(preact@10.29.1)
+      preact-render-to-string: 6.6.5(preact@11.0.0-beta.0)
 
   preact@11.0.0-beta.0: {}
 
@@ -25371,10 +25366,10 @@ snapshots:
     optionalDependencies:
       react: 19.2.5
 
-  react-grab@0.1.48(react@19.2.5):
+  react-grab@0.1.49(react@19.2.5):
     dependencies:
-      '@react-grab/cli': 0.1.48
-      bippy: 0.5.43(react@19.2.5)
+      '@react-grab/cli': 0.1.49
+      bippy: 0.6.1(react@19.2.5)
     optionalDependencies:
       react: 19.2.5
 
@@ -25469,7 +25464,7 @@ snapshots:
       prompts: 2.4.2
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
-      react-grab: 0.1.48(react@19.2.5)
+      react-grab: 0.1.49(react@19.2.5)
     optionalDependencies:
       esbuild: 0.28.0
       unplugin: 2.1.0
