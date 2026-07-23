@@ -21,6 +21,7 @@ import { cn } from '~/lib/cn'
 
 import { formatChangeStats, sourceLabel } from '../shared/diff-items'
 import type { CradleDiffReview, DiffStyle, ReviewDecision } from '../shared/types'
+import { GitHubReviewContext } from './github-review-context'
 
 type DiffReviewKey = keyof typeof import('~/locales/default').default['diff-review']
 
@@ -28,10 +29,12 @@ interface ReviewTopBarProps {
   review: CradleDiffReview
   diffStyle: DiffStyle
   onDiffStyleChange: (style: DiffStyle) => void
-  onPreference: (input: { hideWhitespaceOnly?: boolean, collapseGeneratedFiles?: boolean }) => void
+  onPreference: (input: { hideWhitespaceOnly?: boolean, structuralHighlighting?: boolean, collapseGeneratedFiles?: boolean }) => void
   preferencePending: boolean
   onSubmit: (decision: ReviewDecision, bodyMarkdown: string) => void
   submitPending: boolean
+  onMerge: (method: 'merge' | 'squash' | 'rebase') => void
+  mergePending: boolean
   onCloseReview: () => void
   closeReviewPending: boolean
   onRefresh: () => void
@@ -65,6 +68,8 @@ export function ReviewTopBar({
   preferencePending,
   onSubmit,
   submitPending,
+  onMerge,
+  mergePending,
   onCloseReview,
   closeReviewPending,
   onRefresh,
@@ -94,7 +99,9 @@ export function ReviewTopBar({
       <div className="min-w-0">
         <h1 className="truncate text-[13px] font-medium leading-tight text-foreground">{review.title}</h1>
         <p className="truncate text-[12px] tabular-nums text-muted-foreground/70">
-          {sourceLabel(review.sourceKind)}
+          {review.githubPullRequest?.detail
+            ? `${review.githubPullRequest.owner}/${review.githubPullRequest.repo}#${review.githubPullRequest.number} · ${review.githubPullRequest.detail.headRef} to ${review.githubPullRequest.detail.baseRef}`
+            : sourceLabel(review.sourceKind)}
           {' · '}
           {formatChangeStats(review)}
         </p>
@@ -112,9 +119,11 @@ export function ReviewTopBar({
       {/* Display filters — secondary, icon popover. */}
       <DisplayPopover
         hideWhitespaceOnly={review.preferences.hideWhitespaceOnly}
+        structuralHighlighting={review.preferences.structuralHighlighting}
         collapseGeneratedFiles={review.preferences.collapseGeneratedFiles}
         pending={preferencePending}
         onToggleWhitespace={() => onPreference({ hideWhitespaceOnly: !review.preferences.hideWhitespaceOnly })}
+        onToggleStructural={() => onPreference({ structuralHighlighting: !review.preferences.structuralHighlighting })}
         onToggleGenerated={() => onPreference({ collapseGeneratedFiles: !review.preferences.collapseGeneratedFiles })}
       />
 
@@ -177,6 +186,10 @@ export function ReviewTopBar({
       />
 
       {review.githubPullRequest && (
+        <GitHubReviewContext pullRequest={review.githubPullRequest} onMerge={onMerge} mergePending={mergePending} />
+      )}
+
+      {review.githubPullRequest && (
         <Button variant="ghost" size="icon" className="size-7" asChild>
           <a
             href={`https://github.com/${review.githubPullRequest.owner}/${review.githubPullRequest.repo}/pull/${review.githubPullRequest.number}`}
@@ -225,15 +238,19 @@ export function ReviewTopBar({
 
 function DisplayPopover({
   hideWhitespaceOnly,
+  structuralHighlighting,
   collapseGeneratedFiles,
   pending,
   onToggleWhitespace,
+  onToggleStructural,
   onToggleGenerated,
 }: {
   hideWhitespaceOnly: boolean
+  structuralHighlighting: boolean
   collapseGeneratedFiles: boolean
   pending: boolean
   onToggleWhitespace: () => void
+  onToggleStructural: () => void
   onToggleGenerated: () => void
 }) {
   return (
@@ -249,6 +266,9 @@ function DisplayPopover({
         <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/50">Filter</p>
         <MenuCheck active={hideWhitespaceOnly} onClick={onToggleWhitespace} disabled={pending}>
           Hide whitespace-only
+        </MenuCheck>
+        <MenuCheck active={structuralHighlighting} onClick={onToggleStructural} disabled={pending}>
+          Highlight changed words
         </MenuCheck>
         <MenuCheck active={collapseGeneratedFiles} onClick={onToggleGenerated} disabled={pending}>
           Collapse generated

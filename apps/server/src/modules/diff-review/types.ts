@@ -304,6 +304,48 @@ export interface GitHubPullRequestBinding {
   owner: string
   repo: string
   number: number
+  detail?: GitHubPullRequestReviewDetail
+}
+
+export interface GitHubPullRequestReviewActor {
+  login: string
+  avatarUrl: string | null
+  url: string | null
+}
+
+export interface GitHubPullRequestReviewDetail {
+  url: string
+  title: string
+  body: string | null
+  isDraft: boolean
+  state: 'open' | 'closed'
+  merged: boolean
+  mergeable: boolean | null
+  mergeableState: string
+  headRef: string
+  baseRef: string
+  headSha: string | null
+  author: GitHubPullRequestReviewActor | null
+  reviewers: GitHubPullRequestReviewActor[]
+  assignees: GitHubPullRequestReviewActor[]
+  labels: Array<{ name: string, color: string }>
+  checksState: 'success' | 'failure' | 'pending' | 'neutral'
+  checks: Array<{
+    id: string
+    name: string
+    status: 'queued' | 'in_progress' | 'completed'
+    conclusion: string | null
+    url: string | null
+  }>
+  timeline: Array<{
+    id: string
+    kind: 'comment' | 'review'
+    author: GitHubPullRequestReviewActor | null
+    body: string | null
+    state: string | null
+    createdAt: string
+    url: string | null
+  }>
 }
 
 export type ReviewEventKind = ReviewEventView['eventKind']

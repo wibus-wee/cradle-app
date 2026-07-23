@@ -12,6 +12,7 @@ import {
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdFilesByFileIdViewed,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancel,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerate,
+  postWorkspacesByWorkspaceIdDiffReviewsByReviewIdMerge,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdRefresh,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmit,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreads,
@@ -281,11 +282,33 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     onError: reportMutationError('Close review'),
   })
 
+  const mergeMutation = useMutation({
+    mutationFn: async (mergeMethod: 'merge' | 'squash' | 'rebase') => {
+      const review = reviewQuery.data
+      if (!review) {
+        throw new Error('Review not loaded')
+      }
+      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsByReviewIdMerge({
+        path: { workspaceId, reviewId: review.id },
+        body: { mergeMethod },
+        throwOnError: true,
+      })
+      return data
+    },
+    onSuccess: (data) => {
+      applyReview(data)
+      invalidateList()
+      toastManager.add({ type: 'success', title: 'Pull request merged' })
+    },
+    onError: reportMutationError('Merge pull request'),
+  })
+
   const preferenceMutation = useMutation({
     mutationFn: async (input: {
       diffStyle?: DiffStyle
       fontSize?: number
       hideWhitespaceOnly?: boolean
+      structuralHighlighting?: boolean
       collapseGeneratedFiles?: boolean
       lineHeight?: number
     }) => {
@@ -556,6 +579,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     resolveThreadMutation,
     submitMutation,
     closeReviewMutation,
+    mergeMutation,
     preferenceMutation,
     commitPlanUpdateMutation,
     commitPlanApplyMutation,

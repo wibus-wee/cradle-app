@@ -2604,6 +2604,19 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitPath = z.obj
     reviewId: z.string().min(1)
 });
 
+export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeBody = z.object({
+    mergeMethod: z.enum([
+        'merge',
+        'squash',
+        'rebase'
+    ])
+});
+
+export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergePath = z.object({
+    workspaceId: z.string().min(1),
+    reviewId: z.string().min(1)
+});
+
 export const zPutWorkspacesByWorkspaceIdDiffReviewsPreferencesBody = z.object({
     diffStyle: z.enum(['split', 'unified']).optional(),
     codeTheme: z.string().min(1).optional(),

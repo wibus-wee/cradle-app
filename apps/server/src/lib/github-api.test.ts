@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  addPullRequestReviewCommentReaction,
+  createPullRequestReviewThread,
   fetchPullRequestDetail,
   fetchPullRequestFiles,
+  fetchPullRequestReviewThreads,
   markPullRequestReady,
+  mergePullRequest,
+  replyToPullRequestReviewThread,
   resetTokenCache,
+  resolvePullRequestReviewThread,
 } from './github-api'
 
 const originalGitHubToken = process.env.GH_TOKEN
@@ -166,5 +172,186 @@ describe('pull request detail reads', () => {
         previous_filename: null,
       }),
     ])
+  })
+})
+
+describe('pull request review threads', () => {
+  beforeEach(() => {
+    process.env.GH_TOKEN = 'test-token'
+    resetTokenCache()
+  })
+
+  afterEach(() => {
+    if (originalGitHubToken === undefined) {
+      delete process.env.GH_TOKEN
+    }
+    else {
+      process.env.GH_TOKEN = originalGitHubToken
+    }
+    resetTokenCache()
+    vi.unstubAllGlobals()
+  })
+
+  it('reads remote threads with inline anchors, replies, and reactions', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        repository: {
+          pullRequest: {
+            id: 'PR_70',
+            reviewThreads: {
+              nodes: [{
+                id: 'PRRT_thread',
+                isResolved: false,
+                isOutdated: false,
+                path: 'src/app.ts',
+                line: 8,
+                startLine: 6,
+                diffSide: 'RIGHT',
+                startDiffSide: 'RIGHT',
+                comments: {
+                  nodes: [{
+                    id: 'PRRC_comment',
+                    body: 'Please handle the failure path.',
+                    url: 'https://github.com/cradle/app/pull/70#discussion_r1',
+                    createdAt: '2026-07-21T10:00:00Z',
+                    updatedAt: '2026-07-21T11:00:00Z',
+                    author: { login: 'reviewer' },
+                    reactionGroups: [{
+                      content: 'EYES',
+                      users: { nodes: [{ login: 'author' }] },
+                    }],
+                  }],
+                },
+              }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+      },
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchPullRequestReviewThreads('cradle', 'app', 70)).resolves.toEqual([{
+      id: 'PRRT_thread',
+      isResolved: false,
+      isOutdated: false,
+      path: 'src/app.ts',
+      line: 8,
+      startLine: 6,
+      diffSide: 'RIGHT',
+      startDiffSide: 'RIGHT',
+      comments: [{
+        id: 'PRRC_comment',
+        body: 'Please handle the failure path.',
+        url: 'https://github.com/cradle/app/pull/70#discussion_r1',
+        createdAt: '2026-07-21T10:00:00Z',
+        updatedAt: '2026-07-21T11:00:00Z',
+        author: { login: 'reviewer' },
+        reactionGroups: [{ content: 'EYES', users: [{ login: 'author' }] }],
+      }],
+    }])
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(request.variables).toEqual({ owner: 'cradle', repo: 'app', number: 70, after: null })
+    expect(request.query).toContain('reviewThreads(first: 100')
+  })
+
+  it('uses GraphQL mutations for create, reply, resolve, and reaction operations', async () => {
+    const thread = {
+      id: 'PRRT_thread',
+      isResolved: false,
+      isOutdated: false,
+      path: 'src/app.ts',
+      line: 8,
+      startLine: null,
+      diffSide: 'RIGHT',
+      startDiffSide: null,
+      comments: { nodes: [] },
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ node_id: 'PR_70' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: { addPullRequestReviewThread: { thread } },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: { addPullRequestReviewThreadReply: { thread } },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: { resolveReviewThread: { thread: { ...thread, isResolved: true } } },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: { addReaction: { subject: { id: 'PRRC_comment' } } },
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createPullRequestReviewThread({
+      owner: 'cradle',
+      repo: 'app',
+      pullRequestNumber: 70,
+      body: 'Inline comment',
+      path: 'src/app.ts',
+      line: 8,
+      side: 'RIGHT',
+    })
+    await replyToPullRequestReviewThread({ threadId: 'PRRT_thread', body: 'Reply' })
+    await resolvePullRequestReviewThread('PRRT_thread')
+    await addPullRequestReviewCommentReaction({ commentId: 'PRRC_comment', content: 'EYES' })
+
+    const requests = fetchMock.mock.calls.slice(1).map(call => JSON.parse(String(call[1]?.body)))
+    expect(requests[0]).toMatchObject({
+      variables: {
+        input: {
+          pullRequestId: 'PR_70',
+          body: 'Inline comment',
+          path: 'src/app.ts',
+          line: 8,
+          side: 'RIGHT',
+        },
+      },
+    })
+    expect(requests[1].variables.input).toEqual({ pullRequestReviewThreadId: 'PRRT_thread', body: 'Reply' })
+    expect(requests[2].variables.input).toEqual({ threadId: 'PRRT_thread' })
+    expect(requests[3].variables.input).toEqual({ subjectId: 'PRRC_comment', content: 'EYES' })
+  })
+})
+
+describe('mergePullRequest', () => {
+  beforeEach(() => {
+    process.env.GH_TOKEN = 'test-token'
+    resetTokenCache()
+  })
+
+  afterEach(() => {
+    if (originalGitHubToken === undefined) {
+      delete process.env.GH_TOKEN
+    }
+    else {
+      process.env.GH_TOKEN = originalGitHubToken
+    }
+    resetTokenCache()
+    vi.unstubAllGlobals()
+  })
+
+  it('sends the selected merge method to GitHub', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      sha: 'merge-sha',
+      merged: true,
+      message: 'Pull Request successfully merged',
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(mergePullRequest({
+      owner: 'cradle',
+      repo: 'app',
+      pullRequestNumber: 70,
+      mergeMethod: 'squash',
+    })).resolves.toMatchObject({ merged: true, sha: 'merge-sha' })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/cradle/app/pulls/70/merge',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ merge_method: 'squash' }),
+      }),
+    )
   })
 })

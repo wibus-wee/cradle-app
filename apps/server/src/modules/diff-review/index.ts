@@ -259,6 +259,25 @@ export const diffReview = new Elysia({
     body: DiffReviewModel.submitBody,
     response: { 200: DiffReviewModel.review },
   })
+  .post('/:workspaceId/diff-reviews/:reviewId/merge', ({ params, body }) => {
+    const input = body as { mergeMethod: 'merge' | 'squash' | 'rebase' }
+    return DiffReview.mergeGitHubReview({
+      workspaceId: params.workspaceId,
+      reviewId: params.reviewId,
+      mergeMethod: input.mergeMethod,
+    })
+  }, {
+    detail: {
+      'summary': 'Merge a GitHub pull request diff review',
+      'x-cradle-cli': {
+        command: ['workspace', 'diffs', 'merge'],
+        defaultWorkspaceId: true,
+      },
+    },
+    params: DiffReviewModel.reviewParams,
+    body: DiffReviewModel.mergeBody,
+    response: { 200: DiffReviewModel.review },
+  })
   .put('/:workspaceId/diff-reviews/preferences', ({ params, body }) => {
     return DiffReview.updatePreferences({
       workspaceId: params.workspaceId,

@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process'
 import { z } from 'zod'
 
 import type { CachedFetchResult } from './github-cache'
-import { cachedFetch } from './github-cache'
+import { cachedFetch, deleteCache } from './github-cache'
 
 let cachedToken: string | null | undefined
 
@@ -211,7 +211,7 @@ function createGraphQLFetcher<T>(query: string, variables: Record<string, unknow
 }
 
 async function githubMutate<T>(
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'PUT',
   path: string,
   body: Record<string, unknown>,
   schema: JsonSchema<T>,
@@ -393,6 +393,52 @@ export interface SubmitPullRequestReviewInput {
   pullRequestNumber: number
   body?: string | null
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
+}
+
+export interface MergePullRequestResult {
+  sha: string | null
+  merged: boolean
+  message: string
+}
+
+export type GitHubReviewThreadSide = 'LEFT' | 'RIGHT'
+export type GitHubReactionContent = 'THUMBS_UP' | 'THUMBS_DOWN' | 'LAUGH' | 'HOORAY' | 'CONFUSED' | 'HEART' | 'ROCKET' | 'EYES'
+
+export interface GitHubPullRequestReviewThreadComment {
+  id: string
+  body: string
+  url: string
+  createdAt: string
+  updatedAt: string
+  author: { login: string } | null
+  reactionGroups: Array<{
+    content: GitHubReactionContent
+    users: Array<{ login: string }>
+  }>
+}
+
+export interface GitHubPullRequestReviewThread {
+  id: string
+  isResolved: boolean
+  isOutdated: boolean
+  path: string
+  line: number | null
+  startLine: number | null
+  diffSide: GitHubReviewThreadSide
+  startDiffSide: GitHubReviewThreadSide | null
+  comments: GitHubPullRequestReviewThreadComment[]
+}
+
+export interface CreatePullRequestReviewThreadInput {
+  owner: string
+  repo: string
+  pullRequestNumber: number
+  body: string
+  path: string
+  line: number
+  side: GitHubReviewThreadSide
+  startLine?: number
+  startSide?: GitHubReviewThreadSide
 }
 
 export interface GitHubPullRequestDetail {
@@ -597,6 +643,91 @@ const SubmittedGitHubPullRequestReviewSchema = z.object({
   state: z.string(),
   html_url: z.string().nullable().optional(),
 }).passthrough()
+
+const MergePullRequestResultSchema = z.object({
+  sha: z.string().nullable(),
+  merged: z.boolean(),
+  message: z.string(),
+}).passthrough()
+
+const GitHubReviewThreadReactionContentSchema = z.enum([
+  'THUMBS_UP',
+  'THUMBS_DOWN',
+  'LAUGH',
+  'HOORAY',
+  'CONFUSED',
+  'HEART',
+  'ROCKET',
+  'EYES',
+])
+
+const GitHubReviewThreadCommentSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  url: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  author: z.object({ login: z.string() }).nullable(),
+  reactionGroups: z.array(z.object({
+    content: GitHubReviewThreadReactionContentSchema,
+    users: z.object({
+      nodes: z.array(z.object({ login: z.string() })),
+    }),
+  })),
+})
+
+const GitHubReviewThreadSchema = z.object({
+  id: z.string(),
+  isResolved: z.boolean(),
+  isOutdated: z.boolean(),
+  path: z.string(),
+  line: z.number().int().nullable(),
+  startLine: z.number().int().nullable(),
+  diffSide: z.enum(['LEFT', 'RIGHT']),
+  startDiffSide: z.enum(['LEFT', 'RIGHT']).nullable(),
+  comments: z.object({
+    nodes: z.array(GitHubReviewThreadCommentSchema),
+  }),
+})
+
+const PullRequestReviewThreadsDataSchema = z.object({
+  repository: z.object({
+    pullRequest: z.object({
+      id: z.string(),
+      reviewThreads: z.object({
+        nodes: z.array(GitHubReviewThreadSchema),
+        pageInfo: z.object({
+          hasNextPage: z.boolean(),
+          endCursor: z.string().nullable(),
+        }),
+      }),
+    }).nullable(),
+  }).nullable(),
+})
+
+const PullRequestReviewThreadMutationDataSchema = z.object({
+  addPullRequestReviewThread: z.object({
+    thread: GitHubReviewThreadSchema,
+  }),
+})
+
+const PullRequestReviewThreadReplyMutationDataSchema = z.object({
+  addPullRequestReviewThreadReply: z.object({
+    thread: GitHubReviewThreadSchema,
+  }),
+})
+
+const ResolveReviewThreadMutationDataSchema = z.object({
+  resolveReviewThread: z.object({
+    thread: GitHubReviewThreadSchema,
+  }),
+})
+
+const AddReactionMutationDataSchema = z.object({
+  addReaction: z.object({
+    subject: z.object({ id: z.string() }),
+  }),
+})
 
 const GitHubPullRequestNodeSchema = z.object({
   node_id: z.string(),
@@ -1132,6 +1263,187 @@ export function submitPullRequestReview(input: SubmitPullRequestReviewInput) {
       event: input.event,
     },
     SubmittedGitHubPullRequestReviewSchema,
+  )
+}
+
+export function mergePullRequest(input: {
+  owner: string
+  repo: string
+  pullRequestNumber: number
+  mergeMethod: 'merge' | 'squash' | 'rebase'
+}): Promise<MergePullRequestResult> {
+  return githubMutate(
+    'PUT',
+    `/repos/${input.owner}/${input.repo}/pulls/${input.pullRequestNumber}/merge`,
+    { merge_method: input.mergeMethod },
+    MergePullRequestResultSchema,
+  ).then((result) => {
+    if (result.merged) {
+      deleteCache(`pr:${input.owner}/${input.repo}:${input.pullRequestNumber}`)
+      deleteCache(`pr-detail:${input.owner}/${input.repo}:${input.pullRequestNumber}`)
+    }
+    return result
+  })
+}
+
+const REVIEW_THREAD_FRAGMENT = `
+  fragment CradleReviewThread on PullRequestReviewThread {
+    id
+    isResolved
+    isOutdated
+    path
+    line
+    startLine
+    diffSide
+    startDiffSide
+    comments(first: 100) {
+      nodes {
+        id
+        body
+        url
+        createdAt
+        updatedAt
+        author { login }
+        reactionGroups {
+          content
+          users(first: 100) { nodes { login } }
+        }
+      }
+    }
+  }
+`
+
+function toReviewThread(
+  thread: z.infer<typeof GitHubReviewThreadSchema>,
+): GitHubPullRequestReviewThread {
+  return {
+    ...thread,
+    comments: thread.comments.nodes.map(comment => ({
+      ...comment,
+      reactionGroups: comment.reactionGroups.map(group => ({
+        content: group.content,
+        users: group.users.nodes,
+      })),
+    })),
+  }
+}
+
+export async function fetchPullRequestReviewThreads(
+  owner: string,
+  repo: string,
+  pullRequestNumber: number,
+): Promise<GitHubPullRequestReviewThread[]> {
+  const threads: GitHubPullRequestReviewThread[] = []
+  let after: string | null = null
+
+  for (let page = 0; page < 10; page++) {
+    const data = await githubGraphQL(
+      `query PullRequestReviewThreads($owner: String!, $repo: String!, $number: Int!, $after: String) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $number) {
+            id
+            reviewThreads(first: 100, after: $after) {
+              nodes { ...CradleReviewThread }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      }
+      ${REVIEW_THREAD_FRAGMENT}`,
+      { owner, repo, number: pullRequestNumber, after },
+      PullRequestReviewThreadsDataSchema,
+    )
+    const pullRequest = data.repository?.pullRequest
+    if (!pullRequest) {
+      throw new GitHubApiError({
+        status: 404,
+        path: '/graphql',
+        message: `GitHub pull request ${owner}/${repo}#${pullRequestNumber} was not found.`,
+      })
+    }
+    threads.push(...pullRequest.reviewThreads.nodes.map(toReviewThread))
+    if (!pullRequest.reviewThreads.pageInfo.hasNextPage) {
+      break
+    }
+    after = pullRequest.reviewThreads.pageInfo.endCursor
+    if (!after) {
+      break
+    }
+  }
+  return threads
+}
+
+export async function createPullRequestReviewThread(
+  input: CreatePullRequestReviewThreadInput,
+): Promise<GitHubPullRequestReviewThread> {
+  const pullRequest = await fetchPullRequestNode(input.owner, input.repo, input.pullRequestNumber)
+  if (!pullRequest) {
+    throw new GitHubApiError({
+      status: 502,
+      path: `/repos/${input.owner}/${input.repo}/pulls/${input.pullRequestNumber}`,
+      message: 'GitHub pull request was unavailable before creating the review thread.',
+    })
+  }
+  const data = await githubGraphQL(
+    `mutation AddPullRequestReviewThread($input: AddPullRequestReviewThreadInput!) {
+      addPullRequestReviewThread(input: $input) { thread { ...CradleReviewThread } }
+    }
+    ${REVIEW_THREAD_FRAGMENT}`,
+    {
+      input: {
+        pullRequestId: pullRequest.node_id,
+        body: input.body,
+        path: input.path,
+        line: input.line,
+        side: input.side,
+        startLine: input.startLine,
+        startSide: input.startSide,
+      },
+    },
+    PullRequestReviewThreadMutationDataSchema,
+  )
+  return toReviewThread(data.addPullRequestReviewThread.thread)
+}
+
+export async function replyToPullRequestReviewThread(input: {
+  threadId: string
+  body: string
+}): Promise<GitHubPullRequestReviewThread> {
+  const data = await githubGraphQL(
+    `mutation AddPullRequestReviewThreadReply($input: AddPullRequestReviewThreadReplyInput!) {
+      addPullRequestReviewThreadReply(input: $input) { thread { ...CradleReviewThread } }
+    }
+    ${REVIEW_THREAD_FRAGMENT}`,
+    { input: { pullRequestReviewThreadId: input.threadId, body: input.body } },
+    PullRequestReviewThreadReplyMutationDataSchema,
+  )
+  return toReviewThread(data.addPullRequestReviewThreadReply.thread)
+}
+
+export async function resolvePullRequestReviewThread(
+  threadId: string,
+): Promise<GitHubPullRequestReviewThread> {
+  const data = await githubGraphQL(
+    `mutation ResolveReviewThread($input: ResolveReviewThreadInput!) {
+      resolveReviewThread(input: $input) { thread { ...CradleReviewThread } }
+    }
+    ${REVIEW_THREAD_FRAGMENT}`,
+    { input: { threadId } },
+    ResolveReviewThreadMutationDataSchema,
+  )
+  return toReviewThread(data.resolveReviewThread.thread)
+}
+
+export async function addPullRequestReviewCommentReaction(input: {
+  commentId: string
+  content: GitHubReactionContent
+}): Promise<void> {
+  await githubGraphQL(
+    `mutation AddPullRequestReviewCommentReaction($input: AddReactionInput!) {
+      addReaction(input: $input) { subject { id } }
+    }`,
+    { input: { subjectId: input.commentId, content: input.content } },
+    AddReactionMutationDataSchema,
   )
 }
 

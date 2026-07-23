@@ -48,6 +48,7 @@ export interface DiffHomePageProps {
   view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
+  github?: string
   onWorkspaceSelect: (workspaceId: string) => void
 }
 
@@ -59,6 +60,7 @@ export function DiffHomePage({
   view,
   line,
   side,
+  github,
   onWorkspaceSelect,
 }: DiffHomePageProps) {
   const { t } = useTranslation('diff-review')
@@ -225,6 +227,7 @@ export function DiffHomePage({
                 view={view}
                 line={line}
                 side={side}
+                github={github}
               />
             )
           : (

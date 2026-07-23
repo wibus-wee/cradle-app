@@ -319,6 +319,7 @@ import { register as registerWorkspaceDiffsGuideCancel } from './workspace/diffs
 import { register as registerWorkspaceDiffsGuideGenerate } from './workspace/diffs/guide/generate'
 import { register as registerWorkspaceDiffsList } from './workspace/diffs/list'
 import { register as registerWorkspaceDiffsLocalWorkingTree } from './workspace/diffs/local-working-tree'
+import { register as registerWorkspaceDiffsMerge } from './workspace/diffs/merge'
 import { register as registerWorkspaceDiffsPreferencesSet } from './workspace/diffs/preferences/set'
 import { register as registerWorkspaceDiffsReadiness } from './workspace/diffs/readiness'
 import { register as registerWorkspaceDiffsRefresh } from './workspace/diffs/refresh'
@@ -675,6 +676,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerWorkspaceDiffsGuideGenerate(program)
   registerWorkspaceDiffsList(program)
   registerWorkspaceDiffsLocalWorkingTree(program)
+  registerWorkspaceDiffsMerge(program)
   registerWorkspaceDiffsPreferencesSet(program)
   registerWorkspaceDiffsReadiness(program)
   registerWorkspaceDiffsRefresh(program)

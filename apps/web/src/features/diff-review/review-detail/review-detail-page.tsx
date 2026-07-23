@@ -52,6 +52,7 @@ export function ReviewDetailPage({
     reactionMutation,
     resolveThreadMutation,
     submitMutation,
+    mergeMutation,
     closeReviewMutation,
     preferenceMutation,
     createAgentFixMutation,
@@ -196,6 +197,13 @@ export function ReviewDetailPage({
       const typing = target?.tagName === 'INPUT'
         || target?.tagName === 'TEXTAREA'
         || target?.isContentEditable
+      if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+        event.preventDefault()
+        const nextStyle = diffStyle === 'split' ? 'unified' : 'split'
+        setDiffStyle(nextStyle)
+        preferenceMutation.mutate({ diffStyle: nextStyle })
+        return
+      }
       if (typing || event.metaKey || event.ctrlKey || event.altKey) {
         return
       }
@@ -231,7 +239,7 @@ export function ReviewDetailPage({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [composerAnchor, selectedFileId, selectedLineSelection, visibleFiles])
+  }, [composerAnchor, diffStyle, preferenceMutation, selectedFileId, selectedLineSelection, visibleFiles])
 
   useEffect(() => {
     if (visibleItems.length === 0 || !pendingScrollRef.current) {
@@ -304,6 +312,8 @@ export function ReviewDetailPage({
         preferencePending={preferenceMutation.isPending}
         onSubmit={(decision, bodyMarkdown) => submitMutation.mutate({ decision, bodyMarkdown })}
         submitPending={submitMutation.isPending}
+        onMerge={method => mergeMutation.mutate(method)}
+        mergePending={mergeMutation.isPending}
         onCloseReview={() => closeReviewMutation.mutate(undefined, {
           onSuccess: () => navigateToReviewsList(workspaceId, repositoryPath),
         })}

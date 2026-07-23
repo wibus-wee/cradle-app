@@ -8,6 +8,7 @@ interface DiffInteractionOptions<TAnnotation> {
   controlledSelection?: boolean
   enableGutterUtility?: boolean
   enableLineSelection?: boolean
+  structuralHighlighting?: boolean
   onGutterUtilityClick?: CodeViewOptions<TAnnotation>['onGutterUtilityClick']
 }
 
@@ -21,7 +22,7 @@ export function buildDiffOptions<TAnnotation = undefined>(
     diffStyle,
     diffIndicators: 'bars',
     overflow: 'scroll',
-    lineDiffType: 'word',
+    lineDiffType: interaction.structuralHighlighting === false ? 'none' : 'word',
     hunkSeparators: 'line-info-basic',
     enableLineSelection: interaction.enableLineSelection,
     controlledSelection: interaction.controlledSelection,

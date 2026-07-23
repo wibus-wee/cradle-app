@@ -537,13 +537,112 @@ describe('diff-review capability', () => {
         patch: null,
         previous_filename: null,
       }]
+      const remoteComment = {
+        id: 'PRRC_imported',
+        body: 'Imported from GitHub.',
+        url: 'https://github.com/cradle/app/pull/70#discussion_r1',
+        createdAt: '2026-07-21T10:00:00Z',
+        updatedAt: '2026-07-21T10:00:00Z',
+        author: { login: 'reviewer' },
+        reactionGroups: [],
+      }
+      const importedThread = {
+        id: 'PRRT_imported',
+        isResolved: false,
+        isOutdated: false,
+        path: 'src/app.ts',
+        line: 1,
+        startLine: null,
+        diffSide: 'RIGHT',
+        startDiffSide: null,
+        comments: { nodes: [remoteComment] },
+      }
+      const createdComment = {
+        ...remoteComment,
+        id: 'PRRC_created',
+        body: 'Created from Cradle.',
+        url: 'https://github.com/cradle/app/pull/70#discussion_r2',
+        author: { login: 'local-user' },
+      }
+      const createdThread = {
+        ...importedThread,
+        id: 'PRRT_created',
+        comments: { nodes: [createdComment] },
+      }
+      const repliedThread = {
+        ...createdThread,
+        comments: {
+          nodes: [
+            createdComment,
+            {
+              ...createdComment,
+              id: 'PRRC_reply',
+              body: 'Reply from Cradle.',
+              url: 'https://github.com/cradle/app/pull/70#discussion_r3',
+              updatedAt: '2026-07-21T10:01:00Z',
+            },
+          ],
+        },
+      }
       const fetchMock = vi.fn()
         .mockResolvedValueOnce(new Response(JSON.stringify(pullRequest), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify(files), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          data: {
+            repository: {
+              pullRequest: {
+                id: 'PR_70',
+                reviewThreads: {
+                  nodes: [importedThread],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            },
+          },
+        }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ total_count: 0, check_runs: [] }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'success', total_count: 0, statuses: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ node_id: 'PR_70' }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          data: { addPullRequestReviewThread: { thread: createdThread } },
+        }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          data: { addPullRequestReviewThreadReply: { thread: repliedThread } },
+        }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          data: { addReaction: { subject: { id: 'PRRC_created' } } },
+        }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          data: {
+            repository: {
+              pullRequest: {
+                id: 'PR_70',
+                reviewThreads: {
+                  nodes: [importedThread, {
+                    ...repliedThread,
+                    comments: {
+                      nodes: repliedThread.comments.nodes.map((comment, index) => index === 0
+                        ? {
+                            ...comment,
+                            reactionGroups: [{
+                              content: 'EYES',
+                              users: { nodes: [{ login: 'local-user' }] },
+                            }],
+                          }
+                        : comment),
+                    },
+                  }],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            },
+          },
+        }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          data: { resolveReviewThread: { thread: { ...repliedThread, isResolved: true } } },
+        }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({
           id: 9001,
           state: 'APPROVED',
@@ -568,7 +667,18 @@ describe('diff-review capability', () => {
       )
 
       expect(review.sourceKind).toBe('github-pull-request')
-      expect(review.githubPullRequest).toEqual({ owner: 'cradle', repo: 'app', number: 70 })
+      expect(review.githubPullRequest).toMatchObject({
+        owner: 'cradle',
+        repo: 'app',
+        number: 70,
+        detail: {
+          isDraft: false,
+          headRef: 'feature/remote-review',
+          baseRef: 'main',
+          checksState: 'neutral',
+          author: { login: 'author' },
+        },
+      })
       expect(review.repositoryPath).toBe('github:cradle/app')
       expect(review.status).toBe('open')
       expect(review.currentRevision).toMatchObject({
@@ -581,7 +691,58 @@ describe('diff-review capability', () => {
         expect.objectContaining({ path: 'src/app.ts', status: 'modified', additions: 1, deletions: 1 }),
         expect.objectContaining({ path: 'src/generated.ts', status: 'added', additions: 3, deletions: 0, isBinary: false }),
       ]))
-      expect(fetchMock).toHaveBeenCalledTimes(6)
+      expect(review.threads).toEqual([
+        expect.objectContaining({
+          id: 'github-review-thread:PRRT_imported',
+          state: 'open',
+          createdBy: 'reviewer',
+          comments: [expect.objectContaining({
+            id: 'github-review-comment:PRRC_imported',
+            authorKind: 'external',
+            externalUrl: remoteComment.url,
+          })],
+        }),
+      ])
+      expect(fetchMock).toHaveBeenCalledTimes(7)
+
+      const appFile = review.files.find(file => file.path === 'src/app.ts')!
+      const created = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/threads`,
+        {
+          fileId: appFile.id,
+          anchor: { fileId: appFile.id, side: 'head', startLine: 1, endLine: 1 },
+          bodyMarkdown: 'Created from Cradle.',
+        },
+      )
+      expect(created.threads).toHaveLength(2)
+      expect(created.threads.at(-1)).toMatchObject({
+        id: 'github-review-thread:PRRT_created',
+        comments: [expect.objectContaining({ bodyMarkdown: 'Created from Cradle.' })],
+      })
+
+      const replied = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/threads/github-review-thread:PRRT_created/comments`,
+        { bodyMarkdown: 'Reply from Cradle.' },
+      )
+      expect(replied.threads.at(-1)?.comments).toHaveLength(2)
+
+      const reacted = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/threads/github-review-thread:PRRT_created/reactions`,
+        { reaction: '👀' },
+      )
+      expect(reacted.threads.at(-1)?.reactions).toEqual([
+        expect.objectContaining({ userId: 'local-user', reaction: '👀' }),
+      ])
+
+      const resolved = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/threads/github-review-thread:PRRT_created/resolve`,
+        {},
+      )
+      expect(resolved.threads.at(-1)?.state).toBe('resolved')
 
       const missingBody = await postJsonWithStatus<{ code: string }>(
         app,
@@ -590,7 +751,7 @@ describe('diff-review capability', () => {
         400,
       )
       expect(missingBody.code).toBe('diff_review_github_body_required')
-      expect(fetchMock).toHaveBeenCalledTimes(6)
+      expect(fetchMock).toHaveBeenCalledTimes(13)
 
       const submitted = await postJson<DiffReviewResponse>(
         app,
@@ -602,8 +763,8 @@ describe('diff-review capability', () => {
         decision: 'approve',
         sourceSyncState: 'synced',
       })
-      expect(fetchMock).toHaveBeenCalledTimes(7)
-      const [submitUrl, submitInit] = fetchMock.mock.calls[6]!
+      expect(fetchMock).toHaveBeenCalledTimes(14)
+      const [submitUrl, submitInit] = fetchMock.mock.calls[13]!
       expect(submitUrl).toBe('https://api.github.com/repos/cradle/app/pulls/70/reviews')
       expect(submitInit).toMatchObject({ method: 'POST' })
       expect(JSON.parse(String(submitInit?.body))).toEqual({

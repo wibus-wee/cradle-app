@@ -116,9 +116,10 @@ export function DiffStage({
       controlledSelection: true,
       enableGutterUtility: true,
       enableLineSelection: true,
+      structuralHighlighting: review.preferences.structuralHighlighting,
       onGutterUtilityClick: handleGutterUtilityClick,
     }),
-    [diffStyle, handleGutterUtilityClick],
+    [diffStyle, handleGutterUtilityClick, review.preferences.structuralHighlighting],
   )
 
   const annotationsByItem = useMemo(
