@@ -14,9 +14,33 @@ const sshAuth = t.Union([
 ])
 const cradleServerConnectionState = t.Union([
   t.Literal('idle'),
+  t.Literal('warming'),
   t.Literal('connected'),
   t.Literal('offline'),
 ])
+
+const relayConnectionAttempt = t.Object({
+  attempt: t.Number(),
+  startedAt: t.Number(),
+  websocketOpenedAt: nullableNumber,
+  handshakeReadyAt: nullableNumber,
+  failedAt: nullableNumber,
+}, { additionalProperties: false })
+
+const relayStreamCheckpoint = t.Object({
+  streamId: t.String(),
+  openedAt: t.Number(),
+  firstRequestByteAt: nullableNumber,
+  firstResponseByteAt: nullableNumber,
+  closedAt: nullableNumber,
+}, { additionalProperties: false })
+
+const relayPerformance = t.Object({
+  connectionAttempts: t.Array(relayConnectionAttempt),
+  localListenerReadyAt: nullableNumber,
+  activeStreams: t.Array(relayStreamCheckpoint),
+  completedStreams: t.Array(relayStreamCheckpoint),
+}, { additionalProperties: false })
 
 const relayConfig = t.Object({
   relayServerId: t.Optional(nullableString),
@@ -112,6 +136,7 @@ export const RemoteHostsModel = {
     state: cradleServerConnectionState,
     localBaseUrl: nullableString,
     lastError: nullableString,
+    relayPerformance: t.Union([relayPerformance, t.Null()]),
   }, { additionalProperties: false }),
 
   cradleServerHealth: t.Object({
@@ -119,6 +144,7 @@ export const RemoteHostsModel = {
     state: cradleServerConnectionState,
     localBaseUrl: nullableString,
     lastError: nullableString,
+    relayPerformance: t.Union([relayPerformance, t.Null()]),
     status: t.Literal('ok'),
     health: cradleServerHealthPayload,
   }, { additionalProperties: false }),

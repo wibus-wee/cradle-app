@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
 import { xchacha20poly1305 } from '@noble/ciphers/chacha'
 import { x25519 } from '@noble/curves/ed25519'
@@ -10,26 +10,31 @@ import { utf8ToBytes } from '@noble/hashes/utils.js'
 import { AppError } from '../../errors/app-error'
 
 /**
- * End-to-end crypto for the relay tunnel, built on audited pure-JS primitives:
+ * End-to-end crypto for the relay tunnel:
  *
  * - X25519 ECDH (`@noble/curves`) for key agreement.
  * - HKDF-SHA512 (`@noble/hashes`) with a distinct `info` label per key.
- * - XChaCha20-Poly1305 (`@noble/ciphers`) for per-frame AEAD. Its 192-bit nonce
- *   is large enough that we use a fresh random nonce per frame — this removes
- *   the entire counter / direction-tag nonce management that GCM would force
- *   us to hand-roll (and where nonce reuse is catastrophic).
+ * - XChaCha20-Poly1305 for small frames, where avoiding an OpenSSL call has
+ *   lower fixed latency.
+ * - Native AES-256-GCM for bulk frames, where hardware acceleration provides
+ *   materially higher throughput. Fresh random nonces avoid counter state
+ *   across reconnects.
  *
  * relayd never sees any of this: it forwards opaque `relay_data_frame` blobs.
  */
 
-const HKDF_INFO_PREFIX = 'cradle/relay/v1'
+const HKDF_INFO_PREFIX = 'cradle/relay/v2'
 const KEY_BYTES = 32
 const XCHACHA_NONCE_BYTES = 24
+const AES_GCM_NONCE_BYTES = 12
+const AES_GCM_TAG_BYTES = 16
+const XCHACHA_ALGORITHM_BIT = 0x80
+const NATIVE_AES_MIN_PLAINTEXT_BYTES = 1024
 
 /** Roles for key derivation: each direction's key is tagged with the sender. */
 export type RelayCryptoRole = 'host' | 'controller'
 
-export const RELAY_CRYPTO_ALG = 'xchacha20poly1305'
+export const RELAY_CRYPTO_ALG = 'xchacha20poly1305-small+aes-256-gcm-bulk'
 
 export interface RelayKeyPair {
   /** X25519 private key (raw 32 bytes, base64). Safe to persist as a managed secret. */
@@ -85,7 +90,7 @@ export function computeRelaySharedSecret(
   try {
     return x25519.getSharedSecret(ourPrivate, peerPublic)
   }
-  catch (error) {
+ catch (error) {
     throw new AppError({
       code: 'relay_crypto_invalid_peer_public_key',
       status: 400,
@@ -108,7 +113,13 @@ export interface RelayDerivedKeys {
 }
 
 function deriveKey(secret: Uint8Array, pairingCode: string, label: string): Uint8Array {
-  return hkdf(sha512, secret, utf8ToBytes(pairingCode), utf8ToBytes(`${HKDF_INFO_PREFIX}/${label}`), KEY_BYTES)
+  return hkdf(
+    sha512,
+    secret,
+    utf8ToBytes(pairingCode),
+    utf8ToBytes(`${HKDF_INFO_PREFIX}/${label}`),
+    KEY_BYTES,
+  )
 }
 
 export function deriveRelayKeys(sharedSecret: Uint8Array, pairingCode: string): RelayDerivedKeys {
@@ -165,15 +176,14 @@ export function relayPublicKeyFingerprint(publicKeyBase64: string): string {
 }
 
 /**
- * Stateful encryptor for one direction of the tunnel. XChaCha20-Poly1305's
- * 192-bit nonce makes random-per-frame nonces safe, so there is no counter and
- * no risk of nonce reuse under a key — each frame just needs a fresh 24-byte
- * random nonce, which we prepend to the ciphertext.
+ * Stateful encryptor for one direction of the tunnel. Each frame carries its
+ * random nonce so reconnects can safely reuse the long-lived derived key.
  */
 export class RelayCipher {
   private readonly key: Uint8Array
+  private readonly nativeBulkEnabled: boolean
 
-  constructor(key: Uint8Array) {
+  constructor(key: Uint8Array, nativeBulkEnabled = true) {
     if (key.length !== KEY_BYTES) {
       throw new AppError({
         code: 'relay_crypto_invalid_key',
@@ -182,32 +192,51 @@ export class RelayCipher {
       })
     }
     this.key = key
+    this.nativeBulkEnabled = nativeBulkEnabled
   }
 
-  /** Encrypt plaintext → base64 `nonce(24) || ciphertext || tag(16)`. */
-  encrypt(plaintext: Uint8Array): string {
-    const nonce = randomBytes(XCHACHA_NONCE_BYTES)
-    const cipher = xchacha20poly1305(this.key, nonce)
-    const sealed = cipher.encrypt(plaintext)
-    return bytesToBase64(concatBytes(nonce, sealed))
+  /** Encrypt a frame with the latency- or throughput-optimized V2 AEAD. */
+  encrypt(plaintext: Uint8Array): Uint8Array {
+    if (plaintext.byteLength < NATIVE_AES_MIN_PLAINTEXT_BYTES || !this.nativeBulkEnabled) {
+      const nonce = randomBytes(XCHACHA_NONCE_BYTES)
+      nonce[0] |= XCHACHA_ALGORITHM_BIT
+      return concatBytes(nonce, xchacha20poly1305(this.key, nonce).encrypt(plaintext))
+    }
+    const nonce = randomBytes(AES_GCM_NONCE_BYTES)
+    nonce[0] &= ~XCHACHA_ALGORITHM_BIT
+    const cipher = createCipheriv('aes-256-gcm', this.key, nonce)
+    const ciphertext = cipher.update(plaintext)
+    cipher.final()
+    return concatBytes(nonce, ciphertext, cipher.getAuthTag())
   }
 
-  /** Decrypt a base64 blob produced by the peer's matching cipher. */
-  decrypt(blobBase64: string): Uint8Array {
-    const blob = base64ToBytes(blobBase64)
-    if (blob.length < XCHACHA_NONCE_BYTES + 16) {
+  /** Decrypt a raw blob produced by the peer's matching cipher. */
+  decrypt(blob: Uint8Array): Uint8Array {
+    if (blob.length < AES_GCM_NONCE_BYTES + AES_GCM_TAG_BYTES) {
       throw new AppError({
         code: 'relay_crypto_decrypt_failed',
         status: 400,
         message: 'Relay ciphertext too short.',
       })
     }
-    const nonce = blob.subarray(0, XCHACHA_NONCE_BYTES)
-    const sealed = blob.subarray(XCHACHA_NONCE_BYTES)
     try {
-      return xchacha20poly1305(this.key, nonce).decrypt(sealed)
+      if (blob[0] & XCHACHA_ALGORITHM_BIT) {
+        if (blob.length < XCHACHA_NONCE_BYTES + AES_GCM_TAG_BYTES) {
+          throw new Error('Relay XChaCha ciphertext is too short.')
+        }
+        const nonce = blob.subarray(0, XCHACHA_NONCE_BYTES)
+        return xchacha20poly1305(this.key, nonce).decrypt(blob.subarray(XCHACHA_NONCE_BYTES))
+      }
+      const nonce = blob.subarray(0, AES_GCM_NONCE_BYTES)
+      const ciphertext = blob.subarray(AES_GCM_NONCE_BYTES, -AES_GCM_TAG_BYTES)
+      const tag = blob.subarray(-AES_GCM_TAG_BYTES)
+      const decipher = createDecipheriv('aes-256-gcm', this.key, nonce)
+      decipher.setAuthTag(tag)
+      const plaintext = decipher.update(ciphertext)
+      decipher.final()
+      return new Uint8Array(plaintext.buffer, plaintext.byteOffset, plaintext.byteLength)
     }
-    catch (error) {
+ catch (error) {
       throw new AppError({
         code: 'relay_crypto_decrypt_failed',
         status: 400,

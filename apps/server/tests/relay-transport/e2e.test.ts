@@ -7,6 +7,7 @@ import type { AddressInfo, Socket } from 'node:net'
 import { connect, createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -19,9 +20,18 @@ import {
   relayAssertionHeaders,
   signRelayAssertion,
 } from '../../src/modules/relay-servers/relay-signature-service'
-import { startRelayControllerTransport } from '../../src/modules/relay-transport/controller-transport'
-import { generateRelayKeyPair, relayPublicKeyFingerprint } from '../../src/modules/relay-transport/crypto'
-import { relayEnvelopeSchema } from '../../src/modules/relay-transport/protocol'
+import type {
+  RelayControllerPerformanceSnapshot,
+  RelayStreamCheckpoint,
+} from '../../src/modules/relay-transport/controller-transport'
+import {
+  startRelayControllerTransport,
+} from '../../src/modules/relay-transport/controller-transport'
+import {
+  generateRelayKeyPair,
+  relayPublicKeyFingerprint,
+} from '../../src/modules/relay-transport/crypto'
+import { decodeRelayEnvelope } from '../../src/modules/relay-transport/protocol'
 import { RelaySession } from '../../src/modules/relay-transport/session'
 
 /**
@@ -47,7 +57,10 @@ function resolveRelaydSourceDir(): string | null {
     resolve(moduleDir, '../../../../relayd'),
   ]
   for (const candidate of candidates) {
-    if (existsSyncSafe(join(candidate, 'go.mod')) && existsSyncSafe(join(candidate, 'cmd/relayd/main.go'))) {
+    if (
+      existsSyncSafe(join(candidate, 'go.mod'))
+      && existsSyncSafe(join(candidate, 'cmd/relayd/main.go'))
+    ) {
       return candidate
     }
   }
@@ -58,7 +71,7 @@ function existsSyncSafe(path: string): boolean {
   try {
     return existsSync(path)
   }
-  catch {
+ catch {
     return false
   }
 }
@@ -111,13 +124,15 @@ async function waitForReady(relayUrl: string): Promise<void> {
   let lastError: unknown
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(new URL('/readyz', `${relayUrl}/`), { signal: AbortSignal.timeout(500) })
+      const response = await fetch(new URL('/readyz', `${relayUrl}/`), {
+        signal: AbortSignal.timeout(500),
+      })
       if (response.ok) {
         return
       }
       lastError = new Error(`relayd ready check returned HTTP ${response.status}`)
     }
-    catch (error) {
+ catch (error) {
       lastError = error
     }
     await new Promise(r => setTimeout(r, 200))
@@ -165,8 +180,13 @@ function signalRelayd(child: ChildProcess, signal: NodeJS.Signals): boolean {
       process.kill(-child.pid, signal)
       return true
     }
-    catch (error) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ESRCH') {
+ catch (error) {
+      if (
+        typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        && error.code === 'ESRCH'
+      ) {
         return false
       }
       throw error
@@ -186,7 +206,7 @@ function closeRelaydOwnerPipe(child: ChildProcess): void {
     }
     stdin.destroy()
   }
-  catch {
+ catch {
     // Best-effort cleanup; process signals still handle termination.
   }
 }
@@ -226,9 +246,16 @@ async function startHostBridge(opts: {
       onStreamOpen: (streamId) => {
         const socket = connect({ host: opts.targetHost, port: opts.targetPort })
         streams.set(streamId, socket)
-        socket.on('data', (chunk: Buffer) => session.writeStreamData(streamId, new Uint8Array(chunk)))
-        socket.on('close', () => { session.closeStream(streamId, 'target closed'); streams.delete(streamId) })
-        socket.on('error', () => { session.closeStream(streamId, 'target error'); streams.delete(streamId) })
+        socket.on('data', (chunk: Buffer) =>
+          session.writeStreamData(streamId, new Uint8Array(chunk)))
+        socket.on('close', () => {
+          session.closeStream(streamId, 'target closed')
+          streams.delete(streamId)
+        })
+        socket.on('error', () => {
+          session.closeStream(streamId, 'target error')
+          streams.delete(streamId)
+        })
       },
       onStreamData: (streamId, data) => {
         const socket = streams.get(streamId)
@@ -247,8 +274,7 @@ async function startHostBridge(opts: {
     },
   )
   ws.on('message', (data: WebSocket.RawData) => {
-    const env = relayEnvelopeSchema.parse(JSON.parse(data.toString('utf8')))
-    session.handleEnvelope(env)
+    session.handleEnvelope(decodeRelayEnvelope(new Uint8Array(data as Buffer)))
   })
 
   await new Promise<void>((resolve, reject) => {
@@ -280,13 +306,16 @@ function toWsUrl(relayUrl: string, path: string): string {
   if (url.protocol === 'http:') {
     url.protocol = 'ws:'
   }
-  else if (url.protocol === 'https:') {
+ else if (url.protocol === 'https:') {
     url.protocol = 'wss:'
   }
   return url.toString()
 }
 
-async function callPairingStart(relayUrl: string, assertion: SignedRelayAssertion): Promise<{ pairingCode: string, roomId: string }> {
+async function callPairingStart(
+  relayUrl: string,
+  assertion: SignedRelayAssertion,
+): Promise<{ pairingCode: string, roomId: string }> {
   const response = await fetch(new URL('/pairing/start', `${relayUrl}/`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -295,10 +324,13 @@ async function callPairingStart(relayUrl: string, assertion: SignedRelayAssertio
   if (!response.ok) {
     throw new Error(`/pairing/start returned ${response.status}: ${await response.text()}`)
   }
-  return await response.json() as { pairingCode: string, roomId: string }
+  return (await response.json()) as { pairingCode: string, roomId: string }
 }
 
-async function callPairingClaim(relayUrl: string, assertion: SignedRelayAssertion): Promise<{ roomId: string }> {
+async function callPairingClaim(
+  relayUrl: string,
+  assertion: SignedRelayAssertion,
+): Promise<{ roomId: string }> {
   const response = await fetch(new URL('/pairing/claim', `${relayUrl}/`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -307,14 +339,16 @@ async function callPairingClaim(relayUrl: string, assertion: SignedRelayAssertio
   if (!response.ok) {
     throw new Error(`/pairing/claim returned ${response.status}: ${await response.text()}`)
   }
-  return await response.json() as { roomId: string }
+  return (await response.json()) as { roomId: string }
 }
 
 function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[] }> {
   const requests: string[] = []
   const server = createServer((req, res) => {
     let body = ''
-    req.on('data', (chunk) => { body += chunk.toString() })
+    req.on('data', (chunk) => {
+      body += chunk.toString()
+    })
     req.on('end', () => {
       requests.push(`${req.method} ${req.url} ${body}`)
       res.writeHead(200, { 'content-type': 'application/json' })
@@ -357,8 +391,16 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     const roomId = createRelayRoomId()
     const hostFingerprint = relayPublicKeyFingerprint(hostKeys.publicKeyBase64)
 
-    const pairingStart = signRelayAssertion(hostSigningKeys.privateKeyBase64, { role: 'host', purpose: 'create_room', roomId })
-    const hostWs = signRelayAssertion(hostSigningKeys.privateKeyBase64, { role: 'host', purpose: 'ws', roomId })
+    const pairingStart = signRelayAssertion(hostSigningKeys.privateKeyBase64, {
+      role: 'host',
+      purpose: 'create_room',
+      roomId,
+    })
+    const hostWs = signRelayAssertion(hostSigningKeys.privateKeyBase64, {
+      role: 'host',
+      purpose: 'ws',
+      roomId,
+    })
     const { pairingCode } = await callPairingStart(relayd.relayUrl, pairingStart)
 
     // ── Host: start the bridge (WS + session + TCP target = fake host server).
@@ -378,10 +420,19 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     })
 
     // ── Controller: claim the pairing ──
-    const claimAssertion = signRelayAssertion(controllerSigningKeys.privateKeyBase64, { role: 'controller', purpose: 'claim', roomId, pairingCode })
+    const claimAssertion = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
+      role: 'controller',
+      purpose: 'claim',
+      roomId,
+      pairingCode,
+    })
     const lookup = await callPairingClaim(relayd.relayUrl, claimAssertion)
     expect(lookup.roomId).toBe(roomId)
-    const controllerWs = signRelayAssertion(controllerSigningKeys.privateKeyBase64, { role: 'controller', purpose: 'ws', roomId })
+    const controllerWs = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
+      role: 'controller',
+      purpose: 'ws',
+      roomId,
+    })
 
     // ── Controller: start the relay transport (first pairing) ──
     const handle = await startRelayControllerTransport({
@@ -405,11 +456,103 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       body: 'ping',
     })
     expect(response.status).toBe(200)
-    const json = await response.json() as { ok: boolean, echo: string, path: string }
+    const json = (await response.json()) as { ok: boolean, echo: string, path: string }
     expect(json.ok).toBe(true)
     expect(json.echo).toBe('ping')
     expect(json.path).toBe('/hello')
     expect(fakeHost.requests).toContain('POST /hello ping')
+
+    const coldSnapshot = handle.getPerformanceSnapshot()
+    const coldAttempt = coldSnapshot.connectionAttempts.at(-1)
+    const coldStream = latestRelayStream(coldSnapshot)
+    expect(coldAttempt?.websocketOpenedAt).not.toBeNull()
+    expect(coldAttempt?.handshakeReadyAt).not.toBeNull()
+    expect(coldSnapshot.localListenerReadyAt).not.toBeNull()
+    expect(coldStream?.firstRequestByteAt).not.toBeNull()
+    expect(coldStream?.firstResponseByteAt).not.toBeNull()
+
+    // This request reuses the listener/session above: it must not open another
+    // WebSocket or perform a second relay handshake before proxying bytes.
+    const attemptsBeforeWarmRequest = coldSnapshot.connectionAttempts.length
+    const warmResponse = await fetch(`${handle.localBaseUrl}/warm`, { method: 'GET' })
+    expect(warmResponse.status).toBe(200)
+    await warmResponse.json()
+    const warmSnapshot = handle.getPerformanceSnapshot()
+    const warmStream = latestRelayStream(warmSnapshot)
+    expect(warmSnapshot.connectionAttempts).toHaveLength(attemptsBeforeWarmRequest)
+    expect(warmStream?.streamId).not.toBe(coldStream?.streamId)
+    expect(warmStream?.firstRequestByteAt).not.toBeNull()
+    expect(warmStream?.firstResponseByteAt).not.toBeNull()
+
+    const concurrentBody = 'x'.repeat(64 * 1024)
+    const concurrencyRows = []
+    for (const concurrency of [1, 8]) {
+      const batchStartedAt = performance.now()
+      const durations = await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
+        const startedAt = performance.now()
+        const concurrentResponse = await fetch(`${handle.localBaseUrl}/benchmark/${concurrency}/${index}`, {
+          method: 'POST',
+          headers: { 'content-type': 'text/plain' },
+          body: concurrentBody,
+        })
+        expect(concurrentResponse.status).toBe(200)
+        const body = (await concurrentResponse.json()) as { ok: boolean, echo: string }
+        expect(body.ok).toBe(true)
+        expect(body.echo).toBe(concurrentBody)
+        return performance.now() - startedAt
+      }))
+      const batchElapsedMs = performance.now() - batchStartedAt
+      concurrencyRows.push({
+        concurrency,
+        requestBodyBytes: Buffer.byteLength(concurrentBody),
+        p50Ms: percentile(durations, 0.5),
+        p95Ms: percentile(durations, 0.95),
+        maxMs: Math.max(...durations),
+        aggregateUsefulMiBps:
+          (concurrency * Buffer.byteLength(concurrentBody) * 2) / (1024 * 1024) / (batchElapsedMs / 1_000),
+      })
+    }
+    expect(handle.getPerformanceSnapshot().connectionAttempts).toHaveLength(attemptsBeforeWarmRequest)
+    console.info([
+      '# Relay local-relayd concurrent-stream matrix',
+      '',
+      'This exercises real loopback WebSocket, relayd scheduler, E2EE session, TCP bridge, and HTTP streams. It is not a WAN, Tailscale, or injected-RTT measurement.',
+      '',
+      '| Concurrent streams | Request body | p50 complete | p95 complete | max complete | Aggregate useful throughput |',
+      '| ---: | ---: | ---: | ---: | ---: | ---: |',
+      ...concurrencyRows.map(row =>
+        `| ${row.concurrency} | ${row.requestBodyBytes} B | ${row.p50Ms.toFixed(2)} ms | ${row.p95Ms.toFixed(2)} ms | ${row.maxMs.toFixed(2)} ms | ${row.aggregateUsefulMiBps.toFixed(2)} MiB/s |`),
+    ].join('\n'))
+    console.info(JSON.stringify({
+      kind: 'relay-local-e2e-concurrency',
+      conditions: {
+        relayd: 'local subprocess',
+        transport: 'binary-v2',
+        logicalUsefulBytesPerRequest: Buffer.byteLength(concurrentBody) * 2,
+        connectionAttemptsBeforeMatrix: attemptsBeforeWarmRequest,
+        connectionAttemptsAfterMatrix: handle.getPerformanceSnapshot().connectionAttempts.length,
+      },
+      rows: concurrencyRows,
+    }))
+
+    if (coldAttempt && coldSnapshot.localListenerReadyAt !== null && coldStream && warmStream) {
+      console.info(JSON.stringify({
+        kind: 'relay-cold-warm-checkpoints',
+        conditions: { relayd: 'local subprocess', transport: 'binary-v2' },
+        cold: {
+          connectToWebSocketOpenMs: nonNegativeDuration(coldAttempt.websocketOpenedAt, coldAttempt.startedAt),
+          connectToHandshakeReadyMs: nonNegativeDuration(coldAttempt.handshakeReadyAt, coldAttempt.startedAt),
+          connectToLocalListenerReadyMs: nonNegativeDuration(coldSnapshot.localListenerReadyAt, coldAttempt.startedAt),
+          streamToFirstResponseByteMs: nonNegativeDuration(coldStream.firstResponseByteAt, coldStream.openedAt),
+        },
+        warm: {
+          connectionAttemptsBeforeRequest: attemptsBeforeWarmRequest,
+          connectionAttemptsAfterRequest: warmSnapshot.connectionAttempts.length,
+          additionalWebSocketOrHandshake: 0,
+          streamToFirstResponseByteMs: nonNegativeDuration(warmStream.firstResponseByteAt, warmStream.openedAt),
+        },
+      }))
+    }
 
     await handle.close()
     await hostBridge.stop()
@@ -422,7 +565,11 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       roomId,
       controllerPubkey: controllerSigningKeys.publicKeyBase64,
     })
-    const hostWs2 = signRelayAssertion(hostSigningKeys.privateKeyBase64, { role: 'host', purpose: 'ws', roomId })
+    const hostWs2 = signRelayAssertion(hostSigningKeys.privateKeyBase64, {
+      role: 'host',
+      purpose: 'ws',
+      roomId,
+    })
     const renewResponse = await fetch(new URL('/rooms/host-session', `${relayd.relayUrl}/`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -441,7 +588,11 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       targetPort: fakeHostPort,
     })
 
-    const controllerWs2 = signRelayAssertion(controllerSigningKeys.privateKeyBase64, { role: 'controller', purpose: 'ws', roomId })
+    const controllerWs2 = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
+      role: 'controller',
+      purpose: 'ws',
+      roomId,
+    })
     const handle2 = await startRelayControllerTransport({
       hostId: 'e2e-host',
       relayUrl: relayd.relayUrl,
@@ -455,7 +606,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
 
     const response2 = await fetch(`${handle2.localBaseUrl}/again`, { method: 'GET' })
     expect(response2.status).toBe(200)
-    const json2 = await response2.json() as { ok: boolean, path: string }
+    const json2 = (await response2.json()) as { ok: boolean, path: string }
     expect(json2.ok).toBe(true)
     expect(json2.path).toBe('/again')
 
@@ -463,6 +614,21 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     await hostBridgeReconnect.stop()
   }, 60_000)
 })
+
+function latestRelayStream(snapshot: RelayControllerPerformanceSnapshot): RelayStreamCheckpoint | undefined {
+  return [...snapshot.activeStreams, ...snapshot.completedStreams]
+    .sort((left, right) => right.openedAt - left.openedAt)[0]
+}
+
+function nonNegativeDuration(end: number | null, start: number): number | null {
+  return end === null ? null : Math.max(0, end - start)
+}
+
+function percentile(samples: number[], percentileValue: number): number {
+  const ordered = [...samples].sort((left, right) => left - right)
+  const index = Math.min(ordered.length - 1, Math.ceil(ordered.length * percentileValue) - 1)
+  return ordered[index]!
+}
 
 // Pinned-pubkey variant of startHostBridge for the reconnect phase.
 async function startHostBridgePinned(opts: {
@@ -482,7 +648,11 @@ async function startHostBridgePinned(opts: {
   const session = new RelaySession(
     'host',
     opts.hostPrivateKey,
-    { roomId: opts.roomId, ourPublicKeyBase64: opts.hostPublicKey, pinnedPeerPubkey: opts.pinnedControllerPubkey },
+    {
+      roomId: opts.roomId,
+      ourPublicKeyBase64: opts.hostPublicKey,
+      pinnedPeerPubkey: opts.pinnedControllerPubkey,
+    },
     {
       send: (data) => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -492,9 +662,16 @@ async function startHostBridgePinned(opts: {
       onStreamOpen: (streamId) => {
         const socket = connect({ host: opts.targetHost, port: opts.targetPort })
         streams.set(streamId, socket)
-        socket.on('data', (chunk: Buffer) => session.writeStreamData(streamId, new Uint8Array(chunk)))
-        socket.on('close', () => { session.closeStream(streamId, 'target closed'); streams.delete(streamId) })
-        socket.on('error', () => { session.closeStream(streamId, 'target error'); streams.delete(streamId) })
+        socket.on('data', (chunk: Buffer) =>
+          session.writeStreamData(streamId, new Uint8Array(chunk)))
+        socket.on('close', () => {
+          session.closeStream(streamId, 'target closed')
+          streams.delete(streamId)
+        })
+        socket.on('error', () => {
+          session.closeStream(streamId, 'target error')
+          streams.delete(streamId)
+        })
       },
       onStreamData: (streamId, data) => {
         streams.get(streamId)?.write(Buffer.from(data))
@@ -510,8 +687,7 @@ async function startHostBridgePinned(opts: {
     },
   )
   ws.on('message', (data: WebSocket.RawData) => {
-    const env = relayEnvelopeSchema.parse(JSON.parse(data.toString('utf8')))
-    session.handleEnvelope(env)
+    session.handleEnvelope(decodeRelayEnvelope(new Uint8Array(data as Buffer)))
   })
 
   await new Promise<void>((resolve, reject) => {

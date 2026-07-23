@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "build:desktop-resource": "node scripts/build-desktop-resource.mjs",
+    "benchmark:compare": "pnpm run benchmark:forward && pnpm --dir ../server benchmark:relay",
+    "benchmark:forward": "node scripts/relay-forward-benchmark.mjs",
     "test": "go test ./..."
   }
 }

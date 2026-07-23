@@ -12,9 +12,10 @@ import { relayAssertionHeaders, signRelayAssertion } from '../relay-servers/rela
 import { readSecret, upsertSecret } from '../secrets/service'
 import { loadPrivateKeyBytes, publicKeyFromPrivate } from './crypto'
 import type { RelayEnvelope } from './protocol'
-import { relayEnvelopeSchema } from './protocol'
+import { decodeRelayEnvelope } from './protocol'
 import { readOrCreateHostRelayAuthToken } from './relay-auth-token-service'
 import { RelaySession } from './session'
+import { relayWebSocketDataView } from './websocket-data'
 
 const logger = createChildLogger({ module: 'relay-host-connector' })
 
@@ -75,7 +76,10 @@ class HostConnection {
     private readonly config: HostConnectorConfig,
     private readonly reloadEnrollment: () => Promise<HostEnrollmentRecord>,
     private readonly onPaired: (controllerPubkey: string, controllerSigningPubkey: string) => void,
-    private readonly onStatus: (status: 'pending' | 'paired' | 'offline', lastError?: string) => void,
+    private readonly onStatus: (
+      status: 'pending' | 'paired' | 'offline',
+      lastError?: string,
+    ) => void,
   ) {}
 
   start(): void {
@@ -112,9 +116,12 @@ class HostConnection {
       await this.connectAndServe(enrollment)
       // If connectAndServe returns normally, the connection dropped; schedule reconnect.
     }
-    catch (error) {
+ catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      logger.warn('relay host connection dropped', { enrollmentId: this.enrollmentId, err: message })
+      logger.warn('relay host connection dropped', {
+        enrollmentId: this.enrollmentId,
+        err: message,
+      })
       this.onStatus('offline', message)
     }
     await this.teardown()
@@ -182,7 +189,7 @@ class HostConnection {
       try {
         ws = new WebSocket(wsUrl, { headers: relayAssertionHeaders(hostWsAssertion) })
       }
-      catch (error) {
+ catch (error) {
         drop(error instanceof Error ? error : new Error(String(error)))
         return
       }
@@ -197,7 +204,9 @@ class HostConnection {
         {
           roomId: enrollment.roomId,
           ourPublicKeyBase64: enrollment.hostPubkey,
-          ...(isReconnect ? { pinnedPeerPubkey: enrollment.pinnedControllerPubkey! } : { pairingCode: enrollment.pairingCode ?? '' }),
+          ...(isReconnect
+            ? { pinnedPeerPubkey: enrollment.pinnedControllerPubkey! }
+            : { pairingCode: enrollment.pairingCode ?? '' }),
         },
         {
           send: (data) => {
@@ -212,7 +221,11 @@ class HostConnection {
             ws.on('error', () => drop(new Error('relayd host websocket error')))
             this.backoffMs = 1_000 // reset backoff after a clean ready
             this.lastReadyAt = Date.now()
-            if (!enrollment.pinnedControllerPubkey && learnedControllerPubkey && learnedControllerSigningPubkey) {
+            if (
+              !enrollment.pinnedControllerPubkey
+              && learnedControllerPubkey
+              && learnedControllerSigningPubkey
+            ) {
               this.onPaired(learnedControllerPubkey, learnedControllerSigningPubkey)
             }
             this.onStatus('paired')
@@ -244,10 +257,11 @@ class HostConnection {
       ws.once('open', () => session.start())
       ws.on('message', (data: WebSocket.RawData) => {
         try {
-          const env = relayEnvelopeSchema.parse(JSON.parse(data.toString('utf8')))
-          session.handleEnvelope(env as RelayEnvelope)
+          session.handleEnvelope(
+            decodeRelayEnvelope(relayWebSocketDataView(data)) as RelayEnvelope,
+          )
         }
-        catch (error) {
+ catch (error) {
           drop(error instanceof Error ? error : new Error(String(error)))
         }
       })
@@ -261,7 +275,10 @@ class HostConnection {
     if (!session) {
       return
     }
-    const socket = net.connect({ host: this.config.localServerHost, port: this.config.localServerPort })
+    const socket = net.connect({
+      host: this.config.localServerHost,
+      port: this.config.localServerPort,
+    })
     const requestWriter = new RelayHttpRequestWriter(socket, relayAuthToken, () => {
       session.closeStream(streamId, 'invalid relay HTTP request')
       socket.destroy()
@@ -270,7 +287,10 @@ class HostConnection {
     this.streams.set(streamId, { socket, streamId, requestWriter })
 
     socket.on('data', (chunk: Buffer) => {
-      session.writeStreamData(streamId, new Uint8Array(chunk))
+      session.writeStreamData(
+        streamId,
+        new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength),
+      )
     })
     socket.on('close', () => {
       session.closeStream(streamId, 'local server socket closed')
@@ -336,10 +356,7 @@ export class HostConnectorService {
 
   constructor(private readonly config: HostConnectorConfig) {}
   startAll(): void {
-    const enrollments = db()
-      .select()
-      .from(relayHostEnrollments)
-      .all()
+    const enrollments = db().select().from(relayHostEnrollments).all()
     for (const enrollment of enrollments) {
       this.startForEnrollment(enrollment.id)
     }
@@ -362,7 +379,11 @@ export class HostConnectorService {
         .where(eq(relayHostEnrollments.id, enrollmentId))
         .get()
       if (!row) {
-        throw new AppError({ code: 'relay_host_enrollment_not_found', status: 404, message: 'Relay host enrollment not found.' })
+        throw new AppError({
+          code: 'relay_host_enrollment_not_found',
+          status: 404,
+          message: 'Relay host enrollment not found.',
+        })
       }
       return {
         id: row.id,
@@ -389,10 +410,19 @@ export class HostConnectorService {
       })
       db()
         .update(relayHostEnrollments)
-        .set({ pinnedControllerPubkey: controllerPubkey, status: 'paired', pairingCode: null, lastError: null, updatedAt: now })
+        .set({
+          pinnedControllerPubkey: controllerPubkey,
+          status: 'paired',
+          pairingCode: null,
+          lastError: null,
+          updatedAt: now,
+        })
         .where(eq(relayHostEnrollments.id, enrollmentId))
         .run()
-      logger.info('relay host enrollment paired', { enrollmentId, controllerPubkeyFingerprint: controllerPubkey.slice(0, 16) })
+      logger.info('relay host enrollment paired', {
+        enrollmentId,
+        controllerPubkeyFingerprint: controllerPubkey.slice(0, 16),
+      })
     }
     const onStatus = (status, lastError) => {
       const now = Math.floor(Date.now() / 1000)
@@ -444,7 +474,7 @@ function readHostSigningPrivateKey(enrollmentId: string): string {
   try {
     return readSecret(`relay-host-sign-key:${enrollmentId}`)
   }
-  catch (error) {
+ catch (error) {
     throw new AppError({
       code: 'relay_host_enrollment_signing_key_missing',
       status: 409,
@@ -458,11 +488,12 @@ function readHostControllerSigningPubkey(enrollmentId: string): string {
   try {
     return readSecret(hostControllerSigningPubkeySecretId(enrollmentId))
   }
-  catch (error) {
+ catch (error) {
     throw new AppError({
       code: 'relay_host_enrollment_controller_signing_key_missing',
       status: 409,
-      message: 'Relay host enrollment is missing the controller signing public key. Re-create the pairing.',
+      message:
+        'Relay host enrollment is missing the controller signing public key. Re-create the pairing.',
       details: { enrollmentId, cause: error instanceof Error ? error.message : String(error) },
     })
   }
@@ -493,12 +524,12 @@ class RelayHttpRequestWriter {
    * the on-wire size, but credit tracks the peer's plaintext stream).
    */
   write(data: Uint8Array, onConsumed: (bytes: number) => void): void {
+    const chunk = Buffer.from(data.buffer, data.byteOffset, data.byteLength)
     if (this.released) {
-      this.writeToSocket(Buffer.from(data), data.byteLength, onConsumed)
+      this.writeToSocket(chunk, data.byteLength, onConsumed)
       return
     }
 
-    const chunk = Buffer.from(data)
     this.buffered.push(chunk)
     this.bufferedLength += chunk.byteLength
     this.pendingOriginalBytes += chunk.byteLength
@@ -528,16 +559,17 @@ class RelayHttpRequestWriter {
     this.pendingOriginalBytes = 0
     const body = buffered.subarray(headerEnd + 4)
     this.writeToSocket(
-      Buffer.concat([
-        Buffer.from(`${rewrittenHeader}\r\n\r\n`, 'latin1'),
-        body,
-      ]),
+      Buffer.concat([Buffer.from(`${rewrittenHeader}\r\n\r\n`, 'latin1'), body]),
       originalBytes,
       onConsumed,
     )
   }
 
-  private writeToSocket(data: Buffer, originalBytes: number, onConsumed: (bytes: number) => void): void {
+  private writeToSocket(
+    data: Buffer,
+    originalBytes: number,
+    onConsumed: (bytes: number) => void,
+  ): void {
     this.socket.write(data, (error) => {
       if (error) {
         this.socket.destroy()
@@ -548,7 +580,10 @@ class RelayHttpRequestWriter {
   }
 }
 
-export function rewriteRelayHttpRequestHead(headerBlock: string, relayAuthToken: string): string | null {
+export function rewriteRelayHttpRequestHead(
+  headerBlock: string,
+  relayAuthToken: string,
+): string | null {
   const lines = headerBlock.split('\r\n')
   const requestLine = lines[0]
   if (!requestLine || !/^[A-Z!#$%&'*+.^_`|~-]+ \S+ HTTP\/1\.[01]$/.test(requestLine)) {
@@ -557,13 +592,13 @@ export function rewriteRelayHttpRequestHead(headerBlock: string, relayAuthToken:
 
   const headers = lines.slice(1).filter((line) => {
     const lower = line.toLowerCase()
-    return !lower.startsWith(`${CRADLE_RELAY_TOKEN_HEADER}:`)
-      && !lower.startsWith('connection:')
+    return !lower.startsWith(`${CRADLE_RELAY_TOKEN_HEADER}:`) && !lower.startsWith('connection:')
   })
   const isUpgrade = lines.slice(1).some((line) => {
     const lower = line.toLowerCase()
-    return lower.startsWith('upgrade:')
-      || (lower.startsWith('connection:') && lower.includes('upgrade'))
+    return (
+      lower.startsWith('upgrade:') || (lower.startsWith('connection:') && lower.includes('upgrade'))
+    )
   })
 
   return [
@@ -595,7 +630,7 @@ function toWebSocketUrl(relayUrl: string, path: string): string {
   if (url.protocol === 'http:') {
     url.protocol = 'ws:'
   }
-  else if (url.protocol === 'https:') {
+ else if (url.protocol === 'https:') {
     url.protocol = 'wss:'
   }
   return url.toString()

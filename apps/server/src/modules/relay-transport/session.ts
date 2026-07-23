@@ -3,6 +3,11 @@ import { timingSafeEqual } from 'node:crypto'
 import { x25519 } from '@noble/curves/ed25519'
 
 import { AppError } from '../../errors/app-error'
+import {
+  decodeRelayChunk,
+  encodeRelayChunk,
+  RELAY_MIN_COMPRESSION_INPUT_BYTES,
+} from './compression'
 import type { RelayCryptoRole, RelayDerivedKeys } from './crypto'
 import {
   computeRelayConfirm,
@@ -13,16 +18,19 @@ import {
 } from './crypto'
 import type { InnerFrame, RelayEnvelope } from './protocol'
 import {
-  encryptedPayloadSchema,
-  helloFrameSchema,
+  decodeInnerFrame,
+  decodeRelayErrorPayload,
+  decodeRelayPeerClosedPayload,
+  encodeInnerFrame,
+  encodeRelayEnvelope,
   INNER_FRAME_KIND,
-  innerFrameSchema,
-  peerClosedPayloadSchema,
+  RELAY_CONNECTION_MAX_CREDIT_BYTES,
   RELAY_ENVELOPE_KIND,
   RELAY_MAX_STREAM_CHUNK_BYTES,
   RELAY_PROTOCOL_VERSION,
-  RELAY_STREAM_CREDIT_BYTES,
-  relayErrorPayloadSchema,
+  RELAY_STREAM_MAX_CREDIT_BYTES,
+  RELAY_STREAM_MIN_CREDIT_BYTES,
+  relayPriorityForInnerFrame,
 } from './protocol'
 
 /**
@@ -30,7 +38,7 @@ import {
  * transports. It owns:
  *
  * 1. The `hello` / `hello_confirm` handshake (ECDH → key derivation → pinning).
- * 2. Per-frame XChaCha20-Poly1305 encryption of inner stream frames.
+ * 2. Size-adaptive XChaCha20-Poly1305/AES-256-GCM encryption of inner frames.
  * 3. Stream multiplexing over the single relayd room.
  * 4. Credit-based flow control so a fast sender can't overrun the relayd queue
  *    (64 frames / 4 MiB) or the peer.
@@ -57,11 +65,19 @@ export interface RelaySessionOptions {
   ourName?: string
   /** Optional Ed25519 relay assertion public key sent in our `hello`. */
   ourSigningPubkey?: string
+  /** Initial per-stream in-flight byte allowance. Defaults to 512 KiB. */
+  initialStreamCreditBytes?: number
+  /** Hard per-stream byte allowance. Defaults to 8 MiB. */
+  maxStreamCreditBytes?: number
+  /** Hard aggregate byte allowance across all streams. Defaults to 16 MiB. */
+  maxConnectionCreditBytes?: number
+  /** Disable Zstandard and bulk AES together for controlled V2 before/after benchmarks. */
+  optimizedCodecEnabled?: boolean
 }
 
 export interface RelaySessionCallbacks {
-  /** Write serialized envelope bytes (JSON string) to the relayd WebSocket. */
-  send: (data: string) => void
+  /** Write one encoded binary envelope to relayd. */
+  send: (data: Uint8Array) => void
   onReady?: () => void
   onPeerPubkey?: (peerPubkey: string, fingerprint: string) => void
   /** Fires with the peer's reported label (from its `hello.name`) once known. */
@@ -83,6 +99,8 @@ type SessionState = 'idle' | 'handshake' | 'ready' | 'closed'
 interface StreamFlowState {
   /** Whether the local source is currently paused due to flow control. */
   paused: boolean
+  creditBytes: number
+  pendingData: Uint8Array[]
   /** Total plaintext bytes sent on this stream. */
   sentBytes: number
   /**
@@ -91,6 +109,7 @@ interface StreamFlowState {
    * streamId, so send credit and receive progress must not share a counter.
    */
   peerAckedBytes: number
+  ackedSinceCreditIncrease: number
   /** Total plaintext bytes delivered to the local transport callback. */
   receivedBytes: number
   /** Cumulative bytes the local transport has applied (TCP write / drain). */
@@ -100,11 +119,14 @@ interface StreamFlowState {
   closed: boolean
 }
 
-function createStreamFlowState(): StreamFlowState {
+function createStreamFlowState(creditBytes: number): StreamFlowState {
   return {
     paused: false,
+    creditBytes,
+    pendingData: [],
     sentBytes: 0,
     peerAckedBytes: 0,
+    ackedSinceCreditIncrease: 0,
     receivedBytes: 0,
     appliedBytes: 0,
     ackedToPeerBytes: 0,
@@ -116,7 +138,19 @@ function bytesInFlight(flow: StreamFlowState): number {
   return Math.max(0, flow.sentBytes - flow.peerAckedBytes)
 }
 
-const ACK_INTERVAL_BYTES = 64 * 1024
+function streamIdForFrame(frame: InnerFrame): string | undefined {
+  switch (frame.kind) {
+    case INNER_FRAME_KIND.streamOpen:
+    case INNER_FRAME_KIND.streamData:
+    case INNER_FRAME_KIND.streamAck:
+    case INNER_FRAME_KIND.streamClose:
+      return frame.streamId
+    default:
+      return undefined
+  }
+}
+
+const ACK_INTERVAL_BYTES = 256 * 1024
 
 export class RelaySession {
   readonly role: RelaySessionRole
@@ -144,6 +178,13 @@ export class RelaySession {
   /** Set when we've verified the peer's hello_confirm (first pairing). */
   private confirmVerified = false
   private readonly isReconnect: boolean
+  private readonly initialStreamCreditBytes: number
+  private readonly maxStreamCreditBytes: number
+  private readonly maxConnectionCreditBytes: number
+  private readonly optimizedCodecEnabled: boolean
+  private connectionInFlightBytes = 0
+  private flushCursor = 0
+  private flushingOutbound = false
 
   constructor(
     role: RelaySessionRole,
@@ -157,15 +198,36 @@ export class RelaySession {
     this.pairingCode = options.pairingCode
     this.pinnedPeerPubkey = options.pinnedPeerPubkey
     this.cb = callbacks
-    this.ourPublicKeyBase64 = options.ourPublicKeyBase64 ?? publicKeyFromPrivateKey(ourPrivateKeyBase64)
+    this.ourPublicKeyBase64
+      = options.ourPublicKeyBase64 ?? publicKeyFromPrivateKey(ourPrivateKeyBase64)
     this.isReconnect = Boolean(options.pinnedPeerPubkey)
     // The controller initiates the hello exchange; the host waits for it. This
     // matches the relay model where the host is always-on and the controller
     // connects later — if the host sent hello first, relayd would close it
     // (TryAgainLater) because no controller peer is connected yet.
-    this.initiateHello = options.initiateHello ?? (role === 'controller')
+    this.initiateHello = options.initiateHello ?? role === 'controller'
     this.ourName = options.ourName
     this.ourSigningPubkey = options.ourSigningPubkey
+    this.initialStreamCreditBytes
+      = options.initialStreamCreditBytes ?? RELAY_STREAM_MIN_CREDIT_BYTES
+    this.maxStreamCreditBytes = options.maxStreamCreditBytes ?? RELAY_STREAM_MAX_CREDIT_BYTES
+    this.maxConnectionCreditBytes
+      = options.maxConnectionCreditBytes ?? RELAY_CONNECTION_MAX_CREDIT_BYTES
+    this.optimizedCodecEnabled = options.optimizedCodecEnabled ?? true
+    if (
+      !Number.isSafeInteger(this.initialStreamCreditBytes)
+      || !Number.isSafeInteger(this.maxStreamCreditBytes)
+      || !Number.isSafeInteger(this.maxConnectionCreditBytes)
+      || this.initialStreamCreditBytes < RELAY_STREAM_MIN_CREDIT_BYTES
+      || this.maxStreamCreditBytes < this.initialStreamCreditBytes
+      || this.maxConnectionCreditBytes < this.initialStreamCreditBytes
+    ) {
+      throw new AppError({
+        code: 'relay_credit_config_invalid',
+        status: 500,
+        message: 'Relay stream or connection credit bounds are invalid.',
+      })
+    }
   }
 
   get isReady(): boolean {
@@ -199,7 +261,13 @@ export class RelaySession {
       return
     }
     if (env.version !== RELAY_PROTOCOL_VERSION) {
-      this.fail(new AppError({ code: 'relay_protocol_version', status: 400, message: `Unsupported relay protocol version ${env.version}` }))
+      this.fail(
+        new AppError({
+          code: 'relay_protocol_version',
+          status: 400,
+          message: `Unsupported relay protocol version ${env.version}`,
+        }),
+      )
       return
     }
     switch (env.kind) {
@@ -213,7 +281,13 @@ export class RelaySession {
         this.handleRelayError(env)
         break
       default:
-        this.fail(new AppError({ code: 'relay_protocol_unknown_kind', status: 400, message: `Unknown relay envelope kind ${env.kind}` }))
+        this.fail(
+          new AppError({
+            code: 'relay_protocol_unknown_kind',
+            status: 400,
+            message: `Unknown relay envelope kind ${env.kind}`,
+          }),
+        )
     }
   }
 
@@ -231,7 +305,6 @@ export class RelaySession {
       ...(this.ourName ? { name: this.ourName } : {}),
       ...(this.ourSigningPubkey ? { signingPubkey: this.ourSigningPubkey } : {}),
     }
-    helloFrameSchema.parse(frame)
     // Set helloSent BEFORE sendPlainEnvelope: sendPlainEnvelope is delivered
     // synchronously by the test transport, which can re-enter handleHello →
     // sendHello before this call returns. Without this guard the host would
@@ -248,16 +321,30 @@ export class RelaySession {
         // Pre-key: only plaintext handshake frames are accepted.
         frame = this.parsePlainFrame(env.payload)
         if (frame.kind !== INNER_FRAME_KIND.hello && frame.kind !== INNER_FRAME_KIND.helloConfirm) {
-          this.fail(new AppError({ code: 'relay_handshake_unexpected_frame', status: 400, message: `Unexpected pre-handshake frame ${frame.kind}` }))
+          this.fail(
+            new AppError({
+              code: 'relay_handshake_unexpected_frame',
+              status: 400,
+              message: `Unexpected pre-handshake frame ${frame.kind}`,
+            }),
+          )
           return
         }
       }
-      else {
+ else {
         frame = this.decryptFrame(env.payload)
       }
     }
-    catch (error) {
-      this.fail(error instanceof Error ? error : new AppError({ code: 'relay_protocol_invalid_frame', status: 400, message: String(error) }))
+ catch (error) {
+      this.fail(
+        error instanceof Error
+          ? error
+          : new AppError({
+              code: 'relay_protocol_invalid_frame',
+              status: 400,
+              message: String(error),
+            }),
+      )
       return
     }
 
@@ -272,7 +359,7 @@ export class RelaySession {
         this.handleStreamOpen(frame.streamId)
         break
       case INNER_FRAME_KIND.streamData:
-        this.handleStreamData(frame.streamId, frame.data)
+        this.handleStreamData(frame)
         break
       case INNER_FRAME_KIND.streamAck:
         this.handleStreamAck(frame.streamId, frame.ackedBytes)
@@ -281,40 +368,66 @@ export class RelaySession {
         this.handleStreamCloseFrame(frame.streamId, frame.reason)
         break
       default:
-        this.fail(new AppError({ code: 'relay_protocol_unknown_frame', status: 400, message: `Unknown inner frame kind ${(frame as { kind: string }).kind}` }))
+        this.fail(
+          new AppError({
+            code: 'relay_protocol_unknown_frame',
+            status: 400,
+            message: `Unknown inner frame kind ${(frame as { kind: string }).kind}`,
+          }),
+        )
     }
   }
 
-  private handleHello(frame: { kind: 'hello', version: number, pubkey: string, pinnedPubkey?: string, name?: string, signingPubkey?: string }): void {
+  private handleHello(frame: {
+    kind: 'hello'
+    version: number
+    pubkey: string
+    pinnedPubkey?: string
+    name?: string
+    signingPubkey?: string
+  }): void {
     if (this.peerPubkey !== null) {
-      this.fail(new AppError({ code: 'relay_handshake_duplicate_hello', status: 400, message: 'Received duplicate hello frame.' }))
+      this.fail(
+        new AppError({
+          code: 'relay_handshake_duplicate_hello',
+          status: 400,
+          message: 'Received duplicate hello frame.',
+        }),
+      )
       return
     }
     // Reconnect: the peer's pubkey must match the pinned value.
     if (this.isReconnect) {
       if (!this.pinnedPeerPubkey || frame.pubkey !== this.pinnedPeerPubkey) {
-        this.fail(new AppError({
-          code: 'relay_handshake_pubkey_mismatch',
-          status: 400,
-          message: 'Peer public key does not match the pinned value.',
-        }))
+        this.fail(
+          new AppError({
+            code: 'relay_handshake_pubkey_mismatch',
+            status: 400,
+            message: 'Peer public key does not match the pinned value.',
+          }),
+        )
         return
       }
     }
     // The peer's pinnedPubkey (if any) must match ours too.
     if (frame.pinnedPubkey && frame.pinnedPubkey !== this.ourPublicKeyBase64) {
-      this.fail(new AppError({
-        code: 'relay_handshake_pubkey_mismatch',
-        status: 400,
-        message: 'Peer expected a different local public key.',
-      }))
+      this.fail(
+        new AppError({
+          code: 'relay_handshake_pubkey_mismatch',
+          status: 400,
+          message: 'Peer expected a different local public key.',
+        }),
+      )
       return
     }
 
     this.peerPubkey = frame.pubkey
     this.cb.onPeerPubkey?.(frame.pubkey, peerFingerprint(frame.pubkey))
     if (frame.name || frame.signingPubkey) {
-      this.cb.onPeerInfo?.({ ...(frame.name ? { name: frame.name } : {}), ...(frame.signingPubkey ? { signingPubkey: frame.signingPubkey } : {}) })
+      this.cb.onPeerInfo?.({
+        ...(frame.name ? { name: frame.name } : {}),
+        ...(frame.signingPubkey ? { signingPubkey: frame.signingPubkey } : {}),
+      })
     }
     this.deriveKeys()
 
@@ -328,7 +441,7 @@ export class RelaySession {
       // Pinning verified → ready immediately, no confirm exchange needed.
       this.markReady()
     }
-    else {
+ else {
       // First pairing: try to send hello_confirm now (only fires once we have
       // both sent our own hello and learned the peer's pubkey).
       this.maybeSendConfirm()
@@ -341,8 +454,14 @@ export class RelaySession {
     }
     const sharedSecret = computeRelaySharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
     this.keys = deriveRelayKeys(sharedSecret, this.pairingCode ?? '')
-    this.sendCipher = new RelayCipher(this.role === 'host' ? this.keys.hostSendKey : this.keys.controllerSendKey)
-    this.receiveCipher = new RelayCipher(this.role === 'host' ? this.keys.controllerSendKey : this.keys.hostSendKey)
+    this.sendCipher = new RelayCipher(
+      this.role === 'host' ? this.keys.hostSendKey : this.keys.controllerSendKey,
+      this.optimizedCodecEnabled,
+    )
+    this.receiveCipher = new RelayCipher(
+      this.role === 'host' ? this.keys.controllerSendKey : this.keys.hostSendKey,
+      this.optimizedCodecEnabled,
+    )
   }
 
   /**
@@ -392,17 +511,25 @@ export class RelaySession {
 
   private handleHelloConfirm(frame: { kind: 'hello_confirm', confirm: string }): void {
     if (this.isReconnect || !this.keys || !this.peerPubkey) {
-      this.fail(new AppError({ code: 'relay_handshake_unexpected_confirm', status: 400, message: 'Unexpected hello_confirm frame.' }))
+      this.fail(
+        new AppError({
+          code: 'relay_handshake_unexpected_confirm',
+          status: 400,
+          message: 'Unexpected hello_confirm frame.',
+        }),
+      )
       return
     }
     const sharedSecret = computeRelaySharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
     const expected = this.buildConfirm(sharedSecret)
     if (!confirmEquals(frame.confirm, expected)) {
-      this.fail(new AppError({
-        code: 'relay_handshake_confirm_mismatch',
-        status: 400,
-        message: 'Pairing confirmation failed. Check the pairing code.',
-      }))
+      this.fail(
+        new AppError({
+          code: 'relay_handshake_confirm_mismatch',
+          status: 400,
+          message: 'Pairing confirmation failed. Check the pairing code.',
+        }),
+      )
       return
     }
     this.confirmVerified = true
@@ -430,9 +557,13 @@ export class RelaySession {
   /** Controller side: open a new stream. Returns the streamId. */
   openStream(streamId: string): void {
     if (!this.isReady) {
-      throw new AppError({ code: 'relay_not_ready', status: 503, message: 'Relay session is not ready.' })
+      throw new AppError({
+        code: 'relay_not_ready',
+        status: 503,
+        message: 'Relay session is not ready.',
+      })
     }
-    this.streams.set(streamId, createStreamFlowState())
+    this.streams.set(streamId, createStreamFlowState(this.initialStreamCreditBytes))
     this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamOpen, streamId })
   }
 
@@ -440,31 +571,18 @@ export class RelaySession {
    * Send data on a stream. The data is chunked to stay under the relayd frame
    * cap. The session always sends all of `data` (it does not partial-accept);
    * flow control is signaled back to the caller via onPauseStream/onResumeStream
-   * — the caller must pause reading its local source when asked. A brief
-   * overage of up to one chunk (≤ 256 KiB) past the credit window is absorbed
-   * by relayd's 4 MiB queue and the peer's receive buffer, which keeps the
-   * transport logic simple without risking a queue overrun.
+   * — the caller must pause reading its local source when asked. Per-stream
+   * and connection-wide credit bounds keep aggregate in-flight data within a
+   * fixed memory budget even when many streams are active.
    */
   writeStreamData(streamId: string, data: Uint8Array): void {
     const flow = this.streams.get(streamId)
     if (!flow || flow.closed || !this.isReady) {
       return
     }
-    let offset = 0
-    while (offset < data.length) {
-      const chunkEnd = Math.min(offset + RELAY_MAX_STREAM_CHUNK_BYTES, data.length)
-      const chunk = data.subarray(offset, chunkEnd)
-      const seq = flow.sentBytes
-      this.sendEncryptedFrame({
-        kind: INNER_FRAME_KIND.streamData,
-        streamId,
-        seq,
-        data: Buffer.from(chunk).toString('base64'),
-      })
-      flow.sentBytes += chunk.length
-      offset = chunkEnd
-    }
-    if (bytesInFlight(flow) >= RELAY_STREAM_CREDIT_BYTES && !flow.paused) {
+    flow.pendingData.push(data)
+    this.flushOutboundStreams()
+    if ((flow.pendingData.length > 0 || bytesInFlight(flow) >= flow.creditBytes) && !flow.paused) {
       flow.paused = true
       this.cb.onPauseStream?.(streamId)
     }
@@ -479,7 +597,11 @@ export class RelaySession {
    * Cumulative `stream_ack` frames are emitted every {@link ACK_INTERVAL_BYTES}.
    * Pass `flush: true` (or close the stream) to advertise any remainder.
    */
-  reportStreamDataConsumed(streamId: string, consumedBytes: number, options?: { flush?: boolean }): void {
+  reportStreamDataConsumed(
+    streamId: string,
+    consumedBytes: number,
+    options?: { flush?: boolean },
+  ): void {
     const flow = this.streams.get(streamId)
     if (!flow || flow.closed || !this.isReady || consumedBytes <= 0) {
       return
@@ -537,24 +659,54 @@ export class RelaySession {
     }
     this.maybeSendReceiveAck(streamId, flow, true)
     flow.closed = true
-    this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamClose, streamId, ...(reason ? { reason } : {}) })
+    this.connectionInFlightBytes = Math.max(
+      0,
+      this.connectionInFlightBytes - bytesInFlight(flow),
+    )
+    this.sendEncryptedFrame({
+      kind: INNER_FRAME_KIND.streamClose,
+      streamId,
+      ...(reason ? { reason } : {}),
+    })
+    this.streams.delete(streamId)
   }
 
   private handleStreamOpen(streamId: string): void {
     if (this.streams.has(streamId)) {
-      this.fail(new AppError({ code: 'relay_stream_duplicate', status: 400, message: `Stream ${streamId} already open.` }))
+      this.fail(
+        new AppError({
+          code: 'relay_stream_duplicate',
+          status: 400,
+          message: `Stream ${streamId} already open.`,
+        }),
+      )
       return
     }
-    this.streams.set(streamId, createStreamFlowState())
+    this.streams.set(streamId, createStreamFlowState(this.initialStreamCreditBytes))
     this.cb.onStreamOpen?.(streamId)
   }
 
-  private handleStreamData(streamId: string, dataBase64: string): void {
+  private handleStreamData(frame: Extract<InnerFrame, { kind: 'stream_data' }>): void {
+    const streamId = frame.streamId
     const flow = this.streams.get(streamId)
     if (!flow || flow.closed) {
       return
     }
-    const data = new Uint8Array(Buffer.from(dataBase64, 'base64'))
+    if (frame.seq !== flow.receivedBytes) {
+      this.fail(
+        new AppError({
+          code: 'relay_stream_sequence_invalid',
+          status: 400,
+          message: `Unexpected stream sequence ${frame.seq}; expected ${flow.receivedBytes}.`,
+        }),
+      )
+      return
+    }
+    const data = decodeRelayChunk({
+      data: frame.data,
+      compression: frame.compression ?? 'none',
+      uncompressedBytes: frame.uncompressedBytes ?? frame.data.byteLength,
+    })
     flow.receivedBytes += data.length
     // Deliver first; credit is released only when the transport reports the
     // bytes were applied (TCP write success / drain). See reportStreamDataConsumed.
@@ -569,92 +721,207 @@ export class RelaySession {
     if (ackedBytes > flow.sentBytes) {
       return
     }
+    const previousAckedBytes = flow.peerAckedBytes
     // Send-side credit only — never touch receive-side counters here.
     flow.peerAckedBytes = Math.max(flow.peerAckedBytes, ackedBytes)
-    if (flow.paused && bytesInFlight(flow) < RELAY_STREAM_CREDIT_BYTES / 2) {
-      flow.paused = false
-      this.cb.onResumeStream?.(streamId)
+    const releasedBytes = flow.peerAckedBytes - previousAckedBytes
+    this.connectionInFlightBytes = Math.max(0, this.connectionInFlightBytes - releasedBytes)
+    flow.ackedSinceCreditIncrease += releasedBytes
+    if (
+      flow.ackedSinceCreditIncrease >= flow.creditBytes / 2
+      && flow.creditBytes < this.maxStreamCreditBytes
+    ) {
+      flow.creditBytes = Math.min(this.maxStreamCreditBytes, flow.creditBytes * 2)
+      flow.ackedSinceCreditIncrease = 0
     }
+    this.flushOutboundStreams()
+    this.updatePausedStreams()
     this.cb.onStreamAck?.(streamId, ackedBytes)
   }
 
   private handleStreamCloseFrame(streamId: string, reason?: string): void {
     const flow = this.streams.get(streamId)
     if (flow) {
+      this.connectionInFlightBytes = Math.max(
+        0,
+        this.connectionInFlightBytes - bytesInFlight(flow),
+      )
       flow.closed = true
+      this.streams.delete(streamId)
     }
     this.cb.onStreamClose?.(streamId, reason)
   }
 
+  private flushOutboundStreams(): void {
+    if (this.flushingOutbound) {
+      return
+    }
+    this.flushingOutbound = true
+    try {
+      const streams = [...this.streams.entries()].filter(([, flow]) => !flow.closed)
+      if (streams.length === 0) {
+        return
+      }
+      let madeProgress = true
+      while (madeProgress && this.connectionInFlightBytes < this.maxConnectionCreditBytes) {
+        madeProgress = false
+        for (let offset = 0; offset < streams.length; offset++) {
+          const index = (this.flushCursor + offset) % streams.length
+          const [streamId, flow] = streams[index]
+          if (this.flushOutboundChunk(streamId, flow)) {
+            madeProgress = true
+            this.flushCursor = (index + 1) % streams.length
+          }
+          if (this.connectionInFlightBytes >= this.maxConnectionCreditBytes) {
+            break
+          }
+        }
+      }
+    }
+    finally {
+      this.flushingOutbound = false
+    }
+  }
+
+  private flushOutboundChunk(streamId: string, flow: StreamFlowState): boolean {
+    if (
+      flow.closed
+      || flow.pendingData.length === 0
+      || bytesInFlight(flow) >= flow.creditBytes
+      || this.connectionInFlightBytes >= this.maxConnectionCreditBytes
+    ) {
+      return false
+    }
+    const pending = flow.pendingData[0]
+    const capacity = Math.min(
+      flow.creditBytes - bytesInFlight(flow),
+      this.maxConnectionCreditBytes - this.connectionInFlightBytes,
+    )
+    const length = Math.min(pending.byteLength, capacity, RELAY_MAX_STREAM_CHUNK_BYTES)
+    if (length <= 0) {
+      return false
+    }
+    const chunk = pending.subarray(0, length)
+    if (length === pending.byteLength) {
+      flow.pendingData.shift()
+    }
+ else {
+      flow.pendingData[0] = pending.subarray(length)
+    }
+    const seq = flow.sentBytes
+    flow.sentBytes += chunk.byteLength
+    this.connectionInFlightBytes += chunk.byteLength
+    if (chunk.byteLength < RELAY_MIN_COMPRESSION_INPUT_BYTES || !this.optimizedCodecEnabled) {
+      this.sendEncryptedFrame({
+        kind: INNER_FRAME_KIND.streamData,
+        streamId,
+        seq,
+        data: chunk,
+      })
+      return true
+    }
+    const encoded = encodeRelayChunk(chunk)
+    this.sendEncryptedFrame({
+      kind: INNER_FRAME_KIND.streamData,
+      streamId,
+      seq,
+      data: encoded.data,
+      ...(encoded.compression === 'zstd'
+        ? { compression: 'zstd', uncompressedBytes: encoded.uncompressedBytes }
+        : {}),
+    })
+    return true
+  }
+
+  private updatePausedStreams(): void {
+    for (const [streamId, flow] of this.streams) {
+      if (
+        flow.paused
+        && flow.pendingData.length === 0
+        && bytesInFlight(flow) < flow.creditBytes / 2
+      ) {
+        flow.paused = false
+        this.cb.onResumeStream?.(streamId)
+      }
+    }
+  }
+
   private handlePeerClosed(env: RelayEnvelope): void {
-    const parsed = peerClosedPayloadSchema.safeParse(env.payload)
-    this.cb.onPeerClosed?.(parsed.success ? parsed.data.reason : undefined)
+    try {
+      this.cb.onPeerClosed?.(decodeRelayPeerClosedPayload(env.payload).reason)
+    }
+ catch {
+      this.cb.onPeerClosed?.()
+    }
   }
 
   private handleRelayError(env: RelayEnvelope): void {
-    const parsed = relayErrorPayloadSchema.safeParse(env.payload)
-    this.fail(new AppError({
-      code: 'relay_error',
-      status: 502,
-      message: parsed.success ? (parsed.data.error ?? 'relay error') : 'relay error',
-    }))
+    let message = 'relay error'
+    try {
+      message = decodeRelayErrorPayload(env.payload).error ?? message
+    }
+ catch {
+      // Keep a stable error when the untrusted control payload is malformed.
+    }
+    this.fail(
+      new AppError({
+        code: 'relay_error',
+        status: 502,
+        message,
+      }),
+    )
   }
 
   // ── Frame send helpers ──
 
-  private sendPlainEnvelope(payload: unknown): void {
+  private sendPlainEnvelope(frame: InnerFrame): void {
+    const streamId = streamIdForFrame(frame)
     const env: RelayEnvelope = {
       version: RELAY_PROTOCOL_VERSION,
       roomId: this.roomId,
       seq: this.outboundSeq++,
       kind: RELAY_ENVELOPE_KIND.dataFrame,
-      payload,
+      priority: relayPriorityForInnerFrame(frame),
+      ...(streamId ? { streamId } : {}),
+      payload: encodeInnerFrame(frame),
     }
-    this.cb.send(JSON.stringify(env))
+    this.cb.send(encodeRelayEnvelope(env))
   }
 
   private sendEncryptedFrame(frame: InnerFrame): void {
     if (!this.sendCipher) {
-      throw new AppError({ code: 'relay_not_ready', status: 503, message: 'Relay session keys not derived.' })
+      throw new AppError({
+        code: 'relay_not_ready',
+        status: 503,
+        message: 'Relay session keys not derived.',
+      })
     }
-    innerFrameSchema.parse(frame)
-    const plaintext = Buffer.from(JSON.stringify(frame), 'utf8')
-    const ciphertext = this.sendCipher.encrypt(new Uint8Array(plaintext))
-    const payload = { ciphertext }
-    encryptedPayloadSchema.parse(payload)
-    this.sendPlainEnvelope(payload)
+    const streamId = streamIdForFrame(frame)
+    const env: RelayEnvelope = {
+      version: RELAY_PROTOCOL_VERSION,
+      roomId: this.roomId,
+      seq: this.outboundSeq++,
+      kind: RELAY_ENVELOPE_KIND.dataFrame,
+      priority: relayPriorityForInnerFrame(frame),
+      ...(streamId ? { streamId } : {}),
+      payload: this.sendCipher.encrypt(encodeInnerFrame(frame)),
+    }
+    this.cb.send(encodeRelayEnvelope(env))
   }
 
-  private parsePlainFrame(payload: unknown): InnerFrame {
-    // Plaintext handshake frames arrive as bare JSON objects.
-    const parsed = innerFrameSchema.safeParse(payload)
-    if (!parsed.success) {
-      throw new AppError({ code: 'relay_protocol_invalid_frame', status: 400, message: `Invalid inner frame: ${parsed.error.message}` })
-    }
-    return parsed.data
+  private parsePlainFrame(payload: Uint8Array): InnerFrame {
+    return decodeInnerFrame(payload)
   }
 
-  private decryptFrame(payload: unknown): InnerFrame {
+  private decryptFrame(payload: Uint8Array): InnerFrame {
     if (!this.receiveCipher) {
-      throw new AppError({ code: 'relay_not_ready', status: 503, message: 'Relay session keys not derived.' })
+      throw new AppError({
+        code: 'relay_not_ready',
+        status: 503,
+        message: 'Relay session keys not derived.',
+      })
     }
-    const encryptedParsed = encryptedPayloadSchema.safeParse(payload)
-    if (!encryptedParsed.success) {
-      throw new AppError({ code: 'relay_protocol_invalid_payload', status: 400, message: 'Invalid encrypted payload.' })
-    }
-    const plaintext = this.receiveCipher.decrypt(encryptedParsed.data.ciphertext)
-    let json: unknown
-    try {
-      json = JSON.parse(Buffer.from(plaintext).toString('utf8'))
-    }
-    catch (error) {
-      throw new AppError({ code: 'relay_protocol_invalid_frame', status: 400, message: `Decrypted frame is not JSON: ${error instanceof Error ? error.message : String(error)}` })
-    }
-    const frameParsed = innerFrameSchema.safeParse(json)
-    if (!frameParsed.success) {
-      throw new AppError({ code: 'relay_protocol_invalid_frame', status: 400, message: `Invalid decrypted inner frame: ${frameParsed.error.message}` })
-    }
-    return frameParsed.data
+    return decodeInnerFrame(this.receiveCipher.decrypt(payload))
   }
 
   private fail(error: Error): void {
@@ -675,11 +942,14 @@ export class RelaySession {
       this.cb.onStreamClose?.(streamId, 'session closed')
     }
     this.streams.clear()
+    this.connectionInFlightBytes = 0
   }
 }
 
 function publicKeyFromPrivateKey(privateKeyBase64: string): string {
-  return Buffer.from(x25519.scalarMultBase(new Uint8Array(Buffer.from(privateKeyBase64, 'base64')))).toString('base64')
+  return Buffer.from(
+    x25519.scalarMultBase(new Uint8Array(Buffer.from(privateKeyBase64, 'base64'))),
+  ).toString('base64')
 }
 
 function peerFingerprint(publicKeyBase64: string): string {

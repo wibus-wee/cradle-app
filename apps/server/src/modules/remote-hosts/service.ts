@@ -16,6 +16,7 @@ import {
   signRelayAssertion,
 } from '../relay-servers/relay-signature-service'
 import { resolveRelayUrl as resolveRelayServerUrl } from '../relay-servers/service'
+import type { RelayControllerPerformanceSnapshot } from '../relay-transport/controller-transport'
 import {
   startRelayControllerTransport,
 } from '../relay-transport/controller-transport'
@@ -120,7 +121,7 @@ export interface SshProfileLaunchConfig {
   sshArgs: string[]
 }
 
-export type RemoteHostConnectionState = 'idle' | 'connected' | 'offline'
+export type RemoteHostConnectionState = 'idle' | 'warming' | 'connected' | 'offline'
 
 export interface RemoteHostView extends RemoteHost {
   connectionState: RemoteHostConnectionState
@@ -132,6 +133,7 @@ export interface RemoteCradleServerConnectionView {
   state: RemoteHostConnectionState
   localBaseUrl: string | null
   lastError: string | null
+  relayPerformance: RelayControllerPerformanceSnapshot | null
 }
 
 export interface RemoteCradleServerHealthView extends RemoteCradleServerConnectionView {
@@ -821,6 +823,7 @@ export async function claimRemoteHostRelay(
     state: 'idle',
     localBaseUrl: null,
     lastError: null,
+    relayPerformance: null,
   }
 }
 
@@ -1027,7 +1030,9 @@ function toHostView(host: RemoteHost): RemoteHostView {
   const record = connections.get(host.id)
   return {
     ...host,
-    connectionState: record ? connectionStateOf(record) : 'idle',
+    connectionState: record
+      ? connectionStateOf(record)
+      : connectPromises.has(host.id) ? 'warming' : 'idle',
     lastError: record?.lastError ?? null,
   }
 }
@@ -1038,7 +1043,19 @@ function toConnectionView(record: RemoteHostConnectionRecord): RemoteCradleServe
     state: connectionStateOf(record),
     localBaseUrl: record.tunnelExited ? null : record.baseUrl,
     lastError: record.lastError,
+    relayPerformance: relayPerformanceForTunnel(record.tunnel),
   }
+}
+
+function relayPerformanceForTunnel(tunnel: LocalTunnelHandle | null): RelayControllerPerformanceSnapshot | null {
+  if (!tunnel || !('getPerformanceSnapshot' in tunnel)) {
+    return null
+  }
+  const getPerformanceSnapshot = tunnel.getPerformanceSnapshot
+  if (typeof getPerformanceSnapshot !== 'function') {
+    return null
+  }
+  return getPerformanceSnapshot.call(tunnel) as RelayControllerPerformanceSnapshot
 }
 
 function connectionStateOf(record: RemoteHostConnectionRecord): RemoteHostConnectionState {
