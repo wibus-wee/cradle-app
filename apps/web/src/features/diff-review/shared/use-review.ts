@@ -16,6 +16,7 @@ import {
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmit,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreads,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdComments,
+  postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactions,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdResolve,
   postWorkspacesByWorkspaceIdDiffReviewsLocalWorkingTree,
   putWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanId,
@@ -206,6 +207,23 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     },
     onSuccess: applyReview,
     onError: reportMutationError('Reply'),
+  })
+
+  const reactionMutation = useMutation({
+    mutationFn: async (input: { threadId: string, reaction: string }) => {
+      const review = reviewQuery.data
+      if (!review) {
+        throw new Error('Review not loaded')
+      }
+      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdReactions({
+        path: { workspaceId, reviewId: review.id, threadId: input.threadId },
+        body: { reaction: input.reaction },
+        throwOnError: true,
+      })
+      return data
+    },
+    onSuccess: applyReview,
+    onError: reportMutationError('Add reaction'),
   })
 
   const resolveThreadMutation = useMutation({
@@ -534,6 +552,7 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     viewedMutation,
     createThreadMutation,
     replyMutation,
+    reactionMutation,
     resolveThreadMutation,
     submitMutation,
     closeReviewMutation,

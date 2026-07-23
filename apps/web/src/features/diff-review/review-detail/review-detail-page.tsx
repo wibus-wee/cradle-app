@@ -49,6 +49,7 @@ export function ReviewDetailPage({
     viewedMutation,
     createThreadMutation,
     replyMutation,
+    reactionMutation,
     resolveThreadMutation,
     submitMutation,
     closeReviewMutation,
@@ -181,6 +182,12 @@ export function ReviewDetailPage({
     }
   }, [selectedFileId, visibleFiles])
 
+  const selectFile = (file: ReviewFile) => {
+    setSelectedFileId(file.id)
+    setSelectedLineSelection(null)
+    stageHandleRef.current?.scrollToPath(file.path)
+  }
+
   // Keep review navigation keyboard-first, matching the dense browsing workflow users expect
   // from Linear-style review surfaces. Shortcuts are ignored while editing a text control.
   useEffect(() => {
@@ -241,12 +248,6 @@ export function ReviewDetailPage({
       stageHandleRef.current?.scrollToPath(path)
     }
   }, [visibleItems])
-
-  const selectFile = (file: ReviewFile) => {
-    setSelectedFileId(file.id)
-    setSelectedLineSelection(null)
-    stageHandleRef.current?.scrollToPath(file.path)
-  }
 
   const jumpToThread = (thread: ReviewThread) => {
     stageHandleRef.current?.scrollToThread(thread)
@@ -378,6 +379,8 @@ export function ReviewDetailPage({
             createPending={createThreadMutation.isPending}
             onReply={(threadId, body) => replyMutation.mutate({ threadId, bodyMarkdown: body })}
             replyPending={replyMutation.isPending}
+            onReact={(threadId, reaction) => reactionMutation.mutate({ threadId, reaction })}
+            reactionPending={reactionMutation.isPending}
             onResolve={threadId => resolveThreadMutation.mutate(threadId)}
             resolvePending={resolveThreadMutation.isPending}
             onAskAgentForThread={askAgentForThread}
