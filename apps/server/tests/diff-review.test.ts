@@ -15,10 +15,11 @@ import {
 } from '@cradle/db'
 import type { UIMessageChunk } from 'ai'
 import { eq } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import { resetTokenCache } from '../src/lib/github-api'
 import { getRuntimeRegistry, registerRuntime, unregisterRuntime } from '../src/modules/chat-runtime/chat-runtime-provider-registry'
 import type {
   ChatRuntime,
@@ -160,7 +161,8 @@ interface DiffReviewResponse {
   id: string
   workspaceId: string
   repositoryPath: string
-  sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit'
+  sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'github-pull-request'
+  githubPullRequest: { owner: string, repo: string, number: number } | null
   title: string
   status: 'open' | 'merged' | 'closed' | 'abandoned'
   reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented'
@@ -474,6 +476,164 @@ function insertManualCommitPlan(review: DiffReviewResponse, input: {
 }
 
 describe('diff-review capability', () => {
+  it('materializes a GitHub pull request as a refreshable review source', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-diff-review-github-workspace-')
+    const previousEnv = useIsolatedTestInfra(dataDir)
+    const previousGitHubToken = process.env.GH_TOKEN
+
+    try {
+      process.env.GH_TOKEN = 'test-token'
+      resetTokenCache()
+      const pullRequest = {
+        number: 70,
+        title: 'Complete remote review flow',
+        body: null,
+        state: 'open',
+        draft: false,
+        merged: false,
+        mergeable: true,
+        mergeable_state: 'clean',
+        html_url: 'https://github.com/cradle/app/pull/70',
+        user: { login: 'author', avatar_url: 'https://avatars.example/author', html_url: 'https://github.com/author' },
+        head: { sha: 'head-sha', ref: 'feature/remote-review' },
+        base: { ref: 'main' },
+        additions: 4,
+        deletions: 1,
+        changed_files: 2,
+        commits: 1,
+        comments: 0,
+        review_comments: 0,
+        created_at: '2026-07-20T10:00:00Z',
+        updated_at: '2026-07-21T10:00:00Z',
+        closed_at: null,
+        merged_at: null,
+        requested_reviewers: [],
+        assignees: [],
+        labels: [],
+      }
+      const files = [{
+        sha: 'file-sha',
+        filename: 'src/app.ts',
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+        changes: 2,
+        blob_url: 'https://github.com/cradle/app/blob/head/src/app.ts',
+        raw_url: 'https://raw.githubusercontent.com/cradle/app/head/src/app.ts',
+        contents_url: 'https://api.github.com/repos/cradle/app/contents/src/app.ts',
+        patch: '@@ -1 +1 @@\n-export const local = true\n+export const remote = true',
+        previous_filename: null,
+      }, {
+        sha: 'large-file-sha',
+        filename: 'src/generated.ts',
+        status: 'added',
+        additions: 3,
+        deletions: 0,
+        changes: 3,
+        blob_url: 'https://github.com/cradle/app/blob/head/src/generated.ts',
+        raw_url: 'https://raw.githubusercontent.com/cradle/app/head/src/generated.ts',
+        contents_url: 'https://api.github.com/repos/cradle/app/contents/src/generated.ts',
+        patch: null,
+        previous_filename: null,
+      }]
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(pullRequest), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify(files), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ total_count: 0, check_runs: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'success', total_count: 0, statuses: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          id: 9001,
+          state: 'APPROVED',
+          html_url: 'https://github.com/cradle/app/pull/70#pullrequestreview-9001',
+        }), { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const app = await createServerApp()
+      db()
+        .insert(workspaces)
+        .values(localWorkspaceRow({
+          id: 'workspace-diff-review-github',
+          name: 'Workspace Diff Review GitHub',
+          path: workspaceRoot,
+        }))
+        .run()
+
+      const review = await postJson<DiffReviewResponse>(
+        app,
+        '/workspaces/workspace-diff-review-github/diff-reviews/github-pull-request',
+        { owner: 'cradle', repo: 'app', number: 70 },
+      )
+
+      expect(review.sourceKind).toBe('github-pull-request')
+      expect(review.githubPullRequest).toEqual({ owner: 'cradle', repo: 'app', number: 70 })
+      expect(review.repositoryPath).toBe('github:cradle/app')
+      expect(review.status).toBe('open')
+      expect(review.currentRevision).toMatchObject({
+        sourceVersion: expect.stringContaining('head-sha:'),
+        fileCount: 2,
+        additions: 4,
+        deletions: 1,
+      })
+      expect(review.files).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: 'src/app.ts', status: 'modified', additions: 1, deletions: 1 }),
+        expect.objectContaining({ path: 'src/generated.ts', status: 'added', additions: 3, deletions: 0, isBinary: false }),
+      ]))
+      expect(fetchMock).toHaveBeenCalledTimes(6)
+
+      const missingBody = await postJsonWithStatus<{ code: string }>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/submit`,
+        { decision: 'request-changes' },
+        400,
+      )
+      expect(missingBody.code).toBe('diff_review_github_body_required')
+      expect(fetchMock).toHaveBeenCalledTimes(6)
+
+      const submitted = await postJson<DiffReviewResponse>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/submit`,
+        { decision: 'approve', bodyMarkdown: 'Ready to merge.' },
+      )
+      expect(submitted.reviewState).toBe('approved')
+      expect(submitted.submissions[0]).toMatchObject({
+        decision: 'approve',
+        sourceSyncState: 'synced',
+      })
+      expect(fetchMock).toHaveBeenCalledTimes(7)
+      const [submitUrl, submitInit] = fetchMock.mock.calls[6]!
+      expect(submitUrl).toBe('https://api.github.com/repos/cradle/app/pulls/70/reviews')
+      expect(submitInit).toMatchObject({ method: 'POST' })
+      expect(JSON.parse(String(submitInit?.body))).toEqual({
+        body: 'Ready to merge.',
+        event: 'APPROVE',
+      })
+
+      const closeError = await postJsonWithStatus<{ code: string }>(
+        app,
+        `/workspaces/workspace-diff-review-github/diff-reviews/${review.id}/close`,
+        {},
+        400,
+      )
+      expect(closeError.code).toBe('diff_review_remote_pull_request_cannot_close')
+    }
+    finally {
+      if (previousGitHubToken === undefined) {
+        delete process.env.GH_TOKEN
+      }
+      else {
+        process.env.GH_TOKEN = previousGitHubToken
+      }
+      resetTokenCache()
+      vi.unstubAllGlobals()
+      restoreTestInfra(previousEnv)
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(workspaceRoot, { recursive: true, force: true })
+    }
+  })
+
   it('creates and refreshes an immutable local working tree revision', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-diff-review-workspace-')
@@ -722,7 +882,7 @@ describe('diff-review capability', () => {
       expect(readiness).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ sourceKind: 'local-working-tree', state: 'ready' }),
-          expect.objectContaining({ sourceKind: 'github-pull-request', state: 'workspace-integration-missing' }),
+          expect.objectContaining({ sourceKind: 'github-pull-request', state: 'ready' }),
         ]),
       )
 

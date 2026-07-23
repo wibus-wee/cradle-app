@@ -269,6 +269,7 @@ export interface DiffReviewView {
   sourceId: string | null
   repositoryPath: string
   sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import'
+  githubPullRequest: GitHubPullRequestBinding | null
   title: string
   status: 'open' | 'merged' | 'closed' | 'abandoned'
   reviewState: 'unreviewed' | 'in-review' | 'changes-requested' | 'approved' | 'commented'
@@ -297,6 +298,12 @@ export interface BranchCompareBinding {
 export interface LocalCommitBinding {
   repositoryPath: string
   commitSha: string
+}
+
+export interface GitHubPullRequestBinding {
+  owner: string
+  repo: string
+  number: number
 }
 
 export type ReviewEventKind = ReviewEventView['eventKind']

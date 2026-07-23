@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { getWorkspacesByWorkspaceIdDiffReviews } from '~/api-gen/sdk.gen'
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
 
+import { githubPullRequestReferenceKey } from '../github-pull-request-reference'
 import { reviewForMe, reviewListQueryKey, sourceLabel } from './diff-items'
 import type { CradleDiffReview, ReviewSourceKind } from './types'
 
@@ -14,6 +15,8 @@ export interface ReviewListGroup {
   label: string
   reviews: CradleDiffReview[]
 }
+
+const EMPTY_GITHUB_ROLES = new Map<string, 'authored' | 'reviewing'>()
 
 function groupSourceLabel(sourceKind: ReviewSourceKind): string {
   if (sourceKind === 'local-working-tree') {
@@ -53,7 +56,17 @@ function groupLabel(sourceKind: ReviewSourceKind, status: CradleDiffReview['stat
   return statusPrefix ? `${statusPrefix} ${label.toLowerCase()}` : label
 }
 
-function matchesTab(review: CradleDiffReview, tab: ReviewsListTab): boolean {
+function matchesTab(
+  review: CradleDiffReview,
+  tab: ReviewsListTab,
+  githubRolesByRef: ReadonlyMap<string, 'authored' | 'reviewing'>,
+): boolean {
+  if (review.githubPullRequest) {
+    const role = githubRolesByRef.get(githubPullRequestReferenceKey(review.githubPullRequest))
+    if (role) {
+      return tab === 'all' || (tab === 'for-me' ? role === 'reviewing' : role === 'authored')
+    }
+  }
   if (tab === 'for-me') {
     return reviewForMe(review)
   }
@@ -66,7 +79,10 @@ function matchesTab(review: CradleDiffReview, tab: ReviewsListTab): boolean {
   return true
 }
 
-export function useReviewList(workspaceId: string) {
+export function useReviewList(
+  workspaceId: string,
+  githubRolesByRef: ReadonlyMap<string, 'authored' | 'reviewing'> = EMPTY_GITHUB_ROLES,
+) {
   const query = useQuery({
     queryKey: reviewListQueryKey(workspaceId),
     queryFn: async () => {
@@ -83,8 +99,8 @@ export function useReviewList(workspaceId: string) {
   const reviews = useMemo(() => query.data ?? [], [query.data])
 
   const countForTab = useMemo(
-    () => (tab: ReviewsListTab) => reviews.filter(review => matchesTab(review, tab)).length,
-    [reviews],
+    () => (tab: ReviewsListTab) => reviews.filter(review => matchesTab(review, tab, githubRolesByRef)).length,
+    [githubRolesByRef, reviews],
   )
 
   /** Group reviews for a given tab by `sourceKind:status`. */
@@ -92,7 +108,7 @@ export function useReviewList(workspaceId: string) {
     () => (tab: ReviewsListTab): ReviewListGroup[] => {
       const grouped = new Map<string, ReviewListGroup>()
       for (const review of reviews) {
-        if (!matchesTab(review, tab)) {
+        if (!matchesTab(review, tab, githubRolesByRef)) {
           continue
         }
         const groupKey = `${review.sourceKind}:${review.status}`
@@ -106,7 +122,7 @@ export function useReviewList(workspaceId: string) {
       }
       return Array.from(grouped.values())
     },
-    [reviews],
+    [githubRolesByRef, reviews],
   )
 
   return {

@@ -83,6 +83,26 @@ export const diffReview = new Elysia({
     body: DiffReviewModel.localCommitBody,
     response: { 200: DiffReviewModel.review },
   })
+  .post('/:workspaceId/diff-reviews/github-pull-request', ({ params, body }) => {
+    const input = body as { owner: string, repo: string, number: number }
+    return DiffReview.refreshGitHubPullRequest({
+      workspaceId: params.workspaceId,
+      owner: input.owner,
+      repo: input.repo,
+      number: input.number,
+    })
+  }, {
+    detail: {
+      'summary': 'Create or refresh a GitHub pull request diff review',
+      'x-cradle-cli': {
+        command: ['workspace', 'diffs', 'github-pull-request'],
+        defaultWorkspaceId: true,
+      },
+    },
+    params: DiffReviewModel.workspaceParams,
+    body: DiffReviewModel.githubPullRequestBody,
+    response: { 200: DiffReviewModel.review },
+  })
   .get('/:workspaceId/diff-reviews/:reviewId', ({ params }) => DiffReview.get(params.workspaceId, params.reviewId), {
     detail: {
       'summary': 'Get diff review',
@@ -229,7 +249,7 @@ export const diffReview = new Elysia({
     })
   }, {
     detail: {
-      'summary': 'Submit local diff review decision',
+      'summary': 'Submit a diff review decision',
       'x-cradle-cli': {
         command: ['workspace', 'diffs', 'submit'],
         defaultWorkspaceId: true,

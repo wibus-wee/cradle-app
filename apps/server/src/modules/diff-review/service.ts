@@ -39,6 +39,7 @@ import { and, asc, desc, eq, ne } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
+import { submitPullRequestReview } from '../../lib/github-api'
 import * as BackgroundJobPoller from '../background-job/poller'
 import { registerOwnerProjector } from '../background-job/registry'
 import * as BackgroundJob from '../background-job/service'
@@ -54,6 +55,8 @@ import * as ModelRegistry from '../model-registry/service'
 import { runtimeOwnsProviderBinding, runtimeSupportsProviderKind } from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
 import { resolveProviderTarget } from '../provider-targets/service'
+import type { SessionPullRequestDetail } from '../pull-request/service'
+import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import { buildAgentFixArtifact } from './agent-fix-artifacts'
 import { isRangeAnchorInput, normalizeAnchor, remapAnchorToRevision, toAnchorView } from './anchors'
@@ -64,6 +67,7 @@ import type {
   DiffReviewPreferenceView,
   DiffReviewView,
   DiffRevisionView,
+  GitHubPullRequestBinding,
   LocalCommitBinding,
   ReviewActorKind,
   ReviewAgentFixArtifactView,
@@ -389,6 +393,18 @@ function reviewStateForDecision(
   return 'commented'
 }
 
+function githubReviewEvent(
+  decision: ReviewSubmissionView['decision'],
+): 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT' {
+  if (decision === 'approve') {
+    return 'APPROVE'
+  }
+  if (decision === 'request-changes') {
+    return 'REQUEST_CHANGES'
+  }
+  return 'COMMENT'
+}
+
 function loadThreads(reviewId: string): ReviewThreadView[] {
   const threads = db()
     .select()
@@ -576,6 +592,13 @@ function buildReviewView(
         .all()
         .map(toCommitPlanView)
     : []
+  const githubPullRequest = review.sourceKind === 'github-pull-request' && review.sourceId
+    ? db()
+        .select()
+        .from(diffReviewSources)
+        .where(eq(diffReviewSources.id, review.sourceId))
+        .get()
+    : null
 
   return {
     id: review.id,
@@ -583,6 +606,9 @@ function buildReviewView(
     sourceId: review.sourceId,
     repositoryPath: review.repositoryPath,
     sourceKind: review.sourceKind,
+    githubPullRequest: githubPullRequest
+      ? readSourceBinding<GitHubPullRequestBinding>(githubPullRequest)
+      : null,
     title: review.title,
     status: review.status,
     reviewState: review.reviewState,
@@ -670,6 +696,15 @@ function ensureLocalCommitSource(workspaceId: string, binding: LocalCommitBindin
   return ensureReviewSource({
     workspaceId,
     kind: 'local-commit',
+    binding,
+    refreshPolicy: 'manual',
+  })
+}
+
+function ensureGitHubPullRequestSource(workspaceId: string, binding: GitHubPullRequestBinding): string {
+  return ensureReviewSource({
+    workspaceId,
+    kind: 'github-pull-request',
     binding,
     refreshPolicy: 'manual',
   })
@@ -854,11 +889,13 @@ async function refreshMaterializedPatchReview(input: {
   sourceId: string
   repositoryPath: string
   sourceKind: ReviewSourceKind
+  status?: DiffReviewView['status']
   title: string
   patch: string
   patchHash: string
   sourceVersion: string
   statusFiles: Git.GitFileStatusView[]
+  fileStats?: Array<{ path: string, additions: number, deletions: number }>
   reviewCreatedPayload: unknown
   revisionUpdatedPayload: Record<string, unknown>
 }): Promise<DiffReviewView> {
@@ -874,7 +911,7 @@ async function refreshMaterializedPatchReview(input: {
         repositoryPath: input.repositoryPath,
         sourceKind: input.sourceKind,
         title: input.title,
-        status: 'open',
+        status: input.status ?? 'open',
         reviewState: 'unreviewed',
         currentRevisionId: null,
         createdAt: now,
@@ -898,7 +935,7 @@ async function refreshMaterializedPatchReview(input: {
       .set({
         title: input.title,
         sourceId: input.sourceId,
-        status: input.sourceKind === 'local-working-tree' ? 'open' : review.status,
+        status: input.status ?? (input.sourceKind === 'local-working-tree' ? 'open' : review.status),
         currentRevisionId: null,
         updatedAt: now,
       })
@@ -921,7 +958,7 @@ async function refreshMaterializedPatchReview(input: {
       .set({
         title: input.title,
         sourceId: input.sourceId,
-        status: input.sourceKind === 'local-working-tree' ? 'open' : review.status,
+        status: input.status ?? (input.sourceKind === 'local-working-tree' ? 'open' : review.status),
         updatedAt: now,
       })
       .where(eq(diffReviews.id, review.id))
@@ -930,7 +967,13 @@ async function refreshMaterializedPatchReview(input: {
     return loadReviewView(updated)
   }
 
-  const summaries = parsePatchFileSummaries(input.patch, input.statusFiles)
+  const fileStatsByPath = new Map(input.fileStats?.map(file => [file.path, file]))
+  const summaries = parsePatchFileSummaries(input.patch, input.statusFiles).map((summary) => {
+    const fileStats = fileStatsByPath.get(summary.path)
+    return fileStats
+      ? { ...summary, additions: fileStats.additions, deletions: fileStats.deletions }
+      : summary
+  })
   const additions = summaries.reduce((total, file) => total + file.additions, 0)
   const deletions = summaries.reduce((total, file) => total + file.deletions, 0)
   const revision = db().transaction((tx) => {
@@ -988,7 +1031,7 @@ async function refreshMaterializedPatchReview(input: {
     .set({
       title: input.title,
       sourceId: input.sourceId,
-      status: input.sourceKind === 'local-working-tree' ? 'open' : review.status,
+      status: input.status ?? (input.sourceKind === 'local-working-tree' ? 'open' : review.status),
       currentRevisionId: revision.id,
       updatedAt: now,
     })
@@ -1131,6 +1174,87 @@ export async function refreshLocalCommit(input: {
   })
 }
 
+function githubFilePatch(file: SessionPullRequestDetail['files'][number]): string {
+  const previousPath = file.previousFilename ?? file.filename
+  const header = `diff --git a/${previousPath} b/${file.filename}`
+  const metadata = file.status === 'added'
+    ? `new file mode 100644\n--- /dev/null\n+++ b/${file.filename}`
+    : file.status === 'removed' || file.status === 'deleted'
+      ? `deleted file mode 100644\n--- a/${previousPath}\n+++ /dev/null`
+      : file.status === 'renamed'
+        ? `rename from ${previousPath}\nrename to ${file.filename}\n--- a/${previousPath}\n+++ b/${file.filename}`
+        : `--- a/${previousPath}\n+++ b/${file.filename}`
+  const patch = file.patch?.trimEnd()
+  return `${header}\n${metadata}${patch ? `\n${patch}` : '\nPatch unavailable from GitHub'}\n`
+}
+
+function githubStatus(status: string): Git.GitFileStatusKind {
+  if (status === 'added') { return 'added' }
+  if (status === 'removed' || status === 'deleted') { return 'deleted' }
+  if (status === 'renamed') { return 'renamed' }
+  return 'modified'
+}
+
+export async function refreshGitHubPullRequest(input: {
+  workspaceId: string
+  owner: string
+  repo: string
+  number: number
+}): Promise<DiffReviewView> {
+  const owner = input.owner.toLowerCase()
+  const repo = input.repo.toLowerCase()
+  const detail = await PullRequest.fetchPullRequestDetailByRef(owner, repo, input.number)
+  const binding: GitHubPullRequestBinding = {
+    owner,
+    repo,
+    number: input.number,
+  }
+  const patch = detail.files.map(githubFilePatch).join('')
+  const patchHash = hashText(patch)
+  const sourceId = ensureGitHubPullRequestSource(input.workspaceId, binding)
+  const sourceVersion = `${detail.pullRequest.headSha}:${patchHash}`
+  const repositoryPath = `github:${owner}/${repo}`
+  return refreshMaterializedPatchReview({
+    workspaceId: input.workspaceId,
+    sourceId,
+    repositoryPath,
+    sourceKind: 'github-pull-request',
+    status: detail.pullRequest.merged
+      ? 'merged'
+      : detail.pullRequest.state === 'closed'
+        ? 'closed'
+        : 'open',
+    title: `${owner}/${repo}#${input.number} ${detail.pullRequest.title}`,
+    patch,
+    patchHash,
+    sourceVersion,
+    statusFiles: detail.files.map(file => ({
+      path: file.filename,
+      workspacePath: file.filename,
+      status: githubStatus(file.status),
+    })),
+    fileStats: detail.files.map(file => ({
+      path: file.filename,
+      additions: file.additions,
+      deletions: file.deletions,
+    })),
+    reviewCreatedPayload: {
+      sourceKind: 'github-pull-request',
+      owner,
+      repo,
+      number: input.number,
+      url: detail.pullRequest.url,
+    },
+    revisionUpdatedPayload: {
+      owner,
+      repo,
+      number: input.number,
+      headSha: detail.pullRequest.headSha,
+      baseRef: detail.pullRequest.baseRef,
+    },
+  })
+}
+
 const reviewSourceAdapters: Partial<Record<ReviewSourceKind, ReviewSourceAdapter>> = {
   'local-working-tree': {
     refreshStored: (workspaceId, source) => {
@@ -1157,6 +1281,12 @@ const reviewSourceAdapters: Partial<Record<ReviewSourceKind, ReviewSourceAdapter
         repositoryPath: binding.repositoryPath,
         commitRef: binding.commitSha,
       })
+    },
+  },
+  'github-pull-request': {
+    refreshStored: (workspaceId, source) => {
+      const binding = readSourceBinding<GitHubPullRequestBinding>(source)
+      return refreshGitHubPullRequest({ workspaceId, ...binding })
     },
   },
 }
@@ -1558,18 +1688,30 @@ export function resolveThread(
   return loadReviewView(review, { userId })
 }
 
-export function submitReview(input: {
+export async function submitReview(input: {
   workspaceId: string
   reviewId: string
   decision: 'approve' | 'request-changes' | 'comment'
   bodyMarkdown?: string | null
   userId?: string
-}): DiffReviewView {
+}): Promise<DiffReviewView> {
   const review = getReviewRow(input.workspaceId, input.reviewId)
   const revision = getCurrentRevision(review)
   const userId = input.userId ?? LOCAL_USER_ID
   const now = currentUnixSeconds()
-  db()
+  if (
+    review.sourceKind === 'github-pull-request'
+    && input.decision !== 'approve'
+    && !input.bodyMarkdown?.trim()
+  ) {
+    throw new AppError({
+      code: 'diff_review_github_body_required',
+      status: 400,
+      message: 'GitHub comments and change requests require a review summary',
+      details: { reviewId: review.id, decision: input.decision },
+    })
+  }
+  const submission = db()
     .insert(diffReviewSubmissions)
     .values({
       id: randomUUID(),
@@ -1579,9 +1721,46 @@ export function submitReview(input: {
       decision: input.decision,
       bodyMarkdown: input.bodyMarkdown ?? null,
       submittedAt: now,
-      sourceSyncState: 'local-only',
+      sourceSyncState: review.sourceKind === 'github-pull-request' ? 'pending' : 'local-only',
     })
-    .run()
+    .returning()
+    .get()
+
+  let sourceSyncState: ReviewSubmissionView['sourceSyncState'] = submission.sourceSyncState
+  if (review.sourceKind === 'github-pull-request') {
+    const binding = readSourceBinding<GitHubPullRequestBinding>(getReviewSource(review))
+    try {
+      await submitPullRequestReview({
+        owner: binding.owner,
+        repo: binding.repo,
+        pullRequestNumber: binding.number,
+        body: input.bodyMarkdown,
+        event: githubReviewEvent(input.decision),
+      })
+      sourceSyncState = 'synced'
+    }
+    catch (error) {
+      db()
+        .update(diffReviewSubmissions)
+        .set({ sourceSyncState: 'failed' })
+        .where(eq(diffReviewSubmissions.id, submission.id))
+        .run()
+      recordEvent({
+        reviewId: review.id,
+        eventKind: 'review_submitted',
+        actorKind: 'user',
+        actorId: userId,
+        payload: { revisionId: revision.id, decision: input.decision, sourceSyncState: 'failed' },
+        createdAt: now,
+      })
+      throw error
+    }
+    db()
+      .update(diffReviewSubmissions)
+      .set({ sourceSyncState })
+      .where(eq(diffReviewSubmissions.id, submission.id))
+      .run()
+  }
   db()
     .update(diffReviews)
     .set({ reviewState: reviewStateForDecision(input.decision), updatedAt: now })
@@ -1592,7 +1771,7 @@ export function submitReview(input: {
     eventKind: 'review_submitted',
     actorKind: 'user',
     actorId: userId,
-    payload: { revisionId: revision.id, decision: input.decision, sourceSyncState: 'local-only' },
+    payload: { revisionId: revision.id, decision: input.decision, sourceSyncState },
     createdAt: now,
   })
   return loadReviewView(getReviewRow(input.workspaceId, input.reviewId), { userId })
@@ -1610,6 +1789,14 @@ export function closeReview(input: {
       status: 400,
       message:
         'Live working tree reviews cannot be closed; commit, stash, or discard the working tree changes instead',
+      details: { reviewId: review.id, sourceKind: review.sourceKind },
+    })
+  }
+  if (review.sourceKind === 'github-pull-request') {
+    throw new AppError({
+      code: 'diff_review_remote_pull_request_cannot_close',
+      status: 400,
+      message: 'Close the pull request in GitHub, then refresh this review',
       details: { reviewId: review.id, sourceKind: review.sourceKind },
     })
   }
@@ -1693,13 +1880,8 @@ export function sourceReadiness(workspaceId: string): ReviewSourceReadinessView[
     {
       sourceKind: 'github-pull-request',
       workspaceId,
-      state: 'workspace-integration-missing',
-      actions: [
-        {
-          label: 'Connect GitHub integration',
-          ownerKind: 'workspace-admin',
-        },
-      ],
+      state: 'ready',
+      actions: [],
     },
   ]
 }

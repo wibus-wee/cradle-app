@@ -1,5 +1,6 @@
 import {
   DownSmallLine as ChevronDownIcon,
+  GitBranchLine as GitBranchIcon,
   GitCommitLine as GitCommitIcon,
   GitCompareLine as GitCompareIcon,
   GitPullRequestLine as GitPullRequestIcon,
@@ -12,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
+  postWorkspacesByWorkspaceIdDiffReviewsGithubPullRequest,
   postWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompare,
   postWorkspacesByWorkspaceIdDiffReviewsLocalCommit,
 } from '~/api-gen/sdk.gen'
@@ -28,10 +30,16 @@ import { Input } from '~/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
+import type { CradlePullRequest } from '~/features/pull-requests/use-pull-requests'
+import { useCradlePullRequests } from '~/features/pull-requests/use-pull-requests'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 
 import { GitRefPicker } from './git-ref-picker'
+import {
+  githubPullRequestReferenceKey,
+  parseGitHubPullRequestReference,
+} from './github-pull-request-reference'
 import {
   reviewListQueryKey,
   sourceLabel,
@@ -60,7 +68,18 @@ export function ReviewsListPage({
   workspaceId,
   repositoryPath,
 }: ReviewsListPageProps) {
-  const { reviews, isLoading, isError, countForTab, groupsForTab } = useReviewList(workspaceId)
+  const pullRequests = useCradlePullRequests()
+  const githubRolesByRef = useMemo(
+    () => new Map(pullRequests.entries.map(entry => [
+      githubPullRequestReferenceKey(entry.pullRequest),
+      entry.role,
+    ])),
+    [pullRequests.entries],
+  )
+  const { reviews, isLoading, isError, countForTab, groupsForTab } = useReviewList(
+    workspaceId,
+    githubRolesByRef,
+  )
   const [tab, setTab] = useState<ReviewsListTab>('for-me')
   const [query, setQuery] = useState('')
   const queryClient = useQueryClient()
@@ -112,6 +131,57 @@ export function ReviewsListPage({
     }),
   })
 
+  const pullRequestMutation = useMutation({
+    mutationFn: async (input: { owner: string, repo: string, number: number }) => {
+      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsGithubPullRequest({
+        path: { workspaceId },
+        body: input,
+        throwOnError: true,
+      })
+      return data
+    },
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: reviewListQueryKey(workspaceId) })
+      navigateToReview(workspaceId, data.id)
+    },
+    onError: (error: Error) => toastManager.add({
+      type: 'error',
+      title: 'Open pull request failed',
+      description: error.message,
+    }),
+  })
+
+  const materializedPullRequestRefs = useMemo(
+    () => new Set(reviews.flatMap(review => review.githubPullRequest
+      ? [githubPullRequestReferenceKey(review.githubPullRequest)]
+      : [])),
+    [reviews],
+  )
+
+  const remoteEntriesByTab = useMemo(() => {
+    const entries = pullRequests.entries.filter(entry => (
+      !materializedPullRequestRefs.has(githubPullRequestReferenceKey(entry.pullRequest))
+    ))
+    return {
+      'all': entries,
+      'for-me': entries.filter(entry => entry.role === 'reviewing'),
+      'created': entries.filter(entry => entry.role === 'authored'),
+    } satisfies Record<ReviewsListTab, CradlePullRequest[]>
+  }, [materializedPullRequestRefs, pullRequests.entries])
+
+  const remoteEntries = useMemo(() => {
+    const trimmed = query.trim().toLowerCase()
+    return remoteEntriesByTab[tab].filter((entry) => {
+      if (!trimmed) {
+        return true
+      }
+      const pullRequest = entry.pullRequest
+      return pullRequest.title.toLowerCase().includes(trimmed)
+        || githubPullRequestReferenceKey(pullRequest).includes(trimmed)
+        || pullRequest.headRef.toLowerCase().includes(trimmed)
+    })
+  }, [query, remoteEntriesByTab, tab])
+
   const visibleGroups = useMemo(() => {
     const groups = groupsForTab(tab)
     const trimmed = query.trim().toLowerCase()
@@ -129,25 +199,31 @@ export function ReviewsListPage({
   }, [groupsForTab, tab, query])
 
   const workingTreePresent = reviews.some(review => review.sourceKind === 'local-working-tree')
-  const hasAnyReviews = reviews.length > 0
+  const hasAnyReviews = reviews.length > 0 || pullRequests.entries.length > 0 || pullRequests.isPending
   const isFiltering = query.trim().length > 0
+  const totalCount = reviews.length + remoteEntriesByTab.all.length
+  const countForVisibleTab = (selectedTab: ReviewsListTab) => (
+    countForTab(selectedTab) + remoteEntriesByTab[selectedTab].length
+  )
 
   return (
     <div className="flex h-full w-full min-h-0 flex-col overflow-hidden bg-background" data-testid="reviews-list-page">
       <Header
         workspaceId={workspaceId}
-        count={reviews.length}
+        count={totalCount}
         query={query}
         onQueryChange={setQuery}
         onCompare={input => compareMutation.mutate(input)}
         comparePending={compareMutation.isPending}
         onCommit={input => commitMutation.mutate(input)}
         commitPending={commitMutation.isPending}
+        onPullRequest={input => pullRequestMutation.mutate(input)}
+        pullRequestPending={pullRequestMutation.isPending}
         repositoryPath={repositoryPath}
       />
 
       <div className="flex shrink-0 items-center gap-1 border-b border-border/60 px-4">
-        <TextTabs tab={tab} onChange={setTab} countForTab={countForTab} />
+        <TextTabs tab={tab} onChange={setTab} countForTab={countForVisibleTab} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -170,9 +246,13 @@ export function ReviewsListPage({
                   hasAnyReviews={hasAnyReviews}
                   workingTreePresent={workingTreePresent}
                   visibleGroups={visibleGroups}
+                  remoteEntries={remoteEntries}
+                  remoteEntriesPending={pullRequests.isPending}
                   isFiltering={isFiltering}
                   onCompare={input => compareMutation.mutate(input)}
                   comparePending={compareMutation.isPending}
+                  onPullRequest={input => pullRequestMutation.mutate(input)}
+                  pullRequestPending={pullRequestMutation.isPending}
                 />
               )}
       </div>
@@ -189,6 +269,8 @@ function Header({
   comparePending,
   onCommit,
   commitPending,
+  onPullRequest,
+  pullRequestPending,
   repositoryPath,
 }: {
   workspaceId: string
@@ -199,6 +281,8 @@ function Header({
   comparePending: boolean
   onCommit: (input: { commitRef: string }) => void
   commitPending: boolean
+  onPullRequest: (input: { owner: string, repo: string, number: number }) => void
+  pullRequestPending: boolean
   repositoryPath?: string | null
 }) {
   const { t } = useTranslation('diff-review')
@@ -279,6 +363,7 @@ function Header({
         <PlusIcon className="size-3.5" aria-hidden />
         {t('reviews.workingTree.cta' as DiffReviewKey)}
       </Button>
+      <PullRequestDialog onOpen={onPullRequest} pending={pullRequestPending} />
       <CommitDialog
         workspaceId={workspaceId}
         repositoryPath={repositoryPath}
@@ -341,18 +426,26 @@ function ReviewsContent({
   hasAnyReviews,
   workingTreePresent,
   visibleGroups,
+  remoteEntries,
+  remoteEntriesPending,
   isFiltering,
   onCompare,
   comparePending,
+  onPullRequest,
+  pullRequestPending,
 }: {
   workspaceId: string
   repositoryPath?: string | null
   hasAnyReviews: boolean
   workingTreePresent: boolean
   visibleGroups: Array<{ id: string, label: string, reviews: CradleDiffReview[] }>
+  remoteEntries: CradlePullRequest[]
+  remoteEntriesPending: boolean
   isFiltering: boolean
   onCompare: (input: { baseRef: string, headRef: string }) => void
   comparePending: boolean
+  onPullRequest: (input: { owner: string, repo: string, number: number }) => void
+  pullRequestPending: boolean
 }) {
   const { t } = useTranslation('diff-review')
 
@@ -378,6 +471,15 @@ function ReviewsContent({
           present={workingTreePresent}
         />
       </div>
+
+      {(remoteEntriesPending || remoteEntries.length > 0) && (
+        <RemotePullRequestsSection
+          entries={remoteEntries}
+          loading={remoteEntriesPending}
+          onOpen={onPullRequest}
+          pending={pullRequestPending}
+        />
+      )}
 
       {visibleGroups.length === 0 && isFiltering
         ? (
@@ -434,6 +536,160 @@ function EmptyState({
         </EmptyContent>
       </Empty>
     </div>
+  )
+}
+
+function RemotePullRequestsSection({
+  entries,
+  loading,
+  onOpen,
+  pending,
+}: {
+  entries: CradlePullRequest[]
+  loading: boolean
+  onOpen: (input: { owner: string, repo: string, number: number }) => void
+  pending: boolean
+}) {
+  const { t } = useTranslation('diff-review')
+
+  return (
+    <section className="px-4 pb-2" data-testid="reviews-remote-pull-requests">
+      <div className="flex h-8 items-center gap-1.5 px-1">
+        <GitPullRequestIcon className="size-3.5 text-muted-foreground" aria-hidden />
+        <span className="text-[11px] font-medium text-muted-foreground">
+          {t('reviews.remote.title' as DiffReviewKey)}
+        </span>
+        <span className="text-[11px] tabular-nums text-muted-foreground/50">{entries.length}</span>
+      </div>
+      {loading
+        ? (
+            <div className="flex h-10 items-center gap-2 px-1 text-[12px] text-muted-foreground">
+              <Spinner className="size-3.5" />
+              {t('reviews.remote.loading' as DiffReviewKey)}
+            </div>
+          )
+        : (
+            <ul role="list" className="divide-y divide-border/50">
+              {entries.map((entry) => {
+                const pullRequest = entry.pullRequest
+                return (
+                  <li key={entry.id}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() => onOpen({
+                        owner: pullRequest.owner,
+                        repo: pullRequest.repo,
+                        number: pullRequest.number,
+                      })}
+                      className="group h-auto w-full justify-start gap-3 rounded-none px-1 py-2 text-left font-normal hover:bg-transparent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
+                    >
+                      <GitPullRequestIcon className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] text-foreground/90 group-hover:text-foreground">
+                          {pullRequest.title}
+                        </span>
+                        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                          <span className="shrink-0 font-mono">
+                            {pullRequest.owner}
+                            /
+                            {pullRequest.repo}
+                            {' #'}
+                            {pullRequest.number}
+                          </span>
+                          <span className="text-muted-foreground/40">·</span>
+                          <span className="flex min-w-0 items-center gap-1 truncate font-mono">
+                            <GitBranchIcon className="size-3 shrink-0" aria-hidden />
+                            <span className="truncate">{pullRequest.headRef}</span>
+                          </span>
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+                        {pullRequest.isDraft && <span>{t('reviews.remote.draft' as DiffReviewKey)}</span>}
+                        {pullRequest.additions !== undefined && pullRequest.deletions !== undefined && (
+                          <span className="font-mono">
+                            {`+${pullRequest.additions} -${pullRequest.deletions}`}
+                          </span>
+                        )}
+                      </span>
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+    </section>
+  )
+}
+
+function PullRequestDialog({
+  onOpen,
+  pending,
+}: {
+  onOpen: (input: { owner: string, repo: string, number: number }) => void
+  pending: boolean
+}) {
+  const { t } = useTranslation('diff-review')
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState('')
+  const reference = useMemo(() => parseGitHubPullRequestReference(value), [value])
+
+  const reset = () => setValue('')
+  const submit = () => {
+    if (!reference || pending) {
+      return
+    }
+    onOpen(reference)
+    setOpen(false)
+    reset()
+  }
+
+  return (
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) { reset() } }}>
+      <PopoverTrigger
+        render={(
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]">
+            <GitPullRequestIcon className="size-3.5" aria-hidden />
+            {t('reviews.pullRequest.cta' as DiffReviewKey)}
+          </Button>
+        )}
+      />
+      <PopoverContent align="end" className="w-96 gap-2 p-3">
+        <div className="space-y-1.5">
+          <p className="text-[12px] font-medium text-foreground">
+            {t('reviews.pullRequest.title' as DiffReviewKey)}
+          </p>
+          <Input
+            value={value}
+            onChange={event => setValue(event.target.value)}
+            autoFocus
+            placeholder={t('reviews.pullRequest.placeholder' as DiffReviewKey)}
+            aria-label={t('reviews.pullRequest.title' as DiffReviewKey)}
+            className="h-8 text-[12px]"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                submit()
+              }
+            }}
+          />
+          {value.trim() && !reference && (
+            <p className="text-[11px] text-destructive">
+              {t('reviews.pullRequest.invalid' as DiffReviewKey)}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-1.5 pt-1">
+          <Button variant="ghost" size="sm" className="h-7 text-[12px]" onClick={() => setOpen(false)}>
+            {t('reviews.cancel' as DiffReviewKey)}
+          </Button>
+          <Button size="sm" className="h-7 text-[12px]" disabled={!reference || pending} onClick={submit}>
+            {pending && <Spinner className="size-3.5" />}
+            {t('reviews.openAction' as DiffReviewKey)}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

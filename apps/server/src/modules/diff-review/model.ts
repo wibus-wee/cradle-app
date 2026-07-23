@@ -16,6 +16,11 @@ const sourceKind = t.Union([
   t.Literal('github-pull-request'),
   t.Literal('external-import'),
 ])
+const githubPullRequestBinding = t.Object({
+  owner: t.String(),
+  repo: t.String(),
+  number: t.Integer({ minimum: 1 }),
+})
 const fileStatus = t.Union([
   t.Literal('added'),
   t.Literal('modified'),
@@ -324,6 +329,16 @@ export const DiffReviewModel = {
     commitRef: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
+  githubPullRequestBody: t.Object({
+    owner: t.String({
+      minLength: 1,
+      maxLength: 39,
+      pattern: '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$',
+    }),
+    repo: t.String({ minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9_.-]+$' }),
+    number: t.Integer({ minimum: 1 }),
+  }, { additionalProperties: false }),
+
   setViewedBody: t.Object({
     viewed: t.Boolean(),
   }, { additionalProperties: false }),
@@ -420,6 +435,7 @@ export const DiffReviewModel = {
     sourceId: t.Nullable(t.String()),
     repositoryPath: t.String(),
     sourceKind,
+    githubPullRequest: t.Nullable(githubPullRequestBinding),
     title: t.String(),
     status: reviewStatus,
     reviewState,

@@ -13,41 +13,36 @@ const spec = {
       "flagName": "workspace",
       "resolver": "workspace",
       "resolverAmbient": true
-    },
-    {
-      "name": "reviewId",
-      "required": true,
-      "target": "path.reviewId",
-      "type": "string"
     }
   ],
   "command": [
     "workspace",
     "diffs",
-    "submit"
+    "github-pull-request"
   ],
-  "description": "Submit a diff review decision",
+  "description": "Create or refresh a GitHub pull request diff review",
   "flags": [
     {
-      "name": "decision",
+      "name": "owner",
       "required": true,
-      "target": "body.decision",
-      "type": "string",
-      "values": [
-        "approve",
-        "request-changes",
-        "comment"
-      ]
+      "target": "body.owner",
+      "type": "string"
     },
     {
-      "name": "bodyMarkdown",
-      "required": false,
-      "target": "body.bodyMarkdown",
+      "name": "repo",
+      "required": true,
+      "target": "body.repo",
+      "type": "string"
+    },
+    {
+      "name": "number",
+      "required": true,
+      "target": "body.number",
       "type": "string"
     }
   ],
   "method": "post",
-  "path": "/workspaces/{workspaceId}/diff-reviews/{reviewId}/submit"
+  "path": "/workspaces/{workspaceId}/diff-reviews/github-pull-request"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

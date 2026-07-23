@@ -356,6 +356,6 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `usage` | 11 | Inspect usage and cost data. | `cradle man usage` |
 | `work` | 7 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
-| `workspace` | 54 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
+| `workspace` | 55 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 
 <!-- CRADLE_CLI_MODULES_END -->

@@ -387,6 +387,14 @@ export interface GitHubPullRequestReview {
   html_url: string | null
 }
 
+export interface SubmitPullRequestReviewInput {
+  owner: string
+  repo: string
+  pullRequestNumber: number
+  body?: string | null
+  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
+}
+
 export interface GitHubPullRequestDetail {
   number: number
   title: string
@@ -583,6 +591,12 @@ const GitHubPullRequestFileSchema = z.object({
   patch: file.patch ?? null,
   previous_filename: file.previous_filename ?? null,
 }))
+
+const SubmittedGitHubPullRequestReviewSchema = z.object({
+  id: z.number().finite(),
+  state: z.string(),
+  html_url: z.string().nullable().optional(),
+}).passthrough()
 
 const GitHubPullRequestNodeSchema = z.object({
   node_id: z.string(),
@@ -1106,6 +1120,18 @@ export function updatePullRequest(input: UpdatePullRequestInput): Promise<Create
       body: input.body,
     },
     CreatedGitHubPullRequestSchema,
+  )
+}
+
+export function submitPullRequestReview(input: SubmitPullRequestReviewInput) {
+  return githubMutate(
+    'POST',
+    `/repos/${input.owner}/${input.repo}/pulls/${input.pullRequestNumber}/reviews`,
+    {
+      body: input.body ?? '',
+      event: input.event,
+    },
+    SubmittedGitHubPullRequestReviewSchema,
   )
 }
 

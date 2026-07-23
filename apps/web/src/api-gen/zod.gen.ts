@@ -266,6 +266,13 @@ export const zGetFilesystemBrowseQuery = z.object({
     path: z.string().optional()
 });
 
+export const zPostUsageReconcileClaudeQuery = z.object({
+    maxBindings: z.union([
+        z.string(),
+        z.number().gte(1).lte(1000)
+    ]).optional()
+});
+
 export const zGetUsageDailyQuery = z.object({
     days: z.union([
         z.string(),
@@ -2498,6 +2505,19 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsLocalCommitBody = z.object({
 });
 
 export const zPostWorkspacesByWorkspaceIdDiffReviewsLocalCommitPath = z.object({
+    workspaceId: z.string().min(1)
+});
+
+export const zPostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestBody = z.object({
+    owner: z.string().min(1).max(39).regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/),
+    repo: z.string().min(1).max(100).regex(/^[A-Za-z0-9_.-]+$/),
+    number: z.union([
+        z.string(),
+        z.int().gte(1)
+    ])
+});
+
+export const zPostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestPath = z.object({
     workspaceId: z.string().min(1)
 });
 
