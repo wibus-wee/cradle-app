@@ -1164,7 +1164,7 @@ describe('codexProvider app-server integration', () => {
     })
     expect(runtimeSession.providerRuntimeLease).toBeDefined()
     runtimeSession.providerRuntimeLease?.release()
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('keeps side Codex app-server clients host-managed across fork and side turns', async () => {
@@ -1235,8 +1235,10 @@ describe('codexProvider app-server integration', () => {
 
     runtimeSession.providerRuntimeLease?.release()
 
-    expect(client.close).toHaveBeenCalledOnce()
-    expect(providerRuntimeHostManager.listHosts()).toEqual([])
+    expect(client.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual([
+      expect.objectContaining({ refCount: 0, pinnedCount: 0, hasResource: true }),
+    ])
   })
 
   it('reuses the chat-session host across provider turns and provider-native app-server invokes', async () => {
@@ -1316,8 +1318,10 @@ describe('codexProvider app-server integration', () => {
     await drainPromise
 
     expect(clients).toHaveLength(1)
-    expect(clients[0]!.close).toHaveBeenCalledOnce()
-    expect(providerRuntimeHostManager.listHosts()).toEqual([])
+    expect(clients[0]!.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual([
+      expect.objectContaining({ refCount: 0, hasResource: true }),
+    ])
   })
 
   it('does not share app-server hosts across concurrent chat sessions', async () => {
@@ -1416,9 +1420,12 @@ describe('codexProvider app-server integration', () => {
 
     await Promise.all([firstDrain, secondDrain])
 
-    expect(clients[0]!.close).toHaveBeenCalledOnce()
-    expect(clients[1]!.close).toHaveBeenCalledOnce()
-    expect(providerRuntimeHostManager.listHosts()).toEqual([])
+    expect(clients[0]!.close).not.toHaveBeenCalled()
+    expect(clients[1]!.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scopeId: codexChatSessionAppServerScopeId('chat-session-1'), refCount: 0, hasResource: true }),
+      expect.objectContaining({ scopeId: codexChatSessionAppServerScopeId('chat-session-2'), refCount: 0, hasResource: true }),
+    ]))
   })
 
   it('shares the same chat-session host between turn execution and UI slot reads', async () => {
@@ -1564,7 +1571,7 @@ describe('codexProvider app-server integration', () => {
       truncated: false,
     })
     expect(client.requests.map(request => request.method)).toContain('thread/turns/list')
-    expect(client.close).toHaveBeenCalled()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('maps image attachments to Codex app-server user input', async () => {
@@ -5238,7 +5245,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({ type: 'text-end' }),
     ]))
     expect(runtimeSession.providerSessionId).toBe('codex-thread-1')
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('continues streaming when app-server does not support skill extra roots sync', async () => {
@@ -5294,7 +5301,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({ type: 'text-end' }),
     ]))
     expect(runtimeSession.providerSessionId).toBe('codex-thread-1')
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('pauses an active Codex goal before interrupting a cancelled turn', async () => {
@@ -5371,7 +5378,7 @@ describe('codexProvider app-server integration', () => {
         },
       },
     })
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
     await stream.return(undefined)
   })
 
