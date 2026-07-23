@@ -5,6 +5,10 @@ export type PtyClientEvent
     | { type: 'resize', cols: number, rows: number }
     | { type: 'ping' }
 
+export type PtyActivityState = 'unknown' | 'idle' | 'working' | 'blocked'
+
+export type PtyActivitySource = 'unknown' | 'osc-9999'
+
 export type PtyRestoreInfo = {
   mode: 'live-attach' | 'resume' | 'fresh' | 'history'
   agent?: string
@@ -16,6 +20,8 @@ export type PtySnapshotEvent = {
   seq: number
   buffer: string
   running: boolean
+  activity?: PtyActivityState
+  activitySource?: PtyActivitySource
   restore?: PtyRestoreInfo
 }
 
@@ -32,6 +38,15 @@ export type PtyExitEvent = {
   signal: string | null
 }
 
+export type PtyStatusEvent = {
+  type: 'status'
+  seq: number
+  state: PtyActivityState
+  source: PtyActivitySource
+  agent?: string
+  prompt?: string
+}
+
 export type PtyPongEvent = { type: 'pong' }
 
 export type PtyErrorEvent = {
@@ -40,7 +55,7 @@ export type PtyErrorEvent = {
   message: string
 }
 
-export type PtyServerEvent = PtySnapshotEvent | PtyOutputEvent | PtyExitEvent | PtyPongEvent | PtyErrorEvent
+export type PtyServerEvent = PtySnapshotEvent | PtyOutputEvent | PtyExitEvent | PtyStatusEvent | PtyPongEvent | PtyErrorEvent
 
 export const PtyServerEventSchema = z.discriminatedUnion('type', [
   z.object({
@@ -48,6 +63,8 @@ export const PtyServerEventSchema = z.discriminatedUnion('type', [
     seq: z.number().finite(),
     buffer: z.string(),
     running: z.boolean(),
+    activity: z.enum(['unknown', 'idle', 'working', 'blocked']).optional(),
+    activitySource: z.enum(['unknown', 'osc-9999']).optional(),
     restore: z.object({
       mode: z.enum(['live-attach', 'resume', 'fresh', 'history']),
       agent: z.string().optional(),
@@ -64,6 +81,14 @@ export const PtyServerEventSchema = z.discriminatedUnion('type', [
     seq: z.number().finite(),
     exitCode: z.number().finite().nullable(),
     signal: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal('status'),
+    seq: z.number().finite(),
+    state: z.enum(['unknown', 'idle', 'working', 'blocked']),
+    source: z.enum(['unknown', 'osc-9999']),
+    agent: z.string().optional(),
+    prompt: z.string().optional(),
   }),
   z.object({
     type: z.literal('pong'),

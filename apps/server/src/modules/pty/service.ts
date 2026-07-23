@@ -19,6 +19,7 @@ import { runtimeUsesAgentTerminalLaunch } from '../provider-contracts/runtime-co
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { resolveSessionExecutionRootById } from '../worktree/service'
+import { createPtyAgentStatusOscProcessor } from './agent-status-osc'
 import { captureCodexCliSession } from './codex-session-capture'
 import {
   deleteTerminalHistory,
@@ -41,6 +42,7 @@ const providerCaptureTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellLeaseTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shellSocketCounts = new Map<string, number>()
 const pendingTitleOscBuffers = new Map<string, string>()
+const agentStatusOscProcessors = new Map<string, ReturnType<typeof createPtyAgentStatusOscProcessor>>()
 const PROVIDER_CAPTURE_ATTEMPTS = 120
 const PROVIDER_CAPTURE_RETRY_MS = 500
 const MAX_OSC_LOOKBEHIND_CHARS = 1_000
@@ -51,16 +53,37 @@ const lastRestoreBySession = new Map<string, PtyRestoreInfo>()
 
 const ptyRuntime = new PtyRuntimeRegistry({
   onOutput: (sessionId, role, data) => {
-    ptyTimeline.appendOutput(sessionId, data)
+    const processed = role === 'cli-tui'
+      ? (agentStatusOscProcessors.get(sessionId) ?? (() => {
+          const processor = createPtyAgentStatusOscProcessor()
+          agentStatusOscProcessors.set(sessionId, processor)
+          return processor
+        })())(data)
+      : { cleanData: data, statuses: [] }
+
+    if (processed.cleanData) {
+      ptyTimeline.appendOutput(sessionId, processed.cleanData)
+    }
+    for (const status of processed.statuses) {
+      ptyTimeline.appendStatus({
+        sessionId,
+        state: status.state,
+        source: 'osc-9999',
+        agent: status.agent,
+        prompt: status.prompt,
+      })
+    }
     publishCliTuiTitle(sessionId, role, data)
   },
   onExit: (sessionId, exit) => {
     pendingTitleOscBuffers.delete(sessionId)
+    agentStatusOscProcessors.delete(sessionId)
     persistTimelineHistory(sessionId)
     ptyTimeline.appendExit(sessionId, exit)
   },
   onRelease: (sessionId) => {
     pendingTitleOscBuffers.delete(sessionId)
+    agentStatusOscProcessors.delete(sessionId)
     lastRestoreBySession.delete(sessionId)
     ptyTimeline.delete(sessionId)
   },

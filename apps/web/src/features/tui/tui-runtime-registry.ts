@@ -5,6 +5,7 @@ import { startOrAttachTerminalSession } from './api/terminal-session'
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
 import { createPtyChannel } from './pty-channel'
+import type { PtyActivityState } from './pty-protocol'
 import { installTerminalAddons } from './terminal-addons'
 import { getTerminalFontFamily } from './terminal-font'
 import { useTerminalPreferencesStore } from './terminal-preferences'
@@ -20,6 +21,7 @@ interface TuiRuntimeEntry {
   fitAddon: FitAddon
   channel: ReturnType<typeof createPtyChannel>
   ready: boolean
+  activity: PtyActivityState
   visible: boolean
   disposed: boolean
   exitShown: boolean
@@ -35,6 +37,7 @@ interface TuiRuntimeEntry {
   stopWatchingTheme: () => void
   stopWatchingPreferences: () => void
   readyListeners: Set<(ready: boolean) => void>
+  activityListeners: Set<(activity: PtyActivityState) => void>
 }
 
 function getParkingContainer(): HTMLDivElement {
@@ -58,6 +61,12 @@ function notifyReady(entry: TuiRuntimeEntry, ready: boolean): void {
   for (const listener of entry.readyListeners) {
     listener(ready)
   }
+}
+
+function notifyActivity(entry: TuiRuntimeEntry, activity: PtyActivityState): void {
+  if (entry.activity === activity) { return }
+  entry.activity = activity
+  for (const listener of entry.activityListeners) { listener(activity) }
 }
 
 function proposeDimensions(entry: TuiRuntimeEntry): { cols: number, rows: number } | null {
@@ -152,6 +161,7 @@ function createRuntimeEntry(sessionId: string, container: HTMLDivElement): TuiRu
         entry.exitShown = true
         terminal.write(EXIT_BANNER)
       }
+      notifyActivity(entry, event.activity ?? 'unknown')
     },
     onOutput(event) {
       if (event.data) {
@@ -159,10 +169,14 @@ function createRuntimeEntry(sessionId: string, container: HTMLDivElement): TuiRu
       }
     },
     onExit() {
+      notifyActivity(entry, 'idle')
       if (!entry.exitShown) {
         entry.exitShown = true
         terminal.write(EXIT_BANNER)
       }
+    },
+    onStatus(event) {
+      notifyActivity(entry, event.state)
     },
   })
 
@@ -209,6 +223,7 @@ function createRuntimeEntry(sessionId: string, container: HTMLDivElement): TuiRu
     fitAddon,
     channel,
     ready: false,
+    activity: 'unknown',
     visible: false,
     disposed: false,
     exitShown: false,
@@ -224,6 +239,7 @@ function createRuntimeEntry(sessionId: string, container: HTMLDivElement): TuiRu
     stopWatchingTheme,
     stopWatchingPreferences,
     readyListeners: new Set(),
+    activityListeners: new Set(),
   }
   resizeObserver.observe(container)
 
@@ -260,6 +276,7 @@ class TuiRuntimeRegistry {
     container: HTMLDivElement,
     visible: boolean,
     onReadyChange: (ready: boolean) => void,
+    onActivityChange?: (activity: PtyActivityState) => void,
   ): void {
     let entry = this.entries.get(sessionId)
     if (!entry) {
@@ -275,6 +292,10 @@ class TuiRuntimeRegistry {
 
     entry.readyListeners.add(onReadyChange)
     onReadyChange(entry.ready)
+    if (onActivityChange) {
+      entry.activityListeners.add(onActivityChange)
+      onActivityChange(entry.activity)
+    }
     setVisible(entry, visible)
   }
 
@@ -289,12 +310,14 @@ class TuiRuntimeRegistry {
     sessionId: string,
     container: HTMLDivElement,
     onReadyChange: (ready: boolean) => void,
+    onActivityChange?: (activity: PtyActivityState) => void,
   ): void {
     const entry = this.entries.get(sessionId)
     if (!entry) {
       return
     }
     entry.readyListeners.delete(onReadyChange)
+    if (onActivityChange) { entry.activityListeners.delete(onActivityChange) }
     if (entry.container !== container) {
       return
     }
@@ -331,6 +354,7 @@ class TuiRuntimeRegistry {
     entry.terminal.dispose()
     entry.wrapper.remove()
     entry.readyListeners.clear()
+    entry.activityListeners.clear()
     this.entries.delete(sessionId)
   }
 }

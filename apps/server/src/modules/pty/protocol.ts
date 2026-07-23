@@ -3,6 +3,10 @@ export interface PtyExitState {
   signal: string | null
 }
 
+export type PtyActivityState = 'unknown' | 'idle' | 'working' | 'blocked'
+
+export type PtyActivitySource = 'unknown' | 'osc-9999'
+
 export type PtyClientEvent
   = | { type: 'input', data: string }
     | { type: 'resize', cols: number, rows: number }
@@ -21,6 +25,8 @@ export type PtySnapshotEvent = {
   seq: number
   buffer: string
   running: boolean
+  activity?: PtyActivityState
+  activitySource?: PtyActivitySource
   restore?: PtyRestoreInfo
 }
 
@@ -37,11 +43,21 @@ export type PtyExitEvent = {
   signal: string | null
 }
 
-export type PtyTimelineEvent = PtyOutputEvent | PtyExitEvent
+export type PtyStatusEvent = {
+  type: 'status'
+  seq: number
+  state: PtyActivityState
+  source: PtyActivitySource
+  agent?: string
+  prompt?: string
+}
+
+export type PtyTimelineEvent = PtyOutputEvent | PtyExitEvent | PtyStatusEvent
 
 export type PtyServerEvent
   = | PtySnapshotEvent
     | PtyOutputEvent
     | PtyExitEvent
+    | PtyStatusEvent
     | { type: 'pong' }
     | { type: 'error', code: string, message: string }

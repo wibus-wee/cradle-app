@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getI18n } from '~/i18n/instance'
 import { getAuthenticatedServerWebSocketUrl } from '~/lib/electron'
 
-import type { PtyClientEvent, PtyErrorEvent, PtyExitEvent, PtyOutputEvent, PtySnapshotEvent } from './pty-protocol'
+import type { PtyClientEvent, PtyErrorEvent, PtyExitEvent, PtyOutputEvent, PtySnapshotEvent, PtyStatusEvent } from './pty-protocol'
 import { PtyServerEventJsonSchema } from './pty-protocol'
 
 interface PtyChannelOptions {
@@ -15,6 +15,7 @@ interface PtyChannelOptions {
   onSnapshot: (event: PtySnapshotEvent) => void
   onOutput: (event: PtyOutputEvent) => void
   onExit: (event: PtyExitEvent) => void
+  onStatus?: (event: PtyStatusEvent) => void
   onError?: (event: PtyErrorEvent) => void
   onOpen?: () => void
   onClose?: () => void
@@ -40,6 +41,7 @@ const PtyChannelOptionsSchema = z.object({
   onSnapshot: z.custom<PtyChannelOptions['onSnapshot']>(),
   onOutput: z.custom<PtyChannelOptions['onOutput']>(),
   onExit: z.custom<PtyChannelOptions['onExit']>(),
+  onStatus: z.custom<PtyChannelOptions['onStatus']>().optional(),
   onError: z.custom<PtyChannelOptions['onError']>().optional(),
   onOpen: z.custom<PtyChannelOptions['onOpen']>().optional(),
   onClose: z.custom<PtyChannelOptions['onClose']>().optional(),
@@ -151,6 +153,10 @@ export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
         exitSeen = true
         lastSeq = event.seq
         options.onExit(event)
+        return
+      case 'status':
+        lastSeq = event.seq
+        options.onStatus?.(event)
         return
       case 'pong':
         return

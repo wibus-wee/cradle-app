@@ -1,9 +1,12 @@
 import type {
+  PtyActivitySource,
+  PtyActivityState,
   PtyExitEvent,
   PtyExitState,
   PtyOutputEvent,
   PtyRestoreInfo,
   PtySnapshotEvent,
+  PtyStatusEvent,
   PtyTimelineEvent,
 } from './protocol'
 
@@ -18,6 +21,8 @@ interface TimelineRecord {
   running: boolean
   exit: PtyExitState | null
   restore: PtyRestoreInfo | null
+  activity: PtyActivityState
+  activitySource: PtyActivitySource
   events: PtyTimelineEvent[]
   subscribers: Set<TimelineSubscriber>
 }
@@ -38,6 +43,8 @@ export class PtyTimelineStore {
       running: true,
       exit: null,
       restore: null,
+      activity: 'unknown',
+      activitySource: 'unknown',
       events: [],
       subscribers: new Set(),
     })
@@ -55,6 +62,8 @@ export class PtyTimelineStore {
       running: true,
       exit: null,
       restore: null,
+      activity: 'unknown',
+      activitySource: 'unknown',
       events: [],
       subscribers: new Set(),
     }
@@ -114,6 +123,8 @@ export class PtyTimelineStore {
     record.seq += 1
     record.running = false
     record.exit = exit
+    record.activity = 'idle'
+    record.activitySource = 'unknown'
 
     const event: PtyExitEvent = {
       type: 'exit',
@@ -128,6 +139,33 @@ export class PtyTimelineStore {
     return event
   }
 
+  appendStatus(input: {
+    sessionId: string
+    state: PtyActivityState
+    source: PtyActivitySource
+    agent?: string
+    prompt?: string
+  }): PtyStatusEvent {
+    const record = this.ensureSession(input.sessionId)
+    record.seq += 1
+    record.activity = input.state
+    record.activitySource = input.source
+
+    const event: PtyStatusEvent = {
+      type: 'status',
+      seq: record.seq,
+      state: input.state,
+      source: input.source,
+      ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.prompt ? { prompt: input.prompt } : {}),
+    }
+
+    record.events.push(event)
+    trimEvents(record.events)
+    this.publish(input.sessionId, event)
+    return event
+  }
+
   snapshot(sessionId: string): PtySnapshotEvent | null {
     const record = this.sessions.get(sessionId)
     if (!record) {
@@ -139,6 +177,8 @@ export class PtyTimelineStore {
       seq: record.seq,
       buffer: record.buffer,
       running: record.running,
+      activity: record.activity,
+      activitySource: record.activitySource,
       ...(record.restore ? { restore: record.restore } : {}),
     }
   }
