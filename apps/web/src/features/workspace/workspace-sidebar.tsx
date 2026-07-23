@@ -25,7 +25,7 @@ import {
   Settings2Line as SettingsIcon,
   TransferVerticalLine as ArrowUpDownIcon,
 } from '@mingcute/react'
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
 import {
   memo,
   useCallback,
@@ -42,7 +42,6 @@ import {
   postSessionsByIdRead,
 } from '~/api-gen'
 import {
-  getRemoteHostsOptions,
   getSessionsByIdQueryKey,
   patchWorkspacesByWorkspaceIdLocationMutation,
   patchWorkspacesByWorkspaceIdMutation,
@@ -50,16 +49,7 @@ import {
   postWorkspacesByWorkspaceIdFilesFolderMutation,
   postWorkspacesMultiFolderMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
-import type {
-  GetRemoteHostsResponse,
-} from '~/api-gen/types.gen'
 import { Button } from '~/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
 import {
   Menu,
   MenuCheckboxItem,
@@ -81,15 +71,10 @@ import { prefetchChatSession } from '~/features/chat/session/chat-session-prefet
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
-import {
-  fetchRemoteUpstreamJson,
-  remoteHostUpstreamQueryKey,
-} from '~/features/remote-hosts/upstream-fetch'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
-import { ensureRemoteWorkspaceForPath } from '~/features/workspace/remote-workspace-import'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
 import { useNow } from '~/hooks/use-now'
@@ -129,6 +114,7 @@ import {
   useWorkspaces,
   WORKSPACES_QUERY_KEY,
 } from './use-workspace'
+import { WorkspaceAddDialog } from './workspace-add-dialog'
 import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
 import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
 import {
@@ -168,7 +154,6 @@ import {
 const RECENT_SESSION_WINDOW_SECONDS = 60 * 60
 const DEFAULT_WORKSPACE_FILE_NAME = 'untitled'
 const DEFAULT_WORKSPACE_FOLDER_NAME = 'untitled-folder'
-const EMPTY_WORKSPACES: Workspace[] = []
 const EMPTY_WORKSPACE_SESSIONS: WorkspaceSession[] = []
 const EMPTY_SESSION_ID_SET = new Set<string>()
 
@@ -250,435 +235,6 @@ function isSessionRecent(session: WorkspaceSession, currentUnixTimestamp: number
 type RuntimeIconByKind = WorkspaceRuntimeIconByKind
 
 type SessionMenuRequest = WorkspaceSessionItemMenuRequest
-
-type RemoteHost = GetRemoteHostsResponse[number]
-
-interface RemoteWorkspace {
-  id: string
-  name: string
-  locator: {
-    hostId: string
-    path: string
-    kind?: 'project' | 'managed-worktree'
-    sourceWorkspaceId?: string | null
-  }
-  gitIdentity: {
-    originUrl?: string | null
-    repoRoot?: string | null
-    headSha?: string | null
-    branch?: string | null
-  }
-  identifier: string
-  pinned: number
-  createdAt: number
-  updatedAt: number
-}
-
-interface RemoteWorkspaceFileEntry {
-  type: 'file' | 'directory'
-  name: string
-  path: string
-}
-
-function remoteHostWorkspacesQueryKey(hostId: string) {
-  return remoteHostUpstreamQueryKey(hostId, 'workspaces')
-}
-
-function remoteHostFilesQueryKey(hostId: string, workspaceId: string) {
-  return remoteHostUpstreamQueryKey(hostId, workspaceId, 'files')
-}
-
-function RemoteWorkspaceFileRow({ entry }: { entry: RemoteWorkspaceFileEntry }) {
-  return (
-    <div className="flex items-center gap-2 border-b border-border/40 px-2 py-1.5 last:border-b-0">
-      {entry.type === 'directory'
-        ? <FolderClosedIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
-        : <FilePlusIcon className="size-3.5 shrink-0 text-muted-foreground/45" aria-hidden="true" />}
-      <span className="truncate text-[11.5px] text-foreground/80">{entry.name}</span>
-    </div>
-  )
-}
-
-function RemoteWorkspaceCard({
-  workspace,
-  selected,
-  onSelect,
-}: {
-  workspace: RemoteWorkspace
-  selected: boolean
-  onSelect: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        'flex w-full flex-col gap-1 border-b border-border/40 px-2.5 py-2 text-left last:border-b-0 hover:bg-muted/40',
-        selected && 'bg-muted/50',
-      )}
-    >
-      <span className="truncate text-[11.5px] font-medium text-foreground/85">{workspace.name}</span>
-      <span className="truncate font-mono text-[10.5px] text-muted-foreground/70">{workspace.locator.path}</span>
-      {workspace.gitIdentity.branch && (
-        <span className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
-          <FileDiffIcon className="size-3" aria-hidden="true" />
-          {workspace.gitIdentity.branch}
-        </span>
-      )}
-    </button>
-  )
-}
-
-function RemoteWorkspaceBrowser({
-  host,
-  creating,
-  onCreate,
-}: {
-  host: RemoteHost
-  creating: boolean
-  onCreate: (input: CreateWorkspaceInput) => Promise<void>
-}) {
-  const { t } = useTranslation(['workspace', 'settings'])
-  const { selectDirectory } = useDirectoryPicker()
-  const queryClient = useQueryClient()
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
-  const [importingPath, setImportingPath] = useState(false)
-
-  const workspacesQuery = useQuery({
-    queryKey: remoteHostWorkspacesQueryKey(host.id),
-    queryFn: () => fetchRemoteUpstreamJson<RemoteWorkspace[]>(host.id, '/workspaces'),
-    retry: false,
-  })
-  const workspaces = workspacesQuery.data ?? EMPTY_WORKSPACES
-  const selectedWorkspace = useMemo(() => {
-    return workspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? workspaces[0] ?? null
-  }, [selectedWorkspaceId, workspaces])
-
-  useEffect(() => {
-    setSelectedWorkspaceId(null)
-  }, [host.id])
-
-  useEffect(() => {
-    if (!selectedWorkspaceId && workspaces.length > 0) {
-      setSelectedWorkspaceId(workspaces[0].id)
-    }
-  }, [selectedWorkspaceId, workspaces])
-
-  const filesQuery = useQuery({
-    queryKey: remoteHostFilesQueryKey(host.id, selectedWorkspace?.id ?? ''),
-    queryFn: () => fetchRemoteUpstreamJson<RemoteWorkspaceFileEntry[]>(
-      host.id,
-      `/workspaces/${encodeURIComponent(selectedWorkspace?.id ?? '')}/files`,
-    ),
-    enabled: !!selectedWorkspace,
-    retry: false,
-  })
-
-  const busy = creating || importingPath
-
-  const handleMountExisting = async () => {
-    if (!selectedWorkspace) {
-      return
-    }
-
-    await onCreate({
-      name: selectedWorkspace.name,
-      locator: {
-        hostId: host.id,
-        path: selectedWorkspace.locator.path,
-        kind: selectedWorkspace.locator.kind,
-        sourceWorkspaceId: selectedWorkspace.id,
-      },
-      gitIdentity: selectedWorkspace.gitIdentity,
-    })
-  }
-
-  const handleBrowseAndImport = async () => {
-    setImportingPath(true)
-    try {
-      const path = await selectDirectory({
-        hostId: host.id,
-        title: t('workspace.dialog.remoteBrowseTitle'),
-        description: t('workspace.dialog.remoteBrowseDescription', { hostName: host.displayName }),
-      })
-      if (!path) {
-        return
-      }
-      const input = await ensureRemoteWorkspaceForPath(host.id, path)
-      await onCreate(input)
-      void queryClient.invalidateQueries({ queryKey: remoteHostWorkspacesQueryKey(host.id) })
-    }
-    catch (error) {
-      toastManager.add({
-        type: 'error',
-        title: t('workspace.toast.remoteWorkspaceCreateFailed'),
-        description: error instanceof Error ? error.message : String(error),
-      })
-    }
-    finally {
-      setImportingPath(false)
-    }
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-card/60 px-3 py-2.5">
-        <div className="min-w-0 space-y-0.5">
-          <p className="text-[12px] font-medium text-foreground/90">
-            {t('workspace.dialog.remoteBrowseTitle')}
-          </p>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            {t('workspace.dialog.remoteBrowseHint', { hostName: host.displayName })}
-          </p>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          disabled={busy || host.connectionState !== 'connected'}
-          onClick={() => void handleBrowseAndImport()}
-        >
-          {importingPath
-            ? <LoadingLine className="animate-spin" />
-            : <FolderPlusIcon className="size-3.5" />}
-          {t('workspace.dialog.remoteBrowseAction')}
-        </Button>
-      </div>
-
-      {workspacesQuery.isLoading
-        ? (
-            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
-              <LoadingLine className="size-3 animate-spin" />
-              {t('settings:remoteHosts.loading')}
-            </div>
-          )
-        : workspacesQuery.isError
-          ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
-                {workspacesQuery.error instanceof Error ? workspacesQuery.error.message : String(workspacesQuery.error)}
-              </p>
-            )
-          : workspaces.length === 0
-            ? (
-                <p className="rounded-md border border-dashed border-border/70 px-2.5 py-3 text-center text-[11px] text-muted-foreground">
-                  {t('workspace.dialog.remoteNoExistingWorkspaces')}
-                </p>
-              )
-            : (
-                <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                  <div className="min-h-0 overflow-y-auto rounded-md border border-border/60">
-                    <p className="sticky top-0 border-b border-border/50 bg-muted/30 px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                      {t('workspace.dialog.remoteExistingLabel')}
-                    </p>
-                    {workspaces.map(workspace => (
-                      <RemoteWorkspaceCard
-                        key={workspace.id}
-                        workspace={workspace}
-                        selected={selectedWorkspace?.id === workspace.id}
-                        onSelect={() => setSelectedWorkspaceId(workspace.id)}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="min-w-0 space-y-3">
-                    {selectedWorkspace && (
-                      <div className="space-y-2 rounded-lg border border-border/70 bg-card/60 p-3">
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-medium uppercase text-muted-foreground/70">
-                            {t('workspace.dialog.selectedWorkspace')}
-                          </p>
-                          <p className="truncate font-mono text-[11.5px] text-foreground/80" title={selectedWorkspace.locator.path}>
-                            {selectedWorkspace.locator.path}
-                          </p>
-                        </div>
-                        {selectedWorkspace.gitIdentity.originUrl && (
-                          <p className="break-all font-mono text-[11px] text-muted-foreground/80">
-                            {selectedWorkspace.gitIdentity.originUrl}
-                          </p>
-                        )}
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => void handleMountExisting()}
-                        >
-                          {creating && !importingPath && <LoadingLine className="animate-spin" />}
-                          {t('workspace.dialog.remoteMountExisting')}
-                        </Button>
-                      </div>
-                    )}
-
-                    {filesQuery.isLoading
-                      ? (
-                          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
-                            <LoadingLine className="size-3 animate-spin" />
-                            {t('workspace.dialog.loadingFiles')}
-                          </div>
-                        )
-                      : filesQuery.isError
-                        ? (
-                            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
-                              {filesQuery.error instanceof Error ? filesQuery.error.message : String(filesQuery.error)}
-                            </p>
-                          )
-                        : filesQuery.data && filesQuery.data.length > 0
-                          ? (
-                              <div className="max-h-56 overflow-y-auto rounded-md border border-border/60">
-                                {filesQuery.data.map(entry => (
-                                  <RemoteWorkspaceFileRow key={entry.path} entry={entry} />
-                                ))}
-                              </div>
-                            )
-                          : selectedWorkspace
-                            ? (
-                                <p className="rounded-md border border-dashed border-border/70 px-2.5 py-3 text-center text-[11px] text-muted-foreground">
-                                  {t('settings:remoteHosts.files.empty')}
-                                </p>
-                              )
-                            : null}
-                  </div>
-                </div>
-              )}
-    </div>
-  )
-}
-
-function WorkspaceAddDialog({
-  open,
-  creating,
-  onOpenChange,
-  onAddLocal,
-  onCreateRemote,
-}: {
-  open: boolean
-  creating: boolean
-  onOpenChange: (open: boolean) => void
-  onAddLocal: () => void
-  onCreateRemote: (input: CreateWorkspaceInput) => Promise<void>
-}) {
-  const { t } = useTranslation(['workspace', 'settings'])
-  const [selectedHostId, setSelectedHostId] = useState('local')
-  const { data: remoteHosts = [], isLoading } = useQuery({
-    ...getRemoteHostsOptions(),
-    enabled: open,
-  })
-  const selectedRemoteHost = remoteHosts.find(host => host.id === selectedHostId) ?? null
-
-  useEffect(() => {
-    if (!open) {
-      setSelectedHostId('local')
-    }
-  }, [open])
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="px-5 pt-5">
-          <DialogTitle>
-            {t('workspace.dialog.addWorkspaceTitle', { defaultValue: 'Add workspace' })}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid min-h-96 grid-cols-[12rem_minmax(0,1fr)] border-t border-border/60">
-          <div className="border-r border-border/60 bg-muted/20 p-2">
-            <button
-              type="button"
-              onClick={() => setSelectedHostId('local')}
-              className={cn(
-                'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors',
-                selectedHostId === 'local'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-              )}
-            >
-              <FolderOpenIcon className="size-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                {t('workspace.dialog.addWorkspaceLocalHost', { defaultValue: 'This Mac' })}
-              </span>
-            </button>
-            <div className="mt-2 border-t border-border/60 pt-2">
-              <p className="px-2.5 pb-1 text-[10px] font-medium uppercase text-muted-foreground/60">
-                {t('settings:remoteHosts.page.title')}
-              </p>
-              {isLoading
-                ? (
-                    <div className="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
-                      <LoadingLine className="size-3 animate-spin" />
-                      {t('settings:remoteHosts.loading')}
-                    </div>
-                  )
-                : remoteHosts.length === 0
-                  ? (
-                      <p className="px-2.5 py-2 text-[11px] text-muted-foreground">
-                        {t('workspace.dialog.addWorkspaceNoRemoteHosts', { defaultValue: 'No remote hosts configured.' })}
-                      </p>
-                    )
-                  : remoteHosts.map((host) => {
-                      const connected = host.connectionState === 'connected'
-                      return (
-                        <button
-                          key={host.id}
-                          type="button"
-                          disabled={!connected}
-                          onClick={() => setSelectedHostId(host.id)}
-                          className={cn(
-                            'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                            selectedHostId === host.id
-                              ? 'bg-accent text-foreground'
-                              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                          )}
-                        >
-                          <ArrowUpDownIcon className="size-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">{host.displayName}</span>
-                          <span className={cn('size-1.5 shrink-0 rounded-full', connected ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
-                        </button>
-                      )
-                    })}
-            </div>
-          </div>
-
-          <div className="min-w-0 p-4">
-            {selectedHostId === 'local'
-              ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-                    <div className="flex size-12 items-center justify-center rounded-xl bg-muted/60">
-                      <FolderOpenIcon className="size-6 text-muted-foreground/70" aria-hidden="true" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <h3 className="text-sm font-medium">
-                        {t('workspace.dialog.addWorkspaceLocalTitle', { defaultValue: 'Choose a local project folder' })}
-                      </h3>
-                      <p className="mx-auto max-w-xs text-[12px] leading-relaxed text-muted-foreground">
-                        {t('workspace.dialog.addWorkspaceLocalDescription', { defaultValue: 'Local workspaces use this machine as host and keep your files where they are.' })}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      disabled={creating}
-                      onClick={() => {
-                        onOpenChange(false)
-                        onAddLocal()
-                      }}
-                    >
-                      <FolderPlusIcon className="size-3.5" />
-                      {t('workspace.dialog.addWorkspaceChooseLocal', { defaultValue: 'Choose folder' })}
-                    </Button>
-                  </div>
-                )
-              : selectedRemoteHost
-                ? (
-                    <RemoteWorkspaceBrowser
-                      key={selectedRemoteHost.id}
-                      host={selectedRemoteHost}
-                      creating={creating}
-                      onCreate={onCreateRemote}
-                    />
-                  )
-                : null}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 const WorkspaceGroup = memo(
   ({
