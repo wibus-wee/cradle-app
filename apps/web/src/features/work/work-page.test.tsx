@@ -29,7 +29,7 @@ vi.mock('./use-work', () => ({
   }),
 }))
 
-describe('WorkPage', () => {
+describe('workPage', () => {
   beforeEach(() => {
     mocks.updateSurfaceTitle.mockReset()
     mocks.getWorkDetail.mockReset().mockReturnValue({

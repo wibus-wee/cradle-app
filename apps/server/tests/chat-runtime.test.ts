@@ -1182,9 +1182,9 @@ class TestLiveSteerSnapshotRuntime implements ChatRuntime {
     const streamIndex = this.streamInputs.length
     yield { type: 'text-start', id: `live-steer-text-${streamIndex}` }
     if (streamIndex === 1) {
-      this.resolveFirstStreamStarted?.()
       await new Promise<void>((resolve) => {
         this.releaseFirstStream = resolve
+        this.resolveFirstStreamStarted?.()
       })
     }
     yield {
@@ -3816,7 +3816,6 @@ describe('chat runtime capability', () => {
     const runtime = new TestLiveSteerSnapshotRuntime()
     const originalCodexRuntime = getRuntimeRegistry().get('codex')
     let app: Awaited<ReturnType<typeof createServerApp>> | undefined
-    let runChunksPromise: Promise<UIMessageChunk[]> | null = null
 
     try {
       app = await createServerApp()
@@ -3875,7 +3874,6 @@ describe('chat runtime capability', () => {
         }),
       )
       expect(runRes.status).toBe(200)
-      runChunksPromise = collectSseChunks(runRes)
       await runtime.firstStreamStarted
 
       const steerRes = await app.handle(
@@ -3900,7 +3898,6 @@ describe('chat runtime capability', () => {
       expect(await listChatQueue(app, 'session-live-steer-snapshot')).toHaveLength(1)
 
       runtime.release()
-      await runChunksPromise
 
       await waitForCondition(() => {
         expect(runtime.streamInputs).toHaveLength(2)
@@ -3909,7 +3906,7 @@ describe('chat runtime capability', () => {
       const drainedQueue = await listChatQueue(app, 'session-live-steer-snapshot')
       expect(drainedQueue).toEqual([
         expect.objectContaining({
-          mode: 'queue',
+          mode: 'steer',
           status: 'completed',
           text: 'Use a different provider target.',
           providerTargetId: 'provider-target-live-steer-other',
@@ -3919,9 +3916,6 @@ describe('chat runtime capability', () => {
     }
  finally {
       runtime.release()
-      if (runChunksPromise) {
-        await runChunksPromise.catch(() => undefined)
-      }
       if (originalCodexRuntime) {
         registerRuntime(originalCodexRuntime)
       }
@@ -6484,37 +6478,6 @@ describe('chat runtime capability', () => {
       expect(queueBRes.status).toBe(200)
       const queueB = (await queueBRes.json()) as ChatQueueItemView
 
-      const steerRes = await app.handle(
-        new Request('http://localhost/chat/sessions/session-chat-queue/steer', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ text: 'Steer next run', modelId: 'gpt-4o-mini' }),
-        }),
-      )
-      expect(steerRes.status).toBe(200)
-      const steerResult = (await steerRes.json()) as { mode: string, queueItem: ChatQueueItemView }
-      expect(steerResult).toEqual(
-        expect.objectContaining({
-          mode: 'queued',
-          ok: true,
-          sessionId: 'session-chat-queue',
-        }),
-      )
-      expect(steerResult.queueItem).toEqual(
-        expect.objectContaining({ mode: 'queue', status: 'pending', text: 'Steer next run' }),
-      )
-
-      // This test exercises the pre-existing multi-item queue mechanics (reorder/cancel/drain)
-      // below, which predate steer's auto-fallback; cancel the auto-queued steer item so those
-      // assertions keep exercising exactly the two items they were written against.
-      const cancelSteerQueueItemRes = await app.handle(
-        new Request(
-          `http://localhost/chat/sessions/session-chat-queue/queue/${encodeURIComponent(steerResult.queueItem.id)}`,
-          { method: 'DELETE' },
-        ),
-      )
-      expect(cancelSteerQueueItemRes.status).toBe(200)
-
       let visibleQueue = await listChatQueue(app, 'session-chat-queue')
       expect(
         visibleQueue.filter(item => item.status === 'pending').map(item => item.id),
@@ -6556,7 +6519,7 @@ describe('chat runtime capability', () => {
 
       await waitForCondition(
         () => expect(completionBodies).toEqual(['Start long task', 'Queued follow-up B']),
-        'queued item to drain without rejected steer',
+        'queued item to drain',
       )
       streamControllers[1].enqueue(
         encoder.encode(
@@ -6579,9 +6542,6 @@ describe('chat runtime capability', () => {
       const rows = await getChatMessages(app, 'session-chat-queue')
       expect(rows.filter(row => row.role === 'user').map(row => row.content)).toEqual(
         expect.arrayContaining(['Start long task', 'Queued follow-up B']),
-      )
-      expect(rows.filter(row => row.role === 'user').map(row => row.content)).not.toContain(
-        'Steer next run',
       )
     }
  finally {

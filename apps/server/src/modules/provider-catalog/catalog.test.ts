@@ -91,6 +91,7 @@ describe('providerCatalog', () => {
     setCodexChatgptModelListClientFactoryForTests((options) => {
       codexClientOptions.push(options)
       return {
+        pid: null,
         initialize: vi.fn(async () => undefined),
         request: vi.fn(async (method: string, params?: unknown) => {
           codexRequests.push({ method, params })
@@ -179,6 +180,7 @@ describe('providerCatalog', () => {
     setCodexChatgptModelListClientFactoryForTests((options) => {
       codexClientOptions.push(options)
       return {
+        pid: null,
         initialize: vi.fn(async () => undefined),
         request: vi.fn(async (method: string) => {
           if (method === 'account/login/start') {

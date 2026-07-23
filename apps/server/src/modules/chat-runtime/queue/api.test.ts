@@ -1,3 +1,4 @@
+import type { UUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -122,7 +123,8 @@ describe('enqueueSessionQueueItem', () => {
       )
       // Product enqueue is durable-only; simulate an explicit native submit for cancel coverage.
       await liveRuntimeSessionRegistry.read(sessionId)!.submitNativeInput!({
-        queueItemId: item.id,
+        // Queue rows use generated UUIDs, while Drizzle exposes their SQLite column as string.
+        queueItemId: item.id as UUID,
         message: { id: item.id, role: 'user', parts: [{ type: 'text', text: 'native submitted input' }] },
       })
 

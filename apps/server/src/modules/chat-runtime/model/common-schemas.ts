@@ -290,7 +290,7 @@ export const contextPartSchema = t.Union([
   ),
 ])
 
-export const queueModeSchema = t.Literal('queue')
+export const queueModeSchema = t.String({ enum: ['queue', 'steer'] })
 export const queueStatusSchema = t.Union([
   t.Literal('pending'),
   t.Literal('running'),
