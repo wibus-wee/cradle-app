@@ -3,6 +3,11 @@ import { timingSafeEqual } from 'node:crypto'
 import { x25519 } from '@noble/curves/ed25519'
 
 import { AppError } from '../../errors/app-error'
+import {
+  decodeRelayChunk,
+  encodeRelayChunk,
+  RELAY_MIN_COMPRESSION_INPUT_BYTES,
+} from './compression'
 import type { RelayCryptoRole, RelayDerivedKeys } from './crypto'
 import {
   computeRelayConfirm,
@@ -33,7 +38,7 @@ import {
  * transports. It owns:
  *
  * 1. The `hello` / `hello_confirm` handshake (ECDH → key derivation → pinning).
- * 2. Per-frame XChaCha20-Poly1305 encryption of inner stream frames.
+ * 2. Size-adaptive XChaCha20-Poly1305/AES-256-GCM encryption of inner frames.
  * 3. Stream multiplexing over the single relayd room.
  * 4. Credit-based flow control so a fast sender can't overrun the relayd queue
  *    (64 frames / 4 MiB) or the peer.
@@ -66,6 +71,8 @@ export interface RelaySessionOptions {
   maxStreamCreditBytes?: number
   /** Hard aggregate byte allowance across all streams. Defaults to 16 MiB. */
   maxConnectionCreditBytes?: number
+  /** Disable Zstandard and bulk AES together for controlled V2 before/after benchmarks. */
+  optimizedCodecEnabled?: boolean
 }
 
 export interface RelaySessionCallbacks {
@@ -143,7 +150,7 @@ function streamIdForFrame(frame: InnerFrame): string | undefined {
   }
 }
 
-const ACK_INTERVAL_BYTES = 64 * 1024
+const ACK_INTERVAL_BYTES = 256 * 1024
 
 export class RelaySession {
   readonly role: RelaySessionRole
@@ -174,6 +181,10 @@ export class RelaySession {
   private readonly initialStreamCreditBytes: number
   private readonly maxStreamCreditBytes: number
   private readonly maxConnectionCreditBytes: number
+  private readonly optimizedCodecEnabled: boolean
+  private connectionInFlightBytes = 0
+  private flushCursor = 0
+  private flushingOutbound = false
 
   constructor(
     role: RelaySessionRole,
@@ -202,6 +213,7 @@ export class RelaySession {
     this.maxStreamCreditBytes = options.maxStreamCreditBytes ?? RELAY_STREAM_MAX_CREDIT_BYTES
     this.maxConnectionCreditBytes
       = options.maxConnectionCreditBytes ?? RELAY_CONNECTION_MAX_CREDIT_BYTES
+    this.optimizedCodecEnabled = options.optimizedCodecEnabled ?? true
     if (
       !Number.isSafeInteger(this.initialStreamCreditBytes)
       || !Number.isSafeInteger(this.maxStreamCreditBytes)
@@ -347,7 +359,7 @@ export class RelaySession {
         this.handleStreamOpen(frame.streamId)
         break
       case INNER_FRAME_KIND.streamData:
-        this.handleStreamData(frame.streamId, frame.data)
+        this.handleStreamData(frame)
         break
       case INNER_FRAME_KIND.streamAck:
         this.handleStreamAck(frame.streamId, frame.ackedBytes)
@@ -444,9 +456,11 @@ export class RelaySession {
     this.keys = deriveRelayKeys(sharedSecret, this.pairingCode ?? '')
     this.sendCipher = new RelayCipher(
       this.role === 'host' ? this.keys.hostSendKey : this.keys.controllerSendKey,
+      this.optimizedCodecEnabled,
     )
     this.receiveCipher = new RelayCipher(
       this.role === 'host' ? this.keys.controllerSendKey : this.keys.hostSendKey,
+      this.optimizedCodecEnabled,
     )
   }
 
@@ -645,6 +659,10 @@ export class RelaySession {
     }
     this.maybeSendReceiveAck(streamId, flow, true)
     flow.closed = true
+    this.connectionInFlightBytes = Math.max(
+      0,
+      this.connectionInFlightBytes - bytesInFlight(flow),
+    )
     this.sendEncryptedFrame({
       kind: INNER_FRAME_KIND.streamClose,
       streamId,
@@ -668,11 +686,27 @@ export class RelaySession {
     this.cb.onStreamOpen?.(streamId)
   }
 
-  private handleStreamData(streamId: string, data: Uint8Array): void {
+  private handleStreamData(frame: Extract<InnerFrame, { kind: 'stream_data' }>): void {
+    const streamId = frame.streamId
     const flow = this.streams.get(streamId)
     if (!flow || flow.closed) {
       return
     }
+    if (frame.seq !== flow.receivedBytes) {
+      this.fail(
+        new AppError({
+          code: 'relay_stream_sequence_invalid',
+          status: 400,
+          message: `Unexpected stream sequence ${frame.seq}; expected ${flow.receivedBytes}.`,
+        }),
+      )
+      return
+    }
+    const data = decodeRelayChunk({
+      data: frame.data,
+      compression: frame.compression ?? 'none',
+      uncompressedBytes: frame.uncompressedBytes ?? frame.data.byteLength,
+    })
     flow.receivedBytes += data.length
     // Deliver first; credit is released only when the transport reports the
     // bytes were applied (TCP write success / drain). See reportStreamDataConsumed.
@@ -691,6 +725,7 @@ export class RelaySession {
     // Send-side credit only — never touch receive-side counters here.
     flow.peerAckedBytes = Math.max(flow.peerAckedBytes, ackedBytes)
     const releasedBytes = flow.peerAckedBytes - previousAckedBytes
+    this.connectionInFlightBytes = Math.max(0, this.connectionInFlightBytes - releasedBytes)
     flow.ackedSinceCreditIncrease += releasedBytes
     if (
       flow.ackedSinceCreditIncrease >= flow.creditBytes / 2
@@ -707,57 +742,95 @@ export class RelaySession {
   private handleStreamCloseFrame(streamId: string, reason?: string): void {
     const flow = this.streams.get(streamId)
     if (flow) {
+      this.connectionInFlightBytes = Math.max(
+        0,
+        this.connectionInFlightBytes - bytesInFlight(flow),
+      )
       flow.closed = true
       this.streams.delete(streamId)
     }
     this.cb.onStreamClose?.(streamId, reason)
   }
 
-  private connectionBytesInFlight(): number {
-    let total = 0
-    for (const flow of this.streams.values()) {
-      if (!flow.closed) {
-        total += bytesInFlight(flow)
-      }
-    }
-    return total
-  }
-
   private flushOutboundStreams(): void {
-    for (const [streamId, flow] of this.streams) {
-      this.flushOutboundStream(streamId, flow)
-      if (this.connectionBytesInFlight() >= this.maxConnectionCreditBytes) {
-        break
+    if (this.flushingOutbound) {
+      return
+    }
+    this.flushingOutbound = true
+    try {
+      const streams = [...this.streams.entries()].filter(([, flow]) => !flow.closed)
+      if (streams.length === 0) {
+        return
       }
+      let madeProgress = true
+      while (madeProgress && this.connectionInFlightBytes < this.maxConnectionCreditBytes) {
+        madeProgress = false
+        for (let offset = 0; offset < streams.length; offset++) {
+          const index = (this.flushCursor + offset) % streams.length
+          const [streamId, flow] = streams[index]
+          if (this.flushOutboundChunk(streamId, flow)) {
+            madeProgress = true
+            this.flushCursor = (index + 1) % streams.length
+          }
+          if (this.connectionInFlightBytes >= this.maxConnectionCreditBytes) {
+            break
+          }
+        }
+      }
+    }
+    finally {
+      this.flushingOutbound = false
     }
   }
 
-  private flushOutboundStream(streamId: string, flow: StreamFlowState): void {
-    while (
-      flow.pendingData.length > 0
-      && bytesInFlight(flow) < flow.creditBytes
-      && this.connectionBytesInFlight() < this.maxConnectionCreditBytes
+  private flushOutboundChunk(streamId: string, flow: StreamFlowState): boolean {
+    if (
+      flow.closed
+      || flow.pendingData.length === 0
+      || bytesInFlight(flow) >= flow.creditBytes
+      || this.connectionInFlightBytes >= this.maxConnectionCreditBytes
     ) {
-      const pending = flow.pendingData[0]
-      const capacity = Math.min(
-        flow.creditBytes - bytesInFlight(flow),
-        this.maxConnectionCreditBytes - this.connectionBytesInFlight(),
-      )
-      const length = Math.min(pending.byteLength, capacity, RELAY_MAX_STREAM_CHUNK_BYTES)
-      if (length <= 0) {
-        break
-      }
-      const chunk = pending.subarray(0, length)
-      if (length === pending.byteLength) {
-        flow.pendingData.shift()
-      }
- else {
-        flow.pendingData[0] = pending.subarray(length)
-      }
-      const seq = flow.sentBytes
-      flow.sentBytes += chunk.byteLength
-      this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.streamData, streamId, seq, data: chunk })
+      return false
     }
+    const pending = flow.pendingData[0]
+    const capacity = Math.min(
+      flow.creditBytes - bytesInFlight(flow),
+      this.maxConnectionCreditBytes - this.connectionInFlightBytes,
+    )
+    const length = Math.min(pending.byteLength, capacity, RELAY_MAX_STREAM_CHUNK_BYTES)
+    if (length <= 0) {
+      return false
+    }
+    const chunk = pending.subarray(0, length)
+    if (length === pending.byteLength) {
+      flow.pendingData.shift()
+    }
+ else {
+      flow.pendingData[0] = pending.subarray(length)
+    }
+    const seq = flow.sentBytes
+    flow.sentBytes += chunk.byteLength
+    this.connectionInFlightBytes += chunk.byteLength
+    if (chunk.byteLength < RELAY_MIN_COMPRESSION_INPUT_BYTES || !this.optimizedCodecEnabled) {
+      this.sendEncryptedFrame({
+        kind: INNER_FRAME_KIND.streamData,
+        streamId,
+        seq,
+        data: chunk,
+      })
+      return true
+    }
+    const encoded = encodeRelayChunk(chunk)
+    this.sendEncryptedFrame({
+      kind: INNER_FRAME_KIND.streamData,
+      streamId,
+      seq,
+      data: encoded.data,
+      ...(encoded.compression === 'zstd'
+        ? { compression: 'zstd', uncompressedBytes: encoded.uncompressedBytes }
+        : {}),
+    })
+    return true
   }
 
   private updatePausedStreams(): void {
@@ -802,13 +875,14 @@ export class RelaySession {
   // ── Frame send helpers ──
 
   private sendPlainEnvelope(frame: InnerFrame): void {
+    const streamId = streamIdForFrame(frame)
     const env: RelayEnvelope = {
       version: RELAY_PROTOCOL_VERSION,
       roomId: this.roomId,
       seq: this.outboundSeq++,
       kind: RELAY_ENVELOPE_KIND.dataFrame,
       priority: relayPriorityForInnerFrame(frame),
-      ...(streamIdForFrame(frame) ? { streamId: streamIdForFrame(frame) } : {}),
+      ...(streamId ? { streamId } : {}),
       payload: encodeInnerFrame(frame),
     }
     this.cb.send(encodeRelayEnvelope(env))
@@ -822,13 +896,14 @@ export class RelaySession {
         message: 'Relay session keys not derived.',
       })
     }
+    const streamId = streamIdForFrame(frame)
     const env: RelayEnvelope = {
       version: RELAY_PROTOCOL_VERSION,
       roomId: this.roomId,
       seq: this.outboundSeq++,
       kind: RELAY_ENVELOPE_KIND.dataFrame,
       priority: relayPriorityForInnerFrame(frame),
-      ...(streamIdForFrame(frame) ? { streamId: streamIdForFrame(frame) } : {}),
+      ...(streamId ? { streamId } : {}),
       payload: this.sendCipher.encrypt(encodeInnerFrame(frame)),
     }
     this.cb.send(encodeRelayEnvelope(env))
@@ -867,6 +942,7 @@ export class RelaySession {
       this.cb.onStreamClose?.(streamId, 'session closed')
     }
     this.streams.clear()
+    this.connectionInFlightBytes = 0
   }
 }
 

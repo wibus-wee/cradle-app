@@ -109,6 +109,16 @@ describe('relay crypto', () => {
     expect(cipher.decrypt(b)).toEqual(plaintext)
   })
 
+  it('keeps the benchmark baseline on XChaCha for bulk frames', () => {
+    const cipher = new RelayCipher(new Uint8Array(32).fill(7), false)
+    const plaintext = new Uint8Array(64 * 1024)
+    const sealed = cipher.encrypt(plaintext)
+
+    expect(sealed.byteLength).toBe(plaintext.byteLength + 40)
+    expect(sealed[0] & 0x80).toBe(0x80)
+    expect(cipher.decrypt(sealed)).toEqual(plaintext)
+  })
+
   it('rejects tampered ciphertext (auth tag verification)', () => {
     const keys = deriveRelayKeys(new Uint8Array(32).fill(1), 'CODE')
     const cipher = new RelayCipher(sendKeyForRole(keys, 'host'))

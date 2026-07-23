@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { decodeRelayChunk, encodeRelayChunk } from '../../src/modules/relay-transport/compression'
 import { RelayCipher } from '../../src/modules/relay-transport/crypto'
 import {
   decodeInnerFrame,
@@ -22,13 +23,14 @@ interface BenchmarkRow {
 }
 
 interface CodecSample {
+  profile: 'compressible-json' | 'incompressible'
   payloadBytes: number
   v1WireBytes: number
-  previousV2WireBytes: number
-  currentV2WireBytes: number
+  baselineV2WireBytes: number
+  optimizedV2WireBytes: number
   v1Frames: number
-  previousV2Frames: number
-  currentV2Frames: number
+  baselineV2Frames: number
+  optimizedV2Frames: number
 }
 
 const OLD_CREDIT_BYTES = 512 * 1024
@@ -43,17 +45,51 @@ interface SchedulingFrame {
   sequence: number
 }
 
-function makePayload(length: number): Uint8Array {
-  return Uint8Array.from({ length }, (_, index) => index & 0xFF)
+function makePayload(length: number, profile: CodecSample['profile']): Uint8Array {
+  if (profile === 'compressible-json') {
+    const record = Buffer.from('{"type":"relay_event","status":"streaming","content":"hello from Cradle"}\n')
+    return Uint8Array.from({ length }, (_, index) => record[index % record.length])
+  }
+  let state = 0xA341_316C
+  return Uint8Array.from({ length }, () => {
+    state ^= state << 13
+    state ^= state >>> 17
+    state ^= state << 5
+    return state & 0xFF
+  })
 }
 
-function encodeV2Payload(payload: Uint8Array): { wireBytes: number, frames: number } {
+function baselineV2Wire(payload: Uint8Array): { wireBytes: number, frames: number } {
+  const roomBytes = Buffer.byteLength('room_benchmark')
+  const streamBytes = Buffer.byteLength('benchmark')
+  let wireBytes = 0
+  let frames = 0
+  for (let offset = 0; offset < payload.byteLength; offset += RELAY_MAX_STREAM_CHUNK_BYTES) {
+    const chunkBytes = Math.min(RELAY_MAX_STREAM_CHUNK_BYTES, payload.byteLength - offset)
+    // V2: outer header + room + outer stream id + encrypted(inner header +
+    // inner stream id + data). XChaCha added nonce(24) + tag(16).
+    wireBytes += 16 + roomBytes + streamBytes + 7 + streamBytes + chunkBytes + 40
+    frames++
+  }
+  return { wireBytes, frames }
+}
+
+function encodeOptimizedV2Payload(payload: Uint8Array): { wireBytes: number, frames: number } {
   const cipher = new RelayCipher(new Uint8Array(32).fill(7))
   let wireBytes = 0
   let frames = 0
   for (let offset = 0; offset < payload.byteLength; offset += RELAY_MAX_STREAM_CHUNK_BYTES) {
     const chunk = payload.slice(offset, offset + RELAY_MAX_STREAM_CHUNK_BYTES)
-    const frame = { kind: 'stream_data' as const, streamId: 'benchmark', seq: offset, data: chunk }
+    const compressed = encodeRelayChunk(chunk)
+    const frame = {
+      kind: 'stream_data' as const,
+      streamId: 'benchmark',
+      seq: offset,
+      data: compressed.data,
+      ...(compressed.compression === 'zstd'
+        ? { compression: 'zstd' as const, uncompressedBytes: compressed.uncompressedBytes }
+        : {}),
+    }
     const encoded = encodeRelayEnvelope({
       version: RELAY_PROTOCOL_VERSION,
       roomId: 'room_benchmark',
@@ -67,7 +103,11 @@ function encodeV2Payload(payload: Uint8Array): { wireBytes: number, frames: numb
     const decodedFrame = decodeInnerFrame(cipher.decrypt(decoded.payload))
     expect(decodedFrame).toMatchObject({ kind: 'stream_data', streamId: frame.streamId, seq: offset })
     if (decodedFrame.kind === 'stream_data') {
-      expect(decodedFrame.data).toEqual(chunk)
+      expect(decodeRelayChunk({
+        data: decodedFrame.data,
+        compression: decodedFrame.compression ?? 'none',
+        uncompressedBytes: decodedFrame.uncompressedBytes ?? decodedFrame.data.byteLength,
+      })).toEqual(chunk)
     }
     wireBytes += encoded.byteLength
     frames += 1
@@ -75,19 +115,19 @@ function encodeV2Payload(payload: Uint8Array): { wireBytes: number, frames: numb
   return { wireBytes, frames }
 }
 
-function measureCodec(payloadBytes: number): CodecSample {
-  const payload = makePayload(payloadBytes)
-  const v2 = encodeV2Payload(payload)
+function measureCodec(profile: CodecSample['profile'], payloadBytes: number): CodecSample {
+  const payload = makePayload(payloadBytes, profile)
+  const baselineV2 = baselineV2Wire(payload)
+  const optimizedV2 = encodeOptimizedV2Payload(payload)
   return {
+    profile,
     payloadBytes,
     v1WireBytes: legacyV1WireBytesForStreamData(payload),
-    // Commit 01c39cd8 changes only relayd's forwarding ownership. The V2
-    // codec is deliberately identical before and after that change.
-    previousV2WireBytes: v2.wireBytes,
-    currentV2WireBytes: v2.wireBytes,
+    baselineV2WireBytes: baselineV2.wireBytes,
+    optimizedV2WireBytes: optimizedV2.wireBytes,
     v1Frames: 1,
-    previousV2Frames: v2.frames,
-    currentV2Frames: v2.frames,
+    baselineV2Frames: baselineV2.frames,
+    optimizedV2Frames: optimizedV2.frames,
   }
 }
 
@@ -142,44 +182,44 @@ function deltaPercent(old: number, next: number): string {
 
 function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void {
   const report = {
-    kind: 'relay-three-generation-benchmark',
+    kind: 'relay-v2-performance-benchmark',
     run: {
-      id: 'relay-v1-v2-before-current-compare',
-      protocol: { v1: 1, previousV2: RELAY_PROTOCOL_VERSION, currentV2: RELAY_PROTOCOL_VERSION },
+      id: 'relay-v1-v2-baseline-optimized-compare',
+      protocol: { v1: 1, baselineV2: RELAY_PROTOCOL_VERSION, optimizedV2: RELAY_PROTOCOL_VERSION },
       measurementBoundary: 'same-process codec and scheduler model',
-      payloadPattern: 'payload[index] = index & 0xff',
+      payloadPatterns: ['compressible JSON-like stream', 'deterministic incompressible stream'],
       loss: 'none',
       randomSeed: 'not applicable',
     },
     conditions: {
       oldMaxStreamChunkBytes: 256 * 1024,
-      newMaxStreamChunkBytes: RELAY_MAX_STREAM_CHUNK_BYTES,
+      maxStreamChunkBytes: RELAY_MAX_STREAM_CHUNK_BYTES,
       oldCreditBytes: OLD_CREDIT_BYTES,
-      newCreditRangeBytes: [OLD_CREDIT_BYTES, NEW_MAX_CREDIT_BYTES],
-      newConnectionCreditBytes: NEW_MAX_CONNECTION_CREDIT_BYTES,
+      optimizedCreditRangeBytes: [OLD_CREDIT_BYTES, NEW_MAX_CREDIT_BYTES],
+      optimizedConnectionCreditBytes: NEW_MAX_CONNECTION_CREDIT_BYTES,
       bulkFramesAheadOfControl: BULK_FRAMES_AHEAD_OF_CONTROL,
       reservedMaximumControlFrames: RESERVED_MAX_CONTROL_FRAMES,
     },
     codecSamples: codecSamples.map(sample => ({
       ...sample,
-      v1ToV2WireByteDeltaPercent: deltaPercent(sample.v1WireBytes, sample.currentV2WireBytes),
-      previousV2ToCurrentV2WireByteDeltaPercent: deltaPercent(
-        sample.previousV2WireBytes,
-        sample.currentV2WireBytes,
+      v1ToV2WireByteDeltaPercent: deltaPercent(sample.v1WireBytes, sample.optimizedV2WireBytes),
+      baselineV2ToOptimizedV2WireDeltaPercent: deltaPercent(
+        sample.baselineV2WireBytes,
+        sample.optimizedV2WireBytes,
       ),
     })),
     rows,
     caveat: 'Wire and scheduler rows are exact under the stated inputs. Throughput rows are window bounds, not Internet throughput measurements. Run benchmark:relay:runtime for virtual-session RTT and local real-relayd cold/warm/concurrency samples.',
   }
   const markdown = [
-    `# Relay three-generation benchmark — ${report.run.id}`,
+    `# Relay V2 benchmark — ${report.run.id}`,
     '',
     '## Codec: exact byte measurements',
     '',
-    '| Logical payload | V1 wire bytes | V2 before pass-through | V2 current | V1 → current | V2 before → current | V1 frames | V2 before/current frames |',
-    '| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Profile | Logical payload | V1 wire bytes | V2 baseline | V2 optimized | V1 → V2 | Baseline → optimized | V2 frames |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...report.codecSamples.map(sample =>
-      `| ${sample.payloadBytes} B | ${sample.v1WireBytes} | ${sample.previousV2WireBytes} | ${sample.currentV2WireBytes} | ${sample.v1ToV2WireByteDeltaPercent} | ${sample.previousV2ToCurrentV2WireByteDeltaPercent} | ${sample.v1Frames} | ${sample.previousV2Frames}/${sample.currentV2Frames} |`),
+      `| ${sample.profile} | ${sample.payloadBytes} B | ${sample.v1WireBytes} | ${sample.baselineV2WireBytes} | ${sample.optimizedV2WireBytes} | ${sample.v1ToV2WireByteDeltaPercent} | ${sample.baselineV2ToOptimizedV2WireDeltaPercent} | ${sample.baselineV2Frames}/${sample.optimizedV2Frames} |`),
     '',
     '## Checkpoints',
     '',
@@ -188,18 +228,20 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
     ...rows.map(row =>
       `| ${row.checkpoint} | ${row.old} ${row.unit} | ${row.new} ${row.unit} | ${deltaPercent(row.old, row.new)} | ${row.evidence} |`),
     '',
-    'V2-before and V2-current have identical wire bytes by design: pass-through removes Relay process work, not bytes on the network. The 8 MiB value is the bounded adaptive maximum after successful acknowledgements; new streams start at the same 512 KiB as V1.',
+    'V2 baseline is the PR wire format before endpoint compression/adaptive AEAD. Optimized V2 keeps the relay envelope version, adds independently decodable Zstandard chunks, keeps low-latency XChaCha for small frames, and uses native AES-GCM for bulk frames. Incompressible chunks are sent raw, so compression never expands the wire.',
   ].join('\n')
   console.info(markdown)
   console.info(JSON.stringify(report))
 }
 
 describe('relay three-generation performance comparison', () => {
-  it('emits a reproducible V1/V2-before/V2-current report and guards the gains', () => {
+  it('emits a reproducible V1/V2 baseline-versus-optimized report and guards the gains', () => {
     const codecSamples = [
-      measureCodec(1 * 1024),
-      measureCodec(64 * 1024),
-      measureCodec(256 * 1024),
+      ...(['compressible-json', 'incompressible'] as const).flatMap(profile => [
+        measureCodec(profile, 1 * 1024),
+        measureCodec(profile, 64 * 1024),
+        measureCodec(profile, 256 * 1024),
+      ]),
     ]
     const oldControlPosition = legacyFifoControlPosition(BULK_FRAMES_AHEAD_OF_CONTROL)
     const newSchedule = priorityRoundRobinOrder([
@@ -279,8 +321,10 @@ describe('relay three-generation performance comparison', () => {
     printBenchmark(codecSamples, rows)
 
     for (const sample of codecSamples) {
-      expect(sample.currentV2WireBytes).toBeLessThan(sample.v1WireBytes * 0.7)
-      expect(sample.previousV2WireBytes).toBe(sample.currentV2WireBytes)
+      expect(sample.optimizedV2WireBytes).toBeLessThanOrEqual(sample.baselineV2WireBytes)
+      if (sample.profile === 'compressible-json') {
+        expect(sample.optimizedV2WireBytes).toBeLessThan(sample.baselineV2WireBytes * 0.2)
+      }
     }
     expect(rows.find(row => row.checkpoint === 'control frames ahead of an interactive control frame')?.new).toBe(0)
     expect(rows.find(row => row.checkpoint === 'window cap at 200 ms RTT')?.new).toBe(40)

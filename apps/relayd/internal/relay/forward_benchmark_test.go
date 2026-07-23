@@ -74,12 +74,12 @@ func BenchmarkRelayForwardPath(b *testing.B) {
 
 func benchmarkV2Frame(b *testing.B, payloadBytes int) []byte {
 	b.Helper()
-	// V2 stream_data plaintext is one byte kind, two bytes stream-id length,
-	// four bytes sequence, the stream id, and payload. XChaCha20-Poly1305 adds
-	// a 24-byte nonce plus a 16-byte authentication tag. relayd only sees the
-	// resulting opaque payload, so a deterministic byte slice has the exact
-	// relevant length without doing endpoint cryptography in this Go benchmark.
-	payload := make([]byte, payloadBytes+7+len("benchmark")+24+16)
+	// V2 raw stream_data plaintext is one byte kind, two bytes stream-id length,
+	// four bytes sequence, the stream id, and payload. Bulk AES-256-GCM adds a
+	// 12-byte nonce plus a 16-byte authentication tag. relayd only sees the
+	// resulting opaque payload, so deterministic bytes preserve the exact length
+	// without doing endpoint cryptography in this Go benchmark.
+	payload := make([]byte, payloadBytes+7+len("benchmark")+12+16)
 	for index := range payload {
 		payload[index] = byte(index)
 	}

@@ -15,6 +15,7 @@ import type { RelayEnvelope } from './protocol'
 import { decodeRelayEnvelope } from './protocol'
 import { readOrCreateHostRelayAuthToken } from './relay-auth-token-service'
 import { RelaySession } from './session'
+import { relayWebSocketDataView } from './websocket-data'
 
 const logger = createChildLogger({ module: 'relay-host-connector' })
 
@@ -257,7 +258,7 @@ class HostConnection {
       ws.on('message', (data: WebSocket.RawData) => {
         try {
           session.handleEnvelope(
-            decodeRelayEnvelope(new Uint8Array(data as Buffer)) as RelayEnvelope,
+            decodeRelayEnvelope(relayWebSocketDataView(data)) as RelayEnvelope,
           )
         }
  catch (error) {
@@ -286,7 +287,10 @@ class HostConnection {
     this.streams.set(streamId, { socket, streamId, requestWriter })
 
     socket.on('data', (chunk: Buffer) => {
-      session.writeStreamData(streamId, new Uint8Array(chunk))
+      session.writeStreamData(
+        streamId,
+        new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength),
+      )
     })
     socket.on('close', () => {
       session.closeStream(streamId, 'local server socket closed')
@@ -520,12 +524,12 @@ class RelayHttpRequestWriter {
    * the on-wire size, but credit tracks the peer's plaintext stream).
    */
   write(data: Uint8Array, onConsumed: (bytes: number) => void): void {
+    const chunk = Buffer.from(data.buffer, data.byteOffset, data.byteLength)
     if (this.released) {
-      this.writeToSocket(Buffer.from(data), data.byteLength, onConsumed)
+      this.writeToSocket(chunk, data.byteLength, onConsumed)
       return
     }
 
-    const chunk = Buffer.from(data)
     this.buffered.push(chunk)
     this.bufferedLength += chunk.byteLength
     this.pendingOriginalBytes += chunk.byteLength

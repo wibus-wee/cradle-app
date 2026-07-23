@@ -126,7 +126,7 @@ func TestHubForwardQueuesOriginalValidatedFrame(t *testing.T) {
 	}
 	hub.rooms[env.RoomID] = &room{id: env.RoomID, host: from, controller: peer}
 
-	if err := hub.forward(from, frame, env); err != nil {
+	if err := hub.forward(t.Context(), from, frame, env); err != nil {
 		t.Fatalf("forward() error = %v", err)
 	}
 	item, err := peer.scheduler.next(t.Context())
@@ -226,5 +226,64 @@ func TestPeerSchedulerReservesCapacityForControlAndPrunesDrainedStreams(t *testi
 	}
 	if got := len(scheduler.dataByStream); got != 0 {
 		t.Fatalf("dataByStream retains drained streams: %d", got)
+	}
+}
+
+func TestPeerSchedulerBackpressuresAndResumesDataInsteadOfDroppingPeer(t *testing.T) {
+	scheduler := newPeerScheduler(4, 4096, 1024)
+	for index := range 3 {
+		if err := scheduler.enqueue(queuedEnvelope{data: []byte{byte(index)}, size: 1024}, PriorityData, "bulk"); err != nil {
+			t.Fatalf("fill data queue %d: %v", index, err)
+		}
+	}
+
+	done := make(chan struct{})
+	result := make(chan error, 1)
+	go func() {
+		result <- scheduler.enqueueWait(
+			t.Context(),
+			done,
+			queuedEnvelope{data: []byte("next"), size: 1024},
+			PriorityData,
+			"bulk",
+		)
+	}()
+
+	select {
+	case err := <-result:
+		t.Fatalf("enqueueWait returned before queue space was available: %v", err)
+	default:
+	}
+	if _, err := scheduler.next(t.Context()); err != nil {
+		t.Fatalf("drain one queued frame: %v", err)
+	}
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("enqueueWait after drain: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("enqueueWait did not resume after queue space became available")
+	}
+}
+
+func TestPeerSchedulerBackpressureStopsWhenContextIsCancelled(t *testing.T) {
+	scheduler := newPeerScheduler(4, 4096, 1024)
+	for index := range 3 {
+		if err := scheduler.enqueue(queuedEnvelope{data: []byte{byte(index)}, size: 1024}, PriorityData, "bulk"); err != nil {
+			t.Fatalf("fill data queue %d: %v", index, err)
+		}
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err := scheduler.enqueueWait(
+		ctx,
+		make(chan struct{}),
+		queuedEnvelope{data: []byte("next"), size: 1024},
+		PriorityData,
+		"bulk",
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("enqueueWait cancellation error = %v, expected context.Canceled", err)
 	}
 }

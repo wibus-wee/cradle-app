@@ -100,6 +100,7 @@ type peerScheduler struct {
 	maxDataBytes    int64
 	maxDataCount    int
 	signal          chan struct{}
+	space           chan struct{}
 }
 
 func newPeerScheduler(maxCount int, maxBytes, maxFrameBytes int64) *peerScheduler {
@@ -114,12 +115,35 @@ func newPeerScheduler(maxCount int, maxBytes, maxFrameBytes int64) *peerSchedule
 		maxDataCount: maxCount - controlReserveCount,
 		maxDataBytes: maxBytes - controlReserveBytes,
 		signal:       make(chan struct{}, 1),
+		space:        make(chan struct{}, 1),
 	}
 }
 
 func (s *peerScheduler) enqueue(item queuedEnvelope, priority, streamID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.enqueueLocked(item, priority, streamID)
+}
+
+func (s *peerScheduler) enqueueWait(ctx context.Context, done <-chan struct{}, item queuedEnvelope, priority, streamID string) error {
+	for {
+		s.mu.Lock()
+		err := s.enqueueLocked(item, priority, streamID)
+		s.mu.Unlock()
+		if !errors.Is(err, ErrSlowConsumer) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+			return net.ErrClosed
+		case <-s.space:
+		}
+	}
+}
+
+func (s *peerScheduler) enqueueLocked(item queuedEnvelope, priority, streamID string) error {
 	if s.queuedBytes+item.size > s.maxBytes || s.queuedCount >= s.maxCount {
 		return ErrSlowConsumer
 	}
@@ -151,15 +175,24 @@ func (s *peerScheduler) enqueue(item queuedEnvelope, priority, streamID string) 
 	return nil
 }
 
+func (s *peerScheduler) signalSpace() {
+	select {
+	case s.space <- struct{}{}:
+	default:
+	}
+}
+
 func (s *peerScheduler) next(ctx context.Context) (queuedEnvelope, error) {
 	for {
 		s.mu.Lock()
 		if len(s.control) > 0 {
 			item := s.control[0]
+			s.control[0] = queuedEnvelope{}
 			s.control = s.control[1:]
 			s.queuedBytes -= item.size
 			s.queuedCount--
 			s.mu.Unlock()
+			s.signalSpace()
 			return item, nil
 		}
 		for checked := 0; checked < len(s.streamOrder); checked++ {
@@ -187,6 +220,7 @@ func (s *peerScheduler) next(ctx context.Context) (queuedEnvelope, error) {
 			s.queuedDataBytes -= item.size
 			s.queuedDataCount--
 			s.mu.Unlock()
+			s.signalSpace()
 			return item, nil
 		}
 		s.mu.Unlock()
@@ -403,15 +437,15 @@ func (h *Hub) unregister(state *connState) {
 	}
 }
 
-func (h *Hub) forward(from *connState, data []byte, env Envelope) error {
+func (h *Hub) forward(ctx context.Context, from *connState, data []byte, env Envelope) error {
 	if env.RoomID != from.roomID {
 		return fmt.Errorf("%w: room mismatch", ErrInvalidEnvelope)
 	}
 
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	room, ok := h.rooms[from.roomID]
 	if !ok {
+		h.mu.Unlock()
 		return ErrRoomNotFound
 	}
 	var peer *connState
@@ -421,17 +455,15 @@ func (h *Hub) forward(from *connState, data []byte, env Envelope) error {
 		peer = room.host
 	}
 	if peer == nil {
+		h.mu.Unlock()
 		return ErrPeerNotConnected
 	}
+	h.mu.Unlock()
 	// data is the completed WebSocket message returned by Conn.Read. It has
 	// already passed the same V2 validation as env and is not mutated, so queue
 	// the original bytes instead of copying the opaque payload and re-encoding
 	// an equivalent envelope.
-	if err := peer.enqueue(data, env.Priority, env.StreamID); err != nil {
-		if h.cfg.Metrics != nil && errors.Is(err, ErrSlowConsumer) {
-			h.cfg.Metrics.SlowConsumerCloses.Add(1)
-		}
-		peer.close(websocket.StatusPolicyViolation, "slow consumer")
+	if err := peer.enqueueWait(ctx, data, env.Priority, env.StreamID); err != nil {
 		return err
 	}
 	if h.cfg.Metrics != nil {
@@ -524,7 +556,7 @@ func (c *connState) readLoop(ctx context.Context, cancel context.CancelFunc) err
 			cancel()
 			return err
 		}
-		if err := c.hub.forward(c, data, env); err != nil {
+		if err := c.hub.forward(ctx, c, data, env); err != nil {
 			status := websocket.StatusPolicyViolation
 			if errors.Is(err, ErrPeerNotConnected) {
 				status = websocket.StatusTryAgainLater
@@ -607,6 +639,17 @@ func (c *connState) ping(ctx context.Context) error {
 func (c *connState) enqueue(data []byte, priority, streamID string) error {
 	size := int64(len(data))
 	return c.scheduler.enqueue(queuedEnvelope{data: data, size: size}, priority, streamID)
+}
+
+func (c *connState) enqueueWait(ctx context.Context, data []byte, priority, streamID string) error {
+	size := int64(len(data))
+	return c.scheduler.enqueueWait(
+		ctx,
+		c.done,
+		queuedEnvelope{data: data, size: size},
+		priority,
+		streamID,
+	)
 }
 
 func (c *connState) close(status websocket.StatusCode, reason string) {

@@ -11,6 +11,7 @@ import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
 import type { RelayEnvelope } from './protocol'
 import { decodeRelayEnvelope } from './protocol'
 import { RelaySession } from './session'
+import { relayWebSocketDataView } from './websocket-data'
 
 /**
  * Controller-side relay transport.
@@ -251,7 +252,7 @@ class ControllerTransport {
       ws.on('message', (data: WebSocket.RawData) => {
         try {
           session.handleEnvelope(
-            decodeRelayEnvelope(new Uint8Array(data as Buffer)) as RelayEnvelope,
+            decodeRelayEnvelope(relayWebSocketDataView(data)) as RelayEnvelope,
           )
         }
  catch (error) {
@@ -311,7 +312,10 @@ class ControllerTransport {
 
     socket.on('data', (chunk: Buffer) => {
       checkpoint.firstRequestByteAt ??= Date.now()
-      session.writeStreamData(streamId, new Uint8Array(chunk))
+      session.writeStreamData(
+        streamId,
+        new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength),
+      )
     })
     socket.on('close', () => {
       session.closeStream(streamId, 'local socket closed')
@@ -330,7 +334,7 @@ class ControllerTransport {
       return
     }
     stream.checkpoint.firstResponseByteAt ??= Date.now()
-    const chunk = Buffer.from(data)
+    const chunk = Buffer.from(data.buffer, data.byteOffset, data.byteLength)
     const accepted = stream.socket.write(chunk, (error) => {
       if (error) {
         stream.socket.destroy()

@@ -1,4 +1,5 @@
 import { AppError } from '../../errors/app-error'
+import type { RelayCompressionKind } from './compression'
 
 /**
  * Relay transport protocol. relayd validates and schedules only this outer
@@ -61,7 +62,14 @@ export type InnerFrame
     }
     | { kind: 'hello_confirm', confirm: string }
     | { kind: 'stream_open', streamId: string }
-    | { kind: 'stream_data', streamId: string, seq: number, data: Uint8Array }
+    | {
+      kind: 'stream_data'
+      streamId: string
+      seq: number
+      data: Uint8Array
+      compression?: RelayCompressionKind
+      uncompressedBytes?: number
+    }
     | { kind: 'stream_ack', streamId: string, ackedBytes: number }
     | { kind: 'stream_close', streamId: string, reason?: string }
 
@@ -69,6 +77,7 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf8', { fatal: true })
 const OUTER_HEADER_BYTES = 16
 const FLAG_HAS_STREAM_ID = 1
+const COMPRESSED_STREAM_DATA_CODE = 7
 
 const envelopeKindCode: Record<RelayEnvelopeKind, number> = {
   [RELAY_ENVELOPE_KIND.dataFrame]: 1,
@@ -217,7 +226,7 @@ export function decodeRelayEnvelope(
   const streamOffset = OUTER_HEADER_BYTES + roomLength
   const streamId
     = streamLength > 0 ? readString(bytes, streamOffset, streamLength, 'stream id') : undefined
-  const payload = bytes.slice(streamOffset + streamLength)
+  const payload = bytes.subarray(streamOffset + streamLength)
   return {
     version: RELAY_PROTOCOL_VERSION,
     roomId,
@@ -309,14 +318,35 @@ export function encodeInnerFrame(frame: InnerFrame): Uint8Array {
     case INNER_FRAME_KIND.streamData: {
       checkedUint32(frame.seq, 'Stream sequence')
       const streamId = bytesForString(frame.streamId, 'Stream id')
-      if (frame.data.length === 0 || frame.data.length > RELAY_MAX_STREAM_CHUNK_BYTES) { throw protocolError('Invalid stream-data length.') }
-      const out = new Uint8Array(7 + streamId.length + frame.data.length)
+      const isCompressed = frame.compression === 'zstd'
+      if (frame.compression && frame.compression !== 'none' && !isCompressed) {
+        throw protocolError('Unknown stream-data compression.')
+      }
+      const dataLength = frame.data.byteLength
+      const uncompressedBytes = frame.uncompressedBytes ?? dataLength
+      if (
+        dataLength === 0
+        || dataLength > RELAY_MAX_STREAM_CHUNK_BYTES
+        || !Number.isSafeInteger(uncompressedBytes)
+        || uncompressedBytes <= 0
+        || uncompressedBytes > RELAY_MAX_STREAM_CHUNK_BYTES
+        || (!isCompressed && uncompressedBytes !== dataLength)
+        || (isCompressed && dataLength >= uncompressedBytes)
+      ) {
+        throw protocolError('Invalid stream-data length.')
+      }
+      const headerBytes = isCompressed ? 11 : 7
+      const out = new Uint8Array(headerBytes + streamId.length + dataLength)
       const view = new DataView(out.buffer)
-      out[0] = innerFrameCode[frame.kind]
+      out[0] = isCompressed ? COMPRESSED_STREAM_DATA_CODE : innerFrameCode[frame.kind]
       view.setUint16(1, streamId.length)
       view.setUint32(3, frame.seq)
-      out.set(streamId, 7)
-      out.set(frame.data, 7 + streamId.length)
+      if (isCompressed) {
+        view.setUint32(7, uncompressedBytes)
+      }
+      const dataOffset = headerBytes + streamId.length
+      out.set(streamId, headerBytes)
+      out.set(frame.data, dataOffset)
       return out
     }
     case INNER_FRAME_KIND.streamAck: {
@@ -363,16 +393,30 @@ export function decodeInnerFrame(bytes: Uint8Array): InnerFrame {
     }
     case 3:
       return decodeStreamStringFrame(bytes, view, INNER_FRAME_KIND.streamOpen)
-    case 4: {
-      if (bytes.length < 7) { throw protocolError('Stream-data frame is too short.') }
+    case 4:
+    case COMPRESSED_STREAM_DATA_CODE: {
+      const compressed = bytes[0] === COMPRESSED_STREAM_DATA_CODE
+      const headerBytes = compressed ? 11 : 7
+      if (bytes.length < headerBytes) { throw protocolError('Stream-data frame is too short.') }
       const streamLength = view.getUint16(1)
       const seq = view.getUint32(3)
-      if (streamLength === 0 || 7 + streamLength >= bytes.length) { throw protocolError('Invalid stream-data length.') }
+      const uncompressedBytes = compressed ? view.getUint32(7) : undefined
+      if (
+        streamLength === 0
+        || headerBytes + streamLength >= bytes.length
+        || (!compressed && bytes.length - headerBytes - streamLength > RELAY_MAX_STREAM_CHUNK_BYTES)
+        || (compressed && (!uncompressedBytes || uncompressedBytes > RELAY_MAX_STREAM_CHUNK_BYTES))
+      ) { throw protocolError('Invalid stream-data length.') }
+      const data = bytes.subarray(headerBytes + streamLength)
+      if (data.length > RELAY_MAX_STREAM_CHUNK_BYTES || (compressed && data.length >= uncompressedBytes!)) {
+        throw protocolError('Invalid compressed stream-data length.')
+      }
       return {
         kind: INNER_FRAME_KIND.streamData,
-        streamId: readString(bytes, 7, streamLength, 'stream id'),
+        streamId: readString(bytes, headerBytes, streamLength, 'stream id'),
         seq,
-        data: bytes.slice(7 + streamLength),
+        data,
+        ...(compressed ? { compression: 'zstd' as const, uncompressedBytes } : {}),
       }
     }
     case 5: {
