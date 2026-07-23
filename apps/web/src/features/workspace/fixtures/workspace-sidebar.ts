@@ -2,6 +2,7 @@ import type { WorkSummary } from '~/features/work/use-work'
 import type { Workspace } from '~/features/workspace/types'
 
 import type { WorkspaceSession } from '../use-session'
+import type { WorkspaceSessionGroup } from '../use-session-group'
 
 export const workspaceSidebarFixtureNow = 1_784_836_800
 
@@ -174,6 +175,39 @@ export const workspaceSessionFixtures = {
     execution: { kind: 'local' },
   },
 } satisfies Record<string, WorkspaceSession>
+
+export const workspaceSessionGroupFixtures = {
+  active: {
+    id: 'session-group-active',
+    workspaceId: workspaceFixtures.local.id,
+    title: 'Architecture follow-ups',
+    description: null,
+    linkedIssueId: null,
+    status: 'active',
+    configJson: '{}',
+    archivedAt: null,
+    createdAt: workspaceSidebarFixtureNow - 7_200,
+    updatedAt: workspaceSidebarFixtureNow - 30,
+    sessionCount: 2,
+    statusAggregate: 'idle',
+    latestActivityAt: workspaceSidebarFixtureNow - 30,
+  },
+  review: {
+    id: 'session-group-review',
+    workspaceId: workspaceFixtures.local.id,
+    title: 'Release review',
+    description: null,
+    linkedIssueId: null,
+    status: 'active',
+    configJson: '{}',
+    archivedAt: null,
+    createdAt: workspaceSidebarFixtureNow - 14_400,
+    updatedAt: workspaceSidebarFixtureNow - 300,
+    sessionCount: 3,
+    statusAggregate: 'streaming',
+    latestActivityAt: workspaceSidebarFixtureNow - 300,
+  },
+} satisfies Record<string, WorkspaceSessionGroup>
 
 export const workspaceWorkFixture = {
   id: 'work-sidebar-refactor',

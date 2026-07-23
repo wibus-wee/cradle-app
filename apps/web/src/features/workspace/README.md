@@ -32,6 +32,11 @@ them to the Work surface.
 - **workspace-session-item.tsx**: Runtime adapter for a sidebar Session or Work row. It owns active-surface lookup, title-regeneration state, preview-card orchestration, navigation, and Electron drag/tear-off behavior before rendering the pure row View.
 - **workspace-session-item-view.tsx**: Pure props rendering seam for sidebar Session and Work rows. It owns the row's visual and local interaction semantics without reading route, store, preview-card, drag, or Electron dependencies.
 - **workspace-session-item-view.stories.tsx**: Fixture-driven Storybook catalog covering active, unread, running, user-input, tool-approval, error, automation, title-regeneration, Work/PR, and rename states without mounting the workspace runtime.
+- **workspace-session-actions-menu.tsx**: Runtime adapter for Session and Work row actions. It owns generated clients, query invalidation, navigation, Electron tear-off/close behavior, clipboard/export operations, and title-regeneration state.
+- **workspace-session-actions-menu-state.ts**: Shared controlled-menu state contract used by the sidebar adapter and Session actions adapter.
+- **workspace-session-actions-menu-view.tsx**: Pure props rendering seam for open, edit, read/pin, export, grouping, and archive actions.
+- **workspace-session-actions-menu-view.stories.tsx**: Interactive fixture-driven Storybook catalog for standard, unread/pinned, and grouped Session menus.
+- **workspace-session-group-partition.ts**: Pure owner-typed Session grouping calculation kept outside the Session-group rendering module.
 - **workspace-session-list-section.tsx**: Session-list runtime adapter that owns persisted expansion state, running-session retention, progressive row rendering, and composition of individual Session adapters.
 - **workspace-session-list-view.tsx**: Pure props rendering seam for the sidebar Session list track, empty state, and show-more/show-fewer control.
 - **workspace-session-list-view.stories.tsx**: Interactive fixture-driven Storybook catalog for bounded, expanded, and empty Session lists.

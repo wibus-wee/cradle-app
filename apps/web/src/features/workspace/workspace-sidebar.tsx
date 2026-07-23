@@ -1,13 +1,11 @@
 import {
   AlertLine as CircleAlertIcon,
-  ArchiveLine as ArchiveIcon,
   CalendarTimeAddLine as CalendarClockIcon,
   ChartBar2Line as BarChart3Icon,
   Chat1Line as MessageSquarePlusIcon,
   CopyLine as ClipboardCopyIcon,
   CopyLine as CopyIcon,
   DeleteLine as Trash2Icon,
-  DownloadLine as DownloadIcon,
   DownSmallLine as ChevronDownIcon,
   ExternalLinkLine as ExternalLinkIcon,
   FileNewLine as FilePlusIcon,
@@ -17,7 +15,6 @@ import {
   GitCompareLine as FileDiffIcon,
   GitPullRequestLine as WorkIcon,
   LoadingLine,
-  MailLine as MailIcon,
   MailOpenLine as MailOpenIcon,
   NewFolderLine as FolderPlusIcon,
   PencilLine as PencilIcon,
@@ -31,7 +28,6 @@ import {
 } from '@mingcute/react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -43,19 +39,12 @@ import { useTranslation } from 'react-i18next'
 import { shallow } from 'zustand/shallow'
 
 import {
-  getSessionsByIdExportMarkdown,
   patchSessionsById,
-  postChatSessionsBySessionIdTitleRegenerate,
-  postSessionsByIdArchive,
   postSessionsByIdRead,
-  postSessionsByIdUnread,
-  postWorksByIdArchive,
 } from '~/api-gen'
 import {
   getRemoteHostsOptions,
   getSessionsByIdQueryKey,
-  getWorksByIdQueryKey,
-  getWorksQueryKey,
   patchWorkspacesByWorkspaceIdLocationMutation,
   patchWorkspacesByWorkspaceIdMutation,
   postWorkspacesByWorkspaceIdFilesFileMutation,
@@ -101,11 +90,9 @@ import {
   remoteHostUpstreamQueryKey,
 } from '~/features/remote-hosts/upstream-fetch'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
-import { downloadSessionZip } from '~/features/session/download-session-zip'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
-import type { WorkSummary } from '~/features/work/use-work'
 import { useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import { ensureRemoteWorkspaceForPath } from '~/features/workspace/remote-workspace-import'
@@ -116,23 +103,17 @@ import { cn } from '~/lib/cn'
 import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
 import {
-  closeSurfaceById,
   openAutomation,
-  openChatSession,
   openDiff,
   openNewChat,
   openNewWork,
   openPullRequests,
   openSettingsSection,
   openUsage,
-  openWork,
   openWorkspaceDetail,
 } from '~/navigation/navigation-commands'
-import { chatSurfaceId, workSurfaceId } from '~/navigation/surface-identity'
-import { openTearoffChatSessionWindow, openTearoffSurfaceWindow } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
-import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
 import { PreviewCardProvider } from './preview-card/preview-card-provider'
 import type { WorkspaceSession } from './use-session'
@@ -156,15 +137,20 @@ import {
 } from './use-workspace'
 import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
 import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
+import { WorkspaceSessionActionsMenu } from './workspace-session-actions-menu'
+import type {
+  WorkspaceSessionActionsMenuState,
+} from './workspace-session-actions-menu-state'
+import {
+  CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE,
+} from './workspace-session-actions-menu-state'
 import {
   partitionWorkspaceSessions,
-  SessionGroupMenuItems,
-  WorkspaceSessionGroupSection,
-} from './workspace-session-groups'
+} from './workspace-session-group-partition'
+import { WorkspaceSessionGroupSection } from './workspace-session-groups'
 import type { WorkspaceSessionItemMenuRequest } from './workspace-session-item'
 import type {
   WorkspaceSessionAttentionKind,
-  WorkspaceSessionMenuAnchor,
 } from './workspace-session-item-view'
 import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
 import { WorkspaceSessionListSection } from './workspace-session-list-section'
@@ -214,44 +200,6 @@ function formatToastError(error: unknown): string {
   return JSON.stringify(error)
 }
 
-function formatRegenerateTitleError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  if (!error || typeof error !== 'object') {
-    return String(error)
-  }
-  const payload = error as {
-    message?: unknown
-    details?: {
-      reason?: unknown
-      providerError?: { detail?: unknown, method?: unknown }
-      error?: { message?: unknown }
-    }
-  }
-  const providerDetail
-    = typeof payload.details?.providerError?.detail === 'string'
-      ? payload.details.providerError.detail
-      : null
-  const providerMethod
-    = typeof payload.details?.providerError?.method === 'string'
-      ? payload.details.providerError.method
-      : null
-  if (providerDetail && providerMethod) {
-    return `${providerMethod}: ${providerDetail}`
-  }
-  if (providerDetail) {
-    return providerDetail
-  }
-  if (typeof payload.details?.error?.message === 'string') {
-    return payload.details.error.message
-  }
-  if (typeof payload.message === 'string') {
-    return payload.message
-  }
-  return JSON.stringify(error)
-}
-
 type SessionAttentionKind = WorkspaceSessionAttentionKind
 
 function useSessionAttentionBySessionId(
@@ -296,416 +244,9 @@ function isSessionRecent(session: WorkspaceSession, currentUnixTimestamp: number
   return session.listActivityAt >= currentUnixTimestamp - RECENT_SESSION_WINDOW_SECONDS
 }
 
-type SessionMenuAction = {
-  key: string
-  label: string
-  icon: React.ReactNode
-  testId: string
-  invoke: () => void | Promise<void>
-  variant?: 'default' | 'destructive'
-}
-
-type SessionMenuActionGroup = {
-  key: string
-  actions: SessionMenuAction[]
-}
-
-type SessionMenuAnchor = WorkspaceSessionMenuAnchor
-
 type RuntimeIconByKind = WorkspaceRuntimeIconByKind
 
 type SessionMenuRequest = WorkspaceSessionItemMenuRequest
-
-type SessionMenuState = {
-  open: boolean
-  sessionId: string | null
-  workId: string | null
-  anchor: SessionMenuAnchor | null
-}
-
-const CLOSED_SESSION_MENU_STATE: SessionMenuState = {
-  open: false,
-  sessionId: null,
-  workId: null,
-  anchor: null,
-}
-
-function SessionMenuActionItems({
-  groups,
-  testIdSurface = 'button',
-}: {
-  groups: SessionMenuActionGroup[]
-  testIdSurface?: 'button' | 'context'
-}) {
-  return groups.map((group, groupIndex) => (
-    <Fragment key={group.key}>
-      {groupIndex > 0 && <MenuSeparator />}
-      {group.actions.map(action => (
-        <MenuItem
-          key={action.key}
-          variant={action.variant}
-          onClick={() => {
-            void action.invoke()
-          }}
-          data-testid={
-            testIdSurface === 'context' ? `${action.testId}-context` : action.testId
-          }
-        >
-          {action.icon}
-          {action.label}
-        </MenuItem>
-      ))}
-    </Fragment>
-  ))
-}
-
-function SessionActionsMenu({
-  state,
-  session,
-  work,
-  workspaceId,
-  sessionGroups,
-  onOpenChange,
-  onPrepareSessionOpen,
-  onStartRename,
-  onAddSessionToGroup,
-  onRemoveSessionFromGroup,
-  onCreateSessionGroupFromSession,
-}: {
-  state: SessionMenuState
-  session: WorkspaceSession | null
-  work: WorkSummary | null
-  workspaceId: string
-  sessionGroups: WorkspaceSessionGroup[]
-  onOpenChange: (open: boolean) => void
-  onPrepareSessionOpen: (session: WorkspaceSession) => void
-  onStartRename: (sessionId: string) => void
-  onAddSessionToGroup: (sessionId: string, groupId: string) => void
-  onRemoveSessionFromGroup: (session: WorkspaceSession) => void
-  onCreateSessionGroupFromSession: (session: WorkspaceSession) => void
-}) {
-  const { t } = useTranslation('workspace')
-  const queryClient = useQueryClient()
-  const open = state.open && state.anchor !== null && session !== null
-
-  const invalidateSessionQueries = useCallback(async () => {
-    if (!session) {
-      return
-    }
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-      queryClient.invalidateQueries({
-        queryKey: getSessionsByIdQueryKey({ path: { id: session.id } }),
-      }),
-      queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
-      ...(work
-        ? [queryClient.invalidateQueries({
-            queryKey: getWorksByIdQueryKey({ path: { id: work.id } }),
-          })]
-        : []),
-    ])
-  }, [queryClient, session, work, workspaceId])
-
-  const handleOpenInNewTab = useCallback(() => {
-    if (!session) {
-      return
-    }
-
-    if (work) {
-      openWork(work.id)
-      return
-    }
-    openChatSession(session.id)
-  }, [session, work])
-
-  const handleOpenInNewWindow = useCallback(() => {
-    if (!session) {
-      return
-    }
-
-    onPrepareSessionOpen(session)
-    const screenX = window.screenX + Math.round(window.outerWidth / 2)
-    const screenY = window.screenY + Math.round(window.outerHeight / 2)
-    if (work) {
-      void openTearoffSurfaceWindow({
-        id: workSurfaceId(work.id),
-        kind: 'work',
-        title: work.title,
-        route: { to: '/work/$workId', params: { workId: work.id } },
-        order: 0,
-        closable: true,
-      }, { screenX, screenY, detachSurface: true })
-      return
-    }
-    void openTearoffChatSessionWindow(session.id, { screenX, screenY, detachSurface: true })
-  }, [onPrepareSessionOpen, session, work])
-
-  const handleStartRename = useCallback(() => {
-    if (!session) {
-      return
-    }
-
-    onOpenChange(false)
-    onStartRename(session.id)
-  }, [onOpenChange, onStartRename, session])
-
-  const handleRegenerateTitle = useCallback(async () => {
-    if (!session) {
-      return
-    }
-
-    const { beginRegeneration, endRegeneration } = useTitleRegenerationStore.getState()
-    beginRegeneration(session.id)
-    try {
-      const { error } = await postChatSessionsBySessionIdTitleRegenerate({
-        path: { sessionId: session.id },
-      })
-      if (error) {
-        throw error
-      }
-      await invalidateSessionQueries()
-    }
- catch (error) {
-      toastManager.add({
-        type: 'error',
-        title: t('session.toast.regenerateTitleFailed'),
-        description: formatRegenerateTitleError(error),
-      })
-    }
- finally {
-      endRegeneration(session.id)
-    }
-  }, [invalidateSessionQueries, session, t])
-
-  const handleToggleReadState = useCallback(async () => {
-    if (!session) {
-      return
-    }
-
-    const { data } = session.unread
-      ? await postSessionsByIdRead({ path: { id: session.id } })
-      : await postSessionsByIdUnread({ path: { id: session.id } })
-    if (data) {
-      updateSessionReadState(queryClient, data)
-    }
-  }, [queryClient, session])
-
-  const handleTogglePin = useCallback(async () => {
-    if (!session) {
-      return
-    }
-
-    await patchSessionsById({ path: { id: session.id }, body: { pinned: !session.pinned } })
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-    ])
-  }, [queryClient, session, workspaceId])
-
-  const handleExport = useCallback(async () => {
-    if (!session) {
-      return
-    }
-
-    const { data } = await getSessionsByIdExportMarkdown({ path: { id: session.id } })
-    const md = (data as { markdown?: string } | null)?.markdown
-    if (md) {
-      await navigator.clipboard.writeText(md)
-    }
-  }, [session])
-
-  const handleExportZip = useCallback(async () => {
-    if (!session) {
-      return
-    }
-    try {
-      await downloadSessionZip(session.id)
-    }
-    catch (error) {
-      const code = error instanceof Error ? error.message : ''
-      if (code === 'session-export-busy') {
-        toastManager.add({ type: 'error', title: t('session.toast.exportZipBusy') })
-      }
-      else {
-        toastManager.add({ type: 'error', title: t('session.toast.exportZipFailed') })
-      }
-    }
-  }, [session, t])
-
-  const handleArchive = useCallback(async () => {
-    if (!session) {
-      return
-    }
-
-    if (work) {
-      await postWorksByIdArchive({ path: { id: work.id }, body: { archived: true } })
-    }
-    else {
-      await postSessionsByIdArchive({ path: { id: session.id }, body: { archived: true } })
-    }
-
-    const surfaceId = work ? workSurfaceId(work.id) : chatSurfaceId(session.id)
-    closeSurfaceById(surfaceId)
-
-    if (isElectron) {
-      void nativeIpc?.window.closeSurface(surfaceId).catch(() => {})
-    }
-
-    await invalidateSessionQueries()
-  }, [invalidateSessionQueries, session, work])
-
-  const actionGroups = useMemo<SessionMenuActionGroup[]>(() => {
-    if (!session) {
-      return []
-    }
-
-    const openActions: SessionMenuAction[] = [
-      {
-        key: 'open-surface',
-        label: t('session.action.openInSurface'),
-        icon: <PlusIcon />,
-        testId: `session-menu-open-surface-${session.id}`,
-        invoke: handleOpenInNewTab,
-      },
-    ]
-    if (isElectron) {
-      openActions.push({
-        key: 'open-new-window',
-        label: t('session.action.openInNewWindow'),
-        icon: <ExternalLinkIcon />,
-        testId: `session-menu-open-new-window-${session.id}`,
-        invoke: handleOpenInNewWindow,
-      })
-    }
-
-    const copyActions: SessionMenuAction[] = [
-      {
-        key: 'copy-markdown',
-        label: t('session.action.copyMarkdown'),
-        icon: <ClipboardCopyIcon />,
-        testId: `session-menu-copy-markdown-${session.id}`,
-        invoke: handleExport,
-      },
-      {
-        key: 'export-zip',
-        label: t('session.action.exportZip'),
-        icon: <DownloadIcon />,
-        testId: `session-menu-export-zip-${session.id}`,
-        invoke: handleExportZip,
-      },
-    ]
-    if (import.meta.env.DEV) {
-      copyActions.push({
-        key: 'copy-session-id',
-        label: t('session.action.copySessionId'),
-        icon: <CopyIcon />,
-        testId: `session-menu-copy-session-id-${session.id}`,
-        invoke: () => {
-          navigator.clipboard.writeText(session.id)
-        },
-      })
-    }
-
-    return [
-      { key: 'open', actions: openActions },
-      {
-        key: 'edit',
-        actions: [
-          {
-            key: 'rename',
-            label: t('session.action.rename'),
-            icon: <PencilIcon />,
-            testId: `session-menu-rename-${session.id}`,
-            invoke: handleStartRename,
-          },
-          {
-            key: 'regenerate-title',
-            label: t('session.action.regenerateTitle'),
-            icon: <RefreshCwIcon />,
-            testId: `session-menu-regenerate-title-${session.id}`,
-            invoke: handleRegenerateTitle,
-          },
-        ],
-      },
-      {
-        key: 'state',
-        actions: [
-          {
-            key: 'toggle-read-state',
-            label: session.unread ? t('session.action.markRead') : t('session.action.markUnread'),
-            icon: session.unread ? <MailOpenIcon /> : <MailIcon />,
-            testId: `session-menu-toggle-read-state-${session.id}`,
-            invoke: handleToggleReadState,
-          },
-          {
-            key: 'toggle-pin',
-            label: session.pinned ? t('session.action.unpin') : t('session.action.pin'),
-            icon: session.pinned ? <PinOffIcon /> : <PinIcon />,
-            testId: `session-menu-toggle-pin-${session.id}`,
-            invoke: handleTogglePin,
-          },
-        ],
-      },
-      { key: 'copy', actions: copyActions },
-      {
-        key: 'danger',
-        actions: [
-          {
-            key: 'archive',
-            label: t('session.action.archive'),
-            icon: <ArchiveIcon />,
-            testId: `session-menu-archive-${session.id}`,
-            invoke: handleArchive,
-            variant: 'destructive',
-          },
-        ],
-      },
-    ]
-  }, [
-    handleArchive,
-    handleExport,
-    handleExportZip,
-    handleOpenInNewTab,
-    handleOpenInNewWindow,
-    handleRegenerateTitle,
-    handleStartRename,
-    handleTogglePin,
-    handleToggleReadState,
-    session,
-    t,
-  ])
-
-  return (
-    <Menu open={open} onOpenChange={onOpenChange}>
-      {open && state.anchor
-? (
-        <MenuPopup
-          align="start"
-          anchor={state.anchor}
-          side="bottom"
-          sideOffset={0}
-        >
-          <SessionMenuActionItems groups={actionGroups} testIdSurface="context" />
-          {session
-            ? (
-                <SessionGroupMenuItems
-                  session={session}
-                  groups={sessionGroups}
-                  t={t}
-                  onAddToGroup={groupId => onAddSessionToGroup(session.id, groupId)}
-                  onRemoveFromGroup={() => onRemoveSessionFromGroup(session)}
-                  onCreateGroup={() => onCreateSessionGroupFromSession(session)}
-                />
-              )
-            : null}
-        </MenuPopup>
-      )
-: null}
-    </Menu>
-  )
-}
 
 function WorkspaceTextInputDialog({
   open,
@@ -1568,7 +1109,9 @@ const WorkspaceGroup = memo(
       kind: 'file' | 'folder'
     } | null>(null)
     const [sessionMenuState, setSessionMenuState]
-      = useState<SessionMenuState>(CLOSED_SESSION_MENU_STATE)
+      = useState<WorkspaceSessionActionsMenuState>(
+        CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE,
+      )
     const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null)
     const workspacePinned = Boolean(workspace.pinned)
     const workspaceSessionIds = useMemo(() => sessions.map(session => session.id), [sessions])
@@ -1889,7 +1432,9 @@ const WorkspaceGroup = memo(
     }, [])
     const handleSessionMenuOpenChange = useCallback((open: boolean) => {
       setSessionMenuState(current =>
-        open && current.anchor ? { ...current, open: true } : CLOSED_SESSION_MENU_STATE)
+        open && current.anchor
+          ? { ...current, open: true }
+          : CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE)
     }, [])
 
     useEffect(() => {
@@ -2239,7 +1784,7 @@ const WorkspaceGroup = memo(
               }}
               onCommit={handleRenameSessionGroup}
             />
-            <SessionActionsMenu
+            <WorkspaceSessionActionsMenu
               state={sessionMenuState}
               session={activeMenuSession}
               work={activeMenuWork}

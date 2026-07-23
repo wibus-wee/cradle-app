@@ -7,7 +7,7 @@ import {
   PlusLine as PlusIcon,
 } from '@mingcute/react'
 import type { TFunction } from 'i18next'
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback } from 'react'
 
 import { Button } from '~/components/ui/button'
 import {
@@ -24,41 +24,6 @@ import type { WorkspaceSessionGroup } from './use-session-group'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
 
 type WorkspaceTranslation = TFunction<'workspace'>
-
-export function partitionWorkspaceSessions(
-  sessions: readonly WorkspaceSession[],
-  groups: readonly WorkspaceSessionGroup[],
-): {
-  grouped: Array<{ group: WorkspaceSessionGroup, sessions: WorkspaceSession[] }>
-  ungrouped: WorkspaceSession[]
-} {
-  const sessionsByGroupId = new Map<string, WorkspaceSession[]>()
-  const ungrouped: WorkspaceSession[] = []
-
-  for (const session of sessions) {
-    if (session.sessionGroupId) {
-      const groupSessions = sessionsByGroupId.get(session.sessionGroupId)
-      if (groupSessions) {
-        groupSessions.push(session)
-      }
-      else {
-        sessionsByGroupId.set(session.sessionGroupId, [session])
-      }
-    }
-    else {
-      ungrouped.push(session)
-    }
-  }
-
-  const grouped = groups
-    .map(group => ({
-      group,
-      sessions: sessionsByGroupId.get(group.id) ?? [],
-    }))
-    .filter(entry => entry.sessions.length > 0 || entry.group.status === 'active')
-
-  return { grouped, ungrouped }
-}
 
 interface WorkspaceSessionGroupSectionProps {
   group: WorkspaceSessionGroup
@@ -162,62 +127,3 @@ export const WorkspaceSessionGroupSection = memo(({
     </div>
   )
 })
-
-interface SessionGroupMenuItemsProps {
-  session: WorkspaceSession
-  groups: WorkspaceSessionGroup[]
-  t: WorkspaceTranslation
-  onAddToGroup: (groupId: string) => void
-  onRemoveFromGroup: () => void
-  onCreateGroup: () => void
-}
-
-export function SessionGroupMenuItems({
-  session,
-  groups,
-  t,
-  onAddToGroup,
-  onRemoveFromGroup,
-  onCreateGroup,
-}: SessionGroupMenuItemsProps) {
-  const availableGroups = useMemo(
-    () => groups.filter(group => group.id !== session.sessionGroupId),
-    [groups, session.sessionGroupId],
-  )
-
-  if (session.sessionGroupId) {
-    return (
-      <>
-        <MenuSeparator />
-        <MenuItem onClick={onRemoveFromGroup}>
-          {t('sessionGroup.action.removeFromGroup')}
-        </MenuItem>
-      </>
-    )
-  }
-
-  if (availableGroups.length === 0) {
-    return (
-      <>
-        <MenuSeparator />
-        <MenuItem onClick={onCreateGroup}>
-          {t('sessionGroup.action.createAndAdd')}
-        </MenuItem>
-      </>
-    )
-  }
-
-  return (
-    <>
-      <MenuSeparator />
-      {availableGroups.map(group => (
-        <MenuItem key={group.id} onClick={() => onAddToGroup(group.id)}>
-          {t('sessionGroup.action.addToGroup', { title: group.title })}
-        </MenuItem>
-      ))}
-      <MenuItem onClick={onCreateGroup}>
-        {t('sessionGroup.action.createAndAdd')}
-      </MenuItem>
-    </>
-  )
-}
