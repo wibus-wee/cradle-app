@@ -71,6 +71,15 @@ queued_command 文本匹配 / 150ms settle，以及用 UI Run 完成态阻塞 `i
 的做法。与 Plan 061 互补：061 管 UI Run 准入与风暴，062 管 Claude 输入通道与
 native 队列所有权。
 
+2026-07-23 在 commit `598007aa` 上补充 Plan 063：彻底移除 Desktop-owned Server 的
+renderer/main HTTP、SSE 与 WebSocket 连接。所有 Fetch 语义通过默认 Electron session 的
+`cradle-server://local` protocol handler，复用一条经 managed runner relay 的版本化子进程
+IPC transport，并由 Server 原有 `app.handle(Request)` 执行；PTY 另以 transport-neutral
+duplex adapter 复用同一 transport。locator 复用的进程显式标记为 `attached-http`，不伪装
+满足 zero-socket invariant。实施前必须先通过 packaged Electron streaming/cancellation/
+binary/module-import feasibility gate；Plan 063 只迁移 transport，不重定义 Plan 061 的 Chat
+lifecycle 或 Plan 054 的 cursor 语义。
+
 Each executor: read the plan fully before starting, run its drift check, honor its
 STOP conditions, and update your row below when done. Plans are self-contained —
 they do not assume you saw the audit or any other plan.
@@ -143,6 +152,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
+| 063  | Eliminate Desktop-owned Server sockets with one multiplexed IPC transport | P0 | XL | 038, 040, 054 | TODO (M0 packaged Electron feasibility gate first; coordinate transport files with 061) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
@@ -256,6 +266,7 @@ splitting until this track is stable.
 - 054 follows completed Plans 024 and 040: chat-runtime owns the run cursor/log, while persisted Session projections remain the recovery authority when exact in-memory replay is impossible. It does not depend on unfinished Plans 044 or 050, but those plans must preserve its terminal-publication and snapshot-recovery contracts.
 - 056 consumes Plan 047's already-landed thin Download Center but adds a separate declaration/dispatch layer: Managed Resources owns catalog projection and exact-key command routing; each adapter keeps discovery, versions, installation truth, storage, activation, rollback, and uninstall; Download Center keeps bytes/cancel/resume/history. Chronicle model manifests are the first adapter. Reconcile 047's stale TODO row and execute from a clean worktree because current Server composition, Chronicle, navigation, locale, and generated-client paths overlap operator work.
 - 057 follows 056 and declares `{ opencode, runtime, cli }` through the shared catalog. OpenCode owns release identity, archive extraction, executable verification, installation truth, process leases, and uninstall; its archive transfer uses the same exact resource identity. It must not add an OpenCode-only Settings installer or parallel HTTP command surface.
+- 063 follows completed Plans 038, 040, and 054: IPC requests must still cross the established auth boundary, generated clients remain transport infrastructure beneath feature-owned projections, and cursor-aware reconnect semantics remain owned by Chat Runtime. It coordinates with in-progress Plan 061 only at transport injection points and must stop rather than alter Chat admission/completion/queue semantics. Its internal order is mandatory: packaged custom-protocol proof -> parity fixtures -> versioned contracts/runner relay -> Server `app.handle` host -> main fetch transport -> default-session protocol -> Desktop/Web/SSE migration -> PTY duplex -> credential removal -> zero-socket ratchet and many-Tearoff packaged smoke. Plan 028's HTTP choice is superseded only as transport; plugin ownership remains unchanged.
 - 040 supersedes blocked Plan 023: generated clients remain transport infrastructure, while feature-owned gateways own query/error/invalidation semantics.
 - 041 supersedes blocked Plans 020 and 021: dependency enforcement and lifecycle ownership precede god-file extraction.
 
