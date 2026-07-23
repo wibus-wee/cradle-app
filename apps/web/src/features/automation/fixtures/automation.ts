@@ -1,3 +1,6 @@
+import type { Workspace } from '~/features/workspace/types'
+
+import type { CreateAutomationDraft } from '../automation-draft'
 import type {
   AutomationArtifact,
   AutomationDefinition,
@@ -132,3 +135,101 @@ export const automationArtifactFixtures = [
     createdAt: automationFixtureNow / 1000 - 4 * 86_400 + 420,
   },
 ] satisfies AutomationArtifact[]
+
+export const automationWorkspaceFixtures = [
+  {
+    id: 'workspace-cradle',
+    name: 'cradle-app',
+    locator: {
+      hostId: 'local',
+      path: '/workspace/cradle-app',
+      kind: 'project',
+    },
+    gitIdentity: {
+      originUrl: 'https://github.com/wibus-wee/cradle-app.git',
+      repoRoot: '/workspace/cradle-app',
+      headSha: '0123456789abcdef',
+      branch: 'main',
+    },
+    identifier: 'workspace-cradle',
+    availability: 'available',
+    pinned: 1,
+    createdAt: automationFixtureNow / 1000 - 120 * 86_400,
+    updatedAt: automationFixtureNow / 1000 - 15 * 60,
+  },
+  {
+    id: 'workspace-docs',
+    name: 'product-docs',
+    locator: {
+      hostId: 'local',
+      path: '/workspace/product-docs',
+      kind: 'project',
+    },
+    gitIdentity: {
+      originUrl: 'https://github.com/example/product-docs.git',
+      repoRoot: '/workspace/product-docs',
+      headSha: 'fedcba9876543210',
+      branch: 'main',
+    },
+    identifier: 'workspace-docs',
+    availability: 'available',
+    pinned: 0,
+    createdAt: automationFixtureNow / 1000 - 60 * 86_400,
+    updatedAt: automationFixtureNow / 1000 - 2 * 3_600,
+  },
+] satisfies Workspace[]
+
+export const automationDefinitionFixtures = [
+  releaseAutomationFixture,
+  {
+    ...releaseAutomationFixture,
+    id: 'automation-docs-drift',
+    workspaceId: 'workspace-docs',
+    title: 'Documentation drift scan',
+    description: 'Find stale product documentation.',
+    enabled: true,
+    trigger: {
+      ...releaseAutomationFixture.trigger,
+      rrule:
+        'FREQ=DAILY;INTERVAL=1;BYHOUR=7;BYMINUTE=0;BYSECOND=0',
+      timezone: 'UTC',
+    },
+    latestRun: automationRunFixtures[1],
+  },
+  {
+    ...releaseAutomationFixture,
+    id: 'automation-dependency-audit',
+    title: 'Dependency audit',
+    enabled: false,
+    latestRun: automationRunFixtures[2],
+  },
+] satisfies AutomationDefinition[]
+
+export const automationDraftFixture = {
+  title: 'Release readiness audit',
+  description: 'Review release inputs before the weekly cut.',
+  workspaceId: 'workspace-cradle',
+  enabled: true,
+  schedule: {
+    frequency: 'weekly',
+    interval: 1,
+    weekdays: ['MO', 'TH'],
+    monthDay: 1,
+    time: '09:30',
+  },
+  timezone: 'Asia/Singapore',
+  misfirePolicy: 'run_latest',
+  providerTargetId: 'provider-codex',
+  runtimeKind: 'codex-app-server',
+  modelId: 'gpt-5.4',
+  thinkingEffort: 'high',
+  sessionPolicy: 'new',
+  isolationPolicy: 'worktree_per_run',
+  noFindingsBehavior: 'triage',
+  prompt: [
+    'Review the current release branch.',
+    'Check CI, changelog, signing artifacts, and unresolved blockers.',
+    'Write a concise release-readiness report.',
+  ].join('\n'),
+  artifactName: 'release-readiness.md',
+} satisfies CreateAutomationDraft
