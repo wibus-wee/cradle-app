@@ -32,13 +32,20 @@ See `plans/061-cradle-recall-agent-cognition-stack.md` for the full stack.
 
 ## Target Agent Interface (Tier 1)
 
-| Tool | Mode | Description |
-| ---- | ---- | ----------- |
-| `recall_query` | Read-only | Agent supplies JS; sandbox returns JSON |
-| `recall_attune` | Mutation | `remember()` / `forget()` only; user approval required |
+| Tool            | Mode      | Description                                            |
+| --------------- | --------- | ------------------------------------------------------ |
+| `recall_query`  | Read-only | Agent supplies JS; sandbox returns JSON                |
+| `recall_attune` | Mutation  | `remember()` / `forget()` only; user approval required |
 
 Helpers (`search`, `overview`, `failures`, …) exist **inside** the query sandbox only —
 not as separate MCP tools.
+
+`recall_query` receives the current workspace/session from a trusted runtime-bound
+invocation context, not from the Agent's code or tool arguments. Helper filters can
+only narrow that scope. The existing shared `agent-tools` MCP process has no caller
+session identity, so it cannot register Recall until a provider-native invocation
+bridge exists. This restriction prevents a model from self-authorizing a different
+workspace by passing an ID.
 
 ## Target HTTP / CLI (optional, Phase B+)
 
@@ -50,23 +57,23 @@ OpenAPI + `x-cradle-cli` when routes land.
 
 ## Evidence Sources (L1)
 
-| Source | Owner module | Recall access |
-| ------ | ------------ | ------------- |
-| `messages` + `chat_message_payloads` | chat-runtime | Read via public query API |
-| `backend_run_snapshot_events` | chat-runtime | Read failures/phases |
-| `sessions` metadata | session | Scope filters |
-| Provider thread transcripts | chat-runtime | Lazy fetch helper (Phase D) |
-| External import sessions | external-session-import | Same as native after import |
-| Chronicle activity segments | chronicle | Optional deep evidence (Phase C+) |
+| Source                               | Owner module            | Recall access                     |
+| ------------------------------------ | ----------------------- | --------------------------------- |
+| `messages` + `chat_message_payloads` | chat-runtime            | Read via public query API         |
+| `backend_run_snapshot_events`        | chat-runtime            | Read failures/phases              |
+| `sessions` metadata                  | session                 | Scope filters                     |
+| Provider thread transcripts          | chat-runtime            | Lazy fetch helper (Phase D)       |
+| External import sessions             | external-session-import | Same as native after import       |
+| Chronicle activity segments          | chronicle               | Optional deep evidence (Phase C+) |
 
 Recall module **reads** via owner `public.ts` — no cross-domain table writes.
 
 ## Memory Sources (L2)
 
-| Source | Owner | Recall access |
-| ------ | ----- | ------------- |
-| Chronicle memories / cards | chronicle | `memories()` helper |
-| Attune records | recall or chronicle (TBD Phase D) | `memories()` + `remember()`/`forget()` |
+| Source                     | Owner                             | Recall access                          |
+| -------------------------- | --------------------------------- | -------------------------------------- |
+| Chronicle memories / cards | chronicle                         | `memories()` helper                    |
+| Attune records             | recall or chronicle (TBD Phase D) | `memories()` + `remember()`/`forget()` |
 
 Authority: L1 evidence > L2 memory for factual claims.
 
@@ -82,14 +89,16 @@ Authority: L1 evidence > L2 memory for factual claims.
 - **Owner:** `modules/recall` — L3 agent contract, sandbox, attune (Phase D)
 - **Facade:** `modules/search` — human palette; delegates to recall query core
 - **Evidence writers:** chat-runtime projectors → recall ingest (read model only)
+- **Invocation bridge:** each agent runtime derives immutable `RecallInvocationContext`
+  from the active Chat Runtime session before calling the Recall owner
 
 ## Overlap with Search Module
 
-| Surface | Owner |
-| ------- | ----- |
-| Agent `recall_query` | recall |
-| Human `@` threads / palette | search → recall core |
-| Chronicle MCP | **Unchanged**; out of scope for recall track |
+| Surface                     | Owner                                        |
+| --------------------------- | -------------------------------------------- |
+| Agent `recall_query`        | recall                                       |
+| Human `@` threads / palette | search → recall core                         |
+| Chronicle MCP               | **Unchanged**; out of scope for recall track |
 
 ## Test Plan (when implementing)
 

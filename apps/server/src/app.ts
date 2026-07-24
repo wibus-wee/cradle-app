@@ -61,6 +61,7 @@ import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
+import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
@@ -138,12 +139,15 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   const { includeRuntimeHttpPlugins = false } = options
   const downloadCenter = createDownloadCenterModule(options.downloadCenterService)
   const chronicle = createChronicleModule(downloadCenter.service)
-  const opencodeRuntimeInstallation = options.opencodeRuntimeInstallationService
-    ?? new OpencodeRuntimeInstallationService({ downloadCenter: downloadCenter.service })
-  const managedResources = options.managedResourceService ?? new ManagedResourceService([
-    createChronicleManagedResourceAdapter(downloadCenter.service),
-    createOpencodeManagedResourceAdapter(opencodeRuntimeInstallation),
-  ])
+  const opencodeRuntimeInstallation
+    = options.opencodeRuntimeInstallationService
+      ?? new OpencodeRuntimeInstallationService({ downloadCenter: downloadCenter.service })
+  const managedResources
+    = options.managedResourceService
+      ?? new ManagedResourceService([
+      createChronicleManagedResourceAdapter(downloadCenter.service),
+      createOpencodeManagedResourceAdapter(opencodeRuntimeInstallation),
+    ])
   const app = new Elysia({
     name: 'cradle.server.elysia',
     adapter: node(),
@@ -224,6 +228,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(kanban)
   app.use(linkPreview)
   app.use(search)
+  app.use(recall)
   app.use(createPluginsModule({ downloadCenter: downloadCenter.service }))
   app.use(skills)
   app.use(workflowRules)
@@ -260,9 +265,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 }
 
 export async function createServerApp(options: CreateServerAppOptions = {}) {
-  const {
-    startBackgroundTasks = process.env.NODE_ENV !== 'test',
-  } = options
+  const { startBackgroundTasks = process.env.NODE_ENV !== 'test' } = options
   const downloadCenterService = new DownloadCenterService()
   await downloadCenterService.boot()
   const [
@@ -285,6 +288,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     { shutdownImageOcr },
     { CodexUsageReconciliationScheduler },
     { RunSnapshotMaintenanceScheduler },
+    { initializeRecallProjection },
   ] = await Promise.all([
     import('./infra'),
     import('./modules/chat-runtime/runtime'),
@@ -305,8 +309,10 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     import('./modules/image-ocr/service'),
     import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
     import('./modules/chat-runtime/run-snapshot-maintenance'),
+    import('./modules/recall'),
   ])
   await recoverPersistedRunProjections()
+  initializeRecallProjection()
 
   const opencodeRuntimeInstallationService = new OpencodeRuntimeInstallationService({
     downloadCenter: downloadCenterService,

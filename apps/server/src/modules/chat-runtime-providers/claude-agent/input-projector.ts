@@ -233,7 +233,8 @@ export function buildClaudeQueryOptions(input: {
     // The SDK process must start in bypass mode so a later live switch back to it works reliably.
     // streamTurn syncs the user's actual mode immediately after creating the query.
     permissionMode: 'bypassPermissions',
-    allowDangerouslySkipPermissions: readClaudeAgentAllowDangerouslySkipPermissions(runtimeSettings),
+    allowDangerouslySkipPermissions:
+      readClaudeAgentAllowDangerouslySkipPermissions(runtimeSettings),
     maxTurns: config.maxTurns,
     additionalDirectories: uniquePaths([
       ...runtimeContext.additionalDirectories,
@@ -302,7 +303,7 @@ export function buildClaudeQueryOptions(input: {
   if (Object.keys(registeredServers).length > 0) {
     queryOptions.mcpServers = {
       ...queryOptions.mcpServers,
-      ...projectClaudeAgentMcpServers(registeredServers),
+      ...projectClaudeAgentMcpServers(registeredServers, input.input.runtimeSession.chatSessionId),
     }
   }
 
@@ -533,6 +534,7 @@ function readRecentCradleLocalHistory(history: UIMessage[] | undefined): UIMessa
 
 function projectClaudeAgentMcpServers(
   servers: ReturnType<typeof getRegisteredMcpServers>,
+  chatSessionId: string,
 ): Record<string, McpServerConfig> {
   return Object.fromEntries(
     Object.entries(servers).map(([name, config]) => {
@@ -543,7 +545,10 @@ function projectClaudeAgentMcpServers(
             type: 'stdio',
             command: config.command,
             args: config.args,
-            env: config.env,
+            env:
+              name === 'cradle'
+                ? { ...config.env, CRADLE_CHAT_SESSION_ID: chatSessionId }
+                : config.env,
           } satisfies McpServerConfig,
         ]
       }
