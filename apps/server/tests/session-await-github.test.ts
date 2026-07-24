@@ -55,6 +55,9 @@ function installGitHubFetch(routes: Record<string, unknown | Response>): ReturnT
     if (body instanceof Response) {
       return body
     }
+    if (body instanceof Error) {
+      throw body
+    }
     return jsonResponse(body)
   })
   globalThis.fetch = mock as typeof fetch
@@ -418,10 +421,32 @@ describe('gitHub session-await sources', () => {
     expect(result).toEqual({ awaitId: 'await-1', matched: false })
   })
 
-  it('rejects ambiguous CI filters with more than one target', async () => {
-    await expect(githubCISource.checkPending([
+  it('isolates malformed awaits from unrelated completed CI awaits', async () => {
+    installGitHubFetch({
+      '/repos/acme/app/commits/good-sha/check-runs?per_page=100&page=1': {
+        total_count: 1,
+        check_runs: [{ name: 'build', status: 'completed', conclusion: 'success' }],
+      },
+      '/repos/acme/app/commits/good-sha/status': {
+        state: 'success',
+        total_count: 0,
+        statuses: [],
+      },
+      '/repos/acme/app/actions/runs?head_sha=good-sha&per_page=100&page=1': {
+        total_count: 0,
+        workflow_runs: [],
+      },
+    })
+
+    const results = await githubCISource.checkPending([
       awaitRow({ repo: 'acme/app', pr: 42, runs_id: 101 }),
-    ])).rejects.toThrow('GitHub CI filter requires exactly one of pr, sha, or runs_id')
+      awaitRow({ repo: 'acme/app', sha: 'good-sha' }, { id: 'await-2' }),
+    ])
+
+    expect(results).toEqual([
+      { awaitId: 'await-1', matched: false, transientError: 'GitHub CI await check failed temporarily' },
+      expect.objectContaining({ awaitId: 'await-2', matched: true }),
+    ])
   })
 
   it('does not bypass required checks or statuses', async () => {
@@ -605,6 +630,44 @@ describe('gitHub session-await sources', () => {
           { name: 'Run frontend checks', conclusion: 'success' },
         ],
       }],
+    })
+  })
+
+  it('keeps the await pending when branch-protection lookup is temporarily unavailable', async () => {
+    installGitHubFetch({
+      '/repos/acme/app/pulls/42': {
+        number: 42,
+        title: 'Ship feature',
+        state: 'open',
+        merged: false,
+        mergeable: true,
+        head: { sha: 'head-sha', ref: 'feature' },
+        base: { ref: 'main' },
+      },
+      '/repos/acme/app/commits/head-sha/check-runs?per_page=100&page=1': {
+        total_count: 1,
+        check_runs: [{ name: 'build', status: 'completed', conclusion: 'success' }],
+      },
+      '/repos/acme/app/commits/head-sha/status': {
+        state: 'success',
+        total_count: 0,
+        statuses: [],
+      },
+      '/repos/acme/app/actions/runs?head_sha=head-sha&per_page=100&page=1': {
+        total_count: 0,
+        workflow_runs: [],
+      },
+      '/repos/acme/app/branches/main/protection': new Error('GitHub temporarily unavailable'),
+    })
+
+    const [result] = await githubCISource.checkPending([
+      awaitRow({ repo: 'acme/app', pr: 42 }),
+    ])
+
+    expect(result).toEqual({
+      awaitId: 'await-1',
+      matched: false,
+      transientError: 'GitHub branch protection API unavailable',
     })
   })
 
