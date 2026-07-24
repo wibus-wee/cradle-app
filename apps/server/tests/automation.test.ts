@@ -181,10 +181,50 @@ describe('automation capability', () => {
         nextRunAt: expect.any(Number),
       }))
 
+      await createAutomation(app, { id: 'automation-without-runs' })
+      db().insert(automationRuns).values([
+        {
+          id: 'automation-run-old',
+          automationDefinitionId: created.id,
+          workspaceId: 'workspace-automation',
+          triggerType: 'manual',
+          occurrenceKey: 'manual:old',
+          status: 'complete',
+          triggerSnapshotJson: JSON.stringify(created.trigger),
+          recipeSnapshotJson: JSON.stringify(created.recipe),
+          artifactCount: 0,
+          createdAt: 1_780_000_000,
+          updatedAt: 1_780_000_000,
+        },
+        {
+          id: 'automation-run-latest',
+          automationDefinitionId: created.id,
+          workspaceId: 'workspace-automation',
+          triggerType: 'manual',
+          occurrenceKey: 'manual:latest',
+          status: 'complete',
+          triggerSnapshotJson: JSON.stringify(created.trigger),
+          recipeSnapshotJson: JSON.stringify(created.recipe),
+          artifactCount: 0,
+          createdAt: 1_780_000_001,
+          updatedAt: 1_780_000_001,
+        },
+      ]).run()
+
       const listRes = await app.handle(new Request('http://localhost/automations?workspaceId=workspace-automation'))
       expect(listRes.status).toBe(200)
       const list = await listRes.json()
-      expect(list).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'automation-weekly-report' })]))
+      expect(list).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'automation-weekly-report',
+          latestRun: expect.objectContaining({ id: 'automation-run-latest' }),
+        }),
+        expect.objectContaining({ id: 'automation-without-runs', latestRun: null }),
+      ]))
+
+      const emptyListRes = await app.handle(new Request('http://localhost/automations?workspaceId=workspace-without-automations'))
+      expect(emptyListRes.status).toBe(200)
+      expect(await emptyListRes.json()).toEqual([])
 
       const getRes = await app.handle(new Request('http://localhost/automations/automation-weekly-report'))
       expect(await getRes.json()).toEqual(expect.objectContaining({

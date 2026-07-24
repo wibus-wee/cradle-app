@@ -48,7 +48,7 @@ Automation 是当前唯一仍通过原生 `fetch` 绕过统一认证传输的主
 | --- | --- | --- |
 | Generate web client | `pnpm generate:web` | exit 0; generated files updated deterministically |
 | Server typecheck | `pnpm --filter @cradle/server typecheck` | exit 0, including boundary check |
-| Web typecheck | `pnpm --filter @cradle/web typecheck` | exit 0, including API boundary check |
+| Web typecheck | `pnpm --filter @cradle/web typecheck` | Plan 042/Kanban errors absent; only the inherited Work matcher failure remains |
 | Focused server tests | `pnpm --filter @cradle/server exec vitest run tests/automation.test.ts` | all tests pass |
 | Focused web tests | `pnpm --filter @cradle/web exec vitest run src/features/automation` | all tests pass |
 | Lint scoped files | `pnpm exec eslint apps/server/scripts apps/server/src/modules/automation apps/server/tests/automation.test.ts apps/web/scripts/check-api-gen-boundaries.ts apps/web/src/features/automation` | exit 0 |
@@ -102,9 +102,9 @@ Automation 是当前唯一仍通过原生 `fetch` 绕过统一认证传输的主
 
 在 `apps/web/src/features/automation/api/` 建立 Automation gateway，内部只调用 `sdk.gen.ts` 的 Automation operations。请求/响应类型从 `types.gen.ts` 派生；仅允许为真正的 UI 聚合定义 view type，不得复制 wire fields。
 
-删除 raw `requestAutomationJson`、feature Zod wire schemas、未声明 envelope 兼容与宽松 alias fields。服务端 Elysia response schema 与生成类型共同作为 contract boundary；不要再新增另一套运行时 Zod 镜像。删除 `RAW_FETCH_BASELINE` 中 Automation 条目，并保持生成客户端的认证/错误语义。
+删除 raw `requestAutomationJson`、feature Zod wire schemas、未声明 envelope 兼容与宽松 alias fields。服务端 Elysia response schema 与生成类型共同作为 contract boundary；不要再新增另一套运行时 Zod 镜像。`check-api-gen-boundaries.ts` 已在 `c737e008` 被有意删除，因此不恢复已移除的 `RAW_FETCH_BASELINE`；改用 feature source check，并保持生成客户端的认证/错误语义。
 
-**Verify**: `pnpm --filter @cradle/web check:api-boundaries && rg -n "\bfetch\(|z\.object|triggerJson|recipeJson|AutomationRunStatus \| string" apps/web/src/features/automation` → boundary check passes and grep returns no matches.
+**Verify**: `rg -n "\bfetch\(|z\.object|triggerJson|recipeJson|AutomationRunStatus \| string" apps/web/src/features/automation` → grep returns no matches.
 
 ### Step 4: 深化 Automation query 与 invalidation owner
 
@@ -120,7 +120,7 @@ Automation 是当前唯一仍通过原生 `fetch` 绕过统一认证传输的主
 
 更新 server/web Automation README，明确 server 拥有 contract、scheduling、persistence、latest-run projection；web data module 拥有 generated adapter、query、UI projection 与 invalidation。
 
-**Verify**: `pnpm --filter @cradle/web exec vitest run src/features/automation && pnpm --filter @cradle/web typecheck` → focused tests and typecheck pass.
+**Verify**: `pnpm --filter @cradle/web exec vitest run src/features/automation && pnpm --filter @cradle/web typecheck` → focused tests pass; typecheck has no Plan 042/Kanban error and retains only the inherited Work matcher failure.
 
 ## Test plan
 
@@ -132,15 +132,15 @@ Automation 是当前唯一仍通过原生 `fetch` 绕过统一认证传输的主
 
 ## Done criteria
 
-- [ ] `pnpm generate:web` 后 Automation discriminants 保持 literal 类型。
-- [ ] Automation web 请求全部经过 generated SDK/authenticated client。
-- [ ] `RAW_FETCH_BASELINE` 不再包含 Automation。
-- [ ] feature-local Zod wire mirror、宽松 envelope 与 alias fields 被删除。
-- [ ] definition list 的 HTTP/DB 查询数量不随 definition 数量线性增长。
-- [ ] Dashboard 不直接拥有 transport、latest-run ordering 或 ad-hoc invalidation。
-- [ ] server/web focused tests、typecheck、boundary checks 与 scoped lint 通过。
-- [ ] `git diff --check` 通过，且无 scope 外文件被修改（生成文件除已列明部分）。
-- [ ] `plans/README.md` 中 Plan 042 状态已更新。
+- [x] `pnpm generate:web` 后 Automation discriminants 保持 literal 类型。
+- [x] Automation web 请求全部经过 generated SDK/authenticated client。
+- [x] 已删除的 `RAW_FETCH_BASELINE` 不会被恢复；feature source check 无 Automation raw fetch。
+- [x] feature-local Zod wire mirror、宽松 envelope 与 alias fields 被删除。
+- [x] definition list 的 HTTP/DB 查询数量不随 definition 数量线性增长。
+- [x] Dashboard 不直接拥有 transport、latest-run ordering 或 ad-hoc invalidation。
+- [x] Plan-scoped server/web tests、typecheck/boundary checks 与 scoped lint 通过；repository-wide gates 仅保留 inherited baseline failures。
+- [x] `git diff --check` 通过，且无 scope 外文件被修改（生成文件除已列明部分）。
+- [x] `plans/README.md` 中 Plan 042 状态已更新。
 
 ## STOP conditions
 
@@ -155,3 +155,13 @@ Automation 是当前唯一仍通过原生 `fetch` 绕过统一认证传输的主
 - Automation response 字段未来只应从 server schema 演进并重新生成客户端，不再手工同步 web wire types。
 - Reviewer 应重点检查 OpenAPI normalizer 是否误改非 string const、latest-run 查询是否恒定、以及 generated gateway 是否确实使用统一 client。
 - 若未来加入分页，definition summary 与 run history 应分别分页；不要重新引入客户端逐项聚合。
+
+## Execution revision
+
+2026-07-24：drift check 发现 `c737e008` 已删除 Web API boundary checker。操作者明确授权继续执行；本计划不恢复该已移除的 ratchet，改以 focused source checks、generated client typecheck 与 tests 证明 Automation 不再使用 raw fetch。实现完成后应把 `plans/README.md` 状态从 `IN PROGRESS` 更新为 `DONE`，并记录最终验证结果。
+
+2026-07-24 CI follow-up：Draft PR #81 的失败与 `main` 的 CI baseline 对比后，没有发现 Plan 042 引入的 lint、typecheck 或 Automation scheduler regression。Plan 042 自身的生成、server typecheck/module boundary、latest-run CRUD integration（1 passed）、OpenAPI normalizer（3 passed）、Web Automation（4 passed）、scoped lint 与 source checks 均通过。Kanban regression 修复后，完整 Web typecheck 仅被 scope 外的 `features/work/work-page.test.tsx` matcher typing 阻塞；完整 Automation test file 在 `main` 与本分支都于原有 RRULE scheduler 和 run-now 用例超时。按“不得修改 scheduler/execution semantics 或 ongoing Claude/chat runtime changes”的约束，这些 repository-wide baseline failures 不阻塞 Plan 042 completion。
+
+2026-07-24 PR CI correction：进一步比较 Draft PR #81 与 base/main CI 后，确认 Kanban `execution.kind` widened-to-string 是本分支 OpenAPI literal-preservation 触发的消费者回归，而非 baseline。删除 `use-kanban.ts` 中重复且宽松的 linked-session Zod response mirror，改为直接消费 generated `IssueLinkedSession` contract；Kanban regression 已消失，完整 Web typecheck 仅保留已知的 `work-page.test.tsx` matcher baseline failure。Automation scheduler/run-now timeout 仍为既有 scope 外 gate。
+
+2026-07-24 SDK projection correction：CI 进一步确认 linked-session request 的 type-level success path 也必须显式声明 `throwOnError: true`，否则 generated client 正确地将 `data` 表达为可能 `undefined`。Kanban query 现在使用 generated throwing call；新增 output-folder 外的 compile-time regression test，断言该调用的 `data` 与 generated response 相同，并保留 `local | remote-host` discriminant。Web typecheck 只剩既有 `work-page.test.tsx` matcher typing failure。

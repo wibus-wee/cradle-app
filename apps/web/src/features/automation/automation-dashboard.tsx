@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -10,7 +9,6 @@ import {
 } from '~/features/agent-runtime/use-runtime-catalog'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 
-import { listAutomationArtifacts, listAutomationRuns, listAutomationTriage } from './api-client'
 import { AutomationCreatePanelContainer } from './automation-create-panel-container'
 import { AutomationDashboardView } from './automation-dashboard-view'
 import { AutomationDetailView } from './automation-detail-view'
@@ -29,8 +27,10 @@ import {
 } from './automation-presentation'
 import type { AutomationDefinition } from './types'
 import {
-  automationQueryKeys,
+  useAutomationArtifacts,
   useAutomationDefinitions,
+  useAutomationRuns,
+  useAutomationTriage,
   useCreateAutomation,
   useRunAutomationNow,
   useStopAutomationRun,
@@ -54,12 +54,7 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
 
   const definitionsQuery = useAutomationDefinitions(workspaceFilter)
   const definitions = definitionsQuery.data ?? []
-  const triageQuery = useQuery({
-    queryKey: ['automations', 'triage', { workspaceId: workspaceFilter }],
-    queryFn: () => listAutomationTriage(workspaceFilter),
-    staleTime: 10_000,
-    retry: 1,
-  })
+  const triageQuery = useAutomationTriage(workspaceFilter)
   const triageRuns = triageQuery.data ?? []
   const defaultRuntimeKind = useMemo(
     () => listRuntimeCatalogForSurface(runtimes, 'chat')
@@ -79,24 +74,8 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
       ? definitions.find(definition => definition.id === selectedId) ?? null
       : definitions[0] ?? null
   const selectedAutomationId = selectedDefinition?.id ?? null
-  const runsQuery = useQuery({
-    queryKey: selectedAutomationId
-      ? automationQueryKeys.runs(selectedAutomationId)
-      : ['automations', 'missing', 'runs'],
-    queryFn: () => listAutomationRuns(selectedAutomationId ?? ''),
-    enabled: Boolean(selectedAutomationId),
-    staleTime: 10_000,
-    retry: 1,
-  })
-  const artifactsQuery = useQuery({
-    queryKey: selectedAutomationId
-      ? automationQueryKeys.artifacts(selectedAutomationId)
-      : ['automations', 'missing', 'artifacts'],
-    queryFn: () => listAutomationArtifacts(selectedAutomationId ?? ''),
-    enabled: Boolean(selectedAutomationId),
-    staleTime: 10_000,
-    retry: 1,
-  })
+  const runsQuery = useAutomationRuns(selectedAutomationId)
+  const artifactsQuery = useAutomationArtifacts(selectedAutomationId)
   const createAutomationMutation = useCreateAutomation()
   const updateAutomationMutation = useUpdateAutomation()
   const runNowMutation = useRunAutomationNow()
