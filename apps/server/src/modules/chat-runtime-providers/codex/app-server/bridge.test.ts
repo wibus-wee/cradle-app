@@ -167,7 +167,7 @@ async function readSseEvents(stream: ReadableStream<Uint8Array>): Promise<Array<
 }
 
 describe('codexAppServerBridge stream lifecycle', () => {
-  it('closes command exec streams after the method result', async () => {
+  it('keeps the chat-session host warm after command exec streams end', async () => {
     const client = new FakeBridgeAppServerClient({
       'command/exec': { exitCode: 0 },
     })
@@ -184,7 +184,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
     ])
     expect(client.skillExtraRootsRequests).toEqual([{ extraRoots: ['/tmp/cradle-skill'] }])
     expect(events.map(event => event.event)).toEqual(['request_started', 'result', 'done'])
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('continues bridge calls when app-server does not support skill extra roots sync', async () => {
@@ -204,7 +204,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
       { method: 'config/read', params: { cwd: '/tmp/cradle-workspace' } },
     ])
     expect(result.result).toEqual({ config: { model: 'gpt-5-codex' } })
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('keeps turn start streams open until the turn completion notification', async () => {
@@ -231,7 +231,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
 
     const events = await eventsPromise
     expect(events.map(event => event.event)).toEqual(['request_started', 'result', 'notification', 'done'])
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('reuses one scoped host while bridge streams overlap for the same session', async () => {
@@ -293,7 +293,14 @@ describe('codexAppServerBridge stream lifecycle', () => {
     const [firstEvents, secondEvents] = await Promise.all([firstEventsPromise, secondEventsPromise])
     expect(firstEvents.map(event => event.event)).toEqual(['request_started', 'result', 'notification', 'done'])
     expect(secondEvents.map(event => event.event)).toEqual(['request_started', 'result', 'notification', 'done'])
-    expect(clients[0]!.close).toHaveBeenCalledOnce()
+    expect(clients[0]!.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual([
+      expect.objectContaining({
+        scopeId: codexChatSessionAppServerScopeId('chat-session-1'),
+        refCount: 0,
+        hasResource: true,
+      }),
+    ])
   })
 
   it('passes Cradle session context into bridge app-server clients', async () => {

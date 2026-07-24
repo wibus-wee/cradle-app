@@ -40,9 +40,16 @@ export interface AcquireCodexAppServerHostLeaseInput {
   deps: CodexAppServerHostLeaseDeps
   authenticateChatgpt?: boolean
   pinned?: boolean
+  idleTimeoutMs?: number
 }
 
 export type CodexAppServerHostLease = ProviderProcessHostLease<CodexAppServerHostResource>
+
+/**
+ * Keep a chat-scoped app-server warm long enough for follow-up messages while
+ * still releasing its process after a bounded idle period.
+ */
+export const CODEX_APP_SERVER_IDLE_TIMEOUT_MS = 30 * 60 * 1000
 
 export function codexChatSessionAppServerScopeId(chatSessionId: string): string {
   return `chat-session:${chatSessionId}`
@@ -62,6 +69,8 @@ export async function acquireCodexAppServerHostLease(
     providerTargetId: input.providerTargetId,
     scopeId: input.scopeId,
     pinned: input.pinned ?? false,
+    ttlMs: input.idleTimeoutMs ?? CODEX_APP_SERVER_IDLE_TIMEOUT_MS,
+    retainOnRelease: input.idleTimeoutMs !== 0,
     resourceFingerprint: createCodexAppServerHostFingerprint({
       options: hostClientOptions,
       chatgptAuth: input.chatgptAuth,

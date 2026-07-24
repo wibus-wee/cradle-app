@@ -15,6 +15,7 @@ export type ProviderProcessHostLease<Resource = undefined> = ProviderRuntimeLeas
 export interface AcquireProviderProcessHostResourceInput<Resource> extends ProviderProcessHostKey {
   ttlMs?: number
   pinned?: boolean
+  retainOnRelease?: boolean
   resourceFingerprint?: string
   createResource: ProviderRuntimeResourceFactory<Resource>
   disposeResource: ProviderRuntimeResourceDisposer<Resource>
