@@ -14,5 +14,7 @@
 
 - **app-error-boundary.tsx**: App-wide React error boundary with a restrained fallback for renderer crashes; it logs caught render errors, allows history back, local retry, and full reload actions, and only shows stack details in development.
 - **beta-notice.tsx**: Shared app-level Beta/unstable feature notice. It owns the restrained warning treatment while callers provide feature-specific localized title and description copy.
+- **route-error-view.tsx**: Props-only route failure surface for fixture-driven rendering; callers provide copy and recovery callbacks.
+- **route-error-fallback.tsx**: TanStack Router adapter that derives localized error copy and translates View actions into route retry/home navigation.
 - **diff/**: Shared Cradle diff-rendering module. It owns Pierre worker/highlighter setup, patch parsing and path indexing, standard rendering options, layout controls, read-only patch rendering, and before/after content rendering. Feature modules retain data fetching and domain interactions such as review threads.
 - **workspace-file-icon.tsx**: Shared workspace file icon renderer backed by the `@pierre/trees` built-in complete icon resolver and sprite sheet, reused by file mentions and Git change rows.

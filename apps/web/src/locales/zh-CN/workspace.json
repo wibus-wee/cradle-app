@@ -196,6 +196,7 @@
   "workspace.migrate.toast.successDesc": "已将 {{count}} 项移动到 {{target}}。",
   "workspace.migrate.toast.failed": "迁移失败",
   "workspace.migrate.toast.previewFailed": "预览失败",
+  "workspace.aria.menu": "工作区菜单",
   "workspace.aria.pinned": "已置顶项目",
   "workspace.aria.toggleExpanded": "切换工作区折叠状态",
   "workspace.dialog.addProject": "添加项目",

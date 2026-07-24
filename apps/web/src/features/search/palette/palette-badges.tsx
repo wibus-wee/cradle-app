@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '~/lib/cn'
@@ -14,12 +15,19 @@ interface PaletteFilterBadgesProps {
 /**
  * Horizontal, scrollable strip of mode filter pills. The active pill lifts to
  * a subtle filled surface (`bg-muted text-foreground`) - a quiet, typographic
- * tab rather than a stark inversion. Clicking a pill rewrites the input
- * prefix via {@link setPaletteMode}, so the existing prefix-based model stays
- * the source of truth.
+ * tab rather than a stark inversion. The controlled active mode is kept in
+ * view when the strip overflows on narrow screens.
  */
 export function PaletteFilterBadges({ activeMode, counts, onSelect }: PaletteFilterBadgesProps) {
   const { t } = useTranslation('search')
+  const activeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    activeButtonRef.current?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    })
+  }, [activeMode])
 
   return (
     <div className="no-scrollbar flex items-center gap-1 overflow-x-auto px-2.5 py-2">
@@ -31,6 +39,7 @@ export function PaletteFilterBadges({ activeMode, counts, onSelect }: PaletteFil
         return (
           <button
             key={mode.id}
+            ref={active ? activeButtonRef : undefined}
             type="button"
             onClick={() => onSelect(mode.id)}
             aria-pressed={active}

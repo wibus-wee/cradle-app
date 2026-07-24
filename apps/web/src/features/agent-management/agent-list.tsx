@@ -4,7 +4,6 @@ import {
   DeleteLine as Trash2Icon,
   DownloadLine as DownloadIcon,
   PlusLine as PlusIcon,
-  RightSmallLine as ChevronRightIcon,
   RobotLine as BotIcon,
   SearchLine as SearchIcon,
   SelectorHorizontalLine as SlidersHorizontalIcon,
@@ -13,18 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { ProviderIcon } from '~/components/common/provider-icons'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import { Checkbox } from '~/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
 import {
   Empty,
   EmptyContent,
@@ -35,8 +23,6 @@ import {
 } from '~/components/ui/empty'
 import { Input } from '~/components/ui/input'
 import { ScrollArea } from '~/components/ui/scroll-area'
-import { AgentRuntimeConfigJsonSchema } from '~/features/agent-runtime/agent-config-schema'
-import { buildAvatarUrl } from '~/features/agent-runtime/avatar-url'
 import { runtimeSupportsProviderKind } from '~/features/agent-runtime/runtime-compatibility'
 import type { ModelDescriptor, ProviderTarget } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
@@ -46,7 +32,6 @@ import type { ProviderTargetOption } from '~/features/agent-runtime/use-provider
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import type { RuntimeCatalogItem } from '~/features/agent-runtime/use-runtime-catalog'
 import {
-  runtimeCatalogItemUsesCliLaunchConfig,
   runtimeCatalogItemUsesModelSelection,
   useRuntimeCatalog,
 } from '~/features/agent-runtime/use-runtime-catalog'
@@ -56,7 +41,6 @@ import {
 } from '~/features/composer-toolbar/constants'
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
-import { cn } from '~/lib/cn'
 import type { AgentCreateIntent } from '~/store/settings-overlay'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
@@ -67,7 +51,8 @@ import type {
 } from './agent-batch-configuration'
 import { buildAgentProviderBatchPatches } from './agent-batch-configuration'
 import { AgentDetailPage } from './agent-detail'
-import { StatusDot } from './agent-status-dot'
+import { AgentImportDialogView } from './agent-import-dialog-view'
+import { AgentSidebarRowView } from './agent-sidebar-row-view'
 import {
   applyVisibleRangeSelection,
   mergeVisibleSelection,
@@ -209,118 +194,6 @@ function defaultBatchThinkingEffort(
   )
     ? first
     : 'high'
-}
-
-function AgentSidebarRow({
-  agent,
-  providerTargets,
-  runtimeCatalog,
-  active,
-  selected,
-  onClick,
-  onToggleSelected,
-}: {
-  agent: Agent
-  providerTargets: ProviderTargetOption[]
-  runtimeCatalog: RuntimeCatalogItem[]
-  active: boolean
-  selected: boolean
-  onClick: (shiftKey: boolean) => void
-  onToggleSelected: (checked: boolean, shiftKey: boolean) => void
-}) {
-  const checkboxShiftKeyRef = useRef(false)
-  const avatarUrl = agent.avatarUrl || buildAvatarUrl(agent.avatarStyle, agent.avatarSeed)
-  const lobeIconSlug = agent.avatarStyle === 'lobehub-icon' ? agent.avatarSeed : null
-  const providerTarget = agent.providerTargetId
-    ? (providerTargets.find(target => target.id === agent.providerTargetId) ?? null)
-    : null
-  const runtime = runtimeCatalog.find(item => item.runtimeKind === agent.runtimeKind)
-  const runtimeConfig = AgentRuntimeConfigJsonSchema.parse(agent.configJson)
-  const usesCliLaunchConfig = runtime
-    ? runtimeCatalogItemUsesCliLaunchConfig(runtime)
-    : runtimeConfig.cliTui !== null
-  const cliTuiLaunch = usesCliLaunchConfig ? runtimeConfig.cliTui : null
-  const subtitle = usesCliLaunchConfig
-    ? [runtime?.label ?? agent.runtimeKind, cliTuiLaunch?.preset ?? cliTuiLaunch?.executable]
-        .filter(Boolean)
-        .join(' ·\n')
-        || runtime?.label
-        || agent.runtimeKind
-    : [providerTarget?.name, agent.modelId].filter(Boolean).join(' ·\n') || undefined
-
-  return (
-    <div
-      data-testid={`agent-sidebar-row-${agent.id}`}
-      className={cn(
-        'group/sidebar-row flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left outline-none',
-        'transition-[background-color,opacity,scale] duration-150',
-        // 'focus-within:ring-2 focus-within:ring-ring/50',
-        active
-          ? 'bg-accent text-accent-foreground'
-          : 'hover:bg-foreground/[0.035] active:bg-foreground/6',
-        !agent.enabled && !active && 'opacity-60',
-      )}
-    >
-      <Checkbox
-        checked={selected}
-        onClickCapture={(event) => {
-          checkboxShiftKeyRef.current = event.shiftKey
-        }}
-        onCheckedChange={(value) => {
-          onToggleSelected(!!value, checkboxShiftKeyRef.current)
-          checkboxShiftKeyRef.current = false
-        }}
-      />
-      <button
-        type="button"
-        className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
-        onClick={event => onClick(event.shiftKey)}
-      >
-        <div className="size-7 shrink-0 overflow-hidden rounded-lg bg-foreground/5">
-          {lobeIconSlug
-? (
-            <ProviderIcon iconSlug={lobeIconSlug} presetId={null} className="size-full p-1" />
-          )
-: (
-            avatarUrl && (
-              <img
-                src={avatarUrl}
-                alt={agent.name}
-                className="size-full object-cover"
-                crossOrigin="anonymous"
-              />
-            )
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                'block truncate text-[12.5px] leading-tight',
-                active ? 'font-medium text-foreground' : 'text-foreground/90',
-              )}
-            >
-              {agent.name}
-            </span>
-            <StatusDot tone={agent.enabled ? 'active' : 'muted'} />
-          </div>
-          {subtitle && (
-            <span className="block truncate whitespace-pre text-[10.5px] leading-tight text-muted-foreground/70">
-              {subtitle}
-            </span>
-          )}
-        </div>
-        <ChevronRightIcon
-          className={cn(
-            'size-3 shrink-0 !text-muted-foreground/40 transition-[opacity,transform] duration-150',
-            active
-              ? 'opacity-100 translate-x-0'
-              : 'opacity-0 -translate-x-1 group-hover/sidebar-row:opacity-60 group-hover/sidebar-row:translate-x-0',
-          )}
-        />
-      </button>
-    </div>
-  )
 }
 
 function AgentBatchProviderPanel({
@@ -517,150 +390,6 @@ function AgentBatchProviderPanel({
         </div>
       </div>
     </div>
-  )
-}
-
-function AgentImportDialog({
-  open,
-  preview,
-  selectedIds,
-  busy,
-  error,
-  onOpenChange,
-  onToggleCandidate,
-  onImport,
-}: {
-  open: boolean
-  preview: PreviewLocalConfigImportResult | null
-  selectedIds: Set<string>
-  busy: boolean
-  error: string | null
-  onOpenChange: (open: boolean) => void
-  onToggleCandidate: (candidateId: string, checked: boolean) => void
-  onImport: () => void
-}) {
-  const importableSelectedCount
-    = preview?.candidates.filter(candidate => candidate.importable && selectedIds.has(candidate.id))
-      .length ?? 0
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Import Agents</DialogTitle>
-          <DialogDescription>
-            Review detected Claude, Codex, Gemini, Pi, Kimi, and CC Switch mappings before creating
-            Agents.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-3">
-          {error && (
-            <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
-              {error}
-            </div>
-          )}
-
-          {!preview && (
-            <div className="rounded-md border border-foreground/8 px-3 py-6 text-center text-[12.5px] text-muted-foreground">
-              Scanning local config
-            </div>
-          )}
-
-          {preview && preview.candidates.length === 0 && (
-            <div className="rounded-md border border-foreground/8 px-3 py-6 text-center text-[12.5px] text-muted-foreground">
-              No Claude, Codex, Gemini, Pi, Kimi, or CC Switch mappings found
-            </div>
-          )}
-
-          {preview && preview.candidates.length > 0 && (
-            <div className="max-h-[420px] overflow-auto rounded-lg border border-foreground/8">
-              {preview.candidates.map(candidate => (
-                <label
-                  key={candidate.id}
-                  className={cn(
-                    'flex gap-3 border-b border-foreground/6 px-3 py-3 last:border-b-0',
-                    candidate.importable
-                      ? 'cursor-pointer hover:bg-foreground/[0.025]'
-                      : 'opacity-60',
-                  )}
-                >
-                  <Checkbox
-                    checked={selectedIds.has(candidate.id)}
-                    disabled={!candidate.importable || busy}
-                    onCheckedChange={value => onToggleCandidate(candidate.id, Boolean(value))}
-                  />
-                  {(candidate.avatarUrl || candidate.iconSlug) && (
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-foreground/8 bg-background">
-                      {candidate.avatarUrl
-? (
-                        <img src={candidate.avatarUrl} alt="" className="size-5 object-contain" />
-                      )
-: (
-                        <ProviderIcon
-                          iconSlug={candidate.iconSlug}
-                          presetId={candidate.app}
-                          className="size-5"
-                        />
-                      )}
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-[13px] font-medium text-foreground">
-                        {candidate.agentName}
-                      </span>
-                      <Badge
-                        variant={candidate.sourceKind === 'cc-switch' ? 'secondary' : 'outline'}
-                        className="font-normal"
-                      >
-                        {candidate.sourceLabel}
-                      </Badge>
-                      {candidate.alreadyConfigured && (
-                        <Badge variant="outline" className="font-normal">
-                          Existing
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
-                      <span>{candidate.app}</span>
-                      <span className="truncate">{candidate.resolvedProviderName}</span>
-                      {candidate.modelId && <span className="truncate">{candidate.modelId}</span>}
-                      {candidate.endpoint && (
-                        <span className="truncate font-mono">{candidate.endpoint}</span>
-                      )}
-                      {candidate.executable && (
-                        <span className="truncate font-mono">{candidate.executable}</span>
-                      )}
-                    </div>
-                    {candidate.notes.map(note => (
-                      <p key={note} className="text-[11.5px] leading-relaxed text-muted-foreground">
-                        {note}
-                      </p>
-                    ))}
-                    {candidate.reason && (
-                      <p className="text-[11.5px] leading-relaxed text-destructive">
-                        {candidate.reason}
-                      </p>
-                    )}
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter variant="bare">
-          <Button size="sm" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={onImport} disabled={busy || importableSelectedCount === 0}>
-            <DownloadIcon />
-            {busy ? 'Importing' : 'Import selected'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -1109,7 +838,7 @@ visible
 
           {!isLoading
             && visibleAgents.map(agent => (
-              <AgentSidebarRow
+              <AgentSidebarRowView
                 key={agent.id}
                 agent={agent}
                 providerTargets={providerOptions}
@@ -1213,7 +942,7 @@ active
       list={listPane}
       detail={detailPane}
     >
-      <AgentImportDialog
+      <AgentImportDialogView
         open={importDialogOpen}
         preview={importPreview}
         selectedIds={selectedImportCandidateIds}

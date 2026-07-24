@@ -5,8 +5,13 @@ Renderer-owned UI for chat session awaits in the right aside. The feature lets a
 ## Files
 
 - **await-panel-loader.ts**: Shared lazy loader and intent preload entry for the right aside Feed tab.
-- **awaits-overview.tsx**: Full-tab overview of pending awaits from the Desktop read-only projection; opening an await's chat session calls the chat-owned prefetch boundary before activating the Chat tab.
-- **await-panel.tsx**: Await panel, GitHub composer, source cards, check/status tree rendering, PR review status rendering, terminal await history, target input validation feedback, and delivery retry; GitHub checks render success, failure, skipped/cancelled, and running states with separate icon semantics; session await reads use the shared interactive query refresh policy and live GitHub status keeps an explicit slower interval for pending awaits only; records the global right-aside Feed first-render mark once per module lifetime after the session awaits query succeeds.
+- **awaits-overview.tsx**: Full-tab query/navigation container for pending awaits from the Desktop read-only projection; opening an await's chat session calls the chat-owned prefetch boundary before activating the Chat tab.
+- **awaits-overview-view.tsx / await-row-view.tsx**: Fixture-driven overview and row Views for populated, empty, and unavailable states. They receive owner `DesktopAwaitItem` values and callbacks without reading queries or navigation.
+- **await-panel.tsx**: Thin query/mutation adapter for session await rows, bulk live status, cancel, delivery retry, and optional-check bypass actions.
+- **await-panel-view.tsx / await-source-card-view.tsx**: Fixture-driven panel and stored/live source card Views for active, terminal, unsupported, and delivery-failure states.
+- **github-await-composer-view.tsx / use-github-await-composer.ts**: Local form interaction View plus git detection/create mutation adapter. The View owns target validation without reading repositories or generated clients.
+- **github-ci-await-card-view.tsx / github-review-await-card-view.tsx**: Pure GitHub status Views. CI checks render success, failure, skipped/cancelled, and running states with separate icon semantics.
+- **await-check-tree.ts / await-check-tree-view.tsx**: Pure workflow/check/step tree construction and rendering; optional-check bypass is exposed as a callback.
 - **await-github.ts**: GitHub repository detection and target parsing helpers for human-created awaits, including GitHub check-run `/runs/<id>` URLs and explicit explanations for unsupported workflow run URLs.
 - **await-github.test.ts**: Regression coverage for GitHub repo detection, target parsing, and PR-number inference.
 

@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { useMemo } from 'react'
 
 import { useSessionBinding } from '../session/use-session-binding'
-import { GroupedToolCallBlock, ToolCallBlock } from './blocks'
+import { GroupedToolCallBlock } from '../tool-blocks/containers/grouped-tool-call-block-container'
+import { ToolCallBlock } from '../tool-blocks/containers/tool-call-block-container'
 import { useChatRenderStore } from './chat-render-store'
 import { toolNameFromPart } from './chat-tool-entities'
 import {
@@ -26,6 +27,7 @@ export function ToolCallBlockFromPart({
   children,
   animated,
   sessionId,
+  workspaceDiffTarget,
 }: {
   messageId: string
   part: RenderableToolPart
@@ -33,12 +35,8 @@ export function ToolCallBlockFromPart({
   children?: ReactNode
   animated?: boolean
   sessionId?: string | null
+  workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
 }) {
-  const workspaceId = useSessionBinding(sessionId ?? null, Boolean(sessionId))?.workspaceId ?? null
-  const workspaceDiffTarget = useMemo(
-    () => workspaceId ? { workspaceId } : undefined,
-    [workspaceId],
-  )
   const approval = readToolApproval(part)
 
   return (
@@ -81,6 +79,11 @@ export function ToolCallBlockByPartIndex({
   partIndex: number
   onToolApprovalResponse?: MessageToolApprovalHandler
 }) {
+  const workspaceId = useSessionBinding(sessionId, true)?.workspaceId ?? null
+  const workspaceDiffTarget = useMemo(
+    () => workspaceId ? { workspaceId } : undefined,
+    [workspaceId],
+  )
   const part = useChatRenderStore(
     state => readRenderableToolPartFromState(state, sessionId, messageId, partIndex),
     areRenderableToolPartsEqual,
@@ -93,6 +96,7 @@ export function ToolCallBlockByPartIndex({
       messageId={messageId}
       part={part}
       sessionId={sessionId}
+      workspaceDiffTarget={workspaceDiffTarget}
       onToolApprovalResponse={onToolApprovalResponse}
     />
   )
@@ -102,18 +106,13 @@ export function GroupedToolCallBlockFromParts({
   items,
   uiKind,
   animated,
-  sessionId,
+  workspaceDiffTarget,
 }: {
   items: Array<{ key: string, part: RenderableToolPart }>
   uiKind: ReturnType<typeof describeToolCall>['kind']
   animated?: boolean
-  sessionId?: string | null
+  workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
 }) {
-  const workspaceId = useSessionBinding(sessionId ?? null, Boolean(sessionId))?.workspaceId ?? null
-  const workspaceDiffTarget = useMemo(
-    () => workspaceId ? { workspaceId } : undefined,
-    [workspaceId],
-  )
   if (items.length === 0) {
     return null
   }
@@ -137,6 +136,11 @@ export function GroupedToolCallBlockByPartIndexes({
   uiKind: ReturnType<typeof describeToolCall>['kind']
   sessionId: string
 }) {
+  const workspaceId = useSessionBinding(sessionId, true)?.workspaceId ?? null
+  const workspaceDiffTarget = useMemo(
+    () => workspaceId ? { workspaceId } : undefined,
+    [workspaceId],
+  )
   const parts = useChatRenderStore(
     state =>
       items.flatMap((item) => {
@@ -150,5 +154,11 @@ export function GroupedToolCallBlockByPartIndexes({
       }),
     areGroupedRenderableToolItemsEqual,
   )
-  return <GroupedToolCallBlockFromParts items={parts} uiKind={uiKind} sessionId={sessionId} />
+  return (
+    <GroupedToolCallBlockFromParts
+      items={parts}
+      uiKind={uiKind}
+      workspaceDiffTarget={workspaceDiffTarget}
+    />
+  )
 }

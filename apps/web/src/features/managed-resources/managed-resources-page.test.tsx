@@ -7,11 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ManagedResourcesPage } from './managed-resources-page'
 import type { ManagedResource } from './projection'
+import type { ManagedResourceActionRequest } from './use-managed-resources'
 
 const { action, resourceState } = vi.hoisted(() => ({
   action: {
     isPending: false,
     isError: false,
+    variables: null as ManagedResourceActionRequest | null,
     mutate: vi.fn(),
   },
   resourceState: { resources: [] as ManagedResource[] },
@@ -71,6 +73,7 @@ describe('managedResourcesPage', () => {
   beforeEach(() => {
     action.isPending = false
     action.isError = false
+    action.variables = null
     action.mutate.mockReset()
     resourceState.resources = [resource()]
   })
@@ -84,7 +87,10 @@ describe('managedResourcesPage', () => {
     expect(screen.getByText('1.17.11')).toBeTruthy()
     expect(screen.getByText('state.not-installed')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'action.install' }))
-    expect(action.mutate).toHaveBeenCalledWith('install')
+    expect(action.mutate).toHaveBeenCalledWith({
+      resource: resourceState.resources[0],
+      action: 'install',
+    })
   })
 
   it('renders the Download Center chrome with Library and Activity faces', () => {
@@ -106,9 +112,16 @@ describe('managedResourcesPage', () => {
       },
     })]
     action.isError = true
+    action.variables = {
+      resource: resourceState.resources[0],
+      action: 'update',
+    }
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: 'action.update' }))
-    expect(action.mutate).toHaveBeenCalledWith('update')
+    expect(action.mutate).toHaveBeenCalledWith({
+      resource: resourceState.resources[0],
+      action: 'update',
+    })
     expect(screen.getByText('action.failed')).toBeTruthy()
     expect(screen.queryByRole('textbox')).toBeNull()
   })

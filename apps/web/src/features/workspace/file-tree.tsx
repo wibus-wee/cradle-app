@@ -14,8 +14,8 @@ import { z } from 'zod'
 import { Button } from '~/components/ui/button'
 import { DelayedSpinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
-import type { GitFileStatus } from '~/features/git/types'
-import { useGitRepositories } from '~/features/git/use-git'
+import type { GitFileStatus } from '~/features/git/shared/types'
+import { useGitRepositories } from '~/features/git/shared/use-git'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { getAuthenticatedEventSourceUrl, getServerUrl, isElectron, nativeIpc, platform } from '~/lib/electron'
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
@@ -25,13 +25,13 @@ import { useBrowserPanelStore } from '~/store/browser-panel'
 import type { WorkspaceFileEntry } from './api/files'
 import { listWorkspaceFileChildren } from './api/files'
 import {
-  CreateWorkspaceFileDialog,
   createWorkspaceFileEntry,
   getWorkspaceFileDefaultView,
   joinWorkspacePath,
   renameWorkspaceFilePath,
-  WorkspaceFileContextMenu,
-} from './workspace-file-menu'
+} from './file-context-menu/lib/workspace-file-menu'
+import { CreateWorkspaceFileDialogView } from './file-context-menu/views/create-workspace-file-dialog-view'
+import { WorkspaceFileContextMenuView } from './file-context-menu/views/workspace-file-context-menu-view'
 import {
   isCopyPathChordStart,
   isCopyPathShortcut,
@@ -419,7 +419,7 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
             {t('fileTree.action.newFolder')}
           </Button>
         </div>
-        <CreateWorkspaceFileDialog
+        <CreateWorkspaceFileDialogView
           request={createDialog}
           onOpenChange={open => !open && setCreateDialog(null)}
           onCommit={async (name) => {
@@ -847,7 +847,7 @@ function FileTreeInner({ workspaceId, paths, preparedInput, ready, gitStatus, on
           '--trees-search-bg': 'transparent',
         } as React.CSSProperties}
         renderContextMenu={(item, context) => (
-          <WorkspaceFileContextMenu
+          <WorkspaceFileContextMenuView
             context={context}
             item={item}
             onCopyAbsolutePath={copyAbsolutePath}
@@ -865,13 +865,14 @@ function FileTreeInner({ workspaceId, paths, preparedInput, ready, gitStatus, on
               model.startRenaming(path)
             }}
             onReveal={revealWorkspacePath}
+            revealInExplorer={platform === 'win32'}
             t={t}
             workspacePath={workspacePath}
           />
         )}
       />
 
-      <CreateWorkspaceFileDialog
+      <CreateWorkspaceFileDialogView
         request={createDialog}
         onOpenChange={open => !open && setCreateDialog(null)}
         onCommit={async (name) => {

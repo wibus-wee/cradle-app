@@ -27,7 +27,9 @@
 - **settings-content-loader.ts**: Settings content 的共享 lazy loader 与 intent preload 入口，供 app shell 和 sidebar 在打开设置前预热
 - **settings-container.tsx**: Settings 布局原语。`SettingsPage` 是居中窄列页面壳（统一 22px 标题 + muted 描述），`SettingsGroup` 是 `bg-card` 分组卡片；`SettingsMasterDetail` 是供 Providers/Agents 这类编辑器过大、无法塞进窄列的 section 使用的全高双栏壳，复用 `SettingsHeader` 与 `SettingsPage` 对齐标题，并把 list/detail 包进同一张 card surface；使用它的 section 必须被 settings-content 标记为 fixed-height。
 - **settings-row.tsx**: Settings 页面复用的分组标题、分隔线与行布局组件；支持在 label 旁挂载轻量 accessory，例如 dev-only badge。
-- **settings-sidebar.tsx**: Settings 侧边栏导航与返回入口，使用面向用户的中文导航标签；记录/Chronicle 入口只在 dev runtime 下展示。
+- **settings-sidebar.tsx**: Settings 导航 adapter，拥有 i18n key、dev-only section 和 Plugin Center navigation action，并把翻译后的导航模型传入 View。
+- **settings-sidebar-view.tsx**: Props-only 可搜索 Settings 导航，拥有 query、filter 和 active-row 本地交互，不读取 route、store 或 i18n context。
+- **settings-surfaces.stories.tsx**: Fixture-driven Settings sidebar、page、group、row 和 common form-state catalog。
 - **settings-sidebar.test.tsx**: Settings 侧边栏返回按钮与导航回调的可访问性回归测试
 - **shortcut-settings.tsx**: Shortcuts 设置页，承载 desktop-owned AppShot bare modifier 全局触发键（Double Command / Double Option / Double Shift）和启停开关；保存后复用 desktop preferences API，并在 Electron 中通过 `native.setDesktopPreferences` 立即同步 mac bridge input configuration。页面下方使用现有 Settings row primitive 只读列举 Cradle 内置 application/contextual 快捷键，不新增 shortcut storage ownership。
 - **support-settings.tsx**: Support 设置页，提供本地 diagnostics JSON 导出、feedback template copy、feedback issue 入口、Cradle-owned server data directory reveal/change 和卸载数据保留说明；更改目录由 Electron main 选择、复制、校验并重启，renderer 不执行文件迁移。Electron bootstrap `userData` 不会随 server root 移动，旧 root 在新 server 健康启动后保留为 `.bak-*`；diagnostics bundle schema 跟随 Observability export contract 验证 events、incidents、errorPatterns、timeline 与 logs；Settings Support 首屏在 feedback template 与控制表面 ready 后记录 performance gate。
