@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { useMemo } from 'react'
 
 import { useSessionBinding } from '../session/use-session-binding'
-import { GroupedToolCallBlock, ToolCallBlock } from './blocks'
+import { GroupedToolCallBlock } from '../tool-blocks/containers/grouped-tool-call-block-container'
+import { ToolCallBlock } from '../tool-blocks/containers/tool-call-block-container'
 import { useChatRenderStore } from './chat-render-store'
 import { toolNameFromPart } from './chat-tool-entities'
 import {

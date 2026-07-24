@@ -1,7 +1,7 @@
 import type { CradleToolKind } from '@cradle/chat-runtime-contracts'
 
-import type { ToolCallBlockViewProps } from '../rendering/blocks/tool-call-block'
-import type { RenderableToolPart, ToolState } from '../rendering/tool-ui-classifier'
+import type { RenderableToolPart, ToolState } from '../../rendering/tool-ui-classifier'
+import type { ToolCallBlockViewProps } from '../views/tool-call-block-view'
 
 type ToolFixtureProps = Omit<
   ToolCallBlockViewProps,
@@ -10,6 +10,7 @@ type ToolFixtureProps = Omit<
   | 'onOpenSubagentOutput'
   | 'onOpenWorkflowSurface'
   | 'onWorkflowSurfaceChange'
+  | 'onOpenPlanDocument'
 >
 
 interface ToolFixtureInput {
@@ -90,11 +91,11 @@ export const chatToolKindFixtures: ChatToolFixture[] = [
     kind: 'file-diff',
     apiName: 'Edit',
     args: {
-      file_path: 'apps/web/src/features/chat/rendering/blocks/tool-call-block.tsx',
+      file_path: 'apps/web/src/features/chat/tool-blocks/views/tool-call-block-view.tsx',
       old_string: 'export function ToolCallBlock(',
       new_string: 'export function ToolCallBlockView(',
     },
-    result: { filePath: 'apps/web/src/features/chat/rendering/blocks/tool-call-block.tsx' },
+    result: { filePath: 'apps/web/src/features/chat/tool-blocks/views/tool-call-block-view.tsx' },
   }),
   createToolFixture({
     kind: 'notebook-diff',
@@ -111,9 +112,9 @@ export const chatToolKindFixtures: ChatToolFixture[] = [
       numMatches: 7,
       mode: 'files_with_matches',
       filenames: [
-        'rendering/blocks/tool-call-block.tsx',
+        'tool-blocks/views/tool-call-block-view.tsx',
         'rendering/message-tool-blocks.tsx',
-        'fixtures/chat-tools.ts',
+        'tool-blocks/fixtures/tool-block-fixtures.ts',
       ],
     },
   }),

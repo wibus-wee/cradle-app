@@ -2,9 +2,10 @@ import { useCallback } from 'react'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
-import type { ToolCallBlockViewProps } from './tool-call-block'
-import { ToolCallBlockView } from './tool-call-block'
-import type { ToolCallBlockProps } from './tool-call-block-types'
+import type { ToolCallBlockProps } from '../lib/tool-call-block-types'
+import type { PlanDocumentOpenInput } from '../views/plan-document-preview-view'
+import type { ToolCallBlockViewProps } from '../views/tool-call-block-view'
+import { ToolCallBlockView } from '../views/tool-call-block-view'
 
 type WorkflowSurfaceChange = Parameters<
   NonNullable<ToolCallBlockViewProps['onWorkflowSurfaceChange']>
@@ -15,6 +16,7 @@ type WorkflowSurfaceOpen = Parameters<
 type SubagentOutputOpen = Parameters<
   NonNullable<ToolCallBlockViewProps['onOpenSubagentOutput']>
 >[0]
+type PlanDocumentOpen = PlanDocumentOpenInput
 
 /** Runtime adapter that connects the props-only tool surface to browser-panel state. */
 export function ToolCallBlock({
@@ -27,6 +29,7 @@ export function ToolCallBlock({
   const openWorkflowTab = useBrowserPanelStore(s => s.openWorkflowTab)
   const updateWorkflowTab = useBrowserPanelStore(s => s.updateWorkflowTab)
   const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
+  const openPlanDocumentTab = useBrowserPanelStore(s => s.openPlanDocumentTab)
 
   const handleOpenWorkspaceDiff = useCallback((path: string) => {
     if (!workspaceDiffTarget) {
@@ -71,6 +74,10 @@ export function ToolCallBlock({
     })
   }, [sessionId, updateWorkflowTab])
 
+  const handleOpenPlanDocument = useCallback((input: PlanDocumentOpen) => {
+    openPlanDocumentTab(input)
+  }, [openPlanDocumentTab])
+
   return (
     <ToolCallBlockView
       {...viewProps}
@@ -78,6 +85,7 @@ export function ToolCallBlock({
       onOpenSubagentOutput={sessionId ? handleOpenSubagentOutput : undefined}
       onOpenWorkflowSurface={handleOpenWorkflowSurface}
       onWorkflowSurfaceChange={handleWorkflowSurfaceChange}
+      onOpenPlanDocument={handleOpenPlanDocument}
     />
   )
 }

@@ -11,11 +11,11 @@ import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
-import { hasTerminalDetails } from '../terminal-tool-details'
-import { PLURAL_TITLES, STATUS_LABELS, TOOL_ICON_MAP } from '../tool-block-constants'
-import { basename, readFirstLine } from '../tool-block-utils'
-import type { RenderableToolPart, ToolState, ToolUiKind } from '../tool-ui-classifier'
-import { describeToolCall, readToolInputPayload, readToolPayload } from '../tool-ui-classifier'
+import { hasTerminalDetails } from '../../rendering/terminal-tool-details'
+import { PLURAL_TITLES, STATUS_LABELS, TOOL_ICON_MAP } from '../../rendering/tool-block-constants'
+import { basename, readFirstLine } from '../../rendering/tool-block-utils'
+import type { RenderableToolPart, ToolState, ToolUiKind } from '../../rendering/tool-ui-classifier'
+import { describeToolCall, readToolInputPayload, readToolPayload } from '../../rendering/tool-ui-classifier'
 import {
   FileDiffExecutionDetails,
   hasFileDiffInlineContent,

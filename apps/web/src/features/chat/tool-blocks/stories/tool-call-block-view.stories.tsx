@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useCallback, useState } from 'react'
 
-import type { ChatToolFixture } from '../../fixtures/chat-tools'
+import type { ChatToolFixture } from '../fixtures/tool-block-fixtures'
 import {
   chatToolKindFixtures,
   chatToolStateFixtures,
   chatWorkflowToolFixture,
   groupedFileToolFixtures,
   groupedTerminalToolFixtures,
-} from '../../fixtures/chat-tools'
-import { GroupedToolCallBlockView } from './grouped-tool-call-block'
-import { ToolCallBlockView } from './tool-call-block'
+} from '../fixtures/tool-block-fixtures'
+import { GroupedToolCallBlockView } from '../views/grouped-tool-call-block-view'
+import { ToolCallBlockView } from '../views/tool-call-block-view'
 
 function ToolFixtureRow({
   fixture,
@@ -30,6 +30,7 @@ function ToolFixtureRow({
         onOpenWorkspaceDiff={path => onActivity(`diff: ${path}`)}
         onOpenSubagentOutput={input => onActivity(`subagent: ${input.agentName}`)}
         onOpenWorkflowSurface={input => onActivity(`workflow: ${input.title}`)}
+        onOpenPlanDocument={input => onActivity(`plan: ${input.toolCallId}`)}
       />
     </div>
   )

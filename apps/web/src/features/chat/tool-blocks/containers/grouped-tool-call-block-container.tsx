@@ -2,8 +2,8 @@ import { useCallback } from 'react'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
-import type { GroupedToolCallBlockViewProps } from './grouped-tool-call-block'
-import { GroupedToolCallBlockView } from './grouped-tool-call-block'
+import type { GroupedToolCallBlockViewProps } from '../views/grouped-tool-call-block-view'
+import { GroupedToolCallBlockView } from '../views/grouped-tool-call-block-view'
 
 /** Runtime adapter that connects grouped file actions to browser-panel state. */
 export function GroupedToolCallBlock({

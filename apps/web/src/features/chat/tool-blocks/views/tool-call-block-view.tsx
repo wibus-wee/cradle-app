@@ -20,19 +20,21 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
-import { readBuiltinToolCallInputPayload } from '../chat-tool-entities'
-import { readTerminalOutputSections } from '../terminal-tool-details'
-import { STATUS_LABELS, TOOL_ICON_MAP } from '../tool-block-constants'
+import { EditFileBlock } from '../../rendering/blocks/edit-file-block'
+import { readBuiltinToolCallInputPayload } from '../../rendering/chat-tool-entities'
+import { readTerminalOutputSections } from '../../rendering/terminal-tool-details'
+import { STATUS_LABELS, TOOL_ICON_MAP } from '../../rendering/tool-block-constants'
 import type {
   RenderableToolPart,
   ToolPayload,
   ToolState,
   ToolUiDescriptor,
-} from '../tool-ui-classifier'
-import { describeToolCall, readToolInputPayload, readToolPayload } from '../tool-ui-classifier'
-import { hasWorkflowDetails, readWorkflowSurfaceSnapshot } from '../workflow-surface'
-import { EditFileBlock } from './edit-file-block'
-import type { ToolCallBlockProps } from './tool-call-block-types'
+} from '../../rendering/tool-ui-classifier'
+import { describeToolCall, readToolInputPayload, readToolPayload } from '../../rendering/tool-ui-classifier'
+import { hasWorkflowDetails, readWorkflowSurfaceSnapshot } from '../../rendering/workflow-surface'
+import type { ToolCallBlockProps } from '../lib/tool-call-block-types'
+import { hasHeroContent } from '../lib/tool-hero-content'
+import type { PlanDocumentOpenInput } from './plan-document-preview-view'
 import {
   DetailSection,
   FileDiffExecutionDetails,
@@ -43,8 +45,7 @@ import {
   readFileDiffTarget,
   TerminalExecutionDetails,
 } from './tool-call-details'
-import { ToolHero, WorkflowPhaseList } from './tool-hero'
-import { hasHeroContent } from './tool-hero-content'
+import { ToolHeroView, WorkflowPhaseList } from './tool-hero-view'
 
 // ---------------------------------------------------------------------------
 // Local helpers
@@ -329,6 +330,7 @@ export type ToolCallBlockViewProps = Omit<
     toolCallId: string
     surface: WorkflowSurface
   }) => void
+  onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
 }
 
 /** Props-only tool surface. Browser-panel orchestration stays in ToolCallBlock. */
@@ -347,6 +349,7 @@ export function ToolCallBlockView({
   onOpenSubagentOutput,
   onOpenWorkflowSurface,
   onWorkflowSurfaceChange,
+  onOpenPlanDocument,
   children,
 }: ToolCallBlockViewProps) {
   const inputPayload = readToolInputPayload(input, argumentsText)
@@ -612,13 +615,14 @@ export function ToolCallBlockView({
         {!hasWorkflowPanel && (!hasStructuredPanel || !expanded)
           && hasHeroContent(descriptor, inputPayload, outputPayload, errorText) && (
             <div className="px-3 pb-3">
-              <ToolHero
+              <ToolHeroView
                 descriptor={descriptor}
                 state={state}
                 input={inputPayload}
                 output={outputPayload}
                 errorText={errorText}
                 toolCallId={toolCallId}
+                onOpenPlanDocument={onOpenPlanDocument}
               />
             </div>
           )}

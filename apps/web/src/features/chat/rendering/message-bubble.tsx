@@ -46,19 +46,24 @@ import {
   SteerMessageLabel,
   ThinkingPlaceholder,
 } from './message-bubble-chrome'
-import type { MessageFrame, MessageTextTransform } from './message-bubble-selectors'
+import type {
+  MessageFrame,
+  MessageImageAttachment,
+  MessageTextTransform,
+} from './message-bubble-selectors'
 import {
   areMessageFramesEqual,
+  areMessageImageAttachmentsEqual,
   areRenderSegmentsEqual,
   hasActiveNonTextProgress,
   hasActiveNonTextSegmentProgress,
   isCodexGoalUserMessage,
   readActiveStreamingItemKey,
   readActiveStreamingSegmentKey,
-  readFilePartFromState,
   readMarkdownAnchorProps,
   readMessageDisplayText,
   readMessageFrameFromState,
+  readMessageImageAttachmentsFromState,
   readPlainTextFromState,
   readPlainTextLengthFromState,
   readPlainTextPresenceFromState,
@@ -461,6 +466,7 @@ const MessageBubbleSegmentsView = ({
   frame,
   segments,
   isStreaming,
+  imageAttachments,
   onToolApprovalResponse,
   editAction,
   textTransform,
@@ -469,11 +475,11 @@ const MessageBubbleSegmentsView = ({
   frame: MessageFrame
   segments: ChatRenderSegment[]
   isStreaming: boolean
+  imageAttachments: MessageImageAttachment[]
   onToolApprovalResponse?: MessageBubbleProps['onToolApprovalResponse']
   editAction?: MessageBubbleEditAction
   textTransform?: MessageTextTransform
 }) => {
-  const chatStore = useChatRenderStoreApi()
   const isUser = frame.role === 'user'
   const isAssistant = frame.role === 'assistant'
   const activeStreamingSegmentKey
@@ -489,40 +495,19 @@ const MessageBubbleSegmentsView = ({
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
-  const imageSegments = (() => {
-    return segments
-      .map((segment, index) => ({ segment, index }))
-      .filter(({ segment }) => {
-        if (segment.kind !== 'file-attachment') {
-          return false
-        }
-        const part = readFilePartFromState(
-          chatStore.getState(),
-          sessionId,
-          segment.messageId,
-          segment.partIndex,
-        )
-        return part?.mediaType.startsWith('image/')
-      })
-  })()
-
-  const lightboxImages = (() => {
-    return imageSegments.map(({ segment }) => {
-      if (segment.kind !== 'file-attachment') {
-        return { url: '', alt: '' }
-      }
-      const part = readFilePartFromState(
-        chatStore.getState(),
-        sessionId,
-        segment.messageId,
-        segment.partIndex,
-      )
-      return {
-        url: part?.url ?? '',
-        alt: part?.filename ?? part?.mediaType ?? 'Image',
-      }
-    })
-  })()
+  const imageAttachmentBySegmentKey = new Map(
+    imageAttachments.map(attachment => [attachment.segmentKey, attachment.part]),
+  )
+  const imageSegments = segments
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => imageAttachmentBySegmentKey.has(segment.key))
+  const lightboxImages = imageSegments.map(({ segment }) => {
+    const part = imageAttachmentBySegmentKey.get(segment.key)
+    return {
+      url: part?.url ?? '',
+      alt: part?.filename ?? part?.mediaType ?? 'Image',
+    }
+  })
 
   const handleImageClick = (segmentIndex: number) => {
     const imageIndex = imageSegments.findIndex(({ index }) => index === segmentIndex)
@@ -554,20 +539,7 @@ const MessageBubbleSegmentsView = ({
     let imageBuffer: Array<{ segment: ChatRenderSegment, index: number }> = []
 
     segs.forEach((segment, index) => {
-      const isImage
-        = segment.kind === 'file-attachment'
-          && (() => {
-          if (segment.kind !== 'file-attachment') {
-            return false
-          }
-          const part = readFilePartFromState(
-            chatStore.getState(),
-            sessionId,
-            segment.messageId,
-            segment.partIndex,
-          )
-          return part?.mediaType.startsWith('image/')
-        })()
+      const isImage = imageAttachmentBySegmentKey.has(segment.key)
 
       if (isImage) {
         imageBuffer.push({ segment, index })
@@ -741,6 +713,10 @@ export const MessageBubbleById = ({
     chatSelectors.isVisibleStreamingMessage(storeSessionId, messageId),
     (a, b) => a === b,
   )
+  const imageAttachments = useChatRenderStore(
+    state => readMessageImageAttachmentsFromState(state, storeSessionId, segments),
+    areMessageImageAttachmentsEqual,
+  )
 
   if (!frame) {
     return null
@@ -752,6 +728,7 @@ export const MessageBubbleById = ({
       frame={frame}
       segments={segments}
       isStreaming={isStreaming}
+      imageAttachments={imageAttachments}
       onToolApprovalResponse={onToolApprovalResponse}
       editAction={editAction}
       textTransform={textTransform}

@@ -1,6 +1,6 @@
 import { projectChatTodos } from '../../capabilities/chat-todo-projection'
-import type { ToolPayload, ToolUiDescriptor } from '../tool-ui-classifier'
-import { hasDiffHeroContent } from './tool-call-details'
+import type { ToolPayload, ToolUiDescriptor } from '../../rendering/tool-ui-classifier'
+import { hasDiffHeroContent } from '../views/tool-call-details'
 
 export function hasHeroContent(
   descriptor: ToolUiDescriptor,
