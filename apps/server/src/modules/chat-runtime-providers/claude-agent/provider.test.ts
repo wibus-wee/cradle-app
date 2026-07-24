@@ -344,6 +344,14 @@ function readQueryOptions(callIndex: number): Record<string, unknown> {
   return call!.options!
 }
 
+/** Session Query uses an AsyncIterable prompt; title generation uses a string prompt. */
+function countLongLivedSessionQueryCalls(): number {
+  return sdkMocks.query.mock.calls.filter((call) => {
+    const prompt = (call[0] as { prompt?: unknown } | undefined)?.prompt
+    return prompt !== null && typeof prompt === 'object'
+  }).length
+}
+
 function requireCanUseTool(value: CanUseTool | null): CanUseTool {
   if (!value) {
     throw new Error('Claude Agent query options did not include canUseTool')
@@ -1696,7 +1704,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         // Drain stream.
       }
 
-      expect(sdkMocks.query).toHaveBeenCalledOnce()
+      expect(countLongLivedSessionQueryCalls()).toBe(1)
       expect(readActiveQuery().setPermissionMode).toHaveBeenCalledWith('bypassPermissions')
       await expect(
         originalCanUseTool(
@@ -1997,7 +2005,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         // Drain stream.
       }
 
-      expect(sdkMocks.query).toHaveBeenCalledOnce()
+      expect(countLongLivedSessionQueryCalls()).toBe(1)
       expect(readActiveQuery().applyFlagSettings).toHaveBeenCalledWith({
         effortLevel: null,
         ultracode: false,
@@ -2087,7 +2095,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         // Drain stream.
       }
 
-      expect(sdkMocks.query).toHaveBeenCalledOnce()
+      expect(countLongLivedSessionQueryCalls()).toBe(1)
       expect(readActiveQuery().setPermissionMode).toHaveBeenCalledWith('default')
       await expect(
         originalCanUseTool(
@@ -4017,6 +4025,72 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.dispose()
   })
 
+  it('keeps post-empty-result top-level output on the same user turn (no main synthetic)', async () => {
+    // Regression for empty/early top-level `result` clearing currentTurn, then later
+    // assistant work opening an origin:system synthetic run (b13→e11 failure mode).
+    const prompts: unknown[] = []
+    sdkMocks.query.mockImplementation(
+      (call: { prompt?: AsyncIterable<{ message: { content: unknown } }> }) => {
+        expect(call.prompt).toBeDefined()
+        return createPromptDrivenQuery(
+          call.prompt!,
+          [
+            [
+              {
+                type: 'result',
+                session_id: 'claude-session-empty-result-continue',
+                usage: { input_tokens: 1, output_tokens: 0 },
+              },
+              {
+                type: 'assistant',
+                session_id: 'claude-session-empty-result-continue',
+                message: {
+                  content: [{ type: 'text', text: 'Real work after empty result' }],
+                },
+              },
+              {
+                type: 'result',
+                session_id: 'claude-session-empty-result-continue',
+                usage: { input_tokens: 2, output_tokens: 4 },
+              },
+            ],
+          ],
+          prompts,
+        )
+      },
+    )
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const runtimeSession = createRuntimeSession()
+    const syntheticEvents: ProviderSyntheticTurnEvent[] = []
+    const chunks: UIMessageChunk[] = []
+    for await (const chunk of provider.streamTurn({
+      runId: 'run-claude-agent-empty-result-continue',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Continue after empty result'),
+      workspaceId: 'workspace-1',
+      onProviderSyntheticTurnEvent: (event) => {
+        syntheticEvents.push(event)
+      },
+    })) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'text-delta',
+          delta: 'Real work after empty result',
+        }),
+        expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
+      ]),
+    )
+    expect(syntheticEvents).toEqual([])
+  })
+
   it('keeps task notifications out of the main turn and persists the following top-level reply', async () => {
     const prompts: unknown[] = []
     sdkMocks.query.mockImplementation(
@@ -4691,14 +4765,39 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
   })
 
   it('releases the Claude turn before yielding its native result terminal chunk', async () => {
-    const activeQuery = createControllableQuery()
-    let resolveContextUsage: ((value: SDKControlGetContextUsageResponse) => void) | undefined
-    activeQuery.getContextUsage.mockImplementation(
-      () => new Promise<SDKControlGetContextUsageResponse>((resolve) => {
-        resolveContextUsage = resolve
-      }),
+    // Empty success `result` with no projected output is deferred until the SDK
+    // parks on the next prompt pull. Use a prompt-driven query so idle matches
+    // the real Query (controllable mocks never pull the input stream).
+    const prompts: unknown[] = []
+    sdkMocks.query.mockImplementation(
+      (call: { prompt?: AsyncIterable<{ message: { content: unknown }, shouldQuery?: boolean }> }) => {
+        expect(call.prompt).toBeDefined()
+        return createPromptDrivenQuery(
+          call.prompt!,
+          [
+            [
+              {
+                type: 'result',
+                subtype: 'success',
+                uuid: randomUUID(),
+                session_id: 'claude-session-result-release',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+            ],
+            [
+              {
+                type: 'result',
+                subtype: 'success',
+                uuid: randomUUID(),
+                session_id: 'claude-session-result-release',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+            ],
+          ],
+          prompts,
+        )
+      },
     )
-    sdkMocks.query.mockReturnValue(activeQuery)
 
     const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
     const runtimeSession = createRuntimeSession()
@@ -4712,17 +4811,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     const firstTerminal = firstStream.next()
 
     await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
-    await expect(readPromptText(0)).resolves.toBe('First task')
-    activeQuery.push({
-      type: 'result',
-      subtype: 'success',
-      uuid: randomUUID(),
-      session_id: 'claude-session-result-release',
-      usage: { input_tokens: 1, output_tokens: 1 },
-    })
     await expect(firstTerminal).resolves.toEqual(
       expect.objectContaining({ value: expect.objectContaining({ type: 'finish' }) }),
     )
+    expect(prompts).toEqual(['First task'])
 
     const secondStream = provider.streamTurn({
       runId: 'run-claude-agent-result-release-2',
@@ -4733,22 +4825,13 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
     const secondTerminal = secondStream.next()
 
-    await expect(readPromptText(0)).resolves.toBe('Second task')
-    activeQuery.push({
-      type: 'result',
-      subtype: 'success',
-      uuid: randomUUID(),
-      session_id: 'claude-session-result-release',
-      usage: { input_tokens: 1, output_tokens: 1 },
-    })
     await expect(secondTerminal).resolves.toEqual(
       expect.objectContaining({ value: expect.objectContaining({ type: 'finish' }) }),
     )
+    expect(prompts).toEqual(['First task', 'Second task'])
 
-    resolveContextUsage?.(createContextUsageResponse())
     await firstStream.return(undefined)
     await secondStream.return(undefined)
-    activeQuery.close()
     await provider.dispose()
   })
 
