@@ -10,7 +10,7 @@ export const health = new Elysia({
   .get('', () => Health.check(), {
     detail: {
       'summary': 'Health check',
-      'description': 'Server liveness snapshot',
+      'description': 'Server readiness snapshot',
       'x-cradle-cli': {
         command: ['health'],
       },

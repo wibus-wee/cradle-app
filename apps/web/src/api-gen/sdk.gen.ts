@@ -54,7 +54,7 @@ export const postAuthBrowserSession = <ThrowOnError extends boolean = false>(opt
 /**
  * Health check
  *
- * Server liveness snapshot
+ * Server readiness snapshot
  */
 export const getHealth = <ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>) => (options?.client ?? client).get<GetHealthResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
