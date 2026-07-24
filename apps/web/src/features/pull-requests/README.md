@@ -28,12 +28,21 @@ models for this surface.
 
 ## Files
 
-- `pull-requests-page.tsx` - list surface: role tabs, search, recency
-  grouping, row rendering (status icon, CI check dot, author, branch, diff
-  stat).
-- `pull-request-detail-panel.tsx` - generic detail panel rendered in the
-  Browser Panel, addressed by `owner/repo/number`. Shows an "Open Work"
-  action only when the PR is Work-bound.
+- `pull-requests-page.tsx` - list Container: owns queries, prefetch, Browser
+  Panel navigation, and layout slots.
+- `pull-requests-page-view.tsx` - fixture-driven list View: owns local role
+  filtering, search, recency grouping, and loading/auth/empty presentation.
+- `pull-request-*-view.tsx` - focused props-only row, filter, recency,
+  summary, timeline, check, people, and code-diff rendering modules.
+- `pull-request-detail-panel.tsx` - Browser Panel Container: owns detail
+  query/refetch and Work navigation for `owner/repo/number`.
+- `pull-request-detail-panel-view.tsx` - fixture-driven detail View: owns
+  local tabs and composes summary, timeline, and changed-file Views.
+- `fixtures/pull-requests.ts` - owner-typed deterministic list and detail
+  fixtures; injected `now` values keep recency and relative timestamps stable.
+- `pull-requests-page-view.stories.tsx` and
+  `pull-request-detail-panel-view.stories.tsx` - server-free populated,
+  loading, empty, auth-required, summary, timeline, and code scenes.
 - `use-pull-requests.ts` - drives the paginated authored/reviewing feeds and
   joins them with Work summaries to derive `role` and the optional Work
   overlay.
