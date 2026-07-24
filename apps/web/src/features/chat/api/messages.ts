@@ -1,6 +1,7 @@
 import { infiniteQueryOptions } from '@tanstack/react-query'
 
 import {
+  getChatSessionsBySessionIdMessagesByMessageIdOptions,
   getChatSessionsBySessionIdMessagesInfiniteQueryKey,
   getChatSessionsBySessionIdMessagesOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
@@ -19,6 +20,12 @@ export function chatMessageSnapshotQueryOptions(sessionId: string) {
   return getChatSessionsBySessionIdMessagesOptions({
     path: { sessionId },
     query: { limit: CHAT_MESSAGE_HISTORY_PAGE_SIZE },
+  })
+}
+
+export function chatMessageDetailQueryOptions(sessionId: string, messageId: string) {
+  return getChatSessionsBySessionIdMessagesByMessageIdOptions({
+    path: { sessionId, messageId },
   })
 }
 

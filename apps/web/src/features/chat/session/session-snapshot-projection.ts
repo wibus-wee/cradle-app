@@ -5,6 +5,7 @@ import type { ChatRunState, PassiveRunStateInput } from '~/store/chat'
 import type { ChatSessionMessageRow } from './use-chat-session-types'
 import {
   derivePassiveStatus,
+  isChatMessageShell,
   isChatRunStateCancelling,
   isChatRunStateLocallyDriven,
   projectMainMessagesFromSnapshotRows,
@@ -74,7 +75,10 @@ export function deriveSessionSnapshotProjection(
     ? 'streaming'
     : derivePassiveStatus(input.rows)
 
-  const messages = projectMainMessagesFromSnapshotRows(input.rows)
+  const messages = projectMainMessagesFromSnapshotRows(input.rows).map((message) => {
+    const existing = input.existingMessages.find(candidate => candidate.id === message.id)
+    return existing && !isChatMessageShell(existing) ? existing : message
+  })
   const liveMessage = input.runtimeActiveRunMessageId
     ? input.existingMessages.find(message => message.id === input.runtimeActiveRunMessageId)
     : undefined

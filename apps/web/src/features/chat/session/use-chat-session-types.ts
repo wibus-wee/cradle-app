@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 
+import type { GetChatSessionsBySessionIdMessagesResponse } from '~/api-gen/types.gen'
 import type { ChatRunState } from '~/store/chat'
 import { useChatStore } from '~/store/chat'
 
@@ -8,18 +9,7 @@ import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status
 
 // ── Message Snapshot Types ──────────────────────────────────
 
-export interface ChatSessionMessageRow {
-  messageId: string
-  role: 'user' | 'assistant'
-  status: string
-  errorText?: string | null
-  content: string
-  message: UIMessage
-  parentMessageId: string | null
-  parentToolCallId: string | null
-  taskId: string | null
-  depth: number
-}
+export type ChatSessionMessageRow = GetChatSessionsBySessionIdMessagesResponse['rows'][number]
 export type { ChatContinuationMode, ChatQueueItem }
 
 export interface SendMessageOptions {
@@ -56,8 +46,29 @@ export function projectMainMessagesFromSnapshotRows(rows: ChatSessionMessageRow[
     if (row.parentToolCallId) {
       return []
     }
-    return [row.message]
+    return [createChatMessageShell(row)]
   })
+}
+
+const CHAT_MESSAGE_SHELL_METADATA_KEY = 'historyShell'
+
+export function isChatMessageShell(message: UIMessage): boolean {
+  const metadata = message.metadata as { cradle?: { historyShell?: unknown } } | undefined
+  return metadata?.cradle?.[CHAT_MESSAGE_SHELL_METADATA_KEY] === true
+}
+
+function createChatMessageShell(row: ChatSessionMessageRow): UIMessage {
+  return {
+    id: row.messageId,
+    role: row.role,
+    parts: row.preview ? [{ type: 'text', text: row.preview }] : [],
+    metadata: {
+      cradle: {
+        [CHAT_MESSAGE_SHELL_METADATA_KEY]: true,
+        previewTruncated: row.previewTruncated,
+      },
+    },
+  }
 }
 
 export function projectStreamingMainAssistantMessageIds(rows: ChatSessionMessageRow[]): string[] {

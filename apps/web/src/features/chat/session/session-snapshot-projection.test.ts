@@ -28,24 +28,19 @@ function message(input: {
 function row(input: {
   id: string
   role: 'user' | 'assistant'
-  status?: string
+  status?: ChatSessionMessageRow['status']
   text?: string
   parts?: UIMessage['parts']
-  errorText?: string | null
+  errorText?: string
   parentToolCallId?: string | null
 }): ChatSessionMessageRow {
   return {
     messageId: input.id,
     role: input.role,
     status: input.status ?? 'complete',
-    errorText: input.errorText ?? null,
-    content: input.text ?? '',
-    message: message({
-      id: input.id,
-      role: input.role,
-      text: input.text,
-      parts: input.parts,
-    }),
+    errorText: input.errorText,
+    preview: input.text ?? '',
+    previewTruncated: false,
     parentMessageId: null,
     parentToolCallId: input.parentToolCallId ?? null,
     taskId: null,
@@ -82,7 +77,7 @@ describe('session snapshot projection', () => {
     const projection = deriveSessionSnapshotProjection({
       rows: [
         row({ id: 'user-1', role: 'user', text: 'Question' }),
-        row({ id: 'assistant-empty', role: 'assistant', status: 'streaming', parts: [] }),
+        row({ id: 'assistant-empty', role: 'assistant', status: 'streaming' }),
       ],
       runState: idleRunState,
       existingMessages: [],

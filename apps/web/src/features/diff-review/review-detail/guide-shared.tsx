@@ -122,20 +122,7 @@ export function useGuideStreamingOutput(sessionId: string | null, active: boolea
     if (!row) {
       return null
     }
-    const parts = row.message?.parts ?? []
-    let combined = ''
-    for (const part of parts) {
-      if (part.type === 'text') {
-        combined += part.text
-      }
-      else if (part.type === 'reasoning') {
-        const reasoningText = (part as { text?: string }).text
-        if (reasoningText) {
-          combined += reasoningText
-        }
-      }
-    }
-    return combined.trim() || null
+    return row.preview.trim() || null
   }, [messagesQuery.data])
 }
 
