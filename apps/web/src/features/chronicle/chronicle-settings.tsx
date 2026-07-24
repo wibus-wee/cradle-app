@@ -1,7 +1,5 @@
 import {
   HeartbeatLine as ActivityIcon,
-  Key2Line as KeyRoundIcon,
-  Message1Line as MessageSquareIcon,
   PicLine as ImageIcon,
   Refresh1Line as RefreshCwIcon,
   WarningLine as TriangleAlertIcon,
@@ -14,7 +12,6 @@ import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { Textarea } from '~/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
@@ -25,7 +22,6 @@ import type { ProviderModelOption } from '~/features/composer-toolbar/types'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
-import { getServerUrl } from '~/lib/electron'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import {
@@ -59,6 +55,9 @@ import {
   ChronicleResourceGridContainer,
 } from './chronicle-resource-grid-container'
 import {
+  ChronicleSlackSourceContainer,
+} from './chronicle-slack-source-container'
+import {
   ChronicleSpeakerProfileGridView,
 } from './chronicle-speaker-profile-grid-view'
 import {
@@ -68,15 +67,10 @@ import {
   ChronicleStatusPanelView,
 } from './chronicle-status-panel-view'
 import {
-  formatChronicleRelativeTime as formatRelativeTime,
-} from './chronicle-time-presenter'
-import {
   ChronicleTimelineFeedContainer,
 } from './chronicle-timeline-feed-container'
 import type {
   ChronicleConfig,
-  ChronicleMessageSource,
-  ChronicleSlackSourceDraft,
 } from './use-chronicle.ts'
 import {
   useChronicleAccessibilityEvents,
@@ -94,7 +88,6 @@ import {
   useChronicleMessageSources,
   useChronicleModelResources,
   useChroniclePipelineRuns,
-  useChronicleSlackSourceActions,
   useChronicleSpeakerProfiles,
   useChronicleStatus,
   useChronicleTimeline,
@@ -638,7 +631,10 @@ export function ChronicleSettings() {
           </section>
 
           <SettingsRow label={t('advanced.messageSources.title')} description={t('advanced.messageSources.description')} vertical>
-            <SlackSourcePanel loading={messageSourcesLoading} sources={messageSources} />
+            <ChronicleSlackSourceContainer
+              loading={messageSourcesLoading}
+              sources={messageSources}
+            />
           </SettingsRow>
           <div className="border-t border-border/60" />
 
@@ -1049,184 +1045,4 @@ function parsePrivacyRuleLines(value: string): string[] {
 
 function stringListsEqual(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index])
-}
-
-function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: ChronicleMessageSource[] }) {
-  const { t } = useTranslation('chronicle')
-  const { saveSource, syncSource, saving, syncing } = useChronicleSlackSourceActions()
-  const [draft, setDraft] = useState<ChronicleSlackSourceDraft>({
-    label: 'Slack',
-    token: '',
-    signingSecret: '',
-    channelIds: '',
-    enabled: true,
-    realtimeMode: 'events-api',
-  })
-  const [lastSyncMessage, setLastSyncMessage] = useState<string | null>(null)
-  const canSave = draft.label.trim().length > 0
-    && draft.token.trim().length > 0
-    && draft.channelIds.trim().length > 0
-    && (draft.realtimeMode !== 'events-api' || draft.signingSecret.trim().length > 0)
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-foreground/5 bg-background p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <MessageSquareIcon className="size-3.5 !text-muted-foreground" />
-          <span className="text-[13px] font-medium text-foreground">{t('slack.title')}</span>
-          <Badge variant="outline" className="ml-auto text-[11px]">
-            {sources.length === 0 ? t('common.status.disconnected') : t('slack.sourceCount', { count: sources.length })}
-          </Badge>
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-2">
-          <Input
-            value={draft.label}
-            onChange={event => setDraft(current => ({ ...current, label: event.target.value }))}
-            placeholder={t('slack.placeholder.label')}
-            className="h-9 text-[13px]"
-          />
-          <Input
-            value={draft.channelIds}
-            onChange={event => setDraft(current => ({ ...current, channelIds: event.target.value }))}
-            placeholder={t('slack.placeholder.channelIds')}
-            className="h-9 font-mono text-[13px]"
-          />
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <ToggleGroup
-            type="single"
-            value={draft.realtimeMode}
-            onValueChange={(value) => {
-              if (value === 'polling' || value === 'events-api') {
-                setDraft(current => ({ ...current, realtimeMode: value }))
-              }
-            }}
-            variant="outline"
-            size="sm"
-            spacing={0}
-          >
-            <ToggleGroupItem value="events-api" aria-label="Slack Events API" className="h-8 px-2 text-[12px]">
-              Events API
-            </ToggleGroupItem>
-            <ToggleGroupItem value="polling" aria-label={t('slack.mode.pollingAriaLabel')} className="h-8 px-2 text-[12px]">
-              {t('slack.mode.polling')}
-            </ToggleGroupItem>
-          </ToggleGroup>
-          <span className="text-[12px] text-muted-foreground">
-            {draft.realtimeMode === 'events-api' ? t('slack.mode.eventsDescription') : t('slack.mode.pollingDescription')}
-          </span>
-        </div>
-
-        <div className="mt-2 flex gap-2">
-          <div className="relative min-w-0 flex-1">
-            <KeyRoundIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 !text-muted-foreground/60" />
-            <Input
-              value={draft.token}
-              type="password"
-              onChange={event => setDraft(current => ({ ...current, token: event.target.value }))}
-              placeholder="xoxb- Slack bot token"
-              className="h-9 pl-8 font-mono text-[13px]"
-            />
-          </div>
-          {draft.realtimeMode === 'events-api' && (
-            <div className="relative min-w-0 flex-1">
-              <KeyRoundIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 !text-muted-foreground/60" />
-              <Input
-                value={draft.signingSecret}
-                type="password"
-                onChange={event => setDraft(current => ({ ...current, signingSecret: event.target.value }))}
-                placeholder="Slack signing secret"
-                className="h-9 pl-8 font-mono text-[13px]"
-              />
-            </div>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!canSave || saving}
-            onClick={() => {
-              void saveSource(draft).then(() => {
-                setDraft({ label: 'Slack', token: '', signingSecret: '', channelIds: '', enabled: true, realtimeMode: 'events-api' })
-              })
-            }}
-          >
-            {t('common.action.save')}
-          </Button>
-        </div>
-
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          {t('slack.secretHelp')}
-        </p>
-      </div>
-
-      {loading
-        ? <ChronicleEmptyState icon={<MessageSquareIcon className="size-4" />} title={t('slack.loading')} />
-        : sources.length === 0
-          ? <ChronicleEmptyState icon={<MessageSquareIcon className="size-4" />} title={t('slack.empty')} />
-          : (
-              <div className="flex flex-col gap-2">
-                {sources.map(source => (
-                  <div key={source.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <MessageSquareIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-                      <span className="truncate text-[13px] font-medium text-foreground">{source.label}</span>
-                      <Badge variant="outline" className="ml-auto text-[11px]">{source.status}</Badge>
-                    </div>
-                    <div className="mt-2 grid gap-1 text-[12px] text-muted-foreground md:grid-cols-2">
-                      <span className="truncate font-mono">{source.channelIds.join(', ') || t('slack.noChannels')}</span>
-                      <span className="truncate md:text-right">
-                        {t('slack.lastMessage')}
-                        {' '}
-                        {formatRelativeTime(t, source.lastMessageAt)}
-                      </span>
-                      <span className="truncate">
-                        {t('slack.mode.label')}
-                        {' '}
-                        {formatSlackRealtimeMode(t, source.realtimeMode)}
-                      </span>
-                      <span className="truncate font-mono md:text-right">
-                        {source.realtimeMode === 'events-api'
-                          ? `${getServerUrl()}/chronicle/message-sources/${source.id}/slack/events`
-                          : t('slack.pollingEnabled')}
-                      </span>
-                      {source.lastError && <span className="truncate text-destructive md:col-span-2">{source.lastError}</span>}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={syncing || source.status === 'syncing'}
-                        onClick={() => {
-                          void syncSource(source.id).then((result) => {
-                            setLastSyncMessage(`${result.message}; ${result.ingested} imported`)
-                          })
-                        }}
-                      >
-                        <RefreshCwIcon className="size-3.5" />
-                        {t('common.action.sync')}
-                      </Button>
-                      <span className="text-[12px] text-muted-foreground">
-                        {t('slack.lastSync')}
-                        {' '}
-                        {formatRelativeTime(t, source.lastSyncAt)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-      {lastSyncMessage && <p className="text-[12px] text-muted-foreground">{lastSyncMessage}</p>}
-    </div>
-  )
-}
-
-function formatSlackRealtimeMode(t: ChronicleTranslate, mode: ChronicleMessageSource['realtimeMode']): string {
-  if (mode === 'events-api') { return 'Events API' }
-  if (mode === 'socket-mode') { return 'Socket Mode' }
-  return t('slack.mode.polling')
 }
