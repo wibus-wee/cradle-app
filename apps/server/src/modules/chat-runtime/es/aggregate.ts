@@ -1,7 +1,11 @@
 import type { UIMessage } from 'ai'
 
 import type { ChatMessageStatus } from '../run/stream-chunks'
-import type { QueueProjectionStatus, StoredChatSessionEvent } from './events'
+import type {
+  ChatSessionHeaderEvent,
+  QueueProjectionStatus,
+  StoredChatSessionEvent,
+} from './events'
 
 export interface ActiveRunFact {
   runId: string
@@ -181,3 +185,104 @@ export function evolveChatSessionState(
 }
 
 export const evolve = evolveChatSessionState
+
+/**
+ * Reference-only state for history shells. This is intentionally separate from
+ * `ChatSessionState`: command and recovery callers require hydrated events.
+ */
+export interface ChatSessionHeaderState {
+  aggregateId: string
+  version: number
+  activeRun: ActiveRunFact | null
+  messageStatusById: Map<string, ChatMessageStatus>
+  runOriginById: Map<string, 'user' | 'issue-agent' | 'system'>
+  runMessageIdById: Map<string, string | null>
+  runStatusById: Map<string, ChatMessageStatus>
+}
+
+export function createInitialChatSessionHeaderState(aggregateId = ''): ChatSessionHeaderState {
+  return {
+    aggregateId,
+    version: 0,
+    activeRun: null,
+    messageStatusById: new Map(),
+    runOriginById: new Map(),
+    runMessageIdById: new Map(),
+    runStatusById: new Map(),
+  }
+}
+
+export function reduceChatSessionEventHeaders(
+  events: ChatSessionHeaderEvent[],
+): ChatSessionHeaderState {
+  let state = createInitialChatSessionHeaderState(events[0]?.aggregateId ?? '')
+  for (const event of events) {
+    state = evolveChatSessionHeaderState(state, event)
+  }
+  return state
+}
+
+export function evolveChatSessionHeaderState(
+  state: ChatSessionHeaderState,
+  event: ChatSessionHeaderEvent,
+): ChatSessionHeaderState {
+  state.aggregateId = event.aggregateId
+  state.version = Math.max(state.version, event.version)
+  switch (event.type) {
+    case 'UserMessageAppended':
+    case 'MessageImported':
+    case 'SteerApplied':
+      state.messageStatusById.set(event.payload.message.id, event.payload.message.status)
+      break
+    case 'RunStarted': {
+      const messageId = event.payload.run.messageId ?? event.payload.assistantMessage?.id ?? null
+      state.runOriginById.set(event.payload.run.id, event.payload.run.origin)
+      state.runMessageIdById.set(event.payload.run.id, messageId)
+      state.runStatusById.set(event.payload.run.id, 'streaming')
+      state.activeRun = {
+        runId: event.payload.run.id,
+        messageId,
+        queueItemId: event.payload.queueItemId,
+        startedAt: event.payload.run.startedAt,
+      }
+      if (event.payload.assistantMessage) {
+        state.messageStatusById.set(
+          event.payload.assistantMessage.id,
+          event.payload.assistantMessage.status,
+        )
+      }
+      break
+    }
+    case 'AssistantMessageCompleted':
+      state.messageStatusById.set(event.payload.message.id, event.payload.message.status)
+      break
+    case 'RunCompleted':
+    case 'RunFailed':
+    case 'RunAborted': {
+      state.runStatusById.set(event.payload.runId, event.payload.status)
+      const messageId = state.runMessageIdById.get(event.payload.runId)
+      if (messageId) {
+        state.messageStatusById.set(messageId, event.payload.status)
+      }
+      if (state.activeRun?.runId === event.payload.runId) {
+        state.activeRun = null
+      }
+      break
+    }
+    case 'LastTurnRolledBack': {
+      for (const messageId of event.payload.messageIds) {
+        state.messageStatusById.delete(messageId)
+      }
+      if (
+        state.activeRun?.messageId
+        && event.payload.messageIds.includes(state.activeRun.messageId)
+      ) {
+        state.activeRun = null
+      }
+      break
+    }
+    default:
+      break
+  }
+  return state
+}

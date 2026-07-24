@@ -83,14 +83,19 @@ import {
 } from '../src/modules/provider-runtime/side-conversation-registry'
 import { insertMessageFixtures } from './helpers/message-fixture'
 
-interface ChatMessageRow {
+interface ChatMessageShellRow {
   messageId: string
   role: 'user' | 'assistant'
   status: 'streaming' | 'complete' | 'aborted' | 'failed'
   errorText?: string
-  content: string
+  preview: string
+  previewTruncated: boolean
   parentMessageId: string | null
   parentToolCallId?: string | null
+}
+
+interface ChatMessageDetail {
+  messageId: string
   message: {
     parts: Array<{ type: string, text?: string, [key: string]: unknown }>
     metadata?: Record<string, unknown>
@@ -99,7 +104,7 @@ interface ChatMessageRow {
 
 interface ChatMessageSnapshotResponse {
   revision: number
-  rows: ChatMessageRow[]
+  rows: ChatMessageShellRow[]
 }
 
 interface ChatQueueItemView {
@@ -217,9 +222,9 @@ async function createProfileAndSession(
 async function waitForMessageStatus(
   app: ElysiaApp,
   sessionId: string,
-  expectedStatus: ChatMessageRow['status'],
-): Promise<ChatMessageRow[]> {
-  let latestGroups: ChatMessageRow[] = []
+  expectedStatus: ChatMessageShellRow['status'],
+): Promise<ChatMessageShellRow[]> {
+  let latestGroups: ChatMessageShellRow[] = []
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const response = await app.handle(
       new Request(`http://localhost/chat/sessions/${encodeURIComponent(sessionId)}/messages`),
@@ -240,12 +245,26 @@ async function waitForMessageStatus(
   )
 }
 
-async function getChatMessages(app: ElysiaApp, sessionId: string): Promise<ChatMessageRow[]> {
+async function getChatMessages(app: ElysiaApp, sessionId: string): Promise<ChatMessageShellRow[]> {
   const response = await app.handle(
     new Request(`http://localhost/chat/sessions/${encodeURIComponent(sessionId)}/messages`),
   )
   expect(response.status).toBe(200)
   return ((await response.json()) as ChatMessageSnapshotResponse).rows
+}
+
+async function getChatMessageDetail(
+  app: ElysiaApp,
+  sessionId: string,
+  messageId: string,
+): Promise<ChatMessageDetail> {
+  const response = await app.handle(
+    new Request(
+      `http://localhost/chat/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}`,
+    ),
+  )
+  expect(response.status).toBe(200)
+  return (await response.json()) as ChatMessageDetail
 }
 
 async function waitForCondition<T>(assertion: () => T | Promise<T>, label: string): Promise<T> {
@@ -2260,7 +2279,12 @@ describe('chat runtime capability', () => {
 
       const rows = await getChatMessages(app, 'session-codex-skill')
       const userRow = rows.find(row => row.role === 'user')
-      const storedSkillPart = userRow?.message.parts.find(
+      expect(userRow).toBeDefined()
+      const storedSkillPart = (await getChatMessageDetail(
+        app,
+        'session-codex-skill',
+        userRow!.messageId,
+      )).message.parts.find(
         part => part.type === 'data-cradle-skill',
       )
       expect(storedSkillPart).toBeUndefined()
@@ -2360,7 +2384,12 @@ describe('chat runtime capability', () => {
 
       const rows = await getChatMessages(app, 'session-codex-plugin-mention')
       const userRow = rows.find(row => row.role === 'user')
-      const storedPluginPart = userRow?.message.parts.find(
+      expect(userRow).toBeDefined()
+      const storedPluginPart = (await getChatMessageDetail(
+        app,
+        'session-codex-plugin-mention',
+        userRow!.messageId,
+      )).message.parts.find(
         part => part.type === 'data-cradle-plugin',
       )
       expect(storedPluginPart).toEqual(
@@ -3158,12 +3187,13 @@ describe('chat runtime capability', () => {
       const userMessage = rows.find(row => row.role === 'user')
       const assistantMessage = rows.find(row => row.role === 'assistant')
       expect(userMessage).toEqual(
-        expect.objectContaining({ content: 'Explain server runtime', status: 'complete' }),
+        expect.objectContaining({ preview: 'Explain server runtime', status: 'complete' }),
       )
       expect(assistantMessage).toEqual(
-        expect.objectContaining({ content: 'Hello from chat runtime', status: 'complete' }),
+        expect.objectContaining({ preview: 'Hello from chat runtime', status: 'complete' }),
       )
-      expect(assistantMessage?.message.parts).toEqual(
+      expect(assistantMessage).toBeDefined()
+      expect((await getChatMessageDetail(app, 'session-chat', assistantMessage!.messageId)).message.parts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ type: 'text', text: 'Hello from chat runtime' }),
         ]),
@@ -4574,10 +4604,14 @@ describe('chat runtime capability', () => {
       })
 
       const messageRows = await getChatMessages(app, 'session-chat-repair-snapshot')
-      expect(messageRows[0]?.message.parts.find(part => part.type === 'text')?.text).toBe(
+      expect((await getChatMessageDetail(
+        app,
+        'session-chat-repair-snapshot',
+        'message-repair-snapshot-assistant',
+      )).message.parts.find(part => part.type === 'text')?.text).toBe(
         'oversized assistant text',
       )
-      expect(messageRows[0]?.content).toBe('oversized assistant text')
+      expect(messageRows[0]?.preview).toBe('oversized assistant text')
 
       const storedRow = readMessagePayload(db(), 'message-repair-snapshot-assistant')
       expect(storedRow?.messageJson).toBe(originalSnapshot)
@@ -4680,7 +4714,7 @@ describe('chat runtime capability', () => {
       expect(runRes.status).toBe(200)
 
       const rows = await waitForMessageStatus(app, 'session-chat-switch', 'complete')
-      expect(rows.find(row => row.role === 'assistant')?.content).toBe('Switched provider')
+      expect(rows.find(row => row.role === 'assistant')?.preview).toBe('Switched provider')
 
       expect(
         db()
@@ -4815,7 +4849,7 @@ describe('chat runtime capability', () => {
       expect(runRes.status).toBe(200)
 
       const rows = await waitForMessageStatus(app, 'session-chat-session-model', 'complete')
-      expect(rows.find(row => row.role === 'assistant')?.content).toBe('Preferred model used')
+      expect(rows.find(row => row.role === 'assistant')?.preview).toBe('Preferred model used')
 
       expect(
         db()
@@ -4930,7 +4964,7 @@ describe('chat runtime capability', () => {
       expect(runRes.status).toBe(200)
 
       const rows = await waitForMessageStatus(app, 'session-chat-memory', 'complete')
-      expect(rows.find(row => row.role === 'assistant')?.content).toBe('Use Stripe Checkout.')
+      expect(rows.find(row => row.role === 'assistant')?.preview).toBe('Use Stripe Checkout.')
       const turnPayload = chatCompletionPayloads.find(
         payload =>
           payload.messages.at(-1)?.content
@@ -5211,7 +5245,7 @@ describe('chat runtime capability', () => {
 
       const messageRows = await getChatMessages(app, 'session-chat-provider-synthetic-turn')
       expect(
-        messageRows.map(row => ({ role: row.role, status: row.status, content: row.content })),
+        messageRows.map(row => ({ role: row.role, status: row.status, content: row.preview })),
       ).toEqual([
         { role: 'user', status: 'complete', content: 'Launch background agent' },
         { role: 'assistant', status: 'complete', content: 'Parent response' },
@@ -5332,7 +5366,7 @@ describe('chat runtime capability', () => {
       await waitForCondition(async () => {
         const messageRows = await getChatMessages(app!, 'session-chat-main-synthetic-turn')
         expect(
-          messageRows.map(row => ({ role: row.role, status: row.status, content: row.content })),
+          messageRows.map(row => ({ role: row.role, status: row.status, content: row.preview })),
         ).toEqual([
           { role: 'user', status: 'complete', content: 'Launch background agent' },
           { role: 'assistant', status: 'complete', content: 'Parent response' },
@@ -6540,7 +6574,7 @@ describe('chat runtime capability', () => {
       }, 'queue items to reach terminal states')
 
       const rows = await getChatMessages(app, 'session-chat-queue')
-      expect(rows.filter(row => row.role === 'user').map(row => row.content)).toEqual(
+      expect(rows.filter(row => row.role === 'user').map(row => row.preview)).toEqual(
         expect.arrayContaining(['Start long task', 'Queued follow-up B']),
       )
     }
@@ -6842,7 +6876,7 @@ describe('chat runtime capability', () => {
           })
           .join(''),
       ).toBe(expectedText)
-      expect(rows.find(row => row.role === 'assistant')?.content).toBe(expectedText)
+      expect(rows.find(row => row.role === 'assistant')?.preview).toBe(expectedText)
     }
  finally {
       releaseCompletion()
@@ -7255,7 +7289,7 @@ describe('chat runtime capability', () => {
       })
 
       const rows = await getChatMessages(app, 'session-codex-bang-command')
-      expect(rows.map(row => row.content)).toEqual(['!echo hello', 'hello from shell capable runtime\n'])
+      expect(rows.map(row => row.preview)).toEqual(['!echo hello', 'hello from shell capable runtime\n'])
     }
  finally {
       unregisterRuntime(runtime.runtimeKind, 'chat-runtime-test')

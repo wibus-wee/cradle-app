@@ -4,40 +4,41 @@ import { and, desc, eq, lt, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { readCurrentSessionEventVersion } from './es/event-store'
-import type { HydratedMessage } from './message-payload-store'
-import {
-  hydrateMessage,
-  messagePayloadJoinCondition,
-} from './message-payload-store'
-import { compactStoredMessageSnapshotForRead } from './message-snapshot-compaction'
+import { reduceChatSessionEventHeaders } from './es/aggregate'
+import { readSessionEventHeaders } from './es/event-store'
+import { messagePayloadJoinCondition } from './message-payload-store'
 import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
-import { readRunStreamCheckpointsByMessageIds } from './stream/checkpoint-store'
 import {
-  extractMessageText,
   parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot,
 } from './ui-message'
 
 const messageInsertOrder = sql<number>`messages.rowid`
+// Response-projection bound only: shell/history reads never fetch the durable
+// UIMessage payload. Full content remains available from the detail endpoint.
+const CHAT_HISTORY_SHELL_PREVIEW_MAX_CHARS = 2_000
 
-export interface ChatMessageSnapshotRow {
+export interface ChatMessageShellRow {
   messageId: string
   role: 'user' | 'assistant'
   status: ChatMessageStatus
   errorText?: string
-  content: string
-  message: Omit<UIMessage, 'role'> & { role: 'user' | 'assistant' }
+  preview: string
+  previewTruncated: boolean
   parentMessageId: string | null
   parentToolCallId: string | null
   taskId: string | null
   depth: number
 }
 
-export interface ChatMessageSnapshot {
+export interface ChatMessageShellSnapshot {
   revision: number
-  rows: ChatMessageSnapshotRow[]
+  rows: ChatMessageShellRow[]
   nextCursor: string | null
+}
+
+export interface ChatMessageDetail {
+  message: Omit<UIMessage, 'role'> & { role: 'user' | 'assistant' }
 }
 
 export interface ChatMessagePageInput {
@@ -110,20 +111,36 @@ export function listCompletedRuns(input: {
 export async function getMessageGroups(
   sessionId: string,
   input: ChatMessagePageInput = {},
-): Promise<ChatMessageSnapshotRow[]> {
+): Promise<ChatMessageShellRow[]> {
   return (await getMessagePage(sessionId, input)).rows
 }
 
 async function getMessagePage(
   sessionId: string,
   input: ChatMessagePageInput,
-): Promise<{ rows: ChatMessageSnapshotRow[], nextCursor: string | null }> {
+): Promise<{
+  rows: ChatMessageShellRow[]
+  nextCursor: string | null
+  revision: number
+}> {
   assertStoredSession(sessionId)
+  const headerState = reduceChatSessionEventHeaders(readSessionEventHeaders(sessionId))
   const limit = Math.min(Math.max(Math.floor(input.limit ?? 100), 1), 200)
   const beforeRowId = decodeMessageCursor(input.cursor ?? null)
 
   const candidates = db()
-    .select({ rowId: messageInsertOrder, message: messages, payload: chatMessagePayloads })
+    .select({
+      rowId: messageInsertOrder,
+      messageId: messages.id,
+      role: messages.role,
+      status: messages.status,
+      errorText: chatMessagePayloads.errorText,
+      preview: sql<string>`substr(${chatMessagePayloads.content}, 1, ${CHAT_HISTORY_SHELL_PREVIEW_MAX_CHARS + 1})`,
+      parentMessageId: messages.parentMessageId,
+      parentToolCallId: messages.parentToolCallId,
+      taskId: messages.taskId,
+      depth: messages.depth,
+    })
     .from(messages)
     .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
     .where(
@@ -141,74 +158,74 @@ async function getMessagePage(
     : null
   const rows = page.reverse()
 
-  // Overlay ephemeral streaming checkpoints onto projection rows. Checkpoints are
-  // not projected into `messages` during streaming; this preserves ~10s partial
-  // text freshness for passive window refresh without polluting the fact log.
-  const checkpointByMessageId = new Map(
-    readRunStreamCheckpointsByMessageIds(rows.map(row => row.message.id)).map(checkpoint => [
-      checkpoint.messageId,
-      checkpoint,
-    ]),
-  )
-
   return {
     nextCursor,
-    rows: rows.map(({ message: projected, payload }) => {
-      const row = hydrateMessage(projected, payload)
-      const role = row.role as 'user' | 'assistant'
-      const checkpoint
-        = row.status === 'streaming' ? checkpointByMessageId.get(row.id) : undefined
-      const messageJson = checkpoint?.messageJson ?? row.messageJson
-      const parsedMessage = parseStoredMessageSnapshot(
-        { ...row, messageJson },
-        role,
-      )
-      const message = compactStoredMessageSnapshotForRead({
-        rawJson: messageJson,
-        message: parsedMessage,
-      })
-      if (message.id !== row.id || message.role !== role) {
-        throw new AppError({
-          code: 'chat_message_snapshot_invalid',
-          status: 500,
-          message: 'Stored chat message snapshot is invalid',
-          details: {
-            messageId: row.id,
-            role,
-            reason:
-              message.id !== row.id
-                ? 'message_json.id must match messages.id'
-                : 'message_json.role must match messages.role',
-          },
-        })
-      }
-
-      return {
-        messageId: row.id,
-        role,
-        status: row.status as ChatMessageStatus,
-        errorText: row.errorText ?? undefined,
-        content: extractMessageText(message),
-        message,
-        parentMessageId: row.parentMessageId,
-        parentToolCallId: row.parentToolCallId,
-        taskId: row.taskId,
-        depth: row.depth,
-      }
-    }),
+    revision: headerState.version,
+    rows: rows.map(row => ({
+      messageId: row.messageId,
+      role: row.role as 'user' | 'assistant',
+      status: headerState.messageStatusById.get(row.messageId) ?? row.status as ChatMessageStatus,
+      errorText: row.errorText ?? undefined,
+      preview: row.preview.slice(0, CHAT_HISTORY_SHELL_PREVIEW_MAX_CHARS),
+      previewTruncated: row.preview.length > CHAT_HISTORY_SHELL_PREVIEW_MAX_CHARS,
+      parentMessageId: row.parentMessageId,
+      parentToolCallId: row.parentToolCallId,
+      taskId: row.taskId,
+      depth: row.depth,
+    })),
   }
 }
 
-export async function getMessageSnapshot(
+export async function getMessageShellSnapshot(
   sessionId: string,
   input: ChatMessagePageInput = {},
-): Promise<ChatMessageSnapshot> {
+): Promise<ChatMessageShellSnapshot> {
   const page = await getMessagePage(sessionId, input)
   return {
-    revision: readCurrentSessionEventVersion(db(), sessionId),
+    revision: page.revision,
     rows: page.rows,
     nextCursor: page.nextCursor,
   }
+}
+
+export function getMessageDetail(sessionId: string, messageId: string): ChatMessageDetail {
+  assertStoredSession(sessionId)
+  const row = db()
+    .select({ message: messages, payload: chatMessagePayloads })
+    .from(messages)
+    .innerJoin(chatMessagePayloads, messagePayloadJoinCondition())
+    .where(and(eq(messages.id, messageId), eq(messages.sessionId, sessionId)))
+    .get()
+  if (!row) {
+    throw new AppError({
+      code: 'chat_message_not_found',
+      status: 404,
+      message: 'Chat message was not found',
+      details: { sessionId, messageId },
+    })
+  }
+
+  const role = row.message.role as 'user' | 'assistant'
+  const message = parseStoredMessageSnapshot(
+    { id: row.message.id, messageJson: row.payload.messageJson },
+    role,
+  )
+  if (message.id !== row.message.id || message.role !== role) {
+    throw new AppError({
+      code: 'chat_message_snapshot_invalid',
+      status: 500,
+      message: 'Stored chat message snapshot is invalid',
+      details: {
+        messageId: row.message.id,
+        role,
+        reason:
+          message.id !== row.message.id
+            ? 'message_json.id must match messages.id'
+            : 'message_json.role must match messages.role',
+      },
+    })
+  }
+  return { message }
 }
 
 function encodeMessageCursor(beforeRowId: number): string {
@@ -243,11 +260,11 @@ function decodeMessageCursor(cursor: string | null): number | null {
 }
 
 function parseStoredMessageSnapshot(
-  row: HydratedMessage,
+  row: { id: string, messageJson: string },
   role: 'user' | 'assistant',
-): ChatMessageSnapshotRow['message'] {
+): ChatMessageDetail['message'] {
   try {
-    return parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageSnapshotRow['message']
+    return parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageDetail['message']
   }
  catch (error) {
     throw new AppError({

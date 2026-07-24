@@ -13,15 +13,17 @@ import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
 import * as Session from '../../session/service'
+import { reduceChatSessionEventHeaders } from '../es/aggregate'
 import { commitSessionEventsInTransaction } from '../es/commands'
-import { readSessionEvents } from '../es/event-store'
+import { readSessionEventHeaders, readSessionEvents } from '../es/event-store'
+import type { ChatSessionHeaderEvent } from '../es/events'
 import {
   CHAT_SESSION_AGGREGATE_TYPE,
   LEGACY_ASSISTANT_MESSAGE_SNAPSHOTTED_EVENT_TYPE,
 } from '../es/events'
 import { finalizeInterruptedRun } from '../es/recovery'
-import { getMessageGroups, getMessageSnapshot } from '../history-api'
-import { readMessagePayload } from '../message-payload-store'
+import { getMessageGroups, getMessageShellSnapshot } from '../history-api'
+import { putMessagePayload, readMessagePayload } from '../message-payload-store'
 import {
   deleteRunStreamCheckpoint,
   readRunStreamCheckpoint,
@@ -117,6 +119,34 @@ function seedStreamingRun(input: {
   ])
 }
 
+function messageImportedHeader(index: number): ChatSessionHeaderEvent {
+  const messageId = `message-header-${index}`
+  return {
+    sequenceId: index,
+    aggregateId: 'session-header-cardinality',
+    aggregateType: CHAT_SESSION_AGGREGATE_TYPE,
+    version: index + 1,
+    payload: {
+      message: {
+        id: messageId,
+        sessionId: 'session-header-cardinality',
+        payloadId: messageId,
+        parentMessageId: null,
+        parentToolCallId: null,
+        taskId: null,
+        depth: 0,
+        role: 'assistant',
+        status: 'complete',
+        createdAt: 100 + index,
+        updatedAt: 100 + index,
+      },
+    },
+    subjectRunId: null,
+    occurredAt: 100 + index,
+    type: 'MessageImported',
+  }
+}
+
 describe('run stream checkpoints', () => {
   it('upserts, dedups identical messageJson, and deletes by run id', async () => {
     await withTempDataDir(() => {
@@ -201,7 +231,7 @@ describe('run stream checkpoints', () => {
     })
   })
 
-  it('overlays checkpoint content for streaming messages in history reads', async () => {
+  it('keeps streaming checkpoints out of history shell reads', async () => {
     await withTempDataDir(async () => {
       const sessionId = 'session-checkpoint-overlay'
       const runId = 'run-checkpoint-overlay'
@@ -228,20 +258,72 @@ describe('run stream checkpoints', () => {
           expect.objectContaining({
             messageId,
             status: 'streaming',
-            content: 'overlay partial',
+            preview: '',
           }),
         ]),
       )
       expect(
         readMessagePayload(db(), messageId)?.content,
       ).toBe('')
-      await expect(getMessageSnapshot(sessionId)).resolves.toMatchObject({
+      await expect(getMessageShellSnapshot(sessionId)).resolves.toMatchObject({
         revision: 1,
         rows: expect.arrayContaining([
-          expect.objectContaining({ messageId, content: 'overlay partial' }),
+          expect.objectContaining({ messageId, preview: '' }),
         ]),
       })
     })
+  })
+
+  it('reads event headers without hydrating their referenced message payloads', async () => {
+    await withTempDataDir(() => {
+      const sessionId = 'session-event-headers'
+      const runId = 'run-event-headers'
+      const messageId = 'assistant-event-headers'
+      seedSession(sessionId)
+      seedStreamingRun({ sessionId, runId, messageId, content: 'initial payload' })
+      const payload = readMessagePayload(db(), messageId)
+      if (!payload) {
+        throw new Error('Expected seeded message payload')
+      }
+      putMessagePayload(db(), { ...payload, messageJson: '{ malformed durable payload' })
+
+      const headers = readSessionEventHeaders(sessionId)
+      const state = reduceChatSessionEventHeaders(headers)
+
+      expect(headers).toEqual([
+        expect.objectContaining({
+          type: 'RunStarted',
+          payload: expect.objectContaining({
+            assistantMessage: expect.objectContaining({
+              id: messageId,
+              payloadId: messageId,
+            }),
+          }),
+        }),
+      ])
+      const started = headers[0]
+      expect(started?.type).toBe('RunStarted')
+      if (started?.type === 'RunStarted') {
+        expect(started.payload.assistantMessage).not.toHaveProperty('messageJson')
+        expect(started.payload.assistantMessage).not.toHaveProperty('content')
+      }
+      expect(state.version).toBe(1)
+      expect(state.activeRun).toMatchObject({ runId, messageId })
+      expect(state.runOriginById.get(runId)).toBe('user')
+      expect(state.messageStatusById.get(messageId)).toBe('streaming')
+    })
+  })
+
+  it('reduces thousands of header facts with map-backed message status updates', () => {
+    const eventCount = 10_000
+    const state = reduceChatSessionEventHeaders(
+      Array.from({ length: eventCount }, (_, index) => messageImportedHeader(index)),
+    )
+
+    expect(state.version).toBe(eventCount)
+    expect(state.messageStatusById).toHaveLength(eventCount)
+    expect(state.messageStatusById.get('message-header-0')).toBe('complete')
+    expect(state.messageStatusById.get(`message-header-${eventCount - 1}`)).toBe('complete')
   })
 
   it('deletes session events and checkpoints when deleting a session', async () => {

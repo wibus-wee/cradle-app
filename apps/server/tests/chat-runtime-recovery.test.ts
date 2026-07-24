@@ -19,7 +19,11 @@ import {
   recoverChatRuntimeProjections,
   recoverChatRuntimeSession,
 } from '../src/modules/chat-runtime/es/recovery'
-import { getMessageGroups, getMessageSnapshot } from '../src/modules/chat-runtime/history-api'
+import {
+  getMessageDetail,
+  getMessageGroups,
+  getMessageShellSnapshot,
+} from '../src/modules/chat-runtime/history-api'
 import {
   hydrateMessage,
   putMessagePayload,
@@ -295,7 +299,7 @@ describe('chat runtime recovery', () => {
         })
       }
 
-      const firstPage = await getMessageSnapshot('session-bounded-history')
+      const firstPage = await getMessageShellSnapshot('session-bounded-history')
 
       expect(firstPage.rows).toHaveLength(100)
       expect(firstPage.rows[0]?.messageId).toBe('message-0787')
@@ -304,7 +308,7 @@ describe('chat runtime recovery', () => {
       const allIds = [...firstPage.rows.map(row => row.messageId)]
       let cursor = firstPage.nextCursor
       while (cursor) {
-        const page = await getMessageSnapshot('session-bounded-history', { cursor })
+        const page = await getMessageShellSnapshot('session-bounded-history', { cursor })
         allIds.unshift(...page.rows.map(row => row.messageId))
         cursor = page.nextCursor
       }
@@ -343,6 +347,97 @@ describe('chat runtime recovery', () => {
         }),
       ])
       expect(countSessionEvents('session-read-no-repair')).toBe(0)
+    })
+  })
+
+  it('reads malformed and huge durable payloads as bounded history shells', async () => {
+    await withTempDataDir(async () => {
+      const sessionId = 'session-shell-malformed-payload'
+      const messageId = 'message-shell-malformed-payload'
+      seedSession(sessionId)
+      const hugeContent = 'x'.repeat(20_000)
+      const createdAt = 1700000000
+      putMessagePayload(db(), {
+        id: messageId,
+        sessionId,
+        content: hugeContent,
+        messageJson: '{ deliberately malformed',
+        errorText: null,
+        createdAt,
+        updatedAt: createdAt,
+      })
+      db().insert(messages).values({
+        id: messageId,
+        sessionId,
+        parentMessageId: null,
+        parentToolCallId: null,
+        taskId: null,
+        depth: 0,
+        role: 'assistant',
+        status: 'complete',
+        payloadId: messageId,
+        createdAt,
+        updatedAt: createdAt,
+      }).run()
+
+      await expect(getMessageShellSnapshot(sessionId)).resolves.toMatchObject({
+        rows: [{
+          messageId,
+          preview: 'x'.repeat(2_000),
+          previewTruncated: true,
+        }],
+      })
+      await expect(getMessageShellSnapshot(sessionId)).resolves.not.toMatchObject({
+        rows: [expect.objectContaining({ message: expect.anything() })],
+      })
+      expect(() => getMessageDetail(sessionId, messageId)).toThrow('Stored chat message snapshot is invalid')
+    })
+  })
+
+  it('hydrates the original UIMessage only through the message detail read', async () => {
+    await withTempDataDir(() => {
+      const sessionId = 'session-message-detail'
+      const messageId = 'message-detail'
+      const createdAt = 1700000000
+      const message = {
+        id: messageId,
+        role: 'assistant' as const,
+        parts: [
+          { type: 'text', text: 'Durable transcript text' },
+          {
+            type: 'tool-test',
+            toolCallId: 'tool-detail',
+            state: 'output-available',
+            input: { path: 'README.md' },
+            output: { ok: true },
+          },
+        ],
+      }
+      seedSession(sessionId)
+      putMessagePayload(db(), {
+        id: messageId,
+        sessionId,
+        content: 'Durable transcript text',
+        messageJson: JSON.stringify(message),
+        errorText: null,
+        createdAt,
+        updatedAt: createdAt,
+      })
+      db().insert(messages).values({
+        id: messageId,
+        sessionId,
+        parentMessageId: null,
+        parentToolCallId: null,
+        taskId: null,
+        depth: 0,
+        role: 'assistant',
+        status: 'complete',
+        payloadId: messageId,
+        createdAt,
+        updatedAt: createdAt,
+      }).run()
+
+      expect(getMessageDetail(sessionId, messageId)).toEqual({ message })
     })
   })
 

@@ -28,10 +28,7 @@ interface SessionPreviewTarget {
 }
 
 function readSessionPreviewText(row: ChatSessionMessageRow): string {
-  return row.message.parts
-    .flatMap(part => part.type === 'text' ? [part.text] : [])
-    .join('\n')
-    .trim()
+  return row.preview.trim()
 }
 
 function getPreviewPosition(anchor: HTMLElement, previewHeight: number, placement: PreviewCardPlacement): SessionPreviewPosition {
