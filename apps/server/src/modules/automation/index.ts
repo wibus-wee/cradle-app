@@ -109,13 +109,13 @@ const automationRoutes = new Elysia({
     body: AutomationModel.createBody,
     response: { 200: AutomationModel.definition },
   })
-  .get('/', ({ query }) => Automation.list(query), {
+  .get('/', ({ query }) => Automation.listWithLatestRun(query), {
     detail: {
       'summary': 'List automations',
       'x-cradle-cli': { command: ['automation', 'list'] },
     },
     query: AutomationModel.listQuery,
-    response: { 200: t.Array(AutomationModel.definition) },
+    response: { 200: t.Array(AutomationModel.definitionSummary) },
   })
   .get('/:id', ({ params }) => Automation.get(params.id), {
     detail: {

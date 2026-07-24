@@ -9,7 +9,7 @@ import {
   automationRuns,
 } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
-import { and, desc, eq, isNotNull, isNull, lte, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
@@ -66,6 +66,10 @@ export interface AutomationDefinitionView {
   nextRunAt: number | null
   createdAt: number
   updatedAt: number
+}
+
+export interface AutomationDefinitionSummaryView extends AutomationDefinitionView {
+  latestRun: AutomationRunView | null
 }
 
 export interface AutomationRunView {
@@ -383,6 +387,36 @@ export function list(input: {
     .orderBy(desc(automationDefinitions.updatedAt))
     .all()
     .map(toDefinitionView)
+}
+
+export function listWithLatestRun(input: {
+  workspaceId?: string
+  enabled?: boolean
+}): AutomationDefinitionSummaryView[] {
+  const definitions = list(input)
+  if (definitions.length === 0) {
+    return []
+  }
+
+  const latestRunsByDefinitionId = new Map<string, AutomationRunView>()
+  const definitionIds = definitions.map(definition => definition.id)
+  const runs = db()
+    .select()
+    .from(automationRuns)
+    .where(inArray(automationRuns.automationDefinitionId, definitionIds))
+    .orderBy(desc(automationRuns.createdAt), desc(automationRuns.updatedAt))
+    .all()
+
+  for (const run of runs) {
+    if (!latestRunsByDefinitionId.has(run.automationDefinitionId)) {
+      latestRunsByDefinitionId.set(run.automationDefinitionId, toRunView(run))
+    }
+  }
+
+  return definitions.map(definition => ({
+    ...definition,
+    latestRun: latestRunsByDefinitionId.get(definition.id) ?? null,
+  }))
 }
 
 export function get(id: string): AutomationDefinitionView {

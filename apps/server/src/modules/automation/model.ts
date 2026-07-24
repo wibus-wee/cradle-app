@@ -72,6 +72,52 @@ const runStatusSchema = t.Union([
   t.Literal('cancelled'),
 ])
 
+const definitionSchema = t.Object({
+  id: t.String(),
+  workspaceId: t.Nullable(t.String()),
+  title: t.String(),
+  description: t.String(),
+  enabled: t.Boolean(),
+  trigger: triggerSchema,
+  recipe: recipeSchema,
+  createdByKind: createdByKindSchema,
+  createdById: t.Nullable(t.String()),
+  lastRunAt: t.Nullable(t.Number()),
+  nextRunAt: t.Nullable(t.Number()),
+  createdAt: t.Number(),
+  updatedAt: t.Number(),
+})
+
+const runSchema = t.Object({
+  id: t.String(),
+  automationDefinitionId: t.String(),
+  workspaceId: t.Nullable(t.String()),
+  triggerType: t.Union([t.Literal('manual'), t.Literal('scheduled')]),
+  occurrenceKey: t.Nullable(t.String()),
+  status: runStatusSchema,
+  triggerSnapshot: triggerSchema,
+  recipeSnapshot: recipeSchema,
+  chatSessionId: t.Nullable(t.String()),
+  backendRunId: t.Nullable(t.String()),
+  artifactCount: t.Number(),
+  errorText: t.Nullable(t.String()),
+  resultKind: t.Nullable(t.Union([t.Literal('findings'), t.Literal('no_findings'), t.Literal('stopped'), t.Literal('error')])),
+  resultSummary: t.Nullable(t.String()),
+  triageStatus: t.Nullable(t.Union([t.Literal('unread'), t.Literal('read'), t.Literal('resolved'), t.Literal('archived')])),
+  triagedAt: t.Nullable(t.Number()),
+  scheduledFor: t.Nullable(t.Number()),
+  claimedAt: t.Nullable(t.Number()),
+  startedAt: t.Nullable(t.Number()),
+  finishedAt: t.Nullable(t.Number()),
+  createdAt: t.Number(),
+  updatedAt: t.Number(),
+})
+
+const definitionSummarySchema = t.Composite([
+  definitionSchema,
+  t.Object({ latestRun: t.Nullable(runSchema) }),
+])
+
 export const AutomationModel = {
   trigger: triggerSchema,
   recipe: recipeSchema,
@@ -164,46 +210,11 @@ export const AutomationModel = {
     status: t.Union([t.Literal('unread'), t.Literal('read'), t.Literal('resolved'), t.Literal('archived')]),
   }, { additionalProperties: false }),
 
-  definition: t.Object({
-    id: t.String(),
-    workspaceId: t.Nullable(t.String()),
-    title: t.String(),
-    description: t.String(),
-    enabled: t.Boolean(),
-    trigger: triggerSchema,
-    recipe: recipeSchema,
-    createdByKind: createdByKindSchema,
-    createdById: t.Nullable(t.String()),
-    lastRunAt: t.Nullable(t.Number()),
-    nextRunAt: t.Nullable(t.Number()),
-    createdAt: t.Number(),
-    updatedAt: t.Number(),
-  }),
+  definition: definitionSchema,
 
-  run: t.Object({
-    id: t.String(),
-    automationDefinitionId: t.String(),
-    workspaceId: t.Nullable(t.String()),
-    triggerType: t.Union([t.Literal('manual'), t.Literal('scheduled')]),
-    occurrenceKey: t.Nullable(t.String()),
-    status: runStatusSchema,
-    triggerSnapshot: triggerSchema,
-    recipeSnapshot: recipeSchema,
-    chatSessionId: t.Nullable(t.String()),
-    backendRunId: t.Nullable(t.String()),
-    artifactCount: t.Number(),
-    errorText: t.Nullable(t.String()),
-    resultKind: t.Nullable(t.Union([t.Literal('findings'), t.Literal('no_findings'), t.Literal('stopped'), t.Literal('error')])),
-    resultSummary: t.Nullable(t.String()),
-    triageStatus: t.Nullable(t.Union([t.Literal('unread'), t.Literal('read'), t.Literal('resolved'), t.Literal('archived')])),
-    triagedAt: t.Nullable(t.Number()),
-    scheduledFor: t.Nullable(t.Number()),
-    claimedAt: t.Nullable(t.Number()),
-    startedAt: t.Nullable(t.Number()),
-    finishedAt: t.Nullable(t.Number()),
-    createdAt: t.Number(),
-    updatedAt: t.Number(),
-  }),
+  run: runSchema,
+
+  definitionSummary: definitionSummarySchema,
 
   artifact: t.Object({
     id: t.String(),

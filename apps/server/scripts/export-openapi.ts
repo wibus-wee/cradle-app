@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createServerContractApp } from '../src/app'
+import { normalizeConstSchemas } from './openapi-schema-normalizer'
 
 const scriptsDir = fileURLToPath(new URL('.', import.meta.url))
 const outputPath = resolve(scriptsDir, '..', 'openapi.json')
@@ -15,7 +16,7 @@ if (!response.ok) {
 }
 
 const document = await response.json()
-normalizeConstUnionSchemas(document)
+normalizeConstSchemas(document)
 normalizeNullableSchemas(document)
 await writeFile(outputPath, JSON.stringify(document, null, 2))
 
@@ -59,64 +60,4 @@ function normalizeNullableSchemas(value: unknown): void {
 
 function isNullSchema(value: unknown): boolean {
   return !!value && typeof value === 'object' && !Array.isArray(value) && (value as Record<string, unknown>).type === 'null'
-}
-
-function normalizeConstUnionSchemas(value: unknown): void {
-  if (!value || typeof value !== 'object') {
-    return
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      normalizeConstUnionSchemas(item)
-    }
-    return
-  }
-
-  const record = value as Record<string, unknown>
-  for (const child of Object.values(record)) {
-    normalizeConstUnionSchemas(child)
-  }
-
-  const anyOf = record.anyOf
-  if (!Array.isArray(anyOf) || anyOf.length === 0) {
-    return
-  }
-  const enumValues: string[] = []
-  let nullable = record.nullable === true
-  for (const schema of anyOf) {
-    if (isNullSchema(schema)) {
-      nullable = true
-      continue
-    }
-    const enumValue = getStringConstSchemaValue(schema)
-    if (enumValue === null) {
-      return
-    }
-    enumValues.push(enumValue)
-  }
-
-  if (enumValues.length === 0) {
-    return
-  }
-
-  delete record.anyOf
-  record.type = 'string'
-  record.enum = nullable ? [...new Set(enumValues), null] : [...new Set(enumValues)]
-  if (nullable) {
-    record.nullable = true
-  }
-}
-
-function getStringConstSchemaValue(value: unknown): string | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null
-  }
-
-  const record = value as Record<string, unknown>
-  if (record.type !== undefined && record.type !== 'string') {
-    return null
-  }
-
-  return typeof record.const === 'string' ? record.const : null
 }

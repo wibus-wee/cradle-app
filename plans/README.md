@@ -131,7 +131,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 039  | Replace secret rotation with runtime keyring             | P0       | M      | 038        | DONE                                                                                   |
 | 040  | Establish web state authority                            | P1       | L      | 038        | DONE                                                                                  |
 | 041  | Enforce domain and lifecycle ownership                   | P1       | XL     | 038, 040   | DONE                                                                                  |
-| 042  | Collapse Automation contract and query path              | P0       | L      | 040        | TODO                                                                                  |
+| 042  | Collapse Automation contract and query path              | P0       | L      | 040        | DONE (scoped gates pass; repository-wide CI remains red on inherited baseline failures) |
 | 043  | Deepen Composer Draft lifecycle ownership                | P1       | M      | 040        | TODO                                                                                  |
 | 044  | Establish one Chat turn completion owner                 | P1       | L      | 024, 041   | REJECTED (superseded by end-to-end lifecycle Plan 061)                                |
 | 045  | Close the Provider Catalog target query seam             | P2       | M      | 035, 048   | TODO (execute after Plan 035 status is reconciled and Plan 048 lands)                  |
