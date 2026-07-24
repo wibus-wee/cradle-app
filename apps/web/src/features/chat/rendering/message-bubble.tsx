@@ -20,6 +20,7 @@ import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
 import { readChatContinuationMetadata } from '../capabilities/chat-continuation-metadata'
 import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
+import { MarkdownFileLinkView } from '../transcript/views/markdown-file-link-view'
 import { BangCommandBlock, BangCommandPromptBlock } from './blocks/bang-command-block'
 import { ReasoningBlock } from './blocks/reasoning-block'
 import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
@@ -34,7 +35,6 @@ import {
 } from './chat-render-plan'
 import { useChatRenderStore, useChatRenderStoreApi } from './chat-render-store'
 import { ImageLightbox } from './image-lightbox'
-import { MarkdownFileLink } from './markdown-file-link'
 import {
   FileAttachmentBlock,
   PluginContextBlock,
@@ -819,9 +819,7 @@ function MessageBubbleView({
             showCursor={STREAMDOWN_RENDER_OPTIONS.showCursor}
             animated={item.text.length <= MESSAGE_STREAMING_ANIMATION_MAX_CHARS}
             components={{
-              a: props => (
-                <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} />
-              ),
+                a: props => <MarkdownFileLinkView {...readMarkdownAnchorProps(props)} />,
             }}
           />
         )

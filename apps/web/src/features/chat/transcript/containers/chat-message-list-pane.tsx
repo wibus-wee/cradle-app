@@ -1,84 +1,14 @@
 import type { ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { cn } from '~/lib/cn'
 
-import type { MessageBubbleEditAction, MessageTextTransform } from '../rendering/message-bubble'
-import { MessageBubbleById } from '../rendering/message-bubble'
-import type { useChatSession } from '../session/use-chat-session'
-import { ChatMinimap } from './chat-minimap'
-import { ChatTranscriptView } from './chat-transcript-view'
-import type { ChatScrollRuntime } from './use-chat-scroll-runtime'
+import type { MessageBubbleEditAction, MessageTextTransform } from '../../rendering/message-bubble'
+import type { useChatSession } from '../../session/use-chat-session'
+import { ChatMinimap } from '../../ui/chat-minimap'
+import type { ChatScrollRuntime } from '../../ui/use-chat-scroll-runtime'
+import { ChatTranscriptContent } from './chat-transcript-content'
 
 type ChatSessionProjection = ReturnType<typeof useChatSession>
-
-function ChatTranscriptContent({
-  sessionId,
-  messageIds,
-  messageCount,
-  status,
-  error,
-  isReady,
-  viewportRef,
-  virtualizerRef,
-  keepMountedIndices,
-  onVirtualScroll,
-  onToolApprovalResponse,
-  editPreviousMessageId,
-  editPreviousAction,
-  messageTextTransform,
-  compactInset,
-  historyControl,
-}: {
-  sessionId: string | null
-  messageIds: ChatSessionProjection['messageIds']
-  messageCount: ChatSessionProjection['messageCount']
-  status: ChatSessionProjection['status']
-  error: ChatSessionProjection['error']
-  isReady: boolean
-  viewportRef: ChatScrollRuntime['viewportRef']
-  virtualizerRef: ChatScrollRuntime['virtualizerRef']
-  keepMountedIndices: ChatScrollRuntime['keepMountedIndices']
-  onVirtualScroll: ChatScrollRuntime['handleVirtualScroll']
-  onToolApprovalResponse: ChatSessionProjection['respondToToolApproval']
-  editPreviousMessageId?: string | null
-  editPreviousAction?: MessageBubbleEditAction
-  messageTextTransform?: MessageTextTransform
-  compactInset?: boolean
-  historyControl?: ReactNode
-}) {
-  const { t } = useTranslation('chat')
-  function renderMessage(messageId: string) {
-    return (
-      <MessageBubbleById
-        key={messageId}
-        sessionId={sessionId}
-        messageId={messageId}
-        onToolApprovalResponse={onToolApprovalResponse}
-        editAction={messageId === editPreviousMessageId ? editPreviousAction : undefined}
-        textTransform={messageTextTransform}
-      />
-    )
-  }
-
-  return (
-    <ChatTranscriptView
-      messages={messageIds}
-      renderMessage={renderMessage}
-      status={status}
-      error={error}
-      isReady={isReady || messageCount > 0}
-      emptyLabel={t('empty.startConversation')}
-      errorFallbackLabel={t('error.loadMessages')}
-      viewportRef={viewportRef}
-      virtualizerRef={virtualizerRef}
-      keepMountedIndices={keepMountedIndices}
-      onVirtualScroll={onVirtualScroll}
-      compactInset={compactInset}
-      historyControl={historyControl}
-    />
-  )
-}
 
 export function ChatMessageListPane({
   sessionId,

@@ -65,10 +65,10 @@ import {
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 } from './slash-commands/chat-slash-commands'
 import { ThreadHandoffMenu } from './thread-handoff-menu'
+import { ChatMessageListPane } from './transcript/containers/chat-message-list-pane'
 import type { RollbackDraftSignal } from './ui/chat-composer-section'
 import { ChatComposerSection } from './ui/chat-composer-section'
 import { ChatGoalEditorDialog } from './ui/chat-goal-editor-dialog'
-import { ChatMessageListPane } from './ui/chat-transcript-pane'
 import { useChatScrollRuntime } from './ui/use-chat-scroll-runtime'
 
 export type { ChatViewProps } from './chat-view-types'
