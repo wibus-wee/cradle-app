@@ -12,8 +12,6 @@ import {
   Message1Line as MessageSquareIcon,
   PicLine as ImageIcon,
   Refresh1Line as RefreshCwIcon,
-  SearchLine as SearchIcon,
-  User2Line as UserRoundIcon,
   WarningLine as TriangleAlertIcon,
 } from '@mingcute/react'
 import type { TFunction } from 'i18next'
@@ -38,7 +36,6 @@ import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
 import { getServerUrl } from '~/lib/electron'
 import { formatPercentFromRatio, formatShortDurationMs } from '~/lib/number-format'
-import type { ChronicleFocusTarget } from '~/store/settings-overlay'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import {
@@ -48,8 +45,17 @@ import {
   ChronicleEmptyState,
 } from './chronicle-empty-state'
 import {
+  ChronicleKnowledgeCardGridView,
+} from './chronicle-knowledge-card-grid-view'
+import {
+  ChronicleMemorySearchView,
+} from './chronicle-memory-search-view'
+import {
   ChronicleResourceGridContainer,
 } from './chronicle-resource-grid-container'
+import {
+  ChronicleSpeakerProfileGridView,
+} from './chronicle-speaker-profile-grid-view'
 import {
   formatChronicleDateTime as formatDateTime,
   formatChronicleRelativeTime as formatRelativeTime,
@@ -64,12 +70,9 @@ import type {
   ChronicleAudioTranscript,
   ChronicleConfig,
   ChronicleDreamRun,
-  ChronicleKnowledgeCard,
   ChronicleMessageSource,
   ChronicleSlackSourceDraft,
-  ChronicleSpeakerProfile,
   ChronicleStatus,
-  MemoryEntry,
 } from './use-chronicle.ts'
 import {
   useChronicleAccessibilityEvents,
@@ -592,51 +595,31 @@ export function ChronicleSettings() {
 
         <div ref={memorySectionRef}>
           <SettingsRow label={t('memorySearch.title')} description={t('memorySearch.description')} vertical>
-            <div className="flex flex-col gap-3">
-              <div className="relative">
-                <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 !text-muted-foreground/60" />
-                <Input
-                  value={searchQuery}
-                  onChange={event => setSearchQuery(event.target.value)}
-                  placeholder={t('memorySearch.placeholder')}
-                  className="h-9 pl-8 text-[13px]"
-                />
-              </div>
-              {memoriesLoading || searchingMemories || focusedMemoryLoading
-                ? <ChronicleEmptyState icon={<BrainIcon className="size-4" />} title={t('memorySearch.loading')} />
-                : visibleMemoryEntries.length === 0
-                  ? (
-                      <ChronicleEmptyState
-                        icon={<BrainIcon className="size-4" />}
-                        title={hasSearchQuery ? t('memorySearch.noMatches') : t('memorySearch.empty')}
-                      />
-                    )
-                  : (
-                      <MemoryList
-                        entries={visibleMemoryEntries}
-                        focusTarget={chronicleFocusTarget}
-                      />
-                    )}
-            </div>
+            <ChronicleMemorySearchView
+              query={searchQuery}
+              loading={memoriesLoading || searchingMemories || focusedMemoryLoading}
+              entries={visibleMemoryEntries}
+              focusedMemoryId={chronicleFocusTarget?.type === 'memory' ? chronicleFocusTarget.id : null}
+              onQueryChange={setSearchQuery}
+            />
           </SettingsRow>
         </div>
 
         <div ref={knowledgeSectionRef}>
           <SettingsRow label={t('knowledge.title')} description={t('knowledge.description')} vertical>
-            {knowledgeCardsLoading || focusedKnowledgeLoading
-              ? <ChronicleEmptyState icon={<BrainIcon className="size-4" />} title={t('knowledge.loading')} />
-              : visibleKnowledgeCards.length === 0
-                ? <ChronicleEmptyState icon={<BrainIcon className="size-4" />} title={t('knowledge.empty')} />
-                : <KnowledgeCardList cards={visibleKnowledgeCards} focusTarget={chronicleFocusTarget} />}
+            <ChronicleKnowledgeCardGridView
+              loading={knowledgeCardsLoading || focusedKnowledgeLoading}
+              cards={visibleKnowledgeCards}
+              focusedKnowledgeId={chronicleFocusTarget?.type === 'knowledge' ? chronicleFocusTarget.id : null}
+            />
           </SettingsRow>
         </div>
 
         <SettingsRow label={t('speakers.title')} description={t('speakers.description')} vertical>
-          {speakerProfilesLoading
-            ? <ChronicleEmptyState icon={<UserRoundIcon className="size-4" />} title={t('speakers.loading')} />
-            : speakerProfiles.length === 0
-              ? <ChronicleEmptyState icon={<UserRoundIcon className="size-4" />} title={t('speakers.empty')} />
-              : <SpeakerProfileList profiles={speakerProfiles} />}
+          <ChronicleSpeakerProfileGridView
+            loading={speakerProfilesLoading}
+            profiles={speakerProfiles}
+          />
         </SettingsRow>
       </SettingsGroup>
 
@@ -1299,22 +1282,6 @@ function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: Chr
   )
 }
 
-function formatKnowledgeCardType(t: ChronicleTranslate, type: ChronicleKnowledgeCard['cardType']): string {
-  if (type === 'insight') { return t('knowledgeCard.type.insight') }
-  if (type === 'decision') { return t('knowledgeCard.type.decision') }
-  if (type === 'task') { return t('knowledgeCard.type.task') }
-  if (type === 'pattern') { return t('knowledgeCard.type.pattern') }
-  return t('knowledgeCard.type.fact')
-}
-
-function formatKnowledgeDimension(t: ChronicleTranslate, dimension: ChronicleKnowledgeCard['dimension']): string {
-  if (dimension === 'technical') { return t('knowledgeCard.dimension.technical') }
-  if (dimension === 'business') { return t('knowledgeCard.dimension.business') }
-  if (dimension === 'personal') { return t('knowledgeCard.dimension.personal') }
-  if (dimension === 'project') { return t('knowledgeCard.dimension.project') }
-  return t('knowledgeCard.dimension.general')
-}
-
 function formatDreamRunType(t: ChronicleTranslate, type: ChronicleDreamRun['runType']): string {
   if (type === 'merge') { return t('dreamRun.type.merge') }
   if (type === 'archive') { return t('dreamRun.type.archive') }
@@ -1328,14 +1295,6 @@ function formatDreamRunStatus(t: ChronicleTranslate, status: ChronicleDreamRun['
   if (status === 'failed') { return t('common.status.error') }
   if (status === 'running') { return t('common.status.running') }
   return t('common.status.queued')
-}
-
-function formatKnowledgeCardStatus(t: ChronicleTranslate, status: ChronicleKnowledgeCard['status']): string {
-  if (status === 'active') { return t('knowledgeCard.status.active') }
-  if (status === 'merged') { return t('knowledgeCard.status.merged') }
-  if (status === 'archived') { return t('knowledgeCard.status.archived') }
-  if (status === 'deleted') { return t('knowledgeCard.status.deleted') }
-  return status
 }
 
 function formatTranscriptStatus(t: ChronicleTranslate, status: ChronicleAudioTranscript['status']): string {
@@ -1373,11 +1332,6 @@ function formatAccessibilityEventNotification(t: ChronicleTranslate, notificatio
   return notification
 }
 
-function formatMemoryType(t: ChronicleTranslate, type: MemoryEntry['type']): string {
-  if (type === '10min') { return t('memory.type.short') }
-  return t('memory.type.long')
-}
-
 function formatAudioSegmentTitle(t: ChronicleTranslate, segment: ChronicleAudioRawSegment): string {
   if (segment.source === 'system') { return t('audioRaw.title.system') }
   if (segment.source === 'mixed') { return t('audioRaw.title.mixed') }
@@ -1391,16 +1345,6 @@ function formatAudioProcessingStatus(t: ChronicleTranslate, status: ChronicleAud
   return t('audioRaw.processing.notConnected')
 }
 
-function getMemoryMatchLabel(t: ChronicleTranslate, entry: MemoryEntry): string {
-  if (entry.matchKind === 'hybrid') { return t('memory.match.hybrid') }
-  if (entry.matchKind === 'semantic') {
-    return entry.semanticScore !== null && entry.semanticScore !== undefined
-      ? t('memory.match.semanticScore', { score: entry.semanticScore.toFixed(2) })
-      : t('memory.match.semantic')
-  }
-  return t('memory.match.keyword')
-}
-
 function getAccessibilityTreeDepthClass(depth: number): string {
   if (depth <= 0) { return 'pl-0' }
   if (depth === 1) { return 'pl-2' }
@@ -1412,79 +1356,6 @@ function getAccessibilityTreeDepthClass(depth: number): string {
 // ---------------------------------------------------------------------------
 // Data display components (preserved from original)
 // ---------------------------------------------------------------------------
-
-function MemoryList({
-  entries,
-  focusTarget,
-}: {
-  entries: MemoryEntry[]
-  focusTarget: ChronicleFocusTarget | null
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      {entries.map(entry => (
-        <MemoryCard
-          key={entry.id}
-          entry={entry}
-          focused={focusTarget?.type === 'memory' && focusTarget.id === entry.id}
-        />
-      ))}
-    </div>
-  )
-}
-
-function KnowledgeCardList({
-  cards,
-  focusTarget,
-}: {
-  cards: ChronicleKnowledgeCard[]
-  focusTarget: ChronicleFocusTarget | null
-}) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {cards.map(card => (
-        <article
-          key={card.id}
-          className={cn(
-            'rounded-lg bg-background p-3 shadow-sm transition-[box-shadow,background-color]',
-            focusTarget?.type === 'knowledge' && focusTarget.id === card.id
-              ? 'bg-primary/5 shadow-lg ring-2 ring-primary/40'
-              : 'shadow-[0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]',
-          )}
-          data-testid={`chronicle-knowledge-card-${card.id}`}
-        >
-          <div className="mb-2 flex min-w-0 items-center gap-2">
-            <BrainIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium text-foreground">{card.title}</span>
-            <Badge variant="outline" className="ml-auto text-[11px]">{formatKnowledgeDimension(t, card.dimension)}</Badge>
-          </div>
-          <p className="line-clamp-4 min-h-20 text-[13px] leading-5 text-foreground">{card.content}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Badge variant="secondary" className="text-[11px]">{formatKnowledgeCardType(t, card.cardType)}</Badge>
-            <Badge variant="outline" className="text-[11px]">
-              v
-              {card.version}
-            </Badge>
-            <Badge variant="outline" className="text-[11px]">
-              {Math.round(card.confidence * 100)}
-              %
-            </Badge>
-            {card.status !== 'active' && <Badge variant="outline" className="text-[11px]">{formatKnowledgeCardStatus(t, card.status)}</Badge>}
-            {card.tags.slice(0, 4).map(tag => <Badge key={tag} variant="outline" className="text-[11px]">{tag}</Badge>)}
-          </div>
-          <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-            <span className="truncate">
-              {t('knowledgeCard.sourceSegments', { count: card.sourceSegmentIds.length })}
-            </span>
-            <span className="shrink-0 font-mono">{formatRelativeTime(t, card.updatedAt)}</span>
-          </div>
-        </article>
-      ))}
-    </div>
-  )
-}
 
 function DreamRunPanel({ loading, runs }: { loading: boolean, runs: ChronicleDreamRun[] }) {
   const { t } = useTranslation('chronicle')
@@ -1683,47 +1554,6 @@ function AccessibilityEventList({ events }: { events: ChronicleAccessibilityEven
   )
 }
 
-function SpeakerProfileList({ profiles }: { profiles: ChronicleSpeakerProfile[] }) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {profiles.map(profile => (
-        <article key={profile.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-          <div className="mb-2 flex min-w-0 items-center gap-2">
-            <UserRoundIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium text-foreground">{profile.displayName}</span>
-            <Badge variant="outline" className="ml-auto text-[11px]">
-              {t('speaker.sampleCount', { count: profile.sampleCount })}
-            </Badge>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-[12px] text-muted-foreground">
-            <span className="truncate">
-              {t('speaker.lastSeen')}
-              {' '}
-              {formatRelativeTime(t, profile.lastSeenAt)}
-            </span>
-            <span className="truncate text-right">
-              {profile.embeddingDimensions ? t('speaker.embeddingDimensions', { count: profile.embeddingDimensions }) : t('speaker.noVoiceprint')}
-            </span>
-            <span className="truncate">
-              {profile.embeddingModelId ?? t('speaker.labelFallback')}
-            </span>
-            <span className="truncate text-right">
-              {t('speaker.aliasCount', { count: profile.aliases.length })}
-            </span>
-          </div>
-          {profile.aliases.length > 0 && (
-            <p className="mt-2 truncate text-[11px] text-muted-foreground/70">
-              {profile.aliases.join(', ')}
-            </p>
-          )}
-        </article>
-      ))}
-    </div>
-  )
-}
-
 function AudioTranscriptList({ transcripts }: { transcripts: ChronicleAudioTranscript[] }) {
   const { t } = useTranslation('chronicle')
 
@@ -1829,44 +1659,6 @@ function AudioProcessingBadge({
       {' '}
       {formatAudioProcessingStatus(t, status)}
     </Badge>
-  )
-}
-
-function MemoryCard({ entry, focused }: { entry: MemoryEntry, focused: boolean }) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <article
-      className={cn(
-        'rounded-lg bg-background p-3 shadow-sm transition-[box-shadow,background-color]',
-        focused
-          ? 'bg-primary/5 shadow-lg ring-2 ring-primary/40'
-          : 'shadow-[0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]',
-      )}
-      data-testid={`chronicle-memory-card-${entry.id}`}
-    >
-      <div className="mb-2 flex min-w-0 items-center gap-2">
-        <BrainIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-        <span className="truncate text-[13px] font-medium text-foreground">{entry.title ?? t('memory.fallbackTitle')}</span>
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          {entry.matchKind && (
-            <Badge variant="outline" className="text-[11px]">
-              {getMemoryMatchLabel(t, entry)}
-            </Badge>
-          )}
-          <Badge variant="secondary" className="text-[11px]">{formatMemoryType(t, entry.type)}</Badge>
-        </div>
-      </div>
-      <p className="line-clamp-4 text-[13px] leading-5 text-foreground">{entry.content}</p>
-      <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-        <span className="font-mono">{formatDateTime(t, entry.createdAt)}</span>
-        {entry.sourceCount !== null && entry.sourceCount !== undefined && (
-          <span>
-            {t('memory.sourceCount', { count: entry.sourceCount })}
-          </span>
-        )}
-      </div>
-    </article>
   )
 }
 
