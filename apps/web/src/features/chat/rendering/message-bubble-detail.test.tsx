@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useChatStore } from '~/store/chat'
 
-import { MessageBubbleById } from './message-bubble'
+import { MessageBubbleById } from '../transcript/containers/message-bubble-by-id'
 
 const sdkMocks = vi.hoisted(() => ({
   getChatSessionsBySessionIdMessages: vi.fn(),
