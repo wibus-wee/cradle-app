@@ -16,9 +16,10 @@ import { useRendererChatStore } from '~/store/renderer-chat'
 
 import { submitRuntimeToolApproval } from '../chat/commands/chat-response-command'
 import { getProviderThread, getProviderThreadTurns, providerThreadQueryKey, providerThreadTurnsQueryKey, subscribeProviderThreadStream } from '../chat/commands/provider-thread-command'
-import { ChatRenderStoreProvider, MessageBubble } from '../chat/rendering/message-bubble'
+import { ChatRenderStoreProvider } from '../chat/rendering/chat-render-store'
 import { SubagentIdenticon } from '../chat/rendering/subagent-identicon'
 import { isMatchingApprovalPart, readRuntimeUserInputRequestId } from '../chat/session/use-chat-session-types'
+import { MessageBubbleView } from '../chat/transcript/views/message-bubble-view'
 import { ChatStreamingHandler } from '../chat/transport/chat-streaming-handler'
 import { buildUIMessageChunkStreamFromResponse } from '../chat/transport/sse-chat-transport'
 
@@ -364,11 +365,12 @@ function ProviderThreadMessage({
   }
   return (
     <ChatRenderStoreProvider store={rendererChatStore}>
-      <MessageBubble
+      <MessageBubbleView
         message={message}
         isStreaming={isStreaming}
         executionDetailsDefaultOpen={false}
         onToolApprovalResponse={onToolApprovalResponse}
+        onCopy={text => navigator.clipboard.writeText(text)}
       />
     </ChatRenderStoreProvider>
   )

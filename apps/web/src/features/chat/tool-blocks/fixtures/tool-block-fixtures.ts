@@ -76,13 +76,13 @@ export const chatToolKindFixtures: ChatToolFixture[] = [
   createToolFixture({
     kind: 'file-read',
     apiName: 'Read',
-    args: { file_path: 'apps/web/src/features/chat/rendering/message-bubble.tsx' },
+    args: { file_path: 'apps/web/src/features/chat/transcript/views/message-bubble-view.tsx' },
     result: {
       type: 'text',
       file: {
-        filePath: 'apps/web/src/features/chat/rendering/message-bubble.tsx',
+        filePath: 'apps/web/src/features/chat/transcript/views/message-bubble-view.tsx',
         type: 'text',
-        content: 'export const MessageBubble = MessageBubbleView',
+        content: 'export function MessageBubbleView(props: MessageBubbleViewProps)',
         numLines: 1002,
       },
     },

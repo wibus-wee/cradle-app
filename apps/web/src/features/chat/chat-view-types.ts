@@ -6,7 +6,7 @@ import type { ComposerDecoration } from './composer/containers/composer-containe
 import type { ChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import type { MentionItem, PluginMentionItem } from './mentions/mention-panel'
 import type { SkillMentionItem } from './mentions/skill-mention-panel'
-import type { MessageTextTransform } from './rendering/message-bubble'
+import type { MessageTextTransform } from './rendering/message-bubble-selectors'
 import type { SendMessageOptions } from './session/use-chat-session'
 
 export interface ChatViewProps {

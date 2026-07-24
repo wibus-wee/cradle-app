@@ -2,10 +2,11 @@ import type { ReactNode } from 'react'
 
 import { cn } from '~/lib/cn'
 
-import type { MessageBubbleEditAction, MessageTextTransform } from '../../rendering/message-bubble'
+import type { MessageTextTransform } from '../../rendering/message-bubble-selectors'
 import type { useChatSession } from '../../session/use-chat-session'
 import { ChatMinimap } from '../../ui/chat-minimap'
 import type { ChatScrollRuntime } from '../../ui/use-chat-scroll-runtime'
+import type { MessageBubbleEditAction } from '../views/message-bubble-actions-view'
 import { ChatTranscriptContent } from './chat-transcript-content'
 
 type ChatSessionProjection = ReturnType<typeof useChatSession>

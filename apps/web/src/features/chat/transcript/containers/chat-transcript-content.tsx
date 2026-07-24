@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { MessageBubbleEditAction, MessageTextTransform } from '../../rendering/message-bubble'
-import { MessageBubbleById } from '../../rendering/message-bubble'
+import type { MessageTextTransform } from '../../rendering/message-bubble-selectors'
 import type { useChatSession } from '../../session/use-chat-session'
 import type { ChatScrollRuntime } from '../../ui/use-chat-scroll-runtime'
 import { ChatTranscriptView } from '../views/chat-transcript-view'
+import type { MessageBubbleEditAction } from '../views/message-bubble-actions-view'
+import { MessageBubbleById } from './message-bubble-by-id'
 
 type ChatSessionProjection = ReturnType<typeof useChatSession>
 

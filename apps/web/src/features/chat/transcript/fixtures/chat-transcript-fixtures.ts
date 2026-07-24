@@ -73,7 +73,7 @@ export const chatTranscriptFixture: UIMessage[] = [
     role: 'assistant',
     parts: [{
       type: 'text',
-      text: 'Yes. `ChatMessageListPane` remains the runtime container. It adapts message IDs into view rows, and each `MessageBubbleById` retains its bounded subscription. Storybook supplies the same rows from `UIMessage` fixtures through the props-only `MessageBubble` export.',
+      text: 'Yes. `ChatMessageListPane` remains the runtime container. It adapts message IDs into view rows, and each `MessageBubbleById` retains its bounded subscription. Storybook supplies the same rows from `UIMessage` fixtures through the props-only `MessageBubbleView` export.',
     }],
   },
 ]

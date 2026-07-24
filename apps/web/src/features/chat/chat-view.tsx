@@ -50,7 +50,6 @@ import {
   registerChatComposerFileIngressHandler,
   registerChatPromptIngressHandler,
 } from './prompt-ingress'
-import type { MessageBubbleEditAction } from './rendering/message-bubble'
 import { clearCodexThreadGoal, setCodexThreadGoal } from './runtime/codex-app-server-bridge'
 import { RuntimeSettingsControl } from './runtime/runtime-settings-control'
 import { resolveRuntimeCatalogItem } from './runtime/runtime-settings-presenter'
@@ -66,6 +65,7 @@ import {
 } from './slash-commands/chat-slash-commands'
 import { ThreadHandoffMenu } from './thread-handoff-menu'
 import { ChatMessageListPane } from './transcript/containers/chat-message-list-pane'
+import type { MessageBubbleEditAction } from './transcript/views/message-bubble-actions-view'
 import type { RollbackDraftSignal } from './ui/chat-composer-section'
 import { ChatComposerSection } from './ui/chat-composer-section'
 import { ChatGoalEditorDialog } from './ui/chat-goal-editor-dialog'

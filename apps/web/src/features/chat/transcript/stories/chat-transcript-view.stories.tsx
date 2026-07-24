@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { UIMessage } from 'ai'
 
-import { MessageBubble } from '../../rendering/message-bubble'
 import {
   chatTranscriptFixture,
   streamingChatTranscriptFixture,
 } from '../fixtures/chat-transcript-fixtures'
 import { ChatTranscriptView } from '../views/chat-transcript-view'
+import { MessageBubbleView } from '../views/message-bubble-view'
 
 interface TranscriptSceneProps {
   messages: UIMessage[]
@@ -26,7 +26,7 @@ function TranscriptScene({
   function renderMessage(message: UIMessage) {
     return (
       <div className="py-2.5">
-        <MessageBubble
+        <MessageBubbleView
           message={message}
           isStreaming={message.id === streamingMessageId}
         />

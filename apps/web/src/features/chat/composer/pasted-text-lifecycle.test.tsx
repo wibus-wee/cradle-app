@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { I18nProvider } from '~/i18n/client'
 
-import { MessageBubble } from '../rendering/message-bubble'
 import { buildOptimisticUserMessage } from '../session/optimistic-chat-turn'
+import { MessageBubbleView } from '../transcript/views/message-bubble-view'
 import { Composer } from './containers/composer-container'
 
 afterEach(cleanup)
@@ -46,7 +46,7 @@ function PastedTextLifecycleHarness({
         />
         {message
 ? (
-          <MessageBubble message={message} isStreaming={false} />
+          <MessageBubbleView message={message} isStreaming={false} onCopy={text => navigator.clipboard.writeText(text)} />
         )
 : null}
       </TooltipProvider>
