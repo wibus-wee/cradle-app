@@ -4,7 +4,7 @@ description: 'Install pnpm, set up Node.js, and install dependencies with cache'
 inputs:
   node-version:
     description: Node.js version to use
-    default: latest
+    default: 24
   install-deps:
     description: Whether to run pnpm install
     default: 'true'
