@@ -42,32 +42,38 @@ import type { ChronicleFocusTarget } from '~/store/settings-overlay'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import {
+  ChronicleActivityPipelineContainer,
+} from './chronicle-activity-pipeline-container'
+import {
   ChronicleEmptyState,
 } from './chronicle-empty-state'
 import {
   ChronicleResourceGridContainer,
 } from './chronicle-resource-grid-container'
+import {
+  formatChronicleDateTime as formatDateTime,
+  formatChronicleRelativeTime as formatRelativeTime,
+} from './chronicle-time-presenter'
+import {
+  ChronicleTimelineFeedContainer,
+} from './chronicle-timeline-feed-container'
 import type {
   ChronicleAccessibilityEvent,
   ChronicleAccessibilitySnapshot,
-  ChronicleActivitySegment,
   ChronicleAudioRawSegment,
   ChronicleAudioTranscript,
   ChronicleConfig,
   ChronicleDreamRun,
   ChronicleKnowledgeCard,
   ChronicleMessageSource,
-  ChroniclePipelineRun,
   ChronicleSlackSourceDraft,
   ChronicleSpeakerProfile,
   ChronicleStatus,
   MemoryEntry,
-  TimelineEntry,
 } from './use-chronicle.ts'
 import {
   useChronicleAccessibilityEvents,
   useChronicleAccessibilitySnapshots,
-  useChronicleActivityPipelineActions,
   useChronicleActivitySegments,
   useChronicleAudioRawSegments,
   useChronicleAudioTranscripts,
@@ -109,45 +115,6 @@ const AccessibilityTreeNodeSchema = z.object({
 const AccessibilitySnapshotMetadataSchema = z.object({
   artifactPath: z.string().optional(),
 }).passthrough()
-const TimestampMsSchema = z.union([
-  z.number().finite().transform(value => value < 1_000_000_000_000 ? value * 1000 : value),
-  z.string()
-    .transform(value => new Date(value).getTime())
-    .pipe(z.number().finite()),
-  z.null().transform(() => null),
-])
-
-function formatDateTime(t: ChronicleTranslate, value: string | number | null): string {
-  const time = TimestampMsSchema.parse(value)
-  if (time === null) {
-    return t('time.never')
-  }
-
-  return new Date(time).toLocaleString()
-}
-
-function formatRelativeTime(t: ChronicleTranslate, value: string | number | null): string {
-  const time = TimestampMsSchema.parse(value)
-  if (time === null) {
-    return t('time.never')
-  }
-
-  const diff = Date.now() - time
-  const seconds = Math.max(0, Math.floor(diff / 1000))
-  if (seconds < 60) {
-    return t('time.justNow')
-  }
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) {
-    return t('time.minutesAgo', { count: minutes })
-  }
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) {
-    return t('time.hoursAgo', { count: hours })
-  }
-  const days = Math.floor(hours / 24)
-  return t('time.daysAgo', { count: days })
-}
 
 interface ChronicleSetupNotice {
   title: string
@@ -620,7 +587,7 @@ export function ChronicleSettings() {
             ? <ChronicleEmptyState icon={<ImageIcon className="size-4" />} title={t('recentActivity.loading')} />
             : timelineEntries.length === 0
               ? <ChronicleEmptyState icon={<ImageIcon className="size-4" />} title={t('recentActivity.empty')} />
-              : <TimelineRecordFeed entries={timelineEntries} />}
+              : <ChronicleTimelineFeedContainer entries={timelineEntries} />}
         </SettingsRow>
 
         <div ref={memorySectionRef}>
@@ -782,7 +749,12 @@ export function ChronicleSettings() {
               ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.activitySegments.loading')} />
               : activitySegments.length === 0
                 ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.activitySegments.empty')} />
-                : <ActivityPipelinePanel segments={activitySegments} runs={pipelineRuns} />}
+                : (
+                    <ChronicleActivityPipelineContainer
+                      segments={activitySegments}
+                      runs={pipelineRuns}
+                    />
+                  )}
           </AdvancedDiagnosticSection>
           <div className="border-t border-border/60" />
 
@@ -1325,425 +1297,6 @@ function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: Chr
       {lastSyncMessage && <p className="text-[12px] text-muted-foreground">{lastSyncMessage}</p>}
     </div>
   )
-}
-
-type TimelineSourceFilter = 'all' | 'snapshot' | 'message' | 'audio'
-
-function TimelineRecordFeed({ entries }: { entries: TimelineEntry[] }) {
-  const { t } = useTranslation('chronicle')
-  const serverUrl = getServerUrl()
-  const [sourceFilter, setSourceFilter] = useState<TimelineSourceFilter>('all')
-  const [displayFilter, setDisplayFilter] = useState<number | null>(null)
-  const displayIds = useMemo(
-    () => Array.from(new Set(entries.map(entry => entry.displayId))).sort((left, right) => left - right),
-    [entries],
-  )
-  const filteredEntries = useMemo(
-    () => entries.filter((entry) => {
-      const sourceType = entry.sourceType ?? 'snapshot'
-      return (sourceFilter === 'all' || sourceType === sourceFilter)
-        && (displayFilter === null || entry.displayId === displayFilter)
-    }),
-    [displayFilter, entries, sourceFilter],
-  )
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2 rounded-lg bg-muted/30 p-2 sm:flex-row sm:items-center sm:justify-between">
-        <ToggleGroup
-          type="single"
-          value={sourceFilter}
-          onValueChange={(value) => {
-            if (isTimelineSourceFilter(value)) {
-              setSourceFilter(value)
-            }
-          }}
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label={t('timeline.filter.source.ariaLabel')}
-          className="w-full justify-start sm:w-auto"
-        >
-          <ToggleGroupItem value="all" aria-label={t('timeline.filter.all')} className="h-8 px-2 text-[11px]">
-            {t('timeline.filter.all')}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="snapshot" aria-label={t('timeline.source.snapshot')} className="h-8 px-2 text-[11px]">
-            {t('timeline.source.snapshot')}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="message" aria-label={t('timeline.source.message')} className="h-8 px-2 text-[11px]">
-            {t('timeline.source.message')}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="audio" aria-label={t('timeline.source.audio')} className="h-8 px-2 text-[11px]">
-            {t('timeline.source.audio')}
-          </ToggleGroupItem>
-        </ToggleGroup>
-
-        <select
-          value={displayFilter === null ? 'all' : String(displayFilter)}
-          aria-label={t('timeline.filter.display.ariaLabel')}
-          className="h-8 rounded-md border border-border bg-background px-2 text-[12px] text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={displayIds.length <= 1}
-          onChange={(event) => {
-            setDisplayFilter(event.target.value === 'all' ? null : Number(event.target.value))
-          }}
-        >
-          <option value="all">{t('timeline.filter.allDisplays')}</option>
-          {displayIds.map(displayId => (
-            <option key={displayId} value={displayId}>
-              {t('timeline.displayLabel', { displayId })}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="max-h-[420px] overflow-y-auto overscroll-contain pr-1">
-        {filteredEntries.length === 0
-          ? <ChronicleEmptyState icon={<ImageIcon className="size-4" />} title={t('timeline.filteredEmpty')} />
-          : (
-              <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-                {filteredEntries.map(entry => (
-                  <TimelineRecordItem
-                    key={`${entry.sourceType ?? 'snapshot'}:${entry.id}`}
-                    entry={entry}
-                    frameUrl={`${serverUrl}/chronicle/snapshots/${encodeURIComponent(entry.id)}/frame`}
-                  />
-                ))}
-              </div>
-            )}
-      </div>
-    </div>
-  )
-}
-
-function isTimelineSourceFilter(value: string): value is TimelineSourceFilter {
-  return value === 'all' || value === 'snapshot' || value === 'message' || value === 'audio'
-}
-
-function TimelineRecordItem({ entry, frameUrl }: { entry: TimelineEntry, frameUrl: string }) {
-  const { t } = useTranslation('chronicle')
-  const sourceType = entry.sourceType ?? 'snapshot'
-  const isSnapshot = sourceType === 'snapshot'
-  const sourceLabel = sourceType === 'audio'
-    ? t('timeline.source.audio')
-    : sourceType === 'message'
-      ? t('timeline.source.message')
-      : t('timeline.source.snapshot')
-  const title = getTimelineEntryTitle(t, entry)
-  const secondary = getTimelineEntrySecondaryLabel(t, entry)
-
-  return (
-    <article className="grid min-h-[96px] grid-cols-[92px_minmax(0,1fr)] gap-3 rounded-lg bg-background p-2.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] transition-shadow hover:shadow-[0_0_0_1px_rgba(0,0,0,0.1)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.06)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] sm:grid-cols-[120px_minmax(0,1fr)]">
-      <div className="h-[52px] w-[92px] overflow-hidden rounded-md bg-muted text-muted-foreground shadow-[0_0_0_1px_rgba(0,0,0,0.1)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] sm:h-[68px] sm:w-[120px]">
-        {isSnapshot && entry.framePath
-          ? (
-              <img
-                src={frameUrl}
-                alt={t('timeline.frameAlt', { time: formatDateTime(t, entry.capturedAt) })}
-                className="size-full object-contain"
-                loading="lazy"
-              />
-            )
-          : (
-              <div className="flex size-full items-center justify-center">
-                {sourceType === 'audio'
-                  ? <FileAudioIcon className="size-4" />
-                  : sourceType === 'message'
-                    ? <MessageSquareIcon className="size-4" />
-                    : <ImageIcon className="size-4" />}
-              </div>
-            )}
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px]">
-            {sourceLabel}
-          </Badge>
-          <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-[10px] tabular-nums">
-            {t('timeline.displayLabel', { displayId: entry.displayId })}
-          </Badge>
-          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-            {new Date(entry.capturedAt).toLocaleTimeString()}
-          </span>
-        </div>
-
-        <h4 className="truncate text-[13px] font-medium text-foreground">
-          {title}
-        </h4>
-        {secondary && (
-          <p className="truncate text-[11px] text-muted-foreground">
-            {secondary}
-          </p>
-        )}
-        {entry.ocrText
-          ? (
-              <p className="line-clamp-2 text-[12px] leading-5 text-muted-foreground">
-                {entry.ocrText}
-              </p>
-            )
-          : !entry.framePath && (
-              <p className="text-[12px] text-muted-foreground">
-                {t('timeline.frameUnavailable')}
-              </p>
-            )}
-      </div>
-    </article>
-  )
-}
-
-function getTimelineEntryTitle(t: ChronicleTranslate, entry: TimelineEntry): string {
-  if (entry.sourceType === 'audio') {
-    return entry.channelName ?? entry.windowTitle ?? t('timeline.fallback.audioTranscript')
-  }
-  if (entry.sourceType === 'message') {
-    return entry.channelName ? `#${entry.channelName}` : entry.channelId ?? t('timeline.fallback.slackMessage')
-  }
-  return entry.windowTitle ?? entry.appBundleId ?? t('timeline.fallback.screenRecord')
-}
-
-function getTimelineEntrySecondaryLabel(t: ChronicleTranslate, entry: TimelineEntry): string | null {
-  if (entry.sourceType === 'message') {
-    return entry.userName ?? t('timeline.fallback.unknownUser')
-  }
-  if (entry.appBundleId && entry.windowTitle) {
-    return entry.appBundleId
-  }
-  if (entry.platform) {
-    return entry.platform
-  }
-  return null
-}
-
-function ActivityPipelinePanel({
-  segments,
-  runs,
-}: {
-  segments: ChronicleActivitySegment[]
-  runs: ChroniclePipelineRun[]
-}) {
-  const { t } = useTranslation('chronicle')
-  const { triageSegment, summarizeSegment, crystallizeSegment, runPipelineTick, triaging, summarizing, crystallizing, ticking } = useChronicleActivityPipelineActions()
-  const busy = triaging || summarizing || crystallizing || ticking
-
-  return (
-    <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-      <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-        {segments.map(segment => (
-          <ActivitySegmentCard
-            key={segment.id}
-            segment={segment}
-            busy={busy}
-            onTriage={() => void triageSegment(segment.id)}
-            onSummarize={() => void summarizeSegment(segment.id)}
-            onCrystallize={() => void crystallizeSegment(segment.id)}
-          />
-        ))}
-      </div>
-      <div className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-        <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 items-center gap-2">
-            <CpuIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium text-foreground">{t('pipeline.runs.title')}</span>
-            <Badge variant="outline" className="text-[11px]">{runs.length}</Badge>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full sm:ml-auto sm:w-auto"
-            disabled={busy}
-            onClick={() => void runPipelineTick()}
-          >
-            <RefreshCwIcon className="size-3.5" />
-            {t('pipeline.runs.runNow')}
-          </Button>
-        </div>
-        {runs.length === 0
-          ? (
-              <p className="text-[12px] text-muted-foreground">{t('pipeline.runs.empty')}</p>
-            )
-          : (
-              <div className="flex flex-col gap-1.5">
-                {runs.slice(0, 8).map(run => (
-                  <div key={run.id} className="rounded-md bg-muted/40 px-2.5 py-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-[12px] font-medium text-foreground">
-                        {formatPipelineTrigger(t, run.trigger)}
-                      </span>
-                      <Badge
-                        variant={run.status === 'success' ? 'secondary' : 'outline'}
-                        className={cn(
-                          'ml-auto text-[11px]',
-                          {
-                            'border-destructive/20 bg-destructive/10 text-destructive': run.status === 'error',
-                            'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300': run.status === 'queued' || run.status === 'running',
-                          },
-                        )}
-                      >
-                        {formatPipelineRunStatus(t, run.status)}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                      <span className="truncate">{formatPipelineStage(t, run.stage)}</span>
-                      <span className="shrink-0 font-mono">{formatRelativeTime(t, run.startedAt)}</span>
-                    </div>
-                    {run.errorMessage && (
-                      <p className="mt-1 line-clamp-2 text-[11px] text-destructive">{run.errorMessage}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-      </div>
-    </div>
-  )
-}
-
-function ActivitySegmentCard({
-  segment,
-  busy,
-  onTriage,
-  onSummarize,
-  onCrystallize,
-}: {
-  segment: ChronicleActivitySegment
-  busy: boolean
-  onTriage: () => void
-  onSummarize: () => void
-  onCrystallize: () => void
-}) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <article className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-      <div className="mb-2 flex min-w-0 items-center gap-2">
-        <ActivityIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-        <span className="truncate text-[13px] font-medium text-foreground">
-          {segment.title ?? segment.frontApp ?? t('activitySegment.fallback.title')}
-        </span>
-        <Badge variant="outline" className="ml-auto text-[11px]">
-          {formatActivitySegmentType(t, segment.segmentType)}
-        </Badge>
-      </div>
-      <p className="line-clamp-3 min-h-15 text-[13px] leading-5 text-foreground">
-        {segment.summary ?? t('activitySegment.fallback.summary')}
-      </p>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-        <span className="truncate font-mono">{formatDateTime(t, segment.startedAt)}</span>
-        <span className="truncate text-right">{formatDurationSeconds(t, segment.durationSeconds)}</span>
-        <span className="truncate">{segment.frontApp ?? t('common.status.unknownApp')}</span>
-        <span className="truncate text-right">{formatActivityPipelineStatus(t, segment.pipelineStatus)}</span>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <ActivitySourceBadge label={t('activitySegment.source.screen')} value={segment.sourceCounts.snapshotIds ?? 0} />
-        <ActivitySourceBadge label="Slack" value={segment.sourceCounts.messageIds ?? 0} />
-        <ActivitySourceBadge label={t('activitySegment.source.audio')} value={segment.sourceCounts.audioRawSegmentIds ?? 0} />
-        <ActivitySourceBadge label={t('activitySegment.source.transcript')} value={segment.sourceCounts.audioTranscriptIds ?? 0} />
-        <ActivitySourceBadge label={t('activitySegment.source.memory')} value={segment.sourceCounts.memoryIds ?? 0} />
-      </div>
-      <div className="mt-3 flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || segment.pipelineStatus === 'summarized' || segment.pipelineStatus === 'crystallized'}
-          onClick={onTriage}
-        >
-          <CpuIcon className="size-3.5" />
-          {t('activitySegment.action.triage')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || segment.pipelineStatus === 'summarized' || segment.pipelineStatus === 'crystallized'}
-          onClick={onSummarize}
-        >
-          <BrainIcon className="size-3.5" />
-          {t('activitySegment.action.summarize')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || segment.pipelineStatus === 'crystallized'}
-          onClick={onCrystallize}
-        >
-          <CheckCircle2Icon className="size-3.5" />
-          {t('activitySegment.action.crystallize')}
-        </Button>
-      </div>
-    </article>
-  )
-}
-
-function ActivitySourceBadge({ label, value }: { label: string, value: number }) {
-  if (value <= 0) {
-    return null
-  }
-  return (
-    <Badge variant="secondary" className="text-[11px]">
-      {label}
-      {' '}
-      {value}
-    </Badge>
-  )
-}
-
-function formatActivitySegmentType(t: ChronicleTranslate, type: ChronicleActivitySegment['segmentType']): string {
-  if (type === 'meeting') { return t('activitySegment.type.meeting') }
-  if (type === 'browsing') { return t('activitySegment.type.browsing') }
-  if (type === 'chat') { return t('activitySegment.type.chat') }
-  if (type === 'audio') { return t('activitySegment.type.audio') }
-  if (type === 'idle') { return t('activitySegment.type.idle') }
-  if (type === 'work') { return t('activitySegment.type.work') }
-  return t('common.status.unknown')
-}
-
-function formatActivityPipelineStatus(t: ChronicleTranslate, status: ChronicleActivitySegment['pipelineStatus']): string {
-  if (status === 'triaged') { return t('activitySegment.pipelineStatus.triaged') }
-  if (status === 'summarized') { return t('activitySegment.pipelineStatus.summarized') }
-  if (status === 'crystallized') { return t('activitySegment.pipelineStatus.crystallized') }
-  if (status === 'error') { return t('common.status.error') }
-  return t('activitySegment.pipelineStatus.collecting')
-}
-
-function formatPipelineTrigger(t: ChronicleTranslate, trigger: ChroniclePipelineRun['trigger']): string {
-  if (trigger === 'audio-raw') { return t('pipeline.trigger.audioRaw') }
-  if (trigger === 'audio-transcript') { return t('pipeline.trigger.audioTranscript') }
-  if (trigger === 'message') { return t('pipeline.trigger.message') }
-  if (trigger === 'memory') { return t('pipeline.trigger.memory') }
-  if (trigger === 'summarize') { return t('pipeline.trigger.summarize') }
-  if (trigger === 'manual') { return t('pipeline.trigger.manual') }
-  return t('pipeline.trigger.snapshot')
-}
-
-function formatPipelineStage(t: ChronicleTranslate, stage: ChroniclePipelineRun['stage']): string {
-  if (stage === 'collection') { return t('pipeline.stage.collection') }
-  if (stage === 'triage') { return t('pipeline.stage.triage') }
-  if (stage === 'summarization') { return t('pipeline.stage.summarization') }
-  if (stage === 'crystallization') { return t('pipeline.stage.crystallization') }
-  return t('pipeline.stage.segmentation')
-}
-
-function formatPipelineRunStatus(t: ChronicleTranslate, status: ChroniclePipelineRun['status']): string {
-  if (status === 'success') { return t('common.status.completed') }
-  if (status === 'error') { return t('common.status.error') }
-  if (status === 'queued') { return t('common.status.queued') }
-  if (status === 'running') { return t('common.status.running') }
-  if (status === 'skipped') { return t('common.status.skipped') }
-  return t('common.status.unknown')
-}
-
-function formatDurationSeconds(t: ChronicleTranslate, value: number): string {
-  if (value < 60) { return t('duration.seconds', { count: Math.max(0, Math.floor(value)) }) }
-  const minutes = Math.floor(value / 60)
-  if (minutes < 60) { return t('duration.minutes', { count: minutes }) }
-  const hours = Math.floor(minutes / 60)
-  const remainder = minutes % 60
-  return remainder === 0
-    ? t('duration.hours', { count: hours })
-    : t('duration.hoursMinutes', { hours, minutes: remainder })
 }
 
 function formatKnowledgeCardType(t: ChronicleTranslate, type: ChronicleKnowledgeCard['cardType']): string {
