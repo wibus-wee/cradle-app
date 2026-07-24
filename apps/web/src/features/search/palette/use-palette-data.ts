@@ -20,7 +20,6 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { toastManager } from '~/components/ui/toast'
-import type { ThreadSearchHit } from '~/features/search/types'
 import { useThreadSearch } from '~/features/search/use-thread-search'
 import { getWorkspaceLocationLabel } from '~/features/workspace/types'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
@@ -38,7 +37,9 @@ import type {
   FileSearchAvailability,
   GlobalSearchFile,
   IssueSearchHit,
+  PaletteData,
   PaletteModeId,
+  RecentConversation,
   WorkspaceSearchHit,
 } from './types'
 import { useDebouncedValue } from './use-debounced-value'
@@ -320,11 +321,6 @@ function useIssueSearch(query: string, enabled: boolean) {
   }
 }
 
-export interface RecentConversation {
-  id: string
-  title: string | null
-}
-
 function useRecentConversations(enabled: boolean): RecentConversation[] {
   const { data } = useQuery({
     ...getSessionsOptions({}),
@@ -338,23 +334,6 @@ function useRecentConversations(enabled: boolean): RecentConversation[] {
   })
 
   return data ?? []
-}
-
-export interface PaletteData {
-  commands: CommandAction[]
-  filteredCommands: CommandAction[]
-  suggestedCommands: CommandAction[]
-  recentConversations: RecentConversation[]
-  files: GlobalSearchFile[]
-  workspaces: WorkspaceSearchHit[]
-  threads: ThreadSearchHit[]
-  issues: IssueSearchHit[]
-  fileWorkspaceId: string | null
-  fileAvailability: FileSearchAvailability
-  fileUnavailable: boolean
-  boardId: string | null
-  isPending: boolean
-  hasQuery: boolean
 }
 
 /** Keep the palette's landing data warm while its UI is closed. */
