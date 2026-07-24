@@ -14,8 +14,6 @@ import type {
   ChatRuntimePlanUiSlotState,
 } from '../capabilities/chat-capabilities'
 import type { ChatQueueEnqueueBody, ChatQueueItem } from '../commands/chat-response-command'
-import type { ComposerDecoration, ComposerRuntimeSettingsController } from '../composer/composer'
-import { Composer } from '../composer/composer'
 import type {
   ComposerSlashCommandActionContext,
   ComposerSlashCommandActionResult,
@@ -28,6 +26,8 @@ import type {
   ComposerUsageSlotActions,
 } from '../composer/composer-slot-states'
 import { ComposerSlotStates } from '../composer/composer-slot-states'
+import type { ComposerDecoration, ComposerRuntimeSettingsController } from '../composer/containers/composer-container'
+import { Composer } from '../composer/containers/composer-container'
 import type { ChatComposerRuntime } from '../composer/use-chat-composer-runtime'
 import type { ComposerAppshotRuntime } from '../composer/use-composer-appshot-capture'
 import type { ChatContextPart } from '../context/chat-context-parts'

@@ -3,30 +3,9 @@
 // Layer: Browser feature UI
 // Depends on: BrowserPanel Zustand metadata cache, Electron browser preload bridge
 
-import {
-  ArrowLeftLine as ArrowLeftIcon,
-  ArrowRightLine as ArrowRightIcon,
-  CameraLine as CameraIcon,
-  Chat1Line as MessageSquarePlusIcon,
-  CloseLine as XIcon,
-  Dashboard2Line as GaugeIcon,
-  DeleteLine as Trash2Icon,
-  ExternalLinkLine as ExternalLinkIcon,
-  FileLine as FileTextIcon,
-  GitCompareLine as FileDiffIcon,
-  GitPullRequestLine as PullRequestIcon,
-  GlobeLine as GlobeIcon,
-  LayoutTopLine as PanelTopIcon,
-  PencilLine as PencilIcon,
-  PlusLine as PlusIcon,
-  Refresh1Line as RefreshCwIcon,
-  RobotLine as BotIcon,
-  SendLine as SendIcon,
-  ServerLine as ServerIcon,
-  TerminalBoxLine as SquareTerminalIcon,
-} from '@mingcute/react'
+import { GlobeLine as GlobeIcon } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
-import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import {
   lazy,
   Suspense,
@@ -37,15 +16,9 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useTranslation } from 'react-i18next'
 
-import { Button } from '~/components/ui/button'
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '~/components/ui/empty'
-import { Input } from '~/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
-import { Spinner } from '~/components/ui/spinner'
 import {
-submitChatComposerContextIngress,
+  submitChatComposerContextIngress,
   submitChatComposerFileIngress,
   submitChatPromptIngress,
 } from '~/features/chat/prompt-ingress'
@@ -53,7 +26,6 @@ import { PullRequestDetailPanel } from '~/features/pull-requests/pull-request-de
 import type { TerminalMetadata } from '~/features/tui/terminal-metadata'
 import { WorkspaceFileEditor } from '~/features/workspace/workspace-file-editor'
 import { WorkspaceFilePreview } from '~/features/workspace/workspace-file-preview'
-import { cn } from '~/lib/cn'
 import type {
   BrowserAnnotationAnchor,
   BrowserAnnotationDesignChange,
@@ -77,6 +49,14 @@ import { useLayoutStore } from '~/store/layout'
 import { releaseSideConversation } from '../chat/commands/chat-response-command'
 import type { BrowserAnnotationAdjustmentApplyDetail } from './browser-annotation-adjustment-panel'
 import { BROWSER_ANNOTATION_ADJUSTMENT_APPLY_EVENT } from './browser-annotation-adjustment-panel'
+import {
+  countBrowserAnnotationDesignChanges,
+  formatBrowserAnnotationAnchor,
+} from './browser-annotation-presenter'
+import { BrowserAnnotationRailView } from './browser-annotation-rail-view'
+import { BrowserChromeStatusView } from './browser-chrome-status-view'
+import { BrowserNavigationToolbarView } from './browser-navigation-toolbar-view'
+import { BrowserNewTabSurfaceView } from './browser-new-tab-surface-view'
 import type { BrowserAddressSuggestion } from './browser-panel.logic'
 import {
   browserAddressDisplayValue,
@@ -85,10 +65,11 @@ import {
   resolveBrowserAddressSync,
   resolveBrowserChromeStatus,
 } from './browser-panel.logic'
+import { BrowserPanelCreateSurfaceView } from './browser-panel-create-surface-view'
+import { BrowserPanelTabStripView } from './browser-panel-tab-strip-view'
 import { ContextUsageReport } from './context-usage-report'
 import {
   BROWSER_NATIVE_SURFACE_OCCLUSION_ATTRIBUTE,
-  BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS,
   BROWSER_NATIVE_SURFACE_OCCLUSION_SELECTOR,
 } from './native-surface-occlusion'
 import { useNativeBrowserSurfaceSuppressionStore } from './native-surface-suppression'
@@ -101,7 +82,6 @@ import {
 } from './plan-refine-editor'
 import { SideConversationPanel } from './side-conversation-panel'
 import { SubagentOutputPanel } from './subagent-output-panel'
-import type { BrowserLocalServer } from './use-local-servers'
 import { useLocalServers } from './use-local-servers'
 import { WorkflowOutputPanel } from './workflow-output-panel'
 import { WorkspaceDiffViewer } from './workspace-diff-viewer'
@@ -115,8 +95,6 @@ interface BrowserPanelProps {
   nativeSurfaceVisible?: boolean
   onCloseLastTab?: (ownerId: string) => void
 }
-
-type ChromeKey = keyof typeof import('~/locales/default').default.chrome
 
 interface BrowserPromptAttachment {
   filename?: string
@@ -373,13 +351,6 @@ function getTabTitle(tab: BrowserTabState): string {
   return tab.url
 }
 
-function getPanelTabTitle(tab: BrowserPanelTab): string {
-  if (tab.kind === 'browser') {
-    return getTabTitle(tab)
-  }
-  return tab.title
-}
-
 function isBrowserPanelTab(tab: BrowserPanelTab): tab is BrowserWebTab {
   return tab.kind === 'browser'
 }
@@ -410,153 +381,6 @@ function isPlanRefineEditorSaveEvent(
 
 function isBrowserBlankTab(tab: BrowserWebTab | null): boolean {
   return (tab?.url.trim() ?? '') === 'about:blank'
-}
-
-function localServerStatusLabel(statusCode: number | null): string {
-  if (statusCode === null) {
-    return 'HTTP'
-  }
-  if (statusCode >= 200 && statusCode < 300) {
-    return 'Ready'
-  }
-  if (statusCode >= 300 && statusCode < 400) {
-    return `${statusCode} redirect`
-  }
-  return `${statusCode}`
-}
-
-interface BrowserNewTabSurfaceProps {
-  localServers: BrowserLocalServer[]
-  localServersLoading: boolean
-  localServersError: string | null
-  onOpenUrl: (url: string) => void
-  onRefreshLocalServers: () => void
-}
-
-const BrowserNewTabSurface = ({
-  localServers,
-  localServersLoading,
-  localServersError,
-  onOpenUrl,
-  onRefreshLocalServers,
-}: BrowserNewTabSurfaceProps) => {
-  const localServerCountLabel = localServersLoading
-    ? 'Scanning'
-    : `${localServers.length} local ${localServers.length === 1 ? 'server' : 'servers'}`
-
-  return (
-    <div className="absolute inset-0 overflow-auto bg-background text-foreground">
-      <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-5 py-10">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-medium text-foreground">New tab</h2>
-            <p className="mt-1 truncate text-xs text-muted-foreground">{localServerCountLabel}</p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-            onClick={onRefreshLocalServers}
-            disabled={localServersLoading}
-            aria-label="Refresh local servers"
-          >
-            <RefreshCwIcon className={cn('size-3.5', localServersLoading && 'animate-spin')} />
-          </Button>
-        </div>
-
-        <div className="grid overflow-hidden rounded-lg border border-border/60 bg-muted/20">
-          {localServers.map(server => (
-            <Button
-              key={server.url}
-              type="button"
-              variant="ghost"
-              className="group h-auto min-h-14 w-full min-w-0 justify-start gap-3 rounded-none border-b border-border/50 px-3 py-2 text-left font-normal whitespace-normal last:border-b-0 hover:bg-muted/50"
-              onClick={() => onOpenUrl(server.url)}
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/60">
-                <ServerIcon className="size-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium text-foreground">
-                  {server.title}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                  {`localhost:${server.port}`}
-                </span>
-              </span>
-              <span className="shrink-0 rounded-md bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground tabular-nums ring-1 ring-border/60">
-                {localServerStatusLabel(server.statusCode)}
-              </span>
-              <ExternalLinkIcon className="size-3.5 shrink-0 !text-muted-foreground transition-colors group-hover:!text-foreground" />
-            </Button>
-          ))}
-        </div>
-
-        {!localServersLoading && localServers.length === 0 && (
-          <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-xs text-muted-foreground">
-            {localServersError ?? 'No local servers found.'}
-          </div>
-        )}
-
-        {localServersLoading && localServers.length === 0 && (
-          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-8 text-center text-xs text-muted-foreground">
-            Scanning localhost.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-interface BrowserPanelCreateSurfaceProps {
-  canCreateTui: boolean
-  browserPending: boolean
-  onCreateBrowser: () => void
-  onCreateTui: () => void
-}
-
-function BrowserPanelCreateSurface({
-  canCreateTui,
-  browserPending,
-  onCreateBrowser,
-  onCreateTui,
-}: BrowserPanelCreateSurfaceProps) {
-  return (
-    <Empty className="absolute inset-0 rounded-none border-0 bg-background">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <PanelTopIcon className="size-4" aria-hidden="true" />
-        </EmptyMedia>
-        <EmptyTitle>New Tab</EmptyTitle>
-      </EmptyHeader>
-      <EmptyContent className="grid max-w-xs grid-cols-2 gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-20 flex-col gap-2 whitespace-normal px-3 py-3 text-xs"
-          onClick={onCreateBrowser}
-          disabled={browserPending}
-          aria-label="Create browser tab"
-        >
-          {browserPending ? <Spinner className="size-4" /> : <GlobeIcon className="size-4" />}
-          <span>Browser</span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-20 flex-col gap-2 whitespace-normal px-3 py-3 text-xs"
-          onClick={onCreateTui}
-          disabled={!canCreateTui}
-          aria-label="Create terminal tab"
-          title={canCreateTui ? 'Terminal' : 'Open a workspace to create a terminal.'}
-        >
-          <SquareTerminalIcon className="size-4" />
-          <span>Terminal</span>
-        </Button>
-      </EmptyContent>
-    </Empty>
-  )
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -786,20 +610,6 @@ async function captureBrowserAnnotationScreenshot(input: {
   }
 }
 
-function formatBrowserAnnotationAnchor(anchor: BrowserAnnotationAnchor): string {
-  if (anchor.kind === 'point') {
-    return `point (${Math.round(anchor.x)}, ${Math.round(anchor.y)})`
-  }
-  if (anchor.kind === 'element') {
-    const rect = anchor.element.rect
-    return `element <${anchor.element.tagName.toLowerCase()}> (${Math.round(rect.x)}, ${Math.round(rect.y)}, ${Math.round(rect.width)} x ${Math.round(rect.height)})`
-  }
-  if (anchor.kind === 'text') {
-    return `text "${anchor.text.slice(0, 96)}${anchor.text.length > 96 ? '...' : ''}" (${Math.round(anchor.x)}, ${Math.round(anchor.y)}, ${Math.round(anchor.width)} x ${Math.round(anchor.height)})`
-  }
-  return `region (${Math.round(anchor.x)}, ${Math.round(anchor.y)}, ${Math.round(anchor.width)} x ${Math.round(anchor.height)})`
-}
-
 function getBrowserAnnotationCropRect(
   anchor: BrowserAnnotationAnchor,
 ): BrowserAnnotationCropRect | null {
@@ -976,62 +786,10 @@ function formatBrowserAnnotationDesignChange(
   return rows.length > 0 ? ['Requested design changes:', ...rows] : []
 }
 
-function formatBrowserAnnotationSummary(annotation: BrowserAnnotationRecord): string {
-  if (annotation.body) {
-    return annotation.body
-  }
-  if (annotation.designChange) {
-    return 'Design change'
-  }
-  if (annotation.attachedImages.length > 0) {
-    return `${annotation.attachedImages.length} attached image${annotation.attachedImages.length === 1 ? '' : 's'}`
-  }
-  return formatBrowserAnnotationAnchor(annotation.anchor)
-}
-
-function countBrowserAnnotationDesignChanges(
-  designChange: BrowserAnnotationDesignChange | null,
-): number {
-  if (!designChange) {
-    return 0
-  }
-  return Object.values(designChange).filter(value => Boolean(value?.trim())).length
-}
-
 function hasBrowserAnnotationDesignChanges(
   designChange: BrowserAnnotationDesignChange | null | undefined,
 ): boolean {
   return countBrowserAnnotationDesignChanges(designChange ?? null) > 0
-}
-
-function getBrowserAnnotationPreviewTarget(
-  annotation: BrowserAnnotationRecord,
-): { style: CSSProperties, mode: 'point' | 'rect' } | null {
-  const { width, height } = annotation.surfaceSize
-  if (width <= 0 || height <= 0) {
-    return null
-  }
-  if (annotation.anchor.kind === 'point') {
-    return {
-      mode: 'point',
-      style: {
-        left: `${(annotation.anchor.x / width) * 100}%`,
-        top: `${(annotation.anchor.y / height) * 100}%`,
-      },
-    }
-  }
-
-  const rect
-    = annotation.anchor.kind === 'element' ? annotation.anchor.element.rect : annotation.anchor
-  return {
-    mode: 'rect',
-    style: {
-      left: `${(rect.x / width) * 100}%`,
-      top: `${(rect.y / height) * 100}%`,
-      width: `${(rect.width / width) * 100}%`,
-      height: `${(rect.height / height) * 100}%`,
-    },
-  }
 }
 
 function createBrowserAnnotationPrompt(input: {
@@ -1062,203 +820,6 @@ function createBrowserAnnotationPrompt(input: {
     .join('\n')
 }
 
-interface BrowserAnnotationRailProps {
-  annotations: BrowserAnnotationRecord[]
-  collapsed: boolean
-  onCollapsedChange: (collapsed: boolean) => void
-  onClear: () => void
-  onEdit: (annotation: BrowserAnnotationRecord) => void
-  onDelete: (annotationId: string) => void
-  onSend: (annotation: BrowserAnnotationRecord) => void
-}
-
-function BrowserAnnotationRail({
-  annotations,
-  collapsed,
-  onCollapsedChange,
-  onClear,
-  onEdit,
-  onDelete,
-  onSend,
-}: BrowserAnnotationRailProps) {
-  if (annotations.length === 0) {
-    return null
-  }
-
-  if (collapsed) {
-    return (
-      <div
-        {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
-        className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] items-start justify-end"
-      >
-        <Button
-          type="button"
-          size="icon"
-          className="relative size-10 animate-[browser-annotation-popup-enter_200ms_cubic-bezier(0.34,1.56,0.64,1)_both] rounded-full bg-primary text-primary-foreground shadow-[0_10px_34px_rgba(0,0,0,0.16),inset_0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur-md hover:scale-105 hover:bg-primary/90 active:scale-[0.96] motion-reduce:animate-none dark:shadow-[0_12px_40px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-          onClick={() => onCollapsedChange(false)}
-          aria-label={`Show ${annotations.length} browser annotations`}
-          aria-expanded="false"
-        >
-          <MessageSquarePlusIcon className="size-4" />
-          <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-background px-1.5 text-[10px] font-medium text-primary tabular-nums shadow-sm ring-2 ring-primary">
-            {annotations.length}
-          </span>
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
-      className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] items-start justify-end"
-    >
-      <div className="flex max-h-full w-72 origin-top-right animate-[browser-annotation-popup-enter_200ms_cubic-bezier(0.34,1.56,0.64,1)_both] flex-col overflow-hidden rounded-2xl bg-popover/95 text-popover-foreground shadow-[0_4px_24px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)] backdrop-blur-md motion-reduce:animate-none dark:bg-[#1a1a1a]/95 dark:shadow-[0_4px_24px_rgba(0,0,0,0.34),0_0_0_1px_rgba(255,255,255,0.08)]">
-        <div className="flex h-10 shrink-0 items-center justify-between gap-2 px-2">
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-auto min-w-0 justify-start gap-2 rounded-md px-2 py-1 text-left text-xs text-popover-foreground hover:bg-foreground/5"
-            onClick={() => onCollapsedChange(true)}
-            aria-label="Collapse browser annotations"
-            aria-expanded="true"
-          >
-            <MessageSquarePlusIcon className="size-3.5 shrink-0 !text-primary" />
-            <span className="truncate">Annotations</span>
-            <span className="rounded bg-foreground/7 px-1.5 py-0.5 text-[10px] text-muted-foreground tabular-nums">
-              {annotations.length}
-            </span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground"
-            onClick={onClear}
-            title="Clear all browser annotations"
-            aria-label="Clear all browser annotations"
-          >
-            <Trash2Icon className="size-3.5" />
-          </Button>
-        </div>
-        <div className="min-h-0 overflow-y-auto px-1.5 pb-1.5">
-          {annotations.map((annotation, index) => {
-            const previewTarget = getBrowserAnnotationPreviewTarget(annotation)
-            const designChangeCount = countBrowserAnnotationDesignChanges(annotation.designChange)
-            return (
-              <div
-                key={annotation.id}
-                className="group mb-1.5 grid grid-cols-[44px_minmax(0,1fr)] gap-2 rounded-lg p-1.5 transition-[background-color,scale] duration-150 ease-out last:mb-0 hover:bg-foreground/5 active:scale-[0.99]"
-              >
-                <div className="relative h-11 overflow-hidden rounded-md bg-muted ring-1 ring-border/60">
-                  <img
-                    src={annotation.screenshot.url}
-                    alt=""
-                    className="size-full object-cover"
-                    draggable={false}
-                  />
-                  <div className="absolute inset-0 bg-black/5" aria-hidden="true" />
-                  {previewTarget?.mode === 'rect' && (
-                    <span
-                      className="absolute rounded-[2px] border border-primary bg-primary/15 shadow-[0_0_0_1px_rgba(255,255,255,0.45)]"
-                      style={previewTarget.style}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {previewTarget?.mode === 'point' && (
-                    <span
-                      className="absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.7)]"
-                      style={previewTarget.style}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    className="absolute left-3 top-3 flex size-5 -translate-x-1/2 -translate-y-1/2 animate-[browser-annotation-marker-in_250ms_cubic-bezier(0.22,1,0.36,1)_both] items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.20),inset_0_0_0_1px_rgba(0,0,0,0.04)] motion-reduce:animate-none"
-                    style={{ animationDelay: `${index * 20}ms` }}
-                    aria-hidden="true"
-                  >
-                    {index + 1}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-popover-foreground">
-                      {formatBrowserAnnotationAnchor(annotation.anchor)}
-                    </span>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded px-1.5 py-0.5 text-[10px] tabular-nums',
-                        annotation.status === 'sent'
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-foreground/7 text-muted-foreground',
-                      )}
-                    >
-                      {annotation.status}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                    {formatBrowserAnnotationSummary(annotation)}
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-1">
-                    <span className="truncate text-[10px] text-muted-foreground/80">
-                      {designChangeCount > 0
-                        ? `${designChangeCount} ${designChangeCount === 1 ? 'adjustment' : 'adjustments'}`
-                        : 'Browser note'}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-0.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                        onClick={() => onEdit(annotation)}
-                        title="Edit browser annotation"
-                        aria-label="Edit browser annotation"
-                      >
-                        <PencilIcon className="size-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                        onClick={() => onDelete(annotation.id)}
-                        title="Delete browser annotation"
-                        aria-label="Delete browser annotation"
-                      >
-                        <Trash2Icon className="size-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                        onClick={() => onSend(annotation)}
-                        title={
-                          annotation.status === 'sent'
-                            ? 'Resend browser annotation'
-                            : 'Send browser annotation'
-                        }
-                        aria-label={
-                          annotation.status === 'sent'
-                            ? 'Resend browser annotation'
-                            : 'Send browser annotation'
-                        }
-                      >
-                        <SendIcon className="size-3" />
-                      </Button>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function BrowserPanel({
   ownerId = null,
   activeSessionId = null,
@@ -1268,7 +829,6 @@ export function BrowserPanel({
   nativeSurfaceVisible = true,
   onCloseLastTab,
 }: BrowserPanelProps) {
-  const { t } = useTranslation('chrome')
   const resolvedOwnerId = ownerId ?? DEFAULT_BROWSER_PANEL_OWNER_ID
   const selectBrowserState = selectOwnerBrowserState(resolvedOwnerId)
   const selectBrowserHistory = selectOwnerBrowserHistory(resolvedOwnerId)
@@ -2807,6 +2367,71 @@ export function BrowserPanel({
     })
   }
 
+  const handleGoBack = () => {
+    const bridge = readBrowserBridge()
+    if (!bridge || !activeBrowserTabId) {
+      return
+    }
+    void runBrowserAction(async () => {
+      upsertOwnerState(
+        await bridge.goBack({
+          threadId: resolvedOwnerId,
+          tabId: activeBrowserTabId,
+        }),
+      )
+    })
+  }
+
+  const handleGoForward = () => {
+    const bridge = readBrowserBridge()
+    if (!bridge || !activeBrowserTabId) {
+      return
+    }
+    void runBrowserAction(async () => {
+      upsertOwnerState(
+        await bridge.goForward({
+          threadId: resolvedOwnerId,
+          tabId: activeBrowserTabId,
+        }),
+      )
+    })
+  }
+
+  const handleReload = () => {
+    const bridge = readBrowserBridge()
+    if (!bridge || !activeBrowserTabId) {
+      return
+    }
+    void runBrowserAction(async () => {
+      upsertOwnerState(
+        await bridge.reload({
+          threadId: resolvedOwnerId,
+          tabId: activeBrowserTabId,
+        }),
+      )
+    })
+  }
+
+  const handleAddressFocus = () => {
+    setIsEditingAddress(true)
+    setSuggestionsOpen(true)
+  }
+
+  const handleAddressBlur = () => {
+    window.setTimeout(() => {
+      setIsEditingAddress(false)
+      setSuggestionsOpen(false)
+    }, 120)
+  }
+
+  const handleAddressChange = (nextValue: string) => {
+    setAddressValue(nextValue)
+    if (activeBrowserTabId) {
+      addressDraftByTabIdRef.current.set(activeBrowserTabId, nextValue)
+    }
+    setSuggestionsOpen(true)
+  }
+
   useEffect(() => {
     const handleDirtyEvent = (event: Event) => {
       if (!isPlanRefineEditorDirtyEvent(event)) {
@@ -2889,353 +2514,44 @@ export function BrowserPanel({
       data-browser-panel-ready="true"
       onKeyDownCapture={handlePanelKeyDown}
     >
-      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/50 bg-card px-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-          {tabs.map(tab => (
-            <div
-              key={tab.id}
-              className={cn(
-                'group flex h-7 max-w-44 shrink-0 items-center rounded-md text-[11px] transition-colors',
-                tab.id === resolvedActivePanelTabId
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground',
-              )}
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-full min-w-0 flex-1 justify-start gap-1.5 rounded-l-md rounded-r-none py-1 pl-2 pr-1 text-left text-[11px] font-normal hover:bg-transparent"
-                onClick={() => handleSelectTab(tab.id)}
-                aria-current={tab.id === resolvedActivePanelTabId ? 'page' : undefined}
-              >
-                {tab.kind === 'browser' && tab.isLoading && (
-                  <Spinner
-                    className="size-3 shrink-0 animate-spin !text-primary"
-                    aria-hidden="true"
-                  />
-                )}
-                {tab.kind === 'browser' && !tab.isLoading && tab.faviconUrl && (
-                  <img src={tab.faviconUrl} alt="" className="size-3 shrink-0 rounded-sm" />
-                )}
-                {tab.kind === 'browser' && !tab.isLoading && !tab.faviconUrl && (
-                  <GlobeIcon
-                    className="size-3 shrink-0 !text-muted-foreground/60"
-                    aria-hidden="true"
-                  />
-                )}
-                {tab.kind === 'workspace-file' && (
-                  <FileTextIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'workspace-diff' && (
-                  <FileDiffIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'pull-request' && (
-                  <PullRequestIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'subagent' && (
-                  <BotIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'workflow' && (
-                  <BotIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'side-conversation' && (
-                  <MessageSquarePlusIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'context-usage-report' && (
-                  <GaugeIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'launcher' && (
-                  <PlusIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'tui' && (
-                  <SquareTerminalIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'plan-document' && (
-                  <PanelTopIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                {tab.kind === 'plan-refine' && (
-                  <PencilIcon className="size-3 shrink-0 !text-muted-foreground/60" />
-                )}
-                <span className="truncate">{getPanelTabTitle(tab)}</span>
-                {tab.kind === 'browser'
-                  && tab.sessionId
-                  && tab.sessionId !== activeSessionId
-                  && tab.sessionTitle && (
-                    <span
-                      className="ml-0.5 shrink-0 rounded-sm bg-foreground/7 px-1 text-[9px] text-muted-foreground"
-                      aria-label={`From ${tab.sessionTitle}`}
-                    >
-                      {tab.sessionTitle}
-                    </span>
-                  )}
-              </Button>
-              <Popover
-                open={discardPromptTabId === tab.id}
-                onOpenChange={(open) => {
-                  if (!open && discardPromptTabId === tab.id) {
-                    setDiscardPromptTabId(null)
-                  }
-                }}
-              >
-                <PopoverTrigger
-                  render={(
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      className="mr-0.5 size-5 shrink-0 rounded-sm text-muted-foreground/60 opacity-0 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                      onClick={() => handleCloseTab(tab.id)}
-                      aria-label={`Close ${getPanelTabTitle(tab)}`}
-                      aria-haspopup={tab.kind === 'plan-refine' ? 'dialog' : undefined}
-                    >
-                      <XIcon className="size-3" />
-                    </Button>
-                  )}
-                />
-                {tab.kind === 'plan-refine' && (
-                  <PopoverContent side="bottom" align="end" className="w-64 gap-2 p-3">
-                    <div className="space-y-1">
-                      <div className="text-xs font-medium text-foreground">Discard changes?</div>
-                      <div className="text-[11px] leading-4 text-muted-foreground">
-                        This plan has unsaved edits.
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-1.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => setDiscardPromptTabId(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="xs"
-                        onClick={() => handleDiscardPlanRefineTab(tab.id)}
-                      >
-                        Discard
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                )}
-              </Popover>
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-40"
-            onClick={handleNewTab}
-            aria-label="New panel tab"
-            title="New panel tab"
-          >
-            <PlusIcon className="size-3.5" />
-          </Button>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="size-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-          onClick={handleOpenContextUsageReport}
-          disabled={!activeSessionId}
-          aria-label="Open context usage report"
-          title="Context Usage Report"
-        >
-          <GaugeIcon className="size-3.5" />
-        </Button>
-      </div>
+      <BrowserPanelTabStripView
+        tabs={tabs}
+        activeTabId={resolvedActivePanelTabId}
+        activeSessionId={activeSessionId}
+        discardPromptTabId={discardPromptTabId}
+        contextUsageAvailable={Boolean(activeSessionId)}
+        onSelectTab={handleSelectTab}
+        onRequestCloseTab={handleCloseTab}
+        onDiscardPromptChange={setDiscardPromptTabId}
+        onDiscardTab={handleDiscardPlanRefineTab}
+        onNewTab={handleNewTab}
+        onOpenContextUsage={handleOpenContextUsageReport}
+      />
 
       {activeBrowserTab && (
-        <div className="relative flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-card px-2">
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-              disabled={!activeBrowserTab?.canGoBack}
-              onClick={() => {
-                const bridge = readBrowserBridge()
-                if (bridge && activeBrowserTabId) {
-                  void runBrowserAction(async () => {
-                    upsertOwnerState(
-                      await bridge.goBack({ threadId: resolvedOwnerId, tabId: activeBrowserTabId }),
-                    )
-                  })
-                }
-              }}
-              aria-label="Go back"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-              disabled={!activeBrowserTab?.canGoForward}
-              onClick={() => {
-                const bridge = readBrowserBridge()
-                if (bridge && activeBrowserTabId) {
-                  void runBrowserAction(async () => {
-                    upsertOwnerState(
-                      await bridge.goForward({
-                        threadId: resolvedOwnerId,
-                        tabId: activeBrowserTabId,
-                      }),
-                    )
-                  })
-                }
-              }}
-              aria-label="Go forward"
-            >
-              <ArrowRightIcon className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="size-7 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground"
-              disabled={!nativeBrowserAvailable || !activeBrowserTabId}
-              onClick={() => {
-                const bridge = readBrowserBridge()
-                if (bridge && activeBrowserTabId) {
-                  void runBrowserAction(async () => {
-                    upsertOwnerState(
-                      await bridge.reload({
-                        threadId: resolvedOwnerId,
-                        tabId: activeBrowserTabId,
-                      }),
-                    )
-                  })
-                }
-              }}
-              aria-label="Reload"
-            >
-              <RefreshCwIcon
-                className={cn('size-3.5', activeBrowserTab?.isLoading && 'animate-spin')}
-              />
-            </Button>
-          </div>
-
-          <form className="relative min-w-0 flex-1" onSubmit={handleAddressSubmit}>
-            <Input
-              type="text"
-              value={addressValue}
-              placeholder="Search or enter address"
-              aria-label="Search or enter address"
-              disabled={!nativeBrowserAvailable || !activeBrowserTab}
-              className="h-7 w-full rounded-md border-0 bg-foreground/5 px-3 text-xs shadow-none placeholder:text-muted-foreground/50 focus:bg-foreground/8 focus-visible:ring-0 md:text-xs"
-              onFocus={() => {
-                setIsEditingAddress(true)
-                setSuggestionsOpen(true)
-              }}
-              onBlur={() => {
-                window.setTimeout(() => {
-                  setIsEditingAddress(false)
-                  setSuggestionsOpen(false)
-                }, 120)
-              }}
-              onChange={(event) => {
-                const nextValue = event.target.value
-                setAddressValue(nextValue)
-                if (activeBrowserTabId) {
-                  addressDraftByTabIdRef.current.set(activeBrowserTabId, nextValue)
-                }
-                setSuggestionsOpen(true)
-              }}
-            />
-            {suggestionsOpen && suggestions.length > 0 && (
-              <div
-                className="absolute left-0 right-0 top-8 z-20 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-lg"
-                {...BROWSER_NATIVE_SURFACE_OCCLUSION_PROPS}
-              >
-                {suggestions.map(suggestion => (
-                  <Button
-                    key={suggestion.id}
-                    type="button"
-                    variant="ghost"
-                    className="h-auto w-full min-w-0 justify-start gap-2 rounded-none px-2 py-1.5 text-left text-xs font-normal hover:bg-foreground/5"
-                    onMouseDown={event => event.preventDefault()}
-                    onClick={() => handleSuggestion(suggestion)}
-                  >
-                    {suggestion.faviconUrl && (
-                      <img
-                        src={suggestion.faviconUrl}
-                        alt=""
-                        className="size-3.5 shrink-0 rounded-sm"
-                      />
-                    )}
-                    {!suggestion.faviconUrl && (
-                      <GlobeIcon
-                        className="size-3.5 shrink-0 !text-muted-foreground/60"
-                        aria-hidden="true"
-                      />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-foreground">{suggestion.title}</span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        {suggestion.detail}
-                      </span>
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            )}
-          </form>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-7 shrink-0 rounded-md text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"
-            disabled={!nativeBrowserAvailable || !activeBrowserTabId}
-            onClick={handleCaptureScreenshot}
-            aria-label="Attach screenshot to composer"
-          >
-            <CameraIcon className="size-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-7 shrink-0 gap-1 rounded-md px-2 text-xs disabled:opacity-30',
-              hasActiveAnnotationSession
-                ? 'bg-primary/12 text-primary hover:bg-primary/16'
-                : 'text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground',
-            )}
-            disabled={!nativeBrowserAvailable || !activeBrowserTabId}
-            onClick={hasActiveAnnotationSession ? handleCancelAnnotation : handleStartAnnotation}
-            aria-label={
-              hasActiveAnnotationSession
-                ? t('browser.annotation.cancel' as ChromeKey)
-                : t('browser.annotation.comment' as ChromeKey)
-            }
-            title={t('browser.annotation.toggleTitle' as ChromeKey)}
-          >
-            <MessageSquarePlusIcon className="size-3.5" />
-            <span>{t('browser.annotation.comment' as ChromeKey)}</span>
-          </Button>
-        </div>
+        <BrowserNavigationToolbarView
+          activeTab={activeBrowserTab}
+          addressValue={addressValue}
+          suggestions={suggestions}
+          suggestionsOpen={suggestionsOpen}
+          nativeBrowserAvailable={nativeBrowserAvailable}
+          annotationActive={hasActiveAnnotationSession}
+          onBack={handleGoBack}
+          onForward={handleGoForward}
+          onReload={handleReload}
+          onAddressChange={handleAddressChange}
+          onAddressFocus={handleAddressFocus}
+          onAddressBlur={handleAddressBlur}
+          onAddressSubmit={handleAddressSubmit}
+          onSuggestionSelect={handleSuggestion}
+          onCaptureScreenshot={handleCaptureScreenshot}
+          onToggleAnnotation={
+            hasActiveAnnotationSession ? handleCancelAnnotation : handleStartAnnotation
+          }
+        />
       )}
 
-      {chromeStatus && (
-        <div
-          className={cn(
-            'flex h-7 shrink-0 items-center border-b px-3 text-[11px]',
-            chromeStatus.tone === 'error'
-              ? 'border-destructive/20 bg-destructive/8 text-destructive'
-              : 'border-border/40 bg-muted/40 text-muted-foreground',
-          )}
-        >
-          {chromeStatus.label}
-        </div>
-      )}
+      {chromeStatus && <BrowserChromeStatusView status={chromeStatus} />}
 
       <div className="relative min-h-0 flex-1 overflow-hidden bg-background">
         {activePanelTab?.kind === 'browser' && (
@@ -3249,7 +2565,7 @@ export function BrowserPanel({
                 </div>
               )}
               {nativeBrowserAvailable && activeBrowserTabIsBlank && (
-                <BrowserNewTabSurface
+                <BrowserNewTabSurfaceView
                   localServers={localServers}
                   localServersLoading={localServersLoading}
                   localServersError={localServersError}
@@ -3258,7 +2574,7 @@ export function BrowserPanel({
                 />
               )}
               {!hasActiveAnnotationSession && (
-                <BrowserAnnotationRail
+                <BrowserAnnotationRailView
                   annotations={activeBrowserAnnotations}
                   collapsed={annotationTrayCollapsed}
                   onCollapsedChange={collapsed =>
@@ -3361,7 +2677,7 @@ export function BrowserPanel({
         )}
 
         {activePanelTab?.kind === 'launcher' && (
-          <BrowserPanelCreateSurface
+          <BrowserPanelCreateSurfaceView
             canCreateTui={canCreateTuiTab}
             browserPending={newTabRequestPending}
             onCreateBrowser={() => handleCreateBrowserTab(activePanelTab.id)}
@@ -3402,7 +2718,7 @@ export function BrowserPanel({
         )}
 
         {!activePanelTab && (
-          <BrowserPanelCreateSurface
+          <BrowserPanelCreateSurfaceView
             canCreateTui={canCreateTuiTab}
             browserPending={newTabRequestPending}
             onCreateBrowser={() => handleCreateBrowserTab()}

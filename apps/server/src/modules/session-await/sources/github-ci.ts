@@ -136,8 +136,7 @@ const GitHubRepoSchema = z.string().min(1).regex(/^[^/]+\/[^/]+$/).transform((re
     return { owner, repo }
   })
 
-const GitHubCIFilterSchema = z.object({
-  repo: GitHubRepoSchema,
+const GitHubCIFilterFieldsSchema = z.object({
   pr: z.number().int().positive().optional(),
   sha: z.string().min(1).optional(),
   runs_id: z.number().int().positive().optional(),
@@ -147,25 +146,69 @@ const GitHubCIFilterSchema = z.object({
   headSha: z.string().min(1).optional(),
   workId: z.string().min(1).optional(),
   allowNoChecksAfterSeconds: z.number().int().nonnegative().default(DEFAULT_NO_CHECKS_GRACE_SECONDS),
-}).transform((filter) => {
+})
+
+const GitHubCIFilterSchema = z.union([
+  GitHubCIFilterFieldsSchema.extend({ repo: GitHubRepoSchema })
+    .transform(({ repo, ...filter }) => ({ ...filter, owner: repo.owner, repo: repo.repo })),
+  // A previous head-update serializer persisted the parsed representation.
+  // Continue checking those pending awaits, then replace it with the canonical
+  // `{ repo: "owner/repo" }` representation below.
+  GitHubCIFilterFieldsSchema.extend({
+    owner: z.string().min(1),
+    repo: z.string().min(1).regex(/^[^/]+$/),
+  }),
+]).transform((filter) => {
   const checkRunId = filter.runs_id ?? filter.checkRunId ?? filter.runId
   return { ...filter, checkRunId }
 }).refine(filter => [filter.pr, filter.sha, filter.checkRunId].filter(value => value !== undefined).length === 1, {
   message: 'GitHub CI filter requires exactly one of pr, sha, or runs_id',
 }).refine(filter => filter.headSha === undefined || filter.pr !== undefined, {
   message: 'GitHub CI headSha requires a PR target',
-}).transform(({ repo, ...filter }) => ({
+}).transform(filter => ({
   ...filter,
-  owner: repo.owner,
-  repo: repo.repo,
   statusRef: filter.sha ?? '',
 }))
+
+const LegacyGitHubCIFilterSchema = z.object({
+  owner: z.string().min(1),
+  repo: z.string().min(1).regex(/^[^/]+$/),
+})
+
+function isLegacyGitHubCIFilter(filterJson: string): boolean {
+  return LegacyGitHubCIFilterSchema.safeParse(JSON.parse(filterJson)).success
+}
 
 export const GitHubCIFilterJsonSchema = z.string()
   .transform(raw => JSON.parse(raw))
   .pipe(GitHubCIFilterSchema)
 
 type GitHubCIFilter = z.infer<typeof GitHubCIFilterSchema>
+
+function serializeGitHubCIFilter(filter: GitHubCIFilter): string {
+  const target = filter.pr !== undefined
+    ? { pr: filter.pr }
+    : filter.sha !== undefined
+      ? { sha: filter.sha }
+      : { runs_id: filter.checkRunId }
+
+  return JSON.stringify({
+    repo: `${filter.owner}/${filter.repo}`,
+    ...target,
+    ...(filter.mode === undefined ? {} : { mode: filter.mode }),
+    ...(filter.headSha === undefined ? {} : { headSha: filter.headSha }),
+    ...(filter.workId === undefined ? {} : { workId: filter.workId }),
+    ...(filter.allowNoChecksAfterSeconds === DEFAULT_NO_CHECKS_GRACE_SECONDS
+      ? {}
+      : { allowNoChecksAfterSeconds: filter.allowNoChecksAfterSeconds }),
+  })
+}
+
+function pendingResult(awaitId: string, filter: GitHubCIFilter, needsNormalization: boolean): CheckResult {
+  return needsNormalization
+    ? { awaitId, matched: false, filterUpdate: serializeGitHubCIFilter(filter) }
+    : { awaitId, matched: false }
+}
 
 async function resolveTarget(filter: GitHubCIFilter): Promise<ResolvedCITarget | null> {
   let ref = filter.sha
@@ -220,8 +263,11 @@ function buildTerminalResult(awaitId: string, target: ResolvedCITarget, filter: 
   // headSha mismatch means the await is stale (new push happened).
   // Silently update the filter to track the new head instead of resuming.
   if (target.currentHeadSha !== target.ref) {
-    const updatedFilter = { ...filter, headSha: target.currentHeadSha, targetUrl: null }
-    return { awaitId, matched: false, filterUpdate: JSON.stringify(updatedFilter) }
+    return {
+      awaitId,
+      matched: false,
+      filterUpdate: serializeGitHubCIFilter({ ...filter, headSha: target.currentHeadSha }),
+    }
   }
 
   const outcome = target.merged
@@ -527,113 +573,126 @@ export const githubCISource: SessionAwaitSource = {
     const results: CheckResult[] = []
 
     for (const row of awaits) {
-      const filter = GitHubCIFilterJsonSchema.parse(row.filterJson)
-      const perAwaitBypassed = row.bypassedChecksJson ? JSON.parse(row.bypassedChecksJson) as string[] : []
-
-      let target: ResolvedCITarget | null
       try {
-        target = await resolveTarget(filter)
-      }
-      catch (err) {
-        if (isGitHubMissingTarget(err)) {
-          results.push({ awaitId: row.id, matched: false, permanentError: buildMissingTargetMessage(filter) })
+        const filter = GitHubCIFilterJsonSchema.parse(row.filterJson)
+        const needsNormalization = isLegacyGitHubCIFilter(row.filterJson)
+        const perAwaitBypassed = row.bypassedChecksJson ? JSON.parse(row.bypassedChecksJson) as string[] : []
+
+        let target: ResolvedCITarget | null
+        try {
+          target = await resolveTarget(filter)
+        }
+        catch (err) {
+          if (isGitHubMissingTarget(err)) {
+            results.push({ awaitId: row.id, matched: false, permanentError: buildMissingTargetMessage(filter) })
+            continue
+          }
+          results.push({ awaitId: row.id, matched: false, transientError: 'Unable to resolve GitHub CI target' })
           continue
         }
-        results.push({ awaitId: row.id, matched: false, transientError: 'Unable to resolve GitHub CI target' })
-        continue
-      }
-      if (!target) {
-        results.push({ awaitId: row.id, matched: false, transientError: 'Unable to resolve GitHub CI target' })
-        continue
-      }
-
-      const terminalResult = buildTerminalResult(row.id, target, filter)
-      if (terminalResult) {
-        results.push(terminalResult)
-        continue
-      }
-
-      let aggregate: AggregatedCI | null
-      let workflowAggregate: AggregatedWorkflowRuns | null
-      try {
-        ;[aggregate, workflowAggregate] = await Promise.all([
-          fetchAggregatedCI(target),
-          fetchAggregatedWorkflowRuns(target),
-        ])
-      }
-      catch (err) {
-        if (isGitHubMissingTarget(err)) {
-          results.push({ awaitId: row.id, matched: false, permanentError: buildMissingTargetMessage(filter) })
+        if (!target) {
+          results.push({ awaitId: row.id, matched: false, transientError: 'Unable to resolve GitHub CI target' })
           continue
         }
-        results.push({ awaitId: row.id, matched: false, transientError: 'GitHub CI API unavailable' })
-        continue
-      }
-      if (!aggregate) {
-        results.push({ awaitId: row.id, matched: false, transientError: 'GitHub CI API unavailable' })
-        continue
-      }
-      if (!workflowAggregate) {
-        results.push({ awaitId: row.id, matched: false, transientError: 'GitHub Actions API unavailable' })
-        continue
-      }
 
-      if (workflowAggregate.pendingCount) {
-        results.push({ awaitId: row.id, matched: false })
-        continue
-      }
-
-      const workspacePatterns = getMatchingBypassPatterns(row.workspaceId, `${target.owner}/${target.repo}`)
-      const requiredContexts = target.baseBranch
-        ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))?.requiredContexts ?? []
-        : []
-      aggregate = filterBypassedCI(aggregate, perAwaitBypassed, workspacePatterns, new Set(requiredContexts))
-
-      if (aggregate.totalCount === 0) {
-        const graceSeconds = filter.allowNoChecksAfterSeconds
-        const ageSeconds = Math.floor(Date.now() / 1000) - row.createdAt
-        if (ageSeconds > graceSeconds) {
-          results.push({
-            awaitId: row.id,
-            matched: true,
-            resumeText: 'No GitHub checks or commit statuses were found. Proceeding without CI signals.',
-            resumePayloadJson: buildCIResumePayload(target, aggregate, true),
-          })
+        const terminalResult = buildTerminalResult(row.id, target, filter)
+        if (terminalResult) {
+          results.push(terminalResult)
+          continue
         }
-        else {
-          results.push({ awaitId: row.id, matched: false })
+
+        let aggregate: AggregatedCI | null
+        let workflowAggregate: AggregatedWorkflowRuns | null
+        try {
+          ;[aggregate, workflowAggregate] = await Promise.all([
+            fetchAggregatedCI(target),
+            fetchAggregatedWorkflowRuns(target),
+          ])
         }
-        continue
-      }
+        catch (err) {
+          if (isGitHubMissingTarget(err)) {
+            results.push({ awaitId: row.id, matched: false, permanentError: buildMissingTargetMessage(filter) })
+            continue
+          }
+          results.push({ awaitId: row.id, matched: false, transientError: 'GitHub CI API unavailable' })
+          continue
+        }
+        if (!aggregate) {
+          results.push({ awaitId: row.id, matched: false, transientError: 'GitHub CI API unavailable' })
+          continue
+        }
+        if (!workflowAggregate) {
+          results.push({ awaitId: row.id, matched: false, transientError: 'GitHub Actions API unavailable' })
+          continue
+        }
 
-      if (!aggregate.allCompleted) {
-        results.push({ awaitId: row.id, matched: false })
-        continue
-      }
+        if (workflowAggregate.pendingCount) {
+          results.push(pendingResult(row.id, filter, needsNormalization))
+          continue
+        }
 
-      results.push({
-        awaitId: row.id,
-        matched: true,
-        resumeText: aggregate.allPassed && !workflowAggregate.failureCount
-          ? `GitHub checks passed. All ${aggregate.totalCount} checks/statuses succeeded.`
-          : `GitHub checks completed with failures. ${[
-              buildSummary(aggregate),
-              ...workflowAggregate.workflowRuns
-                .filter(run => run.status === 'completed' && (!run.conclusion || !PASSING_CHECK_CONCLUSIONS.has(run.conclusion)))
-                .map(run => `${run.name ?? `Workflow ${run.id}`}: ${run.conclusion ?? 'unknown'}`),
-            ].filter(Boolean).join(', ')}`,
-        resumePayloadJson: JSON.stringify({
-          ...JSON.parse(buildCIResumePayload(target, aggregate)),
-          allSuccess: aggregate.allPassed && !workflowAggregate.failureCount,
-          workflowFailureCount: workflowAggregate.failureCount,
-          workflowRuns: workflowAggregate.workflowRuns.map(run => ({
-            id: run.id,
-            name: run.name,
-            status: run.status,
-            conclusion: run.conclusion,
-          })),
-        }),
-      })
+        const workspacePatterns = getMatchingBypassPatterns(row.workspaceId, `${target.owner}/${target.repo}`)
+        let requiredContexts: string[]
+        try {
+          requiredContexts = target.baseBranch
+            ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))?.requiredContexts ?? []
+            : []
+        }
+        catch {
+          results.push({ awaitId: row.id, matched: false, transientError: 'GitHub branch protection API unavailable' })
+          continue
+        }
+        aggregate = filterBypassedCI(aggregate, perAwaitBypassed, workspacePatterns, new Set(requiredContexts))
+
+        if (aggregate.totalCount === 0) {
+          const graceSeconds = filter.allowNoChecksAfterSeconds
+          const ageSeconds = Math.floor(Date.now() / 1000) - row.createdAt
+          if (ageSeconds > graceSeconds) {
+            results.push({
+              awaitId: row.id,
+              matched: true,
+              resumeText: 'No GitHub checks or commit statuses were found. Proceeding without CI signals.',
+              resumePayloadJson: buildCIResumePayload(target, aggregate, true),
+            })
+          }
+          else {
+            results.push(pendingResult(row.id, filter, needsNormalization))
+          }
+          continue
+        }
+
+        if (!aggregate.allCompleted) {
+          results.push(pendingResult(row.id, filter, needsNormalization))
+          continue
+        }
+
+        results.push({
+          awaitId: row.id,
+          matched: true,
+          resumeText: aggregate.allPassed && !workflowAggregate.failureCount
+            ? `GitHub checks passed. All ${aggregate.totalCount} checks/statuses succeeded.`
+            : `GitHub checks completed with failures. ${[
+                buildSummary(aggregate),
+                ...workflowAggregate.workflowRuns
+                  .filter(run => run.status === 'completed' && (!run.conclusion || !PASSING_CHECK_CONCLUSIONS.has(run.conclusion)))
+                  .map(run => `${run.name ?? `Workflow ${run.id}`}: ${run.conclusion ?? 'unknown'}`),
+              ].filter(Boolean).join(', ')}`,
+          resumePayloadJson: JSON.stringify({
+            ...JSON.parse(buildCIResumePayload(target, aggregate)),
+            allSuccess: aggregate.allPassed && !workflowAggregate.failureCount,
+            workflowFailureCount: workflowAggregate.failureCount,
+            workflowRuns: workflowAggregate.workflowRuns.map(run => ({
+              id: run.id,
+              name: run.name,
+              status: run.status,
+              conclusion: run.conclusion,
+            })),
+          }),
+        })
+      }
+      catch {
+        results.push({ awaitId: row.id, matched: false, transientError: 'GitHub CI await check failed temporarily' })
+      }
     }
 
     return results

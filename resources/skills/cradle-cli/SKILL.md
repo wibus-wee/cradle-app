@@ -324,6 +324,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `acp` | 11 | Manage ACP agent installation and registry state. | `cradle man acp` |
 | `agent` | 5 | Manage Cradle agent identities. | `cradle man agent` |
 | `automation` | 16 | Manage scheduled automations, runs, and artifacts. | `cradle man automation` |
+| `background-activity` | 1 | Generated Cradle CLI module. | `cradle man background-activity` |
 | `background-job` | 3 | Generated Cradle CLI module. | `cradle man background-job` |
 | `board` | 4 | Manage Kanban boards. | `cradle man board` |
 | `chat` | 20 | Control chat runtime commands. | `cradle man chat` |
@@ -338,7 +339,6 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `kimi` | 1 | Generated Cradle CLI module. | `cradle man kimi` |
 | `link-preview` | 1 | Generated Cradle CLI module. | `cradle man link-preview` |
 | `managed-resources` | 5 | Generated Cradle CLI module. | `cradle man managed-resources` |
-| `mcp-server` | 3 | Generated Cradle CLI module. | `cradle man mcp-server` |
 | `observability` | 5 | Inspect local observability events, incidents, and exports. | `cradle man observability` |
 | `opencode` | 1 | Generated Cradle CLI module. | `cradle man opencode` |
 | `plugin` | 11 | Generated Cradle CLI module. | `cradle man plugin` |
