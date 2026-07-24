@@ -34,12 +34,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
-import type { GitFileStatus, GitRemote } from '~/features/git/types'
-import { useGitRemotes, useGitRepositories } from '~/features/git/use-git'
 import { cn } from '~/lib/cn'
 import { formatTimeAgo } from '~/lib/format-time'
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
 
+import type { GitFileStatus, GitRemote } from '../git/shared/types'
+import { useGitRemotes, useGitRepositories } from '../git/shared/use-git'
 import {
   derivePullRequestNumberFromStatus,
   describeGitHubAwaitTargetInputIssue,
