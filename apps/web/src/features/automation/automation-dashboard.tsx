@@ -12,13 +12,11 @@ import {
   SparklesLine as SparklesIcon,
   WarningLine as TriangleAlertIcon,
 } from '@mingcute/react'
-import { useQuery } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
 import { m } from 'motion/react'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { z } from 'zod'
 
 import { BetaNotice } from '~/components/common/beta-notice'
 import { Badge } from '~/components/ui/badge'
@@ -65,9 +63,8 @@ import type { ThinkingEffort } from '~/features/composer-toolbar/types'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 
-import { listAutomationArtifacts, listAutomationRuns, listAutomationTriage } from './api-client'
-import type { AutomationArtifact, AutomationDefinition, AutomationRecipe, AutomationRun, AutomationRunStatus, AutomationTrigger, CreateAutomationInput } from './types'
-import { automationQueryKeys, useAutomationDefinitions, useCreateAutomation, useRunAutomationNow, useStopAutomationRun, useUpdateAutomation, useUpdateAutomationRunTriage } from './use-automations'
+import type { AutomationArtifact, AutomationDefinition, AutomationRun, AutomationRunStatus, CreateAutomationInput } from './use-automations'
+import { useAutomationArtifacts, useAutomationDefinitions, useAutomationRuns, useAutomationTriage, useCreateAutomation, useRunAutomationNow, useStopAutomationRun, useUpdateAutomation, useUpdateAutomationRunTriage } from './use-automations'
 
 // ── Types & Constants ────────────────────────────────────────────────────────
 
@@ -110,7 +107,6 @@ const STATUS_DOT_COLORS: Record<AutomationRunStatus, string> = {
   complete: 'bg-emerald-400',
   failed: 'bg-red-400',
   cancelled: 'bg-muted-foreground/40',
-  skipped: 'bg-muted-foreground/40',
 }
 
 const STATUS_TEXT_COLORS: Record<AutomationRunStatus, string> = {
@@ -119,27 +115,7 @@ const STATUS_TEXT_COLORS: Record<AutomationRunStatus, string> = {
   complete: 'text-emerald-500',
   failed: 'text-red-500',
   cancelled: 'text-muted-foreground',
-  skipped: 'text-muted-foreground',
 }
-
-// ── Zod Schemas ──────────────────────────────────────────────────────────────
-
-const UnixSecondsValueSchema = z.union([
-  z.number().finite().transform(value => value > 10_000_000_000 ? Math.floor(value / 1000) : value),
-  z.string()
-    .transform(value => Math.floor(Date.parse(value) / 1000))
-    .pipe(z.number().finite()),
-])
-const UnixSecondsSchema = z.union([
-  UnixSecondsValueSchema,
-  z.null().transform(() => null),
-  z.undefined().transform(() => null),
-])
-const RunTimeSortKeySchema = z.union([
-  UnixSecondsValueSchema,
-  z.null().transform(() => 0),
-  z.undefined().transform(() => 0),
-])
 
 // ── Draft Types ──────────────────────────────────────────────────────────────
 
@@ -301,9 +277,8 @@ function buildScheduleRrule(schedule: ScheduleDraft): string {
   return parts.join(';')
 }
 
-function formatDateTime(value: number | string | null | undefined, locale: string, t: TFunction<'automation'>): string {
-  const unixSeconds = UnixSecondsSchema.parse(value)
-  if (unixSeconds === null) {
+function formatDateTime(value: number | null, locale: string, t: TFunction<'automation'>): string {
+  if (value === null) {
     return t('datetime.notRecorded')
   }
 
@@ -312,16 +287,15 @@ function formatDateTime(value: number | string | null | undefined, locale: strin
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(unixSeconds * 1000))
+  }).format(new Date(value * 1000))
 }
 
-function formatRelative(value: number | string | null | undefined, t: TFunction<'automation'>): string {
-  const unixSeconds = UnixSecondsSchema.parse(value)
-  if (unixSeconds === null) {
+function formatRelative(value: number | null, t: TFunction<'automation'>): string {
+  if (value === null) {
     return t('datetime.notRecorded')
   }
 
-  const diff = Math.floor(Date.now() / 1000) - unixSeconds
+  const diff = Math.floor(Date.now() / 1000) - value
   if (diff < 60) {
     return t('relative.justNow')
   }
@@ -334,28 +308,8 @@ function formatRelative(value: number | string | null | undefined, t: TFunction<
   return t('relative.day', { count: Math.floor(diff / 86400) })
 }
 
-function getTrigger(definition: AutomationDefinition): AutomationTrigger | null {
-  return definition.trigger ?? definition.triggerJson ?? null
-}
-
-function getRecipe(definition: AutomationDefinition): AutomationRecipe | null {
-  return definition.recipe ?? definition.recipeJson ?? null
-}
-
 function getRunTime(run: AutomationRun | null | undefined): number {
-  return RunTimeSortKeySchema.parse(run?.createdAt ?? run?.startedAt ?? run?.scheduledFor)
-}
-
-function getLatestRun(definition: AutomationDefinition, runs: AutomationRun[] | undefined): AutomationRun | null {
-  if (definition.latestRun) {
-    return definition.latestRun
-  }
-
-  if (!runs || runs.length === 0) {
-    return null
-  }
-
-  return [...runs].sort((a, b) => getRunTime(b) - getRunTime(a))[0] ?? null
+  return run?.createdAt ?? run?.startedAt ?? run?.scheduledFor ?? 0
 }
 
 function formatScheduleSummary(schedule: ScheduleDraft, t: TFunction<'automation'>): string {
@@ -398,8 +352,8 @@ function SectionLabel({ label, count }: { label: string, count?: number }) {
   )
 }
 
-function StatusDot({ status }: { status: string | null | undefined }) {
-  const normalized = (status ?? 'queued') as AutomationRunStatus
+function StatusDot({ status }: { status: AutomationRunStatus | null | undefined }) {
+  const normalized = status ?? 'queued'
   return (
     <span
       className={cn(
@@ -410,9 +364,9 @@ function StatusDot({ status }: { status: string | null | undefined }) {
   )
 }
 
-function StatusText({ status }: { status: string | null | undefined }) {
+function StatusText({ status }: { status: AutomationRunStatus | null | undefined }) {
   const { t } = useTranslation('automation')
-  const normalized = (status ?? 'queued') as AutomationRunStatus
+  const normalized = status ?? 'queued'
   return (
     <span className={cn('text-[11px]', STATUS_TEXT_COLORS[normalized] ?? STATUS_TEXT_COLORS.queued)}>
       {t(`status.${status ?? 'unknown'}`, { defaultValue: status ?? t('status.unknown') })}
@@ -436,9 +390,8 @@ function DefinitionRow({
   onSelect: () => void
 }) {
   const { t } = useTranslation('automation')
-  const trigger = getTrigger(definition)
-  const schedule = trigger ? parseRruleToSchedule(trigger.rrule) : null
-  const summary = schedule ? formatScheduleSummary(schedule, t) : null
+  const schedule = parseRruleToSchedule(definition.trigger.rrule)
+  const summary = formatScheduleSummary(schedule, t)
 
   return (
     <button
@@ -453,7 +406,7 @@ function DefinitionRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium text-foreground">{definition.title}</span>
         <span className="block truncate text-[10px] text-muted-foreground">
-          {summary ?? trigger?.rrule ?? t('trigger.noTrigger')}
+          {summary}
         </span>
       </span>
       {definition.enabled === false && (
@@ -494,10 +447,9 @@ function DetailView({
   const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null)
 
-  const trigger = getTrigger(definition)
-  const recipe = getRecipe(definition)
-  const schedule = trigger ? parseRruleToSchedule(trigger.rrule) : null
-  const summary = schedule ? formatScheduleSummary(schedule, t) : null
+  const { recipe, trigger } = definition
+  const schedule = parseRruleToSchedule(trigger.rrule)
+  const summary = formatScheduleSummary(schedule, t)
 
   const artifactsData = artifactsQuery.data
   const selectedArtifact = useMemo(() => {
@@ -699,7 +651,7 @@ function DetailView({
               <Card size="sm" className="h-full">
                 <CardHeader>
                   <CardTitle className="text-[12px] font-mono">
-                    {selectedArtifact ? selectedArtifact.title ?? selectedArtifact.name ?? selectedArtifact.id : t('artifact.preview')}
+                    {selectedArtifact ? selectedArtifact.name : t('artifact.preview')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -730,7 +682,7 @@ function TimelineRunRow({
   onTriage: (status: 'resolved' | 'archived') => void
 }) {
   const { t } = useTranslation('automation')
-  const normalized = (run.status ?? 'queued') as AutomationRunStatus
+  const normalized = run.status
   const dotColor = STATUS_DOT_COLORS[normalized] ?? STATUS_DOT_COLORS.queued
 
   return (
@@ -793,7 +745,6 @@ function ArtifactRow({
   active: boolean
   onSelect: () => void
 }) {
-  const { t } = useTranslation('automation')
   return (
     <button
       type="button"
@@ -804,8 +755,8 @@ function ArtifactRow({
       )}
     >
       <FileTextIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-foreground">{artifact.title ?? artifact.name ?? artifact.id}</span>
-      <span className="shrink-0 text-[10px] text-muted-foreground">{artifact.kind ?? artifact.mediaType ?? t('artifact.fallbackKind')}</span>
+      <span className="min-w-0 flex-1 truncate text-foreground">{artifact.name}</span>
+      <span className="shrink-0 text-[10px] text-muted-foreground">{artifact.kind}</span>
     </button>
   )
 }
@@ -1434,12 +1385,7 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   const [workspaceFilter, setWorkspaceFilter] = useState<string | null>(null)
   const definitionsQuery = useAutomationDefinitions(workspaceFilter)
   const definitions = definitionsQuery.data ?? []
-  const triageQuery = useQuery({
-    queryKey: ['automations', 'triage', { workspaceId: workspaceFilter }],
-    queryFn: () => listAutomationTriage(workspaceFilter),
-    staleTime: 10_000,
-    retry: 1,
-  })
+  const triageQuery = useAutomationTriage(workspaceFilter)
   const triageRuns = triageQuery.data ?? []
   const { runtimes } = useRuntimeCatalog()
   const defaultRuntimeKind = useMemo(
@@ -1459,27 +1405,15 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
       ? definitions.find(definition => definition.id === selectedId) ?? null
       : definitions[0] ?? null
   const selectedAutomationId = selectedDefinition?.id ?? null
-  const runsQuery = useQuery({
-    queryKey: selectedAutomationId ? automationQueryKeys.runs(selectedAutomationId) : ['automations', 'missing', 'runs'],
-    queryFn: () => listAutomationRuns(selectedAutomationId ?? ''),
-    enabled: Boolean(selectedAutomationId),
-    staleTime: 10_000,
-    retry: 1,
-  })
-  const artifactsQuery = useQuery({
-    queryKey: selectedAutomationId ? automationQueryKeys.artifacts(selectedAutomationId) : ['automations', 'missing', 'artifacts'],
-    queryFn: () => listAutomationArtifacts(selectedAutomationId ?? ''),
-    enabled: Boolean(selectedAutomationId),
-    staleTime: 10_000,
-    retry: 1,
-  })
+  const runsQuery = useAutomationRuns(selectedAutomationId)
+  const artifactsQuery = useAutomationArtifacts(selectedAutomationId)
   const createAutomationMutation = useCreateAutomation()
   const updateAutomationMutation = useUpdateAutomation()
   const runNowMutation = useRunAutomationNow()
   const stopRunMutation = useStopAutomationRun()
   const triageMutation = useUpdateAutomationRunTriage()
 
-  const latestRun = selectedDefinition ? getLatestRun(selectedDefinition, runsQuery.data) : null
+  const latestRun = selectedDefinition?.latestRun ?? null
   const automationReady = definitionsQuery.isSuccess
     && (!selectedAutomationId || (runsQuery.isSuccess && artifactsQuery.isSuccess))
   const locale = i18n.resolvedLanguage ?? i18n.language
@@ -1491,25 +1425,24 @@ export function AutomationDashboard({ onBack }: AutomationDashboardProps) {
   }, [defaultRuntimeKind, workspaceFilter])
 
   const startEdit = useCallback((definition: AutomationDefinition): void => {
-    const trigger = getTrigger(definition)
-    const recipe = getRecipe(definition)
+    const { recipe, trigger } = definition
     setDraft({
-      title: definition.title ?? '',
-      description: definition.description ?? '',
-      workspaceId: definition.workspaceId ?? null,
-      enabled: definition.enabled !== false,
-      schedule: trigger ? parseRruleToSchedule(trigger.rrule) : DEFAULT_SCHEDULE,
-      timezone: trigger?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      misfirePolicy: trigger?.misfirePolicy ?? 'run_latest',
+      title: definition.title,
+      description: definition.description,
+      workspaceId: definition.workspaceId,
+      enabled: definition.enabled,
+      schedule: parseRruleToSchedule(trigger.rrule),
+      timezone: trigger.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      misfirePolicy: trigger.misfirePolicy ?? 'run_latest',
       providerTargetId: recipe?.providerTargetId ?? '',
-      runtimeKind: (recipe?.runtimeKind as AutomationRuntimeKind | undefined) ?? defaultRuntimeKind,
-      modelId: recipe?.modelId ?? null,
-      thinkingEffort: recipe?.thinkingEffort ?? null,
-      sessionPolicy: recipe?.sessionPolicy ?? 'new',
-      isolationPolicy: recipe?.isolationPolicy ?? 'workspace',
-      noFindingsBehavior: recipe?.completionPolicy?.noFindingsBehavior ?? 'archive',
-      prompt: recipe?.prompt ?? '',
-      artifactName: recipe?.artifactRequests?.[0]?.name ?? 'automation-run.md',
+      runtimeKind: (recipe.runtimeKind as AutomationRuntimeKind | undefined) ?? defaultRuntimeKind,
+      modelId: recipe.modelId ?? null,
+      thinkingEffort: recipe.thinkingEffort ?? null,
+      sessionPolicy: recipe.sessionPolicy ?? 'new',
+      isolationPolicy: recipe.isolationPolicy ?? 'workspace',
+      noFindingsBehavior: recipe.completionPolicy?.noFindingsBehavior ?? 'archive',
+      prompt: recipe.prompt,
+      artifactName: recipe.artifactRequests[0]?.name ?? 'automation-run.md',
     })
     setEditingId(definition.id)
     setDraftError(null)

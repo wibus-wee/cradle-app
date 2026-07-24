@@ -55,7 +55,7 @@ export type GetHealthResponses = {
      * Response for status 200
      */
     200: {
-        status: string;
+        status: 'ok';
         uptime: number;
         memory: {
             heapUsed: number;
@@ -506,7 +506,7 @@ export type PostWorkspacesErrors = {
      * Response for status 409
      */
     409: {
-        code: string;
+        code: 'workspace_locator_exists';
         message: string;
         details: {
             locator: {
@@ -564,7 +564,7 @@ export type PostWorkspacesFromDirectoryErrors = {
      * Response for status 409
      */
     409: {
-        code: string;
+        code: 'workspace_locator_exists';
         message: string;
         details: {
             locator: {
@@ -659,7 +659,7 @@ export type PostWorkspacesMultiFolderErrors = {
      * Response for status 409
      */
     409: {
-        code: string;
+        code: 'workspace_locator_exists';
         message: string;
         details: {
             locator: {
@@ -717,7 +717,7 @@ export type PostWorkspacesMultiFolderFromConfigErrors = {
      * Response for status 409
      */
     409: {
-        code: string;
+        code: 'workspace_locator_exists';
         message: string;
         details: {
             locator: {
@@ -931,8 +931,8 @@ export type PutWorkspacesByWorkspaceIdFilesContentResponses = {
     200: {
         success: boolean;
         ownerBoundary: {
-            classification: string;
-            owner: string;
+            classification: 'non-cradle-owned';
+            owner: 'workspace';
             consentRequired: boolean;
             consentConfirmed: boolean;
             workspacePath: string | null;
@@ -1013,8 +1013,8 @@ export type PostWorkspacesByWorkspaceIdFilesFileResponses = {
     200: {
         success: boolean;
         ownerBoundary: {
-            classification: string;
-            owner: string;
+            classification: 'non-cradle-owned';
+            owner: 'workspace';
             consentRequired: boolean;
             consentConfirmed: boolean;
             workspacePath: string | null;
@@ -1045,8 +1045,8 @@ export type PostWorkspacesByWorkspaceIdFilesFolderResponses = {
     200: {
         success: boolean;
         ownerBoundary: {
-            classification: string;
-            owner: string;
+            classification: 'non-cradle-owned';
+            owner: 'workspace';
             consentRequired: boolean;
             consentConfirmed: boolean;
             workspacePath: string | null;
@@ -1078,8 +1078,8 @@ export type PatchWorkspacesByWorkspaceIdFilesPathResponses = {
     200: {
         success: boolean;
         sourceBoundary: {
-            classification: string;
-            owner: string;
+            classification: 'non-cradle-owned';
+            owner: 'workspace';
             consentRequired: boolean;
             consentConfirmed: boolean;
             workspacePath: string | null;
@@ -1087,8 +1087,8 @@ export type PatchWorkspacesByWorkspaceIdFilesPathResponses = {
             targetPath: string | null;
         };
         destinationBoundary: {
-            classification: string;
-            owner: string;
+            classification: 'non-cradle-owned';
+            owner: 'workspace';
             consentRequired: boolean;
             consentConfirmed: boolean;
             workspacePath: string | null;
@@ -2172,7 +2172,7 @@ export type GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponses
         unavailableReason: string | null;
         refreshedAt: number | null;
         account: {
-            authMode: string;
+            authMode: 'chatgptAuthTokens';
             accountType: 'apiKey' | 'chatgpt' | 'amazonBedrock' | null;
             email: string | null;
             planType: string | null;
@@ -2283,7 +2283,7 @@ export type GetProviderTargetsByProviderTargetIdCodexWhamDiagnosticsResponses = 
         unavailableReason: string | null;
         refreshedAt: number | null;
         account: {
-            authMode: string;
+            authMode: 'chatgptAuthTokens';
             chatgptAccountId: string;
             planType: string | null;
         } | null;
@@ -2953,9 +2953,9 @@ export type GetRemoteHostsByHostIdCradleServerHealthResponses = {
                 closedAt: number | null;
             }>;
         } | null;
-        status: string;
+        status: 'ok';
         health: {
-            status: string;
+            status: 'ok';
             uptime: number;
             memory: {
                 heapUsed: number;
@@ -3020,9 +3020,9 @@ export type PostRemoteHostsByHostIdCradleServerTestResponses = {
                 closedAt: number | null;
             }>;
         } | null;
-        status: string;
+        status: 'ok';
         health: {
-            status: string;
+            status: 'ok';
             uptime: number;
             memory: {
                 heapUsed: number;
@@ -4164,186 +4164,6 @@ export type PutModelRegistryMappingsByModelIdResponses = {
 
 export type PutModelRegistryMappingsByModelIdResponse = PutModelRegistryMappingsByModelIdResponses[keyof PutModelRegistryMappingsByModelIdResponses];
 
-export type GetMcpServersData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/mcp-servers/';
-};
-
-export type GetMcpServersResponses = {
-    /**
-     * Response for status 200
-     */
-    200: Array<{
-        id: string;
-        name: string;
-        transport: 'stdio' | 'streamable-http';
-        enabled: boolean;
-        command?: string;
-        args?: Array<string>;
-        url?: string;
-        secretKeys: Array<string>;
-        status: 'ready' | 'disabled' | 'error';
-        error?: string;
-        supportedRuntimes: Array<string>;
-        createdAt: number;
-        updatedAt: number;
-    }>;
-};
-
-export type GetMcpServersResponse = GetMcpServersResponses[keyof GetMcpServersResponses];
-
-export type PostMcpServersData = {
-    body: {
-        transport: string;
-        name: string;
-        enabled: boolean;
-        command: string;
-        args: Array<string>;
-        secretValues?: {
-            [key: string]: unknown;
-        };
-    } | {
-        transport: string;
-        name: string;
-        enabled: boolean;
-        url: string;
-        secretValues?: {
-            [key: string]: unknown;
-        };
-    };
-    path?: never;
-    query?: never;
-    url: '/mcp-servers/';
-};
-
-export type PostMcpServersResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        name: string;
-        transport: 'stdio' | 'streamable-http';
-        enabled: boolean;
-        command?: string;
-        args?: Array<string>;
-        url?: string;
-        secretKeys: Array<string>;
-        status: 'ready' | 'disabled' | 'error';
-        error?: string;
-        supportedRuntimes: Array<string>;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PostMcpServersResponse = PostMcpServersResponses[keyof PostMcpServersResponses];
-
-export type DeleteMcpServersByIdData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/mcp-servers/{id}';
-};
-
-export type DeleteMcpServersByIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteMcpServersByIdResponse = DeleteMcpServersByIdResponses[keyof DeleteMcpServersByIdResponses];
-
-export type PutMcpServersByIdData = {
-    body: {
-        transport: string;
-        name: string;
-        enabled: boolean;
-        command: string;
-        args: Array<string>;
-        secretValues?: {
-            [key: string]: unknown;
-        };
-    } | {
-        transport: string;
-        name: string;
-        enabled: boolean;
-        url: string;
-        secretValues?: {
-            [key: string]: unknown;
-        };
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/mcp-servers/{id}';
-};
-
-export type PutMcpServersByIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        name: string;
-        transport: 'stdio' | 'streamable-http';
-        enabled: boolean;
-        command?: string;
-        args?: Array<string>;
-        url?: string;
-        secretKeys: Array<string>;
-        status: 'ready' | 'disabled' | 'error';
-        error?: string;
-        supportedRuntimes: Array<string>;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PutMcpServersByIdResponse = PutMcpServersByIdResponses[keyof PutMcpServersByIdResponses];
-
-export type PatchMcpServersByIdEnabledData = {
-    body: {
-        enabled: boolean;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/mcp-servers/{id}/enabled';
-};
-
-export type PatchMcpServersByIdEnabledResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        name: string;
-        transport: 'stdio' | 'streamable-http';
-        enabled: boolean;
-        command?: string;
-        args?: Array<string>;
-        url?: string;
-        secretKeys: Array<string>;
-        status: 'ready' | 'disabled' | 'error';
-        error?: string;
-        supportedRuntimes: Array<string>;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PatchMcpServersByIdEnabledResponse = PatchMcpServersByIdEnabledResponses[keyof PatchMcpServersByIdEnabledResponses];
-
 export type PostProvidersModelsData = {
     body: {
         providerKind: 'openai-compatible' | 'anthropic' | 'universal';
@@ -4943,27 +4763,27 @@ export type GetAutomationsResponses = {
         description: string;
         enabled: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -4979,7 +4799,7 @@ export type GetAutomationsResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -4989,6 +4809,69 @@ export type GetAutomationsResponses = {
         nextRunAt: number | null;
         createdAt: number;
         updatedAt: number;
+        latestRun: {
+            id: string;
+            automationDefinitionId: string;
+            workspaceId: string | null;
+            triggerType: 'manual' | 'scheduled';
+            occurrenceKey: string | null;
+            status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
+            triggerSnapshot: {
+                type: 'rrule';
+                rrule: string;
+                timezone: string;
+                misfirePolicy?: 'skip' | 'run_latest';
+            };
+            recipeSnapshot: {
+                kind: 'agent_task';
+                prompt: string;
+                inputs: Array<{
+                    type: 'file_ref';
+                    path: string;
+                } | {
+                    type: 'inline_file';
+                    name: string;
+                    content: string;
+                } | {
+                    type: 'text';
+                    name: string;
+                    content: string;
+                } | {
+                    type: 'url';
+                    url: string;
+                }>;
+                artifactRequests: Array<{
+                    kind: 'markdown' | 'text' | 'json' | 'file_ref';
+                    name: string;
+                    description?: string;
+                }>;
+                agentId?: string;
+                providerTargetId?: string;
+                runtimeKind?: string;
+                modelId?: string;
+                thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+                sessionPolicy?: 'new' | 'heartbeat';
+                isolationPolicy?: 'workspace' | 'worktree_per_run';
+                completionPolicy?: {
+                    stopWhen?: 'agent_complete';
+                    noFindingsBehavior?: 'archive' | 'triage';
+                };
+            };
+            chatSessionId: string | null;
+            backendRunId: string | null;
+            artifactCount: number;
+            errorText: string | null;
+            resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
+            resultSummary: string | null;
+            triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
+            triagedAt: number | null;
+            scheduledFor: number | null;
+            claimedAt: number | null;
+            startedAt: number | null;
+            finishedAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        } | null;
     }>;
 };
 
@@ -5002,27 +4885,27 @@ export type PostAutomationsData = {
         description?: string;
         enabled?: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5038,7 +4921,7 @@ export type PostAutomationsData = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5061,27 +4944,27 @@ export type PostAutomationsResponses = {
         description: string;
         enabled: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5097,7 +4980,7 @@ export type PostAutomationsResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5152,27 +5035,27 @@ export type GetAutomationsByIdResponses = {
         description: string;
         enabled: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5188,7 +5071,7 @@ export type GetAutomationsByIdResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5208,27 +5091,27 @@ export type PatchAutomationsByIdData = {
         title?: string;
         description?: string;
         trigger?: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe?: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5244,7 +5127,7 @@ export type PatchAutomationsByIdData = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5269,27 +5152,27 @@ export type PatchAutomationsByIdResponses = {
         description: string;
         enabled: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5305,7 +5188,7 @@ export type PatchAutomationsByIdResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5340,27 +5223,27 @@ export type PostAutomationsByIdEnableResponses = {
         description: string;
         enabled: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5376,7 +5259,7 @@ export type PostAutomationsByIdEnableResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5411,27 +5294,27 @@ export type PostAutomationsByIdDisableResponses = {
         description: string;
         enabled: boolean;
         trigger: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipe: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5447,7 +5330,7 @@ export type PostAutomationsByIdDisableResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5486,27 +5369,27 @@ export type PostAutomationsByIdRunResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5522,7 +5405,7 @@ export type PostAutomationsByIdRunResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5566,27 +5449,27 @@ export type GetAutomationsByIdRunsResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5602,7 +5485,7 @@ export type GetAutomationsByIdRunsResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5647,27 +5530,27 @@ export type GetAutomationsByIdRunsByRunIdResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5683,7 +5566,7 @@ export type GetAutomationsByIdRunsByRunIdResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5728,27 +5611,27 @@ export type PostAutomationsByIdRunsByRunIdStopResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5764,7 +5647,7 @@ export type PostAutomationsByIdRunsByRunIdStopResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5811,27 +5694,27 @@ export type PatchAutomationsByIdRunsByRunIdTriageResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -5847,7 +5730,7 @@ export type PatchAutomationsByIdRunsByRunIdTriageResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -5987,27 +5870,27 @@ export type GetAutomationTriageResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -6023,7 +5906,7 @@ export type GetAutomationTriageResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -6063,7 +5946,7 @@ export type PostCronJobsData = {
         title: string;
         description?: string;
         enabled?: boolean;
-        scheduleKind: string;
+        scheduleKind: 'rrule';
         scheduleConfig: string;
         timezone: string;
         prompt: string;
@@ -6109,7 +5992,7 @@ export type PutCronJobsByIdData = {
         title?: string;
         description?: string;
         enabled?: boolean;
-        scheduleKind?: string;
+        scheduleKind?: 'rrule';
         scheduleConfig?: string;
         timezone?: string;
         prompt?: string;
@@ -6144,27 +6027,27 @@ export type GetCronRunsResponses = {
         occurrenceKey: string | null;
         status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
         triggerSnapshot: {
-            type: string;
+            type: 'rrule';
             rrule: string;
             timezone: string;
             misfirePolicy?: 'skip' | 'run_latest';
         };
         recipeSnapshot: {
-            kind: string;
+            kind: 'agent_task';
             prompt: string;
             inputs: Array<{
-                type: string;
+                type: 'file_ref';
                 path: string;
             } | {
-                type: string;
+                type: 'inline_file';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'text';
                 name: string;
                 content: string;
             } | {
-                type: string;
+                type: 'url';
                 url: string;
             }>;
             artifactRequests: Array<{
@@ -6180,7 +6063,7 @@ export type GetCronRunsResponses = {
             sessionPolicy?: 'new' | 'heartbeat';
             isolationPolicy?: 'workspace' | 'worktree_per_run';
             completionPolicy?: {
-                stopWhen?: string;
+                stopWhen?: 'agent_complete';
                 noFindingsBehavior?: 'archive' | 'triage';
             };
         };
@@ -6456,9 +6339,9 @@ export type GetSessionsResponses = {
     200: Array<{
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -6543,9 +6426,9 @@ export type PostSessionsResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -6618,9 +6501,9 @@ export type GetSessionsByIdResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -6680,9 +6563,9 @@ export type PatchSessionsByIdResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -6737,9 +6620,9 @@ export type PostSessionsByIdArchiveResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -6792,9 +6675,9 @@ export type PostSessionsByIdReadResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -6847,9 +6730,9 @@ export type PostSessionsByIdUnreadResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -7233,27 +7116,27 @@ export type GetSessionsByIdEnvironmentResponses = {
             occurrenceKey: string | null;
             status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
             triggerSnapshot: {
-                type: string;
+                type: 'rrule';
                 rrule: string;
                 timezone: string;
                 misfirePolicy?: 'skip' | 'run_latest';
             };
             recipeSnapshot: {
-                kind: string;
+                kind: 'agent_task';
                 prompt: string;
                 inputs: Array<{
-                    type: string;
+                    type: 'file_ref';
                     path: string;
                 } | {
-                    type: string;
+                    type: 'inline_file';
                     name: string;
                     content: string;
                 } | {
-                    type: string;
+                    type: 'text';
                     name: string;
                     content: string;
                 } | {
-                    type: string;
+                    type: 'url';
                     url: string;
                 }>;
                 artifactRequests: Array<{
@@ -7269,7 +7152,7 @@ export type GetSessionsByIdEnvironmentResponses = {
                 sessionPolicy?: 'new' | 'heartbeat';
                 isolationPolicy?: 'workspace' | 'worktree_per_run';
                 completionPolicy?: {
-                    stopWhen?: string;
+                    stopWhen?: 'agent_complete';
                     noFindingsBehavior?: 'archive' | 'triage';
                 };
             };
@@ -7548,9 +7431,9 @@ export type PostThreadHandoffsResponses = {
         session: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -7855,9 +7738,9 @@ export type PostWorksResponses = {
         primaryThread: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -7967,9 +7850,9 @@ export type GetWorksByIdResponses = {
         primaryThread: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -8081,9 +7964,9 @@ export type PostWorksByIdArchiveResponses = {
         primaryThread: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -8197,9 +8080,9 @@ export type PostWorksByIdPrepareResponses = {
         primaryThread: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -8314,9 +8197,9 @@ export type PostWorksByIdSubmitResponses = {
         primaryThread: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -8428,9 +8311,9 @@ export type PostWorksByIdBranchResponses = {
         primaryThread: {
             id: string;
             execution: {
-                kind: string;
+                kind: 'local';
             } | {
-                kind: string;
+                kind: 'remote-host';
                 hostId: string;
                 remoteSessionId: string;
             };
@@ -10240,9 +10123,9 @@ export type GetIssuesByIdSessionsResponses = {
     200: Array<{
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -10443,23 +10326,23 @@ export type GetIssuesByIdActivityResponses = {
             action: 'added-description' | 'changed-field' | 'cleared-description' | 'renamed-issue' | 'updated-description';
             field: 'assignee' | 'description' | 'due-date' | 'labels' | 'metadata' | 'milestone' | 'parent' | 'priority' | 'status' | 'title' | 'workspace' | null;
             fromValue: {
-                kind: string;
+                kind: 'date';
                 timestamp: number;
             } | {
-                kind: string;
+                kind: 'text';
                 text: string;
             } | {
-                kind: string;
+                kind: 'token';
                 token: 'changed' | 'current-user' | 'empty' | 'no-due-date' | 'no-labels' | 'no-milestone' | 'no-parent' | 'no-status' | 'priority-high' | 'priority-low' | 'priority-medium' | 'priority-none' | 'priority-urgent' | 'unassigned' | 'unknown-issue' | 'unknown-milestone' | 'unknown-status' | 'unknown-user';
             } | null;
             toValue: {
-                kind: string;
+                kind: 'date';
                 timestamp: number;
             } | {
-                kind: string;
+                kind: 'text';
                 text: string;
             } | {
-                kind: string;
+                kind: 'token';
                 token: 'changed' | 'current-user' | 'empty' | 'no-due-date' | 'no-labels' | 'no-milestone' | 'no-parent' | 'no-status' | 'priority-high' | 'priority-low' | 'priority-medium' | 'priority-none' | 'priority-urgent' | 'unassigned' | 'unknown-issue' | 'unknown-milestone' | 'unknown-status' | 'unknown-user';
             } | null;
         } | null;
@@ -10746,7 +10629,7 @@ export type DeleteIssuesByIdContextRefsByIndexResponse = DeleteIssuesByIdContext
 export type PostImageOcrRecognizeData = {
     body: {
         files: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -12597,8 +12480,8 @@ export type PostSkillsExportResponses = {
     200: {
         destinationDir: string;
         ownerBoundary: {
-            classification: string;
-            owner: string;
+            classification: 'non-cradle-owned';
+            owner: 'user-selected-export-directory';
             consentRequired: boolean;
             consentConfirmed: boolean;
             destinationDir: string;
@@ -13498,7 +13381,7 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -13800,7 +13683,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalWorkingTreeResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -14077,7 +13960,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalBranchCompareResponses = 
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -14353,7 +14236,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsLocalCommitResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -14630,7 +14513,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsGithubPullRequestResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -14904,7 +14787,7 @@ export type GetWorkspacesByWorkspaceIdDiffReviewsByReviewIdResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -15178,7 +15061,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdRefreshResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -15452,7 +15335,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCloseResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -15729,7 +15612,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdFilesByFileIdViewedR
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -16014,7 +15897,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -16291,7 +16174,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdCom
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -16566,7 +16449,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdRes
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -16843,7 +16726,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmitResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -17119,7 +17002,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdMergeResponses = {
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -17440,7 +17323,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateRespons
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -17714,7 +17597,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancelResponses
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -18001,7 +17884,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesResponses 
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -18282,7 +18165,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -18590,7 +18473,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -18871,7 +18754,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFix
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -19146,7 +19029,7 @@ export type DeleteWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentF
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -19433,7 +19316,7 @@ export type PutWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPl
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -19710,7 +19593,7 @@ export type PostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitP
             reviewId: string;
             revisionId: string;
             actorId: string;
-            strategy: string;
+            strategy: 'manual';
             status: 'draft' | 'accepted' | 'applied' | 'abandoned';
             groups: Array<{
                 id: string;
@@ -20095,7 +19978,7 @@ export type GetEventsData = {
     body?: never;
     path?: never;
     query: {
-        scope: string;
+        scope: 'sessions';
         afterSequenceId?: number;
         workspaceId?: string;
         limit?: number;
@@ -20151,14 +20034,14 @@ export type DeleteChatComposerDraftsBySurfaceIdResponses = {
         draft: {
             text: string;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -20178,7 +20061,7 @@ export type DeleteChatComposerDraftsBySurfaceIdResponses = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -20187,7 +20070,7 @@ export type DeleteChatComposerDraftsBySurfaceIdResponses = {
                 position?: number;
             }>;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -20227,14 +20110,14 @@ export type GetChatComposerDraftsBySurfaceIdResponses = {
         draft: {
             text: string;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -20254,7 +20137,7 @@ export type GetChatComposerDraftsBySurfaceIdResponses = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -20263,7 +20146,7 @@ export type GetChatComposerDraftsBySurfaceIdResponses = {
                 position?: number;
             }>;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -20290,14 +20173,14 @@ export type PutChatComposerDraftsBySurfaceIdData = {
         draft: {
             text: string;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -20317,7 +20200,7 @@ export type PutChatComposerDraftsBySurfaceIdData = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -20326,7 +20209,7 @@ export type PutChatComposerDraftsBySurfaceIdData = {
                 position?: number;
             }>;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -20357,14 +20240,14 @@ export type PutChatComposerDraftsBySurfaceIdResponses = {
         draft: {
             text: string;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -20384,7 +20267,7 @@ export type PutChatComposerDraftsBySurfaceIdResponses = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -20393,7 +20276,7 @@ export type PutChatComposerDraftsBySurfaceIdResponses = {
                 position?: number;
             }>;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -20457,7 +20340,7 @@ export type GetChatRuntimesResponses = {
                 modelSelection: 'provider-model' | 'runtime-owned' | 'alias-matrix' | 'none';
                 thinking: {
                     efforts: Array<string>;
-                } | string;
+                } | 'per-model' | 'unsupported';
             };
             slots: Array<{
                 id: string;
@@ -20469,12 +20352,12 @@ export type GetChatRuntimesResponses = {
                 iconKey?: 'alert' | 'approvals' | 'code-review' | 'compact' | 'config' | 'diff' | 'feedback' | 'filesystem' | 'goal' | 'crew' | 'ide-context' | 'mcp' | 'model' | 'personality' | 'plugin' | 'plan' | 'progress' | 'quick-question' | 'user-input' | 'reasoning' | 'search' | 'side-chat' | 'skills' | 'status' | 'terminal' | 'tool-activity' | 'usage';
                 commandText?: string;
                 commandAction?: {
-                    kind: string;
+                    kind: 'insertText';
                 } | {
-                    kind: string;
+                    kind: 'submitText';
                     requiresEmptyComposer?: boolean;
                 } | {
-                    kind: string;
+                    kind: 'uiAction';
                     actionId: string;
                 };
                 requiresSession?: boolean;
@@ -20614,12 +20497,12 @@ export type GetChatDraftRuntimeCapabilitiesResponses = {
             iconKey?: 'alert' | 'approvals' | 'code-review' | 'compact' | 'config' | 'diff' | 'feedback' | 'filesystem' | 'goal' | 'crew' | 'ide-context' | 'mcp' | 'model' | 'personality' | 'plugin' | 'plan' | 'progress' | 'quick-question' | 'user-input' | 'reasoning' | 'search' | 'side-chat' | 'skills' | 'status' | 'terminal' | 'tool-activity' | 'usage';
             commandText?: string;
             commandAction?: {
-                kind: string;
+                kind: 'insertText';
             } | {
-                kind: string;
+                kind: 'submitText';
                 requiresEmptyComposer?: boolean;
             } | {
-                kind: string;
+                kind: 'uiAction';
                 actionId: string;
             };
             requiresSession?: boolean;
@@ -20662,12 +20545,12 @@ export type GetChatSessionsBySessionIdCapabilitiesResponses = {
             iconKey?: 'alert' | 'approvals' | 'code-review' | 'compact' | 'config' | 'diff' | 'feedback' | 'filesystem' | 'goal' | 'crew' | 'ide-context' | 'mcp' | 'model' | 'personality' | 'plugin' | 'plan' | 'progress' | 'quick-question' | 'user-input' | 'reasoning' | 'search' | 'side-chat' | 'skills' | 'status' | 'terminal' | 'tool-activity' | 'usage';
             commandText?: string;
             commandAction?: {
-                kind: string;
+                kind: 'insertText';
             } | {
-                kind: string;
+                kind: 'submitText';
                 requiresEmptyComposer?: boolean;
             } | {
-                kind: string;
+                kind: 'uiAction';
                 actionId: string;
             };
             requiresSession?: boolean;
@@ -20695,7 +20578,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
     200: {
         runtimeKind: string;
         states: Array<{
-            kind: string;
+            kind: 'goal';
             slotId: string;
             threadId: string;
             objective: string;
@@ -20706,7 +20589,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             createdAt: number;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'compact';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20734,14 +20617,14 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             compactionItemId: string | null;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'status';
             slotId: string;
             threadId: string;
             status: 'notLoaded' | 'idle' | 'systemError' | 'active';
             activeFlags: Array<string>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'model';
             slotId: string;
             threadId: string;
             modelId: string | null;
@@ -20753,7 +20636,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             supportsNamespaceTools: boolean | null;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'reasoning';
             slotId: string;
             threadId: string;
             effort: string | null;
@@ -20764,7 +20647,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'plan';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20780,7 +20663,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             completedCount: number;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'progress';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20797,7 +20680,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             completedCount: number;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'userInput';
             slotId: string;
             threadId: string | null;
             runId: string;
@@ -20820,7 +20703,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             createdAt: number;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'toolActivity';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20837,7 +20720,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'mcp';
             slotId: string;
             threadId: string;
             serverCount: number;
@@ -20855,7 +20738,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'diff';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20865,7 +20748,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             hasDiff: boolean;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'terminal';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20885,7 +20768,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'approvals';
             slotId: string;
             threadId: string;
             turnId: string | null;
@@ -20904,7 +20787,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'alert';
             slotId: string;
             threadId: string | null;
             warningCount: number;
@@ -20918,14 +20801,14 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'filesystem';
             slotId: string;
             threadId: string;
             changedPathCount: number;
             recentPaths: Array<string>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'skills';
             slotId: string;
             threadId: string;
             enabledCount: number;
@@ -20934,7 +20817,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             roots: Array<string>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'plugin';
             slotId: string;
             threadId: string;
             installedCount: number;
@@ -20944,7 +20827,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             errorCount: number;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'search';
             slotId: string;
             threadId: string;
             recentResultCount: number;
@@ -20952,7 +20835,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             fuzzySessionActive: boolean;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'crew';
             slotId: string;
             threadId: string;
             activeCount: number;
@@ -21007,7 +20890,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             }>;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'usage';
             slotId: string;
             threadId: string;
             limitName: string | null;
@@ -21023,7 +20906,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             planType: string | null;
             updatedAt: number;
         } | {
-            kind: string;
+            kind: 'config';
             slotId: string;
             threadId: string;
             modelId: string | null;
@@ -21554,11 +21437,11 @@ export type GetChatSessionsBySessionIdQueueResponses = {
         items: Array<{
             id: string;
             sessionId: string;
-            mode: string;
+            mode: 'queue' | 'steer';
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -21566,14 +21449,14 @@ export type GetChatSessionsBySessionIdQueueResponses = {
                 [key: string]: unknown;
             }>;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -21593,7 +21476,7 @@ export type GetChatSessionsBySessionIdQueueResponses = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -21623,7 +21506,7 @@ export type PostChatSessionsBySessionIdQueueData = {
     body: {
         text?: string;
         files?: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -21631,14 +21514,14 @@ export type PostChatSessionsBySessionIdQueueData = {
             [key: string]: unknown;
         }>;
         contextParts?: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -21658,7 +21541,7 @@ export type PostChatSessionsBySessionIdQueueData = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -21687,11 +21570,11 @@ export type PostChatSessionsBySessionIdQueueResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: string;
+        mode: 'queue' | 'steer';
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -21699,14 +21582,14 @@ export type PostChatSessionsBySessionIdQueueResponses = {
             [key: string]: unknown;
         }>;
         contextParts: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -21726,7 +21609,7 @@ export type PostChatSessionsBySessionIdQueueResponses = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -21755,7 +21638,7 @@ export type PostChatSessionsBySessionIdSteerData = {
     body: {
         text?: string;
         files?: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -21763,14 +21646,14 @@ export type PostChatSessionsBySessionIdSteerData = {
             [key: string]: unknown;
         }>;
         contextParts?: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -21790,7 +21673,7 @@ export type PostChatSessionsBySessionIdSteerData = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -21812,7 +21695,7 @@ export type PostChatSessionsBySessionIdSteerResponses = {
      * Response for status 200
      */
     200: {
-        mode: string;
+        mode: 'steered';
         ok: boolean;
         sessionId: string;
         runId: string;
@@ -21828,17 +21711,17 @@ export type PostChatSessionsBySessionIdSteerResponses = {
             [key: string]: unknown;
         };
     } | {
-        mode: string;
+        mode: 'queued';
         ok: boolean;
         sessionId: string;
         queueItem: {
             id: string;
             sessionId: string;
-            mode: string;
+            mode: 'queue' | 'steer';
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -21846,14 +21729,14 @@ export type PostChatSessionsBySessionIdSteerResponses = {
                 [key: string]: unknown;
             }>;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -21873,7 +21756,7 @@ export type PostChatSessionsBySessionIdSteerResponses = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -21918,11 +21801,11 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
         items: Array<{
             id: string;
             sessionId: string;
-            mode: string;
+            mode: 'queue' | 'steer';
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
-                type: string;
+                type: 'file';
                 mediaType: string;
                 filename?: string;
                 url: string;
@@ -21930,14 +21813,14 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
                 [key: string]: unknown;
             }>;
             contextParts: Array<{
-                type: string;
+                type: 'data-cradle-skill';
                 name: string;
                 path: string;
                 scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
                 description: string | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-plugin';
                 provider?: 'cradle' | 'codex';
                 pluginName: string;
                 displayName: string;
@@ -21957,7 +21840,7 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
                 } | null;
                 position?: number;
             } | {
-                type: string;
+                type: 'data-cradle-file-line-comment';
                 workspaceId: string;
                 path: string;
                 lineStart: number;
@@ -22000,11 +21883,11 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: string;
+        mode: 'queue' | 'steer';
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -22012,14 +21895,14 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
             [key: string]: unknown;
         }>;
         contextParts: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -22039,7 +21922,7 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -22068,7 +21951,7 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
     body: {
         text?: string;
         files?: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -22076,14 +21959,14 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
             [key: string]: unknown;
         }>;
         contextParts?: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -22103,7 +21986,7 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdData = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -22133,11 +22016,11 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: string;
+        mode: 'queue' | 'steer';
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -22145,14 +22028,14 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
             [key: string]: unknown;
         }>;
         contextParts: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -22172,7 +22055,7 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -22233,9 +22116,9 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
     200: {
         id: string;
         execution: {
-            kind: string;
+            kind: 'local';
         } | {
-            kind: string;
+            kind: 'remote-host';
             hostId: string;
             remoteSessionId: string;
         };
@@ -22358,7 +22241,7 @@ export type PostChatSessionsBySessionIdResponseData = {
     body: {
         text?: string;
         files?: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -22366,14 +22249,14 @@ export type PostChatSessionsBySessionIdResponseData = {
             [key: string]: unknown;
         }>;
         contextParts?: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -22393,7 +22276,7 @@ export type PostChatSessionsBySessionIdResponseData = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -22438,7 +22321,7 @@ export type PostChatSideConversationsBySideConversationIdResponseData = {
     body: {
         text?: string;
         files?: Array<{
-            type: string;
+            type: 'file';
             mediaType: string;
             filename?: string;
             url: string;
@@ -22446,14 +22329,14 @@ export type PostChatSideConversationsBySideConversationIdResponseData = {
             [key: string]: unknown;
         }>;
         contextParts?: Array<{
-            type: string;
+            type: 'data-cradle-skill';
             name: string;
             path: string;
             scope: 'builtin' | 'legacy' | 'global' | 'repository' | 'workspace' | 'agent';
             description: string | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-plugin';
             provider?: 'cradle' | 'codex';
             pluginName: string;
             displayName: string;
@@ -22473,7 +22356,7 @@ export type PostChatSideConversationsBySideConversationIdResponseData = {
             } | null;
             position?: number;
         } | {
-            type: string;
+            type: 'data-cradle-file-line-comment';
             workspaceId: string;
             path: string;
             lineStart: number;
@@ -22826,7 +22709,7 @@ export type GetChatRunsByRunIdTraceResponses = {
         path: string;
         recordCount: number;
         records: Array<{
-            schema: string;
+            schema: 'cradle.chat-stream-trace.v1';
             seq: number;
             phase: 'run_started' | 'provider_raw' | 'mapper_output' | 'runtime_chunk' | 'sse_emit' | 'run_completed' | 'run_failed' | 'run_aborted';
             timestamp: number;
@@ -22930,7 +22813,7 @@ export type GetChatSessionsBySessionIdTracesResponses = {
             path: string;
             recordCount: number;
             records: Array<{
-                schema: string;
+                schema: 'cradle.chat-stream-trace.v1';
                 seq: number;
                 phase: 'run_started' | 'provider_raw' | 'mapper_output' | 'runtime_chunk' | 'sse_emit' | 'run_completed' | 'run_failed' | 'run_aborted';
                 timestamp: number;
@@ -23689,7 +23572,7 @@ export type PostChronicleSnapshotsResponses = {
         createdAt: number;
         updatedAt: number;
     } | {
-        status: string;
+        status: 'ignored';
         reason: string;
         sourceId: string;
         capturedAt: string;
@@ -24028,7 +23911,7 @@ export type GetChronicleMessageSourcesResponses = {
      */
     200: Array<{
         id: string;
-        platform: string;
+        platform: 'slack';
         label: string;
         enabled: boolean;
         workspaceId: string | null;
@@ -24050,7 +23933,7 @@ export type GetChronicleMessageSourcesResponse = GetChronicleMessageSourcesRespo
 
 export type PostChronicleMessageSourcesData = {
     body: {
-        platform: string;
+        platform: 'slack';
         label: string;
         enabled: boolean;
         workspaceId?: string | null;
@@ -24071,7 +23954,7 @@ export type PostChronicleMessageSourcesResponses = {
      */
     200: {
         id: string;
-        platform: string;
+        platform: 'slack';
         label: string;
         enabled: boolean;
         workspaceId: string | null;
@@ -24135,7 +24018,7 @@ export type PatchChronicleMessageSourcesBySourceIdResponses = {
      */
     200: {
         id: string;
-        platform: string;
+        platform: 'slack';
         label: string;
         enabled: boolean;
         workspaceId: string | null;
@@ -24203,7 +24086,7 @@ export type GetChronicleMessagesResponses = {
     200: Array<{
         id: string;
         sourceId: string;
-        platform: string;
+        platform: 'slack';
         channelId: string;
         channelName: string | null;
         userName: string | null;
@@ -26148,7 +26031,7 @@ export type PostChroniclePrivacyExportResponse = PostChroniclePrivacyExportRespo
 
 export type PostChroniclePrivacySnapshotsBySnapshotIdFrameMaskData = {
     body: {
-        mode?: string;
+        mode?: 'blur';
         fullFrame?: boolean;
         blurSigma?: number;
         regions?: Array<{
@@ -26732,7 +26615,7 @@ export type GetDownloadCenterTasksResponses = {
      */
     200: Array<{
         taskId: string;
-        scope: string;
+        scope: 'server';
         owner: {
             namespace: string;
             resourceType: string;
@@ -26785,7 +26668,7 @@ export type GetDownloadCenterTasksByIdResponses = {
      */
     200: {
         taskId: string;
-        scope: string;
+        scope: 'server';
         owner: {
             namespace: string;
             resourceType: string;
@@ -26838,7 +26721,7 @@ export type PostDownloadCenterTasksByIdCancelResponses = {
      */
     200: {
         taskId: string;
-        scope: string;
+        scope: 'server';
         owner: {
             namespace: string;
             resourceType: string;
@@ -27031,7 +26914,7 @@ export type GetTerminalSessionsBySessionIdHostResponses = {
      */
     200: {
         sessionId: string;
-        role: string;
+        role: 'cli-tui';
         running: boolean;
         phase: 'absent' | 'running' | 'exited';
         mode: 'live-attach' | 'resume' | 'fresh' | 'history' | null;
@@ -27280,7 +27163,7 @@ export type PostObservabilityEventsResponse = PostObservabilityEventsResponses[k
 
 export type PostObservabilityRuntimeSamplesData = {
     body: {
-        source: string;
+        source: 'desktop-main';
         sampledAt: number;
         main: {
             [key: string]: unknown;
@@ -27533,7 +27416,7 @@ export type GetObservabilityRuntimeSnapshotResponses = {
         };
         desktop: {
             latestSamples: Array<{
-                source: string;
+                source: 'desktop-main';
                 sampledAt: number;
                 main: {
                     [key: string]: unknown;

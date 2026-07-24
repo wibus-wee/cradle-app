@@ -1,3 +1,3 @@
+export type { AutomationDefinition, AutomationRun } from './api/automation'
 export { AutomationDashboard } from './automation-dashboard'
-export type { AutomationDefinition, AutomationRun } from './types'
 export { useAutomationDefinitions } from './use-automations'

@@ -396,8 +396,6 @@ const KanbanIssueRelationSchema = z.object({
   createdAt: z.number(),
 })
 const KanbanIssueRelationListSchema = z.array(KanbanIssueRelationSchema).default([])
-const SessionThinkingEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'])
-const SessionWorktreeHealthSchema = z.enum(['ok', 'missing', 'stale'])
 
 const AgentSessionSchema = z
   .object({
@@ -410,47 +408,6 @@ const AgentSessionSchema = z
     isCurrentDelegation: z.boolean(),
     createdAt: z.number(),
     updatedAt: z.number(),
-  })
-  .passthrough()
-const IssueLinkedSessionSchema = z
-  .object({
-    id: z.string(),
-    execution: z.union([
-      z.object({ kind: z.string() }),
-      z.object({
-        kind: z.string(),
-        hostId: z.string(),
-        remoteSessionId: z.string(),
-      }),
-    ]),
-    parentSessionId: z.string().nullable(),
-    sideContextSource: z.enum(['provider-native', 'cradle-context']).nullable(),
-    workspaceId: z.string().nullable(),
-    title: z.string().nullable(),
-    origin: z.string().default('manual'),
-    providerTargetId: z.string().nullable(),
-    agentId: z.string().nullable(),
-    modelId: z.string().nullable(),
-    thinkingEffort: SessionThinkingEffortSchema.nullable(),
-    linkedIssueId: z.string().nullable(),
-    sessionGroupId: z.string().nullable(),
-    runtimeKind: z.string(),
-    status: z.enum(['idle', 'streaming', 'error']),
-    pinned: z.number(),
-    archivedAt: z.number().nullable(),
-    lastReadAt: z.number().nullable(),
-    createdAt: z.number(),
-    updatedAt: z.number(),
-    latestUserMessageAt: z.number().nullable(),
-    latestAssistantMessageAt: z.number().nullable(),
-    unread: z.boolean(),
-    isIsolated: z.boolean(),
-    worktreeId: z.string().nullable(),
-    worktreeBranch: z.string().nullable(),
-    worktreePath: z.string().nullable(),
-    worktreeHealth: SessionWorktreeHealthSchema.nullable(),
-    pendingWorktreeId: z.string().nullable(),
-    isolationBoundaryRequired: z.boolean(),
   })
   .passthrough()
 const IssueSessionGroupSchema = z
@@ -916,8 +873,11 @@ export function useIssueLinkedSessions(issueId: string, enabled = true) {
   return useQuery({
     queryKey: kanbanKeys.linkedSessions(issueId),
     queryFn: async () => {
-      const { data } = await getIssuesByIdSessions({ path: { id: issueId } })
-      return z.array(IssueLinkedSessionSchema).parse(data) satisfies IssueLinkedSession[]
+      const { data } = await getIssuesByIdSessions({ path: { id: issueId }, throwOnError: true })
+      if (data === undefined) {
+        throw new Error('Linked sessions response did not include data')
+      }
+      return data satisfies IssueLinkedSession[]
     },
     enabled: enabled && !!issueId,
     ...queryRefreshPolicies.interactive,
