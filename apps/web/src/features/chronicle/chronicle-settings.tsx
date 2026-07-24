@@ -17,7 +17,6 @@ import type { TFunction } from 'i18next'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { z } from 'zod'
 
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Badge } from '~/components/ui/badge'
@@ -37,6 +36,12 @@ import { getServerUrl } from '~/lib/electron'
 import { formatPercentFromRatio, formatShortDurationMs } from '~/lib/number-format'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
+import {
+  ChronicleAccessibilityEventListView,
+} from './chronicle-accessibility-event-list-view'
+import {
+  ChronicleAccessibilitySnapshotListView,
+} from './chronicle-accessibility-snapshot-list-view'
 import {
   ChronicleActivityPipelineContainer,
 } from './chronicle-activity-pipeline-container'
@@ -66,8 +71,6 @@ import {
   ChronicleTimelineFeedContainer,
 } from './chronicle-timeline-feed-container'
 import type {
-  ChronicleAccessibilityEvent,
-  ChronicleAccessibilitySnapshot,
   ChronicleAudioRawSegment,
   ChronicleAudioTranscript,
   ChronicleConfig,
@@ -101,23 +104,6 @@ import {
 const MEMORY_SEARCH_LIMIT = 50
 const PRIVACY_RULE_LINE_SPLIT_RE = /\r?\n/
 type ChronicleTranslate = TFunction<'chronicle'>
-
-const AccessibilityTreeNodeSchema = z.object({
-  role: z.string().nullable().optional().transform(value => value?.trim() || 'AXElement'),
-  label: z.union([z.string(), z.number(), z.boolean()]).nullable().optional().transform(value => value === null || value === undefined ? '' : String(value)),
-  value: z.union([z.string(), z.number(), z.boolean()]).nullable().optional().transform(value => value === null || value === undefined ? '' : String(value)),
-  depth: z.coerce.number().finite().nullable().optional().transform(value => value ?? 0),
-  path: z.string().min(1).nullable().optional(),
-}).passthrough().transform(node => ({
-  role: node.role,
-  label: node.label,
-  value: node.value,
-  depth: node.depth,
-  path: node.path ?? `${node.role}:${node.label}:${node.depth}`,
-}))
-const AccessibilitySnapshotMetadataSchema = z.object({
-  artifactPath: z.string().optional(),
-}).passthrough()
 
 interface ChronicleSetupNotice {
   title: string
@@ -692,20 +678,18 @@ export function ChronicleSettings() {
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.accessibilitySnapshots.title')} description={t('advanced.accessibilitySnapshots.description')} vertical>
-            {accessibilitySnapshotsLoading
-              ? <ChronicleEmptyState icon={<EyeIcon className="size-4" />} title={t('advanced.accessibilitySnapshots.loading')} />
-              : accessibilitySnapshots.length === 0
-                ? <ChronicleEmptyState icon={<EyeIcon className="size-4" />} title={t('advanced.accessibilitySnapshots.empty')} />
-                : <AccessibilitySnapshotList snapshots={accessibilitySnapshots} />}
+            <ChronicleAccessibilitySnapshotListView
+              loading={accessibilitySnapshotsLoading}
+              snapshots={accessibilitySnapshots}
+            />
           </SettingsRow>
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.accessibilityEvents.title')} description={t('advanced.accessibilityEvents.description')} vertical>
-            {accessibilityEventsLoading
-              ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.accessibilityEvents.loading')} />
-              : accessibilityEvents.length === 0
-                ? <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('advanced.accessibilityEvents.empty')} />
-                : <AccessibilityEventList events={accessibilityEvents} />}
+            <ChronicleAccessibilityEventListView
+              loading={accessibilityEventsLoading}
+              events={accessibilityEvents}
+            />
           </SettingsRow>
           <div className="border-t border-border/60" />
 
@@ -1301,22 +1285,6 @@ function formatAudioRuntimeStatus(t: ChronicleTranslate, status: ChronicleStatus
   return t('common.status.disabled')
 }
 
-function formatAccessibilityStatus(t: ChronicleTranslate, status: ChronicleAccessibilitySnapshot['status']): string {
-  if (status === 'permission-denied') { return t('accessibility.status.permissionDenied') }
-  if (status === 'unavailable') { return t('common.status.unavailable') }
-  if (status === 'error') { return t('common.status.error') }
-  return t('resource.state.available')
-}
-
-function formatAccessibilityEventNotification(t: ChronicleTranslate, notification: string): string {
-  if (notification === 'AXFocusedWindowChanged') { return t('accessibility.notification.focusedWindowChanged') }
-  if (notification === 'AXFocusedUIElementChanged') { return t('accessibility.notification.focusedElementChanged') }
-  if (notification === 'AXWindowCreated') { return t('accessibility.notification.windowCreated') }
-  if (notification === 'AXWindowMoved') { return t('accessibility.notification.windowMoved') }
-  if (notification === 'AXWindowResized') { return t('accessibility.notification.windowResized') }
-  return notification
-}
-
 function formatAudioSegmentTitle(t: ChronicleTranslate, segment: ChronicleAudioRawSegment): string {
   if (segment.source === 'system') { return t('audioRaw.title.system') }
   if (segment.source === 'mixed') { return t('audioRaw.title.mixed') }
@@ -1330,134 +1298,9 @@ function formatAudioProcessingStatus(t: ChronicleTranslate, status: ChronicleAud
   return t('audioRaw.processing.notConnected')
 }
 
-function getAccessibilityTreeDepthClass(depth: number): string {
-  if (depth <= 0) { return 'pl-0' }
-  if (depth === 1) { return 'pl-2' }
-  if (depth === 2) { return 'pl-4' }
-  if (depth === 3) { return 'pl-6' }
-  return 'pl-8'
-}
-
 // ---------------------------------------------------------------------------
 // Data display components (preserved from original)
 // ---------------------------------------------------------------------------
-
-function AccessibilitySnapshotList({ snapshots }: { snapshots: ChronicleAccessibilitySnapshot[] }) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {snapshots.map((snapshot) => {
-        const artifactPath = AccessibilitySnapshotMetadataSchema.parse(snapshot.metadata).artifactPath
-        return (
-          <article key={snapshot.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-            <div className="mb-2 flex min-w-0 items-center gap-2">
-              <EyeIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-              <span className="truncate text-[13px] font-medium text-foreground">
-                {snapshot.windowTitle ?? snapshot.appBundleId ?? t('accessibility.snapshotFallback.title')}
-              </span>
-              <Badge
-                variant={snapshot.status === 'ready' ? 'secondary' : 'outline'}
-                className={cn(
-                  'ml-auto text-[11px]',
-                  {
-                    'border-destructive/20 bg-destructive/10 text-destructive': snapshot.status === 'error',
-                    'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300': snapshot.status === 'permission-denied',
-                  },
-                )}
-              >
-                {formatAccessibilityStatus(t, snapshot.status)}
-              </Badge>
-            </div>
-            <p className="line-clamp-4 text-[13px] leading-5 text-foreground">
-              {snapshot.text ?? t('accessibility.snapshotFallback.text')}
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
-              <span className="truncate font-mono">{formatDateTime(t, snapshot.capturedAt)}</span>
-              <span className="truncate text-right">
-                {t('accessibility.elementCount', { count: snapshot.elementCount })}
-              </span>
-              <span className="truncate">{snapshot.provider}</span>
-              <span className="truncate text-right">{snapshot.appBundleId ?? t('common.status.unknownApp')}</span>
-            </div>
-            {artifactPath && (
-              <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground/70">
-                {artifactPath}
-              </p>
-            )}
-            <AccessibilityTreePreview tree={snapshot.tree} />
-          </article>
-        )
-      })}
-    </div>
-  )
-}
-
-function AccessibilityTreePreview({ tree }: { tree: unknown[] }) {
-  const nodes = tree.reduce<Array<z.output<typeof AccessibilityTreeNodeSchema>>>((items, node) => {
-    if (items.length >= 4) {
-      return items
-    }
-
-    const parsed = AccessibilityTreeNodeSchema.safeParse(node)
-    if (parsed.success) {
-      items.push(parsed.data)
-    }
-    return items
-  }, [])
-
-  if (nodes.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="mt-2 space-y-1 border-t border-foreground/5 pt-2">
-      {nodes.map(node => (
-        <div key={node.path} className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono">{node.role}</span>
-          <span className={cn('min-w-0 flex-1 truncate', getAccessibilityTreeDepthClass(node.depth))}>
-            {node.label || node.value || node.path}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function AccessibilityEventList({ events }: { events: ChronicleAccessibilityEvent[] }) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {events.map(event => (
-        <article key={event.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-          <div className="mb-2 flex min-w-0 items-center gap-2">
-            <ActivityIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium text-foreground">
-              {formatAccessibilityEventNotification(t, event.notification)}
-            </span>
-            <Badge variant="outline" className="ml-auto text-[11px]">
-              {event.droppedBefore > 0 ? `${event.droppedBefore} dropped` : 'captured'}
-            </Badge>
-          </div>
-          <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
-            <span className="truncate font-mono">{formatDateTime(t, event.capturedAt)}</span>
-            <span className="truncate text-right">{event.appBundleId ?? t('common.status.unknownApp')}</span>
-            <span className="truncate">{event.provider}</span>
-            <span className="truncate text-right">{event.pid === null ? t('accessibility.unknownProcess') : `PID ${event.pid}`}</span>
-            <span className="truncate">
-              {event.snapshotId ? t('accessibility.snapshotLinked') : t('accessibility.snapshotNotLinked')}
-            </span>
-            <span className="truncate text-right">
-              {event.accessibilitySnapshotId ? t('accessibility.windowClueLinked') : t('accessibility.windowClueNotLinked')}
-            </span>
-          </div>
-          <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground/70">{event.sourceId}</p>
-        </article>
-      ))}
-    </div>
-  )
-}
 
 function AudioTranscriptList({ transcripts }: { transcripts: ChronicleAudioTranscript[] }) {
   const { t } = useTranslation('chronicle')
