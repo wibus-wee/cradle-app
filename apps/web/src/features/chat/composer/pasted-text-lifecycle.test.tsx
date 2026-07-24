@@ -46,7 +46,7 @@ function PastedTextLifecycleHarness({
         />
         {message
 ? (
-          <MessageBubble message={message} isStreaming={false} sessionId="session-1" />
+          <MessageBubble message={message} isStreaming={false} />
         )
 : null}
       </TooltipProvider>

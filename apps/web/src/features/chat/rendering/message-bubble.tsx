@@ -1,26 +1,22 @@
 import { Streamdown } from '@cradle/streamdown'
-import {
-  BookmarkLine as BookmarkIcon,
-  BookmarksLine as MarkerIcon,
-  CheckLine as CheckIcon,
-  CopyLine as CopyIcon,
-  PencilLine as PencilIcon,
-} from '@mingcute/react'
 import type { UIMessage } from 'ai'
 import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { Button } from '~/components/ui/button'
-import { Spinner } from '~/components/ui/spinner'
-import { toastManager } from '~/components/ui/toast'
-import { sessionEnvironmentApi } from '~/features/session-environment/api/session-environment'
 import { cn } from '~/lib/cn'
 import { chatSelectors } from '~/store/chat'
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
 import { readChatContinuationMetadata } from '../capabilities/chat-continuation-metadata'
 import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
+import { GroupedToolCallBlockView } from '../tool-blocks/views/grouped-tool-call-block-view'
+import { ToolCallBlockView } from '../tool-blocks/views/tool-call-block-view'
+import { MessageBubbleActionsById } from '../transcript/containers/message-bubble-actions-by-id'
 import { MarkdownFileLinkView } from '../transcript/views/markdown-file-link-view'
+import type { MessageBubbleEditAction } from '../transcript/views/message-bubble-actions-view'
+import {
+  MessageBubbleActionsView,
+} from '../transcript/views/message-bubble-actions-view'
 import { BangCommandBlock, BangCommandPromptBlock } from './blocks/bang-command-block'
 import { ReasoningBlock } from './blocks/reasoning-block'
 import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
@@ -33,7 +29,8 @@ import {
   splitExecutionPhase,
   splitSegmentExecutionPhase,
 } from './chat-render-plan'
-import { useChatRenderStore, useChatRenderStoreApi } from './chat-render-store'
+import { useChatRenderStore } from './chat-render-store'
+import { toolNameFromPart } from './chat-tool-entities'
 import { ImageLightbox } from './image-lightbox'
 import {
   FileAttachmentBlock,
@@ -64,10 +61,9 @@ import {
   readMessageDisplayText,
   readMessageFrameFromState,
   readMessageImageAttachmentsFromState,
-  readPlainTextFromState,
   readPlainTextLengthFromState,
-  readPlainTextPresenceFromState,
   readRenderSegmentsFromState,
+  readToolApproval,
 } from './message-bubble-selectors'
 import {
   MessageFileLineCommentContextPartById,
@@ -82,9 +78,7 @@ import { MESSAGE_STREAMING_ANIMATION_MAX_CHARS } from './message-rendering-const
 import type { MessageToolApprovalHandler } from './message-tool-blocks'
 import {
   GroupedToolCallBlockByPartIndexes,
-  GroupedToolCallBlockFromParts,
   ToolCallBlockByPartIndex,
-  ToolCallBlockFromPart,
 } from './message-tool-blocks'
 import { RunDebugCaption } from './run-debug-caption'
 import { describeToolCall } from './tool-ui-classifier'
@@ -98,15 +92,8 @@ const STEER_MESSAGE_BUBBLE_CLASS
   = 'rounded-br-sm bg-background px-3 py-2 text-muted-foreground shadow-[inset_0_0_0_1px_hsl(var(--border)/0.45)]'
 const IMAGE_ATTACHMENT_GRID_ITEM_CLASS = 'min-w-0 max-w-[300px] flex-1 basis-[calc(50%-0.25rem)]'
 
+export type { MessageBubbleEditAction } from '../transcript/views/message-bubble-actions-view'
 export type { MessageTextTransform } from './message-bubble-selectors'
-
-export interface MessageBubbleEditAction {
-  busy: boolean
-  disabled: boolean
-  label: string
-  title: string
-  onEdit: () => void
-}
 
 function useTextStreamIdle(enabled: boolean, textLength: number): boolean {
   const streamKey = enabled ? textLength : null
@@ -134,7 +121,6 @@ interface MessageBubbleProps {
   isStreaming: boolean
   executionDetailsDefaultOpen?: boolean
   presentation?: 'thread' | 'export'
-  sessionId?: string
   onToolApprovalResponse?: MessageToolApprovalHandler
   debugCaption?: ReactNode
 }
@@ -177,187 +163,6 @@ const MessageThinkingPlaceholderById = ({
   return <ThinkingPlaceholder />
 }
 MessageThinkingPlaceholderById.displayName = 'MessageThinkingPlaceholderById'
-
-const MessageCopyActionById = ({
-  sessionId,
-  messageId,
-  isUser,
-  editAction,
-  textTransform,
-}: {
-  sessionId: string
-  messageId: string
-  isUser: boolean
-  editAction?: MessageBubbleEditAction
-  textTransform?: MessageTextTransform
-}) => {
-  const hasPlainText = useChatRenderStore(state =>
-    readPlainTextPresenceFromState(state, sessionId, messageId, textTransform))
-  const chatStore = useChatRenderStoreApi()
-  const [copied, setCopied] = useState(false)
-  const copyFeedbackTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (copyFeedbackTimerRef.current !== null) {
-        window.clearTimeout(copyFeedbackTimerRef.current)
-      }
-    }
-  }, [])
-
-  const handleCopy = async () => {
-    const plainText = readPlainTextFromState(
-      chatStore.getState(),
-      sessionId,
-      messageId,
-      textTransform,
-    )
-    await navigator.clipboard.writeText(plainText)
-    setCopied(true)
-
-    if (copyFeedbackTimerRef.current !== null) {
-      window.clearTimeout(copyFeedbackTimerRef.current)
-    }
-
-    copyFeedbackTimerRef.current = window.setTimeout(() => {
-      setCopied(false)
-      copyFeedbackTimerRef.current = null
-    }, 1500)
-  }
-
-  const handlePin = async () => {
-    const result = await sessionEnvironmentApi.pinMessage({
-      path: { id: sessionId, messageId },
-    })
-    if (result.error) {
-      toastManager.add({ type: 'error', title: 'Pin failed', description: String(result.error) })
-      return
-    }
-    toastManager.add({ type: 'success', title: 'Message pinned' })
-  }
-
-  const handleMarkSelection = async () => {
-    const selection = window.getSelection()
-    const range = selection?.rangeCount ? selection.getRangeAt(0) : null
-    const bubble = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`)
-    const content = bubble?.querySelector('[data-message-content]')
-    if (
-      !selection
-      || !range
-      || !content
-      || selection.isCollapsed
-      || !content.contains(range.startContainer)
-      || !content.contains(range.endContainer)
-    ) {
-      toastManager.add({ type: 'error', title: 'Select text in this message first' })
-      return
-    }
-    const startRange = document.createRange()
-    startRange.selectNodeContents(content)
-    startRange.setEnd(range.startContainer, range.startOffset)
-    const endRange = document.createRange()
-    endRange.selectNodeContents(content)
-    endRange.setEnd(range.endContainer, range.endOffset)
-    const selectedText = range.toString()
-    const result = await sessionEnvironmentApi.createMarker({
-      path: { id: sessionId },
-      body: {
-        messageId,
-        startOffset: startRange.toString().length,
-        endOffset: endRange.toString().length,
-        selectedText,
-        style: 'highlight',
-        color: 'yellow',
-      },
-    })
-    if (result.error) {
-      toastManager.add({ type: 'error', title: 'Marker failed', description: String(result.error) })
-      return
-    }
-    selection.removeAllRanges()
-    toastManager.add({ type: 'success', title: 'Selection marked' })
-  }
-
-  if (!hasPlainText && !editAction) {
-    return null
-  }
-
-  return (
-    <div
-      className={cn(
-        'mt-1 flex items-center gap-0.5 opacity-0 translate-y-0.5 group-hover:opacity-100 group-hover:translate-y-0 transition-[opacity,transform] duration-150',
-        isUser && 'justify-end',
-      )}
-    >
-      {editAction && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          disabled={editAction.disabled}
-          onClick={editAction.onEdit}
-          className="text-muted-foreground/50 hover:text-foreground"
-          title={editAction.title}
-          aria-label={editAction.label}
-          data-testid="chat-edit-previous-btn"
-        >
-          {editAction.busy
-? (
-            <Spinner className="size-3.5" aria-hidden="true" />
-          )
-: (
-            <PencilIcon className="size-3.5" aria-hidden="true" />
-          )}
-        </Button>
-      )}
-      {hasPlainText && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => void handlePin()}
-          className="text-muted-foreground/50 hover:text-foreground"
-          aria-label="Pin message"
-          title="Pin in environment"
-        >
-          <BookmarkIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-      )}
-      {hasPlainText && isUser && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => void handleMarkSelection()}
-          className="text-muted-foreground/50 hover:text-foreground"
-          aria-label="Mark selected text"
-          title="Mark selected text in environment"
-        >
-          <MarkerIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-      )}
-      {hasPlainText && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={handleCopy}
-          className="text-muted-foreground/50 hover:text-foreground"
-          aria-label="Copy message"
-        >
-          {copied
-? (
-            <CheckIcon className="size-3.5 !text-emerald-500" aria-hidden="true" />
-          )
-: (
-            <CopyIcon className="size-3.5" aria-hidden="true" />
-          )}
-        </Button>
-      )}
-    </div>
-  )
-}
-MessageCopyActionById.displayName = 'MessageCopyActionById'
 
 const MessageSegmentView = ({
   segment,
@@ -663,7 +468,7 @@ const MessageBubbleSegmentsView = ({
           {isAssistant && <RunDebugCaption messageId={frame.id} />}
 
           {!isStreaming && (
-            <MessageCopyActionById
+            <MessageBubbleActionsById
               sessionId={sessionId}
               messageId={frame.id}
               isUser={isUser}
@@ -742,7 +547,6 @@ function MessageBubbleView({
   isStreaming,
   executionDetailsDefaultOpen = false,
   presentation = 'thread',
-  sessionId,
   onToolApprovalResponse,
   debugCaption,
 }: MessageBubbleProps) {
@@ -754,9 +558,6 @@ function MessageBubbleView({
   const isGoalMessage = isCodexGoalUserMessage(message)
   const bangCommand = isUser ? readBangCommandMetadata(message) : null
   const bangResult = isUser ? readBangResultMetadata(message) : null
-  const [copied, setCopied] = useState(false)
-  const copyFeedbackTimerRef = useRef<number | null>(null)
-
   const plainText = readMessageDisplayText(message)
   const plainTextLength = plainText.length
   const streamTextIdle = useTextStreamIdle(isAssistant && isStreaming, plainTextLength)
@@ -780,26 +581,8 @@ function MessageBubbleView({
       && !hasActiveProgress
       && (groupedItems.length === 0 || streamTextIdle)
 
-  useEffect(() => {
-    return () => {
-      if (copyFeedbackTimerRef.current !== null) {
-        window.clearTimeout(copyFeedbackTimerRef.current)
-      }
-    }
-  }, [])
-
   const handleCopy = async () => {
     await navigator.clipboard.writeText(plainText)
-    setCopied(true)
-
-    if (copyFeedbackTimerRef.current !== null) {
-      window.clearTimeout(copyFeedbackTimerRef.current)
-    }
-
-    copyFeedbackTimerRef.current = window.setTimeout(() => {
-      setCopied(false)
-      copyFeedbackTimerRef.current = null
-    }, 1500)
   }
 
   /* ─── Render items ─── */
@@ -839,7 +622,7 @@ function MessageBubbleView({
 
       case 'tool-group':
         return (
-          <GroupedToolCallBlockFromParts
+          <GroupedToolCallBlockView
             key={item.key}
             items={item.items}
             uiKind={item.uiKind}
@@ -847,15 +630,31 @@ function MessageBubbleView({
         )
 
       case 'tool-call':
+        {
+          const approval = readToolApproval(item.part)
         return (
-          <ToolCallBlockFromPart
+          <ToolCallBlockView
             key={item.key}
-            messageId={message.id}
-            part={item.part}
-            sessionId={sessionId}
-            onToolApprovalResponse={onToolApprovalResponse}
+            toolName={toolNameFromPart(item.part)}
+            toolCallId={item.part.toolCallId}
+            state={item.part.state}
+            approval={approval}
+            argumentsText={item.part.argumentsText}
+            input={item.part.input}
+            output={item.part.output}
+            errorText={item.part.errorText}
+            onApprovalResponse={
+              approval && onToolApprovalResponse
+                ? response => onToolApprovalResponse({
+                    messageId: message.id,
+                    approvalId: response.id,
+                    approved: response.approved,
+                  })
+                : undefined
+            }
           />
         )
+        }
 
       case 'file-attachment':
         return <FileAttachmentBlock key={item.key} part={item.part} />
@@ -944,29 +743,11 @@ function MessageBubbleView({
 
         {/* Action bar — appears on hover for all messages */}
         {!isExportPresentation && !isStreaming && plainText.length > 0 && (
-          <div
-            className={cn(
-              'mt-1 flex items-center gap-0.5 opacity-0 translate-y-0.5 group-hover:opacity-100 group-hover:translate-y-0 transition-[opacity,transform] duration-150',
-              isUser && 'justify-end',
-            )}
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleCopy}
-              className="text-muted-foreground/50 hover:text-foreground"
-              aria-label="Copy message"
-            >
-              {copied
-? (
-                <CheckIcon className="size-3.5 !text-emerald-500" aria-hidden="true" />
-              )
-: (
-                <CopyIcon className="size-3.5" aria-hidden="true" />
-              )}
-            </Button>
-          </div>
+          <MessageBubbleActionsView
+            hasPlainText
+            isUser={isUser}
+            onCopy={handleCopy}
+          />
         )}
       </div>
     </div>
