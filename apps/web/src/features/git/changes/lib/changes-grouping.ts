@@ -1,18 +1,13 @@
-import type { GitFileStatus } from '~/features/git/types'
+import type { GitFileStatus } from '~/features/git/shared/types'
 
-type ChangeSectionId = 'tests' | 'docs' | 'sources'
+export type ChangeSectionId = 'tests' | 'docs' | 'sources'
 
 export interface ChangeSection {
   id: ChangeSectionId
-  label: string
   files: GitFileStatus[]
 }
 
-const CHANGE_SECTIONS: Array<{ id: ChangeSectionId, label: string }> = [
-  { id: 'sources', label: 'Sources' },
-  { id: 'docs', label: 'Docs / Specs' },
-  { id: 'tests', label: 'Tests' },
-]
+const CHANGE_SECTIONS: ChangeSectionId[] = ['sources', 'docs', 'tests']
 
 const RE_TEST_FILE = /\.test\.[cm]?[jt]sx?$/i
 const RE_MARKDOWN_FILE = /\.mdx?$/i
@@ -28,9 +23,9 @@ export function groupGitFileStatuses(files: GitFileStatus[]): ChangeSection[] {
     sectionFiles[getChangeSectionId(file.path)].push(file)
   }
 
-  return CHANGE_SECTIONS.map(section => ({
-    ...section,
-    files: [...sectionFiles[section.id]].sort((left, right) => left.path.localeCompare(right.path)),
+  return CHANGE_SECTIONS.map(id => ({
+    id,
+    files: [...sectionFiles[id]].sort((left, right) => left.path.localeCompare(right.path)),
   }))
 }
 

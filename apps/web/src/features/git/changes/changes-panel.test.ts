@@ -4,12 +4,12 @@ import type { ReactNode } from 'react'
 import { createElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { GitFileStatus } from '~/features/git/types'
+import type { GitFileStatus } from '~/features/git/shared/types'
 import { DEFAULT_BROWSER_PANEL_OWNER_ID, useBrowserPanelStore } from '~/store/browser-panel'
 
-import { groupGitFileStatuses } from './changes-grouping'
-import { ChangesPanel } from './changes-panel'
-import { resolveTreeItemFromEvent } from './tree-event-target'
+import { resolveTreeItemFromEvent } from '../shared/tree-event-target'
+import { ChangesPanelContainer } from './containers/changes-panel-container'
+import { groupGitFileStatuses } from './lib/changes-grouping'
 
 const treeMocks = vi.hoisted(() => {
   const select = vi.fn()
@@ -27,6 +27,17 @@ const treeMocks = vi.hoisted(() => {
 
 const gitQueryMocks = vi.hoisted(() => ({
   useGitRepositories: vi.fn(),
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => (
+      {
+        'changes.allChangesTitle': 'All Changes',
+        'changes.viewMode.treeLabel': 'Show changes as tree',
+      } as Record<string, string>
+    )[key] ?? key,
+  }),
 }))
 
 vi.mock('@pierre/trees/react', async () => {
@@ -52,7 +63,7 @@ vi.mock('@pierre/trees/react', async () => {
   }
 })
 
-vi.mock('./use-git', () => ({
+vi.mock('../shared/use-git', () => ({
   useGitRepositories: gitQueryMocks.useGitRepositories,
 }))
 
@@ -120,7 +131,6 @@ describe('groupGitFileStatuses', () => {
     expect(groupGitFileStatuses(files)).toEqual([
       {
         id: 'sources',
-        label: 'Sources',
         files: [
           { path: 'src/app.spec.ts', workspacePath: 'src/app.spec.ts', status: 'modified' },
           { path: 'src/app.tsx', workspacePath: 'src/app.tsx', status: 'modified' },
@@ -128,7 +138,6 @@ describe('groupGitFileStatuses', () => {
       },
       {
         id: 'docs',
-        label: 'Docs / Specs',
         files: [
           { path: 'docs/spec.mdx', workspacePath: 'docs/spec.mdx', status: 'untracked' },
           { path: 'README.md', workspacePath: 'README.md', status: 'modified' },
@@ -136,7 +145,6 @@ describe('groupGitFileStatuses', () => {
       },
       {
         id: 'tests',
-        label: 'Tests',
         files: [{ path: 'src/app.test.ts', workspacePath: 'src/app.test.ts', status: 'added' }],
       },
     ])
@@ -155,7 +163,7 @@ describe('changesPanel type interactions', () => {
       isSuccess: true,
     })
 
-    renderWithQueryClient(createElement(ChangesPanel, {
+    renderWithQueryClient(createElement(ChangesPanelContainer, {
       workspaceId: 'workspace-1',
       sessionId: 'session-worktree-1',
     }))
@@ -185,7 +193,7 @@ describe('changesPanel type interactions', () => {
 
 describe('changesPanel tree interactions', () => {
   it('opens the All Changes browser panel tab for the double-clicked tree file', () => {
-    renderWithQueryClient(createElement(ChangesPanel, {
+    renderWithQueryClient(createElement(ChangesPanelContainer, {
       workspaceId: 'workspace-1',
       sessionId: 'session-worktree-1',
     }))
@@ -212,7 +220,7 @@ describe('changesPanel tree interactions', () => {
   })
 
   it('ignores double-clicks on tree folders', () => {
-    renderWithQueryClient(createElement(ChangesPanel, { workspaceId: 'workspace-1' }))
+    renderWithQueryClient(createElement(ChangesPanelContainer, { workspaceId: 'workspace-1' }))
 
     fireEvent.click(screen.getByRole('radio', { name: 'Show changes as tree' }))
     fireEvent.doubleClick(screen.getByText('src'))

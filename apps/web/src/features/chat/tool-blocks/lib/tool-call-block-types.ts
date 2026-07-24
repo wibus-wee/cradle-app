@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { ToolState } from '../tool-ui-classifier'
+import type { ToolState } from '../../rendering/tool-ui-classifier'
 
 export interface ToolCallBlockProps {
   toolName: string

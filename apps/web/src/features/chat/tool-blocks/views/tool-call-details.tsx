@@ -5,10 +5,10 @@ import { Progress } from '~/components/ui/progress'
 import { Table, TableBody, TableCell, TableRow } from '~/components/ui/table'
 import { cn } from '~/lib/cn'
 
-import { readTerminalOutputSections } from '../terminal-tool-details'
-import type { ToolPayload, ToolState } from '../tool-ui-classifier'
-import { readToolInputPayload, readToolPayload } from '../tool-ui-classifier'
-import { EditFileBlock } from './edit-file-block'
+import { EditFileBlock } from '../../rendering/blocks/edit-file-block'
+import { readTerminalOutputSections } from '../../rendering/terminal-tool-details'
+import type { ToolPayload, ToolState } from '../../rendering/tool-ui-classifier'
+import { readToolInputPayload, readToolPayload } from '../../rendering/tool-ui-classifier'
 
 // ---------------------------------------------------------------------------
 // Constants

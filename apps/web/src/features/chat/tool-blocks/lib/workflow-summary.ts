@@ -43,7 +43,7 @@ export function readSubagentStatusDescription(status: string | null, workflow: b
 }
 
 export function readWorkflowRows(input: ToolPayload, output: ToolPayload): Array<[string, string | number | null]> {
-  return [
+  const rows: Array<[string, string | number | null]> = [
     ['Name', output.workflowName ?? input.workflowName ?? input.subagentName],
     ['Description', output.workflowDescription ?? input.workflowDescription],
     ['Task', output.taskId ?? input.taskId],
@@ -53,5 +53,6 @@ export function readWorkflowRows(input: ToolPayload, output: ToolPayload): Array
     ['Remote session', output.workflowSessionUrl ?? input.workflowSessionUrl],
     ['Warning', output.warning ?? input.warning],
     ['Error', output.error ?? input.error],
-  ].filter(([, value]) => value !== null && value !== '')
+  ]
+  return rows.filter(([, value]) => value !== null && value !== '')
 }

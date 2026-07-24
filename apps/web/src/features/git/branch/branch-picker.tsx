@@ -26,7 +26,7 @@ import {
   gitRepositoriesQueryKey,
   gitStatusQueryKey,
   useGitBranches,
-} from './use-git'
+} from '../shared/use-git'
 
 interface BranchPickerProps {
   workspaceId: string

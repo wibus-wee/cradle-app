@@ -15,34 +15,33 @@ import {
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { useComposerDraftSync } from '~/hooks/use-composer-draft-sync'
 import { cn } from '~/lib/cn'
-import { isLocalMode } from '~/lib/electron'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import type { ComposerDraft } from '~/store/composer-draft'
 
-import type { ChatRuntimeCompactUiSlotState } from '../capabilities/chat-capabilities'
-import { readBangCommand } from '../commands/bang-command'
+import type { ChatRuntimeCompactUiSlotState } from '../../capabilities/chat-capabilities'
+import { readBangCommand } from '../../commands/bang-command'
 import type {
   ChatRuntimeSettings,
   ChatRuntimeSettingsPatch,
-} from '../commands/chat-response-command'
-import type { ChatContextPart } from '../context/chat-context-parts'
-import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../mentions/mention-panel'
-import { MentionPanel } from '../mentions/mention-panel'
-import type { SkillMentionItem } from '../mentions/skill-mention-panel'
-import { SkillMentionPanel } from '../mentions/skill-mention-panel'
-import type { ComposerPastedText } from '../pasted-text/pasted-text'
+} from '../../commands/chat-response-command'
+import type { ChatContextPart } from '../../context/chat-context-parts'
+import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../../mentions/mention-panel'
+import { MentionPanel } from '../../mentions/mention-panel'
+import type { SkillMentionItem } from '../../mentions/skill-mention-panel'
+import { SkillMentionPanel } from '../../mentions/skill-mention-panel'
+import type { ComposerPastedText } from '../../pasted-text/pasted-text'
 import {
   appendPastedTextsToPrompt,
   createComposerPastedText,
   shouldCollapsePastedText,
-} from '../pasted-text/pasted-text'
-import { ComposerPastedTextCard } from '../pasted-text/pasted-text-card'
+} from '../../pasted-text/pasted-text'
+import { ComposerPastedTextCard } from '../../pasted-text/pasted-text-card'
 import {
   buildPlanModeTogglePatch,
   isPlanRuntimeSettings,
   supportsPlanModeToggle,
-} from '../runtime/runtime-settings-presenter'
-import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
+} from '../../runtime/runtime-settings-presenter'
+import type { ChatComposerSlashCommand } from '../../slash-commands/chat-slash-commands'
 import {
   CHAT_SLASH_COMMAND_LISTBOX_ID,
   getActiveSlashCommand,
@@ -51,36 +50,36 @@ import {
   getVisibleSlashCommands,
   isSlashCommandAwaitingRequiredArgument,
   replaceSlashTrigger,
-} from '../slash-commands/slash-command-input'
-import { SlashCommandPanel } from '../slash-commands/slash-command-panel'
+} from '../../slash-commands/slash-command-input'
+import { SlashCommandPanel } from '../../slash-commands/slash-command-panel'
 import type {
   ComposerActionContextOptions,
   ComposerSlashCommandActionContext,
   ComposerSlashCommandActionResult,
   ComposerSlashCommandActionTools,
-} from './composer-action-context'
-import { readComposerActionContext } from './composer-action-context'
-import { ComposerActions } from './composer-actions'
-import { useComposerAttachments } from './composer-attachment-state'
-import type { PendingAppshotAttachment } from './composer-attachments'
-import { ComposerAttachmentInput, ComposerAttachmentList } from './composer-attachments'
-import { composerReducer, INITIAL_COMPOSER_STATE } from './composer-state'
-import type { ComposerSendHandler, ComposerSendResult } from './composer-submit'
+} from '../composer-action-context'
+import { readComposerActionContext } from '../composer-action-context'
+import { ComposerActions } from '../composer-actions'
+import { useComposerAttachments } from '../composer-attachment-state'
+import type { PendingAppshotAttachment } from '../composer-attachments'
+import { ComposerAttachmentInput, ComposerAttachmentList } from '../composer-attachments'
+import { composerReducer, INITIAL_COMPOSER_STATE } from '../composer-state'
+import type { ComposerSendHandler, ComposerSendResult } from '../composer-submit'
 import {
   isComposerSendPromise,
   readBangCommandDraft,
   reportComposerSubmitError,
   submitAndClearDraft,
-} from './composer-submit'
+} from '../composer-submit'
 import type {
   PromptEditorController,
   PromptEditorSnapshot,
   PromptEditorTriggerRange,
-} from './prompt-editor'
-import { PromptEditor } from './prompt-editor'
-import { UltraThinkingDecoration } from './ultra-thinking-decoration'
+} from '../prompt-editor'
+import { PromptEditor } from '../prompt-editor'
+import { UltraThinkingDecoration } from '../ultra-thinking-decoration'
 
-export type { ComposerSendHandler } from './composer-submit'
+export type { ComposerSendHandler } from '../composer-submit'
 
 /** Decorative composer treatments owned by the caller (e.g. ultra thinking). */
 export type ComposerDecoration = 'ultra'
@@ -117,6 +116,8 @@ export interface ComposerCommandController {
 
 export interface ComposerAttachmentIntegration {
   supportsAttachments?: boolean
+  /** Allows native FileList drops. Runtime adapters derive this from the host environment. */
+  acceptsNativeFiles?: boolean
   usesLightOcr?: boolean
   /** File parts injected externally, for example from native Appshot capture. */
   appendFileParts?: FileUIPart[]
@@ -245,7 +246,7 @@ const textareaRowsClasses: Record<number, string> = {
   5: 'min-h-30 max-h-80',
 }
 
-export function Composer({
+export function ComposerView({
   send,
   commands,
   attachments,
@@ -272,6 +273,7 @@ export function Composer({
   const slashCommands = commands?.commands ?? EMPTY_SLASH_COMMANDS
   const onSlashCommandAction = commands?.runAction
   const supportsAttachments = attachments?.supportsAttachments
+  const acceptsNativeFiles = attachments?.acceptsNativeFiles ?? false
   const usesLightOcr = attachments?.usesLightOcr ?? false
   const appendExternalFileParts = attachments?.appendFileParts
   const appendExternalFilePartsKey = attachments?.appendFilePartsKey
@@ -966,7 +968,7 @@ export function Composer({
       }
 
       // In local mode, handle external file drops as attachments
-      if (isLocalMode() && event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+      if (acceptsNativeFiles && event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
         event.preventDefault()
         event.stopPropagation()
         void handleAttachmentFilesSelected({
@@ -977,7 +979,7 @@ export function Composer({
 
       return false
     },
-    [handleAttachmentFilesSelected],
+    [acceptsNativeFiles, handleAttachmentFilesSelected],
   )
 
   const handleMentionClose = useCallback(() => {

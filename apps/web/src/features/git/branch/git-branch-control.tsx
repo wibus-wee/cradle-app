@@ -2,8 +2,8 @@ import { CloudLine as CloudIcon, GitBranchLine as GitBranchIcon } from '@mingcut
 
 import { cn } from '~/lib/cn'
 
+import { useGitRepositories } from '../shared/use-git'
 import { BranchPicker } from './branch-picker'
-import { useGitRepositories } from './use-git'
 
 interface GitBranchControlProps {
   workspaceId: string | null | undefined

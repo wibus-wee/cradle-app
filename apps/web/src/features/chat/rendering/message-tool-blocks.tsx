@@ -107,12 +107,18 @@ export function GroupedToolCallBlockFromParts({
   uiKind,
   animated,
   workspaceDiffTarget,
+  sessionId,
 }: {
   items: Array<{ key: string, part: RenderableToolPart }>
   uiKind: ReturnType<typeof describeToolCall>['kind']
   animated?: boolean
   workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
+  sessionId?: string
 }) {
+  const sessionWorkspaceId = useSessionBinding(sessionId ?? '', Boolean(sessionId))?.workspaceId ?? null
+  const resolvedWorkspaceDiffTarget = workspaceDiffTarget
+    ?? (sessionWorkspaceId ? { workspaceId: sessionWorkspaceId } : undefined)
+
   if (items.length === 0) {
     return null
   }
@@ -122,7 +128,7 @@ export function GroupedToolCallBlockFromParts({
       items={items}
       uiKind={uiKind}
       animated={animated}
-      workspaceDiffTarget={workspaceDiffTarget}
+      workspaceDiffTarget={resolvedWorkspaceDiffTarget}
     />
   )
 }

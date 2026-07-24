@@ -1,4 +1,4 @@
-import type { GitGraphCommit } from '~/features/git/types'
+import type { GitGraphCommit } from './types'
 
 // Colors for branch lanes (cycles if more than 8 lanes)
 export const LANE_COLORS = [

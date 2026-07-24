@@ -22,7 +22,6 @@ import { useTranslation } from 'react-i18next'
 
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { formatTokenCount, formatUsd } from '~/lib/number-format'
-import { useResolvedThemeMode } from '~/store/theme'
 
 import {
   denseCostModelStackSeries,
@@ -47,17 +46,23 @@ echarts.use([
 
 type TrendMetric = 'tokens' | 'cost'
 
-interface UsageTrendChartProps {
+interface UsageTrendChartViewProps {
   dailyCost: DailyCost[]
   dailyByModel: DailyUsageByModel[]
   range: UsageRangeKey
   hasCost: boolean
+  themeMode: 'light' | 'dark'
 }
 
-export function UsageTrendChart({ dailyCost, dailyByModel, range, hasCost }: UsageTrendChartProps) {
+export function UsageTrendChartView({
+  dailyCost,
+  dailyByModel,
+  range,
+  hasCost,
+  themeMode,
+}: UsageTrendChartViewProps) {
   const { t } = useTranslation('usage')
-  const resolvedMode = useResolvedThemeMode()
-  const isDark = resolvedMode === 'dark'
+  const isDark = themeMode === 'dark'
   const [metric, setMetric] = useState<TrendMetric>('tokens')
   const days = rangeDays(range)
   const activeMetric: TrendMetric = hasCost ? metric : 'tokens'
