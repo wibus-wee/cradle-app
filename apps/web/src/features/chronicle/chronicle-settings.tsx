@@ -1,13 +1,6 @@
 import {
-  BrainLine as BrainIcon,
-  ChipLine as CpuIcon,
-  ClockLine as ClockIcon,
-  DriveLine as HardDriveIcon,
-  EyeLine as EyeIcon,
-  FileMusicLine as FileAudioIcon,
   HeartbeatLine as ActivityIcon,
   Key2Line as KeyRoundIcon,
-  LayersLine as LayersIcon,
   Message1Line as MessageSquareIcon,
   PicLine as ImageIcon,
   Refresh1Line as RefreshCwIcon,
@@ -69,7 +62,12 @@ import {
   ChronicleSpeakerProfileGridView,
 } from './chronicle-speaker-profile-grid-view'
 import {
-  formatChronicleDateTime as formatDateTime,
+  ChronicleStatusBadgeView,
+} from './chronicle-status-badge-view'
+import {
+  ChronicleStatusPanelView,
+} from './chronicle-status-panel-view'
+import {
   formatChronicleRelativeTime as formatRelativeTime,
 } from './chronicle-time-presenter'
 import {
@@ -79,7 +77,6 @@ import type {
   ChronicleConfig,
   ChronicleMessageSource,
   ChronicleSlackSourceDraft,
-  ChronicleStatus,
 } from './use-chronicle.ts'
 import {
   useChronicleAccessibilityEvents,
@@ -364,7 +361,10 @@ export function ChronicleSettings() {
       description={t('page.description')}
       action={(
         <div className="flex items-center gap-2">
-          <StatusBadge running={status?.running ?? false} available={status?.available ?? false} />
+          <ChronicleStatusBadgeView
+            running={status?.running ?? false}
+            available={status?.available ?? false}
+          />
           <Button type="button" variant="outline" size="xs" onClick={refreshChronicle} className="transition-transform active:scale-[0.96]">
             <RefreshCwIcon className="size-3" />
             {t('common.action.refresh')}
@@ -629,41 +629,11 @@ export function ChronicleSettings() {
         </summary>
         <div className="border-t border-border/60 px-4 pb-4 pt-3">
           <section className="py-2">
-            <StatusPanel
+            <ChronicleStatusPanelView
               loading={statusLoading}
-              running={status?.running ?? false}
-              available={status?.available ?? false}
-              pid={status?.pid ?? null}
-              lastSummaryAt={status?.lastSummaryAt ?? null}
-              lastExitAt={status?.lastExitAt ?? null}
-              lastExitCode={status?.lastExitCode ?? null}
-              totalSummaries={status?.totalSummaries ?? 0}
-              totalMessages={status?.totalMessages ?? 0}
-              lastMessageAt={status?.lastMessageAt ?? null}
-              totalAccessibilitySnapshots={status?.totalAccessibilitySnapshots ?? 0}
-              lastAccessibilitySnapshotAt={status?.lastAccessibilitySnapshotAt ?? null}
-              totalAccessibilityEvents={status?.totalAccessibilityEvents ?? 0}
-              lastAccessibilityEventAt={status?.lastAccessibilityEventAt ?? null}
-              totalAudioTranscripts={status?.totalAudioTranscripts ?? 0}
-              lastAudioTranscriptAt={status?.lastAudioTranscriptAt ?? null}
-              totalAudioRawSegments={status?.totalAudioRawSegments ?? 0}
-              lastAudioRawSegmentAt={status?.lastAudioRawSegmentAt ?? null}
-              totalActivitySegments={status?.totalActivitySegments ?? 0}
-              totalPipelineRuns={status?.totalPipelineRuns ?? 0}
-              totalKnowledgeCards={status?.totalKnowledgeCards ?? 0}
-              totalDreamRuns={status?.totalDreamRuns ?? 0}
-              activityPipelineEnabled={status?.activityPipelineEnabled ?? config?.activityPipelineEnabled ?? false}
-              activityPipelineRunning={status?.activityPipelineRunning ?? false}
-              activityPipelineIntervalMs={status?.activityPipelineIntervalMs ?? config?.activityPipelineIntervalMs ?? 120_000}
-              activityPipelineBatchSize={status?.activityPipelineBatchSize ?? config?.activityPipelineBatchSize ?? 3}
-              dreamSchedulerEnabled={status?.dreamSchedulerEnabled ?? config?.dreamSchedulerEnabled ?? false}
-              dreamSchedulerRunning={status?.dreamSchedulerRunning ?? false}
-              dreamSchedulerIntervalMs={status?.dreamSchedulerIntervalMs ?? config?.dreamSchedulerIntervalMs ?? 86_400_000}
-              dreamSchedulerApplyMerge={status?.dreamSchedulerApplyMerge ?? config?.dreamSchedulerApplyMerge ?? false}
-              audioCaptureEnabled={status?.audioCaptureEnabled ?? config?.audioCaptureEnabled ?? false}
-              audioRuntimeStatus={status?.audioRuntimeStatus ?? 'disabled'}
+              status={status}
+              config={config}
               modelLabel={modelLabel}
-              storageRoot={config?.storageRoot ?? null}
             />
           </section>
 
@@ -777,18 +747,6 @@ function AdvancedDiagnosticSection({
       {children}
     </section>
   )
-}
-
-function StatusBadge({ running, available }: { running: boolean, available: boolean }) {
-  const { t } = useTranslation('chronicle')
-
-  if (running) {
-    return <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">{t('common.status.running')}</Badge>
-  }
-  if (available) {
-    return <Badge variant="secondary">{t('common.status.ready')}</Badge>
-  }
-  return <Badge variant="outline">{t('common.status.notConfigured')}</Badge>
 }
 
 function ChronicleModelRow({
@@ -1271,239 +1229,4 @@ function formatSlackRealtimeMode(t: ChronicleTranslate, mode: ChronicleMessageSo
   if (mode === 'events-api') { return 'Events API' }
   if (mode === 'socket-mode') { return 'Socket Mode' }
   return t('slack.mode.polling')
-}
-
-function formatAudioRuntimeStatus(t: ChronicleTranslate, status: ChronicleStatus['audioRuntimeStatus']): string {
-  if (status === 'armed') { return t('common.status.armed') }
-  if (status === 'unavailable') { return t('common.status.unavailable') }
-  return t('common.status.disabled')
-}
-
-// ---------------------------------------------------------------------------
-// Status panel (advanced)
-// ---------------------------------------------------------------------------
-
-interface StatusPanelProps {
-  loading: boolean
-  running: boolean
-  available: boolean
-  pid: number | null
-  lastSummaryAt: string | number | null
-  lastExitAt: string | number | null
-  lastExitCode: number | null
-  totalSummaries: number
-  totalMessages: number
-  lastMessageAt: string | number | null
-  totalAccessibilitySnapshots: number
-  lastAccessibilitySnapshotAt: string | number | null
-  totalAccessibilityEvents: number
-  lastAccessibilityEventAt: string | number | null
-  totalAudioTranscripts: number
-  lastAudioTranscriptAt: string | number | null
-  totalAudioRawSegments: number
-  lastAudioRawSegmentAt: string | number | null
-  totalActivitySegments: number
-  totalPipelineRuns: number
-  totalKnowledgeCards: number
-  totalDreamRuns: number
-  activityPipelineEnabled: boolean
-  activityPipelineRunning: boolean
-  activityPipelineIntervalMs: number
-  activityPipelineBatchSize: number
-  dreamSchedulerEnabled: boolean
-  dreamSchedulerRunning: boolean
-  dreamSchedulerIntervalMs: number
-  dreamSchedulerApplyMerge: boolean
-  audioCaptureEnabled: boolean
-  audioRuntimeStatus: ChronicleStatus['audioRuntimeStatus']
-  modelLabel: string | null
-  storageRoot: string | null
-}
-
-function StatusPanel({
-  loading,
-  running,
-  available,
-  pid,
-  lastSummaryAt,
-  lastExitAt,
-  lastExitCode,
-  totalSummaries,
-  totalMessages,
-  lastMessageAt,
-  totalAccessibilitySnapshots,
-  lastAccessibilitySnapshotAt,
-  totalAccessibilityEvents,
-  lastAccessibilityEventAt,
-  totalAudioTranscripts,
-  lastAudioTranscriptAt,
-  totalAudioRawSegments,
-  lastAudioRawSegmentAt,
-  totalActivitySegments,
-  totalPipelineRuns,
-  totalKnowledgeCards,
-  totalDreamRuns,
-  activityPipelineEnabled,
-  activityPipelineRunning,
-  activityPipelineIntervalMs,
-  activityPipelineBatchSize,
-  dreamSchedulerEnabled,
-  dreamSchedulerRunning,
-  dreamSchedulerIntervalMs,
-  dreamSchedulerApplyMerge,
-  audioCaptureEnabled,
-  audioRuntimeStatus,
-  modelLabel,
-  storageRoot,
-}: StatusPanelProps) {
-  const { t } = useTranslation('chronicle')
-
-  if (loading) {
-    return <ChronicleEmptyState icon={<ActivityIcon className="size-4" />} title={t('status.loading')} />
-  }
-
-  return (
-    <div className="rounded-lg border border-foreground/5 bg-background p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <ActivityIcon className="size-3.5 !text-muted-foreground" />
-        <span className="text-[13px] font-medium text-foreground">{t('status.title')}</span>
-        <StatusBadge running={running} available={available} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-10 xl:grid-cols-12">
-        <StatusItem
-          icon={<EyeIcon className="size-3.5" />}
-          label={t('status.item.service')}
-          value={running ? t('status.service.running', { pid: pid ?? t('common.status.unknown') }) : t('common.status.stopped')}
-        />
-        <StatusItem
-          icon={<ClockIcon className="size-3.5" />}
-          label={t('status.item.lastMemory')}
-          value={formatRelativeTime(t, lastSummaryAt)}
-          detail={formatDateTime(t, lastSummaryAt)}
-        />
-        <StatusItem
-          icon={<BrainIcon className="size-3.5" />}
-          label={t('status.item.memories')}
-          value={String(totalSummaries)}
-        />
-        <StatusItem
-          icon={<MessageSquareIcon className="size-3.5" />}
-          label="Slack"
-          value={String(totalMessages)}
-          detail={formatRelativeTime(t, lastMessageAt)}
-        />
-        <StatusItem
-          icon={<EyeIcon className="size-3.5" />}
-          label={t('status.item.windows')}
-          value={String(totalAccessibilitySnapshots)}
-          detail={formatRelativeTime(t, lastAccessibilitySnapshotAt)}
-        />
-        <StatusItem
-          icon={<ActivityIcon className="size-3.5" />}
-          label={t('status.item.events')}
-          value={String(totalAccessibilityEvents)}
-          detail={formatRelativeTime(t, lastAccessibilityEventAt)}
-        />
-        <StatusItem
-          icon={<FileAudioIcon className="size-3.5" />}
-          label={t('status.item.transcripts')}
-          value={String(totalAudioTranscripts)}
-          detail={formatRelativeTime(t, lastAudioTranscriptAt)}
-        />
-        <StatusItem
-          icon={<FileAudioIcon className="size-3.5" />}
-          label={t('status.item.audio')}
-          value={String(totalAudioRawSegments)}
-          detail={audioCaptureEnabled ? formatRelativeTime(t, lastAudioRawSegmentAt) : formatAudioRuntimeStatus(t, audioRuntimeStatus)}
-        />
-        <StatusItem
-          icon={<ActivityIcon className="size-3.5" />}
-          label={t('status.item.activities')}
-          value={String(totalActivitySegments)}
-        />
-        <StatusItem
-          icon={<CpuIcon className="size-3.5" />}
-          label={t('status.item.pipeline')}
-          value={String(totalPipelineRuns)}
-        />
-        <StatusItem
-          icon={<BrainIcon className="size-3.5" />}
-          label={t('status.item.knowledge')}
-          value={String(totalKnowledgeCards)}
-        />
-        <StatusItem
-          icon={<ClockIcon className="size-3.5" />}
-          label={t('status.item.preview')}
-          value={String(totalDreamRuns)}
-        />
-      </div>
-
-      <div className="mt-3 grid gap-2 border-t border-foreground/5 pt-3 text-[12px] text-muted-foreground md:grid-cols-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <HardDriveIcon className="size-3.5 shrink-0" />
-          <span className="truncate">{storageRoot ?? t('status.storageUnavailable')}</span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2 md:justify-end">
-          <CpuIcon className="size-3.5 shrink-0" />
-          <span className="truncate">
-            {activityPipelineEnabled
-              ? t('status.pipelineSummary', {
-                  state: activityPipelineRunning ? t('common.status.running') : t('common.status.ready'),
-                  seconds: Math.round(activityPipelineIntervalMs / 1000),
-                  count: activityPipelineBatchSize,
-                })
-              : t('status.pipelineDisabled')}
-          </span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <LayersIcon className="size-3.5 shrink-0" />
-          <span className="truncate">
-            {dreamSchedulerEnabled
-              ? t('status.dreamSummary', {
-                  state: dreamSchedulerRunning ? t('common.status.running') : t('common.status.ready'),
-                  mode: dreamSchedulerApplyMerge ? t('control.status.autoMerge') : t('control.status.previewOnly'),
-                  hours: Math.round(dreamSchedulerIntervalMs / 3_600_000),
-                })
-              : t('status.dreamDisabled')}
-          </span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2 md:justify-end">
-          <CpuIcon className="size-3.5 shrink-0" />
-          <span className="truncate">{modelLabel ?? t('status.noModel')}</span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <TriangleAlertIcon className="size-3.5 shrink-0" />
-          <span className="truncate">
-            {lastExitCode === null
-              ? t('status.noExitRecord')
-              : t('status.lastExit', { code: lastExitCode, time: formatDateTime(t, lastExitAt) })}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function StatusItem({
-  icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  detail?: string
-}) {
-  return (
-    <div className="min-w-0 rounded-md bg-muted/40 px-2.5 py-2">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        {icon}
-        <span className="text-[11px]">{label}</span>
-      </div>
-      <span className="mt-1 block truncate text-[13px] font-medium tabular-nums text-foreground">{value}</span>
-      {detail && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground/70">{detail}</span>}
-    </div>
-  )
 }
