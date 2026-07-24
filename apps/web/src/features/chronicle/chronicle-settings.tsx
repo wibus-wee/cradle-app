@@ -13,8 +13,6 @@ import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Switch } from '~/components/ui/switch'
-import { Textarea } from '~/components/ui/textarea'
-import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
@@ -51,6 +49,9 @@ import {
 import {
   ChronicleMemorySearchView,
 } from './chronicle-memory-search-view'
+import {
+  ChroniclePrivacyRulesView,
+} from './chronicle-privacy-rules-view'
 import {
   ChronicleResourceGridContainer,
 } from './chronicle-resource-grid-container'
@@ -95,7 +96,6 @@ import {
 } from './use-chronicle.ts'
 
 const MEMORY_SEARCH_LIMIT = 50
-const PRIVACY_RULE_LINE_SPLIT_RE = /\r?\n/
 type ChronicleTranslate = TFunction<'chronicle'>
 
 interface ChronicleSetupNotice {
@@ -607,7 +607,7 @@ export function ChronicleSettings() {
 
       {/* ── Section: Privacy ── */}
       <SettingsGroup label={t('privacySection.title')} description={t('privacySection.description')} bare className="p-4">
-        <PrivacyRulesPanel
+        <ChroniclePrivacyRulesView
           config={config}
           saving={saving}
           onUpdateConfig={updateConfig}
@@ -846,203 +846,4 @@ function ChronicleModelRow({
       />
     </SettingsRow>
   )
-}
-
-export function PrivacyRulesPanel({
-  config,
-  saving,
-  onUpdateConfig,
-}: {
-  config: ChronicleConfig | null
-  saving: boolean
-  onUpdateConfig: (updates: Partial<ChronicleConfig>) => Promise<ChronicleConfig | null>
-}) {
-  const { t } = useTranslation('chronicle')
-  const [draft, setDraft] = useState<PrivacyRulesDraft>({
-    appBundleText: '',
-    titlePatternText: '',
-    urlPatternText: '',
-  })
-  const [saved, setSaved] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setDraft({
-      appBundleText: formatPrivacyRuleLines(config?.privacySensitiveAppBundleIds ?? []),
-      titlePatternText: formatPrivacyRuleLines(config?.privacySensitiveTitlePatterns ?? []),
-      urlPatternText: formatPrivacyRuleLines(config?.privacySensitiveUrlPatterns ?? []),
-    })
-    setSaved(false)
-  }, [
-    config?.privacySensitiveAppBundleIds,
-    config?.privacySensitiveTitlePatterns,
-    config?.privacySensitiveUrlPatterns,
-  ])
-
-  const nextAppBundleIds = parsePrivacyRuleLines(draft.appBundleText)
-  const nextTitlePatterns = parsePrivacyRuleLines(draft.titlePatternText)
-  const nextUrlPatterns = parsePrivacyRuleLines(draft.urlPatternText)
-  const ruleCount = nextAppBundleIds.length + nextTitlePatterns.length + nextUrlPatterns.length
-  const hasChanges = config
-    ? !stringListsEqual(nextAppBundleIds, config.privacySensitiveAppBundleIds)
-    || !stringListsEqual(nextTitlePatterns, config.privacySensitiveTitlePatterns)
-    || !stringListsEqual(nextUrlPatterns, config.privacySensitiveUrlPatterns)
-    : false
-
-  return (
-    <div className="flex flex-col">
-      <SettingsRow
-        label={t('privacy.closedEyes.title')}
-        description={t('privacy.closedEyes.description')}
-        labelAccessory={(
-          <Badge variant="outline" className="text-[11px]">
-            {t('common.status.unavailable')}
-          </Badge>
-        )}
-      >
-        <div className="flex items-center gap-2">
-          <ToggleGroup
-            type="single"
-            value="always-record"
-            disabled
-            variant="outline"
-            size="sm"
-          >
-            <ToggleGroupItem value="auto" aria-label={t('privacy.closedEyes.mode.auto.ariaLabel')} className="h-7 px-2 text-[11px]">
-              {t('privacy.closedEyes.mode.auto')}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="always-record" aria-label={t('privacy.closedEyes.mode.alwaysRecord.ariaLabel')} className="h-7 px-2 text-[11px]">
-              {t('privacy.closedEyes.mode.alwaysRecord')}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="always-pause" aria-label={t('privacy.closedEyes.mode.alwaysPause.ariaLabel')} className="h-7 px-2 text-[11px]">
-              {t('privacy.closedEyes.mode.alwaysPause')}
-            </ToggleGroupItem>
-          </ToggleGroup>
-          <Switch
-            aria-label={t('privacy.closedEyes.toggle')}
-            checked={false}
-            disabled
-          />
-        </div>
-      </SettingsRow>
-      <div className="border-t border-border/60" />
-
-      <SettingsRow
-        label={t('privacy.title')}
-        description={t('privacy.help')}
-        labelAccessory={<Badge variant="outline" className="text-[11px]">{ruleCount === 0 ? t('common.status.notConfigured') : t('privacy.ruleCount', { count: ruleCount })}</Badge>}
-        vertical
-      >
-        <div className="grid gap-3 lg:grid-cols-3">
-          <PrivacyRuleTextarea
-            label="App bundle id"
-            placeholder={t('privacy.appBundle.placeholder')}
-            value={draft.appBundleText}
-            onChange={appBundleText => setDraft(current => ({ ...current, appBundleText }))}
-            disabled={saving || !config}
-          />
-          <PrivacyRuleTextarea
-            label={t('privacy.titlePattern.label')}
-            placeholder={t('privacy.titlePattern.placeholder')}
-            value={draft.titlePatternText}
-            onChange={titlePatternText => setDraft(current => ({ ...current, titlePatternText }))}
-            disabled={saving || !config}
-          />
-          <PrivacyRuleTextarea
-            label={t('privacy.urlPattern.label')}
-            placeholder={t('privacy.urlPattern.placeholder')}
-            value={draft.urlPatternText}
-            onChange={urlPatternText => setDraft(current => ({ ...current, urlPatternText }))}
-            disabled={saving || !config}
-          />
-        </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          {saveError && <span className="text-[12px] text-destructive">{saveError}</span>}
-          {!saveError && saved && <span className="text-[12px] text-muted-foreground">{t('common.status.saved')}</span>}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="sm:ml-auto"
-            disabled={!config || saving || !hasChanges}
-            onClick={() => {
-              setSaveError(null)
-              setSaved(false)
-              void onUpdateConfig({
-                privacySensitiveAppBundleIds: nextAppBundleIds,
-                privacySensitiveTitlePatterns: nextTitlePatterns,
-                privacySensitiveUrlPatterns: nextUrlPatterns,
-              })
-                .then((updated) => {
-                  if (updated) {
-                    setSaved(true)
-                  }
-                })
-                .catch((error: unknown) => {
-                  setSaveError(error instanceof Error ? error.message : t('common.error.saveFailed'))
-                })
-            }}
-          >
-            {t('privacy.saveRules')}
-          </Button>
-        </div>
-      </SettingsRow>
-    </div>
-  )
-}
-
-interface PrivacyRulesDraft {
-  appBundleText: string
-  titlePatternText: string
-  urlPatternText: string
-}
-
-function PrivacyRuleTextarea({
-  label,
-  placeholder,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string
-  placeholder: string
-  value: string
-  disabled: boolean
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
-      <Textarea
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        spellCheck={false}
-        className="min-h-24 resize-y font-mono text-[12px] leading-5"
-      />
-    </label>
-  )
-}
-
-function formatPrivacyRuleLines(values: string[]): string {
-  return values.join('\n')
-}
-
-function parsePrivacyRuleLines(value: string): string[] {
-  const rules: string[] = []
-  const seen = new Set<string>()
-  for (const line of value.split(PRIVACY_RULE_LINE_SPLIT_RE)) {
-    const rule = line.trim()
-    if (!rule || seen.has(rule)) {
-      continue
-    }
-    seen.add(rule)
-    rules.push(rule)
-  }
-  return rules
-}
-
-function stringListsEqual(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index])
 }
