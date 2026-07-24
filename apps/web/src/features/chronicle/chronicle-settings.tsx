@@ -33,7 +33,6 @@ import { SettingsGroup, SettingsPage } from '~/features/settings/settings-contai
 import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
 import { getServerUrl } from '~/lib/electron'
-import { formatPercentFromRatio, formatShortDurationMs } from '~/lib/number-format'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import {
@@ -45,6 +44,12 @@ import {
 import {
   ChronicleActivityPipelineContainer,
 } from './chronicle-activity-pipeline-container'
+import {
+  ChronicleAudioRawSegmentListView,
+} from './chronicle-audio-raw-segment-list-view'
+import {
+  ChronicleAudioTranscriptListView,
+} from './chronicle-audio-transcript-list-view'
 import {
   ChronicleDreamRunContainer,
 } from './chronicle-dream-run-container'
@@ -71,8 +76,6 @@ import {
   ChronicleTimelineFeedContainer,
 } from './chronicle-timeline-feed-container'
 import type {
-  ChronicleAudioRawSegment,
-  ChronicleAudioTranscript,
   ChronicleConfig,
   ChronicleMessageSource,
   ChronicleSlackSourceDraft,
@@ -694,20 +697,18 @@ export function ChronicleSettings() {
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.audioSegments.title')} description={t('advanced.audioSegments.description')} vertical>
-            {audioRawSegmentsLoading
-              ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.audioSegments.loading')} />
-              : audioRawSegments.length === 0
-                ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.audioSegments.empty')} />
-                : <AudioRawSegmentList segments={audioRawSegments} />}
+            <ChronicleAudioRawSegmentListView
+              loading={audioRawSegmentsLoading}
+              segments={audioRawSegments}
+            />
           </SettingsRow>
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.transcripts.title')} description={t('advanced.transcripts.description')} vertical>
-            {audioTranscriptsLoading
-              ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.transcripts.loading')} />
-              : audioTranscripts.length === 0
-                ? <ChronicleEmptyState icon={<FileAudioIcon className="size-4" />} title={t('advanced.transcripts.empty')} />
-                : <AudioTranscriptList transcripts={audioTranscripts} />}
+            <ChronicleAudioTranscriptListView
+              loading={audioTranscriptsLoading}
+              transcripts={audioTranscripts}
+            />
           </SettingsRow>
           <div className="border-t border-border/60" />
 
@@ -1266,13 +1267,6 @@ function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: Chr
   )
 }
 
-function formatTranscriptStatus(t: ChronicleTranslate, status: ChronicleAudioTranscript['status']): string {
-  if (status === 'recording') { return t('common.status.recording') }
-  if (status === 'completed') { return t('common.status.completed') }
-  if (status === 'imported') { return t('common.status.imported') }
-  return t('common.status.error')
-}
-
 function formatSlackRealtimeMode(t: ChronicleTranslate, mode: ChronicleMessageSource['realtimeMode']): string {
   if (mode === 'events-api') { return 'Events API' }
   if (mode === 'socket-mode') { return 'Socket Mode' }
@@ -1283,131 +1277,6 @@ function formatAudioRuntimeStatus(t: ChronicleTranslate, status: ChronicleStatus
   if (status === 'armed') { return t('common.status.armed') }
   if (status === 'unavailable') { return t('common.status.unavailable') }
   return t('common.status.disabled')
-}
-
-function formatAudioSegmentTitle(t: ChronicleTranslate, segment: ChronicleAudioRawSegment): string {
-  if (segment.source === 'system') { return t('audioRaw.title.system') }
-  if (segment.source === 'mixed') { return t('audioRaw.title.mixed') }
-  return t('audioRaw.title.microphone')
-}
-
-function formatAudioProcessingStatus(t: ChronicleTranslate, status: ChronicleAudioRawSegment['vadStatus']): string {
-  if (status === 'pending') { return t('common.status.pending') }
-  if (status === 'ready') { return t('common.status.completed') }
-  if (status === 'error') { return t('common.status.error') }
-  return t('audioRaw.processing.notConnected')
-}
-
-// ---------------------------------------------------------------------------
-// Data display components (preserved from original)
-// ---------------------------------------------------------------------------
-
-function AudioTranscriptList({ transcripts }: { transcripts: ChronicleAudioTranscript[] }) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {transcripts.map(transcript => (
-        <article key={transcript.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-          <div className="mb-2 flex min-w-0 items-center gap-2">
-            <FileAudioIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium text-foreground">
-              {transcript.title ?? transcript.windowTitle ?? t('timeline.fallback.audioTranscript')}
-            </span>
-            <Badge variant="outline" className="ml-auto text-[11px]">{formatTranscriptStatus(t, transcript.status)}</Badge>
-          </div>
-          <p className="line-clamp-4 text-[13px] leading-5 text-foreground">
-            {transcript.previewText || t('audioTranscript.emptyPreview')}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="font-mono">{formatDateTime(t, transcript.startedAt)}</span>
-            <span>
-              {t('audioTranscript.segmentCount', { count: transcript.segmentCount })}
-            </span>
-            {transcript.language && <span>{transcript.language}</span>}
-            {transcript.source === 'asr' && <span>{t('audioTranscript.asrTranscript')}</span>}
-          </div>
-        </article>
-      ))}
-    </div>
-  )
-}
-
-function AudioRawSegmentList({ segments }: { segments: ChronicleAudioRawSegment[] }) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {segments.map(segment => (
-        <article key={segment.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-          <div className="mb-2 flex min-w-0 items-center gap-2">
-            <FileAudioIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium text-foreground">
-              {formatAudioSegmentTitle(t, segment)}
-            </span>
-            <Badge variant={segment.active ? 'secondary' : 'outline'} className="ml-auto text-[11px]">
-              {segment.active ? t('audioRaw.active') : t('audioRaw.quiet')}
-            </Badge>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-[12px] text-muted-foreground">
-            <span className="truncate">
-              {formatDateTime(t, segment.recordedAt)}
-            </span>
-            <span className="truncate text-right">
-              {formatShortDurationMs(segment.durationMs)}
-            </span>
-            <span className="truncate">
-              RMS
-              {' '}
-              {formatPercentFromRatio(segment.rms)}
-            </span>
-            <span className="truncate text-right">
-              Peak
-              {' '}
-              {formatPercentFromRatio(segment.peak)}
-            </span>
-            <span className="truncate">
-              {segment.sampleRate}
-              {' '}
-              Hz
-            </span>
-            <span className="truncate text-right">
-              {segment.channels}
-              {' '}
-              {t('audioRaw.channels')}
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <AudioProcessingBadge label="VAD" status={segment.vadStatus} />
-            <AudioProcessingBadge label="ASR" status={segment.asrStatus} />
-            <AudioProcessingBadge label={t('audioRaw.speaker')} status={segment.speakerStatus} />
-          </div>
-          <div className="mt-2 space-y-1 text-[11px] text-muted-foreground/70">
-            <p className="truncate font-mono">{segment.audioPath}</p>
-            <p className="truncate font-mono">{segment.metadataPath}</p>
-          </div>
-        </article>
-      ))}
-    </div>
-  )
-}
-
-function AudioProcessingBadge({
-  label,
-  status,
-}: {
-  label: string
-  status: ChronicleAudioRawSegment['vadStatus']
-}) {
-  const { t } = useTranslation('chronicle')
-
-  return (
-    <Badge variant="outline" className="text-[11px]">
-      {label}
-      {' '}
-      {formatAudioProcessingStatus(t, status)}
-    </Badge>
-  )
 }
 
 // ---------------------------------------------------------------------------
