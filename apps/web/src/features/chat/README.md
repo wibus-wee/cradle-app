@@ -63,6 +63,10 @@ AI SDK wire validation is intentionally limited to the SSE boundary through `uiM
 - **transcript/containers/chat-message-list-pane.tsx**: Runtime layout adapter that owns scroll refs, minimap data, and composer-overlay orchestration around the transcript surface.
 - **transcript/fixtures/chat-transcript-fixtures.ts**: Server-free `UIMessage` fixtures for stable transcript stories and screenshot scenes.
 - **fixtures/screenshots/chat-transcript-long-thread.png**: 1440×900 golden image captured from the server-free Long Thread story.
+- **context/containers/**: Query and Browser Panel adapters for session context usage; these modules are the only Context surface code that reads runtime data or global stores.
+- **context/views/**: Props-only detail and compact Context window presentation, used by the Composer popover and Storybook without a session runtime.
+- **context/fixtures/context-usage-fixtures.ts**: Typed provider and compact-state fixtures for the Context surface's detailed, near-limit, fallback, loading, and error states.
+- **context/stories/context-usage-view.stories.tsx**: Server-free Context surface gallery. It mounts only `*View` modules and fixture callbacks.
 - **tool-blocks/views/tool-call-block-view.tsx**: Props-only `ToolCallBlockView` for canonical tool envelopes, local expand/detail state, approval callbacks, and bounded open-surface actions.
 - **tool-blocks/containers/tool-call-block-container.tsx**: Runtime `ToolCallBlock` adapter that owns browser-panel subscriptions and translates View actions into workspace diff, subagent, workflow, and plan-document tabs.
 - **tool-blocks/views/grouped-tool-call-block-view.tsx**: Props-only grouped terminal/file activity View; the matching container owns browser-panel diff handoff.
