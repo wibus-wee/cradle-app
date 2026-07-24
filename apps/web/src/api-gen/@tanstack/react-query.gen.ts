@@ -78,7 +78,7 @@ export const getHealthQueryKey = (options?: Options<GetHealthData>) => createQue
 /**
  * Health check
  *
- * Server liveness snapshot
+ * Server readiness snapshot
  */
 export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptions<GetHealthResponse, DefaultError, GetHealthResponse, ReturnType<typeof getHealthQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

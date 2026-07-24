@@ -1,7 +1,15 @@
 import type { ChildProcess } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 
@@ -9,19 +17,28 @@ import { app, dialog } from 'electron'
 import getPort from 'get-port'
 import { z } from 'zod'
 
+import type { DesktopServerBootstrapSnapshot, ServerBootstrapEvent, ServerBootstrapEventKind, ServerBootstrapPhase } from '../shared/server-runtime'
+import {
+  applyServerBootstrapEvent,
+  createDesktopServerBootstrapSnapshot,
+  SERVER_BOOTSTRAP_PHASES,
+} from '../shared/server-runtime'
 import { getDesktopDataDirectoryState } from './data-directory'
 import type { ManagedChildProcess } from './managed-process'
 import { spawnManagedProcess } from './managed-process'
 import { resolveDesktopInstalledPluginsDir } from './plugin-install-links'
 import { getPluginEnvVars } from './plugin-loader'
-import { resolveDesktopPrimaryPluginsDir, resolveDesktopPrimaryPluginsSourceKind } from './plugin-paths'
+import {
+  resolveDesktopPrimaryPluginsDir,
+  resolveDesktopPrimaryPluginsSourceKind,
+} from './plugin-paths'
 
 let serverProcess: ManagedChildProcess | null = null
 let restartCount = 0
 let locatedServerPid: number | null = null
 const MAX_RESTARTS = 3
-const SERVER_STARTUP_TIMEOUT_MS = 90_000
-const SERVER_RESTART_READY_TIMEOUT_MS = 60_000
+const SERVER_BOOTSTRAP_GLOBAL_TIMEOUT_MS = 30 * 60_000
+const SERVER_BOOTSTRAP_PHASE_TIMEOUT_MS = 10 * 60_000
 const SERVER_OUTPUT_LINE_LIMIT = 200
 const SERVER_PROCESS_COMMAND_TIMEOUT_MS = 1_000
 const LOGIN_SHELL_PATH_TIMEOUT_MS = 1500
@@ -76,25 +93,27 @@ const DESKTOP_SERVER_OBSERVABILITY_ENV_KEYS = [
   'OTEL_EXPORTER_OTLP_TRACES_PROTOCOL',
   'OTEL_EXPORTER_OTLP_METRICS_PROTOCOL',
 ] as const
-const ExternalPluginsDirsSchema = z.array(z.string().optional())
-  .transform(values => values.flatMap(value => value?.trim() ? [value.trim()] : []))
+const ExternalPluginsDirsSchema = z
+  .array(z.string().optional())
+  .transform(values => values.flatMap(value => (value?.trim() ? [value.trim()] : [])))
 const ServerLocatorSchema = z.object({
   serverUrl: z.string().url(),
   pid: z.number().int().positive().nullable().optional(),
   version: z.string().optional(),
   updatedAt: z.string().optional(),
 })
-const DesktopServerAccessModeSchema = z.object({
-  inbound: z.object({
-    serverAccessMode: z.enum(['local', 'network']).default('local'),
-  }).default({ serverAccessMode: 'local' }),
-}).passthrough()
+const DesktopServerAccessModeSchema = z
+  .object({
+    inbound: z
+      .object({
+        serverAccessMode: z.enum(['local', 'network']).default('local'),
+      })
+      .default({ serverAccessMode: 'local' }),
+  })
+  .passthrough()
 let currentServerUrl = ''
 let currentServerAuthToken = ''
 const recentServerOutputLines: string[] = []
-
-export type ServerStartupPhase = 'migrating' | 'compacting'
-type ServerStartupSignal = ServerStartupPhase | 'initializing'
 
 interface DesktopServerExitExpectation {
   pid: number | null
@@ -104,7 +123,10 @@ interface DesktopServerExitExpectation {
   requestedSignal: NodeJS.Signals
 }
 
-type DesktopServerExitClassification = 'desktop-requested' | 'external-signal-or-os-kill' | 'process-exit-or-crash'
+type DesktopServerExitClassification
+  = | 'desktop-requested'
+    | 'external-signal-or-os-kill'
+    | 'process-exit-or-crash'
 
 let expectedServerExit: DesktopServerExitExpectation | null = null
 let lastServerSignalBeforeExit: { signal: string, line: string, observedAt: string } | null = null
@@ -135,9 +157,11 @@ export function readDesktopServerAccessMode(dataDir: string): DesktopServerAcces
     return 'local'
   }
   try {
-    return DesktopServerAccessModeSchema.parse(JSON.parse(readFileSync(preferencesPath, 'utf8'))).inbound.serverAccessMode
+    return DesktopServerAccessModeSchema.parse(JSON.parse(readFileSync(preferencesPath, 'utf8')))
+      .inbound
+.serverAccessMode
   }
-  catch {
+ catch {
     return 'local'
   }
 }
@@ -146,7 +170,9 @@ export function readDesktopServerAccessMode(dataDir: string): DesktopServerAcces
  * Start the Cradle server as a forked child process.
  * Returns the full URL the server is listening on.
  */
-export async function startServer(onStartupPhase?: (phase: ServerStartupPhase) => void): Promise<string> {
+export async function startServer(
+  onBootstrapSnapshot?: (snapshot: DesktopServerBootstrapSnapshot) => void,
+): Promise<string> {
   expectedServerExit = null
   lastServerSignalBeforeExit = null
   restartCount = 0
@@ -165,33 +191,27 @@ export async function startServer(onStartupPhase?: (phase: ServerStartupPhase) =
   const port = await getPort({ port: [21423, 21424, 21425, 21426] })
   const host = desktopServerBindHostForAccessMode(readDesktopServerAccessMode(dataDir))
   currentServerUrl = `http://127.0.0.1:${port}`
+  let bootstrapSnapshot = createDesktopServerBootstrapSnapshot()
+  const bootstrapWatchdog: ServerBootstrapWatchdog = {
+    globalTimeoutMs: SERVER_BOOTSTRAP_GLOBAL_TIMEOUT_MS,
+    phaseTimeoutMs: SERVER_BOOTSTRAP_PHASE_TIMEOUT_MS,
+    readSnapshot: () => bootstrapSnapshot,
+  }
 
-  let startupPhase: ServerStartupPhase | null = null
-  let startupTimeoutStartedAt = Date.now()
   await spawnServer({
     host,
     port,
     dataDir,
     credentialSecret,
     serverAuthToken: currentServerAuthToken,
-    onStartupSignal: (signal) => {
-      if (signal === 'initializing') {
-        startupPhase = null
-        startupTimeoutStartedAt = Date.now()
-        return
-      }
-      startupPhase = signal
-      onStartupPhase?.(signal)
+    bootstrapWatchdog,
+    onBootstrapEvent: (event) => {
+      bootstrapSnapshot = applyServerBootstrapEvent(bootstrapSnapshot, event)
+      onBootstrapSnapshot?.(bootstrapSnapshot)
     },
   })
 
-  // Wait for server to be ready
-  await waitForServer(
-    currentServerUrl,
-    SERVER_STARTUP_TIMEOUT_MS,
-    () => startupPhase !== null,
-    () => startupTimeoutStartedAt,
-  )
+  await waitForServer(currentServerUrl, { bootstrapWatchdog })
   writeCliServerLocator({
     dataDir: app.getPath('userData'),
     serverUrl: currentServerUrl,
@@ -201,7 +221,9 @@ export async function startServer(onStartupPhase?: (phase: ServerStartupPhase) =
   return currentServerUrl
 }
 
-async function readHealthyLocatedServerUrl(dataDir: string): Promise<{ serverUrl: string, pid: number | null } | null> {
+async function readHealthyLocatedServerUrl(
+  dataDir: string,
+): Promise<{ serverUrl: string, pid: number | null } | null> {
   const locatorPath = join(dataDir, CLI_SERVER_LOCATOR_FILE)
   if (!existsSync(locatorPath)) {
     return null
@@ -209,10 +231,10 @@ async function readHealthyLocatedServerUrl(dataDir: string): Promise<{ serverUrl
 
   try {
     const locator = ServerLocatorSchema.parse(JSON.parse(readFileSync(locatorPath, 'utf8')))
-    await waitForServer(locator.serverUrl, 1_000)
+    await waitForServer(locator.serverUrl, { timeoutMs: 1_000 })
     return { serverUrl: locator.serverUrl, pid: locator.pid ?? null }
   }
-  catch {
+ catch {
     removeCliServerLocator()
     return null
   }
@@ -241,7 +263,7 @@ function removeCliServerLocator(): void {
   try {
     rmSync(join(app.getPath('userData'), CLI_SERVER_LOCATOR_FILE), { force: true })
   }
-  catch {
+ catch {
     // Shutdown should not fail because the optional CLI locator cannot be cleared.
   }
 }
@@ -252,7 +274,8 @@ async function spawnServer(opts: {
   dataDir: string
   credentialSecret: string
   serverAuthToken: string
-  onStartupSignal?: (signal: ServerStartupSignal) => void
+  bootstrapWatchdog?: ServerBootstrapWatchdog
+  onBootstrapEvent?: (event: ServerBootstrapEvent) => void
 }): Promise<void> {
   const { host, port, dataDir, credentialSecret } = opts
 
@@ -268,15 +291,14 @@ async function spawnServer(opts: {
   const pluginsDir = resolveDesktopPrimaryPluginsDir({ isDev, moduleDir: __dirname })
   const pluginsSourceKind = resolveDesktopPrimaryPluginsSourceKind({ isDev })
   const configuredMigrationsDir = process.env.CRADLE_MIGRATIONS_DIR?.trim()
-  const migrationsDir = configuredMigrationsDir || (isDev ? undefined : join(process.resourcesPath, 'drizzle'))
+  const migrationsDir
+    = configuredMigrationsDir || (isDev ? undefined : join(process.resourcesPath, 'drizzle'))
   const builtinSkillsDir = isDev ? undefined : join(process.resourcesPath, 'resources/skills')
   const codexAppServerPath = resolveDesktopCodexAppServerPath({ isDev, moduleDir: __dirname })
   const installedPluginsDir = resolveDesktopInstalledPluginsDir(app.getPath('userData'))
-  const externalPluginsDirs = [
-    installedPluginsDir,
-    process.env.CRADLE_EXTERNAL_PLUGINS_DIRS,
-  ]
-  const externalPluginsDirList = ExternalPluginsDirsSchema.parse(externalPluginsDirs).join(delimiter)
+  const externalPluginsDirs = [installedPluginsDir, process.env.CRADLE_EXTERNAL_PLUGINS_DIRS]
+  const externalPluginsDirList
+    = ExternalPluginsDirsSchema.parse(externalPluginsDirs).join(delimiter)
   const serverEnv: NodeJS.ProcessEnv = {
     ...process.env,
     ...getPluginEnvVars(),
@@ -315,13 +337,13 @@ async function spawnServer(opts: {
   child.stdout?.on('data', chunk => recordServerOutput('stdout', chunk))
   child.stderr?.on('data', chunk => recordServerOutput('stderr', chunk))
   child.on('message', (message) => {
-    const signal = readServerStartupSignal(message)
-    if (signal) {
-      opts.onStartupSignal?.(signal)
+    const event = readServerBootstrapEvent(message)
+    if (event) {
+      opts.onBootstrapEvent?.(event)
     }
   })
   child.on('error', (err) => {
-    const message = `[server:error] ${err instanceof Error ? err.stack ?? err.message : String(err)}`
+    const message = `[server:error] ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`
     appendServerOutputLine(message)
     console.error(message)
   })
@@ -360,7 +382,7 @@ async function spawnServer(opts: {
       restartCount++
       console.warn(`[desktop] Restarting server (attempt ${restartCount}/${MAX_RESTARTS})...`)
       spawnServer(opts)
-        .then(() => waitForServer(currentServerUrl, SERVER_RESTART_READY_TIMEOUT_MS))
+        .then(() => waitForServer(currentServerUrl, { bootstrapWatchdog: opts.bootstrapWatchdog }))
         .then(() => {
           writeCliServerLocator({
             dataDir: app.getPath('userData'),
@@ -372,13 +394,15 @@ async function spawnServer(opts: {
           showServerCrashDialog(code)
         })
     }
-    else {
+ else {
       showServerCrashDialog(code)
     }
   })
 }
 
-export function pickDesktopServerObservabilityEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function pickDesktopServerObservabilityEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   const picked: NodeJS.ProcessEnv = {}
   for (const key of DESKTOP_SERVER_OBSERVABILITY_ENV_KEYS) {
     const value = env[key]
@@ -403,7 +427,9 @@ export function classifyDesktopServerExit(input: {
   return 'process-exit-or-crash'
 }
 
-function markExpectedServerExit(input: Pick<DesktopServerExitExpectation, 'pid' | 'reason' | 'requestedSignal'>): void {
+function markExpectedServerExit(
+  input: Pick<DesktopServerExitExpectation, 'pid' | 'reason' | 'requestedSignal'>,
+): void {
   expectedServerExit = {
     pid: input.pid,
     source: 'desktop',
@@ -433,7 +459,10 @@ function writeServerExitDiagnostic(input: {
   classification: DesktopServerExitClassification
   expectation: DesktopServerExitExpectation | null
 }): string | null {
-  const diagnosticsPath = join(getDesktopDataDirectoryState().serverDataRoot, SERVER_EXIT_DIAGNOSTICS_FILE)
+  const diagnosticsPath = join(
+    getDesktopDataDirectoryState().serverDataRoot,
+    SERVER_EXIT_DIAGNOSTICS_FILE,
+  )
   try {
     mkdirSync(dirname(diagnosticsPath), { recursive: true })
     appendFileSync(
@@ -455,7 +484,7 @@ function writeServerExitDiagnostic(input: {
     )
     return diagnosticsPath
   }
-  catch (err) {
+ catch (err) {
     console.error('[desktop] Failed to write server exit diagnostics:', err)
     return null
   }
@@ -482,7 +511,7 @@ function recordServerOutput(source: 'stdout' | 'stderr', chunk: Buffer | string)
     if (source === 'stderr') {
       console.error(message)
     }
-    else {
+ else {
       console.warn(message)
     }
   }
@@ -508,13 +537,29 @@ function rememberServerSignalLine(line: string): void {
   }
 }
 
-function createServerStartupError(url: string, timeoutMs: number): Error {
-  const recentOutput = recentServerOutputLines.slice(-40).join('\n')
-  if (!recentOutput) {
-    return new Error(`Server failed to start within ${timeoutMs}ms at ${url}`)
-  }
+function createServerStartupError(
+  url: string,
+  input: {
+    timeoutMs?: number
+    watchdogFailure?: string
+    bootstrapSnapshot?: DesktopServerBootstrapSnapshot
+  } = {},
+): Error {
+  const message
+    = input.watchdogFailure
+      ?? (input.timeoutMs === undefined
+      ? `Server exited before becoming ready at ${url}`
+      : `Server failed to start within ${input.timeoutMs}ms at ${url}`)
+  const bootstrapDiagnostics = input.bootstrapSnapshot
+    ? describeBootstrapDiagnostics(input.bootstrapSnapshot, Date.now())
+    : null
+  const recentOutput = recentServerOutputLines.slice(-40).join('\n') || '(none)'
   return new Error(
-    `Server failed to start within ${timeoutMs}ms at ${url}\n\nRecent server output:\n${recentOutput}`,
+    [
+      message,
+      ...(bootstrapDiagnostics ? [bootstrapDiagnostics] : []),
+      `Recent server output:\n${recentOutput}`,
+    ].join('\n\n'),
   )
 }
 
@@ -605,7 +650,10 @@ function joinPathSegments(segments: string[]): string {
   return uniqueSegments.join(delimiter)
 }
 
-function resolveDesktopCodexAppServerPath(input: { isDev: boolean, moduleDir: string }): string | undefined {
+function resolveDesktopCodexAppServerPath(input: {
+  isDev: boolean
+  moduleDir: string
+}): string | undefined {
   const configuredPath = process.env[CODEX_APP_SERVER_PATH_ENV]?.trim()
   if (configuredPath) {
     return configuredPath
@@ -621,9 +669,24 @@ function resolveDesktopCodexAppServerPath(input: { isDev: boolean, moduleDir: st
   }
 
   return [
-    resolve(input.moduleDir, '../../resources/codex', `${process.platform}-${process.arch}`, executableName),
-    resolve(process.cwd(), 'resources/codex', `${process.platform}-${process.arch}`, executableName),
-    resolve(process.cwd(), 'apps/desktop/resources/codex', `${process.platform}-${process.arch}`, executableName),
+    resolve(
+      input.moduleDir,
+      '../../resources/codex',
+      `${process.platform}-${process.arch}`,
+      executableName,
+    ),
+    resolve(
+      process.cwd(),
+      'resources/codex',
+      `${process.platform}-${process.arch}`,
+      executableName,
+    ),
+    resolve(
+      process.cwd(),
+      'apps/desktop/resources/codex',
+      `${process.platform}-${process.arch}`,
+      executableName,
+    ),
   ].find(candidate => existsSync(candidate))
 }
 
@@ -687,15 +750,15 @@ function resolveDesktopServerAuthToken(dataDir: string): string {
 
 export function getDesktopServerAuthToken(): string {
   if (!currentServerAuthToken) {
-    currentServerAuthToken = resolveDesktopServerAuthToken(getDesktopDataDirectoryState().serverDataRoot)
+    currentServerAuthToken = resolveDesktopServerAuthToken(
+      getDesktopDataDirectoryState().serverDataRoot,
+    )
   }
   return currentServerAuthToken
 }
 
 export function getDesktopServerAuthHeaders(): HeadersInit {
-  return currentServerAuthToken
-    ? { authorization: `Bearer ${currentServerAuthToken}` }
-    : {}
+  return currentServerAuthToken ? { authorization: `Bearer ${currentServerAuthToken}` } : {}
 }
 
 function readDesktopCredentialSecret(secretPath: string): string {
@@ -725,18 +788,20 @@ function archiveKeychainBackedSecret(secretPath: string): void {
 }
 
 function showServerCrashDialog(exitCode: number | null): void {
-  dialog.showMessageBox({
-    type: 'error',
-    title: 'Server Error',
-    message: 'The Cradle server has stopped unexpectedly.',
-    detail: `Exit code: ${exitCode}\nThe app may not function correctly. Please restart the application.`,
-    buttons: ['Restart App', 'Close'],
-  }).then(({ response }) => {
-    if (response === 0) {
-      app.relaunch()
-      app.exit(0)
-    }
-  })
+  dialog
+    .showMessageBox({
+      type: 'error',
+      title: 'Server Error',
+      message: 'The Cradle server has stopped unexpectedly.',
+      detail: `Exit code: ${exitCode}\nThe app may not function correctly. Please restart the application.`,
+      buttons: ['Restart App', 'Close'],
+    })
+    .then(({ response }) => {
+      if (response === 0) {
+        app.relaunch()
+        app.exit(0)
+      }
+    })
 }
 
 /**
@@ -775,8 +840,10 @@ async function stopLocatedServer(timeoutMs: number): Promise<void> {
     return
   }
 
-  if (!await canStopLocatedServer(pid)) {
-    console.warn(`[desktop] Skipping located server stop because pid ${pid} no longer matches a Cradle server.`)
+  if (!(await canStopLocatedServer(pid))) {
+    console.warn(
+      `[desktop] Skipping located server stop because pid ${pid} no longer matches a Cradle server.`,
+    )
     removeCliServerLocator()
     return
   }
@@ -784,7 +851,7 @@ async function stopLocatedServer(timeoutMs: number): Promise<void> {
   try {
     process.kill(pid, 'SIGTERM')
   }
-  catch {
+ catch {
     // The located server may have already exited.
     removeCliServerLocator()
     return
@@ -795,7 +862,7 @@ async function stopLocatedServer(timeoutMs: number): Promise<void> {
     try {
       process.kill(pid, 0)
     }
-    catch {
+ catch {
       removeCliServerLocator()
       return
     }
@@ -805,7 +872,7 @@ async function stopLocatedServer(timeoutMs: number): Promise<void> {
   try {
     process.kill(pid, 'SIGKILL')
   }
-  catch {
+ catch {
     // The located server may have exited after the timeout check.
   }
   removeCliServerLocator()
@@ -817,9 +884,9 @@ async function canStopLocatedServer(pid: number): Promise<boolean> {
   }
 
   try {
-    await waitForServer(currentServerUrl, 1_000)
+    await waitForServer(currentServerUrl, { timeoutMs: 1_000 })
   }
-  catch {
+ catch {
     return false
   }
 
@@ -832,8 +899,10 @@ async function readProcessCommandLine(pid: number): Promise<string | null> {
     return null
   }
 
-  return await readUnixProcessCommandLine(pid, ['-p', String(pid), '-wwE', '-o', 'command='])
-    ?? await readUnixProcessCommandLine(pid, ['-p', String(pid), '-ww', '-o', 'command='])
+  return (
+    (await readUnixProcessCommandLine(pid, ['-p', String(pid), '-wwE', '-o', 'command=']))
+    ?? (await readUnixProcessCommandLine(pid, ['-p', String(pid), '-ww', '-o', 'command=']))
+  )
 }
 
 function readUnixProcessCommandLine(pid: number, args: string[]): Promise<string | null> {
@@ -861,15 +930,17 @@ function readUnixProcessCommandLine(pid: number, args: string[]): Promise<string
 
 export function isDesktopServerProcessCommand(commandLine: string): boolean {
   const normalizedCommand = commandLine.replaceAll('\\', '/')
-  return normalizedCommand.includes(DEV_SERVER_ENTRY_PATTERN)
+  return (
+    normalizedCommand.includes(DEV_SERVER_ENTRY_PATTERN)
     || normalizedCommand.includes(PACKAGED_SERVER_ENTRY_PATTERN)
+  )
 }
 
 function readServerTargetPid(child: ManagedChildProcess | null): number | null {
   return child?.targetPid ?? child?.pid ?? null
 }
 
-function readServerStartupSignal(message: unknown): ServerStartupSignal | null {
+export function readServerBootstrapEvent(message: unknown): ServerBootstrapEvent | null {
   if (
     typeof message !== 'object'
     || message === null
@@ -884,40 +955,126 @@ function readServerStartupSignal(message: unknown): ServerStartupSignal | null {
     typeof targetMessage !== 'object'
     || targetMessage === null
     || !('type' in targetMessage)
-    || targetMessage.type !== 'cradle-server-startup'
+    || targetMessage.type !== 'cradle-server-bootstrap'
     || !('phase' in targetMessage)
+    || !('kind' in targetMessage)
+    || !('at' in targetMessage)
+    || typeof targetMessage.phase !== 'string'
+    || typeof targetMessage.kind !== 'string'
+    || typeof targetMessage.at !== 'string'
   ) {
     return null
   }
-  return targetMessage.phase === 'migrating'
-    || targetMessage.phase === 'compacting'
-    || targetMessage.phase === 'initializing'
-    ? targetMessage.phase
-    : null
+  if (
+    !SERVER_BOOTSTRAP_PHASES.includes(targetMessage.phase as ServerBootstrapPhase)
+    || !(['started', 'completed', 'failed', 'ready'] as ServerBootstrapEventKind[]).includes(
+      targetMessage.kind as ServerBootstrapEventKind,
+    )
+  ) {
+    return null
+  }
+  return {
+    type: 'cradle-server-bootstrap',
+    phase: targetMessage.phase as ServerBootstrapPhase,
+    kind: targetMessage.kind as ServerBootstrapEventKind,
+    at: targetMessage.at,
+    ...('error' in targetMessage && typeof targetMessage.error === 'string'
+      ? { error: targetMessage.error }
+      : {}),
+  }
 }
 
-async function waitForServer(
+export interface ServerBootstrapWatchdog {
+  globalTimeoutMs: number
+  phaseTimeoutMs: number
+  readSnapshot: () => DesktopServerBootstrapSnapshot
+}
+
+export interface WaitForServerOptions {
+  timeoutMs?: number
+  bootstrapWatchdog?: ServerBootstrapWatchdog
+}
+
+export async function waitForServer(
   url: string,
-  timeoutMs: number,
-  isLongRunningStartup: () => boolean = () => false,
-  readTimeoutStartedAt?: () => number,
+  options: WaitForServerOptions = {},
 ): Promise<void> {
   const start = Date.now()
-  const timeoutStartedAt = readTimeoutStartedAt ?? (() => start)
-  while (Date.now() - timeoutStartedAt() < timeoutMs || isLongRunningStartup()) {
+  while (options.timeoutMs === undefined || Date.now() - start < options.timeoutMs) {
+    const bootstrapSnapshot = options.bootstrapWatchdog?.readSnapshot()
     if (serverProcess && (serverProcess.exitCode !== null || serverProcess.signalCode !== null)) {
-      throw createServerStartupError(url, timeoutMs)
+      throw createServerStartupError(url, { bootstrapSnapshot })
+    }
+    const watchdogFailure = readBootstrapWatchdogFailure(start, options.bootstrapWatchdog)
+    if (watchdogFailure) {
+      throw createServerStartupError(url, { watchdogFailure, bootstrapSnapshot })
     }
     try {
       const res = await fetch(`${url}/health`, { headers: getDesktopServerAuthHeaders() })
-      if (res.ok) {
+      if (res.ok && isBootstrapReady(bootstrapSnapshot)) {
         return
       }
     }
-    catch {
+ catch {
       // Server not ready yet
     }
     await new Promise(r => setTimeout(r, 200))
   }
-  throw createServerStartupError(url, timeoutMs)
+  throw createServerStartupError(url, {
+    timeoutMs: options.timeoutMs,
+    bootstrapSnapshot: options.bootstrapWatchdog?.readSnapshot(),
+  })
+}
+
+function isBootstrapReady(snapshot: DesktopServerBootstrapSnapshot | undefined): boolean {
+  // A managed server must prove both that its listener callback ran and that
+  // its ready-only health endpoint responds. Located external servers use the
+  // bounded health probe without a local bootstrap watchdog.
+  return (
+    !snapshot
+    || (snapshot.lastEvent?.phase === 'listener-establishment' && snapshot.lastEvent.kind === 'ready')
+  )
+}
+
+function readBootstrapWatchdogFailure(
+  startedAt: number,
+  watchdog: ServerBootstrapWatchdog | undefined,
+): string | null {
+  if (!watchdog) {
+    return null
+  }
+  const now = Date.now()
+  const snapshot = watchdog.readSnapshot()
+  if (now - startedAt >= watchdog.globalTimeoutMs) {
+    return `Server bootstrap global timeout after ${watchdog.globalTimeoutMs}ms.`
+  }
+  if (
+    snapshot.currentPhase
+    && snapshot.phaseStartedAt
+    && now - Date.parse(snapshot.phaseStartedAt) >= watchdog.phaseTimeoutMs
+  ) {
+    return `Server bootstrap phase timeout after ${watchdog.phaseTimeoutMs}ms.`
+  }
+  return null
+}
+
+function describeBootstrapDiagnostics(
+  snapshot: DesktopServerBootstrapSnapshot,
+  now: number,
+): string {
+  const phase = snapshot.currentPhase ?? snapshot.lastEvent?.phase ?? 'no reported phase'
+  const phaseReport = phase === 'no reported phase' ? undefined : snapshot.phases[phase]
+  const phaseStartedAt = snapshot.phaseStartedAt ?? phaseReport?.startedAt
+  const phaseEndedAt = phaseReport?.failedAt ?? phaseReport?.completedAt
+  const phaseDurationMs = phaseStartedAt
+    ? Math.max(0, (phaseEndedAt ? Date.parse(phaseEndedAt) : now) - Date.parse(phaseStartedAt))
+    : null
+  const lastEvent = snapshot.lastEvent
+    ? `${snapshot.lastEvent.kind}:${snapshot.lastEvent.phase} at ${snapshot.lastEvent.at}`
+    : 'none'
+  return [
+    `Last bootstrap phase: "${phase}".`,
+    `Phase duration: ${phaseDurationMs === null ? 'unavailable' : `${phaseDurationMs}ms`}.`,
+    `Last known bootstrap event: ${lastEvent}.`,
+  ].join(' ')
 }

@@ -4,10 +4,12 @@ import { cors } from '@elysiajs/cors'
 import { node } from '@elysiajs/node'
 import { Elysia } from 'elysia'
 
+import type { ServerBootstrapReporter } from './bootstrap-lifecycle'
 import { loadServerAuthConfig } from './config/server-config'
 import { createAuthPlugin } from './http/auth'
 import { createOpenApiPlugin, registerOpenApiAlias } from './http/openapi'
 import { createRequestIdPlugin } from './http/request-id'
+import { getServerConfig, initializeDatabase, shutdownInfra } from './infra'
 import { createAcpModule } from './modules/acp'
 import { agentIdentity } from './modules/agent-identity'
 import { agentInteractionRuntime } from './modules/agent-interaction-runtime'
@@ -61,7 +63,6 @@ import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
-import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
@@ -88,6 +89,7 @@ import { RuntimeResourceRegistry } from './runtime-resource-registry'
 
 interface CreateServerAppOptions {
   startBackgroundTasks?: boolean
+  bootstrapReporter?: ServerBootstrapReporter
 }
 
 interface CreateServerContractAppOptions {
@@ -125,6 +127,14 @@ function isAllowedCorsOriginValue(origin: string | null): boolean {
 
 function isAllowedCorsOrigin({ headers }: { headers: Headers }): boolean {
   return isAllowedCorsOriginValue(headers.get('origin'))
+}
+
+async function runBootstrapPhase<T>(
+  reporter: ServerBootstrapReporter | undefined,
+  phase: Parameters<ServerBootstrapReporter['run']>[0],
+  operation: () => Promise<T>,
+): Promise<T> {
+  return reporter ? reporter.run(phase, operation) : operation()
 }
 
 export async function createServerContractApp(options: CreateServerContractAppOptions = {}) {
@@ -228,7 +238,6 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(kanban)
   app.use(linkPreview)
   app.use(search)
-  app.use(recall)
   app.use(createPluginsModule({ downloadCenter: downloadCenter.service }))
   app.use(skills)
   app.use(workflowRules)
@@ -265,93 +274,156 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 }
 
 export async function createServerApp(options: CreateServerAppOptions = {}) {
-  const { startBackgroundTasks = process.env.NODE_ENV !== 'test' } = options
+  const { startBackgroundTasks = process.env.NODE_ENV !== 'test', bootstrapReporter } = options
   const downloadCenterService = new DownloadCenterService()
-  await downloadCenterService.boot()
-  const [
-    { shutdownInfra, getServerConfig },
-    { abortAllRuns, flushAllActiveRunSnapshots, recoverPersistedRunProjections },
-    { shutdownTraceStreams },
-    { cleanup: chronicleCleanup },
-    chronicleService,
-    { refreshAllExternalProviderSources },
-    { reconcileExternalIssueSourceRegistrations },
-    { providerRuntimeHostManager },
-    { clearSideConversations },
-    { activateServerPlugins, deactivateAllPlugins },
-    conversationBridgeSupervisor,
-    { destroyWorkspaceFileIndexes },
-    localRelaydSupervisor,
-    { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
-    { initHostConnectorService, getHostConnectorService },
-    { shutdownRemoteHostConnections, startEnabledRelayRemoteHostConnections },
-    { shutdownImageOcr },
-    { CodexUsageReconciliationScheduler },
-    { RunSnapshotMaintenanceScheduler },
-    { initializeRecallProjection },
-  ] = await Promise.all([
-    import('./infra'),
-    import('./modules/chat-runtime/runtime'),
-    import('./modules/chat-runtime/stream-trace'),
-    import('./modules/chronicle/daemon-manager'),
-    import('./modules/chronicle/service'),
-    import('./modules/external-provider-sources/service'),
-    import('./modules/external-issue-sources/service'),
-    import('./modules/provider-runtime/host-manager'),
-    import('./modules/provider-runtime/side-conversation-registry'),
-    import('./plugins/loader'),
-    import('./modules/conversation-bridge/runtime-supervisor'),
-    import('./modules/workspace/files'),
-    import('./modules/relay-servers/local-relayd-supervisor'),
-    import('./modules/chat-runtime-providers/opencode/runtime-context'),
-    import('./modules/relay-transport/host-connector'),
-    import('./modules/remote-hosts/service'),
-    import('./modules/image-ocr/service'),
-    import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
-    import('./modules/chat-runtime/run-snapshot-maintenance'),
-    import('./modules/recall'),
-  ])
-  await recoverPersistedRunProjections()
-  initializeRecallProjection()
+  initializeDatabase(bootstrapReporter)
 
-  const opencodeRuntimeInstallationService = new OpencodeRuntimeInstallationService({
-    downloadCenter: downloadCenterService,
-    prepareManagedPathForRemoval: prepareOpencodeManagedPathForRemoval,
+  await runBootstrapPhase(bootstrapReporter, 'persisted-run-recovery', async () => {
+    const { recoverPersistedRunProjections } = await import('./modules/chat-runtime/runtime')
+    await recoverPersistedRunProjections()
   })
-  await opencodeRuntimeInstallationService.boot()
 
-  const managedResourceService = new ManagedResourceService([
-    createChronicleManagedResourceAdapter(downloadCenterService),
-    createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
-  ])
+  await runBootstrapPhase(bootstrapReporter, 'recall-projection', async () => {
+    const { initializeRecallProjection } = await import('./modules/recall')
+    initializeRecallProjection()
+  })
 
-  const app = await createServerContractApp({
-    includeRuntimeHttpPlugins: true,
-    downloadCenterService,
+  const [
+    app,
     managedResourceService,
     opencodeRuntimeInstallationService,
-  })
-  Worktree.registerStorageMeasurementActivity()
-  registerAgentToolsMcpServer()
-
-  // Initialize the always-on relay host-connector (connects to the host's own
-  // HTTP port to bridge controller tunnels). The local target is this server's
-  // own listen port — stream_open from a controller lands here.
-  const serverConfig = getServerConfig()
-  const hostConnector = initHostConnectorService({
-    localServerHost: '127.0.0.1',
-    localServerPort: serverConfig.port,
-  })
-
-  // Plugin system — discover and activate server plugins
-  await activateServerPlugins(app, {
-    hostServices: {
+    serverConfig,
+    hostConnector,
+    runtime,
+  ] = await runBootstrapPhase(bootstrapReporter, 'service-initialization', async () => {
+    await downloadCenterService.boot()
+    const [
+      { abortAllRuns, flushAllActiveRunSnapshots },
+      { shutdownTraceStreams },
+      { cleanup: chronicleCleanup },
+      chronicleService,
+      { refreshAllExternalProviderSources },
+      { reconcileExternalIssueSourceRegistrations },
+      { providerRuntimeHostManager },
+      { clearSideConversations },
+      { activateServerPlugins, deactivateAllPlugins },
+      conversationBridgeSupervisor,
+      { destroyWorkspaceFileIndexes },
+      localRelaydSupervisor,
+      { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
+      { initHostConnectorService, getHostConnectorService },
+      { shutdownRemoteHostConnections, startEnabledRelayRemoteHostConnections },
+      { shutdownImageOcr },
+      { CodexUsageReconciliationScheduler },
+      { RunSnapshotMaintenanceScheduler },
+    ] = await Promise.all([
+      import('./modules/chat-runtime/runtime'),
+      import('./modules/chat-runtime/stream-trace'),
+      import('./modules/chronicle/daemon-manager'),
+      import('./modules/chronicle/service'),
+      import('./modules/external-provider-sources/service'),
+      import('./modules/external-issue-sources/service'),
+      import('./modules/provider-runtime/host-manager'),
+      import('./modules/provider-runtime/side-conversation-registry'),
+      import('./plugins/loader'),
+      import('./modules/conversation-bridge/runtime-supervisor'),
+      import('./modules/workspace/files'),
+      import('./modules/relay-servers/local-relayd-supervisor'),
+      import('./modules/chat-runtime-providers/opencode/runtime-context'),
+      import('./modules/relay-transport/host-connector'),
+      import('./modules/remote-hosts/service'),
+      import('./modules/image-ocr/service'),
+      import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
+      import('./modules/chat-runtime/run-snapshot-maintenance'),
+    ])
+    const opencodeRuntimeInstallationService = new OpencodeRuntimeInstallationService({
       downloadCenter: downloadCenterService,
-      managedResources: managedResourceService,
-      dataDir: serverConfig.dataDir ?? dirname(serverConfig.dbPath),
-    },
+      prepareManagedPathForRemoval: prepareOpencodeManagedPathForRemoval,
+    })
+    await opencodeRuntimeInstallationService.boot()
+    const managedResourceService = new ManagedResourceService([
+      createChronicleManagedResourceAdapter(downloadCenterService),
+      createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
+    ])
+    const app = await createServerContractApp({
+      includeRuntimeHttpPlugins: true,
+      downloadCenterService,
+      managedResourceService,
+      opencodeRuntimeInstallationService,
+    })
+    Worktree.registerStorageMeasurementActivity()
+    registerAgentToolsMcpServer()
+    const serverConfig = getServerConfig()
+    const hostConnector = initHostConnectorService({
+      localServerHost: '127.0.0.1',
+      localServerPort: serverConfig.port,
+    })
+    return [
+      app,
+      managedResourceService,
+      opencodeRuntimeInstallationService,
+      serverConfig,
+      hostConnector,
+      {
+        abortAllRuns,
+        flushAllActiveRunSnapshots,
+        shutdownTraceStreams,
+        chronicleCleanup,
+        chronicleService,
+        refreshAllExternalProviderSources,
+        reconcileExternalIssueSourceRegistrations,
+        providerRuntimeHostManager,
+        clearSideConversations,
+        activateServerPlugins,
+        deactivateAllPlugins,
+        conversationBridgeSupervisor,
+        destroyWorkspaceFileIndexes,
+        localRelaydSupervisor,
+        stopOpencodeServer,
+        getHostConnectorService,
+        shutdownRemoteHostConnections,
+        startEnabledRelayRemoteHostConnections,
+        shutdownImageOcr,
+        CodexUsageReconciliationScheduler,
+        RunSnapshotMaintenanceScheduler,
+      },
+    ] as const
   })
-  reconcileExternalIssueSourceRegistrations()
+
+  const {
+    abortAllRuns,
+    flushAllActiveRunSnapshots,
+    shutdownTraceStreams,
+    chronicleCleanup,
+    chronicleService,
+    refreshAllExternalProviderSources,
+    reconcileExternalIssueSourceRegistrations,
+    providerRuntimeHostManager,
+    clearSideConversations,
+    activateServerPlugins,
+    deactivateAllPlugins,
+    conversationBridgeSupervisor,
+    destroyWorkspaceFileIndexes,
+    localRelaydSupervisor,
+    stopOpencodeServer,
+    getHostConnectorService,
+    shutdownRemoteHostConnections,
+    startEnabledRelayRemoteHostConnections,
+    shutdownImageOcr,
+    CodexUsageReconciliationScheduler,
+    RunSnapshotMaintenanceScheduler,
+  } = runtime
+
+  await runBootstrapPhase(bootstrapReporter, 'plugin-activation', async () => {
+    await activateServerPlugins(app, {
+      hostServices: {
+        downloadCenter: downloadCenterService,
+        managedResources: managedResourceService,
+        dataDir: serverConfig.dataDir ?? dirname(serverConfig.dbPath),
+      },
+    })
+    reconcileExternalIssueSourceRegistrations()
+  })
 
   const runtimeResources = new RuntimeResourceRegistry()
   const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
