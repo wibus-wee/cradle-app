@@ -17,8 +17,10 @@
   "graphRow.justNow": "刚刚",
   "graphRow.mergedFrom": "合并自 {{sha}}",
   "panel.emptyCommits": "暂无 commit",
+  "panel.emptyRepositories": "未找到 Git 仓库",
   "panel.emptyWorkspace": "请先选择 Workspace",
   "panel.error": "不是 Git 仓库或无权限",
   "panel.fetch": "拉取 Git 更新",
-  "panel.fetch.title": "Fetch all (--all --prune)"
+  "panel.fetch.title": "Fetch all (--all --prune)",
+  "panel.graphError": "无法加载 commit 历史"
 }

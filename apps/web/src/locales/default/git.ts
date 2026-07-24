@@ -21,4 +21,6 @@ export default {
   'panel.fetch': 'Fetch git updates',
   'panel.fetch.title': 'Fetch all (--all --prune)',
   'panel.emptyCommits': 'No commits yet',
+  'panel.emptyRepositories': 'No Git repositories found',
+  'panel.graphError': 'Unable to load commit history',
 } as const

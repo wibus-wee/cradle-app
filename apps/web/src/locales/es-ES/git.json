@@ -17,8 +17,10 @@
   "graphRow.justNow": "Ahora mismo",
   "graphRow.mergedFrom": "Fusionado desde {{sha}}",
   "panel.emptyCommits": "Aún no hay commits",
+  "panel.emptyRepositories": "No se encontraron repositorios Git",
   "panel.emptyWorkspace": "Selecciona primero un Workspace",
   "panel.error": "No es un repositorio Git o no hay permisos",
   "panel.fetch": "Obtener actualizaciones de Git",
-  "panel.fetch.title": "Fetch all (--all --prune)"
+  "panel.fetch.title": "Fetch all (--all --prune)",
+  "panel.graphError": "No se pudo cargar el historial de commits"
 }

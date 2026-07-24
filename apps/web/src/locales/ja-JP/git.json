@@ -17,8 +17,10 @@
   "graphRow.justNow": "たった今",
   "graphRow.mergedFrom": "マージ元: {{sha}}",
   "panel.emptyCommits": "コミットはまだありません",
+  "panel.emptyRepositories": "Git リポジトリが見つかりません",
   "panel.emptyWorkspace": "先に Workspace を選択してください",
   "panel.error": "Git リポジトリではないか、権限がありません",
   "panel.fetch": "Git 更新を取得",
-  "panel.fetch.title": "Fetch all (--all --prune)"
+  "panel.fetch.title": "Fetch all (--all --prune)",
+  "panel.graphError": "コミット履歴を読み込めません"
 }

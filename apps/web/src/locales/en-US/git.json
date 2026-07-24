@@ -17,8 +17,10 @@
   "graphRow.justNow": "Just now",
   "graphRow.mergedFrom": "Merged from {{sha}}",
   "panel.emptyCommits": "No commits yet",
+  "panel.emptyRepositories": "No Git repositories found",
   "panel.emptyWorkspace": "Select a workspace first",
   "panel.error": "Not a Git repository or permission denied",
   "panel.fetch": "Fetch git updates",
-  "panel.fetch.title": "Fetch all (--all --prune)"
+  "panel.fetch.title": "Fetch all (--all --prune)",
+  "panel.graphError": "Unable to load commit history"
 }

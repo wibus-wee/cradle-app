@@ -20,7 +20,7 @@ import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { BrowserAnnotationAdjustmentPanel } from '~/features/browser/browser-annotation-adjustment-panel'
 import { RuntimeSessionPanel } from '~/features/chat/runtime/runtime-session-panel'
 import { useSessionAwaitSummary } from '~/features/chat/session/use-session-await'
-import { ChangesPanel, GitPanel } from '~/features/git'
+import { ChangesPanel, GitPanelContainer } from '~/features/git'
 import { IssueAsidePanel } from '~/features/kanban/issue-aside-panel'
 import { useLinkedIssue } from '~/features/kanban/use-kanban'
 import { useSessionIsolationState } from '~/features/session/use-session-isolation'
@@ -194,7 +194,7 @@ function RightAsidePanelContent({
   if (tabId === 'git') {
     return (
       <div className="flex flex-1 flex-col overflow-hidden" data-testid="right-aside-panel-git">
-        <GitPanel workspaceId={workspaceId} sessionId={gitSessionId} />
+        <GitPanelContainer workspaceId={workspaceId} sessionId={gitSessionId} />
       </div>
     )
   }
