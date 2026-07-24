@@ -25,8 +25,6 @@ const managedWorktreeViewSchema = t.Object({
   createdAt: t.Number(),
   updatedAt: t.Number(),
   sizeBytes: t.Number(),
-  sizeMeasuredAt: t.Nullable(t.Number()),
-  sizeMeasurementError: t.Nullable(t.String()),
   sessionCount: t.Number(),
 })
 

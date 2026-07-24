@@ -8,12 +8,10 @@ import {
 import type {
   GetPullRequestsAuthoredResponse,
   GetPullRequestsByOwnerByRepoByNumberDetailResponse,
-  GetPullRequestsViewerResponse,
 } from '~/api-gen/types.gen'
 
 export type PullRequestDetail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
 export type PullRequestView = GetPullRequestsAuthoredResponse['items'][number]
-export type PullRequestViewer = GetPullRequestsViewerResponse['viewer']
 
 export const pullRequestQueryOptions = {
   authored: getPullRequestsAuthoredInfiniteOptions,

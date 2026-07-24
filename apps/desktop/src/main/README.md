@@ -20,7 +20,7 @@
 - `window-state.ts`：拥有主窗口 bounds 恢复校正逻辑，以及 tear-off window 的 size-only 持久化 helper；主窗口在 `electron-window-state` 持久化基础上按当前 display workArea 修正大小和位置，tear-off 只保存宽高不保存位置。
 - `window-manager.ts`：拥有 Electron window lifecycle 和 renderer/server URL 连接；session tear-off window 从专用 renderer entry 初始化、按释放点选择目标 display，在释放点附近打开并限制在目标 workArea 内、只记忆宽高，同一 session 的重复 open 会聚合到已登记窗口，并在关闭时通知 main renderer 恢复对应 main-window chat tab。
 - `window-manager.test.ts`：覆盖 session tear-off window 并发 open 去重，以及 renderer load 失败时清理 pending session 窗口。
-- `server-process.ts`：拥有 server 子进程启动、复用、显式停止、环境变量注入、Cradle app version 投影，以及 desktop-owned credential secret 文件；packaged runtime 只启动 `@cradle/server` 产出的 `dist/desktop-runtime` artifact。Server 通过嵌套 managed-process IPC 发送有时间戳的 migration、maintenance、persisted-run recovery、service initialization、plugin activation 和 listener establishment 生命周期事实；Desktop 保留最新 snapshot，并以全局和每 phase watchdog 监督它。只有实际 listen callback 的 `ready` 事件和 `/health` 成功才算 ready；超时诊断包含当前 phase、phase 时长、最后事件和最近 server 输出。server ready 后写入 Desktop-owned CLI server locator，普通 App 退出只 detach 并保留 locator 供下次重连，更新/重启等显式 runtime 替换路径才停止 server。
+- `server-process.ts`：拥有 server 子进程启动、复用、显式停止、环境变量注入、Cradle app version 投影，以及 desktop-owned credential secret 文件；packaged runtime 只启动 `@cradle/server` 产出的 `dist/desktop-runtime` artifact；server ready 后写入 Desktop-owned CLI server locator，普通 App 退出只 detach 并保留 locator 供下次重连，更新/重启等显式 runtime 替换路径才停止 server。
 - `data-directory.ts`：拥有可移动的 server 数据根、固定 bootstrap pointer 和 crash-safe 迁移状态机。Electron `userData`、CLI locator、缓存和 updater state 始终留在默认位置；迁移只复制 server data tree，校验 SHA-256 后切换 pointer，并且仅在新 root server ready 后把旧 root 重命名为 `.bak-*`。备份删除是独立显式操作，不与迁移事务绑定。
 - `native-services.ts`：拥有 main-process native IPC service 注册，包括 native dialog/path launch IPC、Desktop CLI install IPC、desktop chat stream broker IPC、Claude / Codex 会话文件的只读本机采样、Mac Appshot Cradle-native capture orchestration、Cradle-native image asset projection、Appshot source-window target locking、Codex temp asset observe-only evidence collection, and Appshot parity probe orchestration.
 - `desktop-cli-manager.ts`：拥有 packaged macOS Desktop CLI command lifecycle；读取 bundled launcher、检查 `/usr/local/bin/cradle` symlink 状态，并通过显式用户操作安装、修复或移除 PATH command。权限提升只用于 symlink 写入，不修改 shell rc 文件。
@@ -65,7 +65,6 @@
 `update-manager.ts` owns the renderer-visible Desktop Updates workflow. The explicit user flow is Check, Download, then Restart on Windows. On macOS, Cradle only opens Sparkle's native update UI; Sparkle exclusively owns discovery, download, installation, relaunch, and their state.
 
 Updates are available only in packaged macOS and Windows builds with update feeds configured:
-
 - macOS: `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` (or derive `appcast.xml` from `CRADLE_DESKTOP_UPDATE_URL`) plus `SPARKLE_ED_PUBLIC_KEY`
 - Windows: `CRADLE_DESKTOP_UPDATE_URL` generic feed root containing `latest.yml`
 

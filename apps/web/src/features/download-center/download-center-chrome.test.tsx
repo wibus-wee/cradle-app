@@ -3,7 +3,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { DownloadTaskRow } from './download-task-row'
+import { DownloadTaskRow } from './download-center-chrome'
 import type { DownloadTask } from './types'
 
 const { openResources, openSettingsSection } = vi.hoisted(() => ({

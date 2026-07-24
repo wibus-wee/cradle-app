@@ -291,21 +291,6 @@ export interface AvailableEditor {
   iconDataUrl?: string
 }
 
-export interface CradleDataPaths {
-  userDataPath: string
-  serverDataPath: string
-  databasePath: string
-  serverLogPath: string
-  serverDataSource: 'default' | 'custom'
-  migration: {
-    phase: string
-    sourceRoot: string | null
-    targetRoot: string | null
-    backupRoot: string | null
-    errorMessage: string | null
-  }
-}
-
 interface NativeServiceMethods {
   showOpenDialog: (options: {
     title?: string
@@ -326,7 +311,20 @@ interface NativeServiceMethods {
   openPathInEditor: (fullPath: string, editorId?: string) => Promise<{ editor: string }>
   listAvailableEditors: () => Promise<AvailableEditor[]>
   openPathInTerminal: (fullPath: string) => Promise<{ terminal: string }>
-  getCradleDataPaths: () => Promise<CradleDataPaths>
+  getCradleDataPaths: () => Promise<{
+    userDataPath: string
+    serverDataPath: string
+    databasePath: string
+    serverLogPath: string
+    serverDataSource: 'default' | 'custom'
+    migration: {
+      phase: string
+      sourceRoot: string | null
+      targetRoot: string | null
+      backupRoot: string | null
+      errorMessage: string | null
+    }
+  }>
   chooseCradleDataDirectory: () => Promise<{ canceled: boolean, filePath?: string }>
   scheduleCradleDataDirectoryMigration: (targetPath: string) => Promise<{
     scheduled: boolean

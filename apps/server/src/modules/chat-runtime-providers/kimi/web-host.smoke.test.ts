@@ -33,6 +33,7 @@ describe('kimi web host smoke', () => {
         defaultModel: 'smoke-model',
       },
       credential: 'smoke-key',
+      mcpServers: {},
     })
     resources.push(resource)
 

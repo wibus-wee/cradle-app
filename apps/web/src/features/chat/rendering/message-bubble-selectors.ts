@@ -376,36 +376,6 @@ export function readFilePartFromState(
   return part?.type === 'file' ? part : null
 }
 
-export interface MessageImageAttachment {
-  segmentKey: string
-  part: FileMessagePart
-}
-
-export function readMessageImageAttachmentsFromState(
-  state: ChatStoreSnapshot,
-  sessionId: string,
-  segments: ChatRenderSegment[],
-): MessageImageAttachment[] {
-  return segments.flatMap((segment) => {
-    if (segment.kind !== 'file-attachment') {
-      return []
-    }
-    const part = readFilePartFromState(state, sessionId, segment.messageId, segment.partIndex)
-    return part?.mediaType.startsWith('image/') ? [{ segmentKey: segment.key, part }] : []
-  })
-}
-
-export function areMessageImageAttachmentsEqual(
-  left: MessageImageAttachment[],
-  right: MessageImageAttachment[],
-): boolean {
-  return left.length === right.length
-    && left.every((attachment, index) => {
-      const candidate = right[index]
-      return attachment.segmentKey === candidate?.segmentKey && attachment.part === candidate.part
-    })
-}
-
 export function readSkillContextPartFromState(
   state: ChatStoreSnapshot,
   sessionId: string,

@@ -95,11 +95,6 @@ export class AsyncEventQueue<TEvent> implements AsyncIterable<TEvent> {
     })
   }
 
-  /** True when at least one consumer is blocked waiting for the next event. */
-  hasWaiters(): boolean {
-    return this.waiters.length > 0
-  }
-
   [Symbol.asyncIterator](): AsyncIterator<TEvent> {
     return {
       next: async (): Promise<IteratorResult<TEvent>> => {

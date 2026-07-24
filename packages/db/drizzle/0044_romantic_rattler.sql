@@ -1,1 +1,0 @@
-ALTER TABLE `session_awaits` ADD `last_observation_json` text;

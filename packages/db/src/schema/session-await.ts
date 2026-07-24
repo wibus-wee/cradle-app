@@ -29,7 +29,6 @@ export const sessionAwaits = sqliteTable('session_awaits', {
   fireAt: int('fire_at'),
   lastCheckedAt: int('last_checked_at'),
   lastErrorText: text('last_error_text'),
-  lastObservationJson: text('last_observation_json'),
   consecutiveErrorCount: int('consecutive_error_count').notNull().default(0),
 }, table => ([
   index('idx_session_awaits_status').on(table.status),

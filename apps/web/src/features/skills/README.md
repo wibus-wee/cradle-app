@@ -11,11 +11,8 @@ Skills import flow copy is owned by the `skills` i18n namespace; discovered skil
 ## Files
 
 - **index.ts**: Skills 功能模块的 barrel export
-- **skill-import-dialog.tsx / skill-import-dialog-view.tsx**: source-import mutation/reducer 容器与 fixture-driven 多步骤 View，支持 GitHub/GitLab/git URL 与本地路径；移动端使用单栏主流程，桌面端保留信息侧栏。
-- **skill-import-*-view.tsx**: 输入、加载、选择、完成和信息侧栏的独立展示组件；loading indicator 使用 transform 动画而不是 left/width 布局动画，所有流程文案通过 `skills` namespace 读取。
-- **skill-manager.tsx**: 通用 Skills 容器，负责 inventory query、层级过滤、目录选择、mutation 与对话框编排；Workspace Skills 首屏在 inventory query 成功后记录 performance gate。
-- **skill-manager-view.tsx**: fixture-driven 主列表 View，接收 owner 类型的 inventory 与 callbacks，不读取 query、route、store 或 Electron。
-- **skill-detail-container.tsx / skill-detail-view.tsx**: 详情 document query 与纯展示边界。
-- **skill-edit-dialog-container.tsx / skill-edit-dialog-view.tsx**: document/mutation adapter 与本地表单 View 边界。
-- **skill-scope-presentation.ts**: 集中维护 scope label、icon 与静态 Tailwind class 映射。
+- **skill-import-dialog.tsx**: 多步骤 Skills 导入对话框，支持 GitHub/GitLab/git URL 与本地路径，并暴露稳定的导入测试锚点给 E2E；loading indicator 使用 transform 动画而不是 left/width 布局动画，所有流程文案通过 `skills` namespace 读取
+- **skill-manager-loader.ts**: Skill Manager 的共享 lazy loader 与 intent preload 入口，供 workspace detail 的 Skills tab 使用
+- **skill-manager.tsx**: 通用 Skills 管理界面，支持 layered inventory、详情对话框中的编辑 / 删除 / 导出动作，以及导入导出；列表主动作、列表删除动作和详情动作按钮都暴露可访问名称，同时稳定保留 `new-skill-btn`、`skill-edit-btn`、`skill-delete-btn`、`skill-save-btn`、`skill-import-btn`、`skill-export-btn` 等锚点供真实 UI E2E 复用；Workspace Skills 首屏在 inventory query 成功后记录 performance gate
+- **skill-manager.test.tsx**: Skills 管理界面回归测试，覆盖列表 / 详情动作按钮的可访问名称以及导出 / 删除动作链路。
 - **use-skills.ts**: TanStack Query hooks，负责 inventory、document、mutation、source-import 以及 export owner-boundary contract 的 IPC 调用，并暴露 inventory query success 作为 workspace skills readiness 口径

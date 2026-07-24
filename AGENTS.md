@@ -122,28 +122,6 @@ function Button({ className, variant = 'primary', ...props }) {
 
 **Placement rule**: If a component is specific to a business domain/feature, place it in the corresponding module directory.
 
-### 3. Frontend Rendering Seams
-
-User-visible feature surfaces must expose a fixture-driven rendering seam.
-
-- `*View` modules receive typed props and callbacks. They may own local interaction
-  state, but must not read queries, mutations, routes, global stores, Electron,
-  generated clients, or session/runtime context.
-- `*Container`, `*ById`, `*Route`, and `*Runtime` modules own those dependencies,
-  derive the View model, and translate View callbacks into application actions.
-- Storybook stories render `*View` modules with fixtures. Do not mount Containers
-  behind decorator stacks that reproduce the application runtime.
-- Prefer one exported semantic React component per production file. Keep small
-  private render helpers colocated only when they are implementation details
-  without an independently useful interface.
-- Import domain data types from their owning contracts or feature modules. Do not
-  create frontend-only projections when an owner type already expresses the data.
-- Split files at real seams: independent semantics, dependency ownership, or a
-  reusable/testable interface. Do not create pass-through files whose interface
-  is as complex as their implementation.
-- When touching an existing user-visible surface that has no fixture-driven View,
-  extract or strengthen that seam as part of the change.
-
 ### Creating a Styled Component with Variants
 
 ```tsx

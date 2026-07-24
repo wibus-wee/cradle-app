@@ -1,7 +1,5 @@
 import type { ComponentType } from 'react'
 
-import type { ThreadSearchHit } from '~/features/search/types'
-
 /**
  * Command palette data types. The palette keeps using `cmdk` for keyboard
  * navigation, accessibility and list semantics; these types describe the data
@@ -59,20 +57,3 @@ export interface RecentConversation {
 }
 
 export type FileSearchAvailability = 'available' | 'unsupported-tab' | 'missing-workspace'
-
-export interface PaletteData {
-  commands: CommandAction[]
-  filteredCommands: CommandAction[]
-  suggestedCommands: CommandAction[]
-  recentConversations: RecentConversation[]
-  files: GlobalSearchFile[]
-  workspaces: WorkspaceSearchHit[]
-  threads: ThreadSearchHit[]
-  issues: IssueSearchHit[]
-  fileWorkspaceId: string | null
-  fileAvailability: FileSearchAvailability
-  fileUnavailable: boolean
-  boardId: string | null
-  isPending: boolean
-  hasQuery: boolean
-}

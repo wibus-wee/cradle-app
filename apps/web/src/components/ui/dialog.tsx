@@ -3,10 +3,10 @@
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
+import { useSuppressNativeBrowserSurface } from "~/features/browser/native-surface-suppression"
 import { cn } from "~/lib/cn"
 import { Button } from "~/components/ui/button"
 import { CloseLine as XIcon } from '@mingcute/react'
-import { useSuppressOverlayHostSurfaces } from './overlay-environment'
 function Dialog({
   open,
   defaultOpen,
@@ -15,7 +15,7 @@ function Dialog({
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(Boolean(defaultOpen))
   const active = open ?? uncontrolledOpen
-  useSuppressOverlayHostSurfaces(active)
+  useSuppressNativeBrowserSurface(active)
 
   const handleOpenChange = (nextOpen: boolean) => {
     setUncontrolledOpen(nextOpen)

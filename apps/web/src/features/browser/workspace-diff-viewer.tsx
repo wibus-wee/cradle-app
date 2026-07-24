@@ -14,7 +14,7 @@ import { PatchDiffView } from '~/components/common/diff/patch-diff-view'
 import { Spinner } from '~/components/ui/spinner'
 import { DEFAULT_BROWSER_PANEL_OWNER_ID, useBrowserPanelStore } from '~/store/browser-panel'
 
-import { useGitDiff } from '../git/shared/use-git'
+import { useGitDiff } from '../git/use-git'
 
 interface WorkspaceDiffViewerProps {
   ownerId?: string | null

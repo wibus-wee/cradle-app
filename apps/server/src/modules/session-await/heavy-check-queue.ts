@@ -57,7 +57,7 @@ export async function applyCheckResults(
           await service.resumeFailedAwait(failed, EMPTY_RESUME_TEXT_ERROR)
         }
       }
- else {
+      else {
         toTrigger.push({
           awaitId: result.awaitId,
           resumeText: result.resumeText,
@@ -79,24 +79,16 @@ export async function applyCheckResults(
         result.permanentError,
         result.incrementErrorCount,
       )
-      if (failed?.status === 'failed' && adapter.resumeOnFailure) {
+      if (failed && adapter.resumeOnFailure) {
         await service.resumeFailedAwait(failed, result.permanentError)
       }
       continue
     }
 
     if (adapter.tracksConsecutiveErrors) {
-      if (!result.transientError) {
-        service.recordTrackedEvaluationCheck(result.awaitId, undefined, result.observationJson)
-      }
-      else {
-        const failed = service.recordTrackedEvaluationFailure(result.awaitId, result.transientError)
-        if (failed?.status === 'failed' && adapter.resumeOnFailure) {
-          await service.resumeFailedAwait(failed, failed.lastErrorText ?? result.transientError)
-        }
-      }
+      service.recordTrackedEvaluationCheck(result.awaitId, result.transientError)
     }
- else {
+    else {
       service.updateLastChecked(result.awaitId, result.transientError)
     }
   }
@@ -118,16 +110,12 @@ async function runJob(job: HeavyCheckJob): Promise<void> {
     const results = await job.adapter.checkPending([job.row])
     await applyCheckResults(job.adapter, results)
   }
- catch (error) {
-    const errorText = service.describeSourceAdapterFailure(error)
+  catch {
     if (job.adapter.tracksConsecutiveErrors) {
-      const failed = service.recordTrackedEvaluationFailure(job.row.id, errorText)
-      if (failed?.status === 'failed' && job.adapter.resumeOnFailure) {
-        await service.resumeFailedAwait(failed, failed.lastErrorText ?? errorText)
-      }
+      service.recordTrackedEvaluationCheck(job.row.id, 'Source adapter threw')
     }
- else {
-      service.updateLastChecked(job.row.id, errorText)
+    else {
+      service.updateLastChecked(job.row.id, 'Source adapter threw')
     }
   }
 }

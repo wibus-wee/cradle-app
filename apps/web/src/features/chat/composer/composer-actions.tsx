@@ -22,7 +22,7 @@ import { cn } from '~/lib/cn'
 import { formatTokenCount } from '~/lib/number-format'
 
 import type { ChatRuntimeCompactUiSlotState } from '../capabilities/chat-capabilities'
-import { ContextUsageDetailPanelContainer } from '../context/containers/context-usage-detail-panel-container'
+import { ContextUsageDetailPanel } from '../context/context-usage-detail-panel'
 import type { ComposerAttachmentController } from './composer-attachment-state'
 import { ComposerAttachmentButton } from './composer-attachments'
 
@@ -114,7 +114,7 @@ function TokenProgress({
         sideOffset={12}
         className="w-auto border-0 bg-transparent p-0 shadow-none ring-0"
       >
-        <ContextUsageDetailPanelContainer
+        <ContextUsageDetailPanel
           sessionId={sessionId ?? null}
           compactState={compactState}
           onClose={() => setOpen(false)}

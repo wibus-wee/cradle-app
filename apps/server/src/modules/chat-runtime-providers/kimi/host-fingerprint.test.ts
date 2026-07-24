@@ -17,11 +17,17 @@ providerTargetId: 'target-a',
   })
 
   it('changes for dynamic provider configuration and credentials', () => {
-    const base = { command: 'kimi', providerTargetId: 'target-a', providerConfig, credential: 'token-one' }
+    const base = { command: 'kimi', providerTargetId: 'target-a', providerConfig, credential: 'token-one', mcpServers: {} }
     expect(createKimiWebHostFingerprint(base)).not.toBe(createKimiWebHostFingerprint({ ...base, credential: 'token-two' }))
     expect(createKimiWebHostFingerprint(base)).not.toBe(createKimiWebHostFingerprint({
       ...base,
       providerConfig: { ...providerConfig, baseUrl: 'https://other.test/v1' },
+    }))
+    expect(createKimiWebHostFingerprint(base)).not.toBe(createKimiWebHostFingerprint({
+      ...base,
+      mcpServers: {
+        browser: { transport: 'stdio', name: 'browser', command: 'node', args: ['server.js'], env: {} },
+      },
     }))
   })
 })

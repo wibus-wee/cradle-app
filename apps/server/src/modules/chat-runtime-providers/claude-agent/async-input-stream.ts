@@ -56,11 +56,6 @@ export class ClaudeAgentInputStream implements AsyncIterable<SDKUserMessage> {
     this.queue.close()
   }
 
-  /** True when the SDK/query is blocked waiting for the next user prompt. */
-  isWaitingForPull(): boolean {
-    return this.queue.hasWaiters()
-  }
-
   [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
     return this.queue[Symbol.asyncIterator]()
   }

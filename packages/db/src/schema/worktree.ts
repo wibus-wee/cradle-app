@@ -1,4 +1,4 @@
-import { index, int, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 import { textPk, timestamps, workspaces } from './shared'
 
@@ -13,9 +13,6 @@ export const worktrees = sqliteTable('worktrees', {
   baseRef: text('base_ref').notNull(),
   status: text('status', { enum: ['active', 'merged', 'abandoned'] }).notNull().default('active'),
   createdBySessionId: text('created_by_session_id'),
-  sizeBytes: int('size_bytes'),
-  sizeMeasuredAt: int('size_measured_at'),
-  sizeMeasurementError: text('size_measurement_error'),
   ...timestamps(),
 }, table => ({
   bySourceWorkspace: index('worktrees_source_workspace_id_idx').on(table.sourceWorkspaceId),

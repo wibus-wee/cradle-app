@@ -280,7 +280,7 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
     })
   })
 
-  it('finalizes normally when the runtime produces no output', async () => {
+  it('finalizes normally with an error chunk when the runtime genuinely produces no output', async () => {
     await withTempDataDir(async () => {
       const sessionId = `session-${randomUUID()}`
       const runId = `run-${randomUUID()}`
@@ -298,7 +298,7 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
 
       expect(deps.completeActiveTurn).toHaveBeenCalledTimes(1)
       const [, finalChunk] = (deps.finalizeSnapshot as ReturnType<typeof vi.fn>).mock.calls[0]
-      expect(finalChunk).toMatchObject({ type: 'finish', finishReason: 'stop' })
+      expect(finalChunk).toMatchObject({ type: 'error' })
     })
   })
 

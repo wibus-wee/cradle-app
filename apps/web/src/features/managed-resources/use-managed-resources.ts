@@ -11,11 +11,6 @@ import type { ManagedResource } from './projection'
 
 export type ManagedResourceAction = 'install' | 'update' | 'uninstall'
 
-export interface ManagedResourceActionRequest {
-  resource: ManagedResource
-  action: ManagedResourceAction
-}
-
 const EMPTY_RESOURCES: ManagedResource[] = []
 
 export function useManagedResources() {
@@ -26,10 +21,10 @@ export function useManagedResources() {
   }
 }
 
-export function useManagedResourceAction() {
+export function useManagedResourceAction(resource: ManagedResource) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ resource, action }: ManagedResourceActionRequest) => {
+    mutationFn: async (action: ManagedResourceAction) => {
       const path = resource.key
       if (action === 'install') {
         const { data } = await postManagedResourcesByNamespaceByResourceTypeByResourceIdInstall({ path, throwOnError: true })

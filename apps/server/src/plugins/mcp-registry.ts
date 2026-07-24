@@ -49,6 +49,7 @@ export interface RegisteredStreamableHttpMcpServer {
 export type RegisteredMcpServer = RegisteredStdioMcpServer | RegisteredStreamableHttpMcpServer
 
 const registry = new Map<string, RegisteredMcpServerConfig>()
+const customRegistry = new Map<string, RegisteredMcpServerConfig>()
 
 export function addHostMcpServer(config: McpServerConfig): void {
   const registered = McpServerConfigSchema.parse(config)
@@ -57,6 +58,9 @@ export function addHostMcpServer(config: McpServerConfig): void {
 
 export function registerHostMcpServer(owner: string, config: McpServerConfig): Disposable {
   const registered = McpServerConfigSchema.parse(config)
+  if (customRegistry.has(registered.name)) {
+    throw new Error(`Duplicate MCP server registration: ${registered.name}`)
+  }
   const record = registerPluginCapability(
     owner,
     'mcp-server',
@@ -79,7 +83,7 @@ export function registerHostMcpServer(owner: string, config: McpServerConfig): D
 }
 
 export function registerPluginMcpServer(owner: string, config: McpServerConfig): Disposable {
-  if (registry.has(config.name)) {
+  if (registry.has(config.name) || customRegistry.has(config.name)) {
     throw new Error(`Duplicate MCP server registration: ${config.name}`)
   }
   return registerHostMcpServer(owner, config)
@@ -89,15 +93,39 @@ export function removeHostMcpServer(name: string): void {
   registry.delete(name)
 }
 
+export function hasHostMcpServer(name: string): boolean {
+  return registry.has(name)
+}
+
+export function replaceCustomMcpServers(configs: McpServerConfig[]): void {
+  const next = new Map<string, RegisteredMcpServerConfig>()
+  for (const config of configs) {
+    const registered = McpServerConfigSchema.parse(config)
+    if (registry.has(registered.name) || next.has(registered.name)) {
+      throw new Error(`Duplicate MCP server registration: ${registered.name}`)
+    }
+    next.set(registered.name, registered)
+  }
+
+  customRegistry.clear()
+  for (const [name, config] of next) {
+    customRegistry.set(name, config)
+  }
+}
+
+export function clearCustomMcpServers(): void {
+  customRegistry.clear()
+}
+
 export function getRegisteredMcpServers(): Record<string, RegisteredMcpServer> {
   return Object.fromEntries(
-    Array.from(registry.entries(), ([name, config]) => [name, projectRuntimeConfig(config)]),
+    [...registry, ...customRegistry].map(([name, config]) => [name, projectRuntimeConfig(config)]),
   )
 }
 
 export function getRegisteredStdioMcpServers(): Record<string, RegisteredStdioMcpServer> {
   return Object.fromEntries(
-    Array.from(registry.entries())
+    [...registry, ...customRegistry]
       .filter((entry): entry is [string, RegisteredStdioMcpServerConfig] => entry[1].transport === 'stdio')
       .map(([name, config]) => [name, projectStdioRuntimeConfig(config)]),
   )

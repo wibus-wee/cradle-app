@@ -78,13 +78,13 @@ L1  Evidence          session_events → messages/payloads, run_snapshot_events,
 
 ### Layer rules (agent design)
 
-| Layer            | Enters context by default?     | Agent act?                              | Authority                       |
-| ---------------- | ------------------------------ | --------------------------------------- | ------------------------------- |
-| L1 Evidence      | **No**                         | via L3 only                             | **Highest** for "what happened" |
-| L2 Memory        | **No**                         | via L3 read; L3 attune write (approved) | Prior note; verify against L1   |
-| L3 Retrieval     | **Only as tool result**        | **Yes** — explicit                      | Bounded JSON observe            |
-| L4 Assembly      | **Yes** — stable prefix + tail | No                                      | Deterministic domain state      |
-| L5 Orchestration | **Structured task state**      | Indirect (queue, work)                  | Task routing, not history       |
+| Layer | Enters context by default? | Agent act? | Authority |
+| ----- | ------------------------- | ---------- | --------- |
+| L1 Evidence | **No** | via L3 only | **Highest** for "what happened" |
+| L2 Memory | **No** | via L3 read; L3 attune write (approved) | Prior note; verify against L1 |
+| L3 Retrieval | **Only as tool result** | **Yes** — explicit | Bounded JSON observe |
+| L4 Assembly | **Yes** — stable prefix + tail | No | Deterministic domain state |
+| L5 Orchestration | **Structured task state** | Indirect (queue, work) | Task routing, not history |
 
 **Red lines:**
 
@@ -97,9 +97,9 @@ L1  Evidence          session_events → messages/payloads, run_snapshot_events,
 
 ### Tier 1 — Tool primitives (hard boundary)
 
-| Verb       | In-chat tool          | Semantics                                        |
-| ---------- | --------------------- | ------------------------------------------------ |
-| **query**  | `recall_query(code)`  | Read-only JS in sandbox; returns JSON            |
+| Verb | In-chat tool | Semantics |
+| ---- | ------------ | --------- |
+| **query** | `recall_query(code)` | Read-only JS in sandbox; returns JSON |
 | **attune** | `recall_attune(code)` | Mutation sandbox: `remember()` / `forget()` only |
 
 Optional later: CLI `cradle recall query` / `cradle recall attune` mirroring Tier 1.
@@ -107,48 +107,21 @@ Optional later: CLI `cradle recall query` / `cradle recall attune` mirroring Tie
 **Not in Tier 1:** `build` (indexer) — Cradle indexes from native ES projectors, not
 external JSONL. Index maintenance is server lifecycle, not agent-facing.
 
-### Invocation context (hard boundary)
-
-`recall_query(code)` intentionally accepts **only code** from the Agent. The server
-must bind an immutable `RecallInvocationContext` from the active Chat Runtime
-session before it invokes the Recall owner:
-
-```ts
-interface RecallInvocationContext {
-  chatSessionId: string
-  workspaceId: string
-  workId: string | null
-  approvalGrantId: string | null
-}
-```
-
-The Agent does not supply this object, and a helper option cannot broaden it. A
-default query uses `workspaceId`; `sessionId`, `workId`, and `issueId` can only
-narrow after the relevant owner verifies the relationship. A general shared MCP
-process with only server authentication is **not** an eligible `recall_query`
-transport: it has no trustworthy calling session. Do not recover the context from
-an Agent-supplied argument, a mutable environment variable, or an HTTP header.
-
-Each agent-capable runtime needs a provider-native invocation bridge that carries
-the bound context into the tool execution. Until that bridge exists, keep the
-Agent tool unregistered; an explicit human/CLI query API may use its own separately
-authorized workspace parameter.
-
 ### Tier 2 — Sandbox helpers (locked to skill + contract tests)
 
 Helpers available inside `recall_query` only (initial set):
 
-| Helper                     | Purpose                                                             |
-| -------------------------- | ------------------------------------------------------------------- |
-| `overview(opts?)`          | Orient: workspace/work context, recent sessions — map, not evidence |
-| `search(text, opts?)`      | FTS / structured search over L1 messages                            |
-| `context(messageId)`       | Expand one hit: neighbors, run, session meta                        |
-| `thread(sessionId, opts?)` | Bounded transcript                                                  |
-| `failures(opts?)`          | Tool failures from run snapshot evidence                            |
-| `fileHistory(path, opts?)` | File-touch tool calls                                               |
-| `runs(sessionId, opts?)`   | Run list + terminal status                                          |
-| `memories(opts?)`          | L2 recall (Chronicle + attune)                                      |
-| `sql(query, ...params)`    | Read-only SELECT/WITH escalation                                    |
+| Helper | Purpose |
+| ------ | ------- |
+| `overview(opts?)` | Orient: workspace/work context, recent sessions — map, not evidence |
+| `search(text, opts?)` | FTS / structured search over L1 messages |
+| `context(messageId)` | Expand one hit: neighbors, run, session meta |
+| `thread(sessionId, opts?)` | Bounded transcript |
+| `failures(opts?)` | Tool failures from run snapshot evidence |
+| `fileHistory(path, opts?)` | File-touch tool calls |
+| `runs(sessionId, opts?)` | Run list + terminal status |
+| `memories(opts?)` | L2 recall (Chronicle + attune) |
+| `sql(query, ...params)` | Read-only SELECT/WITH escalation |
 
 Return shapes are **contract-tested**; changing a helper requires doc + test update
 (see Obelisk ADR-0002 pattern).
@@ -168,28 +141,22 @@ When a query returns **both** evidence and memory, the agent must follow this
 
 ```js
 return {
-  evidence: [
-    /* search/failures/fileHistory hits with ids + snippets */
-  ],
-  memories: [
-    /* memories() hits with id + summary */
-  ],
-  conflicts: [
-    /* explicit pairs where memory contradicts evidence, or [] */
-  ]
-}
+  evidence: [/* search/failures/fileHistory hits with ids + snippets */],
+  memories: [/* memories() hits with id + summary */],
+  conflicts: [/* explicit pairs where memory contradicts evidence, or [] */],
+};
 ```
 
 **Answer rules** (final message to user):
 
-| Claim type                               | Rule                                                                                                       |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Fact** (who/when/what file/tool)       | Must trace to `evidence[]` with cited IDs. No ID → do not state as fact.                                   |
-| **Interpretation** (why, intent, lesson) | Label as inference; may use memory as hypothesis if evidence is thin.                                      |
-| **Memory-only**                          | Prefix: "Previously recorded (not re-verified in this query): …"                                           |
-| **Conflict**                             | State both sides; **evidence wins** for facts; surface conflict explicitly. Do not silently prefer memory. |
-| **No evidence, memory yes**              | Answer from memory with disclaimer; suggest re-verification or broader search.                             |
-| **Neither**                              | Say history was not found; do not invent.                                                                  |
+| Claim type | Rule |
+| ---------- | ---- |
+| **Fact** (who/when/what file/tool) | Must trace to `evidence[]` with cited IDs. No ID → do not state as fact. |
+| **Interpretation** (why, intent, lesson) | Label as inference; may use memory as hypothesis if evidence is thin. |
+| **Memory-only** | Prefix: "Previously recorded (not re-verified in this query): …" |
+| **Conflict** | State both sides; **evidence wins** for facts; surface conflict explicitly. Do not silently prefer memory. |
+| **No evidence, memory yes** | Answer from memory with disclaimer; suggest re-verification or broader search. |
+| **Neither** | Say history was not found; do not invent. |
 
 **Prohibited synthesis patterns:**
 
@@ -223,14 +190,14 @@ Broaden (explicit only):
 
 **Decision table:**
 
-| User intent                              | Default scope       | Narrow filter                 |
-| ---------------------------------------- | ------------------- | ----------------------------- |
-| General past work ("上次 auth 怎么修的") | **workspace**       | none                          |
-| This chat only                           | current **session** | `sessionId`                   |
-| Inside Work, no narrowing phrase         | **workspace**       | none — Work does not restrict |
-| "Just this Work / this task"             | workspace → filter  | `workId`                      |
-| "On this issue"                          | workspace → filter  | `issueId`                     |
-| Imported Claude/Codex only               | workspace           | `origin=imported`             |
+| User intent | Default scope | Narrow filter |
+| ----------- | ------------- | ------------- |
+| General past work ("上次 auth 怎么修的") | **workspace** | none |
+| This chat only | current **session** | `sessionId` |
+| Inside Work, no narrowing phrase | **workspace** | none — Work does not restrict |
+| "Just this Work / this task" | workspace → filter | `workId` |
+| "On this issue" | workspace → filter | `issueId` |
+| Imported Claude/Codex only | workspace | `origin=imported` |
 
 `overview()` shows Work/Issue as **orientation** (map), not as an automatic search
 filter. Helpers accept optional `workId` / `issueId` / `sessionId` — omit them for
@@ -241,26 +208,25 @@ or workspace scope clearly cannot answer (e.g. cross-repo question).
 
 ## Locked decisions (2026-07-21)
 
-| #   | Topic                | Decision                                                                                                                                      |
-| --- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Module owner         | **`modules/recall`** owns L3 agent contract; **`search`** remains human palette facade over same query core                                   |
-| 4   | Sandbox              | **Reuse `javascript-eval`** managed-process pattern                                                                                           |
-| 5   | Runtime coverage     | Register **`recall_query` on all agent-capable runtimes**                                                                                     |
-| 6   | Control-plane filter | **`is_meta` (or equivalent) on evidence rows**; default exclude in helpers                                                                    |
-| 8   | Surfaces             | **Agent → `recall_query`**; **Human → palette/search**; do not unify or replace Chronicle MCP tools in this track                             |
-| 9   | Invocation authority | Bind `RecallInvocationContext` in the active runtime; code has no scope authority and global MCP without caller identity cannot expose Recall |
+| # | Topic | Decision |
+| - | ----- | -------- |
+| 1 | Module owner | **`modules/recall`** owns L3 agent contract; **`search`** remains human palette facade over same query core |
+| 4 | Sandbox | **Reuse `javascript-eval`** managed-process pattern |
+| 5 | Runtime coverage | Register **`recall_query` on all agent-capable runtimes** |
+| 6 | Control-plane filter | **`is_meta` (or equivalent) on evidence rows**; default exclude in helpers |
+| 8 | Surfaces | **Agent → `recall_query`**; **Human → palette/search**; do not unify or replace Chronicle MCP tools in this track |
 
 Details for #2, #3, #7 below (industry-aligned, Cradle-specific).
 
 ## L1 evidence indexing (#2) — industry + Cradle choice
 
-**What authorities do for _execution memory_ (not generic chat memory):**
+**What authorities do for *execution memory* (not generic chat memory):**
 
-| System                            | Pattern                                                                                                                                                                                                                                  |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Obelisk**                       | Normalized relational evidence schema (`messages`, `tool_calls`, `tool_results`, `subagents`, …) + **FTS5** on text with `content=` triggers; structured tables enable `failures()`, `fileHistory()` joins — not plain-message FTS alone |
-| **Mem0**                          | Vector + BM25 + entity graph on **extracted facts** (L2 semantic memory) — different problem; raw transcript is not the retrieval unit                                                                                                   |
-| **LangGraph / checkpoint stores** | Thread state snapshots for **resume**, not agent archaeology across tool/file history                                                                                                                                                    |
+| System | Pattern |
+| ------ | ------- |
+| **Obelisk** | Normalized relational evidence schema (`messages`, `tool_calls`, `tool_results`, `subagents`, …) + **FTS5** on text with `content=` triggers; structured tables enable `failures()`, `fileHistory()` joins — not plain-message FTS alone |
+| **Mem0** | Vector + BM25 + entity graph on **extracted facts** (L2 semantic memory) — different problem; raw transcript is not the retrieval unit |
+| **LangGraph / checkpoint stores** | Thread state snapshots for **resume**, not agent archaeology across tool/file history |
 
 **Cradle choice (aligned with Obelisk for L1, not Mem0):**
 
@@ -274,13 +240,13 @@ Do **not** only repair existing `messages_fts` on plain `content` — that canno
 
 ## L2 attune (#3) — industry + Cradle choice
 
-**What authorities do for _synthesis vs evidence_:**
+**What authorities do for *synthesis vs evidence*:**
 
-| System                    | Write path                                                                                                                                                         | Philosophy                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| **Obelisk**               | **`attune` sandbox** separate from `query`; `remember()` / `forget()`; markdown file + registry row; **anchors** to `message_start` / `message_end`; user approval | Evidence immutable; synthesis is opt-in, auditable     |
-| **Mem0**                  | Automatic **ADD/UPDATE/DELETE** extraction after each turn; vector store of distilled facts                                                                        | Hands-free semantic memory; not user-approved per fact |
-| **Anthropic memory tool** | User-visible memory entries; agent proposes, user can correct                                                                                                      | Closer to Obelisk attune than Mem0 auto-extract        |
+| System | Write path | Philosophy |
+| ------ | ---------- | ---------- |
+| **Obelisk** | **`attune` sandbox** separate from `query`; `remember()` / `forget()`; markdown file + registry row; **anchors** to `message_start` / `message_end`; user approval | Evidence immutable; synthesis is opt-in, auditable |
+| **Mem0** | Automatic **ADD/UPDATE/DELETE** extraction after each turn; vector store of distilled facts | Hands-free semantic memory; not user-approved per fact |
+| **Anthropic memory tool** | User-visible memory entries; agent proposes, user can correct | Closer to Obelisk attune than Mem0 auto-extract |
 
 **Cradle choice (Obelisk-style for recall attune, Chronicle stays separate):**
 
@@ -303,15 +269,15 @@ Do **not** only repair existing `messages_fts` on plain `content` — that canno
 
 **Cradle tier model (native ES + provider APIs):**
 
-| Tier   | Source                                                        | Index strategy                                                                      |
-| ------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| **T0** | Top-level `messages` + tool parts from `message_json`         | **Always** — projector on message complete                                          |
-| **T1** | `backend_run_snapshot_events`                                 | **Always** — failures / run phases                                                  |
-| **T2** | `parentToolCallId` child messages                             | Index with `is_sidechain: true`; exclude from default `thread()` unless opted in    |
-| **T3** | Provider-native threads (`provider-threads` API)              | **Lazy** — `providerThread(id)` helper fetches on query; optional short-lived cache |
-| **T4** | Ephemeral side chat                                           | **Do not index** — not in DB                                                        |
-| **T5** | Remote session projections                                    | **Metadata only** in recall; transcript via remote fetch helper when implemented    |
-| **T6** | Control-plane (`steer`, harness synthetic, goal continuation) | Store with **`is_meta: true`**; default exclude                                     |
+| Tier | Source | Index strategy |
+| ---- | ------ | -------------- |
+| **T0** | Top-level `messages` + tool parts from `message_json` | **Always** — projector on message complete |
+| **T1** | `backend_run_snapshot_events` | **Always** — failures / run phases |
+| **T2** | `parentToolCallId` child messages | Index with `is_sidechain: true`; exclude from default `thread()` unless opted in |
+| **T3** | Provider-native threads (`provider-threads` API) | **Lazy** — `providerThread(id)` helper fetches on query; optional short-lived cache |
+| **T4** | Ephemeral side chat | **Do not index** — not in DB |
+| **T5** | Remote session projections | **Metadata only** in recall; transcript via remote fetch helper when implemented |
+| **T6** | Control-plane (`steer`, harness synthetic, goal continuation) | Store with **`is_meta: true`**; default exclude |
 
 This matches industry pattern: **hot path fully materialized**, **secondary sources lazy**, **ephemeral omitted**.
 
@@ -322,6 +288,7 @@ Agent (all agent-capable runtimes) → recall_query / recall_attune
 Human (Command Palette)            → search module → recall query core (read-only)
 Chronicle MCP tools                → out of scope for this track; no convergence work
 ```
+
 
 ```text
 Turn start:
@@ -339,24 +306,24 @@ same assumption as Obelisk.
 
 ## Lifecycle model
 
-| Event                  | L1                    | L2                                   | L3 index                 |
-| ---------------------- | --------------------- | ------------------------------------ | ------------------------ |
-| Message completed      | update evidence       | —                                    | update search projection |
-| Run terminal           | snapshot events final | —                                    | failures index           |
-| Session archive/delete | retention policy      | unlink or retain per Chronicle rules | purge                    |
-| LastTurnRolledBack     | messages removed      | —                                    | reindex                  |
-| Attune remember        | —                     | insert memory                        | memories index           |
+| Event | L1 | L2 | L3 index |
+| ----- | -- | -- | -------- |
+| Message completed | update evidence | — | update search projection |
+| Run terminal | snapshot events final | — | failures index |
+| Session archive/delete | retention policy | unlink or retain per Chronicle rules | purge |
+| LastTurnRolledBack | messages removed | — | reindex |
+| Attune remember | — | insert memory | memories index |
 
 ## Relationship to existing modules
 
-| Existing                  | Layer                | Recall stance                                                 |
-| ------------------------- | -------------------- | ------------------------------------------------------------- |
-| `chat-runtime/harness`    | L4                   | Unchanged; **no** recall injection                            |
-| `chronicle`               | L2 (+ L1 activity)   | `memories()` reads public projection; attune may write        |
-| `search`                  | Human palette facade | **Reads recall query core**; not agent surface                |
-| `external-session-import` | L1 ingest            | Imported sessions indexed same as native                      |
-| `observability`           | Ops evidence         | Not product recall; may share snapshot reads                  |
-| `javascript-eval`         | Sandbox precedent    | Reuse managed-process / read-only patterns for `recall_query` |
+| Existing | Layer | Recall stance |
+| -------- | ----- | ------------- |
+| `chat-runtime/harness` | L4 | Unchanged; **no** recall injection |
+| `chronicle` | L2 (+ L1 activity) | `memories()` reads public projection; attune may write |
+| `search` | Human palette facade | **Reads recall query core**; not agent surface |
+| `external-session-import` | L1 ingest | Imported sessions indexed same as native |
+| `observability` | Ops evidence | Not product recall; may share snapshot reads |
+| `javascript-eval` | Sandbox precedent | Reuse managed-process / read-only patterns for `recall_query` |
 
 ## Out of scope for this plan
 
@@ -393,9 +360,6 @@ Deliverables:
 - **Reuse `javascript-eval`** managed-process sandbox; inject recall helpers
 - **`search`** module calls recall query core for human palette (facade only)
 - Promote `plans/061-recall-retrieval-contract.md` → `.agents/skills/recall/SKILL.md`
-- Add a provider-native, runtime-bound invocation bridge before registering the
-  agent tool; the current shared agent-tools MCP process is intentionally
-  insufficient because it has no calling session identity
 
 **Depends on:** Phase A merged; 050 recommended for session scope accuracy.
 

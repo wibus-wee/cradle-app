@@ -39,7 +39,7 @@ export function ReasoningBlock({ text, state = 'done' }: ReasoningBlockProps) {
         data-testid="chat-reasoning-toggle"
         className={cn(
           'h-auto gap-1.5 p-0 text-xs hover:bg-transparent',
-          expanded ? 'text-muted-foreground' : 'text-muted-foreground hover:text-foreground',
+          expanded ? 'text-muted-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground',
         )}
       >
         <BrainSvg

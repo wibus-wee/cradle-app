@@ -1,9 +1,14 @@
+import {
+  ExternalLinkLine as ExternalLinkIcon,
+  GitPullRequestLine as GitPullRequestIcon,
+} from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
-import { useBrowserPanelStore } from '~/store/browser-panel'
+import { cn } from '~/lib/cn'
 
-import { SessionPullRequestChromeView } from './session-pull-request-chrome-view'
+import { PullRequestTabLink } from '../pull-requests/pull-request-tab-link'
 import {
   useMarkSessionPullRequestReady,
   useSessionPullRequest,
@@ -17,21 +22,10 @@ export function SessionPullRequestChrome({ sessionId }: SessionPullRequestChrome
   const { t } = useTranslation('session-pull-request')
   const pullRequestQuery = useSessionPullRequest(sessionId)
   const markReady = useMarkSessionPullRequestReady()
-  const openPullRequestTab = useBrowserPanelStore(state => state.openPullRequestTab)
   const pullRequest = pullRequestQuery.data
 
   if (!pullRequest) {
     return null
-  }
-
-  const handleOpenPullRequest = () => {
-    openPullRequestTab({
-      owner: pullRequest.owner,
-      repo: pullRequest.repo,
-      number: pullRequest.number,
-      sessionId,
-      title: pullRequest.title,
-    })
   }
 
   const statusLabel = pullRequest.merged
@@ -61,14 +55,39 @@ export function SessionPullRequestChrome({ sessionId }: SessionPullRequestChrome
   }
 
   return (
-    <SessionPullRequestChromeView
-      pullRequest={pullRequest}
-      statusLabel={statusLabel}
-      markReadyLabel={t('chrome.markReady')}
-      markingReadyLabel={t('chrome.markingReady')}
-      isMarkingReady={markReady.isPending}
-      onOpenPullRequest={handleOpenPullRequest}
-      onMarkReady={() => void handleMarkReady()}
-    />
+    <div
+      className="flex min-w-0 items-center gap-1.5"
+      data-testid="session-pull-request-chrome"
+    >
+      <PullRequestTabLink
+        pullRequest={pullRequest}
+        sessionId={sessionId}
+        className={cn(
+          'inline-flex max-w-[220px] items-center gap-1 rounded-md border border-border/60',
+          'bg-fill/40 px-1.5 py-0.5 text-[11px] text-foreground/90',
+          'transition-colors duration-150 hover:bg-fill active:scale-[0.98]',
+        )}
+      >
+        <GitPullRequestIcon className="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
+        <span className="truncate font-medium">
+          {`#${pullRequest.number}`}
+        </span>
+        <span className="shrink-0 text-muted-foreground">{statusLabel}</span>
+        <ExternalLinkIcon className="size-3 shrink-0 opacity-50" aria-hidden="true" />
+      </PullRequestTabLink>
+      {pullRequest.isDraft && pullRequest.state === 'open' && !pullRequest.merged && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 text-[11px]"
+          disabled={markReady.isPending}
+          onClick={() => void handleMarkReady()}
+          data-testid="session-pull-request-mark-ready"
+        >
+          {markReady.isPending ? t('chrome.markingReady') : t('chrome.markReady')}
+        </Button>
+      )}
+    </div>
   )
 }

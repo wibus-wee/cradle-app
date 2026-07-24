@@ -18,19 +18,17 @@ function pLimit(concurrency: number) {
     new Promise<T>((resolve, reject) => {
       const run = () => {
         active++
-        fn()
-          .then(resolve, reject)
-          .finally(() => {
-            active--
-            if (queue.length > 0) {
-              queue.shift()!()
-            }
-          })
+        fn().then(resolve, reject).finally(() => {
+          active--
+          if (queue.length > 0) {
+            queue.shift()!()
+          }
+        })
       }
       if (active < concurrency) {
         run()
       }
- else {
+      else {
         queue.push(run)
       }
     })
@@ -105,7 +103,7 @@ export async function runOnce(): Promise<void> {
     try {
       allPending = service.listAllPending()
     }
- catch {
+    catch {
       // Table may not exist yet (migration pending) — skip this cycle
       return
     }
@@ -119,8 +117,8 @@ export async function runOnce(): Promise<void> {
     const limit = pLimit(MAX_CONCURRENT_TRIGGERS)
     const timerAwaits = service.listAllPending().filter(r => r.fireAt !== null && r.fireAt <= now)
     await Promise.all(
-      timerAwaits.map(row =>
-        limit(() => service.trigger({ awaitId: row.id, resumeText: 'Timer fired' }))),
+      timerAwaits.map(row => limit(() =>
+        service.trigger({ awaitId: row.id, resumeText: 'Timer fired' }))),
     )
 
     // 3. Source-based checks — inline sources run on the poller path; queued
@@ -132,7 +130,11 @@ export async function runOnce(): Promise<void> {
       }
 
       if ((adapter.execution ?? 'inline') === 'queued') {
-        enqueueHeavyChecks(adapter, pending, adapter.pollIntervalMs ?? DEFAULT_INTERVAL_MS)
+        enqueueHeavyChecks(
+          adapter,
+          pending,
+          adapter.pollIntervalMs ?? DEFAULT_INTERVAL_MS,
+        )
         continue
       }
 
@@ -140,17 +142,13 @@ export async function runOnce(): Promise<void> {
       try {
         results = await adapter.checkPending(pending)
       }
- catch (error) {
-        const errorText = service.describeSourceAdapterFailure(error)
+      catch {
         for (const row of pending) {
           if (adapter.tracksConsecutiveErrors) {
-            const failed = service.recordTrackedEvaluationFailure(row.id, errorText)
-            if (failed?.status === 'failed' && adapter.resumeOnFailure) {
-              await service.resumeFailedAwait(failed, failed.lastErrorText ?? errorText)
-            }
+            service.recordTrackedEvaluationCheck(row.id, 'Source adapter threw')
           }
- else {
-            service.updateLastChecked(row.id, errorText)
+          else {
+            service.updateLastChecked(row.id, 'Source adapter threw')
           }
         }
         continue
@@ -159,7 +157,7 @@ export async function runOnce(): Promise<void> {
       await applyCheckResults(adapter, results, { triggerLimit: limit })
     }
   }
- finally {
+  finally {
     running = false
     if (rerunRequested) {
       rerunRequested = false

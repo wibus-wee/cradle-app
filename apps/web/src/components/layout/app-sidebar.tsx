@@ -1,20 +1,24 @@
-import { GiftLine as GiftIcon } from '@mingcute/react'
+import { DownloadLine as DownloadIcon, GiftLine as GiftIcon, SparklesLine as SparklesIcon } from '@mingcute/react'
 import { m } from 'motion/react'
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AppNavigationControls } from '~/components/layout/app-navigation-controls'
 import { ChromeSideSheet } from '~/components/layout/chrome-side-sheet'
 import { CHROME_COLLAPSED_SIDEBAR_WIDTH } from '~/components/layout/layout-responsive'
 import { ResizeHandle } from '~/components/layout/resize-handle'
-import { SidebarUpdateButton } from '~/components/layout/sidebar-update-button'
 import { Button } from '~/components/ui/button'
+import { toastManager } from '~/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { openWhatsNewDialog, usePendingAnnouncement } from '~/features/changelog/whats-new-store'
+import { isActiveDownload } from '~/features/download-center/types'
+import { useDownloadCenterOwner } from '~/features/download-center/use-download-center'
 import { SettingsSidebar } from '~/features/settings/settings-sidebar'
 import { WorkspaceSidebar } from '~/features/workspace'
 import { useShortcut } from '~/hooks/use-shortcut'
 import { cn } from '~/lib/cn'
+import type { DesktopUpdateStatus } from '~/lib/electron'
+import { isElectron, nativeIpc, subscribeDesktopUpdateStatus } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
 import { closeSurfaceById, openSettingsSection } from '~/navigation/navigation-commands'
 import { useLayoutStore } from '~/store/layout'
@@ -31,6 +35,17 @@ const SIDEBAR_SPRING = { type: 'spring', stiffness: 600, damping: 40 } as const
 const INSTANT = { duration: 0 } as const
 const SIDEBAR_MIN = 180
 const SIDEBAR_MAX = 400
+
+const EMPTY_UPDATE_STATUS: DesktopUpdateStatus = {
+  unsupported: true,
+  provider: null,
+  currentVersion: '0.0.0',
+  isCheckingForUpdates: false,
+  isPreparingUpdate: false,
+  updateDownloaded: false,
+  updateInfo: null,
+  errorMessage: null,
+}
 
 interface AppSidebarContentProps {
   isSettings: boolean
@@ -150,6 +165,133 @@ function SidebarWhatsNewButton({ collapsed }: { collapsed: boolean }) {
               <span className="font-mono text-[11px] tabular-nums text-background/70">
                 {announcement.version}
               </span>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
+  )
+}
+
+function SidebarUpdateButton({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation('chrome')
+  const [status, setStatus] = useState<DesktopUpdateStatus>(EMPTY_UPDATE_STATUS)
+  const downloadTasks = useDownloadCenterOwner({ namespace: 'desktop-update' })
+  const notifiedVersionRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!isElectron || !nativeIpc) {
+      return undefined
+    }
+
+    let mounted = true
+    void nativeIpc.desktopUpdate.getStatus().then((nextStatus) => {
+      if (mounted) {
+        setStatus(nextStatus)
+      }
+    }).catch(() => {})
+
+    const unsubscribe = subscribeDesktopUpdateStatus((nextStatus) => {
+      setStatus(nextStatus)
+    })
+
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    const version = status.updateInfo?.version ?? null
+    if (!version || notifiedVersionRef.current === version) {
+      return
+    }
+
+    notifiedVersionRef.current = version
+    toastManager.add({
+      type: 'info',
+      title: t('update.toast.availableTitle', { version }),
+      description: t('update.toast.availableDescription'),
+    })
+  }, [status.updateInfo?.version, t])
+
+  const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
+    && task.owner.namespace === 'desktop-update'
+    && (task.owner.resourceType === 'macos-update' || task.owner.resourceType === 'windows-update')
+    && isActiveDownload(task))
+  const hasUpdateNotice = !!status.updateInfo || !!updateDownload || status.isPreparingUpdate || status.updateDownloaded
+
+  if (!isElectron || !hasUpdateNotice) {
+    return null
+  }
+
+  const label = status.unsupported
+    ? t('update.status.unavailable')
+    : status.isCheckingForUpdates
+      ? t('update.status.checking')
+      : updateDownload
+        ? t('update.status.downloading', { progress: updateDownload.totalBytes && updateDownload.totalBytes > 0 ? Math.round((updateDownload.transferredBytes / updateDownload.totalBytes) * 100) : '—' })
+        : status.isPreparingUpdate
+          ? t('update.status.preparing')
+          : status.updateDownloaded
+            ? t('update.status.downloaded')
+            : status.updateInfo
+              ? t('update.status.available', { version: status.updateInfo.version })
+              : t('update.status.current')
+
+  const Icon = status.updateDownloaded || updateDownload || status.isPreparingUpdate ? DownloadIcon : SparklesIcon
+
+  return (
+    <TooltipProvider delayDuration={collapsed ? 0 : 500}>
+      <div className="shrink-0 px-2 pb-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size={collapsed ? 'icon-sm' : 'sm'}
+              onClick={() => openSettingsSection('desktop')}
+              className={cn(
+                'relative w-full justify-start gap-2 overflow-hidden text-sidebar-foreground/75 hover:bg-fill/80 hover:text-sidebar-foreground',
+                'active:scale-[0.96]',
+                collapsed && 'pl-1.5',
+                status.updateInfo && 'bg-info/10 text-info hover:bg-info/15 hover:text-info',
+              )}
+              aria-label={label}
+              data-testid="sidebar-update-button"
+            >
+              <span className="relative flex size-4 shrink-0 items-center justify-center">
+                <Icon className="size-3.5" aria-hidden="true" />
+                {status.updateInfo && (
+                  <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-info ring-2 ring-sidebar" />
+                )}
+              </span>
+              <span className={cn('min-w-0 flex-1 truncate text-left text-[12px]', collapsed && 'sr-only')}>
+                {t('update.button')}
+              </span>
+              <span className={cn(
+                'shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground',
+                collapsed && 'sr-only',
+              )}
+              >
+                {status.updateInfo?.version ?? status.currentVersion}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8} className="max-w-72 flex-col items-start gap-1.5 p-2.5 mb-1">
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="font-medium">{t('update.tooltip.title')}</span>
+              <span className="font-mono text-[11px] tabular-nums text-background/70">
+                {status.currentVersion}
+              </span>
+            </div>
+            <div className="text-[11px] text-background/70">
+              {label}
+            </div>
+            {status.updateInfo && (
+              <div className="font-mono text-[11px] tabular-nums text-background/80">
+                {t('update.tooltip.available', { version: status.updateInfo.version })}
+              </div>
             )}
           </TooltipContent>
         </Tooltip>

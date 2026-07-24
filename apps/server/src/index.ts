@@ -1,4 +1,3 @@
-import { ServerBootstrapReporter } from './bootstrap-lifecycle'
 import { flushLogger, getLogger, initializeLogger } from './logging/logger'
 import type { CreateEventInput } from './modules/observability/contract'
 import { OBSERVABILITY_CODES } from './modules/observability/contract'
@@ -114,8 +113,11 @@ async function bootstrap() {
   initializeLogger()
   await initializeTelemetry()
   installProcessFatalHandlers()
-  const bootstrapReporter = new ServerBootstrapReporter()
-  const [{ createServerApp }, { loadServerConfig }, { warmupModelsDevCache }] = await Promise.all([
+  const [
+    { createServerApp },
+    { loadServerConfig },
+    { warmupModelsDevCache },
+  ] = await Promise.all([
     import('./app'),
     import('./config/server-config'),
     import('./modules/model-registry/model-info-registry'),
@@ -124,32 +126,25 @@ async function bootstrap() {
   const config = loadServerConfig()
   const logger = getLogger()
 
-  const app = await createServerApp({ bootstrapReporter })
+  const app = await createServerApp()
   activeRuntimeApp = app
   let runtimeServer: RuntimeServer | null = null
 
-  bootstrapReporter.started('listener-establishment')
-  try {
-    app.listen(
-      {
-        port: config.port,
-        hostname: config.host,
-      },
-      (server) => {
-        runtimeServer = server
-        activeRuntimeServer = server
-        bootstrapReporter.completed('listener-establishment')
-        bootstrapReporter.ready()
-        logger.info(`listening on http://${config.host}:${config.port}`)
-        // Force-refresh models.dev catalog on boot (SWR soft/hard TTL applies afterward)
-        warmupModelsDevCache()
-      },
-    )
-  }
- catch (error) {
-    bootstrapReporter.failed('listener-establishment', error)
-    throw error
-  }
+  app.listen(
+    {
+      port: config.port,
+      hostname: config.host,
+    },
+    (server) => {
+      runtimeServer = server
+      activeRuntimeServer = server
+    },
+  )
+
+  // Force-refresh models.dev catalog on boot (SWR soft/hard TTL applies afterward)
+  warmupModelsDevCache()
+
+  logger.info(`listening on http://${config.host}:${config.port}`)
 
   let shutdownStarted = false
   const gracefulShutdown = async (signal: string) => {

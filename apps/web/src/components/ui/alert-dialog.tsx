@@ -1,9 +1,9 @@
 import * as React from "react"
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
+import { useSuppressNativeBrowserSurface } from "~/features/browser/native-surface-suppression"
 import { cn } from "~/lib/cn"
 import { Button } from "~/components/ui/button"
-import { useSuppressOverlayHostSurfaces } from './overlay-environment'
 
 function AlertDialog({
   open,
@@ -13,7 +13,7 @@ function AlertDialog({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(Boolean(defaultOpen))
   const active = open ?? uncontrolledOpen
-  useSuppressOverlayHostSurfaces(active)
+  useSuppressNativeBrowserSurface(active)
 
   const handleOpenChange = (nextOpen: boolean) => {
     setUncontrolledOpen(nextOpen)

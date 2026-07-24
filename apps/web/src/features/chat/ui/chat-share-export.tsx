@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip
 import { cn } from '~/lib/cn'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
-import { MessageBubbleView } from '../transcript/views/message-bubble-view'
+import { MessageBubble } from '../rendering/message-bubble'
 import {
   readShareExportTitle,
   readShareMessagePreview,
@@ -349,7 +349,7 @@ export function ChatShareExport({ sessionId, disabled }: ChatShareExportProps) {
                       <div className="mx-auto max-w-[760px] space-y-5">
                         {exportMessages.length > 0
                           ? exportMessages.map(message => (
-                              <MessageBubbleView
+                              <MessageBubble
                                 key={message.id}
                                 message={message}
                                 isStreaming={false}

@@ -1,13 +1,29 @@
+import { StaticRender } from '@cradle/streamdown'
+import {
+  DownloadLine as DownloadIcon,
+  MonitorLine as MonitorIcon,
+  PackageLine as PackageCheckIcon,
+  Refresh1Line as RefreshCwIcon,
+  TerminalLine as TerminalIcon,
+  UnlinkLine as UnlinkIcon,
+} from '@mingcute/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
+import { Spinner } from '~/components/ui/spinner'
+import { Switch } from '~/components/ui/switch'
 import { isActiveDownload } from '~/features/download-center/types'
 import { useDownloadCenterOwner } from '~/features/download-center/use-download-center'
 import type { DesktopCliStatus, DesktopUpdateStatus } from '~/lib/electron'
 import { isElectron, nativeIpc, subscribeDesktopUpdateStatus } from '~/lib/electron'
+import { formatCompactBytes } from '~/lib/number-format'
 
-import { DesktopUpdateSettingsView } from './desktop-update-settings-view'
 import { PreferredEditorSetting } from './preferred-editor-setting'
+import { SettingsGroup, SettingsPage } from './settings-container'
+import { SettingsDivider, SettingsRow } from './settings-row'
 import type { DesktopPreferences } from './use-desktop-preferences'
 import { useDesktopPreferences } from './use-desktop-preferences'
 
@@ -34,29 +50,65 @@ const EMPTY_CLI_STATUS: DesktopCliStatus = {
   errorMessage: 'CLI installation is only available in the Electron app',
 }
 
+function readTargetVersion(status: DesktopUpdateStatus): string | null {
+  return status.updateInfo?.version ?? null
+}
+
+function readTargetSize(status: DesktopUpdateStatus): number {
+  return status.updateInfo?.files.reduce((sum, file) => sum + (file.size ?? 0), 0) ?? 0
+}
+
+/** A compact bordered card that frames an operational section below the preferences. */
+function OperationsCard({
+  title,
+  badge,
+  children,
+  testId,
+}: {
+  title: string
+  badge: React.ReactNode
+  children: React.ReactNode
+  testId?: string
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card/40" data-testid={testId}>
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+        <span className="text-[12px] font-medium text-foreground">{title}</span>
+        {badge}
+      </div>
+      <SettingsDivider />
+      <div className="flex flex-col gap-3 px-4 py-3">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export function DesktopUpdateSettings() {
   const { t } = useTranslation('settings')
   const [status, setStatus] = useState<DesktopUpdateStatus>(EMPTY_UPDATE_STATUS)
   const [cliStatus, setCliStatus] = useState<DesktopCliStatus>(EMPTY_CLI_STATUS)
   const [statusReady, setStatusReady] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [terminalAppDraft, setTerminalAppDraft] = useState('')
   const downloadTasks = useDownloadCenterOwner({ namespace: 'desktop-update' })
   const {
-    prefs: desktopPreferences,
-    isSaving: isSavingDesktopPreferences,
-    savePrefs: saveDesktopPreferences,
+    prefs: desktopPrefs,
+    isSaving: isSavingDesktopPrefs,
+    savePrefs: saveDesktopPrefs,
   } = useDesktopPreferences()
 
+  const targetVersion = readTargetVersion(status)
+  const targetSize = readTargetSize(status)
   const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
     && task.owner.namespace === 'desktop-update'
     && (task.owner.resourceType === 'macos-update' || task.owner.resourceType === 'windows-update')
-    && isActiveDownload(task)) ?? null
-  const busy = loading
-    || status.isCheckingForUpdates
-    || !!updateDownload
-    || status.isPreparingUpdate
+    && isActiveDownload(task))
+  const busy = loading || status.isCheckingForUpdates || !!updateDownload || status.isPreparingUpdate
   const isSparkle = status.provider === 'sparkle'
   const canCheck = isElectron && !!nativeIpc && !status.unsupported && !busy
+  const canDownload = canCheck && !isSparkle && !!status.updateInfo && !status.updateDownloaded
+  const canApply = canCheck && !isSparkle && status.updateDownloaded
 
   const updateStatusLabel = useMemo(() => {
     if (status.unsupported) {
@@ -116,7 +168,9 @@ export function DesktopUpdateSettings() {
     }
   }, [])
 
-  const runCliAction = useCallback(async (action: () => Promise<DesktopCliStatus>) => {
+  const runCliAction = useCallback(async (
+    action: () => Promise<DesktopCliStatus>,
+  ) => {
     setLoading(true)
     try {
       setCliStatus(await action())
@@ -142,108 +196,249 @@ export function DesktopUpdateSettings() {
   }, [])
 
   const savePreference = useCallback((updates: Partial<DesktopPreferences>) => {
-    void saveDesktopPreferences(updates).then((updated) => {
+    void saveDesktopPrefs(updates).then((updated) => {
       if (updated && isElectron && nativeIpc) {
         void nativeIpc.native.setDesktopPreferences(updated).catch(() => {})
       }
     })
-  }, [saveDesktopPreferences])
+  }, [saveDesktopPrefs])
 
   useEffect(() => {
     void refreshStatus()
     return subscribeDesktopUpdateStatus(setStatus)
   }, [refreshStatus])
 
+  useEffect(() => {
+    setTerminalAppDraft(desktopPrefs?.externalTerminalApp ?? '')
+  }, [desktopPrefs?.externalTerminalApp])
+
+  const prefsDisabled = !desktopPrefs || isSavingDesktopPrefs
+
   return (
-    <DesktopUpdateSettingsView
-      desktop={isElectron}
-      statusReady={statusReady}
-      status={status}
-      cliStatus={cliStatus}
-      updateDownload={updateDownload}
-      desktopPreferences={desktopPreferences}
-      preferencesDisabled={!desktopPreferences || isSavingDesktopPreferences}
-      loading={loading}
-      preferredEditorSetting={<PreferredEditorSetting />}
-      capabilities={{
-        refreshUpdate: !!nativeIpc && !busy,
-        checkUpdate: canCheck,
-        downloadUpdate: canCheck && !isSparkle && !!status.updateInfo && !status.updateDownloaded,
-        applyUpdate: canCheck && !isSparkle && status.updateDownloaded,
-        refreshCli: !!nativeIpc && !loading,
-        removeCli: !!nativeIpc && !loading && cliStatus.supported && cliStatus.installed,
-        installCli: !!nativeIpc && !loading && cliStatus.supported,
-      }}
-      labels={{
-        pageTitle: t('desktop.page.title' as SettingsKey),
-        pageDescription: t('desktop.page.description' as SettingsKey),
-        desktopBadge: t('desktop.badge.desktop' as SettingsKey),
-        doubleCommandQLabel: t('desktop.doubleCommandQ.label' as SettingsKey),
-        doubleCommandQDescription: t('desktop.doubleCommandQ.description' as SettingsKey),
-        autoCheckLabel: t('desktop.autoCheckForUpdates.label' as SettingsKey),
-        autoCheckDescription: t('desktop.autoCheckForUpdates.description' as SettingsKey),
-        externalTerminalLabel: t('desktop.externalTerminal.label' as SettingsKey),
-        externalTerminalDescription: t('desktop.externalTerminal.description' as SettingsKey),
-        externalTerminalPlaceholder: t('desktop.externalTerminal.placeholder' as SettingsKey),
-        updatesTitle: t('desktop.updates.title' as SettingsKey),
-        updateStatus: updateStatusLabel,
-        currentVersion: t('desktop.updates.currentVersion' as SettingsKey),
-        downloading: t('desktop.updates.status.downloading' as SettingsKey),
-        availableVersion: t('desktop.updates.availableVersion' as SettingsKey),
-        noUpdate: t('desktop.updates.none' as SettingsKey),
-        releaseNotes: t('desktop.updates.releaseNotes' as SettingsKey),
-        refreshUpdate: t('desktop.updates.actions.refresh' as SettingsKey),
-        checkUpdate: t('desktop.updates.actions.check' as SettingsKey),
-        downloadUpdate: t('desktop.updates.actions.download' as SettingsKey),
-        restart: t('desktop.updates.actions.restart' as SettingsKey),
-        cliTitle: t('desktop.cli.title' as SettingsKey),
-        cliStatus: cliStatusLabel,
-        refreshCli: t('desktop.cli.actions.refresh' as SettingsKey),
-        removeCli: t('desktop.cli.actions.remove' as SettingsKey),
-        repairCli: t('desktop.cli.actions.repair' as SettingsKey),
-        installCli: t('desktop.cli.actions.install' as SettingsKey),
-        webNotice: t('desktop.webNotice.description' as SettingsKey),
-      }}
-      onSetRequireDoubleCommandQ={(requireDoubleCommandQToQuit) => {
-        savePreference({ requireDoubleCommandQToQuit })
-      }}
-      onSetAutoCheck={(autoCheckForUpdates) => {
-        savePreference({ autoCheckForUpdates })
-      }}
-      onSetExternalTerminal={(externalTerminalApp) => {
-        savePreference({ externalTerminalApp })
-      }}
-      onRefresh={() => void refreshStatus()}
-      onCheckUpdate={() => {
-        const ipc = nativeIpc
-        if (ipc) {
-          void runUpdateAction(() => ipc.desktopUpdate.checkForUpdates())
-        }
-      }}
-      onDownloadUpdate={() => {
-        const ipc = nativeIpc
-        if (ipc) {
-          void runUpdateAction(() => ipc.desktopUpdate.downloadUpdate())
-        }
-      }}
-      onApplyUpdate={() => {
-        const ipc = nativeIpc
-        if (ipc) {
-          void runUpdateAction(() => ipc.desktopUpdate.applyUpdate())
-        }
-      }}
-      onRemoveCli={() => {
-        const ipc = nativeIpc
-        if (ipc) {
-          void runCliAction(() => ipc.native.removeDesktopCliCommand())
-        }
-      }}
-      onInstallCli={() => {
-        const ipc = nativeIpc
-        if (ipc) {
-          void runCliAction(() => ipc.native.installDesktopCliCommand())
-        }
-      }}
-    />
+    <SettingsPage
+      title={t('desktop.page.title' as SettingsKey)}
+      description={t('desktop.page.description' as SettingsKey)}
+      action={isElectron
+        ? (
+          <Badge variant="outline" className="gap-1.5 font-mono text-[11px]">
+            <MonitorIcon className="size-3" aria-hidden="true" />
+            {t('desktop.badge.desktop' as SettingsKey)}
+          </Badge>
+        )
+        : undefined}
+      data-testid="desktop-update-settings"
+      data-settings-desktop-ready={statusReady ? 'true' : 'false'}
+    >
+      <SettingsGroup>
+        <SettingsRow
+          label={t('desktop.doubleCommandQ.label' as SettingsKey)}
+          description={t('desktop.doubleCommandQ.description' as SettingsKey)}
+        >
+          <Switch
+            checked={desktopPrefs?.requireDoubleCommandQToQuit ?? true}
+            onCheckedChange={requireDoubleCommandQToQuit => savePreference({ requireDoubleCommandQToQuit })}
+            disabled={prefsDisabled}
+            aria-label={t('desktop.doubleCommandQ.label' as SettingsKey)}
+            data-testid="desktop-double-command-q"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label={t('desktop.autoCheckForUpdates.label' as SettingsKey)}
+          description={t('desktop.autoCheckForUpdates.description' as SettingsKey)}
+        >
+          <Switch
+            checked={desktopPrefs?.autoCheckForUpdates ?? true}
+            onCheckedChange={autoCheckForUpdates => savePreference({ autoCheckForUpdates })}
+            disabled={prefsDisabled}
+            aria-label={t('desktop.autoCheckForUpdates.label' as SettingsKey)}
+            data-testid="desktop-auto-check"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label={t('desktop.externalTerminal.label' as SettingsKey)}
+          description={t('desktop.externalTerminal.description' as SettingsKey)}
+          vertical
+        >
+          <Input
+            value={terminalAppDraft}
+            onChange={e => setTerminalAppDraft(e.target.value)}
+            onBlur={() => savePreference({ externalTerminalApp: terminalAppDraft.trim().length > 0 ? terminalAppDraft.trim() : null })}
+            onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder={t('desktop.externalTerminal.placeholder' as SettingsKey)}
+            disabled={prefsDisabled}
+            aria-label={t('desktop.externalTerminal.label' as SettingsKey)}
+            data-testid="desktop-external-terminal"
+          />
+        </SettingsRow>
+
+        {isElectron && <PreferredEditorSetting />}
+
+      </SettingsGroup>
+
+      {isElectron
+        ? (
+          <div className="flex flex-col gap-3">
+            <OperationsCard
+              title={t('desktop.updates.title' as SettingsKey)}
+              testId="desktop-updates-card"
+              badge={(
+                <Badge variant="outline" className="font-mono text-[11px]">
+                  {updateStatusLabel}
+                </Badge>
+              )}
+            >
+              <div className="flex items-center justify-between gap-3 text-[12px]">
+                <span className="text-muted-foreground">{t('desktop.updates.currentVersion' as SettingsKey)}</span>
+                <span className="font-mono tabular-nums text-foreground">{status.currentVersion}</span>
+              </div>
+              {updateDownload && (
+                <div className="flex items-center justify-between gap-3 text-[12px]">
+                  <span className="text-muted-foreground">{t('desktop.updates.status.downloading' as SettingsKey)}</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {formatCompactBytes(updateDownload.transferredBytes)}
+                    {updateDownload.totalBytes === null ? ' · —' : ` / ${formatCompactBytes(updateDownload.totalBytes)}`}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3 text-[12px]">
+                <span className="text-muted-foreground">{t('desktop.updates.availableVersion' as SettingsKey)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono tabular-nums text-foreground">
+                    {targetVersion ?? t('desktop.updates.none' as SettingsKey)}
+                  </span>
+                  {targetSize > 0 && (
+                    <span className="text-[11px] text-muted-foreground">{formatCompactBytes(targetSize)}</span>
+                  )}
+                </div>
+              </div>
+
+              {status.updateInfo?.releaseNotes && (
+                <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5">
+                  <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                    {t('desktop.updates.releaseNotes' as SettingsKey)}
+                  </p>
+                  <div className="max-h-48 overflow-y-auto text-[12px] [&_h2]:mt-3 [&_h2]:mb-1 [&_h2]:text-[12px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:mt-2 [&_h3]:mb-1 [&_h3]:text-[12px] [&_h3]:font-medium [&_h3]:text-foreground [&_p]:my-1 [&_p]:text-muted-foreground [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_li]:text-muted-foreground [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-2 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:font-mono">
+                    <StaticRender content={status.updateInfo.releaseNotes} />
+                  </div>
+                </div>
+              )}
+
+              {status.errorMessage && (
+                <p className="text-[11px] text-muted-foreground">{status.errorMessage}</p>
+              )}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void refreshStatus()}
+                  disabled={!isElectron || !nativeIpc || busy}
+                  aria-label={t('desktop.updates.actions.refresh' as SettingsKey)}
+                >
+                  {loading ? <Spinner className="size-3.5" /> : <RefreshCwIcon className="size-3.5" aria-hidden="true" />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.checkForUpdates())}
+                  disabled={!canCheck}
+                >
+                  {status.isCheckingForUpdates
+                    ? <Spinner className="size-3.5" />
+                    : <PackageCheckIcon className="size-3.5" aria-hidden="true" />}
+                  {t('desktop.updates.actions.check' as SettingsKey)}
+                </Button>
+                {!isSparkle && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.downloadUpdate())}
+                      disabled={!canDownload}
+                    >
+                      <DownloadIcon className="size-3.5" aria-hidden="true" />
+                      {t('desktop.updates.actions.download' as SettingsKey)}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={() => void runUpdateAction(() => nativeIpc!.desktopUpdate.applyUpdate())}
+                      disabled={!canApply}
+                    >
+                      <RefreshCwIcon className="size-3.5" aria-hidden="true" />
+                      {t('desktop.updates.actions.restart' as SettingsKey)}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </OperationsCard>
+
+            <OperationsCard
+              title={t('desktop.cli.title' as SettingsKey)}
+              testId="desktop-cli-card"
+              badge={(
+                <Badge variant="outline" className="font-mono text-[11px]">
+                  {cliStatusLabel}
+                </Badge>
+              )}
+            >
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-[12px] tabular-nums text-foreground break-all">{cliStatus.commandPath}</span>
+                {cliStatus.sourcePath && (
+                  <span className="font-mono text-[11px] text-muted-foreground break-all">{cliStatus.sourcePath}</span>
+                )}
+                {cliStatus.errorMessage && (
+                  <p className="text-[11px] text-muted-foreground">{cliStatus.errorMessage}</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void refreshStatus()}
+                  disabled={!isElectron || !nativeIpc || loading}
+                  aria-label={t('desktop.cli.actions.refresh' as SettingsKey)}
+                >
+                  {loading ? <Spinner className="size-3.5" /> : <RefreshCwIcon className="size-3.5" aria-hidden="true" />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void runCliAction(() => nativeIpc!.native.removeDesktopCliCommand())}
+                  disabled={!isElectron || !nativeIpc || loading || !cliStatus.supported || !cliStatus.installed}
+                >
+                  <UnlinkIcon className="size-3.5" aria-hidden="true" />
+                  {t('desktop.cli.actions.remove' as SettingsKey)}
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => void runCliAction(() => nativeIpc!.native.installDesktopCliCommand())}
+                  disabled={!isElectron || !nativeIpc || loading || !cliStatus.supported}
+                >
+                  <TerminalIcon className="size-3.5" aria-hidden="true" />
+                  {cliStatus.installed
+                    ? t('desktop.cli.actions.repair' as SettingsKey)
+                    : t('desktop.cli.actions.install' as SettingsKey)}
+                </Button>
+              </div>
+            </OperationsCard>
+          </div>
+        )
+        : (
+          <p className="text-[12px] text-muted-foreground" data-testid="desktop-web-notice">
+            {t('desktop.webNotice.description' as SettingsKey)}
+          </p>
+        )}
+    </SettingsPage>
   )
 }

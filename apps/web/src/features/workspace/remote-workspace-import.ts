@@ -1,7 +1,26 @@
 import { fetchRemoteUpstreamJson } from '~/features/remote-hosts/upstream-fetch'
 import type { CreateWorkspaceInput } from '~/features/workspace/use-workspace'
 
-import type { Workspace } from './types'
+/**
+ * Remote workspace record returned by the upstream Cradle Server.
+ * Shape matches local `WorkspaceView` / OpenAPI workspace record.
+ */
+export type RemoteWorkspaceRecord = {
+  id: string
+  name: string
+  locator: {
+    hostId: string
+    path: string
+    kind?: 'project' | 'managed-worktree'
+    sourceWorkspaceId?: string | null
+  }
+  gitIdentity: {
+    originUrl?: string | null
+    repoRoot?: string | null
+    headSha?: string | null
+    branch?: string | null
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -22,7 +41,7 @@ function readErrorCode(error: unknown): string | null {
 
 function toLocalCreateInput(
   hostId: string,
-  remote: Workspace,
+  remote: RemoteWorkspaceRecord,
 ): CreateWorkspaceInput {
   return {
     name: remote.name,
@@ -54,7 +73,7 @@ export async function ensureRemoteWorkspaceForPath(
     throw new Error('Remote directory path is required.')
   }
 
-  const existing = await fetchRemoteUpstreamJson<Workspace | null>(
+  const existing = await fetchRemoteUpstreamJson<RemoteWorkspaceRecord | null>(
     hostId,
     `/workspaces/resolve?hostId=${encodeURIComponent('local')}&path=${encodeURIComponent(trimmed)}`,
   )
@@ -63,7 +82,7 @@ export async function ensureRemoteWorkspaceForPath(
   }
 
   try {
-    const created = await fetchRemoteUpstreamJson<Workspace>(
+    const created = await fetchRemoteUpstreamJson<RemoteWorkspaceRecord>(
       hostId,
       '/workspaces/from-directory',
       {
@@ -77,7 +96,7 @@ export async function ensureRemoteWorkspaceForPath(
     if (readErrorCode(error) !== 'workspace_locator_exists') {
       throw error
     }
-    const raced = await fetchRemoteUpstreamJson<Workspace | null>(
+    const raced = await fetchRemoteUpstreamJson<RemoteWorkspaceRecord | null>(
       hostId,
       `/workspaces/resolve?hostId=${encodeURIComponent('local')}&path=${encodeURIComponent(trimmed)}`,
     )

@@ -29,10 +29,9 @@ export class ProviderRuntimeLease<Resource = undefined> {
     readonly hostId: string,
     readonly pinned: boolean,
     readonly resource: Resource,
-    private readonly idleTimeoutMs: number,
   ) {}
 
-  refresh(ttlMs = this.idleTimeoutMs): void {
+  refresh(ttlMs?: number): void {
     if (this.released) {
       return
     }
@@ -52,7 +51,6 @@ export type ProviderRuntimeResourceFactory<Resource> = () => Resource | Promise<
 export type ProviderRuntimeResourceDisposer<Resource> = (resource: Resource) => void | Promise<void>
 
 interface RuntimeHostEntry extends ProviderRuntimeHostSnapshot {
-  retainOnRelease: boolean
   resource?: unknown
   resourcePromise?: Promise<unknown>
   disposeResource?: ProviderRuntimeResourceDisposer<unknown>
@@ -71,16 +69,14 @@ export class ProviderRuntimeHostManager {
   acquireLease(input: ProviderRuntimeHostKey & {
     ttlMs?: number
     pinned?: boolean
-    retainOnRelease?: boolean
   }): ProviderRuntimeLease {
     const retained = this.retainHost(input)
-    return new ProviderRuntimeLease(this, retained.hostId, retained.pinned, undefined, retained.ttlMs)
+    return new ProviderRuntimeLease(this, retained.hostId, retained.pinned, undefined)
   }
 
   async acquireResource<Resource>(input: ProviderRuntimeHostKey & {
     ttlMs?: number
     pinned?: boolean
-    retainOnRelease?: boolean
     resourceFingerprint?: string
     createResource: ProviderRuntimeResourceFactory<Resource>
     disposeResource: ProviderRuntimeResourceDisposer<Resource>
@@ -124,7 +120,7 @@ export class ProviderRuntimeHostManager {
         this.releaseLease(retained.hostId, retained.pinned)
         throw new Error(`Provider runtime host was released before resource was ready: ${retained.hostId}`)
       }
-      return new ProviderRuntimeLease(this, retained.hostId, retained.pinned, resource, retained.ttlMs)
+      return new ProviderRuntimeLease(this, retained.hostId, retained.pinned, resource)
     }
     catch (error) {
       this.releaseLease(retained.hostId, retained.pinned)
@@ -151,9 +147,8 @@ export class ProviderRuntimeHostManager {
     if (pinned) {
       entry.pinnedCount = Math.max(0, entry.pinnedCount - 1)
     }
-    const now = Date.now()
-    entry.updatedAt = now
-    if (entry.refCount === 0 && (!entry.retainOnRelease || entry.expiresAt <= now)) {
+    entry.updatedAt = Date.now()
+    if (entry.refCount === 0) {
       this.removeHost(hostId, entry)
     }
   }
@@ -269,8 +264,7 @@ export class ProviderRuntimeHostManager {
   private retainHost(input: ProviderRuntimeHostKey & {
     ttlMs?: number
     pinned?: boolean
-    retainOnRelease?: boolean
-  }): { hostId: string, pinned: boolean, ttlMs: number, entry: RuntimeHostEntry } {
+  }): { hostId: string, pinned: boolean, entry: RuntimeHostEntry } {
     this.reapIdleHosts()
     const hostId = this.readHostId(input)
     const now = Date.now()
@@ -284,20 +278,17 @@ export class ProviderRuntimeHostManager {
       hasResource: false,
       expiresAt: now,
       updatedAt: now,
-      retainOnRelease: false,
     }
 
     const pinned = input.pinned ?? false
-    entry.retainOnRelease ||= input.retainOnRelease ?? false
     entry.refCount += 1
     if (pinned) {
       entry.pinnedCount += 1
     }
-    const ttlMs = input.ttlMs ?? DEFAULT_HOST_TTL_MS
-    entry.expiresAt = now + ttlMs
+    entry.expiresAt = now + (input.ttlMs ?? DEFAULT_HOST_TTL_MS)
     entry.updatedAt = now
     this.hosts.set(hostId, entry)
-    return { hostId, pinned, ttlMs, entry }
+    return { hostId, pinned, entry }
   }
 
   private removeHost(hostId: string, entry: RuntimeHostEntry): Promise<void> {

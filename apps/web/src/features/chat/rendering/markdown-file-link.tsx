@@ -1,10 +1,9 @@
-import { handleExternalMarkdownLinkClick } from '@cradle/streamdown'
+import { handleExternalMarkdownLinkClick, isExternalMarkdownHref } from '@cradle/streamdown'
 import type { AnchorHTMLAttributes } from 'react'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
 import { useSessionBinding } from '../session/use-session-binding'
-import { MarkdownFileLinkView } from '../transcript/views/markdown-file-link-view'
 import { parseGitHubPullRequestFromHref } from './github-pull-request-link'
 
 interface MarkdownFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -23,13 +22,18 @@ export function MarkdownFileLink({ href, sessionId, children, ...props }: Markdo
   const sessionBinding = useSessionBinding(sessionId ?? null, Boolean(sessionId))
   const workspaceId = sessionBinding?.workspaceId ?? null
 
-  const handleNavigate = (event: React.MouseEvent<HTMLAnchorElement>, targetHref: string | undefined) => {
-    if (!targetHref || !workspaceId) {
-      handleExternalMarkdownLinkClick(event, targetHref)
+  const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    props.onClick?.(event)
+    if (event.defaultPrevented) {
       return
     }
 
-    const pullRequest = parseGitHubPullRequestFromHref(targetHref)
+    if (!href || !workspaceId) {
+      handleExternalMarkdownLinkClick(event, href)
+      return
+    }
+
+    const pullRequest = parseGitHubPullRequestFromHref(href)
     if (pullRequest) {
       event.preventDefault()
       openPullRequestTab({
@@ -41,7 +45,7 @@ export function MarkdownFileLink({ href, sessionId, children, ...props }: Markdo
     }
 
     // Parse file path from various link formats
-    const filePath = parseFilePathFromHref(targetHref)
+    const filePath = parseFilePathFromHref(href)
 
     if (filePath) {
       event.preventDefault()
@@ -56,7 +60,19 @@ export function MarkdownFileLink({ href, sessionId, children, ...props }: Markdo
     handleExternalMarkdownLinkClick(event, href)
   }
 
-  return <MarkdownFileLinkView {...props} href={href} onNavigate={handleNavigate}>{children}</MarkdownFileLinkView>
+  const external = isExternalMarkdownHref(href)
+
+  return (
+    <a
+      {...props}
+      href={href}
+      target={props.target ?? (external ? '_blank' : undefined)}
+      rel={props.rel ?? (external ? 'noreferrer noopener' : undefined)}
+      onClick={handleClick}
+    >
+      {children}
+    </a>
+  )
 }
 
 /**

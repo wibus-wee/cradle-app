@@ -371,7 +371,6 @@ async function acquireDiagnosticsHostLease(input: {
     runtimeKind: CODEX_RUNTIME_KIND,
     providerTargetId: input.providerTargetId,
     scopeId: diagnosticsScopeId,
-    idleTimeoutMs: 0,
     chatgptAuth,
     options: {
       apiKey: readCodexApiKeyAuth(input.auth) ?? undefined,

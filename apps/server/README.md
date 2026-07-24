@@ -53,10 +53,6 @@ The server follows the repository convention of **technical primitives + busines
 - `CRADLE_LOG_SYNC`: set to `1` to write the file log synchronously during crash diagnostics
 - `CRADLE_CREDENTIAL_SECRET`: secret used to encrypt server-owned secrets
 
-## Desktop Bootstrap
-
-Desktop startup reports ordered, timestamped IPC lifecycle events from `src/bootstrap-lifecycle.ts`: database migration, database maintenance, persisted run recovery, service initialization, plugin activation, and listener establishment. The server emits `ready` only from the `app.listen` callback. Desktop owns supervision and renderer projection; `/health` continues to mean the server is actually ready to serve requests.
-
 ## Commands
 
 - `pnpm dev`: start nodemon development server

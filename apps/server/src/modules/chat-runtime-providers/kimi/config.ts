@@ -1,3 +1,4 @@
+import type { RegisteredMcpServer } from '../../../plugins/mcp-registry'
 import type { RuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
 
 export interface KimiProviderConfig {
@@ -53,6 +54,28 @@ export function renderKimiConfigToml(input: {
     lines.push(`default_model = ${tomlString(input.provider.defaultModel)}`)
   }
   return `${lines.join('\n')}\n`
+}
+
+export function renderKimiMcpConfig(servers: Record<string, RegisteredMcpServer>): string {
+  return `${JSON.stringify({
+    mcpServers: Object.fromEntries(
+      Object.entries(servers).map(([name, server]) => [
+        name,
+        server.transport === 'stdio'
+          ? {
+              transport: 'stdio',
+              command: server.command,
+              args: server.args,
+              ...(Object.keys(server.env).length > 0 ? { env: server.env } : {}),
+            }
+          : {
+              transport: 'http',
+              url: server.url,
+              ...(Object.keys(server.headers).length > 0 ? { headers: server.headers } : {}),
+            },
+      ]),
+    ),
+  }, null, 2)}\n`
 }
 
 function tomlKey(value: string): string {

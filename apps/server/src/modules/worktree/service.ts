@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { promisify } from 'node:util'
+import { lstat, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 import type { Session, Worktree } from '@cradle/db'
 import { backendRuns, sessions, workspaces, worktrees } from '@cradle/db'
@@ -9,7 +9,6 @@ import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
-import * as BackgroundActivity from '../background-activity/service'
 import { runGitCommand } from '../git/git-command'
 import {
   addGitWorktree,
@@ -41,7 +40,6 @@ import {
 } from './worktree-setup-trust'
 
 const BRANCH_PREFIX = 'cradle/wt/'
-const execFileAsync = promisify(execFile)
 
 export type WorkBaseStrategy = 'source-head' | 'remote-default'
 
@@ -61,8 +59,6 @@ export interface WorktreeView {
 export interface ManagedWorktreeView extends WorktreeView {
   workspaceName: string
   sizeBytes: number
-  sizeMeasuredAt: number | null
-  sizeMeasurementError: string | null
   sessionCount: number
 }
 
@@ -130,16 +126,50 @@ function toWorktreeView(record: Worktree): WorktreeView {
   }
 }
 
-function toManagedWorktreeView(
+async function directorySizeBytes(path: string): Promise<number> {
+  let entry
+  try {
+    entry = await lstat(path)
+  }
+  catch {
+    return 0
+  }
+  if (!entry.isDirectory()) {
+    return entry.size
+  }
+
+  let total = 0
+  let children
+  try {
+    children = await readdir(path, { withFileTypes: true })
+  }
+  catch {
+    return 0
+  }
+  for (const child of children) {
+    const childPath = join(path, child.name)
+    if (child.isDirectory()) {
+      total += await directorySizeBytes(childPath)
+      continue
+    }
+    try {
+      total += (await lstat(childPath)).size
+    }
+    catch {
+      // The checkout may be changing while Settings is open.
+    }
+  }
+  return total
+}
+
+async function toManagedWorktreeView(
   record: Worktree,
   workspaceName: string,
-): ManagedWorktreeView {
+): Promise<ManagedWorktreeView> {
   return {
     ...toWorktreeView(record),
     workspaceName,
-    sizeBytes: record.sizeBytes ?? 0,
-    sizeMeasuredAt: record.sizeMeasuredAt,
-    sizeMeasurementError: record.sizeMeasurementError,
+    sizeBytes: await directorySizeBytes(record.path),
     sessionCount: countSessionsUsingWorktree(record.id),
   }
 }
@@ -251,56 +281,15 @@ export async function listManagedWorktrees(): Promise<{ worktrees: ManagedWorktr
     .all()
     .sort((left, right) => right.createdAt - left.createdAt)
 
-  const managed = records.map(record => toManagedWorktreeView(
+  const managed = await Promise.all(records.map(record => toManagedWorktreeView(
     record,
     workspaceNames.get(record.sourceWorkspaceId) ?? record.sourceWorkspaceId,
-  ))
+  )))
 
   return {
     worktrees: managed,
     totalSizeBytes: managed.reduce((total, worktree) => total + worktree.sizeBytes, 0),
   }
-}
-
-async function measureWorktreeSizeBytes(path: string): Promise<number> {
-  const { stdout } = await execFileAsync('du', ['-sk', path], { maxBuffer: 1024 * 1024 })
-  const kibibytes = Number.parseInt(stdout.trim().split(/\s+/)[0] ?? '', 10)
-  if (!Number.isFinite(kibibytes) || kibibytes < 0) {
-    throw new Error('du did not return a valid worktree size')
-  }
-  return kibibytes * 1024
-}
-
-export function registerStorageMeasurementActivity(): void {
-  BackgroundActivity.register({
-    ownerNamespace: 'worktree',
-    key: 'measure-storage',
-    title: 'Measure worktree storage',
-    priority: 'low',
-    trigger: 'explicit refresh',
-    manuallyRunnable: true,
-    async run(reporter) {
-      const records = db().select().from(worktrees).where(eq(worktrees.status, 'active')).all()
-      for (let index = 0; index < records.length; index += 1) {
-        const record = records[index]!
-        reporter.report({ completed: index, total: records.length, worktree: record.name })
-        try {
-          const sizeBytes = await measureWorktreeSizeBytes(record.path)
-          db().update(worktrees).set({
-            sizeBytes,
-            sizeMeasuredAt: now(),
-            sizeMeasurementError: null,
-          }).where(eq(worktrees.id, record.id)).run()
-        }
-        catch (error) {
-          db().update(worktrees).set({
-            sizeMeasurementError: error instanceof Error ? error.message : String(error),
-          }).where(eq(worktrees.id, record.id)).run()
-        }
-      }
-      reporter.report({ completed: records.length, total: records.length })
-    },
-  })
 }
 
 export function resolveSessionExecutionRoot(session: Session): SessionExecutionRoot {
