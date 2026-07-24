@@ -976,31 +976,31 @@ export const zPostAutomationsBody = z.object({
     description: z.string().optional(),
     enabled: z.boolean().optional(),
     trigger: z.object({
-        type: z.enum(['rrule']),
+        type: z.string(),
         rrule: z.string().min(1),
         timezone: z.string().min(1),
         misfirePolicy: z.enum(['skip', 'run_latest']).optional()
     }),
     recipe: z.object({
-        kind: z.enum(['agent_task']),
+        kind: z.string(),
         prompt: z.string().min(1),
         inputs: z.array(z.union([
             z.object({
-                type: z.enum(['file_ref']),
+                type: z.string(),
                 path: z.string().min(1)
             }),
             z.object({
-                type: z.enum(['inline_file']),
+                type: z.string(),
                 name: z.string().min(1),
                 content: z.string()
             }),
             z.object({
-                type: z.enum(['text']),
+                type: z.string(),
                 name: z.string().min(1),
                 content: z.string()
             }),
             z.object({
-                type: z.enum(['url']),
+                type: z.string(),
                 url: z.string().min(1)
             })
         ])),
@@ -1031,7 +1031,7 @@ export const zPostAutomationsBody = z.object({
         sessionPolicy: z.enum(['new', 'heartbeat']).optional(),
         isolationPolicy: z.enum(['workspace', 'worktree_per_run']).optional(),
         completionPolicy: z.object({
-            stopWhen: z.enum(['agent_complete']).optional(),
+            stopWhen: z.string().optional(),
             noFindingsBehavior: z.enum(['archive', 'triage']).optional()
         }).optional()
     }),
@@ -1055,31 +1055,31 @@ export const zPatchAutomationsByIdBody = z.object({
     title: z.string().min(1).optional(),
     description: z.string().optional(),
     trigger: z.object({
-        type: z.enum(['rrule']),
+        type: z.string(),
         rrule: z.string().min(1),
         timezone: z.string().min(1),
         misfirePolicy: z.enum(['skip', 'run_latest']).optional()
     }).optional(),
     recipe: z.object({
-        kind: z.enum(['agent_task']),
+        kind: z.string(),
         prompt: z.string().min(1),
         inputs: z.array(z.union([
             z.object({
-                type: z.enum(['file_ref']),
+                type: z.string(),
                 path: z.string().min(1)
             }),
             z.object({
-                type: z.enum(['inline_file']),
+                type: z.string(),
                 name: z.string().min(1),
                 content: z.string()
             }),
             z.object({
-                type: z.enum(['text']),
+                type: z.string(),
                 name: z.string().min(1),
                 content: z.string()
             }),
             z.object({
-                type: z.enum(['url']),
+                type: z.string(),
                 url: z.string().min(1)
             })
         ])),
@@ -1110,7 +1110,7 @@ export const zPatchAutomationsByIdBody = z.object({
         sessionPolicy: z.enum(['new', 'heartbeat']).optional(),
         isolationPolicy: z.enum(['workspace', 'worktree_per_run']).optional(),
         completionPolicy: z.object({
-            stopWhen: z.enum(['agent_complete']).optional(),
+            stopWhen: z.string().optional(),
             noFindingsBehavior: z.enum(['archive', 'triage']).optional()
         }).optional()
     }).optional(),
@@ -1207,7 +1207,7 @@ export const zPostCronJobsBody = z.object({
     title: z.string().min(1),
     description: z.string().optional(),
     enabled: z.boolean().optional(),
-    scheduleKind: z.enum(['rrule']),
+    scheduleKind: z.string(),
     scheduleConfig: z.string().min(1),
     timezone: z.string().min(1),
     prompt: z.string().min(1),
@@ -1227,7 +1227,7 @@ export const zPutCronJobsByIdBody = z.object({
     title: z.string().min(1).optional(),
     description: z.string().optional(),
     enabled: z.boolean().optional(),
-    scheduleKind: z.enum(['rrule']).optional(),
+    scheduleKind: z.string().optional(),
     scheduleConfig: z.string().min(1).optional(),
     timezone: z.string().min(1).optional(),
     prompt: z.string().min(1).optional(),
@@ -2041,7 +2041,7 @@ export const zDeleteIssuesByIdContextRefsByIndexPath = z.object({
 
 export const zPostImageOcrRecognizeBody = z.object({
     files: z.array(z.object({
-        type: z.enum(['file']),
+        type: z.string(),
         mediaType: z.string().min(1),
         filename: z.string().optional(),
         url: z.string().min(1),
@@ -2847,7 +2847,7 @@ export const zGetAcpAgentsByAgentIdInstallPathPath = z.object({
 });
 
 export const zGetEventsQuery = z.object({
-    scope: z.enum(['sessions']),
+    scope: z.string(),
     afterSequenceId: z.number().gte(0).optional(),
     workspaceId: z.string().optional(),
     limit: z.number().gte(1).lte(500).optional()
@@ -2875,7 +2875,7 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
         text: z.string(),
         contextParts: z.array(z.union([
             z.object({
-                type: z.enum(['data-cradle-skill']),
+                type: z.string(),
                 name: z.string().min(1),
                 path: z.string().min(1),
                 scope: z.enum([
@@ -2890,7 +2890,7 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
                 position: z.number().gte(0).optional()
             }),
             z.object({
-                type: z.enum(['data-cradle-plugin']),
+                type: z.string(),
                 provider: z.enum(['cradle', 'codex']).optional(),
                 pluginName: z.string().min(1),
                 displayName: z.string().min(1),
@@ -2915,7 +2915,7 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
                 position: z.number().gte(0).optional()
             }),
             z.object({
-                type: z.enum(['data-cradle-file-line-comment']),
+                type: z.string(),
                 workspaceId: z.string().min(1),
                 path: z.string().min(1),
                 lineStart: z.number().gte(1),
@@ -2925,7 +2925,7 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
             })
         ])),
         files: z.array(z.object({
-            type: z.enum(['file']),
+            type: z.string(),
             mediaType: z.string().min(1),
             filename: z.string().optional(),
             url: z.string().min(1),
@@ -3069,7 +3069,7 @@ export const zGetChatSessionsBySessionIdQueuePath = z.object({
 export const zPostChatSessionsBySessionIdQueueBody = z.object({
     text: z.string().min(1).optional(),
     files: z.array(z.object({
-        type: z.enum(['file']),
+        type: z.string(),
         mediaType: z.string().min(1),
         filename: z.string().optional(),
         url: z.string().min(1),
@@ -3077,7 +3077,7 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
     })).optional(),
     contextParts: z.array(z.union([
         z.object({
-            type: z.enum(['data-cradle-skill']),
+            type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
             scope: z.enum([
@@ -3092,7 +3092,7 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-plugin']),
+            type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
             displayName: z.string().min(1),
@@ -3117,7 +3117,7 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-file-line-comment']),
+            type: z.string(),
             workspaceId: z.string().min(1),
             path: z.string().min(1),
             lineStart: z.number().gte(1),
@@ -3152,7 +3152,7 @@ export const zPostChatSessionsBySessionIdQueuePath = z.object({
 export const zPostChatSessionsBySessionIdSteerBody = z.object({
     text: z.string().min(1).optional(),
     files: z.array(z.object({
-        type: z.enum(['file']),
+        type: z.string(),
         mediaType: z.string().min(1),
         filename: z.string().optional(),
         url: z.string().min(1),
@@ -3160,7 +3160,7 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
     })).optional(),
     contextParts: z.array(z.union([
         z.object({
-            type: z.enum(['data-cradle-skill']),
+            type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
             scope: z.enum([
@@ -3175,7 +3175,7 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-plugin']),
+            type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
             displayName: z.string().min(1),
@@ -3200,7 +3200,7 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-file-line-comment']),
+            type: z.string(),
             workspaceId: z.string().min(1),
             path: z.string().min(1),
             lineStart: z.number().gte(1),
@@ -3232,7 +3232,7 @@ export const zDeleteChatSessionsBySessionIdQueueByQueueItemIdPath = z.object({
 export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
     text: z.string().min(1).optional(),
     files: z.array(z.object({
-        type: z.enum(['file']),
+        type: z.string(),
         mediaType: z.string().min(1),
         filename: z.string().optional(),
         url: z.string().min(1),
@@ -3240,7 +3240,7 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
     })).optional(),
     contextParts: z.array(z.union([
         z.object({
-            type: z.enum(['data-cradle-skill']),
+            type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
             scope: z.enum([
@@ -3255,7 +3255,7 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-plugin']),
+            type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
             displayName: z.string().min(1),
@@ -3280,7 +3280,7 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-file-line-comment']),
+            type: z.string(),
             workspaceId: z.string().min(1),
             path: z.string().min(1),
             lineStart: z.number().gte(1),
@@ -3350,7 +3350,7 @@ export const zPatchChatSessionsBySessionIdRuntimeSettingsPath = z.object({
 export const zPostChatSessionsBySessionIdResponseBody = z.object({
     text: z.string().optional(),
     files: z.array(z.object({
-        type: z.enum(['file']),
+        type: z.string(),
         mediaType: z.string().min(1),
         filename: z.string().optional(),
         url: z.string().min(1),
@@ -3358,7 +3358,7 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
     })).optional(),
     contextParts: z.array(z.union([
         z.object({
-            type: z.enum(['data-cradle-skill']),
+            type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
             scope: z.enum([
@@ -3373,7 +3373,7 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-plugin']),
+            type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
             displayName: z.string().min(1),
@@ -3398,7 +3398,7 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-file-line-comment']),
+            type: z.string(),
             workspaceId: z.string().min(1),
             path: z.string().min(1),
             lineStart: z.number().gte(1),
@@ -3445,7 +3445,7 @@ export const zPostChatSessionsBySessionIdResponsePath = z.object({
 export const zPostChatSideConversationsBySideConversationIdResponseBody = z.object({
     text: z.string().optional(),
     files: z.array(z.object({
-        type: z.enum(['file']),
+        type: z.string(),
         mediaType: z.string().min(1),
         filename: z.string().optional(),
         url: z.string().min(1),
@@ -3453,7 +3453,7 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
     })).optional(),
     contextParts: z.array(z.union([
         z.object({
-            type: z.enum(['data-cradle-skill']),
+            type: z.string(),
             name: z.string().min(1),
             path: z.string().min(1),
             scope: z.enum([
@@ -3468,7 +3468,7 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-plugin']),
+            type: z.string(),
             provider: z.enum(['cradle', 'codex']).optional(),
             pluginName: z.string().min(1),
             displayName: z.string().min(1),
@@ -3493,7 +3493,7 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
             position: z.number().gte(0).optional()
         }),
         z.object({
-            type: z.enum(['data-cradle-file-line-comment']),
+            type: z.string(),
             workspaceId: z.string().min(1),
             path: z.string().min(1),
             lineStart: z.number().gte(1),
@@ -3606,6 +3606,11 @@ export const zGetChatSessionsBySessionIdMessagesPath = z.object({
 export const zGetChatSessionsBySessionIdMessagesQuery = z.object({
     cursor: z.string().min(1).optional(),
     limit: z.number().gte(1).lte(200).optional()
+});
+
+export const zGetChatSessionsBySessionIdMessagesByMessageIdPath = z.object({
+    sessionId: z.string().min(1),
+    messageId: z.string().min(1)
 });
 
 export const zGetChatRunsCompletedQuery = z.object({
@@ -3856,7 +3861,7 @@ export const zDeleteChronicleModelResourcesByCategoryPath = z.object({
 });
 
 export const zPostChronicleMessageSourcesBody = z.object({
-    platform: z.enum(['slack']),
+    platform: z.string(),
     label: z.string().min(1),
     enabled: z.boolean(),
     workspaceId: z.string().nullish(),
@@ -4273,7 +4278,7 @@ export const zPostChroniclePrivacyExportBody = z.object({
 });
 
 export const zPostChroniclePrivacySnapshotsBySnapshotIdFrameMaskBody = z.object({
-    mode: z.enum(['blur']).optional(),
+    mode: z.string().optional(),
     fullFrame: z.boolean().optional(),
     blurSigma: z.number().gte(1).lte(100).optional(),
     regions: z.array(z.object({
@@ -4443,7 +4448,7 @@ export const zPostObservabilityEventsBody = z.object({
 });
 
 export const zPostObservabilityRuntimeSamplesBody = z.object({
-    source: z.enum(['desktop-main']),
+    source: z.string(),
     sampledAt: z.number(),
     main: z.record(z.string(), z.unknown()),
     appMetrics: z.array(z.record(z.string(), z.unknown())),

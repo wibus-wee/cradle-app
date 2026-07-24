@@ -5,10 +5,15 @@ import { AppError } from '../../../errors/app-error'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import { putMessagePayload, readMessagePayload } from '../message-payload-store'
-import type { ChatSessionEvent, StoredChatSessionEvent } from './events'
+import type {
+  ChatSessionEvent,
+  ChatSessionHeaderEvent,
+  StoredChatSessionEvent,
+} from './events'
 import {
   CHAT_SESSION_AGGREGATE_TYPE,
   isLegacyAssistantMessageSnapshottedRow,
+  parseChatSessionEventHeader,
   parseStoredChatSessionEvent,
   serializeChatSessionEventPayload,
 } from './events'
@@ -92,6 +97,24 @@ export function readSessionEvents(
     .all()
     .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
     .map(row => parseStoredChatSessionEvent(row, payloadId => readMessagePayload(d, payloadId)))
+}
+
+/**
+ * Shell/history-only event reader. It deliberately leaves message bodies in
+ * `chat_message_payloads` and returns payload references instead.
+ */
+export function readSessionEventHeaders(
+  aggregateId: string,
+  d: Pick<ChatRuntimeWriteDb, 'select'> = db(),
+): ChatSessionHeaderEvent[] {
+  return d
+    .select()
+    .from(sessionEvents)
+    .where(eq(sessionEvents.aggregateId, aggregateId))
+    .orderBy(sessionEvents.version)
+    .all()
+    .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
+    .map(parseChatSessionEventHeader)
 }
 
 function persistEventMessagePayloads(

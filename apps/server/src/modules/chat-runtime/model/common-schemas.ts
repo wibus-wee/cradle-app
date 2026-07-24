@@ -22,7 +22,7 @@ export const uiMessageSchema = t.Object(
   { additionalProperties: true },
 )
 
-export const chatMessageSnapshotSchema = t.Object({
+export const chatMessageShellSchema = t.Object({
   messageId: t.String(),
   role: t.Union([t.Literal('user'), t.Literal('assistant')]),
   status: t.Union([
@@ -32,12 +32,16 @@ export const chatMessageSnapshotSchema = t.Object({
     t.Literal('failed'),
   ]),
   errorText: t.Optional(t.String()),
-  content: t.String(),
-  message: uiMessageSchema,
+  preview: t.String(),
+  previewTruncated: t.Boolean(),
   parentMessageId: t.Union([t.String(), t.Null()]),
   parentToolCallId: t.Union([t.String(), t.Null()]),
   taskId: t.Union([t.String(), t.Null()]),
   depth: t.Number(),
+})
+
+export const chatMessageDetailSchema = t.Object({
+  message: uiMessageSchema,
 })
 
 export const slashCommandSchema = t.Object({

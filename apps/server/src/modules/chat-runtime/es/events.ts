@@ -288,6 +288,71 @@ export type StoredChatSessionEvent
   = Omit<ChatSessionEventRow, 'eventType' | 'payload'>
     & ChatSessionEvent
 
+/**
+ * Event-sourced shell projection boundary. Unlike `StoredChatSessionEvent`,
+ * these facts retain payload references only and never hydrate a message body.
+ */
+export interface ChatSessionMessageHeader {
+  id: string
+  sessionId: string
+  payloadId: string
+  parentMessageId: string | null
+  parentToolCallId: string | null
+  taskId: string | null
+  depth: number
+  role: 'user' | 'assistant'
+  status: ChatMessageStatus
+  createdAt: number
+  updatedAt: number
+}
+
+export interface CompletedChatSessionMessageHeader {
+  id: string
+  sessionId: string
+  payloadId: string
+  status: ChatMessageStatus
+  updatedAt: number
+}
+
+export type ChatSessionHeaderEvent
+  = | (Omit<ChatSessionEventRow, 'eventType' | 'payload'> & {
+    type: 'UserMessageAppended' | 'MessageImported' | 'SteerApplied'
+    payload: { message: ChatSessionMessageHeader }
+  })
+  | (Omit<ChatSessionEventRow, 'eventType' | 'payload'> & {
+      type: 'RunStarted'
+      payload: {
+        run: BackendRunStartedFact
+        assistantMessage: ChatSessionMessageHeader | null
+        queueItemId: string | null
+      }
+    })
+    | (Omit<ChatSessionEventRow, 'eventType' | 'payload'> & {
+      type: 'AssistantMessageCompleted'
+      payload: { message: CompletedChatSessionMessageHeader }
+    })
+    | (Omit<ChatSessionEventRow, 'eventType' | 'payload'> & {
+      type: TerminalRunEventType
+      payload: Pick<RunTerminalPayload, 'runId' | 'sessionId' | 'queueItemId' | 'status' | 'finishedAt'>
+    })
+    | (Omit<ChatSessionEventRow, 'eventType' | 'payload'> & {
+      type: 'LastTurnRolledBack'
+      payload: Pick<LastTurnRolledBackPayload, 'sessionId' | 'messageIds' | 'updatedAt'>
+    })
+    | (Omit<ChatSessionEventRow, 'eventType' | 'payload'> & {
+      type: Exclude<
+        ChatSessionEventType,
+        | 'UserMessageAppended'
+        | 'MessageImported'
+        | 'SteerApplied'
+        | 'RunStarted'
+        | 'AssistantMessageCompleted'
+        | TerminalRunEventType
+        | 'LastTurnRolledBack'
+      >
+      payload: Record<string, never>
+    })
+
 type V1RunStartedPayload = Omit<RunStartedPayload, 'v'> & {
   assistantMessageProjection?: 'insert' | 'update' | null
 }
@@ -360,6 +425,103 @@ export function parseStoredChatSessionEvent(
       ? hydrateStoredChatSessionPayload(type, rawPayload, resolveMessagePayload)
       : upcastChatSessionEventPayload(type, rawPayload as ChatSessionEvent['payload']),
   } as StoredChatSessionEvent
+}
+
+/**
+ * Parses only event-owned structural fields and message payload references.
+ * Shell/history callers must use this instead of the hydrated event parser.
+ */
+export function parseChatSessionEventHeader(
+  row: ChatSessionEventRow,
+): ChatSessionHeaderEvent {
+  const type = row.eventType as ChatSessionEventType
+  const payload = JSON.parse(row.payload) as StoredChatSessionPayloadV4
+  return {
+    ...row,
+    type,
+    payload: toChatSessionHeaderPayload(type, payload),
+  } as ChatSessionHeaderEvent
+}
+
+function toChatSessionHeaderPayload(
+  type: ChatSessionEventType,
+  payload: StoredChatSessionPayloadV4,
+): ChatSessionHeaderEvent['payload'] {
+  switch (type) {
+    case 'UserMessageAppended':
+    case 'MessageImported':
+    case 'SteerApplied':
+      return {
+        message: toChatSessionMessageHeader(
+          (payload as StoredUserMessageAppendedPayload | StoredMessageImportedPayload | StoredSteerAppliedPayload)
+            .message,
+        ),
+      }
+    case 'RunStarted': {
+      const stored = payload as StoredRunStartedPayload
+      return {
+        run: stored.run,
+        assistantMessage: stored.assistantMessage
+          ? toChatSessionMessageHeader(stored.assistantMessage)
+          : null,
+        queueItemId: stored.queueItemId ?? null,
+      }
+    }
+    case 'AssistantMessageCompleted': {
+      const stored = payload as StoredAssistantMessageCompletedPayload
+      const message = stored.message as StoredAssistantMessageCompletedPayload['message']
+        | AssistantMessageCompletedPayload['message']
+      return {
+        message: {
+          id: message.id,
+          sessionId: message.sessionId,
+          payloadId: 'payloadId' in message ? message.payloadId : message.id,
+          status: message.status,
+          updatedAt: message.updatedAt,
+        },
+      }
+    }
+    case 'RunCompleted':
+    case 'RunFailed':
+    case 'RunAborted': {
+      const terminal = payload as RunTerminalPayload
+      return {
+        runId: terminal.runId,
+        sessionId: terminal.sessionId,
+        queueItemId: terminal.queueItemId,
+        status: terminal.status,
+        finishedAt: terminal.finishedAt,
+      }
+    }
+    case 'LastTurnRolledBack': {
+      const rollback = payload as LastTurnRolledBackPayload
+      return {
+        sessionId: rollback.sessionId,
+        messageIds: rollback.messageIds,
+        updatedAt: rollback.updatedAt,
+      }
+    }
+    default:
+      return {}
+  }
+}
+
+function toChatSessionMessageHeader(
+  message: StoredMessageReference | MessageRecordedFact,
+): ChatSessionMessageHeader {
+  return {
+    id: message.id,
+    sessionId: message.sessionId,
+    payloadId: 'payloadId' in message ? message.payloadId : message.id,
+    parentMessageId: message.parentMessageId,
+    parentToolCallId: message.parentToolCallId,
+    taskId: message.taskId,
+    depth: message.depth,
+    role: message.role,
+    status: message.status,
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+  }
 }
 
 /**

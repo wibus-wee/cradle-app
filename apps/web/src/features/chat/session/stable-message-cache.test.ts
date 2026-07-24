@@ -6,12 +6,8 @@ const rows = [{
   messageId: 'message-1',
   role: 'user' as const,
   status: 'complete',
-  content: 'hello',
-  message: {
-    id: 'message-1',
-    role: 'user' as const,
-    parts: [{ type: 'text', text: 'hello' }],
-  },
+  preview: 'hello',
+  previewTruncated: false,
   parentMessageId: null,
   parentToolCallId: null,
   taskId: null,
@@ -22,7 +18,7 @@ describe('stable message cache records', () => {
   it('accepts revisioned present and authoritative-empty snapshots', () => {
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 3,
+      schemaVersion: 4,
       revision: 4,
       snapshotState: 'present',
       cachedAt: 100,
@@ -32,7 +28,7 @@ describe('stable message cache records', () => {
 
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 3,
+      schemaVersion: 4,
       revision: 5,
       snapshotState: 'empty',
       cachedAt: 101,
@@ -49,7 +45,7 @@ describe('stable message cache records', () => {
     })).toBeNull()
     expect(parseStableMessageCacheRecord({
       sessionId: 'session-1',
-      schemaVersion: 3,
+      schemaVersion: 4,
       revision: -1,
       snapshotState: 'present',
       cachedAt: 100,

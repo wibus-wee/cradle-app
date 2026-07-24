@@ -2,7 +2,8 @@ import { t } from 'elysia'
 
 import { SessionModel } from '../session/model'
 import {
-  chatMessageSnapshotSchema,
+  chatMessageDetailSchema,
+  chatMessageShellSchema,
   codexAppServerCapabilitySchema,
   codexAppServerServerMessageSchema,
   completedRunSchema,
@@ -43,6 +44,11 @@ import {
 export const ChatRuntimeModel = {
   sessionIdParams: t.Object({
     sessionId: t.String({ minLength: 1 }),
+  }),
+
+  chatMessageParams: t.Object({
+    sessionId: t.String({ minLength: 1 }),
+    messageId: t.String({ minLength: 1 }),
   }),
 
   runIdParams: t.Object({
@@ -456,11 +462,13 @@ export const ChatRuntimeModel = {
   chatMessages: t.Object(
     {
       revision: t.Number({ minimum: 0 }),
-      rows: t.Array(chatMessageSnapshotSchema),
+      rows: t.Array(chatMessageShellSchema),
       nextCursor: t.Union([t.String(), t.Null()]),
     },
     { additionalProperties: false },
   ),
+
+  chatMessageDetail: chatMessageDetailSchema,
 
   queueItem: queueItemSchema,
 

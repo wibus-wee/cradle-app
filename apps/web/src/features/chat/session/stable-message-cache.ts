@@ -1,10 +1,10 @@
 import type { ChatSessionMessageRow } from './use-chat-session'
 
 const DB_NAME = 'cradle-chat-stable-message-cache'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const STORE_NAME = 'stable-message-rows'
 const CACHED_SESSION_LIMIT = 80
-const CACHE_SCHEMA_VERSION = 3
+const CACHE_SCHEMA_VERSION = 4
 
 export interface StableMessageCacheSnapshot {
   sessionId: string
@@ -159,18 +159,11 @@ function isMessageRow(value: unknown): value is ChatSessionMessageRow {
     typeof row.messageId !== 'string'
     || (row.role !== 'user' && row.role !== 'assistant')
     || typeof row.status !== 'string'
-    || typeof row.content !== 'string'
     || typeof row.depth !== 'number'
   ) {
     return false
   }
-  const message = row.message as Partial<ChatSessionMessageRow['message']> | undefined
-  return Boolean(
-    message
-    && typeof message.id === 'string'
-    && (message.role === 'user' || message.role === 'assistant')
-    && Array.isArray(message.parts),
-  )
+  return typeof row.preview === 'string' && typeof row.previewTruncated === 'boolean'
 }
 
 function writeCacheRecord(db: IDBDatabase, record: StableMessageCacheSnapshot): Promise<void> {
