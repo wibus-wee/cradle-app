@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DraftChatComposer } from '~/features/chat/composer/draft-chat-composer'
+import { DraftChatComposer } from '~/features/chat/composer/containers/draft-chat-composer-container'
 import type { Workspace } from '~/features/workspace/types'
 import { isLocalWorkspace } from '~/features/workspace/types'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'

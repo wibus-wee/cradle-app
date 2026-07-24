@@ -8,8 +8,8 @@ import type { PostSessionsData } from '~/api-gen/types.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { runtimeComposerUsesCollapsedInput, useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { describeChatExecutionError } from '~/features/chat/commands/chat-execution-errors'
-import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
-import { DraftChatComposerWithState } from '~/features/chat/composer/draft-chat-composer'
+import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/containers/draft-chat-composer-container'
+import { DraftChatComposerWithState } from '~/features/chat/composer/containers/draft-chat-composer-container'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import {
   isPlanRuntimeSettings,

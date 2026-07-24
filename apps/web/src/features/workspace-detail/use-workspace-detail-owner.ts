@@ -11,7 +11,7 @@ import {
 import { toastManager } from '~/components/ui/toast'
 import { runtimeComposerUsesCollapsedInput } from '~/features/agent-runtime/use-runtime-catalog'
 import { describeChatExecutionError } from '~/features/chat/commands/chat-execution-errors'
-import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/draft-chat-composer'
+import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/containers/draft-chat-composer-container'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { readRunRuntimeSettingsPatch } from '~/features/chat/runtime/runtime-settings-presenter'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'

@@ -1,17 +1,13 @@
 import { Settings2Line as SettingsIcon, ShieldLine as ShieldIcon } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
-import { m } from 'motion/react'
-import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { getSkills, getWorkspacesByWorkspaceIdGitMergeBase } from '~/api-gen/sdk.gen'
-import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
 import type { ClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
 import { hasClaudeAgentModelAliases } from '~/features/agent-runtime/claude-agent-config'
-import type { ApiProviderKind, RuntimeKind } from '~/features/agent-runtime/types'
-import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
+import type { ApiProviderKind } from '~/features/agent-runtime/types'
 import {
   runtimeComposerAllowsEmptySubmit,
   runtimeComposerUsesAliasMatrixModelSelection,
@@ -19,7 +15,6 @@ import {
   useRuntimeCatalog,
 } from '~/features/agent-runtime/use-runtime-catalog'
 import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
-import type { RuntimeProviderBinding } from '~/features/composer-toolbar/types'
 import type { ComposerStateResult } from '~/features/composer-toolbar/use-composer-state'
 import { RemoteHostConnectionNotice } from '~/features/remote-hosts/remote-host-connection-notice'
 import { useRemoteHostConnection } from '~/features/remote-hosts/use-remote-host-connection'
@@ -31,55 +26,54 @@ import { openSettingsSection as openSettingsRouteSection } from '~/navigation/na
 import { useNewChatStore } from '~/store/new-chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
-import type {
-  RuntimeSettingsPatch,
-  RuntimeSettingsPatchValue,
-} from '../commands/chat-response-command'
-import type { ChatContextPart } from '../context/chat-context-parts'
-import type { MentionItem } from '../mentions/mention-panel'
-import { searchPluginMentions } from '../mentions/plugin-mentions'
-import type { SkillMentionItem } from '../mentions/skill-mention-panel'
+import type { RuntimeSettingsPatch } from '../../commands/chat-response-command'
+import type { ChatContextPart } from '../../context/chat-context-parts'
+import type { MentionItem } from '../../mentions/mention-panel'
+import { searchPluginMentions } from '../../mentions/plugin-mentions'
+import type { SkillMentionItem } from '../../mentions/skill-mention-panel'
 import {
   useDraftClaudeAgentModelAliases,
   useProviderTargetClaudeAgentModelAliases,
-} from '../runtime/claude-session-model-matrix-control'
-import { RuntimeSettingsControl } from '../runtime/runtime-settings-control'
+} from '../../runtime/claude-session-model-matrix-control'
+import { RuntimeSettingsControl } from '../../runtime/runtime-settings-control'
 import {
   mergeRuntimeSettings,
   readDefaultRuntimeSettings,
   resolveRuntimeCatalogItem,
-} from '../runtime/runtime-settings-presenter'
-import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
+} from '../../runtime/runtime-settings-presenter'
+import type { ChatComposerSlashCommand } from '../../slash-commands/chat-slash-commands'
 import {
   CRADLE_APPSHOT_SLASH_ACTION_ID,
   CRADLE_APPSHOT_SLASH_COMMAND,
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   withSlashCommandAvailability,
-} from '../slash-commands/chat-slash-commands'
-import { useRuntimeComposerSlashCommands } from '../slash-commands/use-runtime-composer-slash-commands'
+} from '../../slash-commands/chat-slash-commands'
+import { useRuntimeComposerSlashCommands } from '../../slash-commands/use-runtime-composer-slash-commands'
 import type {
   ComposerSlashCommandActionContext,
   ComposerSlashCommandActionResult,
   ComposerSlashCommandActionTools,
-} from './composer-action-context'
-import { modelSupportsAttachments, modelSupportsImageInput } from './composer-attachment-state'
-import { ComposerSlotStates } from './composer-slot-states'
-import { Composer } from './containers/composer-container'
-import { prepareLightOcrAttachments } from './light-ocr'
-import { useComposerAppshotCapture } from './use-composer-appshot-capture'
+} from '../composer-action-context'
+import { modelSupportsAttachments, modelSupportsImageInput } from '../composer-attachment-state'
+import { ComposerSlotStates } from '../composer-slot-states'
+import type {
+  DraftChatComposerProps,
+  DraftChatComposerSendHandler,
+  DraftChatComposerSubmitOptions,
+  DraftChatRuntimeSettings,
+} from '../lib/draft-chat-composer-types'
+import { prepareLightOcrAttachments } from '../light-ocr'
+import { useComposerAppshotCapture } from '../use-composer-appshot-capture'
+import { DraftChatComposerView } from '../views/draft-chat-composer-view'
+import { DraftChatReadinessNoticeView } from '../views/draft-chat-readiness-notice-view'
+import { Composer } from './composer-container'
 
-type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
-
-interface DraftClaudeAgentConfig {
-  modelAliases: ClaudeAgentModelAliases
-}
-
-export type DraftChatRuntimeSettings = Record<
-  string,
-  RuntimeSettingsPatchValue | DraftClaudeAgentConfig | undefined
-> & {
-  claudeAgent?: DraftClaudeAgentConfig | null
-}
+export type {
+  DraftChatComposerProps,
+  DraftChatComposerSendHandler,
+  DraftChatComposerSubmitOptions,
+  DraftChatRuntimeSettings,
+} from '../lib/draft-chat-composer-types'
 
 const PLACEHOLDER_HINT_KEYS = [
   'placeholder.task',
@@ -88,48 +82,6 @@ const PLACEHOLDER_HINT_KEYS = [
   'placeholder.fixTest',
   'placeholder.refactor',
 ] as const
-
-export interface DraftChatComposerSubmitOptions {
-  runtimeKind: RuntimeKind
-  providerBinding: RuntimeProviderBinding
-  runtimeComposer: RuntimeCatalogComposer
-  agentId?: string
-  agentName?: string
-  acpAgentId?: string
-  acpAgentName?: string
-  acpDraftSessionId?: string
-  providerTargetId?: string
-  providerTargetName?: string
-  modelId?: string | null
-  thinkingEffort?: ChatThinkingEffort
-  runtimeSettings: DraftChatRuntimeSettings
-}
-
-export type DraftChatComposerSendHandler = (
-  text: string,
-  files: FileUIPart[],
-  contextParts: ChatContextPart[],
-  options: DraftChatComposerSubmitOptions,
-) => boolean | void | Promise<boolean | void>
-
-interface DraftChatComposerProps {
-  workspaceId: string | null
-  /**
-   * When the selected workspace is mounted from a remote host, load the remote
-   * provider catalog and gate send on host connection.
-   */
-  remoteHostId?: string | null
-  active?: boolean
-  contextBar?: ReactNode
-  replaceText?: string
-  replaceTextKey?: number
-  onDraftChange?: (draft: string) => void
-  onSend: DraftChatComposerSendHandler
-  onSendInNewWindow?: DraftChatComposerSendHandler
-  onSendIsolated?: DraftChatComposerSendHandler
-  testIdPrefix?: string
-  sendButtonText?: string
-}
 
 interface DraftChatComposerContentProps extends DraftChatComposerProps {
   composerState: ComposerStateResult
@@ -579,10 +531,11 @@ function DraftChatComposerContent({
   }
 
   return (
-    <>
-      <ComposerSlotStates slots={[]} states={[]} review={reviewSlot} />
-      <Composer
-        send={{
+    <DraftChatComposerView
+      composerState={<ComposerSlotStates slots={[]} states={[]} review={reviewSlot} />}
+      composer={(
+        <Composer
+          send={{
           submit: handleSend,
           label: sendButtonText,
           submitInNewWindow: handleSendInNewWindow,
@@ -591,11 +544,11 @@ function DraftChatComposerContent({
           sendDisabled,
           allowEmptySend: allowEmptySubmit,
         }}
-        commands={{
+          commands={{
           commands: slashCommands,
           runAction: handleSlashCommandAction,
         }}
-        attachments={{
+          attachments={{
           supportsAttachments,
           usesLightOcr,
           appendFileParts: appshotRuntime.externalFileParts,
@@ -603,22 +556,22 @@ function DraftChatComposerContent({
           pendingAppshots: appshotRuntime.pendingAppshots,
           onActionTargetElementChange: appshotRuntime.setActionTargetElement,
         }}
-        runtimeSettings={{
+          runtimeSettings={{
           runtimeKind: selection.runtimeKind,
           settings: runtimeSettings,
           disabled: sending,
           onChange: updateRuntimeSettings,
         }}
-        decoration={selection.thinkingEffort === 'ultra' ? 'ultra' : null}
-        slots={{
+          decoration={selection.thinkingEffort === 'ultra' ? 'ultra' : null}
+          slots={{
           toolbar,
           footer,
         }}
-        externalSignals={{
+          externalSignals={{
           replaceText,
           replaceTextKey,
         }}
-        view={{
+          view={{
           placeholder,
           searchFiles,
           searchPlugins: searchPluginMentions,
@@ -646,76 +599,32 @@ function DraftChatComposerContent({
           attachIconClassName: 'size-3',
           sendButtonClassName: 'ml-0.5',
         }}
-        accessibility={{
+          accessibility={{
           textareaAriaLabel: t('accessibility.message', 'New chat message'),
           sendButtonAriaLabel: t('send.tooltip'),
         }}
-        testIds={{
+          testIds={{
           actionTarget: `${testIdPrefix}-composer-action-target`,
           textarea: `${testIdPrefix}-textarea`,
           fileInput: `${testIdPrefix}-file-input`,
           attachButton: `${testIdPrefix}-attach-btn`,
           sendButton: `${testIdPrefix}-send-btn`,
         }}
-      />
-      {remoteConnectionBlocked
-? (
-        <div className="mt-2">
-          <RemoteHostConnectionNotice gate={remoteConnection.gate} />
-        </div>
-      )
-: (
-        <DraftChatReadinessNotice
-          notice={readinessNotice}
-          onAction={openSettingsSection}
-          testIdPrefix={testIdPrefix}
         />
       )}
-    </>
-  )
-}
-
-function DraftChatReadinessNotice({
-  notice,
-  onAction,
-  testIdPrefix,
-}: {
-  notice: {
-    key: string
-    icon: typeof SettingsIcon
-    message: string
-    actionLabel: string
-    disabled: boolean
-  } | null
-  onAction: (section: string) => void
-  testIdPrefix: string
-}) {
-  if (!notice) {
-    return null
-  }
-
-  const NoticeIcon = notice.icon
-
-  return (
-    <m.div
-      className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2 text-[12px] text-muted-foreground"
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
-      data-testid={`${testIdPrefix}-readiness-notice`}
-    >
-      <NoticeIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
-      <span className="min-w-0 flex-1 leading-relaxed">{notice.message}</span>
-      <Button
-        type="button"
-        size="xs"
-        variant="outline"
-        onClick={() => onAction(notice.key)}
-        disabled={notice.disabled}
-        className="h-7 shrink-0"
-      >
-        {notice.actionLabel}
-      </Button>
-    </m.div>
+      notice={remoteConnectionBlocked
+        ? (
+            <div className="mt-2">
+              <RemoteHostConnectionNotice gate={remoteConnection.gate} />
+            </div>
+          )
+        : (
+            <DraftChatReadinessNoticeView
+              notice={readinessNotice}
+              onAction={openSettingsSection}
+              testIdPrefix={testIdPrefix}
+            />
+          )}
+    />
   )
 }
