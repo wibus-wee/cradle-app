@@ -1255,6 +1255,11 @@ export const zGetAssetsByIdContentPath = z.object({
     id: z.string().min(1)
 });
 
+export const zPostBackgroundActivitiesByOwnerNamespaceByKeyRunPath = z.object({
+    ownerNamespace: z.string().min(1),
+    key: z.string().min(1)
+});
+
 export const zGetBackgroundJobsQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     ownerNamespace: z.string().min(1).optional(),
@@ -1778,6 +1783,10 @@ export const zPostSessionAwaitsByIdBypassCheckBody = z.object({
 });
 
 export const zPostSessionAwaitsByIdBypassCheckPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostSessionAwaitsByIdEvaluateNowPath = z.object({
     id: z.string().min(1)
 });
 
@@ -2421,7 +2430,8 @@ export const zGetWorkspacesByWorkspaceIdGitDiffPath = z.object({
 
 export const zGetWorkspacesByWorkspaceIdGitDiffQuery = z.object({
     repo: z.string().min(1).optional(),
-    paths: z.string().optional()
+    paths: z.string().optional(),
+    sessionId: z.string().min(1).optional()
 });
 
 export const zGetWorkspacesByWorkspaceIdGitMergeBasePath = z.object({

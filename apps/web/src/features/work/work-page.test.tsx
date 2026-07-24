@@ -47,7 +47,7 @@ describe('workPage', () => {
   it('preserves the user right aside preference when opening a Work', () => {
     render(<WorkPage workId="work-1" />)
 
-    expect(screen.getByTestId('work-session-content').textContent).toContain('session-1')
+    expect(screen.getByTestId('work-session-content').textContent).toBe('session-1')
     expect(useLayoutStore.getState()).toMatchObject({
       asideOpen: false,
       asideActiveTab: 'git',

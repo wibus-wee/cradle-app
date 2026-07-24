@@ -102,7 +102,7 @@ describe('worktree capability', () => {
       expect(await response.json()).toEqual({
         cleaned: [],
         skipped: 0,
-        totalSizeBytes: 8,
+        totalSizeBytes: 0,
       })
       expect(database.select().from(worktrees).where(eq(worktrees.status, 'active')).all()).toHaveLength(2)
     }

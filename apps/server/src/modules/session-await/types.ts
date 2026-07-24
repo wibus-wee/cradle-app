@@ -42,6 +42,12 @@ interface PendingCheckResult {
   incrementErrorCount?: boolean
   /** When set, the await's filterJson is silently updated (e.g. head SHA tracking) without triggering a resume. */
   filterUpdate?: string
+  /**
+   * Serialized progress observation reported by a still-pending source check
+   * (javascript cell `{ pending: true, progress }`). `null` clears a stale
+   * observation after a clean check; `undefined` leaves the stored one alone.
+   */
+  observationJson?: string | null
 }
 
 interface MatchedCheckResult {

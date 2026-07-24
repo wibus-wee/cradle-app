@@ -32,6 +32,7 @@ import { register as registerAutomationRunTriage } from './automation/run/triage
 import { register as registerAutomationRuns } from './automation/runs'
 import { register as registerAutomationTriageList } from './automation/triage/list'
 import { register as registerAutomationUpdate } from './automation/update'
+import { register as registerBackgroundActivityList } from './background-activity/list'
 import { register as registerBackgroundJobCancel } from './background-job/cancel'
 import { register as registerBackgroundJobGet } from './background-job/get'
 import { register as registerBackgroundJobList } from './background-job/list'
@@ -388,6 +389,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerAutomationRuns(program)
   registerAutomationTriageList(program)
   registerAutomationUpdate(program)
+  registerBackgroundActivityList(program)
   registerBackgroundJobCancel(program)
   registerBackgroundJobGet(program)
   registerBackgroundJobList(program)

@@ -167,6 +167,56 @@ describe('javascript session await', () => {
     expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
   })
 
+  it('stores a progress observation from a pending cell and clears it on a plain false', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    const row = await register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({
+        program: `export default async () => ({ pending: true, progress: { note: '3 of 5 checkpoints', done: 3 } })`,
+      }),
+    })
+
+    await runOnceAndFlush()
+
+    expect(readAwait(row.id)).toEqual(
+      expect.objectContaining({
+        status: 'pending',
+        consecutiveErrorCount: 0,
+        lastObservationJson: '{"note":"3 of 5 checkpoints","done":3}',
+      }),
+    )
+    expect(mockedEnqueueSessionQueueItem).not.toHaveBeenCalled()
+
+    updateProgram(row.id, PENDING_PROGRAM)
+    makeDue(row.id)
+    await runOnceAndFlush()
+
+    expect(readAwait(row.id)).toEqual(
+      expect.objectContaining({ status: 'pending', lastObservationJson: null }),
+    )
+  })
+
+  it('fails immediately when a pending result also carries resumeText', async () => {
+    const { workspaceId, sessionId } = seedSession()
+    const row = await register({
+      chatSessionId: sessionId,
+      workspaceId,
+      source: JAVASCRIPT_AWAIT_SOURCE,
+      filterJson: JSON.stringify({
+        program: `export default async () => ({ pending: true, resumeText: 'confused' })`,
+      }),
+    })
+
+    await runOnceAndFlush()
+
+    expect(readAwait(row.id)).toEqual(
+      expect.objectContaining({ status: 'failed', failureKind: 'source' }),
+    )
+    expect(readAwait(row.id)?.lastErrorText).toContain('must not carry resumeText')
+  })
+
   it('triggers the await and enqueues the resume message when the cell completes', async () => {
     const { workspaceId, sessionId } = seedSession()
     const row = await register({

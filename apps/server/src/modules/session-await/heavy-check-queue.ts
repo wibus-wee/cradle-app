@@ -87,9 +87,9 @@ export async function applyCheckResults(
 
     if (adapter.tracksConsecutiveErrors) {
       if (!result.transientError) {
-        service.recordTrackedEvaluationCheck(result.awaitId)
+        service.recordTrackedEvaluationCheck(result.awaitId, undefined, result.observationJson)
       }
- else {
+      else {
         const failed = service.recordTrackedEvaluationFailure(result.awaitId, result.transientError)
         if (failed?.status === 'failed' && adapter.resumeOnFailure) {
           await service.resumeFailedAwait(failed, failed.lastErrorText ?? result.transientError)

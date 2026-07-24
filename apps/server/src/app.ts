@@ -14,6 +14,8 @@ import { agentInteractionRuntime } from './modules/agent-interaction-runtime'
 import { registerAgentToolsMcpServer } from './modules/agent-tools/runtime-registration'
 import { assets } from './modules/assets'
 import { automation } from './modules/automation'
+import { backgroundActivity } from './modules/background-activity'
+import * as BackgroundActivity from './modules/background-activity/service'
 import { backgroundJob } from './modules/background-job'
 import * as BackgroundJobPoller from './modules/background-job/poller'
 import { chatRuntime } from './modules/chat-runtime'
@@ -80,6 +82,7 @@ import { sessionWork, work } from './modules/work'
 import { workflowRules } from './modules/workflow-rules'
 import { workspace } from './modules/workspace'
 import { worktree } from './modules/worktree'
+import * as Worktree from './modules/worktree/service'
 import { RuntimeResourceRegistry } from './runtime-resource-registry'
 
 interface CreateServerAppOptions {
@@ -203,6 +206,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(agentIdentity)
   app.use(automation)
   app.use(assets)
+  app.use(backgroundActivity)
   app.use(backgroundJob)
   app.use(session)
   app.use(sessionEnvironment)
@@ -321,6 +325,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     managedResourceService,
     opencodeRuntimeInstallationService,
   })
+  Worktree.registerStorageMeasurementActivity()
   registerAgentToolsMcpServer()
 
   // Initialize the always-on relay host-connector (connects to the host's own
@@ -357,6 +362,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     stop: flushAllActiveRunSnapshots,
   })
   runtimeResources.register({ name: 'active-chat-runs', phase: 'drain', stop: abortAllRuns })
+  runtimeResources.register({
+    name: 'background-activity',
+    phase: 'cancel',
+    stop: () => BackgroundActivity.stop(),
+  })
   runtimeResources.register({
     name: 'run-snapshot-maintenance',
     phase: 'cancel',

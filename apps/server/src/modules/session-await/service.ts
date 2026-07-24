@@ -79,6 +79,7 @@ const RetryAwaitDeliveryInputSchema = z.object({
 
 const LastCheckedInputSchema = z.object({
   errorText: z.string().nullable().default(null),
+  observationJson: z.string().nullable().optional(),
 })
 
 async function enqueueResume(row: SessionAwait, resumeText: string): Promise<void> {
@@ -478,16 +479,21 @@ export function updateFilterJson(awaitId: string, filterJson: string): void {
 
 // Used by sources that opt into tracksConsecutiveErrors (javascript). Keeps the
 // shared updateLastChecked path free of counter side effects for other sources.
-export function recordTrackedEvaluationCheck(awaitId: string, errorText?: string): void {
-  const input = LastCheckedInputSchema.parse({ errorText })
+// `observationJson` follows the CheckResult contract: a string stores a fresh
+// progress observation, `null` clears it after a clean check, and `undefined`
+// (e.g. an evaluation error) leaves the stored observation untouched.
+export function recordTrackedEvaluationCheck(awaitId: string, errorText?: string, observationJson?: string | null): void {
+  const input = LastCheckedInputSchema.parse({ errorText, observationJson })
   const now = Math.floor(Date.now() / 1000)
   db()
     .update(sessionAwaits)
     .set({
       lastCheckedAt: now,
       lastErrorText: input.errorText,
-      consecutiveErrorCount:
-        input.errorText === null ? 0 : sql`${sessionAwaits.consecutiveErrorCount} + 1`,
+      consecutiveErrorCount: input.errorText === null
+        ? 0
+        : sql`${sessionAwaits.consecutiveErrorCount} + 1`,
+      ...(input.observationJson === undefined ? {} : { lastObservationJson: input.observationJson }),
     })
     .where(and(eq(sessionAwaits.id, awaitId), eq(sessionAwaits.status, 'pending')))
     .run()

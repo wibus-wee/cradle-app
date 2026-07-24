@@ -218,6 +218,15 @@ type ActiveClaudeTurn = {
   outputTextCollector: ReturnType<typeof createBoundedTextCollector>
   endGeneration: (error?: unknown) => void
   interruptRequested: boolean
+  /**
+   * True once this user turn projected any non-terminal UI chunks.
+   * Empty/early top-level `result` must not clear `currentTurn` until this is
+   * set — otherwise later Query output opens an `origin: system` synthetic run
+   * (lifecycle takeover).
+   */
+  hasProjectedOutput: boolean
+  /** Set while an empty main `result` is deferred pending follow-on Query output or input-pull idle. */
+  deferredEmptyResult: boolean
 }
 
 type ActiveClaudeSyntheticTurn = {
@@ -642,16 +651,27 @@ export class ClaudeAgentProvider implements ChatRuntime {
       void this.captureClaudeAgentAccountSnapshot(input.runtimeSession, activeQuery)
       void this.pumpClaudeSessionQuery(sessionId, activeEntry)
     }
- else if (activeEntry.currentTurn) {
-      throw new ProviderRuntimeError(
-        ProviderErrors.requestFailed(
-          this.runtimeKind,
-          'streamTurn',
-          `Claude Agent session already has an active turn: ${sessionId}`,
-        ),
-      )
-    }
  else {
+      if (activeEntry.currentTurn) {
+        const existingTurn = activeEntry.currentTurn
+        if (!existingTurn.hasProjectedOutput) {
+          // Prior turn stayed open after a deferred empty `result` with no follow-on
+          // output. Finish it so the next user send can start cleanly.
+          this.finalizeClaudeUserTurn(activeEntry, existingTurn, {
+            type: 'finish',
+            finishReason: 'stop',
+          })
+        }
+ else {
+          throw new ProviderRuntimeError(
+            ProviderErrors.requestFailed(
+              this.runtimeKind,
+              'streamTurn',
+              `Claude Agent session already has an active turn: ${sessionId}`,
+            ),
+          )
+        }
+      }
       await this.updateActiveQueryUltracode({
         runtimeSession: input.runtimeSession,
         enabled: ultracodeEnabled,
@@ -728,6 +748,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
       outputTextCollector,
       endGeneration,
       interruptRequested: false,
+      hasProjectedOutput: false,
+      deferredEmptyResult: false,
     }
     activeEntry.currentTurn = turn
 
@@ -816,13 +838,14 @@ export class ClaudeAgentProvider implements ChatRuntime {
       entry.pumpRunning = false
       const turn = entry.currentTurn
       if (turn) {
-        this.completeClaudeProviderThreadTurns(entry, turn)
-        turn.endGeneration()
-        entry.currentTurn = null
-        if (turn.interruptRequested) {
-          turn.queue.push({ type: 'abort', reason: 'user' })
-        }
-        turn.queue.close()
+        // Query ended: abort if the user interrupted; otherwise just close the
+        // projection queue (no synthetic `finish` — the consumer may already
+        // have received a terminal chunk, or tests close the mock mid-turn).
+        this.finalizeClaudeUserTurn(
+          entry,
+          turn,
+          turn.interruptRequested ? { type: 'abort', reason: 'user' } : null,
+        )
       }
       await this.completeClaudeSyntheticTurns(entry)
       entry.closed = true
@@ -831,6 +854,61 @@ export class ClaudeAgentProvider implements ChatRuntime {
       entry.inputStream.close()
       this.releaseQuery(sessionId, entry)
     }
+  }
+
+  /**
+   * Close the active user UI turn projection. Does not stop the long-lived SDK Query.
+   */
+  private finalizeClaudeUserTurn(
+    entry: ActiveClaudeQuery,
+    turn: ActiveClaudeTurn,
+    terminalChunk?: UIMessageChunk | null,
+  ): void {
+    if (entry.currentTurn !== turn) {
+      return
+    }
+    turn.deferredEmptyResult = false
+    this.completeClaudeProviderThreadTurns(entry, turn)
+    turn.endGeneration()
+    entry.currentTurn = null
+    if (terminalChunk) {
+      turn.queue.push(terminalChunk)
+    }
+    turn.queue.close()
+    void this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(() => undefined)
+  }
+
+  /**
+   * After an empty main `result`, keep the user turn open for follow-on Query output.
+   * If the SDK instead parks on the next prompt pull, the native turn is idle — finish
+   * the empty UI turn so the next user send is not blocked (harness / true empty reply).
+   */
+  private scheduleDeferredEmptyMainTurnIdleCheck(entry: ActiveClaudeQuery): void {
+    // Bounded retries: after an empty `result`, the pump may still be draining
+    // buffered Query messages before it parks on the next prompt pull. Do not
+    // spin forever — the next `streamTurn` / Query teardown also finalizes
+    // empty turns with no projected output.
+    let attempts = 0
+    const check = () => {
+      if (entry.closed) {
+        return
+      }
+      const turn = entry.currentTurn
+      if (!turn?.deferredEmptyResult || turn.hasProjectedOutput) {
+        return
+      }
+      if (entry.inputStream.isWaitingForPull()) {
+        this.finalizeClaudeUserTurn(entry, turn, {
+          type: 'finish',
+          finishReason: 'stop',
+        })
+        return
+      }
+      if (attempts++ < 8) {
+        setTimeout(check, 0)
+      }
+    }
+    setTimeout(check, 0)
   }
 
   private async handleClaudeSessionMessage(
@@ -940,6 +1018,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
           turn.outputTextCollector.append((chunk as { delta: string }).delta)
         }
         turn.queue.push(chunk)
+        turn.hasProjectedOutput = true
+        turn.deferredEmptyResult = false
       }
     }
  else {
@@ -948,18 +1028,27 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     if (isMainTurnResult) {
       if (turn) {
-        this.completeClaudeProviderThreadTurns(entry, turn)
-        turn.endGeneration()
-        entry.currentTurn = null
-        if (terminalChunk) {
-          turn.queue.push(
-            turn.interruptRequested && message.subtype === 'error_during_execution'
-              ? { type: 'abort', reason: 'user' }
-              : terminalChunk,
-          )
+        const shouldDeferEmptyMainResult = shouldDeferEmptyClaudeMainTurnResult({
+          turn,
+          message,
+          terminalChunk,
+        })
+        if (shouldDeferEmptyMainResult) {
+          // Keep `currentTurn` so subsequent Query messages stay on this user run.
+          // Closing here would clear the turn and reopen work as a system synthetic.
+          turn.deferredEmptyResult = true
+          resetClaudeAgentChunkMapperForTurn(entry.mapperState)
+          this.scheduleDeferredEmptyMainTurnIdleCheck(entry)
+          return
         }
-        turn.queue.close()
-        void this.refreshCompactState({ runtimeSession: entry.runtimeSession }).catch(() => undefined)
+        turn.deferredEmptyResult = false
+        this.finalizeClaudeUserTurn(
+          entry,
+          turn,
+          turn.interruptRequested && message.subtype === 'error_during_execution'
+            ? { type: 'abort', reason: 'user' }
+            : terminalChunk,
+        )
       }
       resetClaudeAgentChunkMapperForTurn(entry.mapperState)
     }
@@ -1074,6 +1163,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         toolCallId: providerThreadId,
         errorText,
       })
+      turn.hasProjectedOutput = true
       return
     }
 
@@ -1097,6 +1187,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         },
       }),
     })
+    turn.hasProjectedOutput = true
   }
 
   private emitClaudeAgentToolApprovalRequest(
@@ -1121,6 +1212,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     for (const chunk of emitClaudeAgentToolApprovalChunks(entry.mapperState, request)) {
       turn.queue.push(chunk)
+      turn.hasProjectedOutput = true
     }
   }
 
@@ -2177,6 +2269,33 @@ function readTerminalProviderThreadErrorText(chunks: UIMessageChunk[]): string |
     (chunk): chunk is Extract<UIMessageChunk, { type: 'error' }> => chunk.type === 'error',
   )
   return error?.errorText ?? null
+}
+
+function shouldDeferEmptyClaudeMainTurnResult(input: {
+  turn: ActiveClaudeTurn
+  message: SDKMessage
+  terminalChunk: UIMessageChunk | undefined
+}): boolean {
+  const { turn, message, terminalChunk } = input
+  if (turn.hasProjectedOutput || turn.interruptRequested) {
+    return false
+  }
+  if (message.type !== 'result') {
+    return false
+  }
+  // Failed/error results still finalize immediately.
+  if (
+    message.subtype === 'error_during_execution'
+    || message.subtype === 'error_max_turns'
+    || message.subtype === 'error_max_budget_usd'
+    || message.subtype === 'error_max_structured_output_retries'
+  ) {
+    return false
+  }
+  if (terminalChunk && terminalChunk.type !== 'finish') {
+    return false
+  }
+  return true
 }
 
 function shouldRouteClaudeMessageToMainSyntheticTurn(
