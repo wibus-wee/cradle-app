@@ -150,6 +150,7 @@
   "workspace.action.remove": "Remove workspace",
   "workspace.action.rename": "Rename",
   "workspace.action.unpin": "Unpin project",
+  "workspace.aria.menu": "Workspace menu",
   "workspace.aria.pinned": "Pinned project",
   "workspace.aria.toggleExpanded": "Toggle workspace collapse state",
   "workspace.dialog.addProject": "Add project",

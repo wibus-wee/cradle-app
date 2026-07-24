@@ -5,7 +5,7 @@ import { useCallback, useMemo } from 'react'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { useProviderTargetModels } from '~/features/agent-runtime/use-agent-models'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
-import { useGitRepositories } from '~/features/git/use-git'
+import { useGitRepositories } from '~/features/git/shared/use-git'
 import { useChatPreferencesQuery } from '~/features/settings/use-chat-preferences'
 import { isElectron, platform } from '~/lib/electron'
 
@@ -292,7 +292,7 @@ export function useChatComposerRuntime({
     }
     // Use the last turn's window occupancy (current context fill), not the
     // session-cumulative `total` which sums every turn and overflows the window.
-    // Mirrors readCompactWindowUsage in context-usage-detail-panel.tsx so the
+    // Mirrors the Context usage adapter so the ring and breakdown panel agree.
     // ring and the breakdown panel agree.
     const windowUsage
       = compactSlotState.last.totalTokens > 0 ? compactSlotState.last : compactSlotState.total

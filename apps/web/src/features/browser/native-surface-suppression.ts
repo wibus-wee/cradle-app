@@ -26,11 +26,16 @@ export const useNativeBrowserSurfaceSuppressionStore
     },
   }))
 
+export function acquireNativeBrowserSurfaceSuppression(): () => void {
+  return useNativeBrowserSurfaceSuppressionStore.getState().acquire()
+}
+
+/** Browser-feature hook for non-primitive overlays owned directly by the app shell. */
 export function useSuppressNativeBrowserSurface(active: boolean): void {
   useEffect(() => {
     if (!active) {
       return
     }
-    return useNativeBrowserSurfaceSuppressionStore.getState().acquire()
+    return acquireNativeBrowserSurfaceSuppression()
   }, [active])
 }

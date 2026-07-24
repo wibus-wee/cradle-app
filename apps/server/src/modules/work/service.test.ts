@@ -113,6 +113,7 @@ function mockSessionAwaitRegister(viewerOwnsPersonalRepository = false) {
     fireAt: null,
     lastCheckedAt: null,
     lastErrorText: null,
+    lastObservationJson: null,
     consecutiveErrorCount: 0,
   }))
 }

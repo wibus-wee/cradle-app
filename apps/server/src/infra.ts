@@ -1,6 +1,7 @@
 import type { dbSchema } from '@cradle/db'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 
+import type { ServerBootstrapReporter } from './bootstrap-lifecycle'
 import type { ServerConfigValues } from './config/server-config'
 import { ServerConfig } from './config/server-config'
 import { DatabaseConfig } from './database/database.config'
@@ -88,13 +89,13 @@ export function getLogger(): Logger {
   return _logger
 }
 
-function ensureDbProvider(): DbProvider {
+function ensureDbProvider(bootstrapReporter?: ServerBootstrapReporter): DbProvider {
   refreshInfraForEnv()
   if (!_dbProvider) {
     const sc = _serverConfig ?? (_serverConfig = new ServerConfig())
     const dbConfig = new DatabaseConfig(sc)
     _dbProvider = new DbProvider(dbConfig)
-    new MigrationRunner(_dbProvider, dbConfig, getLogger()).onModuleInit()
+    new MigrationRunner(_dbProvider, dbConfig, getLogger(), bootstrapReporter).onModuleInit()
   }
   return _dbProvider
 }
@@ -102,6 +103,11 @@ function ensureDbProvider(): DbProvider {
 /** Return the raw drizzle database instance — the one thing services actually need. */
 export function db(): BetterSQLite3Database<typeof dbSchema> {
   return ensureDbProvider().getDb()
+}
+
+/** Initialize the database before other bootstrap services acquire it lazily. */
+export function initializeDatabase(bootstrapReporter?: ServerBootstrapReporter): void {
+  ensureDbProvider(bootstrapReporter)
 }
 
 /** Gracefully close the database and clear all cached singletons. */

@@ -9,7 +9,7 @@ import { cradleIssueAgentSource } from './sources/cradle-issue-agent'
 import { cradleIssueStatusSource } from './sources/cradle-issue-status'
 import { fetchLiveCIStatus, githubCISource } from './sources/github-ci'
 import { fetchLiveReviewStatus, githubReviewSource } from './sources/github-review'
-import { javascriptAwaitSource } from './sources/javascript'
+import { JAVASCRIPT_AWAIT_SOURCE, javascriptAwaitSource, previewJavaScriptAwait } from './sources/javascript'
 
 export const sessionAwait = new Elysia({
   prefix: '/session-awaits',
@@ -158,6 +158,22 @@ export const sessionAwait = new Elysia({
     params: SessionAwaitModel.idParams,
     body: SessionAwaitModel.bypassCheckBody,
     response: { 200: SessionAwaitModel.sessionAwait },
+  })
+  .post('/:id/evaluate-now', async ({ params }) => {
+    const row = SessionAwait.get(params.id)
+    if (!row) {
+      throw new AppError({ code: 'session_await_not_found', status: 404, message: 'Session await not found' })
+    }
+    if (row.source !== JAVASCRIPT_AWAIT_SOURCE || row.status !== 'pending') {
+      throw new AppError({ code: 'session_await_not_evaluatable', status: 409, message: 'Only pending javascript awaits can be evaluated on demand' })
+    }
+    return previewJavaScriptAwait(row)
+  }, {
+    detail: {
+      summary: 'Evaluate a pending javascript await cell once',
+    },
+    params: SessionAwaitModel.idParams,
+    response: { 200: SessionAwaitModel.evaluateNowResponse },
   })
   .get('/:id/live-status', async ({ params }) => {
     const row = SessionAwait.get(params.id)

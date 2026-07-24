@@ -1,10 +1,9 @@
-import type { MouseEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
-import type { PullRequestView } from './api/pull-requests'
-
-type PullRequestTabTarget = Pick<PullRequestView, 'owner' | 'repo' | 'number' | 'url' | 'title'>
+import type { PullRequestTabTarget } from './pull-request-tab-link-view'
+import { PullRequestTabLinkView } from './pull-request-tab-link-view'
 
 interface PullRequestTabLinkProps {
   pullRequest: PullRequestTabTarget
@@ -31,19 +30,7 @@ export function PullRequestTabLink({
 }: PullRequestTabLinkProps) {
   const openPullRequestTab = useBrowserPanelStore(state => state.openPullRequestTab)
 
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (
-      event.defaultPrevented
-      || event.button !== 0
-      || event.metaKey
-      || event.ctrlKey
-      || event.shiftKey
-      || event.altKey
-    ) {
-      return
-    }
-
-    event.preventDefault()
+  const handleOpen = () => {
     openPullRequestTab({
       owner: pullRequest.owner,
       repo: pullRequest.repo,
@@ -56,15 +43,13 @@ export function PullRequestTabLink({
   }
 
   return (
-    <a
+    <PullRequestTabLinkView
+      pullRequest={pullRequest}
       className={className}
-      href={pullRequest.url}
-      target="_blank"
-      rel="noreferrer"
       title={title ?? pullRequest.title}
-      onClick={handleClick}
+      onOpen={handleOpen}
     >
       {children}
-    </a>
+    </PullRequestTabLinkView>
   )
 }

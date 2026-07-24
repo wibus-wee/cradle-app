@@ -32,6 +32,7 @@ import { register as registerAutomationRunTriage } from './automation/run/triage
 import { register as registerAutomationRuns } from './automation/runs'
 import { register as registerAutomationTriageList } from './automation/triage/list'
 import { register as registerAutomationUpdate } from './automation/update'
+import { register as registerBackgroundActivityList } from './background-activity/list'
 import { register as registerBackgroundJobCancel } from './background-job/cancel'
 import { register as registerBackgroundJobGet } from './background-job/get'
 import { register as registerBackgroundJobList } from './background-job/list'
@@ -174,9 +175,6 @@ import { register as registerManagedResourcesInstall } from './managed-resources
 import { register as registerManagedResourcesList } from './managed-resources/list'
 import { register as registerManagedResourcesUninstall } from './managed-resources/uninstall'
 import { register as registerManagedResourcesUpdate } from './managed-resources/update'
-import { register as registerMcpServerDelete } from './mcp-server/delete'
-import { register as registerMcpServerList } from './mcp-server/list'
-import { register as registerMcpServerSetEnabled } from './mcp-server/set-enabled'
 import { register as registerObservabilityErrorPatterns } from './observability/error-patterns'
 import { register as registerObservabilityEvents } from './observability/events'
 import { register as registerObservabilityExport } from './observability/export'
@@ -391,6 +389,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerAutomationRuns(program)
   registerAutomationTriageList(program)
   registerAutomationUpdate(program)
+  registerBackgroundActivityList(program)
   registerBackgroundJobCancel(program)
   registerBackgroundJobGet(program)
   registerBackgroundJobList(program)
@@ -533,9 +532,6 @@ export function registerGeneratedCommands(program: Command): void {
   registerManagedResourcesList(program)
   registerManagedResourcesUninstall(program)
   registerManagedResourcesUpdate(program)
-  registerMcpServerDelete(program)
-  registerMcpServerList(program)
-  registerMcpServerSetEnabled(program)
   registerObservabilityErrorPatterns(program)
   registerObservabilityEvents(program)
   registerObservabilityExport(program)

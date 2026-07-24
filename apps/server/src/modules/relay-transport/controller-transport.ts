@@ -11,6 +11,7 @@ import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
 import type { RelayEnvelope } from './protocol'
 import { decodeRelayEnvelope } from './protocol'
 import { RelaySession } from './session'
+import { closeRelayWebSocket } from './websocket'
 import { relayWebSocketDataView } from './websocket-data'
 
 /**
@@ -380,10 +381,7 @@ class ControllerTransport {
     this.session?.close()
     this.session = null
     if (this.ws) {
-      this.ws.removeAllListeners()
-      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-        this.ws.close()
-      }
+      closeRelayWebSocket(this.ws)
       this.ws = null
     }
     if (this.server) {

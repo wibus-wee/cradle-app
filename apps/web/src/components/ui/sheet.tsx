@@ -1,8 +1,8 @@
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
-import { useSuppressNativeBrowserSurface } from "~/features/browser/native-surface-suppression"
 import { cn } from "~/lib/cn"
+import { useSuppressOverlayHostSurfaces } from './overlay-environment'
 import { Button } from "~/components/ui/button"
 import { CloseLine as XIcon } from '@mingcute/react'
 function Sheet({
@@ -13,7 +13,7 @@ function Sheet({
 }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(Boolean(defaultOpen))
   const active = open ?? uncontrolledOpen
-  useSuppressNativeBrowserSurface(active)
+  useSuppressOverlayHostSurfaces(active)
 
   const handleOpenChange = (nextOpen: boolean) => {
     setUncontrolledOpen(nextOpen)

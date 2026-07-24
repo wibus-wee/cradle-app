@@ -1080,7 +1080,7 @@ body {
 [data-pre-mounted] .sd-code-lang {
   font-size: 0.8em;
   font-weight: 500;
-  color: var(--muted-foreground);
+  color: color-mix(in srgb, var(--muted-foreground) 88%, var(--foreground));
   user-select: none;
 }
 

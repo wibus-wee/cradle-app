@@ -43,7 +43,6 @@ import { Elysia, t } from 'elysia'
 
 import { db, getServerConfig } from '../../infra'
 import { abortAllRuns } from '../chat-runtime/runtime'
-import { resetCustomMcpServerService } from '../mcp-servers/service'
 
 const TABLES_IN_DELETION_ORDER = [
   downloadCenterTasks,
@@ -111,12 +110,6 @@ function resolveIsolatedPreferencesDir(): string | null {
   return path.join(path.resolve(dataDir), 'preferences')
 }
 
-function resolveMcpServersDir(): string | null {
-  const config = getServerConfig()
-  const dataDir = config.dataDir ?? path.dirname(config.dbPath)
-  return dataDir ? path.join(path.resolve(dataDir), 'mcp-servers') : null
-}
-
 export const testReset = new Elysia({
   prefix: '/test/reset',
   detail: { tags: ['test-reset'] },
@@ -151,18 +144,7 @@ export const testReset = new Elysia({
         fs.rmSync(preferencesDir, { recursive: true, force: true })
       }
     }
-    catch {
-      /* best effort */
-    }
-
-    const mcpServersDir = resolveMcpServersDir()
-    try {
-      if (mcpServersDir && fs.existsSync(mcpServersDir)) {
-        fs.rmSync(mcpServersDir, { recursive: true, force: true })
-      }
-      resetCustomMcpServerService()
-    }
-    catch {
+ catch {
       /* best effort */
     }
 
