@@ -21,9 +21,10 @@
 
 Registration stores `{ program }` in `filterJson` — the program is immutable for the await's lifetime; a changed condition means a new await. The preferred input is an inline bare function such as `async ({ tools, cwd }) => false`; a complete ES module with a default export is also accepted. Registration preflights normalized module syntax in a disposable Node process without importing or executing it, rejecting invalid programs with `session_await_program_invalid`. A non-function default export becomes a permanent program error on its first real evaluation.
 
-Each due check evaluates the cell with the await workspace's local path as `cwd` (non-local or missing workspaces are terminal failures). Evaluations run on the session-await heavy-check queue (`execution: 'queued'`) with bounded concurrency so they never block inline sources such as `github-ci`. The cell contract is `false | { resumeText, payload? }`:
+Each due check evaluates the cell with the await workspace's local path as `cwd` (non-local or missing workspaces are terminal failures). Evaluations run on the session-await heavy-check queue (`execution: 'queued'`) with bounded concurrency so they never block inline sources such as `github-ci`. The cell contract is `false | { pending: true, progress? } | { resumeText, payload? }`:
 
-- `false` — condition still pending; the await stays pending.
+- `false` — condition still pending; the await stays pending and any stored observation is cleared.
+- `{ pending: true, progress? }` — condition still pending; `progress` is an optional JSON-serializable observation (at most `MAX_OBSERVATION_BYTES`, 8 KiB, when serialized) stored on the row as `lastObservationJson` and surfaced in the UI so a pending await is not a black box. A pending result must not also carry `resumeText` or `payload`.
 - `{ resumeText, payload? }` — condition met; the await triggers with the resume text. `payload` must be JSON-serializable and at most `MAX_RESUME_PAYLOAD_BYTES` (32 KiB) when serialized.
 - Anything else (`undefined`, `null`, `true`, blank `resumeText`) is an invalid result and fails the await immediately.
 

@@ -2698,7 +2698,7 @@ export type GetRemoteHostsResponses = {
         capabilitiesJson: string;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'connected' | 'offline';
+        connectionState: 'idle' | 'warming' | 'connected' | 'offline';
         lastError: string | null;
     }>;
 };
@@ -2757,7 +2757,7 @@ export type PostRemoteHostsResponses = {
         capabilitiesJson: string;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'connected' | 'offline';
+        connectionState: 'idle' | 'warming' | 'connected' | 'offline';
         lastError: string | null;
     };
 };
@@ -2837,7 +2837,7 @@ export type PatchRemoteHostsByHostIdResponses = {
         capabilitiesJson: string;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'connected' | 'offline';
+        connectionState: 'idle' | 'warming' | 'connected' | 'offline';
         lastError: string | null;
     };
 };
@@ -2859,9 +2859,33 @@ export type PostRemoteHostsByHostIdCradleServerConnectResponses = {
      */
     200: {
         hostId: string;
-        state: 'idle' | 'connected' | 'offline';
+        state: 'idle' | 'warming' | 'connected' | 'offline';
         localBaseUrl: string | null;
         lastError: string | null;
+        relayPerformance: {
+            connectionAttempts: Array<{
+                attempt: number;
+                startedAt: number;
+                websocketOpenedAt: number | null;
+                handshakeReadyAt: number | null;
+                failedAt: number | null;
+            }>;
+            localListenerReadyAt: number | null;
+            activeStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+            completedStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+        } | null;
     };
 };
 
@@ -2902,9 +2926,33 @@ export type GetRemoteHostsByHostIdCradleServerHealthResponses = {
      */
     200: {
         hostId: string;
-        state: 'idle' | 'connected' | 'offline';
+        state: 'idle' | 'warming' | 'connected' | 'offline';
         localBaseUrl: string | null;
         lastError: string | null;
+        relayPerformance: {
+            connectionAttempts: Array<{
+                attempt: number;
+                startedAt: number;
+                websocketOpenedAt: number | null;
+                handshakeReadyAt: number | null;
+                failedAt: number | null;
+            }>;
+            localListenerReadyAt: number | null;
+            activeStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+            completedStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+        } | null;
         status: string;
         health: {
             status: string;
@@ -2945,9 +2993,33 @@ export type PostRemoteHostsByHostIdCradleServerTestResponses = {
      */
     200: {
         hostId: string;
-        state: 'idle' | 'connected' | 'offline';
+        state: 'idle' | 'warming' | 'connected' | 'offline';
         localBaseUrl: string | null;
         lastError: string | null;
+        relayPerformance: {
+            connectionAttempts: Array<{
+                attempt: number;
+                startedAt: number;
+                websocketOpenedAt: number | null;
+                handshakeReadyAt: number | null;
+                failedAt: number | null;
+            }>;
+            localListenerReadyAt: number | null;
+            activeStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+            completedStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+        } | null;
         status: string;
         health: {
             status: string;
@@ -2990,9 +3062,33 @@ export type PostRemoteHostsByHostIdRelayClaimResponses = {
      */
     200: {
         hostId: string;
-        state: 'idle' | 'connected' | 'offline';
+        state: 'idle' | 'warming' | 'connected' | 'offline';
         localBaseUrl: string | null;
         lastError: string | null;
+        relayPerformance: {
+            connectionAttempts: Array<{
+                attempt: number;
+                startedAt: number;
+                websocketOpenedAt: number | null;
+                handshakeReadyAt: number | null;
+                failedAt: number | null;
+            }>;
+            localListenerReadyAt: number | null;
+            activeStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+            completedStreams: Array<{
+                streamId: string;
+                openedAt: number;
+                firstRequestByteAt: number | null;
+                firstResponseByteAt: number | null;
+                closedAt: number | null;
+            }>;
+        } | null;
     };
 };
 
@@ -6016,6 +6112,69 @@ export type GetAssetsByIdContentData = {
     url: '/assets/{id}/content';
 };
 
+export type GetBackgroundActivitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/background-activities';
+};
+
+export type GetBackgroundActivitiesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        ownerNamespace: string;
+        key: string;
+        title: string;
+        priority: 'low' | 'normal' | 'high';
+        trigger: string;
+        manuallyRunnable: boolean;
+        status: 'idle' | 'running' | 'succeeded' | 'failed';
+        progress: unknown;
+        lastError: string | null;
+        createdAt: number;
+        updatedAt: number;
+        startedAt: number | null;
+        finishedAt: number | null;
+    }>;
+};
+
+export type GetBackgroundActivitiesResponse = GetBackgroundActivitiesResponses[keyof GetBackgroundActivitiesResponses];
+
+export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunData = {
+    body?: never;
+    path: {
+        ownerNamespace: string;
+        key: string;
+    };
+    query?: never;
+    url: '/background-activities/{ownerNamespace}/{key}/run';
+};
+
+export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ownerNamespace: string;
+        key: string;
+        title: string;
+        priority: 'low' | 'normal' | 'high';
+        trigger: string;
+        manuallyRunnable: boolean;
+        status: 'idle' | 'running' | 'succeeded' | 'failed';
+        progress: unknown;
+        lastError: string | null;
+        createdAt: number;
+        updatedAt: number;
+        startedAt: number | null;
+        finishedAt: number | null;
+    };
+};
+
+export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponse = PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses[keyof PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses];
+
 export type GetBackgroundJobsData = {
     body?: never;
     path?: never;
@@ -9017,6 +9176,7 @@ export type GetSessionAwaitsResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     }>;
 };
@@ -9060,6 +9220,7 @@ export type PostSessionAwaitsResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9097,6 +9258,7 @@ export type GetSessionAwaitsByIdResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9134,6 +9296,7 @@ export type PostSessionAwaitsByIdCancelResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9174,6 +9337,7 @@ export type PostSessionAwaitsByIdTriggerResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9214,6 +9378,7 @@ export type PostSessionAwaitsByIdRetryDeliveryResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9323,11 +9488,37 @@ export type PostSessionAwaitsByIdBypassCheckResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
+        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
 
 export type PostSessionAwaitsByIdBypassCheckResponse = PostSessionAwaitsByIdBypassCheckResponses[keyof PostSessionAwaitsByIdBypassCheckResponses];
+
+export type PostSessionAwaitsByIdEvaluateNowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/session-awaits/{id}/evaluate-now';
+};
+
+export type PostSessionAwaitsByIdEvaluateNowResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+        matched?: boolean;
+        observationJson?: string | null;
+        resumeText?: string;
+        resumePayloadJson?: string;
+        error?: string;
+    };
+};
+
+export type PostSessionAwaitsByIdEvaluateNowResponse = PostSessionAwaitsByIdEvaluateNowResponses[keyof PostSessionAwaitsByIdEvaluateNowResponses];
 
 export type GetSessionAwaitsByIdLiveStatusData = {
     body?: never;
@@ -12749,6 +12940,7 @@ export type GetWorkspacesByWorkspaceIdGitDiffData = {
     query?: {
         repo?: string;
         paths?: string;
+        sessionId?: string;
     };
     url: '/workspaces/{workspaceId}/git/diff';
 };
@@ -12841,6 +13033,8 @@ export type GetWorktreesManagedResponses = {
             createdAt: number;
             updatedAt: number;
             sizeBytes: number;
+            sizeMeasuredAt: number | null;
+            sizeMeasurementError: string | null;
             sessionCount: number;
         }>;
         totalSizeBytes: number;
@@ -12877,6 +13071,8 @@ export type PostWorktreesCleanupResponses = {
             createdAt: number;
             updatedAt: number;
             sizeBytes: number;
+            sizeMeasuredAt: number | null;
+            sizeMeasurementError: string | null;
             sessionCount: number;
         }>;
         skipped: number;
@@ -21277,7 +21473,7 @@ export type GetChatSessionsBySessionIdQueueResponses = {
         items: Array<{
             id: string;
             sessionId: string;
-            mode: string;
+            mode: 'queue' | 'steer';
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
@@ -21410,7 +21606,7 @@ export type PostChatSessionsBySessionIdQueueResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: string;
+        mode: 'queue' | 'steer';
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
@@ -21557,7 +21753,7 @@ export type PostChatSessionsBySessionIdSteerResponses = {
         queueItem: {
             id: string;
             sessionId: string;
-            mode: string;
+            mode: 'queue' | 'steer';
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
@@ -21641,7 +21837,7 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
         items: Array<{
             id: string;
             sessionId: string;
-            mode: string;
+            mode: 'queue' | 'steer';
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
@@ -21723,7 +21919,7 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: string;
+        mode: 'queue' | 'steer';
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
@@ -21856,7 +22052,7 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: string;
+        mode: 'queue' | 'steer';
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{

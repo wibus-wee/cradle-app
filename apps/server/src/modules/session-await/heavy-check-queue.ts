@@ -86,7 +86,7 @@ export async function applyCheckResults(
     }
 
     if (adapter.tracksConsecutiveErrors) {
-      service.recordTrackedEvaluationCheck(result.awaitId, result.transientError)
+      service.recordTrackedEvaluationCheck(result.awaitId, result.transientError, result.observationJson)
     }
     else {
       service.updateLastChecked(result.awaitId, result.transientError)
