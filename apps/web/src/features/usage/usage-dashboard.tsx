@@ -1,23 +1,209 @@
-import { useResolvedThemeMode } from '~/store/theme'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { UsageDashboardView } from './usage-dashboard-view'
+import { Skeleton } from '~/components/ui/skeleton'
+import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
+import { cn } from '~/lib/cn'
+import { formatTokenCount } from '~/lib/number-format'
+
+import { UsageBreakdown } from './usage-breakdown'
+import { UsageHeatmap } from './usage-heatmap'
+import { UsageHeroCards } from './usage-hero-cards'
+import { UsagePatterns } from './usage-patterns'
+import type { UsageRangeKey } from './usage-time-range'
+import { USAGE_RANGE_OPTIONS } from './usage-time-range'
+import { UsageTrendChart } from './usage-trend-chart'
+import type { UsageStats, UsageSummary } from './use-usage-overview'
 import { useUsageOverview } from './use-usage-overview'
 
 export function UsageDashboard() {
-  const usage = useUsageOverview()
-  const themeMode = useResolvedThemeMode()
+  const { t } = useTranslation('usage')
+  const [range, setRange] = useState<UsageRangeKey>('30d')
+  const { daily, dailyByModel, hourly, summary, stats, costSummary, dailyCost, usageReady, hasData } = useUsageOverview()
+
+  const hasCost = Boolean(costSummary && costSummary.totalCostUsd > 0)
+  const hasRankedUsage = Boolean(
+    summary
+    && (summary.byModel.length > 0 || summary.byAgent.length > 0 || summary.byProviderTarget.length > 0),
+  )
 
   return (
-    <UsageDashboardView
-      daily={usage.daily}
-      dailyByModel={usage.dailyByModel}
-      hourly={usage.hourly}
-      summary={usage.summary}
-      stats={usage.stats}
-      costSummary={usage.costSummary}
-      dailyCost={usage.dailyCost}
-      usageReady={usage.usageReady}
-      themeMode={themeMode}
-    />
+    <div
+      className="h-full overflow-y-auto"
+      data-testid="usage-dashboard"
+      data-usage-ready={usageReady ? 'true' : 'false'}
+    >
+      <div className="relative mx-auto max-w-5xl px-8 py-10">
+        {/* Soft ambient glow behind the header/hero region - the one deliberate
+            spot of "texture" on an otherwise flat, functional page. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-32 left-1/2 -z-10 h-80 w-[640px] -translate-x-1/2 rounded-full bg-blue-500/[0.07] blur-3xl"
+        />
+
+        {/* Header row with time range selector */}
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground text-balance" data-testid="usage-dashboard-title">{t('title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
+          </div>
+          {hasData && (
+            <ToggleGroup
+              type="single"
+              value={range}
+              onValueChange={(value) => {
+                if (value) { setRange(value as UsageRangeKey) }
+              }}
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-px rounded-md"
+            >
+              {USAGE_RANGE_OPTIONS.map(option => (
+                <ToggleGroupItem key={option.key} value={option.key} className="h-7 px-2.5 text-xs tabular-nums">
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          )}
+        </div>
+
+        {/* Loading skeleton - first paint only, before any cached data exists */}
+        {!usageReady && !hasData && <UsageDashboardSkeleton />}
+
+        {/* Main dashboard body. Deliberately mixed: the opening KPI/trend zone
+            stays card-less (big numbers and a floating chart carry it), then
+            a hairline marks the switch into the denser, boxed "widgets" below
+            - one visual language for the whole page would read as flat. */}
+        {usageReady && hasData && summary && stats && (
+          <div className="mt-10">
+            <UsageHeroCards
+              daily={daily}
+              dailyCost={dailyCost}
+              stats={stats}
+              range={range}
+              hasCost={hasCost}
+            />
+
+            <SecondaryStats summary={summary} stats={stats} />
+
+            <div className="mt-10">
+              <UsageTrendChart dailyCost={dailyCost} dailyByModel={dailyByModel} range={range} hasCost={hasCost} />
+            </div>
+
+            <div className="mt-12 space-y-8 border-t border-foreground/8 pt-10">
+              <SectionCard>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-blue-500" />
+                    <h2 className="text-sm font-semibold text-foreground">{t('heatmap.title')}</h2>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('heatmap.description')}</p>
+                </div>
+                <div className="mt-4">
+                  <UsageHeatmap data={daily} dailyByModel={dailyByModel} />
+                </div>
+              </SectionCard>
+
+              {hasRankedUsage && (
+                <SectionCard>
+                  <UsageBreakdown summary={summary} costSummary={costSummary} />
+                </SectionCard>
+              )}
+
+              <SectionCard>
+                <UsagePatterns daily={daily} dailyByModel={dailyByModel} hourly={hourly} />
+              </SectionCard>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {usageReady && summary && summary.totalTokens === 0 && (
+          <div className="mt-20 text-center" data-testid="usage-empty-state">
+            <p className="text-sm text-muted-foreground">
+              {t('empty.noData')}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SectionCard({ children, className }: { children: React.ReactNode, className?: string }) {
+  return (
+    <div
+      className={cn(
+        'rounded-2xl bg-card p-5 ring-1 ring-foreground/8 shadow-[0_1px_2px_rgba(0,0,0,0.03),0_4px_10px_-4px_rgba(0,0,0,0.04)]',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+const SKELETON_HERO_KEYS = ['hero-1', 'hero-2', 'hero-3', 'hero-4']
+const SKELETON_STAT_KEYS = ['stat-1', 'stat-2', 'stat-3', 'stat-4', 'stat-5', 'stat-6']
+
+function UsageDashboardSkeleton() {
+  return (
+    <div className="mt-10">
+      <div className="flex flex-wrap gap-x-10 gap-y-6">
+        {SKELETON_HERO_KEYS.map(key => (
+          <div key={key} className="space-y-2">
+            <Skeleton className="h-3 w-16 rounded-full" />
+            <Skeleton className="h-8 w-24 rounded-md" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-foreground/6 pt-5">
+        {SKELETON_STAT_KEYS.map(key => (
+          <Skeleton key={key} className="h-8 w-20 rounded-md" />
+        ))}
+      </div>
+      <Skeleton className="mt-10 h-64 rounded-2xl" />
+      <div className="mt-12 space-y-8 border-t border-foreground/8 pt-10">
+        <Skeleton className="h-48 rounded-2xl" />
+        <Skeleton className="h-48 rounded-2xl" />
+      </div>
+    </div>
+  )
+}
+
+// Secondary detail row - a quiet "meta stats" strip beneath the flashier
+// headline numbers above. Card-less like the rest of the hero zone, just
+// hairline-topped to read as "supporting detail" for what's above rather
+// than a new section. Deliberately neutral/monochrome (color already lives
+// in the hero numbers and charts - Von Restorff: if everything is colorful,
+// nothing stands out).
+function SecondaryStats({ summary, stats }: { summary: UsageSummary, stats: UsageStats }) {
+  const { t } = useTranslation('usage')
+  const cells: Array<{ label: string, value: string, testId: string }> = [
+    { label: t('pill.today'), value: formatTokenCount(stats.todayTokens), testId: 'usage-pill-today-tokens' },
+    { label: t('pill.prompt'), value: formatTokenCount(summary.totalPromptTokens), testId: 'usage-pill-prompt-tokens' },
+    { label: t('pill.completion'), value: formatTokenCount(summary.totalCompletionTokens), testId: 'usage-pill-completion-tokens' },
+    { label: t('pill.turns'), value: String(summary.totalTurns), testId: 'usage-pill-total-turns' },
+    { label: t('pill.avgDaily'), value: formatTokenCount(stats.avgDailyTokens), testId: 'usage-pill-avg-daily-tokens' },
+    { label: t('pill.activeDays'), value: String(stats.activeDays), testId: 'usage-pill-active-days' },
+    { label: t('pill.bestStreak'), value: `${stats.longestStreak}d`, testId: 'usage-pill-best-streak' },
+  ]
+  if (stats.peakDay) {
+    cells.push({
+      label: t('pill.peak'),
+      value: t('pill.peakValue', { tokens: formatTokenCount(stats.peakDay.totalTokens), date: stats.peakDay.date.slice(5) }),
+      testId: 'usage-pill-peak-day',
+    })
+  }
+
+  return (
+    <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-foreground/6 pt-5">
+      {cells.map(cell => (
+        <div key={cell.testId} className="min-w-[92px]" data-testid={cell.testId}>
+          <p className="text-[10.5px] text-muted-foreground" data-testid={`${cell.testId}-label`}>{cell.label}</p>
+          <p className="mt-0.5 text-[13px] font-medium tabular-nums text-foreground" data-testid={`${cell.testId}-value`}>{cell.value}</p>
+        </div>
+      ))}
+    </div>
   )
 }

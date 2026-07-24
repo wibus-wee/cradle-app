@@ -51,8 +51,6 @@ interface ManagedWorktree {
   createdAt: number
   updatedAt: number
   sizeBytes: number
-  sizeMeasuredAt: number | null
-  sizeMeasurementError: string | null
   sessionCount: number
 }
 
@@ -191,7 +189,7 @@ function WorktreeRow({ worktree, busy, onCleanup }: WorktreeRowProps) {
         <div className="flex min-w-0 items-center gap-2">
           <GitBranchIcon className="size-3.5 shrink-0 !text-muted-foreground" aria-hidden="true" />
           <span className="truncate text-[13px] font-medium text-foreground">{worktree.name}</span>
-          <Badge variant="outline">{worktree.sizeMeasuredAt ? formatBytes(worktree.sizeBytes) : 'Not measured'}</Badge>
+          <Badge variant="outline">{formatBytes(worktree.sizeBytes)}</Badge>
           {worktree.sessionCount > 0 && (
             <Badge variant="secondary">
               {t('worktrees.list.boundSessions', { count: worktree.sessionCount })}
@@ -206,7 +204,6 @@ function WorktreeRow({ worktree, busy, onCleanup }: WorktreeRowProps) {
           <span>{t('worktrees.list.createdAt', { value: formatDate(worktree.createdAt) })}</span>
         </div>
         <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground/80">{worktree.path}</p>
-        {worktree.sizeMeasurementError && <p className="mt-1 text-[11px] text-destructive">{worktree.sizeMeasurementError}</p>}
       </div>
       <Button
         type="button"

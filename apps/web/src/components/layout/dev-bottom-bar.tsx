@@ -8,7 +8,6 @@ import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Switch } from '~/components/ui/switch'
-import { BackgroundActivityPopover } from '~/features/devtool/background-activity/background-activity-popover'
 import { ResourcesPopover } from '~/features/devtool/resources/resources-popover'
 import { isElectron, nativeIpc } from '~/lib/electron'
 import { getReactDiagnosticsApi } from '~/lib/react-diagnostics'
@@ -101,7 +100,6 @@ export function DevBottomBar() {
           <FolderOpenIcon className="inline-block size-3.5" aria-hidden="true" />
           {t('dev.action.openUserData')}
         </button>
-        <BackgroundActivityPopover />
         <ResourcesPopover />
       </div>
     </footer>

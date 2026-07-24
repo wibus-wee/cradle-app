@@ -15,7 +15,6 @@ User-facing diagnostic labels and status text are owned by the `devtool` i18n na
 - **observability/**: Canonical observability event/incident inspection and local export controls
 - **plugins/**: Plugin discovery, layer state, declared/runtime contribution graph, client panel registration, and command execution diagnostics
 - **resources/**: AppHeader resources popover with renderer, server, CLI TUI, bottom-panel process memory breakdown, and partial endpoint failure feedback
-- **background-activity/**: Dev footer popover for the server-owned registry of runtime maintenance and other background activity
 - **surfaces/**: Router and app surface diagnostics for active route, opened surfaces, ordering, and owner identity
 
 ## Files

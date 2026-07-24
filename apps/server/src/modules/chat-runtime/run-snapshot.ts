@@ -17,7 +17,6 @@ import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { OBSERVABILITY_CODES } from '../observability/contract'
 import * as Observability from '../observability/service'
-import { projectRecallToolEvent } from '../recall/public'
 
 const logger = createChildLogger({ module: 'chat-runtime.run-snapshot' })
 
@@ -158,13 +157,9 @@ export function readMaxRunSnapshotEvents(): number {
 }
 
 function readRunSnapshotEventsReadLimit(): number {
-  return readPositiveIntegerEnv(
-    'CRADLE_CHAT_RUN_SNAPSHOT_EVENTS_READ_LIMIT',
-    DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT,
-  )
+  return readPositiveIntegerEnv('CRADLE_CHAT_RUN_SNAPSHOT_EVENTS_READ_LIMIT', DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT)
 }
-const SnapshotRecordSchema = z
-  .string()
+const SnapshotRecordSchema = z.string()
   .transform(raw => JSON.parse(raw))
   .pipe(z.record(z.string(), z.unknown()))
 let lastRetentionPruneAt = 0
@@ -197,15 +192,13 @@ export function startRunSnapshot(input: StartRunSnapshotInput): ChatRunSnapshot 
     db().insert(backendRunSnapshots).values(row).run()
     return toChatRunSnapshot(row as BackendRunSnapshot, [])
   }
- catch (error) {
+  catch (error) {
     logger.error('failed to start run snapshot', { input, error })
     return null
   }
 }
 
-export function appendRunSnapshotEvent(
-  input: AppendRunSnapshotEventInput,
-): ChatRunSnapshotEvent | null {
+export function appendRunSnapshotEvent(input: AppendRunSnapshotEventInput): ChatRunSnapshotEvent | null {
   const row: NewBackendRunSnapshotEvent = {
     id: randomUUID(),
     snapshotId: input.snapshotId,
@@ -227,12 +220,10 @@ export function appendRunSnapshotEvent(
   }
 
   try {
-    const d = db()
-    d.insert(backendRunSnapshotEvents).values(row).run()
-    projectRecallToolEvent(d, { sourceEventId: row.id })
+    db().insert(backendRunSnapshotEvents).values(row).run()
     return toChatRunSnapshotEvent(row as BackendRunSnapshotEvent)
   }
- catch (error) {
+  catch (error) {
     logger.error('failed to append run snapshot event', { input, error })
     return null
   }
@@ -246,8 +237,7 @@ export function appendRunSnapshotEvent(
  */
 export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPayloadInput): void {
   try {
-    const d = db()
-    const result = d
+    db()
       .update(backendRunSnapshotEvents)
       .set({
         payloadJson: stringifySnapshotRecord(input.payload),
@@ -256,11 +246,8 @@ export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPaylo
       })
       .where(eq(backendRunSnapshotEvents.id, input.eventId))
       .run()
-    if (result.changes > 0) {
-      projectRecallToolEvent(d, { sourceEventId: input.eventId })
-    }
   }
- catch (error) {
+  catch (error) {
     logger.error('failed to update run snapshot event payload', { input, error })
   }
 }
@@ -294,10 +281,7 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
         .update(backendRunSnapshots)
         .set(values)
         .where(
-          and(
-            eq(backendRunSnapshots.id, input.snapshotId),
-            eq(backendRunSnapshots.status, 'running'),
-          ),
+          and(eq(backendRunSnapshots.id, input.snapshotId), eq(backendRunSnapshots.status, 'running')),
         )
         .run()
 
@@ -326,7 +310,7 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
       })
     }
   }
- catch (error) {
+  catch (error) {
     logger.error('failed to finalize run snapshot', { input, error })
   }
 }
@@ -347,24 +331,22 @@ export function getRunSnapshots(filter: RunSnapshotFilter = {}): ChatRunSnapshot
   }
 
   const limit = clampSnapshotLimit(filter.limit)
-  const rows
-    = conditions.length > 0
-      ? db()
-          .select()
-          .from(backendRunSnapshots)
-          .where(and(...conditions))
-          .orderBy(desc(backendRunSnapshots.startedAt))
-          .limit(limit)
-          .all()
-      : db()
-          .select()
-          .from(backendRunSnapshots)
-          .orderBy(desc(backendRunSnapshots.startedAt))
-          .limit(limit)
-          .all()
+  const rows = conditions.length > 0
+    ? db()
+        .select()
+        .from(backendRunSnapshots)
+        .where(and(...conditions))
+        .orderBy(desc(backendRunSnapshots.startedAt))
+        .limit(limit)
+        .all()
+    : db()
+        .select()
+        .from(backendRunSnapshots)
+        .orderBy(desc(backendRunSnapshots.startedAt))
+        .limit(limit)
+        .all()
 
-  return rows.map(row =>
-    toChatRunSnapshot(row, filter.includeEvents ? getSnapshotEvents(row.id) : []))
+  return rows.map(row => toChatRunSnapshot(row, filter.includeEvents ? getSnapshotEvents(row.id) : []))
 }
 
 export function getRunSnapshot(runId: string): ChatRunSnapshot | null {
@@ -382,10 +364,7 @@ export function getRunSnapshot(runId: string): ChatRunSnapshot | null {
  * memory just to render a debug view. Pair with `countSnapshotEvents` to
  * detect truncation.
  */
-function getSnapshotEvents(
-  snapshotId: string,
-  limit = readRunSnapshotEventsReadLimit(),
-): BackendRunSnapshotEvent[] {
+function getSnapshotEvents(snapshotId: string, limit = readRunSnapshotEventsReadLimit()): BackendRunSnapshotEvent[] {
   return db()
     .select()
     .from(backendRunSnapshotEvents)
@@ -396,20 +375,15 @@ function getSnapshotEvents(
 }
 
 function countSnapshotEvents(snapshotId: string): number {
-  return (
-    db()
-      .select({ count: sql<number>`count(*)` })
-      .from(backendRunSnapshotEvents)
-      .where(eq(backendRunSnapshotEvents.snapshotId, snapshotId))
-      .get()
+  return db()
+    .select({ count: sql<number>`count(*)` })
+    .from(backendRunSnapshotEvents)
+    .where(eq(backendRunSnapshotEvents.snapshotId, snapshotId))
+    .get()
 ?.count ?? 0
-  )
 }
 
-function toChatRunSnapshot(
-  row: BackendRunSnapshot,
-  events: BackendRunSnapshotEvent[],
-): ChatRunSnapshot {
+function toChatRunSnapshot(row: BackendRunSnapshot, events: BackendRunSnapshotEvent[]): ChatRunSnapshot {
   const eventCount = countSnapshotEvents(row.id)
   return {
     id: row.id,
@@ -460,10 +434,7 @@ function toChatRunSnapshotEvent(row: BackendRunSnapshotEvent): ChatRunSnapshotEv
 
 function stringifySnapshotRecord(payload: Record<string, unknown>): string {
   const raw = JSON.stringify(payload)
-  const limit = readPositiveIntegerEnv(
-    'CRADLE_CHAT_RUN_SNAPSHOT_PAYLOAD_MAX_CHARS',
-    DEFAULT_PAYLOAD_LIMIT,
-  )
+  const limit = readPositiveIntegerEnv('CRADLE_CHAT_RUN_SNAPSHOT_PAYLOAD_MAX_CHARS', DEFAULT_PAYLOAD_LIMIT)
   if (raw.length <= limit) {
     return raw
   }
@@ -489,13 +460,11 @@ export function maintainRunSnapshots(now = Date.now()): RunSnapshotMaintenanceRe
         backendRunSnapshotEvents,
         eq(backendRunSnapshotEvents.snapshotId, backendRunSnapshots.id),
       )
-      .where(
-        and(
-          eq(backendRunSnapshots.status, 'complete'),
-          sql`${backendRunSnapshotEvents.chunkType} is not null`,
-          notLike(backendRunSnapshotEvents.payloadJson, `${COMPACTED_SUCCESS_PAYLOAD_PREFIX}%`),
-        ),
-      )
+      .where(and(
+        eq(backendRunSnapshots.status, 'complete'),
+        sql`${backendRunSnapshotEvents.chunkType} is not null`,
+        notLike(backendRunSnapshotEvents.payloadJson, `${COMPACTED_SUCCESS_PAYLOAD_PREFIX}%`),
+      ))
       .groupBy(backendRunSnapshots.id)
       .orderBy(backendRunSnapshots.completedAt, backendRunSnapshots.id)
       .limit(DEFAULT_COMPACTION_SNAPSHOT_BATCH_SIZE)
@@ -508,14 +477,13 @@ export function maintainRunSnapshots(now = Date.now()): RunSnapshotMaintenanceRe
     }
 
     const expiredSnapshotIds = readExpiredRunSnapshotIds(tx, now)
-    const prunedSnapshots
-      = expiredSnapshotIds.length === 0
-        ? 0
-        : tx
-            .delete(backendRunSnapshots)
-            .where(inArray(backendRunSnapshots.id, expiredSnapshotIds))
-            .run()
-.changes
+    const prunedSnapshots = expiredSnapshotIds.length === 0
+      ? 0
+      : tx
+          .delete(backendRunSnapshots)
+          .where(inArray(backendRunSnapshots.id, expiredSnapshotIds))
+          .run()
+          .changes
 
     return { compactedEventPayloads, prunedSnapshots }
   })
@@ -531,7 +499,7 @@ function pruneExpiredRunSnapshots(): void {
   try {
     maintainRunSnapshots(now)
   }
- catch (error) {
+  catch (error) {
     logger.error('failed to prune expired run snapshots', { error })
   }
 }
@@ -569,10 +537,9 @@ function compactSuccessfulRunSnapshotEventPayloads(
 
 function compactSuccessfulPayload(payloadJson: string): string {
   const parsed = SnapshotRecordSchema.safeParse(payloadJson)
-  const coalescedCount
-    = parsed.success && typeof parsed.data.coalescedCount === 'number'
-      ? parsed.data.coalescedCount
-      : undefined
+  const coalescedCount = parsed.success && typeof parsed.data.coalescedCount === 'number'
+    ? parsed.data.coalescedCount
+    : undefined
   return JSON.stringify({
     schema: COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
     originalLength: payloadJson.length,
@@ -585,7 +552,10 @@ function isCompactedSuccessPayload(payloadJson: string): boolean {
   return parsed.success && parsed.data.schema === COMPACTED_SUCCESS_PAYLOAD_SCHEMA
 }
 
-function readExpiredRunSnapshotIds(d: RunSnapshotMaintenanceDb, now: number): string[] {
+function readExpiredRunSnapshotIds(
+  d: RunSnapshotMaintenanceDb,
+  now: number,
+): string[] {
   const successRetentionDays = readNonNegativeIntegerEnv(
     'CRADLE_CHAT_RUN_SNAPSHOT_SUCCESS_RETENTION_DAYS',
     DEFAULT_SUCCESS_RETENTION_DAYS,
@@ -598,27 +568,20 @@ function readExpiredRunSnapshotIds(d: RunSnapshotMaintenanceDb, now: number): st
 
   if (successRetentionDays > 0) {
     const cutoff = now - successRetentionDays * 24 * 60 * 60 * 1000
-    predicates.push(
-      and(
-        eq(backendRunSnapshots.status, 'complete'),
-        lt(
-          sql`coalesce(${backendRunSnapshots.completedAt}, ${backendRunSnapshots.startedAt})`,
-          cutoff,
-        ),
-      )!,
-    )
+    predicates.push(and(
+      eq(backendRunSnapshots.status, 'complete'),
+      lt(sql`coalesce(${backendRunSnapshots.completedAt}, ${backendRunSnapshots.startedAt})`, cutoff),
+    )!)
   }
   if (failureRetentionDays > 0) {
     const cutoff = now - failureRetentionDays * 24 * 60 * 60 * 1000
-    predicates.push(
-      and(
-        or(eq(backendRunSnapshots.status, 'failed'), eq(backendRunSnapshots.status, 'aborted')),
-        lt(
-          sql`coalesce(${backendRunSnapshots.completedAt}, ${backendRunSnapshots.startedAt})`,
-          cutoff,
-        ),
-      )!,
-    )
+    predicates.push(and(
+      or(
+        eq(backendRunSnapshots.status, 'failed'),
+        eq(backendRunSnapshots.status, 'aborted'),
+      ),
+      lt(sql`coalesce(${backendRunSnapshots.completedAt}, ${backendRunSnapshots.startedAt})`, cutoff),
+    )!)
   }
   if (predicates.length === 0) {
     return []

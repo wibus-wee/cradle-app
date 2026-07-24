@@ -17,36 +17,8 @@ interface ImportMeta {
 
 type DesktopServerStatus
   = | { state: 'starting' }
-    | { state: 'migrating', phase: string }
-    | { state: 'bootstrapping', bootstrap: DesktopServerBootstrapSnapshot }
-    | { state: 'ready', serverUrl: string, bootstrap: DesktopServerBootstrapSnapshot }
-    | { state: 'failed', message: string, bootstrap: DesktopServerBootstrapSnapshot | null }
-
-type DesktopServerBootstrapSnapshot = {
-  startedAt: string
-  currentPhase:
-    | 'database-migration'
-    | 'database-maintenance'
-    | 'persisted-run-recovery'
-    | 'service-initialization'
-    | 'plugin-activation'
-    | 'listener-establishment'
-    | null
-  phaseStartedAt: string | null
-  phases: Partial<Record<NonNullable<DesktopServerBootstrapSnapshot['currentPhase']>, {
-    startedAt?: string
-    completedAt?: string
-    failedAt?: string
-    error?: string
-  }>>
-  lastEvent: {
-    type: 'cradle-server-bootstrap'
-    phase: NonNullable<DesktopServerBootstrapSnapshot['currentPhase']>
-    kind: 'started' | 'completed' | 'failed' | 'ready'
-    at: string
-    error?: string
-  } | null
-}
+    | { state: 'ready', serverUrl: string }
+    | { state: 'failed', message: string }
 
 // Stub out Electron-only window properties so devtool code compiles in web context.
 // These features are non-functional in the web build but won't crash.
@@ -93,9 +65,7 @@ interface Window {
       list: () => Promise<import('@cradle/download-center').DownloadTaskView[]>
       get: (taskId: string) => Promise<import('@cradle/download-center').DownloadTaskView | null>
       cancel: (taskId: string) => Promise<import('@cradle/download-center').DownloadTaskView | null>
-      onTaskChanged: (
-        handler: (task: import('@cradle/download-center').DownloadTaskView) => void,
-      ) => () => void
+      onTaskChanged: (handler: (task: import('@cradle/download-center').DownloadTaskView) => void) => () => void
     }
     serverRuntime?: {
       getStatus: () => Promise<DesktopServerStatus>
@@ -179,14 +149,12 @@ interface Window {
         method: string
         params?: Record<string, unknown>
       }) => Promise<unknown>
-      discoverLocalServers: () => Promise<
-        Array<{
-          port: number
-          url: string
-          title: string
-          statusCode: number | null
-        }>
-      >
+      discoverLocalServers: () => Promise<Array<{
+        port: number
+        url: string
+        title: string
+        statusCode: number | null
+      }>>
       navigate: (input: {
         threadId: string
         tabId?: string

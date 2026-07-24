@@ -3,9 +3,8 @@ import { join, resolve } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen } from 'electron'
 import windowStateKeeper from 'electron-window-state'
 
-import type { DesktopServerBootstrapSnapshot, DesktopServerStatus } from '../shared/server-runtime'
+import type { DesktopServerStatus } from '../shared/server-runtime'
 import {
-  createDesktopServerBootstrapSnapshot,
   DESKTOP_SERVER_STATUS_CHANGED_CHANNEL,
   DESKTOP_SERVER_STATUS_GET_CHANNEL,
 } from '../shared/server-runtime'
@@ -38,7 +37,9 @@ import {
 } from './desktop-assets'
 import { DesktopDownloadCenterService } from './download-center'
 import { installExternalLinkPolicy } from './external-link-policy'
-import { initializeIpcDevtool } from './ipc-devtool'
+import {
+  initializeIpcDevtool,
+} from './ipc-devtool'
 import { MacBridgeManager } from './mac-bridge-manager'
 import type { MacInputBareModifier } from './mac-bridge-protocol'
 import { createNativeServices } from './native-services'
@@ -74,12 +75,7 @@ import {
   syncAllDesktopLayerSources,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
-import {
-  getDesktopServerAuthHeaders,
-  getDesktopServerAuthToken,
-  startServer,
-  stopServer,
-} from './server-process'
+import { getDesktopServerAuthHeaders, getDesktopServerAuthToken, startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
@@ -115,7 +111,6 @@ let canProcessOpenWorkspaceLinks = false
 const pendingOpenWorkspaceUrls: string[] = []
 const browserManager = new DesktopBrowserManager()
 let desktopServerStatus: DesktopServerStatus = { state: 'starting' }
-let desktopServerBootstrapSnapshot: DesktopServerBootstrapSnapshot | null = null
 
 async function readRendererRuntimeDiagnostics(): Promise<Array<Record<string, unknown>>> {
   const windows = BrowserWindow.getAllWindows().filter(window => !window.isDestroyed())
@@ -131,20 +126,19 @@ async function readRendererRuntimeDiagnostics(): Promise<Array<Record<string, un
       url: webContents.getURL(),
     }
     try {
-      const renderer = (await webContents.executeJavaScript(
+      const renderer = await webContents.executeJavaScript(
         'globalThis.__CRADLE_RENDERER_DIAGNOSTICS__?.() ?? null',
         true,
-      )) as unknown
+      ) as unknown
       diagnostics.push({ ...base, renderer })
     }
- catch (error) {
+    catch (error) {
       diagnostics.push({
         ...base,
         renderer: null,
-        error:
-          error instanceof Error
-            ? { name: error.name, message: error.message, stack: error.stack }
-            : { message: String(error) },
+        error: error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : { message: String(error) },
       })
     }
   }
@@ -444,16 +438,15 @@ async function openWorkspaceFromDeepLink(rawUrl: string): Promise<void> {
     }
     await trayManager.performAction('open-workspace', { workspaceId: request.workspaceId })
   }
- catch (err) {
+  catch (err) {
     console.error('[open-workspace] deep link failed:', err)
     const message = err instanceof Error ? err.message : String(err)
     await dialog.showMessageBox({
       type: 'error',
       title: 'Open Workspace Failed',
-      message:
-        err instanceof OpenWorkspaceLinkError
-          ? 'The open workspace link is invalid.'
-          : 'Cradle could not open the workspace.',
+      message: err instanceof OpenWorkspaceLinkError
+        ? 'The open workspace link is invalid.'
+        : 'Cradle could not open the workspace.',
       detail: message,
       buttons: ['OK'],
     })
@@ -478,9 +471,7 @@ function processPendingOpenWorkspaceUrls(): void {
 
 async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): Promise<void> {
   if (!options.stopServerRuntime) {
-    console.warn(
-      '[desktop] stopServerRuntime=false is ignored; desktop-owned server will be stopped',
-    )
+    console.warn('[desktop] stopServerRuntime=false is ignored; desktop-owned server will be stopped')
   }
 
   browserManager.dispose()
@@ -505,11 +496,7 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   await stopServer()
 }
 
-function requestDesktopExit(input: {
-  reason: string
-  exitCode: number
-  stopServerRuntime: boolean
-}): void {
+function requestDesktopExit(input: { reason: string, exitCode: number, stopServerRuntime: boolean }): void {
   if (shutdownPromise) {
     return
   }
@@ -536,10 +523,7 @@ function requestDesktopExit(input: {
     })
 }
 
-async function prepareDesktopExitForExternalQuit(input: {
-  reason: string
-  stopServerRuntime: boolean
-}): Promise<void> {
+async function prepareDesktopExitForExternalQuit(input: { reason: string, stopServerRuntime: boolean }): Promise<void> {
   if (shutdownPromise) {
     await shutdownPromise
     return
@@ -547,11 +531,10 @@ async function prepareDesktopExitForExternalQuit(input: {
 
   console.warn(`[desktop] preparing runtime shutdown: ${input.reason}`)
   isQuitting = true
-  shutdownPromise = shutdownDesktopRuntime({ stopServerRuntime: input.stopServerRuntime }).catch(
-    (error) => {
+  shutdownPromise = shutdownDesktopRuntime({ stopServerRuntime: input.stopServerRuntime })
+    .catch((error) => {
       console.error('[desktop] runtime shutdown failed:', error)
-    },
-  )
+    })
   await shutdownPromise
 }
 
@@ -569,10 +552,7 @@ function registerProcessShutdownHandlers(): void {
   process.once('SIGTERM', handleSignal)
 }
 
-async function applyAppshotHotkeyPreference(
-  enabled: boolean,
-  trigger: MacInputBareModifier = 'DoubleCommand',
-): Promise<void> {
+async function applyAppshotHotkeyPreference(enabled: boolean, trigger: MacInputBareModifier = 'DoubleCommand'): Promise<void> {
   if (process.platform !== 'darwin' || !macBridgeManager) {
     return
   }
@@ -591,9 +571,7 @@ async function applyAppshotHotkeyPreference(
 
 async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void> {
   try {
-    const response = await fetch(new URL('/preferences/desktop', serverUrl), {
-      headers: getDesktopServerAuthHeaders(),
-    })
+    const response = await fetch(new URL('/preferences/desktop', serverUrl), { headers: getDesktopServerAuthHeaders() })
     if (!response.ok) {
       await applyAppshotHotkeyPreference(true)
       updateManager?.configurePreferences({
@@ -602,7 +580,7 @@ async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void
       })
       return
     }
-    const preferences = (await response.json()) as DesktopRuntimePreferences
+    const preferences = await response.json() as DesktopRuntimePreferences
     quitGuard.updatePreferences({
       requireDoubleCommandQToQuit: preferences.requireDoubleCommandQToQuit,
     })
@@ -615,7 +593,7 @@ async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void
       autoDownloadUpdates: preferences.autoDownloadUpdates,
     })
   }
- catch (error) {
+  catch (error) {
     console.warn('[preferences] failed to read desktop preferences:', error)
     await applyAppshotHotkeyPreference(true)
     updateManager?.configurePreferences({
@@ -725,13 +703,10 @@ export async function startDesktopApp(): Promise<void> {
   })
   macBridgeManager.on('hotkeyTriggered', (event) => {
     console.log('[mac-bridge] forwarding Appshot hotkey to renderer:', event)
-    const targetWindow
-      = windowManager?.getLastFocusedAppshotWindow()
-        ?? (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null)
+    const targetWindow = windowManager?.getLastFocusedAppshotWindow()
+      ?? (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null)
     if (!targetWindow || targetWindow.isDestroyed()) {
-      console.warn(
-        '[mac-bridge] Appshot hotkey ignored because no Appshot renderer window is available.',
-      )
+      console.warn('[mac-bridge] Appshot hotkey ignored because no Appshot renderer window is available.')
       return
     }
     targetWindow.webContents.send('capture:appshot-hotkey', event)
@@ -771,110 +746,96 @@ export async function startDesktopApp(): Promise<void> {
     handlePluginInstallUrls([url])
   })
 
-  app
-    .whenReady()
-    .then(async () => {
-      await initializeDesktopDataDirectory()
-      desktopDownloadCenter = new DesktopDownloadCenterService({
-        userDataPath: app.getPath('userData'),
-      })
-      await desktopDownloadCenter.boot()
-      await updateManager?.recoverDownloadCenter(desktopDownloadCenter)
-      desktopDownloadCenter.onTaskChange((task) => {
-        for (const window of BrowserWindow.getAllWindows()) {
-          if (!window.isDestroyed()) {
-            window.webContents.send('download-center:task-changed', task)
-          }
+  app.whenReady().then(async () => {
+    await initializeDesktopDataDirectory()
+    desktopDownloadCenter = new DesktopDownloadCenterService({ userDataPath: app.getPath('userData') })
+    await desktopDownloadCenter.boot()
+    await updateManager?.recoverDownloadCenter(desktopDownloadCenter)
+    desktopDownloadCenter.onTaskChange((task) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+          window.webContents.send('download-center:task-changed', task)
         }
-      })
-      appBadgeManager.initialize()
-      mainWindow = await createMainWindow()
-      setMainWindow(mainWindow)
+      }
+    })
+    appBadgeManager.initialize()
+    mainWindow = await createMainWindow()
+    setMainWindow(mainWindow)
 
-      app.on('activate', async () => {
-        if (!mainWindow || mainWindow.isDestroyed()) {
-          const restoredWindow = await createMainWindow()
-          setMainWindow(restoredWindow)
-          return
+    app.on('activate', async () => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        const restoredWindow = await createMainWindow()
+        setMainWindow(restoredWindow)
+        return
+      }
+      showMainWindow()
+    })
+
+    void (async () => {
+      publishDesktopServerStatus({ state: 'starting' })
+      try {
+        if (process.platform === 'darwin') {
+          await macBridgeManager?.start()
         }
-        showMainWindow()
-      })
+        await activateDesktopPlugins()
+        processPendingPluginInstallUrls()
+        handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
+        handleOpenWorkspaceUrls(collectOpenWorkspaceUrls(process.argv))
 
-      void (async () => {
-        publishDesktopServerStatus({ state: 'starting' })
+        const pendingDataMigration = getDesktopDataDirectoryState().pendingMigration
+        if (pendingDataMigration && !['completed', 'failed'].includes(pendingDataMigration.phase)) {
+          // A previous process may have survived a desktop crash. Stop its
+          // located server before copying the filesystem tree.
+          await stopServer()
+        }
+        const migration = await runPendingDesktopDataMigration((phase) => {
+          publishDesktopServerStatus({ state: 'migrating', phase })
+        })
+        if (migration.failed) {
+          console.error('[desktop] data migration failed:', migration.message)
+        }
+
+        let serverUrl: string
+        const publishServerStartupPhase = (phase: 'migrating' | 'compacting') => {
+          publishDesktopServerStatus(
+            phase === 'compacting'
+              ? { state: 'compacting' }
+              : { state: 'migrating', phase: 'database' },
+          )
+        }
         try {
-          if (process.platform === 'darwin') {
-            await macBridgeManager?.start()
-          }
-          await activateDesktopPlugins()
-          processPendingPluginInstallUrls()
-          handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
-          handleOpenWorkspaceUrls(collectOpenWorkspaceUrls(process.argv))
-
-          const pendingDataMigration = getDesktopDataDirectoryState().pendingMigration
-          if (
-            pendingDataMigration
-            && !['completed', 'failed'].includes(pendingDataMigration.phase)
-          ) {
-            // A previous process may have survived a desktop crash. Stop its
-            // located server before copying the filesystem tree.
-            await stopServer()
-          }
-          const migration = await runPendingDesktopDataMigration((phase) => {
-            publishDesktopServerStatus({ state: 'migrating', phase })
-          })
-          if (migration.failed) {
-            console.error('[desktop] data migration failed:', migration.message)
-          }
-
-          let serverUrl: string
-          desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
-          const publishServerBootstrapSnapshot = (snapshot: DesktopServerBootstrapSnapshot) => {
-            desktopServerBootstrapSnapshot = snapshot
-            publishDesktopServerStatus({ state: 'bootstrapping', bootstrap: snapshot })
-          }
-          try {
-            serverUrl = await startServer(publishServerBootstrapSnapshot)
-          }
- catch (error) {
-            await rollbackDesktopDataMigrationAfterHealthFailure(
-              error instanceof Error ? error.message : String(error),
-            )
-            if (migration.migrated) {
-              console.error('[desktop] new data root failed health check; restored previous root')
-              desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
-              serverUrl = await startServer(publishServerBootstrapSnapshot)
-            }
- else {
-              throw error
-            }
-          }
-          initializeDesktopServicesForServer(serverUrl)
-          await completeDesktopDataMigrationAfterHealthyStart()
-          publishDesktopServerStatus({
-            state: 'ready',
-            serverUrl,
-            bootstrap: desktopServerBootstrapSnapshot ?? createDesktopServerBootstrapSnapshot(),
-          })
+          serverUrl = await startServer(publishServerStartupPhase)
         }
- catch (error) {
-          console.error('[desktop] runtime startup failed:', error)
-          publishDesktopServerStatus({
-            state: 'failed',
-            message: error instanceof Error ? error.message : String(error),
-            bootstrap: desktopServerBootstrapSnapshot,
-          })
+        catch (error) {
+          await rollbackDesktopDataMigrationAfterHealthFailure(error instanceof Error ? error.message : String(error))
+          if (migration.migrated) {
+            console.error('[desktop] new data root failed health check; restored previous root')
+            serverUrl = await startServer(publishServerStartupPhase)
+          }
+          else {
+            throw error
+          }
         }
-      })()
+        initializeDesktopServicesForServer(serverUrl)
+        await completeDesktopDataMigrationAfterHealthyStart()
+        publishDesktopServerStatus({ state: 'ready', serverUrl })
+      }
+      catch (error) {
+        console.error('[desktop] runtime startup failed:', error)
+        publishDesktopServerStatus({
+          state: 'failed',
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })()
+  }).catch((error) => {
+    console.error('[desktop] app startup failed:', error)
+    requestDesktopExit({
+      reason: 'startup failure',
+      exitCode: 1,
+      stopServerRuntime: true,
     })
-    .catch((error) => {
-      console.error('[desktop] app startup failed:', error)
-      requestDesktopExit({
-        reason: 'startup failure',
-        exitCode: 1,
-        stopServerRuntime: true,
-      })
-    })
+  })
 
   app.on('window-all-closed', () => {
     if (!trayManager && process.platform !== 'darwin') {

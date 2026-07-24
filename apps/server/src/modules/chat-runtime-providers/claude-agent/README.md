@@ -1,15 +1,5 @@
 # Claude Agent Runtime Provider
 
-## IRON LAW — Do not take over Claude lifecycle
-
-Cradle **must not** own Claude Agent SDK turn/session scheduling. The long-lived SDK `Query` + `AsyncIterable` is the authority for turns, coalescing, `result` boundaries, interrupt / `still_queued`, and per-UUID cancel. Cradle only **projects** SDK events into UI Runs, messages, SSE, queue rows, and observability.
-
-**Forbidden failure mode (do not reintroduce):** closing the active user UI run on an empty/early top-level `result`, clearing `currentTurn`, then opening an `origin: system` synthetic run so the same Claude work continues under a second Cradle run id. That is lifecycle takeover disguised as projection.
-
-If a change requires Cradle to schedule Claude turns again: stop and redesign. Prefer deleting wrong scheduling seams over adding more lifecycle ownership.
-
----
-
 Owns the Claude Agent SDK adapter for Chat Runtime. This provider translates Cradle `UIMessage` turns into Claude Agent SDK streaming input and maps SDK output back into AI SDK `UIMessageChunk` events.
 
 Selected chat Skills arrive as Cradle-owned `data-cradle-skill` message parts. The provider removes them from the text/image input blocks and merges their names into Claude Agent SDK `queryOptions.skills` unless the profile already enables `skills: "all"`.
@@ -40,7 +30,7 @@ Claude Workflow observation is a dedicated provider submodule under [`workflow/`
 
 One Cradle chat session owns one long-lived Claude SDK `Query` and one continuous `AsyncIterable<SDKUserMessage>`. The Query remains alive across top-level `result` messages: `result` closes a native turn, not the session. Claude owns native input queueing, priority coalescing, background continuation, interrupt, and per-UUID cancellation.
 
-Input submission is independent from output projection. User sends, live Guide messages, and durable queue submissions push directly into the SDK input stream with an explicit native priority. They never wait for a Cradle UI Run, synthetic projection Run, transcript write, or queue-row transition. The pump continues consuming SDK messages in arrival order; top-level output after a prior **non-empty** `result` opens a new system-origin UI Run when needed, but that Run is only an SSE/persistence container and has no input authority. An empty/early top-level `result` must **not** clear the active user `currentTurn` — subsequent Query output stays on the same user UI run (see IRON LAW above).
+Input submission is independent from output projection. User sends, live Guide messages, and durable queue submissions push directly into the SDK input stream with an explicit native priority. They never wait for a Cradle UI Run, synthetic projection Run, transcript write, or queue-row transition. The pump continues consuming SDK messages in arrival order; top-level output after a prior `result` opens a new system-origin UI Run when needed, but that Run is only an SSE/persistence container and has no input authority.
 
 Durable queue rows are submitted-input records. A live submission stamps the queue row UUID onto `SDKUserMessage.uuid`. Claude Code's `msg_lifecycle_v1` protocol emits `command_lifecycle` events carrying that UUID as `command_uuid`, with `queued`, `started`, and terminal `completed` / `failed` / `cancelled` states. Those events are the only completion authority; `result` remains only a native turn boundary. Multiple command UUIDs may complete around one coalesced native turn without inventing one-row-one-turn Runs. There is no user-echo assumption, prompt-text matching, settle timer, or adopt path.
 

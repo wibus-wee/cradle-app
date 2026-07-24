@@ -226,7 +226,6 @@ export default {
   'workspace.migrate.toast.successDesc': 'Moved {{count}} items to {{target}}.',
   'workspace.migrate.toast.failed': 'Migration failed',
   'workspace.migrate.toast.previewFailed': 'Preview failed',
-  'workspace.aria.menu': 'Workspace menu',
   'workspace.aria.pinned': 'Pinned project',
   'workspace.aria.toggleExpanded': 'Toggle workspace collapse state',
   'workspace.dialog.cancel': 'Cancel',

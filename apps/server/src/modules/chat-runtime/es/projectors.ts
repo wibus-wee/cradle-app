@@ -8,7 +8,6 @@ import {
 } from '@cradle/db'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
-import { projectRecallMessage, projectRecallRun } from '../../recall/public'
 import { applyPlanImplementationApprovalResponse } from '../interaction/plan-implementation-message'
 import {
   messagePayloadJoinCondition,
@@ -52,7 +51,6 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
     case 'UserMessageAppended':
     case 'MessageImported':
       d.insert(messages).values(toMessageProjectionValues(event.payload.message)).run()
-      projectRecallMessage(d, { messageId: event.payload.message.id })
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'RunStarted':
@@ -84,7 +82,6 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
         }
       }
       d.insert(backendRuns).values(event.payload.run).run()
-      projectRecallRun(d, { runId: event.payload.run.id })
       if (event.payload.queueItemId) {
         projectQueueItemClaimed(d, {
           queueItemId: event.payload.queueItemId,
@@ -109,14 +106,12 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           ),
         )
         .run()
-      projectRecallMessage(d, { messageId: event.payload.message.id })
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'RunCompleted':
     case 'RunFailed':
     case 'RunAborted':
       projectRunTerminal(d, event.payload)
-      projectRecallRun(d, { runId: event.payload.runId })
       break
     case 'InteractionRequested':
     case 'InteractionResolved':
@@ -126,12 +121,10 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       break
     case 'QueueItemEnqueued': {
       const item = event.payload.item
-      d.insert(chatSessionQueueItems)
-        .values({
-          ...item,
-          runtimeSettingsJson: normalizeQueueItemRuntimeSettingsJson(item),
-        })
-        .run()
+      d.insert(chatSessionQueueItems).values({
+        ...item,
+        runtimeSettingsJson: normalizeQueueItemRuntimeSettingsJson(item),
+      }).run()
       touchSession(d, event.payload.item.sessionId, event.payload.item.updatedAt)
       break
     }
@@ -161,7 +154,6 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       break
     case 'SteerApplied':
       d.insert(messages).values(toMessageProjectionValues(event.payload.message)).run()
-      projectRecallMessage(d, { messageId: event.payload.message.id, isMeta: true })
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'LastTurnRolledBack':
@@ -190,10 +182,13 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
   }
 }
 
-function hasProjectedMessage(d: ProjectorDb, messageId: string, sessionId: string): boolean {
+function hasProjectedMessage(
+  d: ProjectorDb,
+  messageId: string,
+  sessionId: string,
+): boolean {
   return (
-    d
-      .select({ id: messages.id })
+    d.select({ id: messages.id })
       .from(messages)
       .where(and(eq(messages.id, messageId), eq(messages.sessionId, sessionId)))
       .limit(1)
@@ -309,7 +304,7 @@ function projectQueueItemCancelled(d: ProjectorDb, payload: QueueItemCancelledPa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        or(
+                or(
           eq(chatSessionQueueItems.status, 'pending'),
           and(
             eq(chatSessionQueueItems.status, 'running'),
@@ -336,7 +331,7 @@ function projectQueueItemClaimed(d: ProjectorDb, payload: QueueItemClaimedPayloa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -354,7 +349,7 @@ function projectQueueItemReleased(d: ProjectorDb, payload: QueueItemReleasedPayl
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -371,7 +366,7 @@ function projectQueueItemFailed(d: ProjectorDb, payload: QueueItemFailedPayload)
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
@@ -388,7 +383,7 @@ function projectQueueItemCompleted(d: ProjectorDb, payload: QueueItemCompletedPa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        or(
+                or(
           eq(chatSessionQueueItems.status, 'pending'),
           and(
             eq(chatSessionQueueItems.status, 'running'),
@@ -412,19 +407,16 @@ function projectQueueItemReordered(d: ProjectorDb, payload: QueueItemReorderedPa
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)
 }
 
-function projectQueueItemUpdated(
-  d: ProjectorDb,
-  payload: QueueItemUpdatedPayload & {
-    runtimeAccessMode?: 'approval-required' | 'full-access' | null
-    runtimeInteractionMode?: 'default' | 'plan' | null
-  },
-): void {
+function projectQueueItemUpdated(d: ProjectorDb, payload: QueueItemUpdatedPayload & {
+  runtimeAccessMode?: 'approval-required' | 'full-access' | null
+  runtimeInteractionMode?: 'default' | 'plan' | null
+}): void {
   d.update(chatSessionQueueItems)
     .set({
       text: payload.text,
@@ -440,7 +432,7 @@ function projectQueueItemUpdated(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.status, 'pending'),
+                eq(chatSessionQueueItems.status, 'pending'),
       ),
     )
     .run()
@@ -460,7 +452,7 @@ function projectQueueItemProviderTargetCleared(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-        eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId),
+                eq(chatSessionQueueItems.providerTargetId, payload.providerTargetId),
       ),
     )
     .run()
@@ -496,7 +488,7 @@ function projectRunTerminalQueueItem(
       and(
         eq(chatSessionQueueItems.id, payload.queueItemId),
         eq(chatSessionQueueItems.sessionId, payload.sessionId),
-      ),
+              ),
     )
     .run()
   touchSession(d, payload.sessionId, payload.updatedAt)

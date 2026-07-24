@@ -1,7 +1,9 @@
 import {
+  ArrowLeftLine as ArrowLeftIcon,
   ArrowToDownLine as ArrowDownToLineIcon,
   Box3Line as BoxesIcon,
   ChipLine as ChipIcon,
+  CloseLine as XIcon,
   Cursor2Line as MousePointer2Icon,
   CylinderLine as DatabaseIcon,
   Flag2Line as FlagIcon,
@@ -18,19 +20,17 @@ import {
   PluginLine as PlugIcon,
   RobotLine as BotIcon,
   SandglassLine as HourglassIcon,
+  SearchLine as SearchIcon,
   ServerLine as ServerIcon,
   WifiLine as WifiIcon,
 } from '@mingcute/react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { openWhatsNewDialog } from '~/features/changelog/whats-new-store'
 import { cn } from '~/lib/cn'
 import { openPluginCenter } from '~/navigation/navigation-commands'
-
-import type { SettingsNavigationSection } from './settings-sidebar-view'
-import { SettingsSidebarView } from './settings-sidebar-view'
 
 type SettingsKey = keyof typeof import('~/locales/default').default.settings
 
@@ -161,6 +161,16 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     items: [
       { id: 'plugins', labelKey: 'nav.plugins', icon: PlugIcon, onActivate: openPluginCenter },
       {
+        id: 'mcpServers',
+        labelKey: 'nav.mcpServers',
+        icon: ServerIcon,
+        searchKeys: [
+          'mcpServers.page.title',
+          'mcpServers.transport.stdio',
+          'mcpServers.transport.http',
+        ],
+      },
+      {
         id: 'integrations',
         labelKey: 'nav.integrations',
         icon: LinkIcon,
@@ -264,35 +274,111 @@ interface SettingsSidebarProps {
 
 export function SettingsSidebar({ activeSection, onSetSection, onClose }: SettingsSidebarProps) {
   const { t } = useTranslation('settings')
-  const sections = useMemo<SettingsNavigationSection[]>(() => {
-    return SETTINGS_SECTIONS.map(section => ({
-      id: section.labelKey,
-      label: t(section.labelKey),
-      items: section.items.map(item => ({
-        id: item.id,
-        label: t(item.labelKey),
-        icon: item.icon,
-        onActivate: item.onActivate,
-        searchTerms: [
-          item.labelKey,
-          ...(item.searchKeys ?? []),
-          ...(item.searchKeys ?? []).map(searchKey => t(searchKey)),
-        ],
-      })),
-    }))
-  }, [t])
+  const [query, setQuery] = useState('')
+
+  const normalizedQuery = query.trim().toLowerCase()
+
+  const filteredSections = useMemo(() => {
+    if (!normalizedQuery) { return SETTINGS_SECTIONS }
+
+    return SETTINGS_SECTIONS.map((section) => {
+      const sectionLabel = t(section.labelKey).toLowerCase()
+      const sectionMatches = sectionLabel.includes(normalizedQuery)
+
+      const matchedItems = section.items.filter((item) => {
+        if (sectionMatches) { return true }
+
+        const itemLabel = t(item.labelKey).toLowerCase()
+        if (itemLabel.includes(normalizedQuery)) { return true }
+
+        const keyMatch = item.labelKey.toLowerCase().includes(normalizedQuery)
+        if (keyMatch) { return true }
+
+        if (item.searchKeys) {
+          return item.searchKeys.some((searchKey) => {
+            const searchLabel = t(searchKey).toLowerCase()
+            const searchKeyMatch = searchKey.toLowerCase().includes(normalizedQuery)
+            return searchLabel.includes(normalizedQuery) || searchKeyMatch
+          })
+        }
+
+        return false
+      })
+
+      return matchedItems.length > 0 ? { ...section, items: matchedItems } : null
+    }).filter(Boolean) as SettingsSection[]
+  }, [normalizedQuery, t])
 
   return (
-    <SettingsSidebarView
-      activeSection={activeSection}
-      sections={sections}
-      title={t('sidebar.title')}
-      searchPlaceholder={t('sidebar.search')}
-      closeLabel={t('sidebar.close')}
-      clearSearchLabel={t('sidebar.clearSearch')}
-      noResultsLabel={t('sidebar.noResults')}
-      onSetSection={onSetSection}
-      onClose={onClose}
-    />
+    <div className="flex flex-1 flex-col overflow-hidden" data-testid="settings-sidebar">
+      {/* Back header */}
+      <div className="flex items-center gap-1.5 px-3 py-2">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={onClose}
+          aria-label={t('sidebar.close')}
+          data-testid="settings-close"
+        >
+          <ArrowLeftIcon aria-hidden="true" />
+        </Button>
+        <span className="text-xs font-medium text-foreground select-none">{t('sidebar.title')}</span>
+      </div>
+
+      {/* Search */}
+      <div className="flex h-7 items-center gap-1.5 rounded-md border border-border/60 bg-background/60 px-2 mx-2 mb-1 focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
+        <SearchIcon className="size-3.5 shrink-0 !text-muted-foreground/60" />
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder={t('sidebar.search')}
+          className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/45"
+          data-testid="settings-search"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+            aria-label={t('sidebar.clearSearch')}
+          >
+            <XIcon className="size-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Sectioned nav */}
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-2">
+        {filteredSections.map(({ labelKey, items }) => (
+          <div key={labelKey} className="flex flex-col gap-0.5">
+            <span className="px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground select-none">
+              {t(labelKey)}
+            </span>
+            {items.map(({ id, labelKey: itemLabelKey, icon: Icon, onActivate }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => (onActivate ? onActivate() : onSetSection(id))}
+                data-testid={`settings-nav-${id}`}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',
+                  activeSection === id
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                )}
+              >
+                <Icon className="size-3.5" aria-hidden="true" />
+                {t(itemLabelKey)}
+              </button>
+            ))}
+          </div>
+        ))}
+        {normalizedQuery && filteredSections.length === 0 && (
+          <div className="px-2.5 py-4 text-center text-xs text-muted-foreground">
+            {t('sidebar.noResults')}
+          </div>
+        )}
+      </nav>
+    </div>
   )
 }

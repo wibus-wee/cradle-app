@@ -1,20 +1,56 @@
 import { useQuery } from '@tanstack/react-query'
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 
 import { getWorkspacesByWorkspaceId } from '~/api-gen/sdk.gen'
+import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
 import { useSurfaceStore } from '~/navigation/surface-store'
 
-import {
-  WorkspaceDetailLayoutSlotsRuntime,
-} from './workspace-detail-layout-slots-runtime'
-import { preloadWorkspaceDetailTerminalPanel } from './workspace-detail-terminal-panel-loader'
+const WorkspaceDetailPage = lazy(() => import('./workspace-detail-page').then(m => ({ default: m.WorkspaceDetailPage })))
 
-const WorkspaceDetailPageContainer = lazy(() => (
-  import('./workspace-detail-page-container')
-    .then(module => ({ default: module.WorkspaceDetailPageContainer }))
-))
+function loadTerminalPanelView() {
+  return import('~/features/tui/bottom-terminal-panel').then(module => ({ default: module.BottomTerminalPanel }))
+}
+
+const BottomTerminalPanel = lazy(loadTerminalPanelView)
+
+function WorkspaceDetailLayoutSlots({
+  workspaceId,
+  workspacePath,
+}: {
+  workspaceId: string
+  workspacePath: string | null
+}) {
+  'use no memo'
+
+  const hasWorkspace = !!workspacePath
+  const panel = useMemo(
+    () => (
+      <Suspense fallback={null}>
+        {hasWorkspace
+          ? (
+              <BottomTerminalPanel
+                ownerId={`workspace:${workspaceId}`}
+                cwd={workspacePath!}
+              />
+            )
+          : null}
+      </Suspense>
+    ),
+    [hasWorkspace, workspaceId, workspacePath],
+  )
+
+  useRegisterLayoutSlots(`workspace-detail:${workspaceId}`, useMemo(() => ({
+    asideWorkspaceId: workspaceId,
+    hasAside: true,
+    hasBrowserPanel: true,
+    hasPanel: true,
+    panel,
+  }), [panel, workspaceId]))
+
+  return null
+}
 
 export function WorkspaceDetailRouteContent({ workspaceId }: { workspaceId: string }) {
   'use no memo'
@@ -39,21 +75,15 @@ export function WorkspaceDetailRouteContent({ workspaceId }: { workspaceId: stri
 
   useEffect(() => {
     if (workspacePath) {
-      void preloadWorkspaceDetailTerminalPanel()
+      void loadTerminalPanelView()
     }
   }, [workspacePath])
 
   return (
     <>
-      <WorkspaceDetailLayoutSlotsRuntime
-        workspaceId={workspaceId}
-        workspacePath={workspacePath}
-      />
+      <WorkspaceDetailLayoutSlots workspaceId={workspaceId} workspacePath={workspacePath} />
       <Suspense fallback={null}>
-        <WorkspaceDetailPageContainer
-          workspaceId={workspaceId}
-          workspace={workspace}
-        />
+        <WorkspaceDetailPage workspaceId={workspaceId} />
       </Suspense>
     </>
   )

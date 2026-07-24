@@ -2,8 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises'
 
 import type { ManagedChildProcess, ManagedSpawnOptions } from '../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../infra/managed-process'
+import type { RegisteredMcpServer } from '../../../plugins/mcp-registry'
 import type { KimiProviderConfig } from './config'
-import { renderKimiConfigToml } from './config'
+import { renderKimiConfigToml, renderKimiMcpConfig } from './config'
 import type { KimiHttpClient } from './http/client'
 import { createKimiHttpClient } from './http/client'
 import { getApiV1Healthz } from './protocol/rest/sdk.gen'
@@ -18,6 +19,7 @@ export interface KimiWebHostOptions {
   providerTargetId: string
   providerConfig: KimiProviderConfig
   credential: string | null
+  mcpServers: Record<string, RegisteredMcpServer>
 }
 
 export interface KimiWebHostResource {
@@ -34,6 +36,11 @@ export async function createKimiWebHostResource(input: KimiWebHostOptions): Prom
   await writeFile(
     `${home}/config.toml`,
     renderKimiConfigToml({ provider: input.providerConfig, credential: input.credential }),
+    { encoding: 'utf8', mode: 0o600 },
+  )
+  await writeFile(
+    `${home}/mcp.json`,
+    renderKimiMcpConfig(input.mcpServers),
     { encoding: 'utf8', mode: 0o600 },
   )
 

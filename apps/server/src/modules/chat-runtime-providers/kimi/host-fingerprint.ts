@@ -12,6 +12,7 @@ export function createKimiWebHostFingerprint(input: KimiWebHostOptions): string 
     providerTargetId: input.providerTargetId,
     providerConfig: stableJson(input.providerConfig),
     credentialFingerprint: input.credential ? sha256(input.credential) : null,
+    mcpFingerprint: sha256(JSON.stringify(stableJson(input.mcpServers))),
   })
 }
 

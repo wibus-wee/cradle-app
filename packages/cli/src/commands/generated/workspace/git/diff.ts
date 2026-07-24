@@ -33,6 +33,12 @@ const spec = {
       "required": false,
       "target": "query.paths",
       "type": "string"
+    },
+    {
+      "name": "sessionId",
+      "required": false,
+      "target": "query.sessionId",
+      "type": "string"
     }
   ],
   "method": "get",

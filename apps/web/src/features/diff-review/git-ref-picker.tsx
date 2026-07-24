@@ -10,7 +10,7 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { Spinner } from '~/components/ui/spinner'
-import { useGitBranches, useGitGraph } from '~/features/git/shared/use-git'
+import { useGitBranches, useGitGraph } from '~/features/git/use-git'
 import { cn } from '~/lib/cn'
 
 type DiffReviewKey = keyof typeof import('~/locales/default').default['diff-review']

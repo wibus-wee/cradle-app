@@ -16,10 +16,9 @@ import { useRendererChatStore } from '~/store/renderer-chat'
 
 import { submitRuntimeToolApproval } from '../chat/commands/chat-response-command'
 import { getProviderThread, getProviderThreadTurns, providerThreadQueryKey, providerThreadTurnsQueryKey, subscribeProviderThreadStream } from '../chat/commands/provider-thread-command'
-import { ChatRenderStoreProvider } from '../chat/rendering/chat-render-store'
+import { ChatRenderStoreProvider, MessageBubble } from '../chat/rendering/message-bubble'
 import { SubagentIdenticon } from '../chat/rendering/subagent-identicon'
 import { isMatchingApprovalPart, readRuntimeUserInputRequestId } from '../chat/session/use-chat-session-types'
-import { MessageBubbleView } from '../chat/transcript/views/message-bubble-view'
 import { ChatStreamingHandler } from '../chat/transport/chat-streaming-handler'
 import { buildUIMessageChunkStreamFromResponse } from '../chat/transport/sse-chat-transport'
 
@@ -321,6 +320,7 @@ export function SubagentOutputPanel({
             {messages.map(message => (
               <ProviderThreadMessage
                 key={message.id}
+                sessionId={sessionId}
                 viewSessionId={viewSessionId}
                 messageId={message.id}
                 onToolApprovalResponse={handleToolApprovalResponse}
@@ -346,10 +346,12 @@ export function SubagentOutputPanel({
 }
 
 function ProviderThreadMessage({
+  sessionId,
   viewSessionId,
   messageId,
   onToolApprovalResponse,
 }: {
+  sessionId: string
   viewSessionId: string
   messageId: string
   onToolApprovalResponse?: (response: {
@@ -365,12 +367,12 @@ function ProviderThreadMessage({
   }
   return (
     <ChatRenderStoreProvider store={rendererChatStore}>
-      <MessageBubbleView
+      <MessageBubble
         message={message}
         isStreaming={isStreaming}
         executionDetailsDefaultOpen={false}
+        sessionId={sessionId}
         onToolApprovalResponse={onToolApprovalResponse}
-        onCopy={text => navigator.clipboard.writeText(text)}
       />
     </ChatRenderStoreProvider>
   )

@@ -34,7 +34,6 @@ export const SessionAwaitModel = {
     fireAt: t.Nullable(t.Number()),
     lastCheckedAt: t.Nullable(t.Number()),
     lastErrorText: t.Nullable(t.String()),
-    lastObservationJson: t.Nullable(t.String()),
     consecutiveErrorCount: t.Number(),
   }),
 
@@ -80,15 +79,6 @@ export const SessionAwaitModel = {
 
   bypassCheckBody: t.Object({
     checkName: t.String({ minLength: 1 }),
-  }),
-
-  evaluateNowResponse: t.Object({
-    ok: t.Boolean(),
-    matched: t.Optional(t.Boolean()),
-    observationJson: t.Optional(t.Nullable(t.String())),
-    resumeText: t.Optional(t.String()),
-    resumePayloadJson: t.Optional(t.String()),
-    error: t.Optional(t.String()),
   }),
 
   bypassRule: t.Object({

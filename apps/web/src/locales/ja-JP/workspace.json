@@ -196,7 +196,6 @@
   "workspace.migrate.toast.successDesc": "{{count}} 件を {{target}} に移動しました。",
   "workspace.migrate.toast.failed": "移行に失敗しました",
   "workspace.migrate.toast.previewFailed": "プレビューに失敗しました",
-  "workspace.aria.menu": "ワークスペースメニュー",
   "workspace.aria.pinned": "ピン留めされたプロジェクト",
   "workspace.aria.toggleExpanded": "ワークスペースの折りたたみ状態を切り替え",
   "workspace.dialog.addProject": "プロジェクトを追加",

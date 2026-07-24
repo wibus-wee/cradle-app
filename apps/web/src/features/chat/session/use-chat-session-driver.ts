@@ -339,5 +339,5 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       locallyDriven: projection.locallyDriven,
       runtimeActiveRunMessageId: runtimeStatusFreshForSubscription ? runtimeActiveRunMessageId : null,
     })
-  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeStatus, runtimeStatusFreshForSubscription, snapshotRevision])
+  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeStatus, runtimeStatusFreshForSubscription])
 }

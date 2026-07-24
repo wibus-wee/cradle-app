@@ -1,10 +1,8 @@
 import { domAnimation, LazyMotion } from 'motion/react'
 import { useEffect } from 'react'
 
-import { OverlayEnvironmentProvider } from '~/components/ui/overlay-environment'
 import { toastManager, ToastProvider } from '~/components/ui/toast'
 import { TooltipProvider } from '~/components/ui/tooltip'
-import { acquireNativeBrowserSurfaceSuppression } from '~/features/browser/native-surface-suppression'
 import { createChatContextProvider } from '~/features/chat/context/chat-context'
 import { installContextProviders } from '~/features/context/context-registry'
 import { DirectoryPickerProvider } from '~/features/filesystem/directory-picker-provider'
@@ -19,19 +17,17 @@ import { applyThemeProfile } from '~/store/theme-customization-runtime'
 
 export function AppEnvironmentProviders({ children }: { children: React.ReactNode }) {
   return (
-    <OverlayEnvironmentProvider acquireHostSurfaceSuppression={acquireNativeBrowserSurfaceSuppression}>
-      <LazyMotion features={domAnimation}>
-        <ToastProvider>
-          <DesktopQuitGuardToastBridge />
-          <RendererContextRuntime />
-          <TooltipProvider>
-            <ShortcutProvider>
-              <DirectoryPickerProvider>{children}</DirectoryPickerProvider>
-            </ShortcutProvider>
-          </TooltipProvider>
-        </ToastProvider>
-      </LazyMotion>
-    </OverlayEnvironmentProvider>
+    <LazyMotion features={domAnimation}>
+      <ToastProvider>
+        <DesktopQuitGuardToastBridge />
+        <RendererContextRuntime />
+        <TooltipProvider>
+          <ShortcutProvider>
+            <DirectoryPickerProvider>{children}</DirectoryPickerProvider>
+          </ShortcutProvider>
+        </TooltipProvider>
+      </ToastProvider>
+    </LazyMotion>
   )
 }
 

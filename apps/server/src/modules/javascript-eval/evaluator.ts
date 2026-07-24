@@ -1,9 +1,8 @@
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 import { spawnManagedProcess } from '../../infra/managed-process'
 import { normalizeJavaScriptCellProgram } from './program'
@@ -18,16 +17,12 @@ export const MAX_EVALUATOR_RESULT_BYTES = 1024 * 1024
 
 const STDERR_MAX_BYTES = 1024 * 1024
 const localModuleDir = dirname(fileURLToPath(import.meta.url))
-const require = createRequire(import.meta.url)
 
 export interface EvaluateCellInput {
   program: string
   mode?: 'check' | 'run'
   cwd?: string
   timeoutMs?: number
-  runnerPath?: string
-  runnerUsesTsx?: boolean
-  runnerInput?: unknown
 }
 
 export type EvaluateCellResult
@@ -56,18 +51,13 @@ function resolveEvaluatorRunnerPath(): string {
     resolve(localModuleDir, 'javascript-eval-runner.js'),
     resolve(dirname(localModuleDir), 'javascript-eval-runner.js'),
   ]
-  const candidates
-    = localModuleDir.endsWith('/src/modules/javascript-eval')
-      || localModuleDir.endsWith('\\src\\modules\\javascript-eval')
-      ? [sourceCandidate]
-      : builtCandidates
+  const candidates = localModuleDir.endsWith('/src/modules/javascript-eval') || localModuleDir.endsWith('\\src\\modules\\javascript-eval')
+    ? [sourceCandidate]
+    : builtCandidates
   return candidates.find(candidate => existsSync(candidate)) ?? candidates[0]!
 }
 
-function appendAtByteLimit(
-  current: Buffer<ArrayBufferLike>,
-  chunk: Buffer<ArrayBufferLike>,
-): Buffer<ArrayBufferLike> {
+function appendAtByteLimit(current: Buffer<ArrayBufferLike>, chunk: Buffer<ArrayBufferLike>): Buffer<ArrayBufferLike> {
   if (current.byteLength >= STDERR_MAX_BYTES) {
     return current
   }
@@ -113,10 +103,7 @@ async function runManagedNode(input: {
     }
     const timer = setTimeout(() => {
       timedOut = true
-      void child
-        .stop()
-        .catch(() => {})
-        .finally(() => finish(child.exitCode, child.signalCode))
+      void child.stop().catch(() => {}).finally(() => finish(child.exitCode, child.signalCode))
     }, input.timeoutMs)
 
     child.once('close', finish)
@@ -152,39 +139,25 @@ async function checkProgram(program: string, timeoutMs: number): Promise<Evaluat
   return { kind: 'program-error', error: readCrashError(execution) }
 }
 
-function buildRunnerArgs(runnerPath: string, runnerUsesTsx: boolean): string[] {
+function buildRunnerArgs(runnerPath: string): string[] {
   const args = [`--max-old-space-size=${EVALUATOR_MAX_OLD_SPACE_MB}`]
-  if (runnerUsesTsx) {
-    args.push('--import', pathToFileURL(require.resolve('tsx')).href)
-  }
   // Source-mode tests/dev resolve runner.ts; plain node needs type stripping.
-  else if (runnerPath.endsWith('.ts')) {
+  if (runnerPath.endsWith('.ts')) {
     args.push('--experimental-strip-types', '--no-warnings')
   }
   args.push(runnerPath)
   return args
 }
 
-async function runProgram(
-  program: string,
-  input: EvaluateCellInput,
-  timeoutMs: number,
-): Promise<EvaluateCellResult> {
+async function runProgram(program: string, input: EvaluateCellInput, timeoutMs: number): Promise<EvaluateCellResult> {
   const tempDir = await mkdtemp(join(tmpdir(), 'cradle-javascript-eval-'))
   const resultPath = join(tempDir, 'result.json')
   try {
     const execution = await runManagedNode({
-      args: buildRunnerArgs(
-        input.runnerPath ?? resolveEvaluatorRunnerPath(),
-        input.runnerUsesTsx ?? false,
-      ),
+      args: buildRunnerArgs(resolveEvaluatorRunnerPath()),
       cwd: input.cwd,
       env: { CRADLE_JAVASCRIPT_EVAL_RESULT_PATH: resultPath },
-      stdin: JSON.stringify({
-        program,
-        execTimeoutMs: EXEC_DEFAULT_TIMEOUT_MS,
-        runnerInput: input.runnerInput,
-      }),
+      stdin: JSON.stringify({ program, execTimeoutMs: EXEC_DEFAULT_TIMEOUT_MS }),
       timeoutMs,
     })
     if (execution.timedOut) {
@@ -195,14 +168,11 @@ async function runProgram(
     try {
       const resultFile = await stat(resultPath)
       if (resultFile.size > MAX_EVALUATOR_RESULT_BYTES) {
-        return {
-          kind: 'crashed',
-          error: 'Evaluator process returned an oversized protocol result.',
-        }
+        return { kind: 'crashed', error: 'Evaluator process returned an oversized protocol result.' }
       }
       reply = JSON.parse(await readFile(resultPath, 'utf8')) as RunnerReply
     }
- catch {
+    catch {
       return { kind: 'crashed', error: readCrashError(execution) }
     }
 
@@ -214,24 +184,21 @@ async function runProgram(
     }
     return { kind: 'crashed', error: 'Evaluator process returned an invalid protocol result.' }
   }
- finally {
+  finally {
     await rm(tempDir, { recursive: true, force: true })
   }
 }
 
 export async function evaluateCell(input: EvaluateCellInput): Promise<EvaluateCellResult> {
   if (Buffer.byteLength(input.program, 'utf8') > MAX_PROGRAM_BYTES) {
-    return {
-      kind: 'program-error',
-      error: `JavaScript program exceeds the ${MAX_PROGRAM_BYTES} byte limit.`,
-    }
+    return { kind: 'program-error', error: `JavaScript program exceeds the ${MAX_PROGRAM_BYTES} byte limit.` }
   }
 
   let program: string
   try {
     program = await normalizeJavaScriptCellProgram(input.program)
   }
- catch (error) {
+  catch (error) {
     return { kind: 'program-error', error: error instanceof Error ? error.message : String(error) }
   }
 

@@ -1,8 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
 import { fork, spawn } from 'node:child_process'
 
-import { forwardManagedTargetMessage } from './managed-process-protocol'
-
 interface BaseTarget {
   cwd?: string
   env?: Record<string, string | undefined>
@@ -73,12 +71,12 @@ function signalChild(signal: NodeJS.Signals): boolean {
     if (process.platform !== 'win32') {
       process.kill(-pid, signal)
     }
- else {
+    else {
       child.kill(signal)
     }
     return true
   }
- catch (error) {
+  catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ESRCH') {
       return false
     }
@@ -110,7 +108,7 @@ try {
   }
   child.stdout?.pipe(process.stdout)
   child.stderr?.pipe(process.stderr)
-  child.on('message', message => emitStatus(forwardManagedTargetMessage(message)))
+  child.on('message', message => emitStatus({ type: 'target-message', message }))
   child.once('error', (error) => {
     emitStatus({ type: 'error', message: error.message })
     process.exit(1)
@@ -120,7 +118,7 @@ try {
     process.exit(code ?? (signal ? 1 : 0))
   })
 }
- catch (error) {
+catch (error) {
   emitStatus({ type: 'error', message: error instanceof Error ? error.message : String(error) })
   process.exit(1)
 }

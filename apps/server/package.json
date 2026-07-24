@@ -30,7 +30,7 @@
     "leak:harness": "tsx scripts/leak-harness.ts",
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit && pnpm check:boundaries",
     "check:boundaries": "tsx scripts/check-module-boundaries.ts",
-    "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter \"../../plugins/*\" build && vitest run --no-file-parallelism",
+    "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter \"../../plugins/*\" build && vitest run",
     "test:watch": "vitest",
     "benchmark:relay": "vitest run tests/relay-transport/performance-compare.test.ts --reporter=verbose",
     "benchmark:relay:codec": "vitest run tests/relay-transport/codec-throughput-benchmark.test.ts --reporter=verbose --maxWorkers=1 --no-file-parallelism",
