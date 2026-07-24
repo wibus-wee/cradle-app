@@ -45,7 +45,8 @@ import {
   readFileDiffTarget,
   TerminalExecutionDetails,
 } from './tool-call-details'
-import { ToolHeroView, WorkflowPhaseList } from './tool-hero-view'
+import { WorkflowPhaseListView } from './tool-hero/workflow-phase-list-view'
+import { ToolHeroView } from './tool-hero-view'
 
 // ---------------------------------------------------------------------------
 // Local helpers
@@ -291,7 +292,7 @@ function WorkflowExecutionDetails({ input, output }: { input: ToolPayload, outpu
           ]}
         />
       </DetailSection>
-      <WorkflowPhaseList phases={phases} />
+      <WorkflowPhaseListView phases={phases} />
       <DetailSection title="Full input">
         <RawValue value={input.rawValue} />
       </DetailSection>
