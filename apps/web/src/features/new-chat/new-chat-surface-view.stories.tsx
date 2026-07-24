@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 
-import { ComposerView } from '~/features/chat/composer/composer-view'
+import { ComposerView } from '~/features/chat/composer/views/composer-view'
 
 import type { NewChatQuickAction } from './new-chat-quick-actions-view'
 import { NewChatQuickActionsView } from './new-chat-quick-actions-view'

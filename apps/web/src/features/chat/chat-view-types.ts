@@ -2,7 +2,7 @@ import type { MutableRefObject, ReactNode } from 'react'
 
 import type { ModelDescriptor, RuntimeKind } from '~/features/agent-runtime/types'
 
-import type { ComposerDecoration } from './composer/composer'
+import type { ComposerDecoration } from './composer/containers/composer-container'
 import type { ChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import type { MentionItem, PluginMentionItem } from './mentions/mention-panel'
 import type { SkillMentionItem } from './mentions/skill-mention-panel'

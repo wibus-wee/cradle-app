@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 
 import { Badge } from '~/components/ui/badge'
-import type { ComposerProps } from '~/features/chat/composer/composer-view'
-import { ComposerView } from '~/features/chat/composer/composer-view'
+import type { ComposerProps } from '~/features/chat/composer/views/composer-view'
+import { ComposerView } from '~/features/chat/composer/views/composer-view'
 
 import { newWorkWorkspaceFixtures } from './fixtures/new-work'
 import type { NewWorkFailureKind } from './new-work-error-view'

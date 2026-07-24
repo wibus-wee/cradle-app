@@ -14,7 +14,7 @@ import type { SkillInventoryEntry } from '~/features/skills/types'
 import { chatSelectors } from '~/store/chat'
 import { useRendererChatStore } from '~/store/renderer-chat'
 
-import { Composer } from '../chat/composer/composer'
+import { Composer } from '../chat/composer/containers/composer-container'
 import type { ChatContextPart } from '../chat/context/chat-context-parts'
 import type { MentionItem } from '../chat/mentions/mention-panel'
 import { searchPluginMentions } from '../chat/mentions/plugin-mentions'

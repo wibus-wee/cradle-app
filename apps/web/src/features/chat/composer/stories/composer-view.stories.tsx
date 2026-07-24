@@ -1,29 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import type { FileUIPart } from 'ai'
 import { useMemo, useState } from 'react'
 
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 
-import type { ComposerProps } from './composer-view'
-import { ComposerView } from './composer-view'
-
-type ComposerStoryState = 'empty' | 'draft' | 'attachments' | 'streaming' | 'sending' | 'disabled'
-
-const attachmentFixtures: FileUIPart[] = [
-  {
-    type: 'file',
-    filename: 'architecture-notes.md',
-    mediaType: 'text/markdown',
-    url: 'data:text/markdown;base64,IyBDb21wb25lbnQgQXJjaGl0ZWN0dXJl',
-  },
-  {
-    type: 'file',
-    filename: 'surface.png',
-    mediaType: 'image/png',
-    url: 'data:image/png;base64,iVBORw0KGgo=',
-  },
-]
+import type { ComposerStoryState } from '../fixtures/composer-view-fixtures'
+import {
+  composerAttachmentFixtures,
+  composerDraftFixture,
+} from '../fixtures/composer-view-fixtures'
+import type { ComposerProps } from '../views/composer-view'
+import { ComposerView } from '../views/composer-view'
 
 function ComposerStateScene({ state }: { state: ComposerStoryState }) {
   const [activity, setActivity] = useState('No composer action selected')
@@ -42,7 +29,7 @@ function ComposerStateScene({ state }: { state: ComposerStoryState }) {
     attachments: {
       supportsAttachments: true,
       acceptsNativeFiles: false,
-      appendFileParts: state === 'attachments' ? attachmentFixtures : undefined,
+      appendFileParts: state === 'attachments' ? composerAttachmentFixtures : undefined,
       appendFilePartsKey: state === 'attachments' ? 1 : 0,
     },
     slots: {
@@ -58,7 +45,7 @@ function ComposerStateScene({ state }: { state: ComposerStoryState }) {
     externalSignals: {
       replaceText: state === 'empty'
         ? ''
-        : 'Refactor the visible surface into a props-only View and add stable fixtures.',
+        : composerDraftFixture,
       replaceTextKey: 1,
     },
     view: {

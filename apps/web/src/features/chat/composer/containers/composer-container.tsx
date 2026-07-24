@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 
 import { isLocalMode } from '~/lib/electron'
 
-import type { ComposerAttachmentIntegration, ComposerProps } from './composer-view'
-import { ComposerView } from './composer-view'
+import type { ComposerAttachmentIntegration, ComposerProps } from '../views/composer-view'
+import { ComposerView } from '../views/composer-view'
 
 export { ComposerView }
 export type {
@@ -20,7 +20,7 @@ export type {
   ComposerSlots,
   ComposerTestIds,
   ComposerViewOptions,
-} from './composer-view'
+} from '../views/composer-view'
 
 /** Runtime adapter that supplies host capabilities to the props-driven ComposerView. */
 export function Composer({ attachments, ...props }: ComposerProps) {

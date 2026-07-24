@@ -57,7 +57,6 @@ import {
   withSlashCommandAvailability,
 } from '../slash-commands/chat-slash-commands'
 import { useRuntimeComposerSlashCommands } from '../slash-commands/use-runtime-composer-slash-commands'
-import { Composer } from './composer'
 import type {
   ComposerSlashCommandActionContext,
   ComposerSlashCommandActionResult,
@@ -65,6 +64,7 @@ import type {
 } from './composer-action-context'
 import { modelSupportsAttachments, modelSupportsImageInput } from './composer-attachment-state'
 import { ComposerSlotStates } from './composer-slot-states'
+import { Composer } from './containers/composer-container'
 import { prepareLightOcrAttachments } from './light-ocr'
 import { useComposerAppshotCapture } from './use-composer-appshot-capture'
 

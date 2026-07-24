@@ -8,7 +8,7 @@ import { I18nProvider } from '~/i18n/client'
 
 import { MessageBubble } from '../rendering/message-bubble'
 import { buildOptimisticUserMessage } from '../session/optimistic-chat-turn'
-import { Composer } from './composer'
+import { Composer } from './containers/composer-container'
 
 afterEach(cleanup)
 
