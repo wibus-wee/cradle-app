@@ -4164,6 +4164,186 @@ export type PutModelRegistryMappingsByModelIdResponses = {
 
 export type PutModelRegistryMappingsByModelIdResponse = PutModelRegistryMappingsByModelIdResponses[keyof PutModelRegistryMappingsByModelIdResponses];
 
+export type GetMcpServersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/mcp-servers/';
+};
+
+export type GetMcpServersResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        name: string;
+        transport: 'stdio' | 'streamable-http';
+        enabled: boolean;
+        command?: string;
+        args?: Array<string>;
+        url?: string;
+        secretKeys: Array<string>;
+        status: 'ready' | 'disabled' | 'error';
+        error?: string;
+        supportedRuntimes: Array<string>;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetMcpServersResponse = GetMcpServersResponses[keyof GetMcpServersResponses];
+
+export type PostMcpServersData = {
+    body: {
+        transport: string;
+        name: string;
+        enabled: boolean;
+        command: string;
+        args: Array<string>;
+        secretValues?: {
+            [key: string]: unknown;
+        };
+    } | {
+        transport: string;
+        name: string;
+        enabled: boolean;
+        url: string;
+        secretValues?: {
+            [key: string]: unknown;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/mcp-servers/';
+};
+
+export type PostMcpServersResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        transport: 'stdio' | 'streamable-http';
+        enabled: boolean;
+        command?: string;
+        args?: Array<string>;
+        url?: string;
+        secretKeys: Array<string>;
+        status: 'ready' | 'disabled' | 'error';
+        error?: string;
+        supportedRuntimes: Array<string>;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostMcpServersResponse = PostMcpServersResponses[keyof PostMcpServersResponses];
+
+export type DeleteMcpServersByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/mcp-servers/{id}';
+};
+
+export type DeleteMcpServersByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteMcpServersByIdResponse = DeleteMcpServersByIdResponses[keyof DeleteMcpServersByIdResponses];
+
+export type PutMcpServersByIdData = {
+    body: {
+        transport: string;
+        name: string;
+        enabled: boolean;
+        command: string;
+        args: Array<string>;
+        secretValues?: {
+            [key: string]: unknown;
+        };
+    } | {
+        transport: string;
+        name: string;
+        enabled: boolean;
+        url: string;
+        secretValues?: {
+            [key: string]: unknown;
+        };
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/mcp-servers/{id}';
+};
+
+export type PutMcpServersByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        transport: 'stdio' | 'streamable-http';
+        enabled: boolean;
+        command?: string;
+        args?: Array<string>;
+        url?: string;
+        secretKeys: Array<string>;
+        status: 'ready' | 'disabled' | 'error';
+        error?: string;
+        supportedRuntimes: Array<string>;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PutMcpServersByIdResponse = PutMcpServersByIdResponses[keyof PutMcpServersByIdResponses];
+
+export type PatchMcpServersByIdEnabledData = {
+    body: {
+        enabled: boolean;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/mcp-servers/{id}/enabled';
+};
+
+export type PatchMcpServersByIdEnabledResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        transport: 'stdio' | 'streamable-http';
+        enabled: boolean;
+        command?: string;
+        args?: Array<string>;
+        url?: string;
+        secretKeys: Array<string>;
+        status: 'ready' | 'disabled' | 'error';
+        error?: string;
+        supportedRuntimes: Array<string>;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchMcpServersByIdEnabledResponse = PatchMcpServersByIdEnabledResponses[keyof PatchMcpServersByIdEnabledResponses];
+
 export type PostProvidersModelsData = {
     body: {
         providerKind: 'openai-compatible' | 'anthropic' | 'universal';
@@ -6111,69 +6291,6 @@ export type GetAssetsByIdContentData = {
     query?: never;
     url: '/assets/{id}/content';
 };
-
-export type GetBackgroundActivitiesData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/background-activities';
-};
-
-export type GetBackgroundActivitiesResponses = {
-    /**
-     * Response for status 200
-     */
-    200: Array<{
-        ownerNamespace: string;
-        key: string;
-        title: string;
-        priority: 'low' | 'normal' | 'high';
-        trigger: string;
-        manuallyRunnable: boolean;
-        status: 'idle' | 'running' | 'succeeded' | 'failed';
-        progress: unknown;
-        lastError: string | null;
-        createdAt: number;
-        updatedAt: number;
-        startedAt: number | null;
-        finishedAt: number | null;
-    }>;
-};
-
-export type GetBackgroundActivitiesResponse = GetBackgroundActivitiesResponses[keyof GetBackgroundActivitiesResponses];
-
-export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunData = {
-    body?: never;
-    path: {
-        ownerNamespace: string;
-        key: string;
-    };
-    query?: never;
-    url: '/background-activities/{ownerNamespace}/{key}/run';
-};
-
-export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ownerNamespace: string;
-        key: string;
-        title: string;
-        priority: 'low' | 'normal' | 'high';
-        trigger: string;
-        manuallyRunnable: boolean;
-        status: 'idle' | 'running' | 'succeeded' | 'failed';
-        progress: unknown;
-        lastError: string | null;
-        createdAt: number;
-        updatedAt: number;
-        startedAt: number | null;
-        finishedAt: number | null;
-    };
-};
-
-export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponse = PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses[keyof PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses];
 
 export type GetBackgroundJobsData = {
     body?: never;
@@ -9176,7 +9293,6 @@ export type GetSessionAwaitsResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     }>;
 };
@@ -9220,7 +9336,6 @@ export type PostSessionAwaitsResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9258,7 +9373,6 @@ export type GetSessionAwaitsByIdResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9296,7 +9410,6 @@ export type PostSessionAwaitsByIdCancelResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9337,7 +9450,6 @@ export type PostSessionAwaitsByIdTriggerResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9378,7 +9490,6 @@ export type PostSessionAwaitsByIdRetryDeliveryResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
@@ -9488,37 +9599,11 @@ export type PostSessionAwaitsByIdBypassCheckResponses = {
         fireAt: number | null;
         lastCheckedAt: number | null;
         lastErrorText: string | null;
-        lastObservationJson: string | null;
         consecutiveErrorCount: number;
     };
 };
 
 export type PostSessionAwaitsByIdBypassCheckResponse = PostSessionAwaitsByIdBypassCheckResponses[keyof PostSessionAwaitsByIdBypassCheckResponses];
-
-export type PostSessionAwaitsByIdEvaluateNowData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/session-awaits/{id}/evaluate-now';
-};
-
-export type PostSessionAwaitsByIdEvaluateNowResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-        matched?: boolean;
-        observationJson?: string | null;
-        resumeText?: string;
-        resumePayloadJson?: string;
-        error?: string;
-    };
-};
-
-export type PostSessionAwaitsByIdEvaluateNowResponse = PostSessionAwaitsByIdEvaluateNowResponses[keyof PostSessionAwaitsByIdEvaluateNowResponses];
 
 export type GetSessionAwaitsByIdLiveStatusData = {
     body?: never;
@@ -13033,8 +13118,6 @@ export type GetWorktreesManagedResponses = {
             createdAt: number;
             updatedAt: number;
             sizeBytes: number;
-            sizeMeasuredAt: number | null;
-            sizeMeasurementError: string | null;
             sessionCount: number;
         }>;
         totalSizeBytes: number;
@@ -13071,8 +13154,6 @@ export type PostWorktreesCleanupResponses = {
             createdAt: number;
             updatedAt: number;
             sizeBytes: number;
-            sizeMeasuredAt: number | null;
-            sizeMeasurementError: string | null;
             sessionCount: number;
         }>;
         skipped: number;
@@ -21473,7 +21554,7 @@ export type GetChatSessionsBySessionIdQueueResponses = {
         items: Array<{
             id: string;
             sessionId: string;
-            mode: 'queue' | 'steer';
+            mode: string;
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
@@ -21606,7 +21687,7 @@ export type PostChatSessionsBySessionIdQueueResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: 'queue' | 'steer';
+        mode: string;
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
@@ -21753,7 +21834,7 @@ export type PostChatSessionsBySessionIdSteerResponses = {
         queueItem: {
             id: string;
             sessionId: string;
-            mode: 'queue' | 'steer';
+            mode: string;
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
@@ -21837,7 +21918,7 @@ export type PostChatSessionsBySessionIdQueueReorderResponses = {
         items: Array<{
             id: string;
             sessionId: string;
-            mode: 'queue' | 'steer';
+            mode: string;
             status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
             text: string;
             files: Array<{
@@ -21919,7 +22000,7 @@ export type DeleteChatSessionsBySessionIdQueueByQueueItemIdResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: 'queue' | 'steer';
+        mode: string;
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{
@@ -22052,7 +22133,7 @@ export type PatchChatSessionsBySessionIdQueueByQueueItemIdResponses = {
     200: {
         id: string;
         sessionId: string;
-        mode: 'queue' | 'steer';
+        mode: string;
         status: 'pending' | 'running' | 'cancelled' | 'completed' | 'failed';
         text: string;
         files: Array<{

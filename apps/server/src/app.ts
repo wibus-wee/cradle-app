@@ -53,6 +53,7 @@ import { kimiServer } from './modules/kimi-server'
 import { linkPreview } from './modules/link-preview'
 import { createManagedResourcesModule } from './modules/managed-resources'
 import { ManagedResourceService } from './modules/managed-resources/service'
+import { mcpServers } from './modules/mcp-servers'
 import { modelRegistry } from './modules/model-registry'
 import { observability } from './modules/observability'
 import { opencodeServer } from './modules/opencode-server'
@@ -216,6 +217,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(externalSessionImport)
   app.use(secrets)
   app.use(modelRegistry)
+  app.use(mcpServers)
   app.use(providers)
   app.use(agentIdentity)
   app.use(automation)

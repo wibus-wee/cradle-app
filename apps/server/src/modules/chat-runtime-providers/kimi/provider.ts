@@ -1,5 +1,6 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 
+import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
 import type {
   BackgroundTerminalListResult,
   CancelTurnInput,
@@ -585,6 +586,7 @@ path: { session_id: sessionId },
         providerTargetId: profile.providerTargetId,
         providerConfig: projectKimiProviderConfig(profile),
         credential: profile.credentialRef ? this.deps.readSecret(profile.credentialRef) : null,
+        mcpServers: getRegisteredMcpServers(),
       },
     })
   }

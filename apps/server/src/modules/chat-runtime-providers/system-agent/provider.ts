@@ -2,6 +2,7 @@ import type { DefaultRuntimeConfigOptions, MessageIngressCommand, MessageIngress
 import { defaultRuntimeConfig, executeIngressCommand } from '@hijarvis/core'
 import type { UIMessageChunk } from 'ai'
 
+import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
 import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness/projection'
 import type {
   CancelTurnInput,
@@ -28,6 +29,7 @@ import {
   mapSystemAgentEventToChunks,
 } from './event-to-chunk-mapper'
 import { projectSystemAgentUserPrompt } from './input-projector'
+import { createSystemAgentMcpTools } from './mcp-tools'
 import {
   SYSTEM_AGENT_RUNTIME_CAPABILITIES,
   SYSTEM_AGENT_RUNTIME_KIND,
@@ -130,6 +132,7 @@ export class SystemAgentProvider implements ChatRuntime {
     const sessionId = input.runtimeSession.chatSessionId
 
     const runtimeContext = resolveSystemAgentRuntimeContext()
+    const mcpTools = await createSystemAgentMcpTools(getRegisteredMcpServers(), this.deps.logger)
 
     const runtimeConfigOptions: DefaultRuntimeConfigOptions = {
       provider,
@@ -217,7 +220,11 @@ export class SystemAgentProvider implements ChatRuntime {
     // Resolve skill roots — use jarvis workspace root (always has a valid path)
     const skillRoots = this.resolveSkillPaths(runtimeContext.jarvisWorkspaceRoot)
 
-    const commandPromise = executeIngressCommand({ config: jarConfig, command, pluginOverrides: { skillRoots } }).then((result) => {
+    const commandPromise = executeIngressCommand({
+      config: jarConfig,
+      command,
+      pluginOverrides: { skillRoots, tools: mcpTools.tools },
+    }).then((result) => {
       if (result.kind === 'message') {
         this.captureResultUsage(result, model)
       }
@@ -249,6 +256,7 @@ export class SystemAgentProvider implements ChatRuntime {
     }
     finally {
       this.releaseTurn(sessionId, abortController)
+      await mcpTools.close()
     }
 
     if (!abortController.signal.aborted) {

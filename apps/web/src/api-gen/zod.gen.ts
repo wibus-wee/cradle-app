@@ -863,6 +863,58 @@ export const zPutModelRegistryMappingsByModelIdPath = z.object({
     modelId: z.string().min(1)
 });
 
+export const zPostMcpServersBody = z.union([
+    z.object({
+        transport: z.string(),
+        name: z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+        enabled: z.boolean().default(true),
+        command: z.string().min(1),
+        args: z.array(z.string()),
+        secretValues: z.record(z.string(), z.unknown()).optional()
+    }),
+    z.object({
+        transport: z.string(),
+        name: z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+        enabled: z.boolean().default(true),
+        url: z.url().min(1),
+        secretValues: z.record(z.string(), z.unknown()).optional()
+    })
+]);
+
+export const zDeleteMcpServersByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPutMcpServersByIdBody = z.union([
+    z.object({
+        transport: z.string(),
+        name: z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+        enabled: z.boolean().default(true),
+        command: z.string().min(1),
+        args: z.array(z.string()),
+        secretValues: z.record(z.string(), z.unknown()).optional()
+    }),
+    z.object({
+        transport: z.string(),
+        name: z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+        enabled: z.boolean().default(true),
+        url: z.url().min(1),
+        secretValues: z.record(z.string(), z.unknown()).optional()
+    })
+]);
+
+export const zPutMcpServersByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPatchMcpServersByIdEnabledBody = z.object({
+    enabled: z.boolean()
+});
+
+export const zPatchMcpServersByIdEnabledPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zPostProvidersModelsBody = z.object({
     providerKind: z.enum([
         'openai-compatible',
@@ -1253,11 +1305,6 @@ export const zGetAssetsByIdPath = z.object({
 
 export const zGetAssetsByIdContentPath = z.object({
     id: z.string().min(1)
-});
-
-export const zPostBackgroundActivitiesByOwnerNamespaceByKeyRunPath = z.object({
-    ownerNamespace: z.string().min(1),
-    key: z.string().min(1)
 });
 
 export const zGetBackgroundJobsQuery = z.object({
@@ -1783,10 +1830,6 @@ export const zPostSessionAwaitsByIdBypassCheckBody = z.object({
 });
 
 export const zPostSessionAwaitsByIdBypassCheckPath = z.object({
-    id: z.string().min(1)
-});
-
-export const zPostSessionAwaitsByIdEvaluateNowPath = z.object({
     id: z.string().min(1)
 });
 

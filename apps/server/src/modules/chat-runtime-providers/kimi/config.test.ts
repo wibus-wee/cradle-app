@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
-import { projectKimiProviderConfig, renderKimiConfigToml, resolveKimiModelReference } from './config'
+import { projectKimiProviderConfig, renderKimiConfigToml, renderKimiMcpConfig, resolveKimiModelReference } from './config'
 
 function createProfile(configJson: string): RuntimeProviderTargetProfile {
   return {
@@ -28,5 +28,37 @@ defaultModel: 'gpt-4.1',
     expect(provider.defaultModel).toBe('gpt-4.1')
     expect(renderKimiConfigToml({ provider, credential: 'test-key' })).toContain('default_model = "cradle-target-a/gpt-4.1"')
     expect(resolveKimiModelReference(provider, 'gpt-4.1')).toBe('cradle-target-a/gpt-4.1')
+  })
+
+  it('renders stdio and HTTP MCP servers in Kimi native mcp.json shape', () => {
+    expect(JSON.parse(renderKimiMcpConfig({
+      browser: {
+        transport: 'stdio',
+        name: 'browser',
+        command: 'node',
+        args: ['server.js'],
+        env: { TOKEN: 'secret' },
+      },
+      remote: {
+        transport: 'streamable-http',
+        name: 'remote',
+        url: 'https://mcp.example.test/mcp',
+        headers: { Authorization: 'Bearer secret' },
+      },
+    }))).toEqual({
+      mcpServers: {
+        browser: {
+          transport: 'stdio',
+          command: 'node',
+          args: ['server.js'],
+          env: { TOKEN: 'secret' },
+        },
+        remote: {
+          transport: 'http',
+          url: 'https://mcp.example.test/mcp',
+          headers: { Authorization: 'Bearer secret' },
+        },
+      },
+    })
   })
 })
