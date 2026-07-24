@@ -1,6 +1,5 @@
 import {
   BrainLine as BrainIcon,
-  CheckCircleLine as CheckCircle2Icon,
   ChipLine as CpuIcon,
   ClockLine as ClockIcon,
   DriveLine as HardDriveIcon,
@@ -42,6 +41,9 @@ import {
   ChronicleActivityPipelineContainer,
 } from './chronicle-activity-pipeline-container'
 import {
+  ChronicleDreamRunContainer,
+} from './chronicle-dream-run-container'
+import {
   ChronicleEmptyState,
 } from './chronicle-empty-state'
 import {
@@ -69,7 +71,6 @@ import type {
   ChronicleAudioRawSegment,
   ChronicleAudioTranscript,
   ChronicleConfig,
-  ChronicleDreamRun,
   ChronicleMessageSource,
   ChronicleSlackSourceDraft,
   ChronicleStatus,
@@ -81,7 +82,6 @@ import {
   useChronicleAudioRawSegments,
   useChronicleAudioTranscripts,
   useChronicleConfig,
-  useChronicleDreamActions,
   useChronicleDreamRuns,
   useChronicleKnowledgeCard,
   useChronicleKnowledgeCards,
@@ -742,7 +742,7 @@ export function ChronicleSettings() {
           <div className="border-t border-border/60" />
 
           <SettingsRow label={t('advanced.dreamRuns.title')} description={t('advanced.dreamRuns.description')} vertical>
-            <DreamRunPanel loading={dreamRunsLoading} runs={dreamRuns} />
+            <ChronicleDreamRunContainer loading={dreamRunsLoading} runs={dreamRuns} />
           </SettingsRow>
         </div>
       </details>
@@ -1282,21 +1282,6 @@ function SlackSourcePanel({ loading, sources }: { loading: boolean, sources: Chr
   )
 }
 
-function formatDreamRunType(t: ChronicleTranslate, type: ChronicleDreamRun['runType']): string {
-  if (type === 'merge') { return t('dreamRun.type.merge') }
-  if (type === 'archive') { return t('dreamRun.type.archive') }
-  if (type === 'prune') { return t('dreamRun.type.prune') }
-  if (type === 'restore') { return t('dreamRun.type.restore') }
-  return t('dreamRun.type.dryRun')
-}
-
-function formatDreamRunStatus(t: ChronicleTranslate, status: ChronicleDreamRun['status']): string {
-  if (status === 'completed') { return t('common.status.completed') }
-  if (status === 'failed') { return t('common.status.error') }
-  if (status === 'running') { return t('common.status.running') }
-  return t('common.status.queued')
-}
-
 function formatTranscriptStatus(t: ChronicleTranslate, status: ChronicleAudioTranscript['status']): string {
   if (status === 'recording') { return t('common.status.recording') }
   if (status === 'completed') { return t('common.status.completed') }
@@ -1356,86 +1341,6 @@ function getAccessibilityTreeDepthClass(depth: number): string {
 // ---------------------------------------------------------------------------
 // Data display components (preserved from original)
 // ---------------------------------------------------------------------------
-
-function DreamRunPanel({ loading, runs }: { loading: boolean, runs: ChronicleDreamRun[] }) {
-  const { t } = useTranslation('chronicle')
-  const { startDreamDryRun, startDreamMerge, startingDryRun, startingMerge } = useChronicleDreamActions()
-  const starting = startingDryRun || startingMerge
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <ClockIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-          <span className="truncate text-[13px] font-medium text-foreground">{t('dreamRun.candidatesTitle')}</span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-auto"
-            disabled={starting}
-            onClick={() => void startDreamDryRun()}
-          >
-            <RefreshCwIcon className="size-3.5" />
-            {t('dreamRun.generatePreview')}
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            disabled={starting}
-            onClick={() => void startDreamMerge()}
-          >
-            <CheckCircle2Icon className="size-3.5" />
-            {t('dreamRun.applyMerge')}
-          </Button>
-        </div>
-      </div>
-
-      {loading
-        ? <ChronicleEmptyState icon={<ClockIcon className="size-4" />} title={t('dreamRun.loading')} />
-        : runs.length === 0
-          ? <ChronicleEmptyState icon={<ClockIcon className="size-4" />} title={t('dreamRun.empty')} />
-          : (
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {runs.slice(0, 8).map(run => (
-                  <article key={run.id} className="rounded-lg border border-foreground/5 bg-background p-3 shadow-sm">
-                    <div className="mb-2 flex min-w-0 items-center gap-2">
-                      <ClockIcon className="size-3.5 shrink-0 !text-muted-foreground" />
-                      <span className="truncate text-[13px] font-medium text-foreground">{formatDreamRunType(t, run.runType)}</span>
-                      <Badge
-                        variant={run.status === 'completed' ? 'secondary' : 'outline'}
-                        className={cn(
-                          'ml-auto text-[11px]',
-                          { 'border-destructive/20 bg-destructive/10 text-destructive': run.status === 'failed' },
-                        )}
-                      >
-                        {formatDreamRunStatus(t, run.status)}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
-                      <span>
-                        {t('dreamRun.inputCount', { count: run.inputCount })}
-                      </span>
-                      <span>
-                        {t('dreamRun.candidateCount', { count: run.result.candidateCount })}
-                      </span>
-                      <span>
-                        {t('dreamRun.mergedCount', { count: run.mergedCount })}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                      <span className="truncate">{run.result.vectorMode}</span>
-                      <span className="shrink-0 font-mono">{formatRelativeTime(t, run.startedAt)}</span>
-                    </div>
-                    {run.errorMessage && <p className="mt-1 line-clamp-2 text-[11px] text-destructive">{run.errorMessage}</p>}
-                  </article>
-                ))}
-              </div>
-            )}
-    </div>
-  )
-}
 
 function AccessibilitySnapshotList({ snapshots }: { snapshots: ChronicleAccessibilitySnapshot[] }) {
   const { t } = useTranslation('chronicle')
