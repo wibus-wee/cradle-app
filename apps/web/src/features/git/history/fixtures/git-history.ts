@@ -1,4 +1,4 @@
-import type { GitGraphCommit, GitRepository } from '../types'
+import type { GitGraphCommit, GitRepository } from '../../shared/types'
 
 export const gitRepositoryFixture = {
   path: '.',

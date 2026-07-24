@@ -14,9 +14,9 @@ import { Button } from '~/components/ui/button'
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
+import type { LayoutCommit } from '../../shared/graph-layout'
+import type { GitRepository } from '../../shared/types'
 import { GIT_GRAPH_ROW_HEIGHT, GitGraphRowView } from './git-graph-row-view'
-import type { LayoutCommit } from './graph-layout'
-import type { GitRepository } from './types'
 
 export type GitGraphStatus = 'loading' | 'error' | 'ready'
 

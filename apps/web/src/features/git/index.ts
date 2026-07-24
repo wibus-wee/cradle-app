@@ -1,3 +1,3 @@
-export { ChangesPanel } from './changes-panel'
-export { GitBranchControl } from './git-branch-control'
-export { GitPanelContainer } from './git-panel-container'
+export { GitBranchControl } from './branch/git-branch-control'
+export { ChangesPanelContainer } from './changes/containers/changes-panel-container'
+export { GitPanelContainer } from './history/containers/git-panel-container'

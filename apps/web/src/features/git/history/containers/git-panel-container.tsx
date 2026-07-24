@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 
-import { GitPanelView } from './git-panel-view'
+import type { GitRepository } from '../../shared/types'
+import { useGitRepositories } from '../../shared/use-git'
+import { GitPanelView } from '../views/git-panel-view'
 import { GitRepositoryPanelSectionContainer } from './git-repository-panel-section-container'
-import type { GitRepository } from './types'
-import { useGitRepositories } from './use-git'
 
 export interface GitPanelContainerProps {
   workspaceId: string | null | undefined

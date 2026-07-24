@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
+import { computeGraphLayout } from '../../shared/graph-layout'
+import type { GitRepository } from '../../shared/types'
 import {
   gitGraphCommitsFixture,
   gitRepositoriesFixture,
   gitRepositoryFixture,
-} from './fixtures/git-history'
-import { GitPanelView } from './git-panel-view'
-import { GitRepositoryPanelSectionView } from './git-repository-panel-section-view'
-import { computeGraphLayout } from './graph-layout'
-import type { GitRepository } from './types'
+} from '../fixtures/git-history'
+import { GitPanelView } from '../views/git-panel-view'
+import { GitRepositoryPanelSectionView } from '../views/git-repository-panel-section-view'
 
 interface GitHistoryStorySceneProps {
   panelState?: 'empty-workspace' | 'loading' | 'error' | 'ready'

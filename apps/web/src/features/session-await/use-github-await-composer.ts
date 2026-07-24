@@ -6,7 +6,7 @@ import {
   postSessionAwaitsMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { toastManager } from '~/components/ui/toast'
-import { useGitRemotes, useGitRepositories } from '~/features/git/use-git'
+import { useGitRemotes, useGitRepositories } from '~/features/git/shared/use-git'
 
 import {
   derivePullRequestNumberFromStatus,

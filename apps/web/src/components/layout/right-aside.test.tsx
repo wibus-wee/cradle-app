@@ -29,7 +29,7 @@ vi.mock('~/features/session-await/await-panel', () => ({
 }))
 
 vi.mock('~/features/git', () => ({
-  ChangesPanel: () => <div data-testid="changes-panel" />,
+  ChangesPanelContainer: () => <div data-testid="changes-panel" />,
   GitPanelContainer: () => <div data-testid="git-panel" />,
 }))
 

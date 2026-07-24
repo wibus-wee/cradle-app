@@ -2,9 +2,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip
 import { getI18n } from '~/i18n/instance'
 import { cn } from '~/lib/cn'
 
+import type { LayoutCommit } from '../../shared/graph-layout'
+import { LANE_COLORS } from '../../shared/graph-layout'
 import { GitAuthorAvatarView } from './git-author-avatar-view'
-import type { LayoutCommit } from './graph-layout'
-import { LANE_COLORS } from './graph-layout'
 
 export const GIT_GRAPH_ROW_HEIGHT = 27
 

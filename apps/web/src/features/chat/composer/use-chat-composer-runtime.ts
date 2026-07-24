@@ -5,7 +5,7 @@ import { useCallback, useMemo } from 'react'
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
 import { useProviderTargetModels } from '~/features/agent-runtime/use-agent-models'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
-import { useGitRepositories } from '~/features/git/use-git'
+import { useGitRepositories } from '~/features/git/shared/use-git'
 import { useChatPreferencesQuery } from '~/features/settings/use-chat-preferences'
 import { isElectron, platform } from '~/lib/electron'
 

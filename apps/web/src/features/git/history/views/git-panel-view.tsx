@@ -5,7 +5,7 @@ import {
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { GitRepository } from './types'
+import type { GitRepository } from '../../shared/types'
 
 export type GitPanelStatus = 'empty-workspace' | 'loading' | 'error' | 'ready'
 

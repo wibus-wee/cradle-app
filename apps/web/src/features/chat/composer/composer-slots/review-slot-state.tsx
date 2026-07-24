@@ -18,7 +18,7 @@ import type { GetWorkspacesByWorkspaceIdGitBranchesResponse } from '~/api-gen/ty
 import { Button } from '~/components/ui/button'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { Spinner } from '~/components/ui/spinner'
-import { useGitBranches, useGitRepositories, useGitStatus } from '~/features/git/use-git'
+import { useGitBranches, useGitRepositories, useGitStatus } from '~/features/git/shared/use-git'
 import { cn } from '~/lib/cn'
 
 import {

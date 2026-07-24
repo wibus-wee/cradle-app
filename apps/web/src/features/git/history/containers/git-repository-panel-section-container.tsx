@@ -4,17 +4,17 @@ import { useState } from 'react'
 
 import { postWorkspacesByWorkspaceIdGitFetchMutation } from '~/api-gen/@tanstack/react-query.gen'
 
-import { BranchPicker } from './branch-picker'
-import { GitRepositoryPanelSectionView } from './git-repository-panel-section-view'
-import { computeGraphLayout } from './graph-layout'
-import type { GitRepository } from './types'
+import { BranchPicker } from '../../branch/branch-picker'
+import { computeGraphLayout } from '../../shared/graph-layout'
+import type { GitRepository } from '../../shared/types'
 import {
   gitBranchesQueryKey,
   gitGraphQueryKey,
   gitRepositoriesQueryKey,
   gitStatusQueryKey,
   useGitGraph,
-} from './use-git'
+} from '../../shared/use-git'
+import { GitRepositoryPanelSectionView } from '../views/git-repository-panel-section-view'
 
 export interface GitRepositoryPanelSectionContainerProps {
   workspaceId: string
