@@ -1,0 +1,53 @@
+name: Update Codex SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Codex release tag to install (leave blank for the latest release)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-codex-sdk
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update runtime and protocol
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Sync the Codex runtime and protocol bindings
+        env:
+          CRADLE_CODEX_RELEASE_TAG: ${{ inputs.release_tag || 'latest' }}
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: |
+          pnpm --filter @cradle/desktop sync:codex-runtime
+          pnpm --filter @cradle/server generate:codex-app-server-protocol
+
+      - name: Create or update SDK pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          branch: automation/codex-sdk-update
+          delete-branch: true
+          commit-message: 'chore(codex): update SDK'
+          title: 'chore(codex): update SDK'
+          body: |
+            Automated Codex runtime and app-server protocol update.
+
+            The repository pull-request workflow runs validation for this change.
+          add-paths: |
+            apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/**
+            apps/server/src/modules/chat-runtime-providers/codex/app-server/capabilities.ts

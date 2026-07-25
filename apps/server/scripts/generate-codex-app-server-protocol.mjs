@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
   ensureCodexRuntime,
-  readCodexRuntimeVersion,
+  readCodexRuntimeVersion
 } from '../../desktop/scripts/sync-codex-runtime.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -22,32 +22,54 @@ const command = [
   'generate-ts',
   '--experimental',
   '--out',
-  protocolRoot,
+  protocolRoot
 ]
 
 await run(command[0], command.slice(1))
 
 const generatorVersion = await readCodexRuntimeVersion(runtime.executablePath)
-await writeFile(manifestPath, `${JSON.stringify({
-  owner: 'apps/server/src/modules/chat-runtime-providers/codex',
-  protocol: 'codex-app-server',
-  bindings: 'typescript',
-  generator: 'codex app-server generate-ts',
-  generatorVersion: generatorVersion ?? runtime.manifest.binary.version ?? runtime.manifest.release.tagName,
-  experimental: true,
-  command: 'pnpm --filter @cradle/server generate:codex-app-server-protocol',
-  generatedDate: new Date().toISOString().slice(0, 10),
-  notes: [
-    'Codex app-server does not expose a separate schema version in generated files; generatorVersion is the schema source version.',
-    'Regenerate with pnpm --filter @cradle/server generate:codex-app-server-protocol so Cradle uses the vendored Codex runtime, not a global codex command.',
-  ],
-}, null, 2)}\n`, 'utf8')
+const resolvedGeneratorVersion =
+  generatorVersion ?? runtime.manifest.binary.version ?? runtime.manifest.release.tagName
+const existingManifest = await readManifest(manifestPath)
+await writeFile(
+  manifestPath,
+  `${JSON.stringify(
+    {
+      owner: 'apps/server/src/modules/chat-runtime-providers/codex',
+      protocol: 'codex-app-server',
+      bindings: 'typescript',
+      generator: 'codex app-server generate-ts',
+      generatorVersion: resolvedGeneratorVersion,
+      experimental: true,
+      command: 'pnpm --filter @cradle/server generate:codex-app-server-protocol',
+      generatedDate:
+        existingManifest?.generatorVersion === resolvedGeneratorVersion
+          ? existingManifest.generatedDate
+          : new Date().toISOString().slice(0, 10),
+      notes: [
+        'Codex app-server does not expose a separate schema version in generated files; generatorVersion is the schema source version.',
+        'Regenerate with pnpm --filter @cradle/server generate:codex-app-server-protocol so Cradle uses the vendored Codex runtime, not a global codex command.'
+      ]
+    },
+    null,
+    2
+  )}\n`,
+  'utf8'
+)
+
+async function readManifest(path) {
+  try {
+    return JSON.parse(await readFile(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
 
 function run(file, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(file, args, {
       cwd: repoRoot,
-      stdio: 'inherit',
+      stdio: 'inherit'
     })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
@@ -55,7 +77,11 @@ function run(file, args) {
         resolve()
         return
       }
-      reject(new Error(`${file} ${args.join(' ')} failed with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}`))
+      reject(
+        new Error(
+          `${file} ${args.join(' ')} failed with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}`
+        )
+      )
     })
   })
 }
