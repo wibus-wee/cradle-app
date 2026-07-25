@@ -1,5 +1,5 @@
 {
-  "coreScopeSha256": "2836de5b619457497f2be536f8b88b71df41ddd794a3835f17484ff228ceba4f",
+  "coreScopeSha256": "c4e6bef1a6bf6c9f61774e1ebc348af50c5120c271fc96edeb5320bfe2b5a9be",
   "declarations": [
     {
       "path": "resources/messages/messages.d.ts",
@@ -22,13 +22,13 @@
       "sha256": "ba21775d1a33f982fd5c76d6d79d953f084efdcb16576c07dcf8dbb562f4f10f"
     }
   ],
-  "generatedAt": "2026-07-25T11:47:42.085Z",
-  "grammarSha256": "db78f49be127979e43647d1ffc6a197e01873e7232237bc6d6dc78c00f462b71",
+  "generatedAt": "2026-07-25T12:51:19.549Z",
+  "grammarSha256": "ebdd034edaee848ac357124935db45a1c87c4473b41de1ab0f223c265c2dfea5",
   "owner": "@cradle/model-api-simulator",
-  "packageIntegrity": null,
+  "packageIntegrity": "sha512-BJrFIVyjNuU8lfDyIJTvlRYzgQg+zEl78BxE7fq8esULsGz9IRQvGtW5spq3tydmtjQb/GFdooKGdGsetpx+lQ==",
   "provider": "anthropic",
   "refreshCommand": "pnpm protocol:refresh:anthropic",
-  "schemaSha256": "9929e4b8b12b3fb136e1252df091bab94a231d36824afbeba7e536295cc38526",
+  "schemaSha256": "f313721919150603524f65a23d6bb0149ede183cd8570366eead4b7ddfb3e8b3",
   "sdkVersion": "0.115.0",
   "selectedTypes": [
     "AnthropicMessageCreateParams",
@@ -48,5 +48,6 @@
     "AnthropicBetaModelInfo",
     "AnthropicBetaModelListParams",
     "AnthropicBetaModelRetrieveParams"
-  ]
+  ],
+  "transitionCorpusSha256": "5ebb8ab724d0b6e69e7b05c545cc3a4b5c1c7d7f6c635b191c08b3eed095f6a5"
 }

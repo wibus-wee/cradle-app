@@ -1,7 +1,6 @@
 import type { ModelApiSimulator, StartSimulatorOptions } from './contract'
-import { ScenarioController } from './core/scenario-runtime'
 import { startListener } from './listener'
-import { createSimulatorApp } from './server'
+import { createSimulatorApp, createSimulatorRuntime } from './server'
 
 export * from './anthropic'
 export * from './contract'
@@ -11,8 +10,8 @@ export * from './openai'
 export async function startModelApiSimulator(
   options: StartSimulatorOptions = {},
 ): Promise<ModelApiSimulator> {
-  const controller = new ScenarioController()
-  const app = createSimulatorApp(controller)
+  const runtime = createSimulatorRuntime()
+  const app = createSimulatorApp(runtime)
   const server = await startListener(app.fetch, options.port ?? 0)
   if (!server.url) { throw new Error('srvx did not expose a URL after ready()') }
   const url = new URL(server.url)
@@ -22,11 +21,11 @@ export async function startModelApiSimulator(
   return {
     anthropicBaseUrl: origin,
     openaiBaseUrl: `${origin}/v1`,
-    controller,
+    controller: runtime.controller,
     async close(): Promise<void> {
       if (closed) { return }
       closed = true
-      controller.close()
+      runtime.controller.close()
       await server.close(true)
     },
   }

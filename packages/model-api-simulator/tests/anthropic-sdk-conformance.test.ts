@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import Anthropic from 'anthropic-sdk-0-115'
 import { describe, expect, it } from 'vitest'
 
 import type { ModelApiSimulator, SimulatorExchange } from '../src'
@@ -9,7 +9,7 @@ const message = {
   type: 'message',
   role: 'assistant',
   model: 'claude-test',
-  content: [{ type: 'text', text: 'hello' }],
+  content: [{ type: 'text', text: 'hello', citations: null }],
   stop_reason: 'end_turn',
   stop_sequence: null,
   container: null,
@@ -22,6 +22,7 @@ const message = {
     input_tokens: 1,
     output_tokens: 1,
     output_tokens_details: null,
+    server_tool_use: null,
     service_tier: null,
   },
 } as const
@@ -45,7 +46,11 @@ const streamSteps = [
   },
   {
     kind: 'event' as const,
-    event: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    event: {
+      type: 'content_block_start',
+      index: 0,
+      content_block: { type: 'text', text: '', citations: null },
+    },
   },
   {
     kind: 'event' as const,
@@ -68,6 +73,7 @@ const streamSteps = [
         input_tokens: 1,
         output_tokens: 1,
         output_tokens_details: null,
+        server_tool_use: null,
       },
     },
   },
@@ -173,7 +179,7 @@ describe('anthropic official SDK conformance', () => {
             messages: [{ role: 'user', content: 'hello' }],
           })
           .finalMessage()
-        expect(final.content).toEqual([{ type: 'text', text: 'hello' }])
+        expect(final.content).toEqual([{ type: 'text', text: 'hello', citations: null }])
 
         expect(
           await client.messages.countTokens({
@@ -261,6 +267,7 @@ describe('anthropic official SDK conformance', () => {
             input_tokens: 1,
             output_tokens: 1,
             output_tokens_details: null,
+            server_tool_use: null,
           },
         },
       },

@@ -1,0 +1,39 @@
+{
+  "provider": "openai",
+  "transitions": [
+    { "id": "queued", "from": ["active"], "event": "response.queued", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "created", "from": ["active"], "event": "response.created", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "in-progress", "from": ["active"], "event": "response.in_progress", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "output-item-added", "from": ["active"], "event": "response.output_item.added", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "output-item-done", "from": ["active"], "event": "response.output_item.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "content-part-added", "from": ["active"], "event": "response.content_part.added", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "content-part-done", "from": ["active"], "event": "response.content_part.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "output-text-delta", "from": ["active"], "event": "response.output_text.delta", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "output-text-done", "from": ["active"], "event": "response.output_text.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "refusal-delta", "from": ["active"], "event": "response.refusal.delta", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "refusal-done", "from": ["active"], "event": "response.refusal.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "reasoning-summary-part-added", "from": ["active"], "event": "response.reasoning_summary_part.added", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "reasoning-summary-part-done", "from": ["active"], "event": "response.reasoning_summary_part.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "reasoning-summary-text-delta", "from": ["active"], "event": "response.reasoning_summary_text.delta", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "reasoning-summary-text-done", "from": ["active"], "event": "response.reasoning_summary_text.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "reasoning-text-delta", "from": ["active"], "event": "response.reasoning_text.delta", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "reasoning-text-done", "from": ["active"], "event": "response.reasoning_text.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "function-arguments-delta", "from": ["active"], "event": "response.function_call_arguments.delta", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "function-arguments-done", "from": ["active"], "event": "response.function_call_arguments.done", "to": "active", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "completed", "from": ["active"], "event": "response.completed", "to": "terminal", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "failed", "from": ["active"], "event": "response.failed", "to": "terminal", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "incomplete", "from": ["active"], "event": "response.incomplete", "to": "terminal", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "error", "from": ["active"], "event": "error", "to": "terminal", "evidence": "documented:https://developers.openai.com/api/reference/resources/responses#streaming" },
+    { "id": "disconnect", "from": ["active"], "event": "disconnect", "to": "terminal", "evidence": "simulator:openai-disconnect" }
+  ],
+  "correlations": [
+    { "id": "sequence-number-increases", "evidence": "simulator:openai-sequence-number" },
+    { "id": "response-id-stable", "evidence": "simulator:openai-response-id" },
+    { "id": "output-index-stable", "evidence": "simulator:openai-output-index" },
+    { "id": "item-id-known", "evidence": "simulator:openai-item-id" },
+    { "id": "item-index-stable", "evidence": "simulator:openai-item-index" },
+    { "id": "content-index-stable", "evidence": "simulator:openai-content-index" },
+    { "id": "call-id-stable", "evidence": "simulator:openai-call-id" },
+    { "id": "terminal-forbids-events", "evidence": "simulator:openai-terminal-forbids-events" }
+  ]
+}

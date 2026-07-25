@@ -42,5 +42,7 @@ minimumReleaseAgeExclude:
   - '@arcships/light-ocr-model-ppocrv6-small@0.3.0'
   - '@arcships/light-ocr-win32-x64@0.3.0'
   - '@arcships/light-ocr@0.3.0'
+overrides:
+  '@anthropic-ai/claude-agent-sdk>@anthropic-ai/sdk': 0.81.0
 patchedDependencies:
   '@elysiajs/node@1.4.5': patches/@elysiajs__node@1.4.5.patch

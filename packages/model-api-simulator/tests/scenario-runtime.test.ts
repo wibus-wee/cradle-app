@@ -4,6 +4,7 @@ import type { SimulatorScenario } from '../src/contract'
 import {
   DuplicateGateError,
   ScenarioController,
+  ScenarioMismatchError,
   SimulatorScenarioError,
   UnknownGateError,
 } from '../src/core/scenario-runtime'
@@ -95,7 +96,57 @@ describe('scenario controller', () => {
         },
       ],
     })
-    expect(() => controller.assertExhausted()).toThrow('1 exchange(s) remain')
+    expect(() => controller.assertExhausted()).toThrow('Unconsumed exchanges: models')
+  })
+
+  it('matches structural JSON, query, and selected body fields without key-order sensitivity', () => {
+    const controller = new ScenarioController()
+    controller.enqueue({
+      provider: 'openai',
+      exchanges: [{
+        label: 'structural',
+        request: {
+          method: 'POST',
+          path: '/v1/responses',
+          query: { beta: 'true' },
+          body: { first: 1, second: { nested: true } },
+          bodyFields: { '/second/nested': true },
+        },
+        response: { kind: 'json', body: {} },
+      }],
+    })
+    controller.take('openai', {
+      method: 'POST',
+      path: '/v1/responses',
+      query: { beta: 'true' },
+      headers: {},
+      body: { second: { nested: true }, first: 1 },
+    })
+    expect(() => controller.assertExhausted()).not.toThrow()
+  })
+
+  it('does not consume the head exchange on a typed mismatch', () => {
+    const controller = new ScenarioController()
+    controller.enqueue({
+      provider: 'openai',
+      exchanges: [{
+        label: 'preserved',
+        request: { method: 'GET', path: '/v1/models' },
+        response: { kind: 'json', body: {} },
+      }],
+    })
+    expect(() => controller.take('openai', {
+      method: 'GET',
+      path: '/v1/models/wrong',
+      headers: {},
+    })).toThrow(ScenarioMismatchError)
+    expect(() => controller.take('openai', {
+      method: 'GET',
+      path: '/v1/models',
+      headers: {},
+    })).not.toThrow()
+    expect(controller.requests().map(request => request.index)).toEqual([0, 1])
+    controller.assertExhausted()
   })
 
   it('rejects duplicate and unknown gate operations', async () => {

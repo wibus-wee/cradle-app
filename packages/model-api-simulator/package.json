@@ -24,13 +24,14 @@
     "srvx": "^0.11.15"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "0.115.0",
     "@types/node": "^22.19.1",
+    "anthropic-sdk-0-115": "npm:@anthropic-ai/sdk@0.115.0",
     "fast-check": "^4.9.0",
-    "openai": "^6.34.0",
+    "openai": "6.34.0",
     "ts-json-schema-generator": "^2.9.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "yaml": "^2.9.0"
   }
 }

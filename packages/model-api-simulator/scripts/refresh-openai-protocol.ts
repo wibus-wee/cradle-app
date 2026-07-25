@@ -3,41 +3,19 @@ import { resolve } from 'node:path'
 
 import scopeJson from '../protocol/core-scope.json'
 import type { Json } from './protocol-utils'
-import { asRecord, filterDiscriminatedBranches, serialize, sha256, writeJson } from './protocol-utils'
+import {
+  applyExactBranchSelections,
+  applyExactEnumSelections,
+  asRecord,
+  assertOnlyAllowlistedDiscriminatedBranches,
+  removeSourceMetadata,
+  retainAllowlistedDiscriminatedBranches,
+  serialize,
+  sha256,
+  writeJson,
+} from './protocol-utils'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const selectedPaths = new Set([
-  '/responses',
-  '/responses?beta=true',
-  '/responses/{response_id}',
-  '/responses/{response_id}/cancel',
-  '/responses/{response_id}/input_items',
-  '/responses/input_tokens',
-  '/responses/compact',
-  '/models',
-  '/models/{model}',
-])
-const excludedMarkers = [
-  'mcp',
-  'web_search',
-  'file_search',
-  'annotation',
-  'citation',
-  'image',
-  'audio',
-  'computer',
-  'bash',
-  'shell',
-  'text_editor',
-  'memory',
-  'tool_search',
-  'web_fetch',
-  'code_interpreter',
-  'code_execution',
-  'server_tool',
-  'custom_tool',
-]
-
 function parseRef(): string {
   const index = process.argv.indexOf('--ref')
   const ref = index >= 0 ? process.argv[index + 1] : undefined
@@ -55,35 +33,38 @@ async function main(): Promise<void> {
   if (typeof document.openapi !== 'string' || !document.openapi.startsWith('3.1.')) { throw new Error(`Expected OpenAPI 3.1, received ${String(document.openapi)}`) }
 
   const paths = asRecord(document.paths)
-  const retainedPaths = Object.fromEntries(
-    Object.entries(paths).filter(([path]) => selectedPaths.has(path)),
-  )
+  const retainedPaths = selectOperations(paths, new Set(scopeJson.openai.operations))
   const reachableComponents = collectReachableComponents(document, retainedPaths)
   const allowed = new Set([
     ...scopeJson.openai.events,
     ...scopeJson.openai.outputTypes,
+    ...scopeJson.openai.requestTypes,
+    ...scopeJson.openai.supportTypes,
   ])
-  const filtered = filterDiscriminatedBranches(
-    {
-      openapi: document.openapi,
-      info: document.info,
-      paths: retainedPaths,
-      components: reachableComponents,
-    },
-    allowed,
-    excludedMarkers,
-  )
-  if (!filtered) { throw new Error('Core OpenAI snapshot was filtered to nothing') }
+  const preliminary: Json = {
+    openapi: document.openapi,
+    info: document.info,
+    paths: retainedPaths,
+    components: reachableComponents,
+  }
+  const filtered = retainAllowlistedDiscriminatedBranches(preliminary, preliminary, allowed)
+  applyExactBranchSelections(filtered, scopeJson.openai.branchSelections)
+  applyExactEnumSelections(filtered, scopeJson.openai.enumSelections)
   const filteredRecord = asRecord(filtered)
-  const normalized: Json = {
+  const normalized: Json = removeSourceMetadata({
     ...filteredRecord,
     components: collectReachableComponents(
       filteredRecord,
       asRecord(filteredRecord.paths),
     ),
-  }
+  })
+  assertOnlyAllowlistedDiscriminatedBranches(normalized, normalized, allowed)
   const normalizedText = serialize(normalized)
   const coreScopeText = await readFile(resolve(ROOT, 'protocol/core-scope.json'))
+  const grammarText = await readFile(resolve(ROOT, 'protocol/openai/stream-grammar.json'))
+  const transitionCorpusText = await readFile(
+    resolve(ROOT, 'protocol/openai/transition-corpus.json'),
+  )
   await writeJson(resolve(ROOT, 'protocol/openai/openapi.json'), normalized)
   await writeJson(resolve(ROOT, 'protocol/openai/MANIFEST.json'), {
     owner: '@cradle/model-api-simulator',
@@ -94,9 +75,46 @@ async function main(): Promise<void> {
     sourceSha256: sha256(source),
     normalizedSha256: sha256(normalizedText),
     coreScopeSha256: sha256(coreScopeText),
+    grammarSha256: sha256(grammarText),
+    transitionCorpusSha256: sha256(transitionCorpusText),
     generatedAt: new Date().toISOString(),
     refreshCommand: `pnpm protocol:refresh:openai --ref ${ref}`,
   })
+}
+
+function selectOperations(
+  paths: Record<string, Json>,
+  allowedOperationIds: ReadonlySet<string>,
+): Record<string, Json> {
+  const selected = new Map<string, { path: string, method: string, operation: Json }>()
+  for (const [path, rawPathItem] of Object.entries(paths)) {
+    const pathItem = asRecord(rawPathItem)
+    for (const method of ['get', 'post', 'delete']) {
+      const rawOperation = pathItem[method]
+      if (!rawOperation || typeof rawOperation !== 'object' || Array.isArray(rawOperation)) {
+        continue
+      }
+      const operationId = asRecord(rawOperation).operationId
+      if (typeof operationId === 'string' && allowedOperationIds.has(operationId)) {
+        if (selected.has(operationId)) {
+          throw new Error(`Duplicate OpenAPI operationId "${operationId}"`)
+        }
+        selected.set(operationId, { path, method, operation: rawOperation })
+      }
+    }
+  }
+  const missing = [...allowedOperationIds].filter(id => !selected.has(id))
+  if (missing.length > 0) {
+    throw new Error(`Core operation IDs missing from OpenAPI: ${missing.join(', ')}`)
+  }
+  const retained: Record<string, Json> = {}
+  for (const [, selection] of [...selected].sort(([left], [right]) => left.localeCompare(right))) {
+    const pathItem = asRecord(paths[selection.path]!)
+    const target = (retained[selection.path] ??= {}) as Record<string, Json>
+    if (pathItem.parameters) { target.parameters = pathItem.parameters }
+    target[selection.method] = selection.operation
+  }
+  return retained
 }
 
 function collectReachableComponents(

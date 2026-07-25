@@ -14,7 +14,17 @@ export async function observeRequest(
   return {
     method: request.method,
     path: new URL(request.url).pathname,
+    query: normalizedQuery(new URL(request.url)),
     headers,
     ...(body === undefined ? {} : { body }),
   }
+}
+
+function normalizedQuery(url: URL): Readonly<Record<string, string | readonly string[]>> {
+  const result: Record<string, string | readonly string[]> = {}
+  for (const name of [...new Set(url.searchParams.keys())].sort()) {
+    const values = url.searchParams.getAll(name)
+    result[name] = values.length === 1 ? values[0]! : values
+  }
+  return result
 }

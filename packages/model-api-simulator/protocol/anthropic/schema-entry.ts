@@ -4,25 +4,25 @@ import type {
   BetaRawMessageStreamEvent,
   MessageCountTokensParams as BetaMessageCountTokensParams,
   MessageCreateParams as BetaMessageCreateParams,
-} from '@anthropic-ai/sdk/resources/beta/messages'
+} from 'anthropic-sdk-0-115/resources/beta/messages'
 import type {
   BetaModelInfo,
   ModelListParams as BetaModelListParams,
   ModelRetrieveParams as BetaModelRetrieveParams,
-} from '@anthropic-ai/sdk/resources/beta/models'
+} from 'anthropic-sdk-0-115/resources/beta/models'
 import type {
   Message as StableMessage,
   MessageCountTokensParams as StableMessageCountTokensParams,
   MessageCreateParams as StableMessageCreateParams,
   MessageTokensCount as StableMessageTokensCount,
   RawMessageStreamEvent as StableRawMessageStreamEvent,
-} from '@anthropic-ai/sdk/resources/messages'
+} from 'anthropic-sdk-0-115/resources/messages'
 import type {
   ModelInfo as StableModelInfo,
   ModelListParams as StableModelListParams,
   ModelRetrieveParams as StableModelRetrieveParams,
-} from '@anthropic-ai/sdk/resources/models'
-import type { ErrorResponse as StableErrorResponse } from '@anthropic-ai/sdk/resources/shared'
+} from 'anthropic-sdk-0-115/resources/models'
+import type { ErrorResponse as StableErrorResponse } from 'anthropic-sdk-0-115/resources/shared'
 
 export type AnthropicMessageCreateParams = StableMessageCreateParams
 export type AnthropicMessageCountTokensParams = StableMessageCountTokensParams

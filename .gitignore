@@ -38,3 +38,4 @@ artifacts
 /docs
 # Foglamp codebase scan (editToken is secret)
 .foglamp/
+packages/model-api-simulator/.cache/

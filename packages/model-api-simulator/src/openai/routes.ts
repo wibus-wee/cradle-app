@@ -6,39 +6,45 @@ import type { ScenarioController } from '../core/scenario-runtime'
 import { createScheduledStream } from '../core/stream-scheduler'
 import { authenticateOpenAi } from './auth'
 import { openAiError } from './errors'
+import type { OpenAiResourceStore } from './resource-store'
+import {
+  OpenAiResourceNotFoundError,
+} from './resource-store'
 import { encodeOpenAiEvent } from './sse'
 import { validateOpenAiStream } from './state-machine'
 
 export function openAiRoutes(
   controller: ScenarioController,
   protocol: SimulatorProtocolValidator,
+  resources: OpenAiResourceStore,
 ) {
   return new Elysia({ name: 'cradle.model-api-simulator.openai' })
-    .post('/v1/responses', ({ request }) => handleOpenAiRequest(controller, protocol, request))
+    .post('/v1/responses', ({ request }) => handleOpenAiRequest(controller, protocol, resources, request))
     .get('/v1/responses/:response_id', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, request))
+      handleOpenAiRequest(controller, protocol, resources, request))
     .delete('/v1/responses/:response_id', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, request))
+      handleOpenAiRequest(controller, protocol, resources, request))
     .post('/v1/responses/:response_id/cancel', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, request))
+      handleOpenAiRequest(controller, protocol, resources, request))
     .get('/v1/responses/:response_id/input_items', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, request))
+      handleOpenAiRequest(controller, protocol, resources, request))
     .post('/v1/responses/input_tokens', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, request))
+      handleOpenAiRequest(controller, protocol, resources, request))
     .post('/v1/responses/compact', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, request))
+      handleOpenAiRequest(controller, protocol, resources, request))
 }
 
 export async function handleOpenAiRequest(
   controller: ScenarioController,
   protocol: SimulatorProtocolValidator,
+  resources: OpenAiResourceStore,
   request: Request,
 ): Promise<Response> {
   const authenticationError = authenticateOpenAi(request)
   if (authenticationError) { return authenticationError }
   try {
     const observed = await observeRequest(request)
-    protocol.validateRequest('openai', request, observed)
+    const operation = protocol.validateRequest('openai', request, observed)
     const exchange = controller.take('openai', observed)
     const headers = new Headers(exchange.response.headers)
     headers.set(
@@ -46,14 +52,25 @@ export async function handleOpenAiRequest(
       headers.get('x-request-id') ?? `req_simulator_${controller.requests().length}`,
     )
     if (exchange.response.kind === 'json') {
-      protocol.validateJsonResponse('openai', request, exchange.response.body)
+      const body = exchange.resourceEffect
+        ? resources.apply(exchange.resourceEffect, operation, request, exchange.response.body)
+        : exchange.response.body
+      protocol.validateJsonResponse(
+        operation,
+        request,
+        exchange.response.status ?? 200,
+        body,
+      )
       headers.set('content-type', 'application/json')
-      return Response.json(exchange.response.body, {
+      return Response.json(body, {
         status: exchange.response.status ?? 200,
         headers,
       })
     }
-    protocol.validateStream('openai', request, exchange.response.steps)
+    if (exchange.resourceEffect?.kind === 'store_response') {
+      resources.apply(exchange.resourceEffect, operation, request, exchange.resourceEffect.response)
+    }
+    protocol.validateStream(operation, exchange.response.steps)
     validateOpenAiStream(exchange.response.steps)
     headers.set('content-type', 'text/event-stream')
     headers.set('cache-control', 'no-cache')
@@ -64,6 +81,10 @@ export async function handleOpenAiRequest(
     )
   }
  catch (error) {
-    return openAiError(error instanceof Error ? error : new Error(String(error)))
+    const normalized = error instanceof Error ? error : new Error(String(error))
+    return openAiError(
+      normalized,
+      normalized instanceof OpenAiResourceNotFoundError ? 404 : 400,
+    )
   }
 }

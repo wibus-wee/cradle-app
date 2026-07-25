@@ -1,26 +1,90 @@
 {
   "provider": "anthropic",
-  "initial": "message_start",
-  "terminal": ["message_stop", "error", "disconnect"],
-  "events": [
-    "message_start",
-    "content_block_start",
-    "content_block_delta",
-    "content_block_stop",
-    "message_delta",
-    "message_stop",
-    "ping",
-    "error"
-  ],
   "transitions": [
-    "message-start",
-    "ping",
-    "content-block-start",
-    "content-block-delta",
-    "content-block-stop",
-    "message-delta",
-    "message-stop",
-    "error",
-    "disconnect"
+    {
+      "id": "message-start",
+      "from": ["idle"],
+      "event": "message_start",
+      "to": "message",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#full-http-stream-response"
+    },
+    {
+      "id": "ping",
+      "from": ["message", "content", "message_delta"],
+      "event": "ping",
+      "to": "same",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#ping-events"
+    },
+    {
+      "id": "content-block-start",
+      "from": ["message"],
+      "event": "content_block_start",
+      "to": "content",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#content-block-delta"
+    },
+    {
+      "id": "content-block-delta",
+      "from": ["content"],
+      "event": "content_block_delta",
+      "to": "content",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#content-block-delta"
+    },
+    {
+      "id": "content-block-stop",
+      "from": ["content"],
+      "event": "content_block_stop",
+      "to": "message",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#full-http-stream-response"
+    },
+    {
+      "id": "message-delta",
+      "from": ["message", "message_delta"],
+      "event": "message_delta",
+      "to": "message_delta",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#full-http-stream-response"
+    },
+    {
+      "id": "message-stop",
+      "from": ["message_delta"],
+      "event": "message_stop",
+      "to": "terminal",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#full-http-stream-response"
+    },
+    {
+      "id": "error",
+      "from": ["idle", "message", "content", "message_delta"],
+      "event": "error",
+      "to": "terminal",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#error-events"
+    },
+    {
+      "id": "disconnect",
+      "from": ["idle", "message", "content", "message_delta"],
+      "event": "disconnect",
+      "to": "terminal",
+      "evidence": "simulator:anthropic-disconnect"
+    }
+  ],
+  "correlations": [
+    {
+      "id": "message-start-empty-content",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#full-http-stream-response"
+    },
+    {
+      "id": "content-index-contiguous",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#full-http-stream-response"
+    },
+    {
+      "id": "content-index-open",
+      "evidence": "simulator:anthropic-content-index-open"
+    },
+    {
+      "id": "usage-monotonic",
+      "evidence": "documented:https://platform.claude.com/docs/en/build-with-claude/streaming#message-delta"
+    },
+    {
+      "id": "terminal-forbids-events",
+      "evidence": "simulator:anthropic-terminal-forbids-events"
+    }
   ]
 }

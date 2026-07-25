@@ -1,6 +1,46 @@
 {
   "anthropic": {
+    "operations": [
+      "messages.create",
+      "messages.count_tokens",
+      "models.list",
+      "models.retrieve"
+    ],
+    "schemaRoots": [
+      "AnthropicMessageCreateParams",
+      "AnthropicBetaMessageCreateParams",
+      "AnthropicMessageCountTokensParams",
+      "AnthropicBetaMessageCountTokensParams",
+      "AnthropicMessage",
+      "AnthropicBetaMessage",
+      "AnthropicMessageTokensCount",
+      "AnthropicBetaMessageTokensCount",
+      "AnthropicRawMessageStreamEvent",
+      "AnthropicBetaRawMessageStreamEvent",
+      "AnthropicModelListParams",
+      "AnthropicBetaModelListParams",
+      "AnthropicModelRetrieveParams",
+      "AnthropicBetaModelRetrieveParams",
+      "AnthropicModelInfo",
+      "AnthropicBetaModelInfo",
+      "AnthropicErrorResponse"
+    ],
     "contentBlocks": ["text", "tool_use", "thinking", "redacted_thinking"],
+    "requestTypes": ["text", "tool_result"],
+    "supportTypes": [
+      "redeemed",
+      "not_applied",
+      "api_error",
+      "authentication_error",
+      "billing_error",
+      "timeout_error",
+      "invalid_request_error",
+      "not_found_error",
+      "overloaded_error",
+      "permission_error",
+      "rate_limit_error",
+      "direct"
+    ],
     "deltas": ["text_delta", "input_json_delta", "thinking_delta", "signature_delta"],
     "events": [
       "message_start",
@@ -14,6 +54,34 @@
     ]
   },
   "openai": {
+    "operations": [
+      "listModels",
+      "retrieveModel",
+      "createResponse",
+      "beta_createResponse",
+      "getResponse",
+      "deleteResponse",
+      "cancelResponse",
+      "listInputItems",
+      "Compactconversation",
+      "Getinputtokencounts"
+    ],
+    "schemaRoots": [
+      "CreateResponse",
+      "BetaCreateResponse",
+      "Response",
+      "BetaResponse",
+      "ResponseStreamEvent",
+      "BetaResponseStreamEvent",
+      "ResponseItemList",
+      "TokenCountsBody",
+      "TokenCountsResource",
+      "CompactResponseMethodPublicBody",
+      "CompactResource",
+      "ListModelsResponse",
+      "Model",
+      "Error"
+    ],
     "events": [
       "response.queued",
       "response.created",
@@ -39,6 +107,41 @@
       "response.function_call_arguments.done",
       "error"
     ],
-    "outputTypes": ["message", "output_text", "refusal", "reasoning", "function_call"]
+    "outputTypes": ["message", "output_text", "refusal", "reasoning", "function_call"],
+    "requestTypes": ["message", "input_text", "input_file", "function_call_output"],
+    "supportTypes": [
+      "function",
+      "reasoning_text",
+      "summary_text",
+      "text",
+      "json_object",
+      "json_schema",
+      "compaction",
+      "compaction_trigger",
+      "direct",
+      "error",
+      "redeemed",
+      "not_applied"
+    ],
+    "enumSelections": {
+      "#/components/schemas/IncludeEnum": [
+        "reasoning.encrypted_content",
+        "message.output_text.logprobs"
+      ],
+      "#/components/schemas/BetaIncludeEnum": [
+        "reasoning.encrypted_content",
+        "message.output_text.logprobs"
+      ]
+    },
+    "branchSelections": {
+      "#/components/schemas/InputItem/oneOf": [
+        "#/components/schemas/Item",
+        "#/components/schemas/CompactionTriggerItemParam"
+      ],
+      "#/components/schemas/BetaInputItem/oneOf": [
+        "#/components/schemas/BetaItem",
+        "#/components/schemas/BetaCompactionTriggerItemParam"
+      ]
+    }
   }
 }

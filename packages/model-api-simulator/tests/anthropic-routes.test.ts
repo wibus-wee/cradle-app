@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ScenarioController } from '../src/core/scenario-runtime'
-import { createSimulatorApp } from '../src/server'
+import { createSimulatorApp, createSimulatorRuntime } from '../src/server'
 
 const headers = {
   'content-type': 'application/json',
@@ -14,7 +13,7 @@ const stableMessage = {
   type: 'message',
   role: 'assistant',
   model: 'claude-test',
-  content: [{ type: 'text', text: 'hello' }],
+  content: [{ type: 'text', text: 'hello', citations: null }],
   container: null,
   stop_details: null,
   stop_reason: 'end_turn',
@@ -27,6 +26,7 @@ const stableMessage = {
     input_tokens: 1,
     output_tokens: 1,
     output_tokens_details: null,
+    server_tool_use: null,
     service_tier: null,
   },
 } as const
@@ -44,8 +44,9 @@ const validCountRequest = {
 
 describe('anthropic routes', () => {
   it('requires auth/version and returns provider-native errors', async () => {
-    const controller = new ScenarioController()
-    const app = createSimulatorApp(controller)
+    const runtime = createSimulatorRuntime()
+    const { controller } = runtime
+    const app = createSimulatorApp(runtime)
     const missing = await app.handle(
       new Request('http://simulator/v1/messages', { method: 'POST', body: '{}' }),
     )
@@ -79,7 +80,8 @@ describe('anthropic routes', () => {
   })
 
   it('serves non-streaming messages, token counts, models, and beta query form', async () => {
-    const controller = new ScenarioController()
+    const runtime = createSimulatorRuntime()
+    const { controller } = runtime
     controller.enqueue({
       provider: 'anthropic',
       exchanges: [
@@ -116,7 +118,7 @@ describe('anthropic routes', () => {
         },
       ],
     })
-    const app = createSimulatorApp(controller)
+    const app = createSimulatorApp(runtime)
     const message = await app.handle(
       new Request('http://simulator/v1/messages?beta=true', {
         method: 'POST',
@@ -140,7 +142,8 @@ describe('anthropic routes', () => {
   })
 
   it('emits named SSE frames and rejects excluded variants before streaming', async () => {
-    const controller = new ScenarioController()
+    const runtime = createSimulatorRuntime()
+    const { controller } = runtime
     controller.enqueue({
       provider: 'anthropic',
       exchanges: [
@@ -173,6 +176,7 @@ describe('anthropic routes', () => {
                     input_tokens: 1,
                     output_tokens: 1,
                     output_tokens_details: null,
+                    server_tool_use: null,
                   },
                 },
               },
@@ -191,7 +195,7 @@ describe('anthropic routes', () => {
         },
       ],
     })
-    const app = createSimulatorApp(controller)
+    const app = createSimulatorApp(runtime)
     const response = await app.handle(
       new Request('http://simulator/v1/messages', {
         method: 'POST',

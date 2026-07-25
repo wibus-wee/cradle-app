@@ -2,12 +2,13 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { createGenerator } from 'ts-json-schema-generator'
+import { parse } from 'yaml'
 
 import scopeJson from '../protocol/core-scope.json'
 import type { Json } from './protocol-utils'
 import {
-  filterDiscriminatedBranches,
   pruneLocalDefinitions,
+  retainAllowlistedDiscriminatedBranches,
   serialize,
   sha256,
   writeJson,
@@ -33,27 +34,8 @@ const names = [
   'AnthropicBetaModelListParams',
   'AnthropicBetaModelRetrieveParams',
 ] as const
-const excludedMarkers = [
-  'mcp',
-  'image',
-  'audio',
-  'bash',
-  'shell',
-  'text_editor',
-  'memory',
-  'tool_search',
-  'web_search',
-  'file_search',
-  'web_fetch',
-  'code_execution',
-  'computer',
-  'citation',
-  'server_tool',
-  'custom_tool',
-]
-
 async function main(): Promise<void> {
-  const sdkRoot = resolve(ROOT, 'node_modules/@anthropic-ai/sdk')
+  const sdkRoot = resolve(ROOT, 'node_modules/anthropic-sdk-0-115')
   const packageText = await readFile(resolve(sdkRoot, 'package.json'), 'utf8')
   const packageJson = JSON.parse(packageText) as { version: string }
   const entry = resolve(ROOT, 'protocol/anthropic/schema-entry.ts')
@@ -69,12 +51,13 @@ async function main(): Promise<void> {
     ...scopeJson.anthropic.events,
     ...scopeJson.anthropic.contentBlocks,
     ...scopeJson.anthropic.deltas,
+    ...scopeJson.anthropic.requestTypes,
+    ...scopeJson.anthropic.supportTypes,
   ])
   const catalogues: Record<string, Json> = {}
   for (const name of names) {
     const schema = generator.createSchema(name) as Json
-    const filtered = filterDiscriminatedBranches(schema, allowed, excludedMarkers)
-    if (!filtered) { throw new Error(`Selected Anthropic type ${name} was filtered to nothing`) }
+    const filtered = retainAllowlistedDiscriminatedBranches(schema, schema, allowed)
     catalogues[name] = pruneLocalDefinitions(filtered)
   }
   const catalogue: Json = {
@@ -84,6 +67,9 @@ async function main(): Promise<void> {
   const schemaText = serialize(catalogue)
   const coreScopeText = await readFile(resolve(ROOT, 'protocol/core-scope.json'))
   const grammarText = await readFile(resolve(ROOT, 'protocol/anthropic/stream-grammar.json'))
+  const transitionCorpusText = await readFile(
+    resolve(ROOT, 'protocol/anthropic/transition-corpus.json'),
+  )
   const declarationPaths = [
     'resources/messages/messages.d.ts',
     'resources/models.d.ts',
@@ -102,15 +88,29 @@ async function main(): Promise<void> {
     owner: '@cradle/model-api-simulator',
     provider: 'anthropic',
     sdkVersion: packageJson.version,
-    packageIntegrity: null,
+    packageIntegrity: await readPackageIntegrity(packageJson.version),
     selectedTypes: [...names],
     declarations,
     schemaSha256: sha256(schemaText),
     coreScopeSha256: sha256(coreScopeText),
     grammarSha256: sha256(grammarText),
+    transitionCorpusSha256: sha256(transitionCorpusText),
     generatedAt: new Date().toISOString(),
     refreshCommand: 'pnpm protocol:refresh:anthropic',
   })
+}
+
+async function readPackageIntegrity(version: string): Promise<string> {
+  const lockPath = resolve(ROOT, '../../pnpm-lock.yaml')
+  const lock = parse(await readFile(lockPath, 'utf8')) as {
+    packages?: Record<string, { resolution?: { integrity?: string } }>
+  }
+  const entry = lock.packages?.[`@anthropic-ai/sdk@${version}`]
+  const integrity = entry?.resolution?.integrity
+  if (!integrity) {
+    throw new Error(`pnpm lockfile has no integrity for @anthropic-ai/sdk@${version}`)
+  }
+  return integrity
 }
 
 await main()

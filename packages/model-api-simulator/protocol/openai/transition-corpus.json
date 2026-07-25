@@ -1,0 +1,51 @@
+{
+  "scenarios": [
+    {
+      "label": "all nonterminal families and completion",
+      "steps": [
+        { "kind": "event", "event": { "type": "response.queued", "sequence_number": 0, "response_id": "resp_trace" } },
+        { "kind": "event", "event": { "type": "response.created", "sequence_number": 1, "response_id": "resp_trace" } },
+        { "kind": "event", "event": { "type": "response.in_progress", "sequence_number": 2, "response_id": "resp_trace" } },
+        { "kind": "event", "event": { "type": "response.output_item.added", "sequence_number": 3, "response_id": "resp_trace", "output_index": 0, "item_index": 0, "item": { "id": "item_message", "type": "message" } } },
+        { "kind": "event", "event": { "type": "response.content_part.added", "sequence_number": 4, "response_id": "resp_trace", "item_id": "item_message", "output_index": 0, "item_index": 0, "content_index": 0 } },
+        { "kind": "event", "event": { "type": "response.output_text.delta", "sequence_number": 5, "response_id": "resp_trace", "item_id": "item_message", "output_index": 0, "content_index": 0 } },
+        { "kind": "event", "event": { "type": "response.output_text.done", "sequence_number": 6, "response_id": "resp_trace", "item_id": "item_message", "output_index": 0, "content_index": 0 } },
+        { "kind": "event", "event": { "type": "response.refusal.delta", "sequence_number": 7, "response_id": "resp_trace", "item_id": "item_message", "output_index": 0, "content_index": 0 } },
+        { "kind": "event", "event": { "type": "response.refusal.done", "sequence_number": 8, "response_id": "resp_trace", "item_id": "item_message", "output_index": 0, "content_index": 0 } },
+        { "kind": "event", "event": { "type": "response.content_part.done", "sequence_number": 9, "response_id": "resp_trace", "item_id": "item_message", "output_index": 0, "item_index": 0, "content_index": 0 } },
+        { "kind": "event", "event": { "type": "response.output_item.done", "sequence_number": 10, "response_id": "resp_trace", "output_index": 0, "item_index": 0, "item": { "id": "item_message", "type": "message" } } },
+
+        { "kind": "event", "event": { "type": "response.output_item.added", "sequence_number": 11, "response_id": "resp_trace", "output_index": 1, "item_index": 1, "item": { "id": "item_reasoning", "type": "reasoning" } } },
+        { "kind": "event", "event": { "type": "response.reasoning_summary_part.added", "sequence_number": 12, "response_id": "resp_trace", "item_id": "item_reasoning", "output_index": 1, "item_index": 1 } },
+        { "kind": "event", "event": { "type": "response.reasoning_summary_text.delta", "sequence_number": 13, "response_id": "resp_trace", "item_id": "item_reasoning", "output_index": 1 } },
+        { "kind": "event", "event": { "type": "response.reasoning_summary_text.done", "sequence_number": 14, "response_id": "resp_trace", "item_id": "item_reasoning", "output_index": 1 } },
+        { "kind": "event", "event": { "type": "response.reasoning_summary_part.done", "sequence_number": 15, "response_id": "resp_trace", "item_id": "item_reasoning", "output_index": 1, "item_index": 1 } },
+        { "kind": "event", "event": { "type": "response.reasoning_text.delta", "sequence_number": 16, "response_id": "resp_trace", "item_id": "item_reasoning", "output_index": 1 } },
+        { "kind": "event", "event": { "type": "response.reasoning_text.done", "sequence_number": 17, "response_id": "resp_trace", "item_id": "item_reasoning", "output_index": 1 } },
+        { "kind": "event", "event": { "type": "response.output_item.done", "sequence_number": 18, "response_id": "resp_trace", "output_index": 1, "item_index": 1, "item": { "id": "item_reasoning", "type": "reasoning" } } },
+
+        { "kind": "event", "event": { "type": "response.output_item.added", "sequence_number": 19, "response_id": "resp_trace", "output_index": 2, "item_index": 2, "item": { "id": "item_function", "type": "function_call", "call_id": "call_trace" } } },
+        { "kind": "event", "event": { "type": "response.function_call_arguments.delta", "sequence_number": 20, "response_id": "resp_trace", "item_id": "item_function", "output_index": 2, "item_index": 2, "call_id": "call_trace" } },
+        { "kind": "event", "event": { "type": "response.function_call_arguments.done", "sequence_number": 21, "response_id": "resp_trace", "item_id": "item_function", "output_index": 2, "item_index": 2, "call_id": "call_trace" } },
+        { "kind": "event", "event": { "type": "response.output_item.done", "sequence_number": 22, "response_id": "resp_trace", "output_index": 2, "item_index": 2, "item": { "id": "item_function", "type": "function_call", "call_id": "call_trace" } } },
+        { "kind": "event", "event": { "type": "response.completed", "sequence_number": 23, "response_id": "resp_trace" } }
+      ]
+    },
+    {
+      "label": "failed terminal",
+      "steps": [{ "kind": "event", "event": { "type": "response.failed", "sequence_number": 0 } }]
+    },
+    {
+      "label": "incomplete terminal",
+      "steps": [{ "kind": "event", "event": { "type": "response.incomplete", "sequence_number": 0 } }]
+    },
+    {
+      "label": "top-level error terminal",
+      "steps": [{ "kind": "event", "event": { "type": "error", "sequence_number": 0 } }]
+    },
+    {
+      "label": "transport disconnect",
+      "steps": [{ "kind": "disconnect", "reason": "fixture" }]
+    }
+  ]
+}

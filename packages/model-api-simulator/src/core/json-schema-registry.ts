@@ -28,18 +28,24 @@ export class JsonSchemaRegistry {
     allErrors: true,
     discriminator: true,
     strict: false,
-    validateFormats: false,
+    validateFormats: true,
   })
 
   readonly #draft2020 = new Ajv2020({
     allErrors: true,
     strict: false,
-    validateFormats: false,
+    validateFormats: true,
   })
 
   constructor() {
     addFormats(this.#draft07)
     addFormats(this.#draft2020)
+    for (const registry of [this.#draft07, this.#draft2020]) {
+      registry.addFormat('unixtime', {
+        type: 'number',
+        validate: value => Number.isFinite(value) && value >= 0,
+      })
+    }
   }
 
   validate<T extends JsonValue>(schemaId: ProtocolSchemaId, value: JsonValue): T {
@@ -50,6 +56,20 @@ export class JsonSchemaRegistry {
 
   accepts(schemaId: ProtocolSchemaId, value: JsonValue): boolean {
     return this.#validator(schemaId)(value) as boolean
+  }
+
+  validateOpenAiSchema(schema: object, value: JsonValue, label: string): void {
+    const validate = this.#draft2020.compile({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      ...schema,
+      components: openAiDocument.components,
+    })
+    if (!validate(value)) {
+      throw new ProtocolValidationError(
+        `openai:2020-12:${label}`,
+        validate.errors ? [...validate.errors] : [],
+      )
+    }
   }
 
   #validator(schemaId: ProtocolSchemaId): ValidateFunction {

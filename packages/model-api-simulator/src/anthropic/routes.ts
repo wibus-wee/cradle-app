@@ -28,19 +28,24 @@ export async function handleAnthropicRequest(
   if (authenticationError) { return authenticationError }
   try {
     const observed = await observeRequest(request)
-    protocol.validateRequest('anthropic', request, observed)
+    const operation = protocol.validateRequest('anthropic', request, observed)
     const exchange = controller.take('anthropic', observed)
     const headers = new Headers(exchange.response.headers)
     headers.set('request-id', headers.get('request-id') ?? `req_simulator_${controller.requests().length}`)
     if (exchange.response.kind === 'json') {
-      protocol.validateJsonResponse('anthropic', request, exchange.response.body)
+      protocol.validateJsonResponse(
+        operation,
+        request,
+        exchange.response.status ?? 200,
+        exchange.response.body,
+      )
       headers.set('content-type', 'application/json')
       return Response.json(exchange.response.body, {
         status: exchange.response.status ?? 200,
         headers,
       })
     }
-    protocol.validateStream('anthropic', request, exchange.response.steps)
+    protocol.validateStream(operation, exchange.response.steps)
     validateAnthropicStream(exchange.response.steps)
     headers.set('content-type', 'text/event-stream')
     headers.set('cache-control', 'no-cache')

@@ -14,11 +14,13 @@ export function createScheduledStream(
 ): ReadableStream<Uint8Array> {
   let cancelled = false
   let unregister: (() => void) | undefined
+  const gateOwner = new AbortController()
   let index = 0
   return new ReadableStream<Uint8Array>({
     start(stream) {
       unregister = controller.trackStream((reason) => {
         cancelled = true
+        gateOwner.abort()
         stream.error(reason)
       })
     },
@@ -40,7 +42,7 @@ export function createScheduledStream(
               stream.enqueue(encodeEvent(step))
               return
             case 'gate':
-              await controller.waitAtGate(step.name)
+              await controller.waitAtGate(step.name, gateOwner.signal)
               break
             case 'yield':
               await schedulerYield()
@@ -63,6 +65,7 @@ export function createScheduledStream(
     },
     cancel() {
       cancelled = true
+      gateOwner.abort()
       unregister?.()
     },
   })

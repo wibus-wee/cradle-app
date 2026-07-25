@@ -14,16 +14,35 @@ export function isJsonObject(value: JsonValue): value is JsonObject {
 export interface RequestMatch {
   readonly method: string
   readonly path: string
+  readonly query?: Readonly<Record<string, string | readonly string[]>>
   readonly body?: JsonValue
+  readonly bodyFields?: Readonly<Record<string, JsonValue>>
 }
 
 export interface ObservedRequest {
   readonly index: number
   readonly method: string
   readonly path: string
+  readonly query?: Readonly<Record<string, string | readonly string[]>>
   readonly headers: Readonly<Record<string, string>>
   readonly body?: JsonValue
 }
+
+export interface OpenAiInputItemsPage {
+  readonly after?: string
+  readonly body: JsonObject
+}
+
+export type OpenAiResourceEffect
+  = | {
+      readonly kind: 'store_response'
+      readonly response: JsonObject
+      readonly inputItemPages?: readonly OpenAiInputItemsPage[]
+    }
+    | { readonly kind: 'retrieve_response' }
+    | { readonly kind: 'cancel_response' }
+    | { readonly kind: 'delete_response' }
+    | { readonly kind: 'list_input_items' }
 
 export type StreamStep
   = | { readonly kind: 'event', readonly event: JsonValue }
@@ -36,6 +55,7 @@ export interface SimulatorExchange {
   readonly label: string
   readonly request: RequestMatch
   readonly expectedHeaders?: Readonly<Record<string, string>>
+  readonly resourceEffect?: OpenAiResourceEffect
   readonly response:
     | {
         readonly kind: 'json'
@@ -58,6 +78,7 @@ export type SimulatorScenario
 export interface SimulatorController {
   enqueue: (scenario: SimulatorScenario) => void
   waitForRequest: (match: RequestMatch) => Promise<ObservedRequest>
+  waitForGate: (gate: string) => Promise<void>
   release: (gate: string) => void
   requests: () => readonly ObservedRequest[]
   assertExhausted: () => void

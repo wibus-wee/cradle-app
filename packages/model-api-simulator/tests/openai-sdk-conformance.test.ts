@@ -75,6 +75,7 @@ describe('openAI official SDK conformance', () => {
     async () => {
       const simulator = await startModelApiSimulator()
       const urls: string[] = []
+      const storedResponse = { ...responseFixture, status: 'in_progress' as const }
       const simpleStream = [
         {
           kind: 'event' as const,
@@ -89,27 +90,48 @@ describe('openAI official SDK conformance', () => {
       simulator.controller.enqueue({
         provider: 'openai',
         exchanges: [
-          exchange('create', 'POST', '/v1/responses', { kind: 'json', body: responseFixture }),
+          {
+            ...exchange('create', 'POST', '/v1/responses', {
+              kind: 'json',
+              body: storedResponse,
+            }),
+            resourceEffect: {
+              kind: 'store_response',
+              response: storedResponse,
+              inputItemPages: [{
+                body: {
+                  object: 'list',
+                  data: [],
+                  first_id: '',
+                  last_id: '',
+                  has_more: false,
+                },
+              }],
+            },
+          },
           exchange('raw', 'POST', '/v1/responses', { kind: 'stream', steps: simpleStream }),
           exchange('final', 'POST', '/v1/responses', { kind: 'stream', steps: simpleStream }),
-          exchange('retrieve', 'GET', '/v1/responses/resp_simulator', {
-            kind: 'json',
-            body: responseFixture,
-          }),
-          exchange('cancel', 'POST', '/v1/responses/resp_simulator/cancel', {
-            kind: 'json',
-            body: { ...responseFixture, status: 'cancelled' },
-          }),
-          exchange('items', 'GET', '/v1/responses/resp_simulator/input_items', {
-            kind: 'json',
-            body: {
-              object: 'list',
-              data: [],
-              first_id: '',
-              last_id: '',
-              has_more: false,
-            },
-          }),
+          {
+            ...exchange('retrieve', 'GET', '/v1/responses/resp_simulator', {
+              kind: 'json',
+              body: {},
+            }),
+            resourceEffect: { kind: 'retrieve_response' },
+          },
+          {
+            ...exchange('cancel', 'POST', '/v1/responses/resp_simulator/cancel', {
+              kind: 'json',
+              body: {},
+            }),
+            resourceEffect: { kind: 'cancel_response' },
+          },
+          {
+            ...exchange('items', 'GET', '/v1/responses/resp_simulator/input_items', {
+              kind: 'json',
+              body: {},
+            }),
+            resourceEffect: { kind: 'list_input_items' },
+          },
           exchange('tokens', 'POST', '/v1/responses/input_tokens', {
             kind: 'json',
             body: { object: 'response.input_tokens', input_tokens: 4 },
@@ -124,10 +146,20 @@ describe('openAI official SDK conformance', () => {
               usage: responseFixture.usage,
             },
           }),
-          exchange('delete', 'DELETE', '/v1/responses/resp_simulator', {
-            kind: 'json',
-            body: {},
-          }),
+          {
+            ...exchange('delete', 'DELETE', '/v1/responses/resp_simulator', {
+              kind: 'json',
+              body: {},
+            }),
+            resourceEffect: { kind: 'delete_response' },
+          },
+          {
+            ...exchange('retrieve deleted', 'GET', '/v1/responses/resp_simulator', {
+              kind: 'json',
+              body: {},
+            }),
+            resourceEffect: { kind: 'retrieve_response' },
+          },
           exchange('models', 'GET', '/v1/models', {
             kind: 'json',
             body: {
@@ -162,12 +194,15 @@ describe('openAI official SDK conformance', () => {
               .finalResponse()
           ).id,
         ).toBe('resp_simulator')
-        expect((await client.responses.retrieve('resp_simulator')).id).toBe('resp_simulator')
+        expect((await client.responses.retrieve('resp_simulator')).status).toBe('in_progress')
         expect((await client.responses.cancel('resp_simulator')).status).toBe('cancelled')
         expect((await client.responses.inputItems.list('resp_simulator')).data).toEqual([])
         expect((await client.responses.inputTokens.count({ model: 'gpt-test', input: 'hello' })).input_tokens).toBe(4)
         expect((await client.responses.compact({ model: 'gpt-test', input: 'hello' })).id).toBe('cmp_1')
         await client.responses.delete('resp_simulator')
+        await expect(client.responses.retrieve('resp_simulator')).rejects.toMatchObject({
+          status: 404,
+        })
         expect((await client.models.list()).data[0]?.id).toBe('gpt-test')
         expect((await client.models.retrieve('gpt-test')).id).toBe('gpt-test')
         expect(urls.every(url => new URL(url).hostname === '127.0.0.1')).toBe(true)
