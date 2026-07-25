@@ -375,6 +375,7 @@ function protocolUsage(inputTokens: number, outputTokens: number) {
   return {
     inputTokens,
     cachedInputTokens: Math.floor(inputTokens / 2),
+    cacheWriteInputTokens: 0,
     outputTokens,
     reasoningOutputTokens: Math.floor(outputTokens / 2),
     totalTokens: inputTokens + outputTokens,

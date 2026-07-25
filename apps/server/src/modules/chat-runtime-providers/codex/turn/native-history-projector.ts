@@ -88,7 +88,10 @@ function projectUserInput(input: UserInput): CodexContentItem[] {
         image_url: input.url,
         ...(input.detail ? { detail: input.detail } : {}),
       }]
+    case 'audio':
+      return [{ type: 'input_audio', audio_url: input.url }]
     case 'localImage':
+    case 'localAudio':
     case 'skill':
     case 'mention':
       return [{

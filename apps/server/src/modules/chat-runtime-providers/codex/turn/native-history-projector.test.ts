@@ -32,4 +32,30 @@ describe('projectCodexNativeTurnsToCodexItems', () => {
       },
     ])
   })
+
+  it('preserves native audio user input', () => {
+    expect(projectCodexNativeTurnsToCodexItems([
+      {
+        id: 'turn-audio',
+        status: 'completed',
+        itemsView: 'full',
+        startedAt: 1,
+        completedAt: 2,
+        durationMs: 1,
+        error: null,
+        items: [{
+          type: 'userMessage',
+          id: 'user-message-audio',
+          content: [{ type: 'audio', url: 'https://example.test/voice.ogg' }],
+        }],
+      },
+    ])).toEqual([
+      {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_audio', audio_url: 'https://example.test/voice.ogg' }],
+        metadata: { turn_id: 'turn-audio' },
+      },
+    ])
+  })
 })

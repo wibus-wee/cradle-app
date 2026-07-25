@@ -48,6 +48,7 @@ const TurnContextSchema = z.object({
 const NativeTokenUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative(),
   cached_input_tokens: z.number().int().nonnegative(),
+  cache_write_input_tokens: z.number().int().nonnegative().optional(),
   output_tokens: z.number().int().nonnegative(),
   reasoning_output_tokens: z.number().int().nonnegative(),
   total_tokens: z.number().int().nonnegative(),
@@ -472,6 +473,7 @@ function toProtocolUsage(usage: z.infer<typeof NativeTokenUsageSchema>): TokenUs
   return {
     inputTokens: usage.input_tokens,
     cachedInputTokens: usage.cached_input_tokens,
+    cacheWriteInputTokens: usage.cache_write_input_tokens ?? 0,
     outputTokens: usage.output_tokens,
     reasoningOutputTokens: usage.reasoning_output_tokens,
     totalTokens: usage.total_tokens,

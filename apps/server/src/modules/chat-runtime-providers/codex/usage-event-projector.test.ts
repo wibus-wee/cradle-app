@@ -108,6 +108,7 @@ function usage(
   return {
     inputTokens,
     cachedInputTokens,
+    cacheWriteInputTokens: 0,
     outputTokens,
     reasoningOutputTokens,
     totalTokens: inputTokens + outputTokens,
