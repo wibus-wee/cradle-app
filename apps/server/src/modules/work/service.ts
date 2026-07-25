@@ -95,6 +95,31 @@ function requirePrimaryThread(workId: string): Session.SessionView {
   return session
 }
 
+async function archiveWorkForPrimarySession(sessionId: string): Promise<void> {
+  const membership = db()
+    .select({ workId: workThreads.workId })
+    .from(workThreads)
+    .where(and(eq(workThreads.sessionId, sessionId), eq(workThreads.role, 'primary')))
+    .get()
+  if (!membership) {
+    return
+  }
+
+  const session = Session.get(sessionId)
+  const worktreeId = session?.worktreeId ?? session?.pendingWorktreeId
+  if (worktreeId) {
+    await Worktree.cleanupWorktree({ worktreeId, mode: 'abandon' })
+  }
+
+  const timestamp = now()
+  db().update(works).set({
+    archivedAt: timestamp,
+    updatedAt: timestamp,
+  }).where(eq(works.id, membership.workId)).run()
+}
+
+Session.onSessionArchiving(archiveWorkForPrimarySession)
+
 function projectConversationTitle(work: Work, primaryThread: Session.SessionView): Work {
   const title = primaryThread.title?.trim()
   return title && title !== work.title ? { ...work, title } : work
@@ -343,12 +368,14 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
 export async function setArchived(input: { id: string, archived: boolean }): Promise<WorkDetail> {
   const work = requireWork(input.id)
   const primaryThread = requirePrimaryThread(work.id)
-  const timestamp = now()
-  db().update(works).set({
-    archivedAt: input.archived ? timestamp : null,
-    updatedAt: timestamp,
-  }).where(eq(works.id, work.id)).run()
-  Session.setArchived({ id: primaryThread.id, archived: input.archived })
+  await Session.setArchived({ id: primaryThread.id, archived: input.archived })
+  if (!input.archived) {
+    const timestamp = now()
+    db().update(works).set({
+      archivedAt: null,
+      updatedAt: timestamp,
+    }).where(eq(works.id, work.id)).run()
+  }
   return (await get(work.id))!
 }
 

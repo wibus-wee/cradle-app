@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 
 import type { Session, Worktree } from '@cradle/db'
 import { backendRuns, sessions, workspaces, worktrees } from '@cradle/db'
-import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
@@ -872,7 +872,10 @@ export async function cleanupWorktree(input: {
   const boundSessions = db()
     .select({ id: sessions.id })
     .from(sessions)
-    .where(inArray(sessions.worktreeId, [worktree.id]))
+    .where(or(
+      eq(sessions.worktreeId, worktree.id),
+      eq(sessions.pendingWorktreeId, worktree.id),
+    ))
     .all()
   for (const bound of boundSessions) {
     leaveSessionIsolation(bound.id)

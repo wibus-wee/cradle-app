@@ -39,6 +39,10 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
   pull request exists and the branch is not on the remote; the worktree
   directory name/path never changes.
 - Mark Ready and merge remain user-controlled outside this module.
+- Archiving a Work, or archiving its primary Session directly, abandons the
+  managed checkout and removes its local branch before persisting the archive
+  state. The operation fails rather than reporting completion when cleanup
+  cannot be performed.
 
 ## Ownership boundaries
 

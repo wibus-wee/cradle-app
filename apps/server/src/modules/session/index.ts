@@ -103,8 +103,8 @@ export const session = new Elysia({
   )
   .post(
     '/:id/archive',
-    ({ params, body }) => {
-      const result = Session.setArchived({ id: params.id, archived: body.archived })
+    async ({ params, body }) => {
+      const result = await Session.setArchived({ id: params.id, archived: body.archived })
       if (!result) {
         throw new AppError({ code: 'session_not_found', status: 404, message: 'Session not found' })
       }

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -234,10 +234,27 @@ describe('work delivery control', () => {
       expect(prepared.readiness.commitsAhead).toBe(1)
       expect(prepared.work.handoffSummary).toBe('Created the managed Work flow.')
 
-      await Worktree.cleanupWorktree({
-        worktreeId: detail.execution.worktreeId!,
-        mode: 'abandon',
+      const archivedSession = await Session.setArchived({
+        id: detail.primaryThread.id,
+        archived: true,
       })
+
+      expect(archivedSession?.archivedAt).not.toBeNull()
+      expect(existsSync(worktreePath)).toBe(false)
+      const activeWorktrees = execFileSync(
+        'git',
+        ['worktree', 'list', '--porcelain'],
+        { cwd: repositoryPath },
+      ).toString()
+      expect(activeWorktrees).not.toContain(worktreePath)
+      expect(() => execFileSync(
+        'git',
+        ['show-ref', '--verify', `refs/heads/${detail.execution.worktreeBranch}`],
+        { cwd: repositoryPath },
+      )).toThrow()
+      expect(db().select({ status: worktrees.status }).from(worktrees).get()?.status).toBe('abandoned')
+      expect(db().select({ worktreeId: sessions.worktreeId }).from(sessions).get()?.worktreeId).toBeNull()
+      expect(db().select({ archivedAt: works.archivedAt }).from(works).get()?.archivedAt).not.toBeNull()
     }
     finally {
       rmSync(repositoryPath, { recursive: true, force: true })

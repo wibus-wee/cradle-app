@@ -546,10 +546,14 @@ export function listBySessionGroupId(sessionGroupId: string): SessionView[] {
   return list({ sessionGroupId, archived: false })
 }
 
-export function setArchived(input: { id: string, archived: boolean }): SessionView | null {
+export async function setArchived(input: { id: string, archived: boolean }): Promise<SessionView | null> {
   const record = db().select().from(sessions).where(eq(sessions.id, input.id)).get()
   if (!record) {
     return null
+  }
+
+  if (input.archived) {
+    await notifySessionArchiving(input.id)
   }
 
   const now = Math.floor(Date.now() / 1000)
@@ -1159,8 +1163,10 @@ export async function updateTitle(input: { id: string, title: string }): Promise
 
 type CleanupHandler = (sessionId: string) => void
 type ArchiveHandler = (sessionId: string) => void
+type ArchivingHandler = (sessionId: string) => void | Promise<void>
 const cleanupHandlers: CleanupHandler[] = []
 const archiveHandlers: ArchiveHandler[] = []
+const archivingHandlers: ArchivingHandler[] = []
 
 export function onSessionCleanup(handler: CleanupHandler): void {
   cleanupHandlers.push(handler)
@@ -1168,6 +1174,16 @@ export function onSessionCleanup(handler: CleanupHandler): void {
 
 export function onSessionArchived(handler: ArchiveHandler): void {
   archiveHandlers.push(handler)
+}
+
+export function onSessionArchiving(handler: ArchivingHandler): void {
+  archivingHandlers.push(handler)
+}
+
+async function notifySessionArchiving(id: string): Promise<void> {
+  for (const handler of archivingHandlers) {
+    await handler(id)
+  }
 }
 
 function notifySessionArchived(id: string): void {
