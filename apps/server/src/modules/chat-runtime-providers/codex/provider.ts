@@ -347,6 +347,7 @@ export class CodexProvider implements ChatRuntime {
         }, auth),
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         }),
       },
@@ -459,6 +460,7 @@ export class CodexProvider implements ChatRuntime {
         env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         }),
       },
@@ -626,6 +628,7 @@ export class CodexProvider implements ChatRuntime {
         }, auth),
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         }),
       },
@@ -936,6 +939,7 @@ export class CodexProvider implements ChatRuntime {
         }, auth),
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         }),
       },
@@ -980,6 +984,7 @@ export class CodexProvider implements ChatRuntime {
         }, auth),
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         }),
       },
@@ -1035,6 +1040,7 @@ export class CodexProvider implements ChatRuntime {
       createServerRequestHandler: (auth) => {
         const handler: CodexAppServerResourceRequestHandler = request => this.handleCodexServerRequest(input, request, {
           chatgptAuth: readCodexChatgptAuth(auth),
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         })
         handler.readThreadId = () => input.runtimeSession.providerSessionId
@@ -1499,6 +1505,7 @@ export class CodexProvider implements ChatRuntime {
     request: Parameters<NonNullable<CodexAppServerClientOptions['serverRequestHandler']>>[0],
     options: {
       chatgptAuth?: CodexChatgptAuthCredential | null
+      readSecret?: (credentialRef: string) => string
       updateSecretValue?: (credentialRef: string, secret: string) => void
     },
   ): Promise<unknown> {
@@ -1682,6 +1689,7 @@ export class CodexProvider implements ChatRuntime {
       chatgptAuth: input.chatgptAuth,
       pinned: input.pinned ?? false,
       deps: {
+        readSecret: this.deps.readSecret,
         createAppServerClient: this.deps.createAppServerClient,
         readCodexPreferences: this.deps.readCodexPreferences,
         readCodexCliCompatibleIdentity: this.deps.readCodexCliCompatibleIdentity,
@@ -1775,6 +1783,7 @@ export class CodexProvider implements ChatRuntime {
               env: input.codexEnv,
               serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
                 chatgptAuth: input.chatgptAuth,
+                readSecret: this.deps.readSecret,
                 updateSecretValue: this.deps.updateSecret,
               }),
             },
@@ -1839,6 +1848,7 @@ export class CodexProvider implements ChatRuntime {
         env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
+          readSecret: this.deps.readSecret,
           updateSecretValue: this.deps.updateSecret,
         }),
       },
@@ -1879,6 +1889,7 @@ export class CodexProvider implements ChatRuntime {
           env: buildCodexAppServerEnv(codexEnvInput, titleGeneration.auth),
           serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
             chatgptAuth: titleChatgptAuth,
+            readSecret: this.deps.readSecret,
             updateSecretValue: this.deps.updateSecret,
           }),
         },

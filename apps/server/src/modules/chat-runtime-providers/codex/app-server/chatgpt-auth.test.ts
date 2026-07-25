@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CodexConfig } from '../../../provider-contracts/provider-base'
 import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
@@ -11,8 +11,15 @@ import {
   CODEX_BEDROCK_API_KEY_SECRET_KIND,
   CODEX_CHATGPT_AUTH_SECRET_KIND,
   CODEX_PERSONAL_ACCESS_TOKEN_SECRET_KIND,
+  CodexChatgptAuthReauthRequiredError,
   resolveCodexAppServerAuth,
+  resolveFreshCodexChatgptAuthCredential,
+  setCodexChatgptAuthRefreshFetchForTests,
 } from './chatgpt-auth'
+
+afterEach(() => {
+  setCodexChatgptAuthRefreshFetchForTests(null)
+})
 
 function createSecretMetadata(id: string, kind: string, secret: string) {
   return {
@@ -198,3 +205,89 @@ describe('resolveCodexAppServerAuth', () => {
     })
   })
 })
+
+describe('resolveFreshCodexChatgptAuthCredential', () => {
+  it('single-flights concurrent refreshes and persists refresh-token rotation once', async () => {
+    let secret = JSON.stringify({
+      accessToken: createJwt({ exp: 0 }),
+      refreshToken: 'refresh-token-1',
+      chatgptAccountId: 'account-1',
+      chatgptPlanType: 'plus',
+    })
+    const accessToken = createJwt({ exp: Math.floor(Date.now() / 1000) + 3600 })
+    const refresh = vi.fn(async () => new Response(JSON.stringify({
+      access_token: accessToken,
+      refresh_token: 'refresh-token-2',
+    }), { status: 200 }))
+    const updateSecretValue = vi.fn((_credentialRef: string, value: string) => {
+      secret = value
+    })
+    setCodexChatgptAuthRefreshFetchForTests(refresh)
+
+    const results = await Promise.all(Array.from({ length: 6 }).fill(resolveFreshCodexChatgptAuthCredential({
+      credentialRef: 'credential-chatgpt',
+      store: { readSecret: () => secret, updateSecretValue },
+    })))
+
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(updateSecretValue).toHaveBeenCalledTimes(1)
+    expect(results.map(result => result.accessToken)).toEqual(Array.from({ length: 6 }).fill(accessToken))
+    expect(JSON.parse(secret)).toMatchObject({ accessToken, refreshToken: 'refresh-token-2' })
+  })
+
+  it('maps invalid refresh credentials to reauth-required without erasing the stored secret', async () => {
+    const secret = JSON.stringify({
+      accessToken: createJwt({ exp: 0 }),
+      refreshToken: 'refresh-token-1',
+      chatgptAccountId: 'account-1',
+      chatgptPlanType: 'plus',
+    })
+    const updateSecretValue = vi.fn()
+    setCodexChatgptAuthRefreshFetchForTests(async () => new Response(JSON.stringify({
+      error: { code: 'invalid_grant' },
+    }), { status: 401 }))
+
+    await expect(resolveFreshCodexChatgptAuthCredential({
+      credentialRef: 'credential-chatgpt',
+      store: { readSecret: () => secret, updateSecretValue },
+    })).rejects.toBeInstanceOf(CodexChatgptAuthReauthRequiredError)
+
+    expect(updateSecretValue).not.toHaveBeenCalled()
+  })
+
+  it('does not call refresh while the access token remains outside the refresh window', async () => {
+    const accessToken = createJwt({ exp: Math.floor(Date.now() / 1000) + 3600 })
+    const refresh = vi.fn()
+    setCodexChatgptAuthRefreshFetchForTests(refresh)
+
+    const credential = await resolveFreshCodexChatgptAuthCredential({
+      credentialRef: 'credential-chatgpt',
+      store: {
+        readSecret: () => JSON.stringify({
+          accessToken,
+          refreshToken: 'refresh-token-1',
+          chatgptAccountId: 'account-1',
+          chatgptPlanType: 'plus',
+        }),
+        updateSecretValue: vi.fn(),
+      },
+    })
+
+    expect(credential.accessToken).toBe(accessToken)
+    expect(refresh).not.toHaveBeenCalled()
+  })
+})
+
+function createJwt(input: { exp: number }): string {
+  return [
+    Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url'),
+    Buffer.from(JSON.stringify({
+      'exp': input.exp,
+      'https://api.openai.com/auth': {
+        chatgpt_account_id: 'account-1',
+        chatgpt_plan_type: 'plus',
+      },
+    })).toString('base64url'),
+    'sig',
+  ].join('.')
+}

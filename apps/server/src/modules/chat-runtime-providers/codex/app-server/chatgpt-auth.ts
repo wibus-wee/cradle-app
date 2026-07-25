@@ -3,6 +3,8 @@
  */
 import { readOptionalObjectRecord as readRecord } from '../../../../helpers/json-record'
 import { outboundFetch } from '../../../../lib/outbound-network'
+import type { CredentialAuthDriver, CredentialLifecycleStore } from '../../../provider-auth/credential-lifecycle'
+import { resolveFreshAccessToken } from '../../../provider-auth/credential-lifecycle'
 import type { CodexAuthMode, CodexConfig } from '../../../provider-contracts/provider-base'
 import type { SecretValueWithMetadata } from '../../../secrets/service'
 import type { LoginAccountParams } from '../app-server-protocol/v2/LoginAccountParams'
@@ -18,6 +20,10 @@ export const CODEX_BEDROCK_REGION_ENV = 'AWS_REGION'
 const CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 const OPENAI_OAUTH_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 const ACCESS_TOKEN_REFRESH_SKEW_SECONDS = 5 * 60
+
+type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+let refreshFetchForTests: FetchLike | null = null
 
 export class CodexChatgptAuthReauthRequiredError extends Error {
   readonly code = 'codex_chatgpt_auth_reauth_required'
@@ -36,8 +42,13 @@ export interface CodexChatgptAuthCredential {
   chatgptPlanType: string | null
 }
 
-export interface CodexChatgptAuthDeps {
-  updateSecretValue?: (credentialRef: string, secret: string) => void
+export type CodexChatgptAuthStore = CredentialLifecycleStore
+
+export function setCodexChatgptAuthRefreshFetchForTests(fetchImpl: FetchLike | null): void {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('Codex ChatGPT auth refresh fetch override is test-only')
+  }
+  refreshFetchForTests = fetchImpl
 }
 
 export type CodexAppServerAuthResolution
@@ -216,14 +227,17 @@ function assertNoNativeCodexAuthModeWithoutCredential(selected: CodexAuthMode | 
   }
 }
 
-export async function ensureCodexChatgptAuthAccessToken(
-  credential: CodexChatgptAuthCredential,
-  deps: CodexChatgptAuthDeps,
-): Promise<CodexChatgptAuthCredential> {
-  if (credential.accessToken && !isAccessTokenExpiring(credential.accessToken)) {
-    return credential
-  }
-  return refreshCodexChatgptAuthCredential(credential, deps)
+export async function resolveFreshCodexChatgptAuthCredential(input: {
+  credentialRef: string
+  store: CodexChatgptAuthStore
+  forceRefresh?: boolean
+}): Promise<CodexChatgptAuthCredential> {
+  return await resolveFreshAccessToken({
+    credentialRef: input.credentialRef,
+    store: input.store,
+    driver: CODEX_CHATGPT_AUTH_DRIVER,
+    forceRefresh: input.forceRefresh,
+  })
 }
 
 export function buildCodexChatgptAuthLoginParams(
@@ -240,15 +254,14 @@ export function buildCodexChatgptAuthLoginParams(
   }
 }
 
-export async function refreshCodexChatgptAuthCredential(
+async function refreshCodexChatgptAuthCredential(
   credential: CodexChatgptAuthCredential,
-  deps: CodexChatgptAuthDeps,
 ): Promise<CodexChatgptAuthCredential> {
   if (!credential.refreshToken) {
     throw new Error('Codex ChatGPT auth refresh requires a refresh token')
   }
 
-  const response = await outboundFetch(OPENAI_OAUTH_TOKEN_URL, {
+  const response = await (refreshFetchForTests ?? outboundFetch)(OPENAI_OAUTH_TOKEN_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -295,15 +308,30 @@ export async function refreshCodexChatgptAuthCredential(
     chatgptAccountId,
     chatgptPlanType,
   }
-  deps.updateSecretValue?.(credential.credentialRef, JSON.stringify({
-    kind: CODEX_CHATGPT_AUTH_SECRET_KIND,
-    accessToken,
-    refreshToken: nextRefreshToken,
-    chatgptAccountId,
-    chatgptPlanType,
-    updatedAt: Date.now(),
-  }))
   return next
+}
+
+const CODEX_CHATGPT_AUTH_DRIVER: CredentialAuthDriver<CodexChatgptAuthCredential> = {
+  id: 'codex-chatgpt-auth',
+  parseCredential: (credentialRef, secret) => {
+    const credential = readCodexChatgptAuthCredential(credentialRef, secret)
+    if (!credential) {
+      throw new Error('Codex ChatGPT credential metadata is invalid')
+    }
+    return credential
+  },
+  hasFreshAccessToken: credential => Boolean(credential.accessToken && !isAccessTokenExpiring(credential.accessToken)),
+  refreshCredential: credential => refreshCodexChatgptAuthCredential(credential),
+  serializeCredential: credential => JSON.stringify({
+    kind: CODEX_CHATGPT_AUTH_SECRET_KIND,
+    accessToken: credential.accessToken,
+    refreshToken: credential.refreshToken,
+    chatgptAccountId: credential.chatgptAccountId,
+    chatgptPlanType: credential.chatgptPlanType,
+    updatedAt: Date.now(),
+  }),
+  isReauthRequired: error => error instanceof CodexChatgptAuthReauthRequiredError,
+  createReauthRequiredError: () => new CodexChatgptAuthReauthRequiredError(),
 }
 
 function parseJsonRecord(raw: string): Record<string, unknown> | null {
@@ -321,8 +349,10 @@ function isReauthRequiredRefreshResponse(status: number, body: string): boolean 
   }
   const parsed = parseJsonRecord(body)
   const error = readRecord(parsed?.error)
-  return readString(error?.code) === 'refresh_token_invalidated'
-    || readString(error?.code) === 'token_expired'
+  const code = readString(error?.code) ?? readString(parsed?.error)
+  return code === 'refresh_token_invalidated'
+    || code === 'token_expired'
+    || code === 'invalid_grant'
     || readString(error?.message)?.toLowerCase().includes('refresh token has been invalidated') === true
     || readString(error?.message)?.toLowerCase().includes('try signing in again') === true
 }

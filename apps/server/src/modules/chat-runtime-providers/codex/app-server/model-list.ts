@@ -4,7 +4,7 @@ import type { CodexAppServerClientLike } from '../types'
 import type { CodexChatgptAuthCredential } from './chatgpt-auth'
 import {
   buildCodexChatgptAuthLoginParams,
-  ensureCodexChatgptAuthAccessToken,
+  resolveFreshCodexChatgptAuthCredential,
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
 import { CodexAppServerClient } from './client'
@@ -16,14 +16,19 @@ let createClientForTests: ((options?: CodexAppServerClientOptions) => CodexAppSe
 export async function listCodexChatgptModels(input: {
   credential: CodexChatgptAuthCredential
   config?: Record<string, unknown>
+  readSecret: (credentialRef: string) => string
   updateSecretValue?: (credentialRef: string, secret: string) => void
 }): Promise<ModelDescriptor[]> {
   const clientOptions = input.config ? { config: input.config } : undefined
   const client = createClientForTests?.(clientOptions) ?? new CodexAppServerClient(clientOptions)
   try {
     await client.initialize()
-    const credential = await ensureCodexChatgptAuthAccessToken(input.credential, {
-      updateSecretValue: input.updateSecretValue,
+    const credential = await resolveFreshCodexChatgptAuthCredential({
+      credentialRef: input.credential.credentialRef,
+      store: {
+        readSecret: input.readSecret,
+        updateSecretValue: input.updateSecretValue ?? missingCredentialLifecycleStore,
+      },
     })
     await client.request('account/login/start', buildCodexChatgptAuthLoginParams(credential))
     const response = await client.request('model/list', {
@@ -35,6 +40,10 @@ export async function listCodexChatgptModels(input: {
   finally {
     await client.close()
   }
+}
+
+function missingCredentialLifecycleStore(): never {
+  throw new Error('Codex ChatGPT model listing requires a credential lifecycle store')
 }
 
 export async function listCodexApiKeyModels(input: {

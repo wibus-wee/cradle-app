@@ -13,7 +13,7 @@ import type { CodexChatgptAuthCredential } from './chatgpt-auth'
 import {
   buildCodexChatgptAuthLoginParams,
   CodexChatgptAuthReauthRequiredError,
-  ensureCodexChatgptAuthAccessToken,
+  resolveFreshCodexChatgptAuthCredential,
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
 import { CodexAppServerClient } from './client'
@@ -24,6 +24,7 @@ import {
 } from './host-resource'
 
 export interface CodexAppServerHostLeaseDeps {
+  readSecret: (credentialRef: string) => string
   createAppServerClient?: (options: CodexAppServerClientOptions) => CodexAppServerClientLike
   readCodexPreferences?: () => { useCradleUserAgent: boolean }
   readCodexCliCompatibleIdentity?: () => boolean
@@ -82,6 +83,7 @@ export async function acquireCodexAppServerHostLease(
   try {
     await initializeCodexAppServerHost(lease.resource, {
       chatgptAuth: input.chatgptAuth,
+      readSecret: input.deps.readSecret,
       updateSecretValue: input.deps.updateSecretValue,
       authenticateChatgpt: input.authenticateChatgpt ?? true,
       mapChatgptAuthError: input.deps.mapChatgptAuthError,
@@ -112,6 +114,7 @@ async function initializeCodexAppServerHost(
   resource: CodexAppServerHostResource,
   input: {
     chatgptAuth: CodexChatgptAuthCredential | null
+    readSecret: (credentialRef: string) => string
     updateSecretValue?: (credentialRef: string, secret: string) => void
     authenticateChatgpt: boolean
     mapChatgptAuthError?: (error: CodexChatgptAuthReauthRequiredError) => Error
@@ -125,6 +128,7 @@ async function initializeCodexAppServerHost(
   const chatgptAuth = input.chatgptAuth
   resource.chatgptAuthenticated ??= authenticateCodexAppServerChatgpt(resource.client, {
     chatgptAuth,
+    readSecret: input.readSecret,
     updateSecretValue: input.updateSecretValue,
     mapChatgptAuthError: input.mapChatgptAuthError,
   })
@@ -135,13 +139,18 @@ async function authenticateCodexAppServerChatgpt(
   client: CodexAppServerClientLike,
   input: {
     chatgptAuth: CodexChatgptAuthCredential
+    readSecret: (credentialRef: string) => string
     updateSecretValue?: (credentialRef: string, secret: string) => void
     mapChatgptAuthError?: (error: CodexChatgptAuthReauthRequiredError) => Error
   },
 ): Promise<void> {
   try {
-    const credential = await ensureCodexChatgptAuthAccessToken(input.chatgptAuth, {
-      updateSecretValue: input.updateSecretValue,
+    const credential = await resolveFreshCodexChatgptAuthCredential({
+      credentialRef: input.chatgptAuth.credentialRef,
+      store: {
+        readSecret: input.readSecret,
+        updateSecretValue: input.updateSecretValue ?? missingCredentialLifecycleStore,
+      },
     })
     await client.request('account/login/start', buildCodexChatgptAuthLoginParams(credential))
   }
@@ -151,4 +160,8 @@ async function authenticateCodexAppServerChatgpt(
     }
     throw error
   }
+}
+
+function missingCredentialLifecycleStore(): never {
+  throw new Error('Codex ChatGPT auth requires a credential lifecycle store')
 }

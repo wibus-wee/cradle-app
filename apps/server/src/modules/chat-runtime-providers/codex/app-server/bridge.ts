@@ -19,8 +19,8 @@ import type { CodexAppServerAuthResolution, CodexChatgptAuthCredential } from '.
 import {
   readCodexApiKeyAuth,
   readCodexChatgptAuth,
-  refreshCodexChatgptAuthCredential,
   resolveCodexAppServerAuth,
+  resolveFreshCodexChatgptAuthCredential,
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions, CodexAppServerServerRequest } from './client'
 import { isCodexAppServerUnknownMethodError } from './client'
@@ -108,6 +108,7 @@ export class CodexAppServerBridge {
     const hostLease = await this.acquireHostLease(input, input.method, {
       serverRequestHandler: (request, auth) => buildDefaultCodexAppServerRequestResult(request, {
         chatgptAuth: auth,
+        readSecret: this.deps.readSecret,
         updateSecretValue: this.deps.updateSecretValue,
       }),
     })
@@ -143,6 +144,7 @@ export class CodexAppServerBridge {
               serverRequestHandler: async (request, auth) => {
                 const result = await buildDefaultCodexAppServerRequestResult(request, {
                   chatgptAuth: auth,
+                  readSecret: this.deps.readSecret,
                   updateSecretValue: this.deps.updateSecretValue,
                 })
                 writeSse(controller, encoder, 'server_request', {
@@ -260,6 +262,7 @@ export class CodexAppServerBridge {
       chatgptAuth,
       authenticateChatgpt: !isAccountAuthMutationMethod(requestedMethod),
       deps: {
+        readSecret: this.deps.readSecret,
         createAppServerClient: this.deps.createAppServerClient,
         readCodexPreferences: this.deps.readCodexPreferences,
         readCodexCliCompatibleIdentity: this.deps.readCodexCliCompatibleIdentity,
@@ -385,6 +388,7 @@ export async function buildDefaultCodexAppServerRequestResult(
   request: CodexAppServerServerRequest,
   options: {
     chatgptAuth?: CodexChatgptAuthCredential | null
+    readSecret?: (credentialRef: string) => string
     updateSecretValue?: (credentialRef: string, secret: string) => void
   } = {},
 ): Promise<unknown> {
@@ -405,8 +409,13 @@ export async function buildDefaultCodexAppServerRequestResult(
       if (!options.chatgptAuth) {
         throw new Error('Cradle Codex app-server bridge cannot refresh ChatGPT auth tokens without a ChatGPT credential')
       }
-      return projectChatgptAuthRefreshResponse(await refreshCodexChatgptAuthCredential(options.chatgptAuth, {
-        updateSecretValue: options.updateSecretValue,
+      if (!options.readSecret || !options.updateSecretValue) {
+        throw new Error('Cradle Codex app-server bridge cannot refresh ChatGPT auth tokens without a credential lifecycle store')
+      }
+      return projectChatgptAuthRefreshResponse(await resolveFreshCodexChatgptAuthCredential({
+        credentialRef: options.chatgptAuth.credentialRef,
+        store: { readSecret: options.readSecret, updateSecretValue: options.updateSecretValue },
+        forceRefresh: true,
       }))
     case 'attestation/generate':
       throw new Error('Cradle Codex app-server bridge cannot generate client attestation tokens')

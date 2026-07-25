@@ -102,6 +102,7 @@ class OpenAICompatibleMetadataProvider implements ProviderMetadataProvider {
         const baseUrl = config.baseUrl?.trim() || null
         return await listCodexChatgptModels({
           credential: chatgptAuth,
+          readSecret: deps.readSecret,
           config: baseUrl
             ? buildCodexExternalModelProviderConfig(
                 normalizeBaseUrl(baseUrl),

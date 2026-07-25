@@ -19,10 +19,10 @@ import type { CodexAppServerClientLike } from '../types'
 import { buildDefaultCodexAppServerRequestResult } from './bridge'
 import type { CodexAppServerAuthResolution } from './chatgpt-auth'
 import {
-  ensureCodexChatgptAuthAccessToken,
   readCodexApiKeyAuth,
   readCodexChatgptAuth,
   resolveCodexAppServerAuth,
+  resolveFreshCodexChatgptAuthCredential,
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
 import { buildCodexAppServerEnv } from './env'
@@ -290,8 +290,13 @@ export async function readCodexWhamDiagnostics(
     }
   }
 
-  const chatgptAuth = await ensureCodexChatgptAuthAccessToken(readCodexChatgptAuth(resolved.auth)!, {
-    updateSecretValue: deps.updateSecretValue,
+  const currentChatgptAuth = readCodexChatgptAuth(resolved.auth)!
+  const chatgptAuth = await resolveFreshCodexChatgptAuthCredential({
+    credentialRef: currentChatgptAuth.credentialRef,
+    store: {
+      readSecret: deps.readSecret,
+      updateSecretValue: deps.updateSecretValue,
+    },
   })
   if (!chatgptAuth.accessToken) {
     throw new AppError({
@@ -383,10 +388,12 @@ async function acquireDiagnosticsHostLease(input: {
       }, input.auth),
       serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
         chatgptAuth,
+        readSecret: input.deps.readSecret,
         updateSecretValue: input.deps.updateSecretValue,
       }),
     },
     deps: {
+      readSecret: input.deps.readSecret,
       createAppServerClient: input.deps.createAppServerClient,
       readCodexPreferences: input.deps.readCodexPreferences,
       readCodexCliCompatibleIdentity: input.deps.readCodexCliCompatibleIdentity,
