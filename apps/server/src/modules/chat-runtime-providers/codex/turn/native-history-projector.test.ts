@@ -46,6 +46,7 @@ describe('projectCodexNativeTurnsToCodexItems', () => {
         items: [{
           type: 'userMessage',
           id: 'user-message-audio',
+          clientId: null,
           content: [{ type: 'audio', url: 'https://example.test/voice.ogg' }],
         }],
       },
