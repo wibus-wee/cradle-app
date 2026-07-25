@@ -1,0 +1,5144 @@
+{
+  "invalidWitnesses": [
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaMessage:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessage",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaMessageCountTokensParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaMessageCreateParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaMessageTokensCount:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageTokensCount",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaModelInfo:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelInfo",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaModelListParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelListParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaModelRetrieveParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelRetrieveParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicBetaRawMessageStreamEvent:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicErrorResponse:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicErrorResponse",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicMessage:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicMessage",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicMessageCountTokensParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicMessageCreateParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicMessageTokensCount:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicMessageTokensCount",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicModelInfo:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicModelInfo",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicModelListParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicModelListParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicModelRetrieveParams:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicModelRetrieveParams",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:anthropic:schema:AnthropicRawMessageStreamEvent:wrong-type",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:BetaCreateResponse:wrong-type",
+      "schemaId": "openai:2020-12:BetaCreateResponse",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:BetaResponse:wrong-type",
+      "schemaId": "openai:2020-12:BetaResponse",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:BetaResponseStreamEvent:wrong-type",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:CompactResource:wrong-type",
+      "schemaId": "openai:2020-12:CompactResource",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:CompactResponseMethodPublicBody:wrong-type",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:CreateResponse:wrong-type",
+      "schemaId": "openai:2020-12:CreateResponse",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:DeleteModelResponse:wrong-type",
+      "schemaId": "openai:2020-12:DeleteModelResponse",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:Error:wrong-type",
+      "schemaId": "openai:2020-12:Error",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:IncludeEnum:wrong-type",
+      "schemaId": "openai:2020-12:IncludeEnum",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:ListModelsResponse:wrong-type",
+      "schemaId": "openai:2020-12:ListModelsResponse",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:Response:wrong-type",
+      "schemaId": "openai:2020-12:Response",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:ResponseItemList:wrong-type",
+      "schemaId": "openai:2020-12:ResponseItemList",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:ResponseStreamEvent:wrong-type",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:TokenCountsBody:wrong-type",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    },
+    {
+      "id": "invalid:openai:schema:TokenCountsResource:wrong-type",
+      "schemaId": "openai:2020-12:TokenCountsResource",
+      "targetedRule": "type",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": false
+      },
+      "value": []
+    }
+  ],
+  "witnesses": [
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessage"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessage:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessage",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "container": {
+          "expires_at": "",
+          "id": "",
+          "skills": []
+        },
+        "content": [],
+        "context_management": {
+          "applied_edits": []
+        },
+        "diagnostics": {
+          "cache_miss_reason": {
+            "cache_missed_input_tokens": 0,
+            "type": "model_changed"
+          }
+        },
+        "id": "",
+        "model": "",
+        "role": "assistant",
+        "stop_details": {
+          "category": "cyber",
+          "explanation": null,
+          "fallback_credit_token": null,
+          "fallback_has_prefill_claim": null,
+          "recommended_model": null,
+          "type": "refusal"
+        },
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "fallback_credit": {
+            "status": {
+              "type": "redeemed"
+            }
+          },
+          "inference_geo": null,
+          "input_tokens": 0,
+          "iterations": [],
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": [],
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:2",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:3",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "context_management": {},
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:4",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "output_config": {}
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:5",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "output_format": {
+          "schema": {},
+          "type": "json_schema"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:6",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "speed": "standard"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:7",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "system": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:8",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "thinking": {
+          "budget_tokens": 0,
+          "type": "enabled"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:9",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "tool_choice": {
+          "type": "auto"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:10",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCountTokensParams:11",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "user_profile_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": [],
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:2",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:3",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "container": {},
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:4",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "context_management": {},
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:5",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "diagnostics": {},
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:6",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "fallback_credit_token": "",
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:7",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "fallbacks": [],
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:8",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "inference_geo": null,
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:9",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "metadata": {},
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:10",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "output_config": {}
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:11",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "output_format": {
+          "schema": {},
+          "type": "json_schema"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:12",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "service_tier": "auto"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:13",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "speed": "standard"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:14",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stop_sequences": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:15",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": false
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:16",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "system": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:17",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "temperature": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:18",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "thinking": {
+          "budget_tokens": 0,
+          "type": "enabled"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:19",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "tool_choice": {
+          "type": "auto"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:20",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:21",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "top_k": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:22",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "top_p": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:23",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "user_profile_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:24",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:25",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": [],
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:26",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:27",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "container": {},
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:28",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "context_management": {},
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:29",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "diagnostics": {},
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:30",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "fallback_credit_token": "",
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:31",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "fallbacks": [],
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:32",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "inference_geo": null,
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:33",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "metadata": {},
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:34",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "output_config": {},
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:35",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "output_format": {
+          "schema": {},
+          "type": "json_schema"
+        },
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:36",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "service_tier": "auto",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:37",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "speed": "standard",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:38",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stop_sequences": [],
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:39",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "system": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:40",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "temperature": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:41",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "thinking": {
+          "budget_tokens": 0,
+          "type": "enabled"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:42",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "tool_choice": {
+          "type": "auto"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:43",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:44",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "top_k": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:45",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "top_p": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageCreateParams:46",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "user_profile_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaMessageTokensCount"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaMessageTokensCount:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaMessageTokensCount",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "context_management": {
+          "original_input_tokens": 0
+        },
+        "input_tokens": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelInfo"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelInfo:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelInfo",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "allowed_fallback_models": [],
+        "capabilities": {
+          "batch": {
+            "supported": false
+          },
+          "context_management": {
+            "clear_thinking_20251015": {
+              "supported": false
+            },
+            "clear_tool_uses_20250919": {
+              "supported": false
+            },
+            "compact_20260112": {
+              "supported": false
+            },
+            "supported": false
+          },
+          "effort": {
+            "high": {
+              "supported": false
+            },
+            "low": {
+              "supported": false
+            },
+            "max": {
+              "supported": false
+            },
+            "medium": {
+              "supported": false
+            },
+            "supported": false,
+            "xhigh": {
+              "supported": false
+            }
+          },
+          "pdf_input": {
+            "supported": false
+          },
+          "structured_outputs": {
+            "supported": false
+          },
+          "thinking": {
+            "supported": false,
+            "types": {
+              "adaptive": {
+                "supported": false
+              },
+              "enabled": {
+                "supported": false
+              }
+            }
+          }
+        },
+        "created_at": "",
+        "display_name": "",
+        "id": "",
+        "max_input_tokens": null,
+        "max_tokens": null,
+        "type": "model"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelListParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelListParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "after_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelListParams:2",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "before_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelListParams:3",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelListParams:4",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "limit": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelRetrieveParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelRetrieveParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelRetrieveParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaModelRetrieveParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaModelRetrieveParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicBetaModelRetrieveParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaRawMessageStreamEvent:0",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "message": {
+          "container": {
+            "expires_at": "",
+            "id": "",
+            "skills": []
+          },
+          "content": [],
+          "context_management": {
+            "applied_edits": []
+          },
+          "diagnostics": {
+            "cache_miss_reason": {
+              "cache_missed_input_tokens": 0,
+              "type": "model_changed"
+            }
+          },
+          "id": "",
+          "model": "",
+          "role": "assistant",
+          "stop_details": {
+            "category": "cyber",
+            "explanation": null,
+            "fallback_credit_token": null,
+            "fallback_has_prefill_claim": null,
+            "recommended_model": null,
+            "type": "refusal"
+          },
+          "stop_reason": "end_turn",
+          "stop_sequence": null,
+          "type": "message",
+          "usage": {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": null,
+            "cache_read_input_tokens": null,
+            "fallback_credit": {
+              "status": {
+                "type": "redeemed"
+              }
+            },
+            "inference_geo": null,
+            "input_tokens": 0,
+            "iterations": [],
+            "output_tokens": 0,
+            "output_tokens_details": {
+              "thinking_tokens": 0
+            },
+            "service_tier": "standard",
+            "speed": "standard"
+          }
+        },
+        "type": "message_start"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaRawMessageStreamEvent:1",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "context_management": {
+          "applied_edits": []
+        },
+        "delta": {
+          "container": {
+            "expires_at": "",
+            "id": "",
+            "skills": []
+          },
+          "stop_details": {
+            "category": "cyber",
+            "explanation": null,
+            "fallback_credit_token": null,
+            "fallback_has_prefill_claim": null,
+            "recommended_model": null,
+            "type": "refusal"
+          },
+          "stop_reason": "end_turn",
+          "stop_sequence": null
+        },
+        "type": "message_delta",
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "fallback_credit": {
+            "status": {
+              "type": "redeemed"
+            }
+          },
+          "input_tokens": null,
+          "iterations": [],
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaRawMessageStreamEvent:2",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "type": "message_stop"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaRawMessageStreamEvent:3",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "content_block": {
+          "text": "",
+          "type": "text"
+        },
+        "index": 0,
+        "type": "content_block_start"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaRawMessageStreamEvent:4",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "delta": {
+          "text": "",
+          "type": "text_delta"
+        },
+        "index": 0,
+        "type": "content_block_delta"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicBetaRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicBetaRawMessageStreamEvent:5",
+      "schemaId": "anthropic:draft-07:AnthropicBetaRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "index": 0,
+        "type": "content_block_stop"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicErrorResponse"
+      ],
+      "id": "witness:anthropic:schema:AnthropicErrorResponse:0",
+      "schemaId": "anthropic:draft-07:AnthropicErrorResponse",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "error": {
+          "message": "",
+          "type": "invalid_request_error"
+        },
+        "request_id": null,
+        "type": "error"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessage"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessage:0",
+      "schemaId": "anthropic:draft-07:AnthropicMessage",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "container": {
+          "expires_at": "",
+          "id": ""
+        },
+        "content": [],
+        "id": "",
+        "model": "",
+        "role": "assistant",
+        "stop_details": {
+          "category": "cyber",
+          "explanation": null,
+          "type": "refusal"
+        },
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "inference_geo": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "service_tier": "standard"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:2",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "output_config": {}
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:3",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "system": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:4",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "thinking": {
+          "budget_tokens": 0,
+          "type": "enabled"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:5",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "tool_choice": {
+          "type": "auto"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:6",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCountTokensParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCountTokensParams:7",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCountTokensParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "messages": [],
+        "model": "",
+        "user_profile_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:2",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "container": null,
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:3",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "inference_geo": null,
+        "max_tokens": 0,
+        "messages": [],
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:4",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "metadata": {},
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:5",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "output_config": {}
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:6",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "service_tier": "auto"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:7",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stop_sequences": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:8",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": false
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:9",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "system": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:10",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "temperature": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:11",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "thinking": {
+          "budget_tokens": 0,
+          "type": "enabled"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:12",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "tool_choice": {
+          "type": "auto"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:13",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:14",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "top_k": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:15",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "top_p": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:16",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "user_profile_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:17",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:18",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:19",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "container": null,
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:20",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "inference_geo": null,
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:21",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "metadata": {},
+        "model": "",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:22",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "output_config": {},
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:23",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "service_tier": "auto",
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:24",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stop_sequences": [],
+        "stream": true
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:25",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "system": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:26",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "temperature": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:27",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "thinking": {
+          "budget_tokens": 0,
+          "type": "enabled"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:28",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "tool_choice": {
+          "type": "auto"
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:29",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:30",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "top_k": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:31",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "top_p": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageCreateParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageCreateParams:32",
+      "schemaId": "anthropic:draft-07:AnthropicMessageCreateParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "max_tokens": 0,
+        "messages": [],
+        "model": "",
+        "stream": true,
+        "user_profile_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicMessageTokensCount"
+      ],
+      "id": "witness:anthropic:schema:AnthropicMessageTokensCount:0",
+      "schemaId": "anthropic:draft-07:AnthropicMessageTokensCount",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "input_tokens": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelInfo"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelInfo:0",
+      "schemaId": "anthropic:draft-07:AnthropicModelInfo",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "capabilities": {
+          "batch": {
+            "supported": false
+          },
+          "context_management": {
+            "clear_thinking_20251015": {
+              "supported": false
+            },
+            "clear_tool_uses_20250919": {
+              "supported": false
+            },
+            "compact_20260112": {
+              "supported": false
+            },
+            "supported": false
+          },
+          "effort": {
+            "high": {
+              "supported": false
+            },
+            "low": {
+              "supported": false
+            },
+            "max": {
+              "supported": false
+            },
+            "medium": {
+              "supported": false
+            },
+            "supported": false,
+            "xhigh": {
+              "supported": false
+            }
+          },
+          "pdf_input": {
+            "supported": false
+          },
+          "structured_outputs": {
+            "supported": false
+          },
+          "thinking": {
+            "supported": false,
+            "types": {
+              "adaptive": {
+                "supported": false
+              },
+              "enabled": {
+                "supported": false
+              }
+            }
+          }
+        },
+        "created_at": "",
+        "display_name": "",
+        "id": "",
+        "max_input_tokens": null,
+        "max_tokens": null,
+        "type": "model"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelListParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelListParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "after_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelListParams:2",
+      "schemaId": "anthropic:draft-07:AnthropicModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "before_id": ""
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelListParams:3",
+      "schemaId": "anthropic:draft-07:AnthropicModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelListParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelListParams:4",
+      "schemaId": "anthropic:draft-07:AnthropicModelListParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "limit": 0
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelRetrieveParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelRetrieveParams:0",
+      "schemaId": "anthropic:draft-07:AnthropicModelRetrieveParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicModelRetrieveParams"
+      ],
+      "id": "witness:anthropic:schema:AnthropicModelRetrieveParams:1",
+      "schemaId": "anthropic:draft-07:AnthropicModelRetrieveParams",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "betas": []
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicRawMessageStreamEvent:0",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "message": {
+          "container": {
+            "expires_at": "",
+            "id": ""
+          },
+          "content": [],
+          "id": "",
+          "model": "",
+          "role": "assistant",
+          "stop_details": {
+            "category": "cyber",
+            "explanation": null,
+            "type": "refusal"
+          },
+          "stop_reason": "end_turn",
+          "stop_sequence": null,
+          "type": "message",
+          "usage": {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": null,
+            "cache_read_input_tokens": null,
+            "inference_geo": null,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "output_tokens_details": {
+              "thinking_tokens": 0
+            },
+            "service_tier": "standard"
+          }
+        },
+        "type": "message_start"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicRawMessageStreamEvent:1",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "delta": {
+          "container": {
+            "expires_at": "",
+            "id": ""
+          },
+          "stop_details": {
+            "category": "cyber",
+            "explanation": null,
+            "type": "refusal"
+          },
+          "stop_reason": "end_turn",
+          "stop_sequence": null
+        },
+        "type": "message_delta",
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicRawMessageStreamEvent:2",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "type": "message_stop"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicRawMessageStreamEvent:3",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "content_block": {
+          "text": "",
+          "type": "text"
+        },
+        "index": 0,
+        "type": "content_block_start"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicRawMessageStreamEvent:4",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "delta": {
+          "text": "",
+          "type": "text_delta"
+        },
+        "index": 0,
+        "type": "content_block_delta"
+      }
+    },
+    {
+      "covers": [
+        "anthropic:schema:AnthropicRawMessageStreamEvent"
+      ],
+      "id": "witness:anthropic:schema:AnthropicRawMessageStreamEvent:5",
+      "schemaId": "anthropic:draft-07:AnthropicRawMessageStreamEvent",
+      "validation": {
+        "dialect": "draft-07",
+        "valid": true
+      },
+      "value": {
+        "index": 0,
+        "type": "content_block_stop"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaCreateResponse"
+      ],
+      "id": "witness:openai:schema:BetaCreateResponse:0",
+      "schemaId": "openai:2020-12:BetaCreateResponse",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponse"
+      ],
+      "id": "witness:openai:schema:BetaResponse:0",
+      "schemaId": "openai:2020-12:BetaResponse",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "created_at": 1,
+        "error": null,
+        "id": "resp_corpus",
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "gpt-corpus",
+        "object": "response",
+        "output": [],
+        "parallel_tool_calls": true,
+        "status": "completed",
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponse"
+      ],
+      "id": "witness:openai:schema:BetaResponse:1",
+      "schemaId": "openai:2020-12:BetaResponse",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "created_at": 0,
+        "error": {
+          "code": "server_error",
+          "message": ""
+        },
+        "id": "",
+        "incomplete_details": {},
+        "instructions": "",
+        "object": "response",
+        "output": [],
+        "parallel_tool_calls": false
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:0",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.completed"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:1",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.completed"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:2",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "logprobs": [],
+          "text": "",
+          "type": "output_text"
+        },
+        "sequence_number": 0,
+        "type": "response.content_part.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:3",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "logprobs": [],
+          "text": "",
+          "type": "output_text"
+        },
+        "sequence_number": 0,
+        "type": "response.content_part.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:4",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "logprobs": [],
+          "text": "",
+          "type": "output_text"
+        },
+        "sequence_number": 0,
+        "type": "response.content_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:5",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "logprobs": [],
+          "text": "",
+          "type": "output_text"
+        },
+        "sequence_number": 0,
+        "type": "response.content_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:6",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.created"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:7",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.created"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:8",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "code": "",
+        "message": "",
+        "param": "",
+        "sequence_number": 0,
+        "type": "error"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:9",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "code": "",
+        "message": "",
+        "param": "",
+        "sequence_number": 0,
+        "type": "error"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:10",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.function_call_arguments.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:11",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.function_call_arguments.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:12",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "arguments": "",
+        "item_id": "",
+        "name": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.function_call_arguments.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:13",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "arguments": "",
+        "item_id": "",
+        "name": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.function_call_arguments.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:14",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.in_progress"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:15",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.in_progress"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:16",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.failed"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:17",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.failed"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:18",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.incomplete"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:19",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.incomplete"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:20",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item": {
+          "content": [],
+          "id": "",
+          "role": "assistant",
+          "status": "in_progress",
+          "type": "message"
+        },
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_item.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:21",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "item": {
+          "content": [],
+          "id": "",
+          "role": "assistant",
+          "status": "in_progress",
+          "type": "message"
+        },
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_item.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:22",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item": {
+          "content": [],
+          "id": "",
+          "role": "assistant",
+          "status": "in_progress",
+          "type": "message"
+        },
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_item.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:23",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "item": {
+          "content": [],
+          "id": "",
+          "role": "assistant",
+          "status": "in_progress",
+          "type": "message"
+        },
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_item.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:24",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:25",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:26",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:27",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:28",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "status": "incomplete",
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:29",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:30",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:31",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "summary_index": 0,
+        "text": "",
+        "type": "response.reasoning_summary_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:32",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "summary_index": 0,
+        "text": "",
+        "type": "response.reasoning_summary_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:33",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.reasoning_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:34",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.reasoning_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:35",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "text": "",
+        "type": "response.reasoning_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:36",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "text": "",
+        "type": "response.reasoning_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:37",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.refusal.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:38",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.refusal.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:39",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "refusal": "",
+        "sequence_number": 0,
+        "type": "response.refusal.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:40",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "refusal": "",
+        "sequence_number": 0,
+        "type": "response.refusal.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:41",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "logprobs": [],
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:42",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "logprobs": [],
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:43",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "logprobs": [],
+        "output_index": 0,
+        "sequence_number": 0,
+        "text": "",
+        "type": "response.output_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:44",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "content_index": 0,
+        "item_id": "",
+        "logprobs": [],
+        "output_index": 0,
+        "sequence_number": 0,
+        "text": "",
+        "type": "response.output_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:45",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.queued"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:BetaResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:BetaResponseStreamEvent:46",
+      "schemaId": "openai:2020-12:BetaResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "agent": {
+          "agent_name": ""
+        },
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.queued"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResource"
+      ],
+      "id": "witness:openai:schema:CompactResource:0",
+      "schemaId": "openai:2020-12:CompactResource",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "created_at": 0,
+        "id": "",
+        "object": "response.compaction",
+        "output": [],
+        "usage": {
+          "input_tokens": 0,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens": 0,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 0
+        }
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:0",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:1",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "input": "",
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:2",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "instructions": "",
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:3",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": "",
+        "previous_response_id": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:4",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": "",
+        "prompt_cache_key": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:5",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": "",
+        "prompt_cache_options": {}
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:6",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": "",
+        "prompt_cache_retention": "24h"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CompactResponseMethodPublicBody"
+      ],
+      "id": "witness:openai:schema:CompactResponseMethodPublicBody:7",
+      "schemaId": "openai:2020-12:CompactResponseMethodPublicBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": "",
+        "service_tier": "auto"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:CreateResponse"
+      ],
+      "id": "witness:openai:schema:CreateResponse:0",
+      "schemaId": "openai:2020-12:CreateResponse",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "openai:schema:DeleteModelResponse"
+      ],
+      "id": "witness:openai:schema:DeleteModelResponse:0",
+      "schemaId": "openai:2020-12:DeleteModelResponse",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "deleted": false,
+        "id": "",
+        "object": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:Error"
+      ],
+      "id": "witness:openai:schema:Error:0",
+      "schemaId": "openai:2020-12:Error",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "code": "",
+        "message": "",
+        "param": "",
+        "type": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:IncludeEnum"
+      ],
+      "id": "witness:openai:schema:IncludeEnum:0",
+      "schemaId": "openai:2020-12:IncludeEnum",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": "reasoning.encrypted_content"
+    },
+    {
+      "covers": [
+        "openai:schema:IncludeEnum"
+      ],
+      "id": "witness:openai:schema:IncludeEnum:1",
+      "schemaId": "openai:2020-12:IncludeEnum",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": "message.output_text.logprobs"
+    },
+    {
+      "covers": [
+        "openai:schema:ListModelsResponse"
+      ],
+      "id": "witness:openai:schema:ListModelsResponse:0",
+      "schemaId": "openai:2020-12:ListModelsResponse",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "data": [],
+        "object": "list"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:Model"
+      ],
+      "id": "witness:openai:schema:Model:0",
+      "schemaId": "openai:2020-12:Model",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "created": 0,
+        "id": "",
+        "object": "model",
+        "owned_by": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:Response"
+      ],
+      "id": "witness:openai:schema:Response:0",
+      "schemaId": "openai:2020-12:Response",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "created_at": 1,
+        "error": null,
+        "id": "resp_corpus",
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "gpt-corpus",
+        "object": "response",
+        "output": [],
+        "parallel_tool_calls": true,
+        "status": "completed",
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:Response"
+      ],
+      "id": "witness:openai:schema:Response:1",
+      "schemaId": "openai:2020-12:Response",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "created_at": 0,
+        "error": {
+          "code": "server_error",
+          "message": ""
+        },
+        "id": "",
+        "incomplete_details": {},
+        "instructions": "",
+        "object": "response",
+        "output": [],
+        "parallel_tool_calls": false
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseItemList"
+      ],
+      "id": "witness:openai:schema:ResponseItemList:0",
+      "schemaId": "openai:2020-12:ResponseItemList",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "data": [],
+        "first_id": "",
+        "has_more": false,
+        "last_id": "",
+        "object": "list"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:0",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.completed"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:1",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "logprobs": [],
+          "text": "",
+          "type": "output_text"
+        },
+        "sequence_number": 0,
+        "type": "response.content_part.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:2",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "logprobs": [],
+          "text": "",
+          "type": "output_text"
+        },
+        "sequence_number": 0,
+        "type": "response.content_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:3",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.created"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:4",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "code": "",
+        "message": "",
+        "param": "",
+        "sequence_number": 0,
+        "type": "error"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:5",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.function_call_arguments.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:6",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "arguments": "",
+        "item_id": "",
+        "name": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.function_call_arguments.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:7",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.in_progress"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:8",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.failed"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:9",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.incomplete"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:10",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item": {
+          "content": [],
+          "id": "",
+          "role": "assistant",
+          "status": "in_progress",
+          "type": "message"
+        },
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_item.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:11",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item": {
+          "content": [],
+          "id": "",
+          "role": "assistant",
+          "status": "in_progress",
+          "type": "message"
+        },
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_item.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:12",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.added"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:13",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:14",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "part": {
+          "text": "",
+          "type": "summary_text"
+        },
+        "sequence_number": 0,
+        "status": "incomplete",
+        "summary_index": 0,
+        "type": "response.reasoning_summary_part.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:15",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "summary_index": 0,
+        "type": "response.reasoning_summary_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:16",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "summary_index": 0,
+        "text": "",
+        "type": "response.reasoning_summary_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:17",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.reasoning_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:18",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "text": "",
+        "type": "response.reasoning_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:19",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.refusal.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:20",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "output_index": 0,
+        "refusal": "",
+        "sequence_number": 0,
+        "type": "response.refusal.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:21",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "delta": "",
+        "item_id": "",
+        "logprobs": [],
+        "output_index": 0,
+        "sequence_number": 0,
+        "type": "response.output_text.delta"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:22",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "content_index": 0,
+        "item_id": "",
+        "logprobs": [],
+        "output_index": 0,
+        "sequence_number": 0,
+        "text": "",
+        "type": "response.output_text.done"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:ResponseStreamEvent"
+      ],
+      "id": "witness:openai:schema:ResponseStreamEvent:23",
+      "schemaId": "openai:2020-12:ResponseStreamEvent",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "response": {
+          "created_at": 0,
+          "error": {
+            "code": "server_error",
+            "message": ""
+          },
+          "id": "",
+          "incomplete_details": {},
+          "instructions": "",
+          "object": "response",
+          "output": [],
+          "parallel_tool_calls": false
+        },
+        "sequence_number": 0,
+        "type": "response.queued"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:0",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {}
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:1",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "conversation": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:2",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "input": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:3",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "instructions": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:4",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "model": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:5",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "parallel_tool_calls": false
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:6",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "personality": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:7",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "previous_response_id": ""
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:8",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "reasoning": {}
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:9",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "text": {}
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:10",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "tool_choice": "none"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:11",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "tools": []
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsBody"
+      ],
+      "id": "witness:openai:schema:TokenCountsBody:12",
+      "schemaId": "openai:2020-12:TokenCountsBody",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "truncation": "auto"
+      }
+    },
+    {
+      "covers": [
+        "openai:schema:TokenCountsResource"
+      ],
+      "id": "witness:openai:schema:TokenCountsResource:0",
+      "schemaId": "openai:2020-12:TokenCountsResource",
+      "validation": {
+        "dialect": "2020-12",
+        "valid": true
+      },
+      "value": {
+        "input_tokens": 0,
+        "object": "response.input_tokens"
+      }
+    }
+  ]
+}

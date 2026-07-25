@@ -1,0 +1,12 @@
+{
+  "coreScopeSha256": "2836de5b619457497f2be536f8b88b71df41ddd794a3835f17484ff228ceba4f",
+  "generatedAt": "2026-07-25T12:00:17.018Z",
+  "normalizedSha256": "ea3389d59386ea5d0183e72fa9f5f396e966ac62f8460017a0e90397871aa75a",
+  "openapiVersion": "3.1.0",
+  "owner": "@cradle/model-api-simulator",
+  "provider": "openai",
+  "refreshCommand": "pnpm protocol:refresh:openai --ref 5c044be3bf3a42854e99e34616564eeb2124a317",
+  "sourceSha256": "9f65dd3582af1404d00d22f56d32595524a88459a98310afbb3cc488eb3fa270",
+  "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/5c044be3bf3a42854e99e34616564eeb2124a317/openapi.json",
+  "upstreamRef": "5c044be3bf3a42854e99e34616564eeb2124a317"
+}

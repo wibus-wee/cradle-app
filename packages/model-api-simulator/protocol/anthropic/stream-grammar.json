@@ -1,0 +1,26 @@
+{
+  "provider": "anthropic",
+  "initial": "message_start",
+  "terminal": ["message_stop", "error", "disconnect"],
+  "events": [
+    "message_start",
+    "content_block_start",
+    "content_block_delta",
+    "content_block_stop",
+    "message_delta",
+    "message_stop",
+    "ping",
+    "error"
+  ],
+  "transitions": [
+    "message-start",
+    "ping",
+    "content-block-start",
+    "content-block-delta",
+    "content-block-stop",
+    "message-delta",
+    "message-stop",
+    "error",
+    "disconnect"
+  ]
+}

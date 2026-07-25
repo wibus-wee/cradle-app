@@ -34,6 +34,12 @@ jobs:
         run: pnpm typecheck:apps-web
       - name: Typecheck Desktop (apps/desktop)
         run: pnpm typecheck:desktop
+      - name: Typecheck Model API Simulator
+        run: pnpm typecheck:model-api-simulator
+      - name: Check Model API Simulator Protocol Artifacts
+        run: pnpm --filter @cradle/model-api-simulator protocol:check
+      - name: Check Model API Simulator Protocol Coverage
+        run: pnpm --filter @cradle/model-api-simulator coverage:check
 
   # ─── Unit Tests (src + packages) ──────────────────────────────────────────
   unit-tests:

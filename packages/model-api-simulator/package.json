@@ -1,0 +1,36 @@
+{
+  "name": "@cradle/model-api-simulator",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts",
+    "protocol:refresh:openai": "tsx scripts/refresh-openai-protocol.ts",
+    "protocol:refresh:anthropic": "tsx scripts/refresh-anthropic-protocol.ts",
+    "protocol:generate": "tsx scripts/generate-protocol-artifacts.ts",
+    "protocol:check": "tsx scripts/check-protocol-artifacts.ts",
+    "coverage:check": "tsx scripts/check-protocol-coverage.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "elysia": "^1.4.28",
+    "srvx": "^0.11.15"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "0.115.0",
+    "@types/node": "^22.19.1",
+    "fast-check": "^4.9.0",
+    "openai": "^6.34.0",
+    "ts-json-schema-generator": "^2.9.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
+  }
+}

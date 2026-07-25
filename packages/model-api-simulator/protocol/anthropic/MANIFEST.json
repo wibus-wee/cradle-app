@@ -1,0 +1,52 @@
+{
+  "coreScopeSha256": "2836de5b619457497f2be536f8b88b71df41ddd794a3835f17484ff228ceba4f",
+  "declarations": [
+    {
+      "path": "resources/messages/messages.d.ts",
+      "sha256": "889c9ac173b997a78b3bd700e31cbcb644340c9329e502f959c814b7351e6aba"
+    },
+    {
+      "path": "resources/models.d.ts",
+      "sha256": "14115a83d277bb66dab4cdba8dde6ece9bcf7be73aa0792824769e14cba98a25"
+    },
+    {
+      "path": "resources/shared.d.ts",
+      "sha256": "b744556f87cf10af2aff9931bfd60e47674b07410f3b0e6af9cdcda07fa01acf"
+    },
+    {
+      "path": "resources/beta/messages/messages.d.ts",
+      "sha256": "2d03edf110c7eb5cafe42a0d6423100aa5638f7a18b5e1728df03f9be3ce01f6"
+    },
+    {
+      "path": "resources/beta/models.d.ts",
+      "sha256": "ba21775d1a33f982fd5c76d6d79d953f084efdcb16576c07dcf8dbb562f4f10f"
+    }
+  ],
+  "generatedAt": "2026-07-25T11:47:42.085Z",
+  "grammarSha256": "db78f49be127979e43647d1ffc6a197e01873e7232237bc6d6dc78c00f462b71",
+  "owner": "@cradle/model-api-simulator",
+  "packageIntegrity": null,
+  "provider": "anthropic",
+  "refreshCommand": "pnpm protocol:refresh:anthropic",
+  "schemaSha256": "9929e4b8b12b3fb136e1252df091bab94a231d36824afbeba7e536295cc38526",
+  "sdkVersion": "0.115.0",
+  "selectedTypes": [
+    "AnthropicMessageCreateParams",
+    "AnthropicMessageCountTokensParams",
+    "AnthropicMessage",
+    "AnthropicMessageTokensCount",
+    "AnthropicRawMessageStreamEvent",
+    "AnthropicModelInfo",
+    "AnthropicModelListParams",
+    "AnthropicModelRetrieveParams",
+    "AnthropicErrorResponse",
+    "AnthropicBetaMessageCreateParams",
+    "AnthropicBetaMessageCountTokensParams",
+    "AnthropicBetaMessage",
+    "AnthropicBetaMessageTokensCount",
+    "AnthropicBetaRawMessageStreamEvent",
+    "AnthropicBetaModelInfo",
+    "AnthropicBetaModelListParams",
+    "AnthropicBetaModelRetrieveParams"
+  ]
+}
