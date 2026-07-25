@@ -22,7 +22,9 @@ function printUsage() {
 
 Options:
   --zip <path>       New macOS zip artifact (required unless --feed-dir already has one).
-  --version <value>  New app version written into a placeholder appcast.xml.
+  --version <value>  Human-readable version written into the placeholder appcast.
+  --build-version <n>
+                      Increasing numeric Sparkle comparison version. Defaults to 999999.
   --old-app <path>   Existing packaged Cradle.app to launch against the local feed.
   --feed-dir <path>  Feed output directory. Defaults to release/update-smoke.
   --port <n>         Local static server port. Defaults to 8765.
@@ -35,6 +37,7 @@ function parseArgs(argv) {
   const options = {
     zip: null,
     version: '9.9.9',
+    buildVersion: '999999',
     oldApp: null,
     feedDir: path.resolve(desktopRoot, 'release/update-smoke'),
     port: 8765,
@@ -63,6 +66,9 @@ function parseArgs(argv) {
       case '--version':
         options.version = value
         break
+      case '--build-version':
+        options.buildVersion = value
+        break
       case '--old-app':
         options.oldApp = path.resolve(value)
         break
@@ -83,7 +89,7 @@ function parseArgs(argv) {
   return options
 }
 
-function writePlaceholderAppcast({ feedDir, version, zipName, baseUrl, size }) {
+function writePlaceholderAppcast({ feedDir, version, buildVersion, zipName, baseUrl, size }) {
   const appcast = `<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
@@ -94,7 +100,7 @@ function writePlaceholderAppcast({ feedDir, version, zipName, baseUrl, size }) {
       <description><![CDATA[<p>Local smoke update ${version}</p>]]></description>
       <enclosure
         url="${baseUrl}${zipName}"
-        sparkle:version="${version}"
+        sparkle:version="${buildVersion}"
         sparkle:shortVersionString="${version}"
         length="${size}"
         type="application/octet-stream"
@@ -131,6 +137,9 @@ async function serveFeed(feedDir, port) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+  if (!/^\d+(?:\.\d+){0,2}$/.test(options.buildVersion)) {
+    throw new Error('--build-version must be numeric (x, x.y, or x.y.z)')
+  }
   mkdirSync(options.feedDir, { recursive: true })
 
   let zipName = null
@@ -156,6 +165,7 @@ async function main() {
   writePlaceholderAppcast({
     feedDir: options.feedDir,
     version: options.version,
+    buildVersion: options.buildVersion,
     zipName,
     baseUrl,
     size: zipSize,
@@ -166,6 +176,7 @@ async function main() {
   console.log(`Serving Sparkle smoke feed at ${baseUrl}`)
   console.log(`Appcast: ${appcastUrl}`)
   console.log(`Zip: ${path.join(options.feedDir, zipName)}`)
+  console.log(`Sparkle version: ${options.buildVersion} (displayed as ${options.version})`)
   console.log('Note: placeholder appcast is NOT EdDSA-signed. For real installs run generate-appcast with SPARKLE_ED_PRIVATE_KEY.')
 
   if (options.launch) {

@@ -12,7 +12,13 @@ const sparkleAppcastUrl = resolveSparkleAppcastUrlForBuild(
   process.env.CRADLE_DESKTOP_SPARKLE_APPCAST_URL?.trim() || updateServerUrl || '',
 )
 const sparklePublicEdKey = process.env.SPARKLE_ED_PUBLIC_KEY?.trim() || undefined
+const sparkleBundleVersion = process.env.CRADLE_DESKTOP_SPARKLE_BUNDLE_VERSION?.trim() || undefined
+const sparkleDisplayVersion = process.env.CRADLE_DESKTOP_SPARKLE_DISPLAY_VERSION?.trim() || undefined
 const hasAppleSigningIdentity = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
+
+if (sparkleBundleVersion && !/^\d+(?:\.\d+){0,2}$/.test(sparkleBundleVersion)) {
+  throw new Error('CRADLE_DESKTOP_SPARKLE_BUNDLE_VERSION must be numeric (x, x.y, or x.y.z)')
+}
 
 if (!hasAppleSigningIdentity) {
   process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
@@ -279,6 +285,8 @@ const config = {
 
   mac: {
     category: 'public.app-category.developer-tools',
+    ...(sparkleBundleVersion ? { bundleVersion: sparkleBundleVersion } : {}),
+    ...(sparkleDisplayVersion ? { bundleShortVersion: sparkleDisplayVersion } : {}),
     compression: 'maximum',
     entitlements: '../../build/entitlements.mac.plist',
     entitlementsInherit: '../../build/entitlements.mac.plist',

@@ -43,6 +43,7 @@ jobs:
       channel: ${{ steps.params.outputs.channel }}
       desktop_version: ${{ steps.params.outputs.desktop_version }}
       display_version: ${{ steps.params.outputs.display_version }}
+      sparkle_bundle_version: ${{ steps.params.outputs.sparkle_bundle_version }}
       release_tag: ${{ steps.params.outputs.release_tag }}
       dev_feed_tag: ${{ steps.params.outputs.dev_feed_tag }}
       bleeding_edge_feed_tag: ${{ steps.params.outputs.bleeding_edge_feed_tag }}
@@ -62,6 +63,7 @@ jobs:
         run: |
           semver_regex='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
           RUN_NUMBER="${{ github.run_number }}"
+          SPARKLE_BUNDLE_VERSION="$RUN_NUMBER"
           DEV_FEED_TAG="feed-dev"
           BLEEDING_EDGE_FEED_TAG="feed-bleeding-edge"
 
@@ -110,6 +112,10 @@ jobs:
             echo "Desktop version must be SemVer-compatible: $DESKTOP_VERSION" >&2
             exit 1
           fi
+          if [[ ! "$SPARKLE_BUNDLE_VERSION" =~ ^[0-9]+$ ]]; then
+            echo "Sparkle bundle version must be an increasing numeric build number: $SPARKLE_BUNDLE_VERSION" >&2
+            exit 1
+          fi
 
           if [ "$CHANNEL" = "release" ]; then
             UPDATE_URL="https://github.com/${{ github.repository }}/releases/latest/download/"
@@ -149,6 +155,7 @@ jobs:
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "desktop_version=$DESKTOP_VERSION" >> "$GITHUB_OUTPUT"
           echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "sparkle_bundle_version=$SPARKLE_BUNDLE_VERSION" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "dev_feed_tag=$DEV_FEED_TAG" >> "$GITHUB_OUTPUT"
           echo "bleeding_edge_feed_tag=$BLEEDING_EDGE_FEED_TAG" >> "$GITHUB_OUTPUT"
@@ -165,6 +172,7 @@ jobs:
           echo "Channel: $CHANNEL"
           echo "Desktop version: $DESKTOP_VERSION"
           echo "Display version: $DISPLAY_VERSION"
+          echo "Sparkle bundle version: $SPARKLE_BUNDLE_VERSION"
           echo "Release tag: $RELEASE_TAG"
           echo "Dev feed tag: $DEV_FEED_TAG"
           echo "Bleeding edge feed tag: $BLEEDING_EDGE_FEED_TAG"
@@ -265,6 +273,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
           CRADLE_DESKTOP_SPARKLE_APPCAST_URL: ${{ needs.resolve.outputs.sparkle_appcast_url }}
+          CRADLE_DESKTOP_SPARKLE_BUNDLE_VERSION: ${{ needs.resolve.outputs.sparkle_bundle_version }}
+          CRADLE_DESKTOP_SPARKLE_DISPLAY_VERSION: ${{ needs.resolve.outputs.display_version }}
           SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
           CRADLE_ELECTRON_REBUILD_ARCH: arm64
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
@@ -276,6 +286,29 @@ jobs:
             exit 1
           fi
           pnpm dist:mac --arm64
+
+      - name: Verify macOS Sparkle versions
+        env:
+          EXPECTED_BUNDLE_VERSION: ${{ needs.resolve.outputs.sparkle_bundle_version }}
+          EXPECTED_DISPLAY_VERSION: ${{ needs.resolve.outputs.display_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          info_plist="apps/desktop/release/mac-arm64/Cradle.app/Contents/Info.plist"
+          bundle_version="$(plutil -extract CFBundleVersion raw -o - "$info_plist")"
+          display_version="$(plutil -extract CFBundleShortVersionString raw -o - "$info_plist")"
+
+          if [ "$bundle_version" != "$EXPECTED_BUNDLE_VERSION" ]; then
+            echo "Unexpected CFBundleVersion: expected $EXPECTED_BUNDLE_VERSION, got $bundle_version" >&2
+            exit 1
+          fi
+          if [ "$display_version" != "$EXPECTED_DISPLAY_VERSION" ]; then
+            echo "Unexpected CFBundleShortVersionString: expected $EXPECTED_DISPLAY_VERSION, got $display_version" >&2
+            exit 1
+          fi
+
+          echo "Sparkle comparison version: $bundle_version"
+          echo "Sparkle display version: $display_version"
 
       - name: Verify macOS framework symlinks
         shell: bash
