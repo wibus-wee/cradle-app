@@ -1,0 +1,72 @@
+name: Update Chat Runtime SDKs
+
+on:
+  workflow_dispatch:
+    inputs:
+      claude_agent_sdk_version:
+        description: Claude Agent SDK version to install (leave blank for latest)
+        required: false
+        type: string
+      codex_release_tag:
+        description: Codex release tag to install (leave blank for latest)
+        required: false
+        type: string
+      kimi_version:
+        description: Kimi Code CLI version to install (leave blank for latest)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-chat-runtime-sdks
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update runtimes and protocol bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Install Kimi Code CLI
+        env:
+          KIMI_VERSION: ${{ inputs.kimi_version || 'latest' }}
+        run: npm install --global "@moonshot-ai/kimi-code@${KIMI_VERSION}"
+
+      - name: Update SDKs and regenerate protocol bindings
+        env:
+          CLAUDE_AGENT_SDK_VERSION: ${{ inputs.claude_agent_sdk_version || 'latest' }}
+          CRADLE_CODEX_RELEASE_TAG: ${{ inputs.codex_release_tag || 'latest' }}
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: |
+          pnpm --filter @cradle/server up "@anthropic-ai/claude-agent-sdk@${CLAUDE_AGENT_SDK_VERSION}"
+          pnpm --filter @cradle/desktop sync:codex-runtime
+          pnpm --filter @cradle/server generate:codex-app-server-protocol
+          pnpm --filter @cradle/server generate:kimi-web-protocol
+
+      - name: Create or update SDK pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          branch: automation/chat-runtime-sdk-update
+          delete-branch: true
+          commit-message: 'chore(chat-runtime): update SDKs'
+          title: 'chore(chat-runtime): update SDKs'
+          body: |
+            Automated Claude Agent SDK, Codex runtime/protocol, and Kimi protocol update.
+
+            The repository pull-request workflow runs validation for this change.
+          add-paths: |
+            apps/server/package.json
+            pnpm-lock.yaml
+            apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/**
+            apps/server/src/modules/chat-runtime-providers/codex/app-server/capabilities.ts
+            apps/server/src/modules/chat-runtime-providers/kimi/protocol/**

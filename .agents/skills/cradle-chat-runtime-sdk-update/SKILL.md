@@ -1,132 +1,65 @@
 ---
 name: cradle-chat-runtime-sdk-update
-description: Update Cradle chat-runtime native SDK and protocol integrations. Use when upgrading or validating the vendored Codex app-server runtime/protocol, Kimi Web OpenAPI/AsyncAPI snapshots and generated bindings, or @anthropic-ai/claude-agent-sdk in apps/server; also use when asked to inspect newly generated native APIs for useful Cradle features.
+description: "Refresh and assess every Cradle Chat Runtime SDK integration through the manual GitHub workflow: Claude Agent SDK, vendored Codex runtime/app-server protocol, and Kimi Web OpenAPI/AsyncAPI snapshots. Use when asked to update or inspect these SDKs/protocols, trigger their update PR, wait for the generated PR and CI with Cradle Session Await, or explain which native changes matter for Cradle."
 ---
 
 # Cradle Chat Runtime SDK Update
 
-Use this skill for Cradle-owned Server chat runtime dependency updates:
+Own the Cradle projections, not the provider implementations: Server owns runtime contracts and adapters; Desktop owns bundled-runtime injection; Codex, Claude, and Kimi own their native semantics.
 
-- Codex: Desktop-vendored Codex CLI runtime, generated app-server protocol bindings, and Codex adapter behavior.
-- Kimi: locally installed `kimi web`, captured REST OpenAPI and WebSocket AsyncAPI contracts, generated REST bindings, and the future Kimi adapter.
-- Claude Agent: `@anthropic-ai/claude-agent-sdk` and the Server Claude Agent provider.
+## Trigger the complete update
 
-Keep the ownership boundary clear: Server owns Chat Runtime contracts and provider adapters; Desktop owns bundled runtime injection; Codex/Claude own their native protocol semantics. Read external/native namespaces, but write Cradle-owned projections only.
+Use `.github/workflows/update-chat-runtime-sdks.yml`; do not update only one provider by default. It has no schedule and does not run tests itself. It updates all of:
 
-## Workflow
+- `@anthropic-ai/claude-agent-sdk` in `apps/server` with pnpm's supply-chain policy intact.
+- The full Codex CLI runtime and generated app-server protocol/capabilities.
+- The Kimi Code CLI, then Kimi's REST and WebSocket protocol snapshots and bindings.
 
-1. Inspect current state before changing files.
-
-```bash
-git status --short
-node -e "const root=require('./package.json'); const srv=require('./apps/server/package.json'); console.log({claudeAgentSdk:srv.dependencies['@anthropic-ai/claude-agent-sdk']})"
-sed -n '1,80p' apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/MANIFEST.json
-test -f apps/server/src/modules/chat-runtime-providers/kimi/protocol/MANIFEST.json
-sed -n '1,120p' apps/server/src/modules/chat-runtime-providers/kimi/protocol/MANIFEST.json
-```
-
-2. Upgrade dependencies with pnpm and respect supply-chain policy.
+Dispatch from `main`, leaving version inputs empty for the latest release or supplying explicit versions for a reproducible update:
 
 ```bash
-pnpm --filter @cradle/server up @anthropic-ai/claude-agent-sdk --latest
+gh workflow run update-chat-runtime-sdks.yml --repo wibus-wee/cradle-app --ref main
+run_id="$(gh run list --repo wibus-wee/cradle-app --workflow update-chat-runtime-sdks.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId')"
 ```
 
-If pnpm refuses a newer dist-tag due to minimum release age, do not add `minimumReleaseAgeExclude` casually. Report the rejected version and use the latest policy-accepted version unless the user explicitly wants to bypass the policy.
+Do not add `minimumReleaseAgeExclude` to bypass a package-policy rejection. Report the rejected SDK version and use the latest accepted version unless the user explicitly authorizes a policy change.
 
-3. Sync or verify the Codex runtime.
+## Await the update and its PR CI
 
-Use the full Codex CLI asset, not the standalone app-server asset. For reproducible work, pin the release tag:
+After dispatch, register a Cradle JavaScript await for that exact GitHub Actions run; do not use `gh run watch` or a shell polling loop. End the turn after registering it.
 
 ```bash
-CRADLE_CODEX_RELEASE_TAG=rust-vX.Y.Z pnpm --filter @cradle/desktop sync:codex-runtime
+cradle session await javascript \
+  --reason "Waiting for Chat Runtime SDK update workflow ${run_id}" \
+  --program "async ({ tools }) => { const result = await tools.exec({ argv: ['gh', 'run', 'view', '${run_id}', '--repo', 'wibus-wee/cradle-app', '--json', 'status,conclusion,url'] }); if (result.exitCode !== 0) throw new Error(result.stderr); const run = JSON.parse(result.stdout); if (run.status !== 'completed') return false; return { resumeText: JSON.stringify(run) }; }"
 ```
 
-If the user says Codex is already upgraded, skip syncing and verify the current bundled runtime:
+When resumed, report a failed update immediately. On success, find the generated PR from `automation/chat-runtime-sdk-update`. If there is no PR, report that every SDK and generated artifact was already current. If a PR exists, register the normal CI await and end the turn:
 
 ```bash
-node -e "const p=require('./apps/desktop/resources/codex/darwin-arm64/codex-runtime.json'); console.log(p.release?.tagName, p.binary?.version)"
+pr_number="$(gh pr list --repo wibus-wee/cradle-app --head automation/chat-runtime-sdk-update --state open --json number --jq '.[0].number')"
+cradle session await github-ci wibus-wee/cradle-app --pr "$pr_number" --reason "Waiting for Chat Runtime SDK update PR #${pr_number} CI"
 ```
 
-4. Generate Codex protocol and capabilities.
+The workflow creates the PR with the repository PAT, not `GITHUB_TOKEN`, so the standard `pull_request` CI is triggered. Do not run duplicate local tests; use the PR CI result.
 
-```bash
-pnpm --filter @cradle/server generate:codex-app-server-protocol
-```
+## Assess the generated update
 
-This must use the vendored runtime through the existing script, not a global `codex` command.
+After the update workflow and PR CI finish, inspect the PR diff and classify every changed provider surface. Do not hand-edit generated bindings.
 
-5. Sync or verify the Kimi Web protocol when Kimi is in scope.
+- Codex: inspect `ClientRequest.ts`, `ServerNotification.ts`, `capabilities.ts`, changed `v2/*Params.ts` and `v2/*Response.ts`, plus root unions. Identify new methods, notifications, and type narrowing/widening.
+- Claude Agent: inspect the dependency and lockfile diff, then compare its exported types and tool/event semantics against Cradle's Claude provider. Preserve Cradle-canonical persisted tool names.
+- Kimi: inspect OpenAPI, AsyncAPI, manifest hashes, REST bindings, and `websocket.ts`. Classify frames as text/thinking, tool lifecycle, turn lifecycle, approval/question, goal/task state, or diagnostics.
 
-Kimi's executing `kimi` binary, not a source checkout, is the protocol source of truth. Refresh both REST and WebSocket contracts through the Cradle-owned generator:
+For every notable native change, state one of: **implement now** (name the Cradle owner and seam), **follow up** (explain the missing product decision), or **leave native** (explain why Cradle should not project it). Never infer `ChatRuntimeChunk` behavior from a Kimi schema alone.
 
-```bash
-pnpm --filter @cradle/server generate:kimi-web-protocol
-```
+## Report to the user
 
-The command starts `kimi web` with a fresh temporary `KIMI_CODE_HOME`, discovers its loopback port, reads only that temporary home's `server.token` in memory to authenticate schema requests, calls `kimi web kill`, and removes the home. Never point this workflow at `~/.kimi-code`, parse/log the startup token, or use `--dangerous-bypass-auth`.
+After CI, give a concise product-facing report containing:
 
-For a deterministic binding-only regeneration in CI or an environment without Kimi installed:
+- PR URL, CI outcome, and exact Claude/Codex/Kimi versions or Kimi schema hashes changed; explicitly say when a provider had no change.
+- API additions, removals, widenings, and narrowings that deserve attention.
+- Concrete Cradle opportunities, such as a UI slot, session capability, persisted diagnostic, interaction bridge, or a reason to keep the feature provider-native.
+- Any adapter work required before merging, and any rejected version caused by supply-chain policy.
 
-```bash
-pnpm --filter @cradle/server generate:kimi-web-protocol-bindings
-```
-
-The Kimi output owner is `apps/server/src/modules/chat-runtime-providers/kimi/protocol/`:
-
-- `openapi.json` and `asyncapi.json` are normalized, committed protocol snapshots.
-- `MANIFEST.json` records the Kimi version plus SHA-256 values for both snapshots.
-- `rest/` is generated from OpenAPI and must contain TypeScript types and Zod schemas.
-- `websocket.ts` is a generated directional catalogue of AsyncAPI frames and payload schemas. It is not a Chat Runtime event mapper.
-
-Before implementing a Kimi provider, extend the OpenAPI generation with `@hey-api/client-ofetch` and `@hey-api/sdk` so `rest/` also exposes a typed request client. Keep the client configuration hand-written in the Kimi runtime namespace: it owns the per-host base URL, transient bearer token, ofetch timeout/retry policy, and Kimi envelope error handling. Disable automatic retries for Kimi commands unless an operation-specific policy proves retry safety. Do not make provider code build URLs or request bodies manually, and do not expose a generic raw-Kimi bridge as a Cradle public API.
-
-6. Review generated API changes, not just typecheck.
-
-Use `git diff --stat`, `git diff --name-status`, and targeted diffs on:
-
-- `apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/ClientRequest.ts`
-- `apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/ServerNotification.ts`
-- `apps/server/src/modules/chat-runtime-providers/codex/app-server/capabilities.ts`
-- changed `v2/*Params.ts`, `v2/*Response.ts`, and root union types such as `ResponseItem.ts`, `AuthMode.ts`, `ReasoningEffort.ts`
-
-Classify changes as:
-
-- New client methods that can become session-scoped Chat Runtime capabilities.
-- New notifications that should affect runtime state, diagnostics, UI slots, or persistence.
-- Type narrowing/widening that requires adapter changes.
-- Native features that are interesting but should remain Codex-owned until Cradle has a clear owner.
-
-For useful Codex APIs, call out concrete Cradle opportunities. Recent examples include account usage/rate-limit credit surfaces, thread delete, background terminal list/terminate, turn moderation metadata, response item metadata, agent-message items, selected capability roots, realtime speech append, remote-control pairing status, and new auth modes such as personal access token or Bedrock API key.
-
-For Kimi, review OpenAPI operation and schema changes alongside AsyncAPI message additions/removals. Classify WebSocket changes into stream text/thinking, tool lifecycle, turn lifecycle, approval/question interaction, goal/task state, and diagnostics. The eventual Kimi adapter must make an explicit projection decision for each consumed frame; do not infer Cradle `ChatRuntimeChunk` behavior solely from a generated JSON schema.
-
-7. Update adapter code only where the generated API requires it.
-
-Do not preserve deprecated request fields with compatibility shims. If generated types remove or narrow fields, update Cradle projections and tests directly. If generated fields require absolute paths, resolve them at the Cradle boundary instead of sending relative paths.
-
-8. Verify focused surfaces.
-
-```bash
-pnpm --filter @cradle/server typecheck
-pnpm --filter @cradle/server exec vitest run src/modules/chat-runtime-providers/codex/app-server/client.test.ts src/modules/chat-runtime-providers/codex/app-server/capabilities.test.ts src/modules/chat-runtime-providers/codex/provider.test.ts
-pnpm --filter @cradle/server exec vitest run src/modules/chat-runtime-providers/claude-agent/provider.test.ts src/modules/chat-runtime-providers/claude-agent/event-to-chunk-mapper.test.ts tests/sdk-providers.test.ts
-pnpm --filter @cradle/server exec vitest run src/modules/chat-runtime-providers/kimi/protocol/generator.test.ts
-pnpm --filter @cradle/server generate:kimi-web-protocol
-pnpm --filter @cradle/server generate:kimi-web-protocol-bindings
-```
-
-Known Claude Agent SDK upgrade check: tool API names should stay Cradle-canonical in persisted tool payloads, for example `claude-code/Bash` rather than older lowercase expectations.
-
-## Reporting
-
-End with:
-
-- Versions updated and whether any newer registry/GitHub release was skipped by policy.
-- Whether Codex protocol generation succeeded and the manifest version.
-- Whether Kimi protocol generation succeeded, its runtime version, and both schema hashes.
-- Notable API additions/removals/widenings/narrowings.
-- Whether Kimi REST output includes the typed request client required for a provider implementation, or is intentionally snapshot-only.
-- Code or test changes made in response.
-- Exact verification commands and pass/fail status.
-
-Mention unrelated dirty worktree files separately; do not revert them.
+Mention the workflow's deliberate behavior: it creates no date-only PR when Codex or Kimi's version and generated schema are unchanged, and it leaves testing to the generated PR's normal CI.

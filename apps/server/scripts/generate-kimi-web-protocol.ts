@@ -4,12 +4,15 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { KimiAsyncApiDocument, KimiOpenApiDocument } from '../src/modules/chat-runtime-providers/kimi/protocol/generator'
+import type {
+  KimiAsyncApiDocument,
+  KimiOpenApiDocument
+} from '../src/modules/chat-runtime-providers/kimi/protocol/generator'
 import {
   createKimiProtocolManifest,
   normalizeKimiAsyncApiDocument,
   normalizeKimiOpenApiDocument,
-  stringifyKimiJson,
+  stringifyKimiJson
 } from '../src/modules/chat-runtime-providers/kimi/protocol/generator'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -24,7 +27,7 @@ try {
   const token = await readFileWithRetry(join(kimiHome, 'server.token'))
   const [openapi, asyncapi] = await Promise.all([
     fetchKimiJson<KimiOpenApiDocument>(port, '/openapi.json', token),
-    fetchKimiJson<KimiAsyncApiDocument>(port, '/asyncapi.json', token),
+    fetchKimiJson<KimiAsyncApiDocument>(port, '/asyncapi.json', token)
   ])
 
   if (!openapi.openapi.startsWith('3.')) {
@@ -36,34 +39,61 @@ try {
 
   const normalizedOpenapi = normalizeKimiOpenApiDocument(openapi)
   const normalizedAsyncapi = normalizeKimiAsyncApiDocument(asyncapi)
-  const manifest = createKimiProtocolManifest({
+  const generatedManifest = createKimiProtocolManifest({
     runtimeVersion,
     openapi: normalizedOpenapi,
     asyncapi: normalizedAsyncapi,
-    generatedDate: new Date().toISOString().slice(0, 10),
+    generatedDate: new Date().toISOString().slice(0, 10)
   })
+  const existingManifest = await readExistingManifest()
+  const manifest =
+    existingManifest &&
+    existingManifest.runtimeVersion === generatedManifest.runtimeVersion &&
+    existingManifest.openapiSha256 === generatedManifest.openapiSha256 &&
+    existingManifest.asyncapiSha256 === generatedManifest.asyncapiSha256
+      ? { ...generatedManifest, generatedDate: existingManifest.generatedDate }
+      : generatedManifest
 
   await mkdir(protocolRoot, { recursive: true })
   await writeFile(join(protocolRoot, 'openapi.json'), stringifyKimiJson(normalizedOpenapi), 'utf8')
-  await writeFile(join(protocolRoot, 'asyncapi.json'), stringifyKimiJson(normalizedAsyncapi), 'utf8')
+  await writeFile(
+    join(protocolRoot, 'asyncapi.json'),
+    stringifyKimiJson(normalizedAsyncapi),
+    'utf8'
+  )
   await writeFile(join(protocolRoot, 'MANIFEST.json'), stringifyKimiJson(manifest), 'utf8')
   await run('pnpm', ['exec', 'tsx', 'scripts/generate-kimi-web-protocol-bindings.ts'])
 
   console.log(`Generated Kimi Web protocol bindings from kimi ${runtimeVersion}`)
   console.log(`OpenAPI SHA-256: ${manifest.openapiSha256}`)
   console.log(`AsyncAPI SHA-256: ${manifest.asyncapiSha256}`)
-}
-finally {
+} finally {
   await stopKimiWeb().catch(() => undefined)
   await rm(kimiHome, { force: true, recursive: true })
+}
+
+async function readExistingManifest(): Promise<ReturnType<
+  typeof createKimiProtocolManifest
+> | null> {
+  try {
+    return JSON.parse(await readFile(join(protocolRoot, 'MANIFEST.json'), 'utf8')) as ReturnType<
+      typeof createKimiProtocolManifest
+    >
+  } catch {
+    return null
+  }
 }
 
 function readKimiVersion(): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(kimiCommand, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
-    child.stdout.on('data', (chunk) => { output += String(chunk) })
-    child.stderr.on('data', (chunk) => { output += String(chunk) })
+    child.stdout.on('data', (chunk) => {
+      output += String(chunk)
+    })
+    child.stderr.on('data', (chunk) => {
+      output += String(chunk)
+    })
     child.once('error', reject)
     child.once('exit', (code) => {
       const version = output.match(/\b\d+\.\d+\.\d+(?:[-+][A-Z0-9.-]+)?\b/i)?.[0]
@@ -80,7 +110,7 @@ function startKimiWeb(): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(kimiCommand, ['web', '--port', '0', '--no-open', '--log-level', 'silent'], {
       env: { ...process.env, KIMI_CODE_HOME: kimiHome },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe']
     })
     let output = ''
     const timeout = setTimeout(() => {
@@ -114,8 +144,7 @@ async function readFileWithRetry(path: string): Promise<string> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
       return await readFile(path, 'utf8')
-    }
-    catch (error) {
+    } catch (error) {
       lastError = error as Error
       await delay(100)
     }
@@ -128,14 +157,13 @@ async function fetchKimiJson<T>(port: number, path: string, token: string): Prom
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}${path}`, {
-        headers: { authorization: `Bearer ${token.trim()}` },
+        headers: { authorization: `Bearer ${token.trim()}` }
       })
       if (!response.ok) {
         throw new Error(`Kimi returned ${response.status} for ${path}.`)
       }
-      return await response.json() as T
-    }
-    catch (error) {
+      return (await response.json()) as T
+    } catch (error) {
       lastError = error as Error
       await delay(100)
     }
@@ -147,7 +175,7 @@ function stopKimiWeb(): Promise<void> {
   return new Promise((resolve) => {
     const child = spawn(kimiCommand, ['web', 'kill'], {
       env: { ...process.env, KIMI_CODE_HOME: kimiHome },
-      stdio: 'ignore',
+      stdio: 'ignore'
     })
     child.once('error', () => resolve())
     child.once('exit', () => resolve())
@@ -163,13 +191,17 @@ function run(file: string, args: string[]): Promise<void> {
         resolve()
         return
       }
-      reject(new Error(`${file} ${args.join(' ')} failed with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}`))
+      reject(
+        new Error(
+          `${file} ${args.join(' ')} failed with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}`
+        )
+      )
     })
   })
 }
 
 function delay(milliseconds: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, milliseconds))
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function stripAnsi(value: string): string {
