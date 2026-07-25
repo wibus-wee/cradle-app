@@ -1255,6 +1255,30 @@
                     },
                     {
                       "properties": {
+                        "type": {
+                          "const": "agent.created",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "agent.disposed",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
                         "patch": {
                           "additionalProperties": {},
                           "propertyNames": {
@@ -2334,6 +2358,9 @@
                             }
                           ]
                         },
+                        "prompt": {
+                          "type": "string"
+                        },
                         "turnId": {
                           "type": "number"
                         },
@@ -3203,6 +3230,9 @@
                         "commandId": {
                           "type": "string"
                         },
+                        "taskId": {
+                          "type": "string"
+                        },
                         "type": {
                           "const": "shell.output",
                           "type": "string"
@@ -3260,6 +3290,29 @@
                         "type",
                         "commandId",
                         "taskId"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "commandId": {
+                          "type": "string"
+                        },
+                        "isError": {
+                          "type": "boolean"
+                        },
+                        "taskId": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "const": "shell.completed",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "commandId",
+                        "isError"
                       ],
                       "type": "object"
                     },
@@ -4632,6 +4685,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -4705,6 +4762,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -4983,6 +5044,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -5056,6 +5121,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -6191,7 +6260,7 @@
   "info": {
     "description": "WebSocket protocol for Kimi Code daemon control frames, acknowledgements, system frames, and session event streaming.",
     "title": "Kimi Code WebSocket API",
-    "version": "0.28.0"
+    "version": "0.29.0"
   },
   "operations": {
     "receiveClientMessages": {

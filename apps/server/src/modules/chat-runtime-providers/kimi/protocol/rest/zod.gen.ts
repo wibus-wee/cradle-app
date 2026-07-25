@@ -45,6 +45,10 @@ export const zFsBrowseQuery = z.object({
     path: z.string().min(1).optional()
 });
 
+export const zFsContentQuery = z.object({
+    path: z.string().min(1)
+});
+
 export const zGetApiV1GuiStoreGetItemQuery = z.object({
     key: z.string().min(1).max(256)
 });
@@ -79,6 +83,10 @@ export const zPostApiV1OauthLoginBody = z.object({
 });
 
 export const zPostApiV1OauthLogoutBody = z.object({
+    provider: z.string().min(1).optional()
+});
+
+export const zGetApiV1OauthUsageQuery = z.object({
     provider: z.string().min(1).optional()
 });
 
@@ -411,6 +419,7 @@ export const zSubmitPromptBody = z.object({
         z.object({
             source: z.union([
                 z.object({
+                    id: z.string().min(1).optional(),
                     kind: z.enum(['url']),
                     url: z.string().min(1)
                 }),
@@ -429,6 +438,7 @@ export const zSubmitPromptBody = z.object({
         z.object({
             source: z.union([
                 z.object({
+                    id: z.string().min(1).optional(),
                     kind: z.enum(['url']),
                     url: z.string().min(1)
                 }),
@@ -457,6 +467,7 @@ export const zSubmitPromptBody = z.object({
             type: z.enum(['thinking'])
         })
     ])).min(1),
+    disabled_tools: z.array(z.string()).optional(),
     goal_control: z.enum([
         'pause',
         'resume',
@@ -471,6 +482,7 @@ export const zSubmitPromptBody = z.object({
         'auto'
     ]).optional(),
     plan_mode: z.boolean().optional(),
+    profile: z.string().min(1).optional(),
     swarm_mode: z.boolean().optional(),
     thinking: z.string().min(1).optional()
 });
@@ -611,6 +623,17 @@ export const zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath = z.object({
     terminal_id: z.string().min(1)
 });
 
+export const zGetApiV1SessionsBySessionIdTranscriptPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptQuery = z.object({
+    agent_id: z.string().min(1),
+    before_turn: z.string().min(1).optional(),
+    after_turn: z.string().min(1).optional(),
+    page_size: z.int().gte(1).lte(100).optional()
+});
+
 export const zGetApiV1SessionsBySessionIdWarningsPath = z.object({
     session_id: z.string().min(1)
 });
@@ -638,40 +661,4 @@ export const zPatchApiV1WorkspacesByWorkspaceIdPath = z.object({
 
 export const zListWorkspaceSkillsPath = z.object({
     workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
-});
-
-export const zGetApiV2ByServiceByMethodPath = z.object({
-    service: z.string(),
-    method: z.string()
-});
-
-export const zPostApiV2ByServiceByMethodPath = z.object({
-    service: z.string(),
-    method: z.string()
-});
-
-export const zGetApiV2SessionBySessionIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    service: z.string(),
-    method: z.string()
-});
-
-export const zPostApiV2SessionBySessionIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    service: z.string(),
-    method: z.string()
-});
-
-export const zGetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    agent_id: z.string(),
-    service: z.string(),
-    method: z.string()
-});
-
-export const zPostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    agent_id: z.string(),
-    service: z.string(),
-    method: z.string()
 });

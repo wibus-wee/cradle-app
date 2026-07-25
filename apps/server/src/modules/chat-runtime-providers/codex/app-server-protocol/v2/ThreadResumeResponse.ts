@@ -43,4 +43,18 @@ multiAgentMode: MultiAgentMode,
 /**
  * `thread/turns/list` page returned when requested by `initialTurnsPage`.
  */
-initialTurnsPage: TurnsPage | null, };
+initialTurnsPage: TurnsPage | null,
+/**
+ * Opaque head cursor for hydrating paginated turns backwards.
+ *
+ * Pass this as `cursor` to `thread/turns/list` with
+ * `sortDirection: "desc"`. The first page includes the cursor's head turn.
+ */
+turnsBackwardsCursor: string | null,
+/**
+ * Opaque head cursor for hydrating paginated items backwards.
+ *
+ * Pass this as `cursor` to `thread/items/list` with
+ * `sortDirection: "desc"`. The first page includes the cursor's head item.
+ */
+itemsBackwardsCursor: string | null, };

@@ -1171,6 +1171,30 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    type: {
+                      const: 'agent.created',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    type: {
+                      const: 'agent.disposed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
                     patch: {
                       additionalProperties: {},
                       propertyNames: {
@@ -2250,6 +2274,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         },
                       ],
                     },
+                    prompt: {
+                      type: 'string',
+                    },
                     turnId: {
                       type: 'number',
                     },
@@ -3119,6 +3146,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     commandId: {
                       type: 'string',
                     },
+                    taskId: {
+                      type: 'string',
+                    },
                     type: {
                       const: 'shell.output',
                       type: 'string',
@@ -3176,6 +3206,29 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     'type',
                     'commandId',
                     'taskId',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    commandId: {
+                      type: 'string',
+                    },
+                    isError: {
+                      type: 'boolean',
+                    },
+                    taskId: {
+                      type: 'string',
+                    },
+                    type: {
+                      const: 'shell.completed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'commandId',
+                    'isError',
                   ],
                   type: 'object',
                 },
@@ -4548,6 +4601,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -4621,6 +4678,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -4899,6 +4960,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -4972,6 +5037,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',

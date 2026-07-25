@@ -80,6 +80,11 @@ cliVersion: string,
  */
 source: SessionSource,
 /**
+ * Whether the app server accepts direct turn input for this loaded thread.
+ * `None` means the capability is unavailable, such as for an unloaded stored thread.
+ */
+canAcceptDirectInput: boolean | null,
+/**
  * Optional analytics source classification for this thread.
  */
 threadSource: ThreadSource | null,

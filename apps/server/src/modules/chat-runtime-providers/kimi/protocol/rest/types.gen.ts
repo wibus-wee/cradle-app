@@ -361,6 +361,28 @@ export type FsBrowseResponses = {
 
 export type FsBrowseResponse = FsBrowseResponses[keyof FsBrowseResponses];
 
+export type FsContentData = {
+    body?: never;
+    path?: never;
+    query: {
+        path: string;
+    };
+    url: '/api/v1/fs:content';
+};
+
+export type FsContentResponses = {
+    /**
+     * Default Response
+     */
+    200: Blob | File;
+    /**
+     * Default Response
+     */
+    206: Blob | File;
+};
+
+export type FsContentResponse = FsContentResponses[keyof FsContentResponses];
+
 export type FsHomeData = {
     body?: never;
     path?: never;
@@ -854,6 +876,56 @@ export type PostApiV1OauthLogoutResponses = {
 };
 
 export type PostApiV1OauthLogoutResponse = PostApiV1OauthLogoutResponses[keyof PostApiV1OauthLogoutResponses];
+
+export type GetApiV1OauthUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        provider?: string;
+    };
+    url: '/api/v1/oauth/usage';
+};
+
+export type GetApiV1OauthUsageResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            extra_usage: {
+                balance_cents: number;
+                currency: string;
+                monthly_charge_limit_cents: number;
+                monthly_charge_limit_enabled: boolean;
+                monthly_used_cents: number;
+                total_cents: number;
+            } | null;
+            kind: 'ok';
+            limits: Array<{
+                label: string;
+                limit: number;
+                reset_hint?: string;
+                used: number;
+            }>;
+            summary: {
+                label: string;
+                limit: number;
+                reset_hint?: string;
+                used: number;
+            } | null;
+        } | {
+            kind: 'error';
+            message: string;
+            status?: number;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1OauthUsageResponse = GetApiV1OauthUsageResponses[keyof GetApiV1OauthUsageResponses];
 
 export type GetApiV1ProvidersData = {
     body?: never;
@@ -2153,6 +2225,7 @@ export type GetApiV1SessionsBySessionIdMessagesResponses = {
                     type: 'tool_result';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2166,6 +2239,7 @@ export type GetApiV1SessionsBySessionIdMessagesResponses = {
                     type: 'image';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2254,6 +2328,7 @@ export type GetApiV1SessionsBySessionIdMessagesByMessageIdResponses = {
                 type: 'tool_result';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2267,6 +2342,7 @@ export type GetApiV1SessionsBySessionIdMessagesByMessageIdResponses = {
                 type: 'image';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2571,6 +2647,7 @@ export type ListPromptsResponses = {
                     type: 'tool_result';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2584,6 +2661,7 @@ export type ListPromptsResponses = {
                     type: 'image';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2627,6 +2705,7 @@ export type ListPromptsResponses = {
                     type: 'tool_result';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2640,6 +2719,7 @@ export type ListPromptsResponses = {
                     type: 'image';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2700,6 +2780,7 @@ export type SubmitPromptData = {
             type: 'tool_result';
         } | {
             source: {
+                id?: string;
                 kind: 'url';
                 url: string;
             } | {
@@ -2713,6 +2794,7 @@ export type SubmitPromptData = {
             type: 'image';
         } | {
             source: {
+                id?: string;
                 kind: 'url';
                 url: string;
             } | {
@@ -2735,6 +2817,7 @@ export type SubmitPromptData = {
             thinking: string;
             type: 'thinking';
         }>;
+        disabled_tools?: Array<string>;
         goal_control?: 'pause' | 'resume' | 'cancel';
         goal_objective?: string;
         metadata?: {
@@ -2743,6 +2826,7 @@ export type SubmitPromptData = {
         model?: string;
         permission_mode?: 'manual' | 'yolo' | 'auto';
         plan_mode?: boolean;
+        profile?: string;
         swarm_mode?: boolean;
         thinking?: string;
     };
@@ -2775,6 +2859,7 @@ export type SubmitPromptResponses = {
                 type: 'tool_result';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2788,6 +2873,7 @@ export type SubmitPromptResponses = {
                 type: 'image';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2860,12 +2946,6 @@ export type SubmitPromptResponses = {
         request_id: string;
     } | {
         code: 40401;
-        data: null;
-        details?: unknown;
-        msg: string;
-        request_id: string;
-    } | {
-        code: 40901;
         data: null;
         details?: unknown;
         msg: string;
@@ -3258,6 +3338,7 @@ export type GetApiV1SessionsBySessionIdSnapshotResponses = {
                         type: 'tool_result';
                     } | {
                         source: {
+                            id?: string;
                             kind: 'url';
                             url: string;
                         } | {
@@ -3271,6 +3352,7 @@ export type GetApiV1SessionsBySessionIdSnapshotResponses = {
                         type: 'image';
                     } | {
                         source: {
+                            id?: string;
                             kind: 'url';
                             url: string;
                         } | {
@@ -3871,6 +3953,227 @@ export type GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses = {
 
 export type GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponse = GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses[keyof GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses];
 
+export type GetApiV1SessionsBySessionIdTranscriptData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query: {
+        agent_id: string;
+        before_turn?: string;
+        after_turn?: string;
+        page_size?: number;
+    };
+    url: '/api/v1/sessions/{session_id}/transcript';
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            agent_id: string;
+            agents: Array<{
+                agentId: string;
+                createdAt?: string;
+                disposedAt?: string;
+                label?: string;
+                parentAgentId?: string;
+                type?: 'main' | 'sub' | 'independent';
+            }>;
+            attachments: Array<{
+                attachmentId: string;
+                mediaType: string;
+                name?: string;
+                placeholder?: string;
+                size?: number;
+                source?: {
+                    kind: 'url';
+                    url: string;
+                } | {
+                    fileId: string;
+                    kind: 'file';
+                };
+            }>;
+            has_more: boolean;
+            interactions: Array<{
+                interactionId: string;
+                interactionKind: 'approval' | 'question';
+                request?: unknown;
+                response?: unknown;
+                state: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'answered' | 'dismissed';
+                toolCallId: string;
+            }>;
+            items: Array<{
+                attachmentIds?: Array<string>;
+                endedAt?: string;
+                kind: 'turn';
+                ordinal: number;
+                origin: {
+                    kind: 'user';
+                    payload?: unknown;
+                } | {
+                    kind: 'cron';
+                    payload?: unknown;
+                    taskId?: string;
+                } | {
+                    kind: 'task';
+                    payload?: unknown;
+                    taskId: string;
+                } | {
+                    kind: 'hook';
+                    payload?: unknown;
+                } | {
+                    kind: 'compaction';
+                    payload?: unknown;
+                } | {
+                    kind: 'side';
+                    payload?: unknown;
+                } | {
+                    kind: 'other';
+                    payload?: unknown;
+                };
+                prompt?: string;
+                startedAt?: string;
+                state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+                steps: Array<{
+                    endedAt?: string;
+                    frames: Array<{
+                        attachmentIds?: Array<string>;
+                        frameId: string;
+                        kind: 'text';
+                        role: 'assistant' | 'user';
+                        taskId?: string;
+                        text: string;
+                    } | {
+                        frameId: string;
+                        kind: 'thinking';
+                        text: string;
+                    } | {
+                        agentRefs?: Array<{
+                            agentId: string;
+                            role?: 'child' | 'member';
+                        }>;
+                        approvalId?: string;
+                        display?: unknown;
+                        error?: string;
+                        frameId: string;
+                        input?: unknown;
+                        kind: 'tool';
+                        name: string;
+                        output?: unknown;
+                        state: 'running' | 'done' | 'error';
+                        taskId?: string;
+                        todoId?: string;
+                        toolCallId: string;
+                        view?: string;
+                    } | {
+                        frameId: string;
+                        interactionId: string;
+                        interactionKind: 'approval' | 'question';
+                        kind: 'interaction';
+                        request?: unknown;
+                        response?: unknown;
+                        state: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'answered' | 'dismissed';
+                        toolCallId?: string;
+                    } | {
+                        detail?: unknown;
+                        frameId: string;
+                        kind: 'notice';
+                        level: 'error' | 'warning' | 'info';
+                        message: string;
+                        source?: string;
+                    }>;
+                    kind: 'step';
+                    ordinal: number;
+                    startedAt?: string;
+                    state: 'running' | 'completed' | 'interrupted' | 'failed';
+                    stepId: string;
+                    turnId: string;
+                }>;
+                turnId: string;
+                usage?: {
+                    cachedTokens?: number;
+                    cost?: number;
+                    inputTokens?: number;
+                    outputTokens?: number;
+                };
+            } | {
+                at?: string;
+                kind: 'marker';
+                marker: string;
+                markerId: string;
+                payload?: unknown;
+            } | {
+                at?: string;
+                kind: 'taskref';
+                refId: string;
+                taskId: string;
+            }>;
+            meta: {
+                activity?: 'idle' | 'turn' | 'disposing' | 'unknown';
+                goal?: {
+                    budgetLimit?: number;
+                    budgetUsed?: number;
+                    completionCriterion?: string;
+                    objective: string;
+                    status: 'active' | 'paused' | 'blocked' | 'complete';
+                };
+                modes?: {
+                    plan?: {
+                        reviewPath?: string;
+                    };
+                    swarm?: {
+                        trigger?: string;
+                    };
+                };
+            };
+            pending_interactions: Array<string>;
+            tasks: Array<{
+                agentId?: string;
+                description?: string;
+                detached: boolean;
+                endedAt?: string;
+                kind: 'shell' | 'subagent' | 'tool' | 'other';
+                outputTail: string;
+                startedAt?: string;
+                state: 'running' | 'completed' | 'failed' | 'timed_out' | 'killed' | 'lost';
+                taskId: string;
+            }>;
+            todos: Array<{
+                items: Array<{
+                    status: 'pending' | 'in_progress' | 'done';
+                    title: string;
+                }>;
+                todoId: string;
+                updatedAt?: string;
+            }>;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptResponse = GetApiV1SessionsBySessionIdTranscriptResponses[keyof GetApiV1SessionsBySessionIdTranscriptResponses];
+
 export type GetApiV1SessionsBySessionIdWarningsData = {
     body?: never;
     path: {
@@ -3957,6 +4260,7 @@ export type GetApiV1ToolsResponses = {
         code: 0;
         data: {
             tools: Array<{
+                active?: boolean;
                 description: string;
                 input_schema: unknown;
                 mcp_server_id?: string;
@@ -4177,128 +4481,6 @@ export type ListWorkspaceSkillsResponses = {
 };
 
 export type ListWorkspaceSkillsResponse = ListWorkspaceSkillsResponses[keyof ListWorkspaceSkillsResponses];
-
-export type GetApiV2ByServiceByMethodData = {
-    body?: never;
-    path: {
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/{service}/{method}';
-};
-
-export type GetApiV2ByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type PostApiV2ByServiceByMethodData = {
-    body?: never;
-    path: {
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/{service}/{method}';
-};
-
-export type PostApiV2ByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type GetApiV2ChannelsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v2/channels';
-};
-
-export type GetApiV2ChannelsResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type GetApiV2SessionBySessionIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/{service}/{method}';
-};
-
-export type GetApiV2SessionBySessionIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type PostApiV2SessionBySessionIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/{service}/{method}';
-};
-
-export type PostApiV2SessionBySessionIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        agent_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/agent/{agent_id}/{service}/{method}';
-};
-
-export type GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        agent_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/agent/{agent_id}/{service}/{method}';
-};
-
-export type PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
 
 export type GetAsyncapiJsonData = {
     body?: never;
