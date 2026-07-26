@@ -63,6 +63,22 @@ interface ClaudeAgentAlertSnapshot {
 }
 
 const CLAUDE_AGENT_RECENT_ALERT_LIMIT = 12
+const CLAUDE_AGENT_RECENT_CREW_CALL_LIMIT = 24
+const CLAUDE_AGENT_RECENT_WORKFLOW_EXECUTION_LIMIT = 12
+const CLAUDE_AGENT_RECENT_TASK_ACTIVITY_LIMIT = 24
+const CLAUDE_AGENT_CREW_PROMPT_SNAPSHOT_LIMIT = 2_000
+
+function retainRecentClaudeActivity<T extends { status: string, startedAt: number | null }>(
+  items: T[],
+  limit: number,
+): T[] {
+  const running = items.filter(item => item.status === 'running')
+  const recentTerminal = items
+    .filter(item => item.status !== 'running')
+    .sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))
+    .slice(0, limit)
+  return [...running, ...recentTerminal]
+}
 
 export const CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID = '__cradle_claude_runtime_default__'
 
@@ -589,17 +605,21 @@ export function writeClaudeAgentCrewCall(
   const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
   const claudeAgentState = { ...readRecord(snapshot.claudeAgent) }
   const existingCalls = readClaudeAgentCrewCallsSnapshot(claudeAgentState.crewCalls)
+  const snapshotCall: ClaudeAgentCrewCallSnapshot = {
+    ...call,
+    prompt: call.prompt?.slice(0, CLAUDE_AGENT_CREW_PROMPT_SNAPSHOT_LIMIT) ?? null,
+  }
 
   // Upsert: update existing call or append new one
-  const index = existingCalls.findIndex(c => c.id === call.id || (call.agentId !== null && c.agentId === call.agentId))
+  const index = existingCalls.findIndex(c => c.id === snapshotCall.id || (snapshotCall.agentId !== null && c.agentId === snapshotCall.agentId))
   if (index >= 0) {
-    existingCalls[index] = mergeClaudeAgentCrewCall(existingCalls[index]!, call)
+    existingCalls[index] = mergeClaudeAgentCrewCall(existingCalls[index]!, snapshotCall)
   }
   else {
-    existingCalls.push(call)
+    existingCalls.push(snapshotCall)
   }
 
-  claudeAgentState.crewCalls = existingCalls
+  claudeAgentState.crewCalls = retainRecentClaudeActivity(existingCalls, CLAUDE_AGENT_RECENT_CREW_CALL_LIMIT)
   runtimeSession.providerStateSnapshot = JSON.stringify({
     ...snapshot,
     claudeAgent: claudeAgentState,
@@ -622,7 +642,10 @@ export function writeClaudeAgentWorkflowExecution(
     existingExecutions.push(execution)
   }
 
-  claudeAgentState.workflowExecutions = existingExecutions
+  claudeAgentState.workflowExecutions = retainRecentClaudeActivity(
+    existingExecutions,
+    CLAUDE_AGENT_RECENT_WORKFLOW_EXECUTION_LIMIT,
+  )
   runtimeSession.providerStateSnapshot = JSON.stringify({
     ...snapshot,
     claudeAgent: claudeAgentState,
@@ -726,7 +749,7 @@ function mergeClaudeAgentCrewCall(
     id: existing.id,
     agentId: next.agentId ?? existing.agentId,
     tool: mergeClaudeAgentCrewTool(existing.tool, next.tool),
-    prompt: next.prompt ?? existing.prompt,
+    prompt: (next.prompt ?? existing.prompt)?.slice(0, CLAUDE_AGENT_CREW_PROMPT_SNAPSHOT_LIMIT) ?? null,
     description: next.description ?? existing.description,
     subagentType: next.subagentType ?? existing.subagentType,
     model: next.model ?? existing.model,
@@ -832,7 +855,7 @@ export function writeClaudeAgentTaskActivity(
     existingItems.push(item)
   }
 
-  claudeAgentState.taskActivity = existingItems
+  claudeAgentState.taskActivity = retainRecentClaudeActivity(existingItems, CLAUDE_AGENT_RECENT_TASK_ACTIVITY_LIMIT)
   runtimeSession.providerStateSnapshot = JSON.stringify({
     ...snapshot,
     claudeAgent: claudeAgentState,

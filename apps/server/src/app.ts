@@ -22,6 +22,7 @@ import * as BackgroundActivity from './modules/background-activity/service'
 import { backgroundJob } from './modules/background-job'
 import * as BackgroundJobPoller from './modules/background-job/poller'
 import { chatRuntime } from './modules/chat-runtime'
+import { getRuntimeRegistry } from './modules/chat-runtime/chat-runtime-provider-registry'
 import {
   chatRuntimeEventRoutes,
   chatRuntimeGlobalEventRoutes,
@@ -490,6 +491,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     stop: () => conversationBridgeSupervisor.stopAllConversationBridgeConnections(),
   })
   runtimeResources.register({ name: 'plugins', phase: 'stop', stop: deactivateAllPlugins })
+  runtimeResources.register({
+    name: 'chat-runtime-providers',
+    phase: 'stop',
+    stop: () => getRuntimeRegistry().disposeAll(),
+  })
   runtimeResources.register({
     name: 'provider-runtime',
     phase: 'stop',

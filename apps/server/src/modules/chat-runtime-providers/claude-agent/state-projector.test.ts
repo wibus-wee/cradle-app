@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RuntimeSession } from '../../chat-runtime/runtime-provider-types'
-import { readClaudeAgentWorkflowExecutions } from './state-projector'
+import {
+  readClaudeAgentWorkflowExecutions,
+  writeClaudeAgentCrewCall,
+  writeClaudeAgentTaskActivity,
+  writeClaudeAgentWorkflowExecution,
+} from './state-projector'
 import {
   createClaudeWorkflowExecutionRecord,
   mergeClaudeWorkflowExecutionRecord,
@@ -104,5 +109,108 @@ describe('claude Workflow provider snapshot', () => {
   it('reads old snapshots without Workflow executions as empty', () => {
     const runtimeSession = createRuntimeSession()
     expect(readClaudeAgentWorkflowExecutions(runtimeSession)).toEqual([])
+  })
+
+  it('bounds recent activity snapshots while retaining running work', () => {
+    const runtimeSession = createRuntimeSession()
+    for (let index = 0; index < 34; index += 1) {
+      writeClaudeAgentCrewCall(runtimeSession, {
+        id: `crew-${index}`,
+        agentId: null,
+        tool: 'Agent',
+        prompt: index === 33 ? 'x'.repeat(2_100) : `crew prompt ${index}`,
+        description: null,
+        subagentType: null,
+        model: null,
+        reasoningEffort: null,
+        tools: [],
+        outputFile: null,
+        runInBackground: false,
+        status: 'completed',
+        startedAt: index,
+        completedAt: index,
+      })
+    }
+    writeClaudeAgentCrewCall(runtimeSession, {
+      id: 'crew-running',
+      agentId: null,
+      tool: 'Agent',
+      prompt: 'still running',
+      description: null,
+      subagentType: null,
+      model: null,
+      reasoningEffort: null,
+      tools: [],
+      outputFile: null,
+      runInBackground: true,
+      status: 'running',
+      startedAt: 0,
+      completedAt: null,
+    })
+
+    for (let index = 0; index < 14; index += 1) {
+      writeClaudeAgentWorkflowExecution(runtimeSession, createClaudeWorkflowExecutionRecord({
+        toolCallId: `workflow-${index}`,
+        status: 'completed',
+        startedAt: index,
+      }))
+    }
+    writeClaudeAgentWorkflowExecution(runtimeSession, createClaudeWorkflowExecutionRecord({
+      toolCallId: 'workflow-running',
+      status: 'running',
+      startedAt: 0,
+    }))
+
+    for (let index = 0; index < 30; index += 1) {
+      writeClaudeAgentTaskActivity(runtimeSession, {
+        id: `task-${index}`,
+        label: `Task ${index}`,
+        status: 'completed',
+        startedAt: index,
+        completedAt: index,
+      })
+    }
+    writeClaudeAgentTaskActivity(runtimeSession, {
+      id: 'task-running',
+      label: 'Still running',
+      status: 'running',
+      startedAt: 0,
+      completedAt: null,
+    })
+
+    const claudeAgent = JSON.parse(runtimeSession.providerStateSnapshot!).claudeAgent as {
+      crewCalls: Array<{ id: string, prompt: string | null }>
+      workflowExecutions: Array<{ toolCallId: string }>
+      taskActivity: Array<{ id: string }>
+    }
+    expect(claudeAgent.crewCalls).toHaveLength(25)
+    expect(claudeAgent.crewCalls.map(call => call.id)).toEqual(expect.arrayContaining(['crew-running', 'crew-33']))
+    expect(claudeAgent.crewCalls.find(call => call.id === 'crew-33')?.prompt).toHaveLength(2_000)
+    expect(claudeAgent.workflowExecutions).toHaveLength(13)
+    expect(claudeAgent.workflowExecutions.map(execution => execution.toolCallId)).toContain('workflow-running')
+    expect(claudeAgent.taskActivity).toHaveLength(25)
+    expect(claudeAgent.taskActivity.map(item => item.id)).toContain('task-running')
+  })
+
+  it('caps workflow lifecycle snapshots at twenty entries', () => {
+    let execution = createClaudeWorkflowExecutionRecord({ toolCallId: 'workflow-lifecycle-limit' })
+    for (let index = 0; index < 25; index += 1) {
+      execution = mergeClaudeWorkflowExecutionRecord(execution, createClaudeWorkflowExecutionRecord({
+        toolCallId: 'workflow-lifecycle-limit',
+        lifecycle: {
+          type: 'system',
+          subtype: 'task_progress',
+          task_id: 'workflow-task-limit',
+          description: `Progress ${index}`,
+          usage: { total_tokens: index, tool_uses: index, duration_ms: index },
+          uuid: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+          session_id: 'claude-session-lifecycle-limit',
+        },
+      }))
+    }
+
+    expect(execution.lifecycle).toHaveLength(20)
+    expect(execution.rawLifecycle).toHaveLength(20)
+    expect(execution.lifecycle[0]?.description).toBe('Progress 5')
   })
 })

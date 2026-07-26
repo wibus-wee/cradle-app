@@ -6,10 +6,12 @@ import type {
   Options,
   Query,
   SDKAuthStatusMessage,
+  SDKCommandsChangedMessage,
   SDKMessage,
   SDKPermissionDeniedMessage,
   SDKRateLimitEvent,
   SessionMessage,
+  SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
 import {
   getSessionInfo,
@@ -185,6 +187,7 @@ type ActiveClaudeQuery = {
   taskLaunchesById: Map<string, ClaudeCrewLink>
   workflowOutputsByToolCallId: Map<string, Record<string, unknown>>
   workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>>
+  slashCommands: SlashCommand[] | null
   permissionBridgeState: ClaudeAgentPermissionBridgeState
   runtimeSession: RuntimeSession
   providerTargetId: string
@@ -386,6 +389,12 @@ export class ClaudeAgentProvider implements ChatRuntime {
   }
 
   async getPresentation(input: GetCapabilitiesInput): Promise<RuntimePresentationCapabilities> {
+    const liveEntry = this.activeQueries.get(input.runtimeSession.chatSessionId)
+    if (liveEntry && !liveEntry.closed) {
+      const slashCommands = liveEntry.slashCommands ?? await liveEntry.query.supportedCommands()
+      liveEntry.slashCommands = slashCommands
+      return projectClaudeAgentPresentation(slashCommands)
+    }
     const abortController = new AbortController()
     const stderrSink = createClaudeStderrSink()
     const queryOptions = buildClaudeQueryOptions({
@@ -550,15 +559,15 @@ export class ClaudeAgentProvider implements ChatRuntime {
       this.closeSessionQuery(sessionId, activeEntry)
       activeEntry = undefined
     }
-    const ultracodeEnabled = isClaudeAgentUltracodeEnabled(input.providerOptions?.thinkingEffort)
-    const permissionBridgeState = activeEntry?.permissionBridgeState ?? createClaudeAgentPermissionBridgeState({
-      runtimeInput: input,
-      permissionMode: 'bypassPermissions',
-      runtimeSettings: input.providerOptions?.runtimeSettings,
-    })
     const turnPermissionMode: Options['permissionMode'] = readClaudeAgentPermissionMode(
       input.providerOptions?.runtimeSettings,
     )
+    const ultracodeEnabled = isClaudeAgentUltracodeEnabled(input.providerOptions?.thinkingEffort)
+    const permissionBridgeState = activeEntry?.permissionBridgeState ?? createClaudeAgentPermissionBridgeState({
+      runtimeInput: input,
+      permissionMode: turnPermissionMode,
+      runtimeSettings: input.providerOptions?.runtimeSettings,
+    })
     // Reuse the long-lived query's stderr sink when the session already exists;
     // otherwise create one for the new query. The sink must outlive the
     // pump loop so it can enrich the surfaced error when the process exits.
@@ -577,16 +586,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
       this.activePermissionModesBySession.set(sessionId, turnPermissionMode)
       const inputStream = new ClaudeAgentInputStream()
       const activeQuery = query({ prompt: inputStream, options: queryOptions })
-      if (turnPermissionMode !== 'bypassPermissions') {
-        void activeQuery.setPermissionMode(turnPermissionMode).catch((error) => {
-          this.deps.logger?.warn?.('Claude Agent failed to sync SDK permission mode after query start', {
-            error,
-            permissionMode: turnPermissionMode,
-            sessionId,
-            resumed: shouldResumeProviderSession,
-          })
-        })
-      }
       const taskLaunchesById: Map<string, ClaudeCrewLink> = new Map()
       const workflowOutputsByToolCallId: Map<string, Record<string, unknown>> = new Map()
       const workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>> = new Map()
@@ -607,6 +606,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
         taskLaunchesById,
         workflowOutputsByToolCallId,
         workflowLifecyclesByToolCallId,
+        slashCommands: null,
         permissionBridgeState,
         runtimeSession: input.runtimeSession,
         providerTargetId: profile.providerTargetId,
@@ -903,6 +903,11 @@ export class ClaudeAgentProvider implements ChatRuntime {
 
     if (message.type === 'command_lifecycle') {
       this.handleClaudeCommandLifecycle(entry, message)
+      return
+    }
+
+    if (message.type === 'system' && message.subtype === 'commands_changed') {
+      entry.slashCommands = (message as SDKCommandsChangedMessage).commands
       return
     }
 
@@ -1653,30 +1658,29 @@ export class ClaudeAgentProvider implements ChatRuntime {
       return
     }
 
-    // Interrupt the long-lived Query even when `currentTurn` is already cleared
-    // (empty-result / synthetic projection window). Otherwise Composer cancel
-    // returns ok while Claude keeps running under a system synthetic run.
     const turn = entry.currentTurn
     if (turn) {
       turn.interruptRequested = true
-      // A deferred empty main `result` already consumed the native turn boundary.
-      // `interrupt()` will not produce another result while the Query is parked on
-      // the next prompt pull — settle the UI turn here or Stop hangs forever.
-      if (turn.deferredEmptyResult && !turn.hasProjectedOutput) {
+      if (!turn.hasProjectedOutput || turn.deferredEmptyResult) {
         this.finalizeClaudeUserTurn(entry, turn, {
           type: 'abort',
           reason: 'user',
         })
       }
     }
-
-    // For in-flight turns with projected output, interrupt does not settle the
-    // turn: the native result / query exit remains the terminal authority.
-    await entry.query.interrupt()
+    void entry.query.interrupt().catch(() => {})
+    this.closeSessionQuery(sessionId, entry)
   }
 
   async dispose(): Promise<void> {
     for (const [sessionId, entry] of this.activeQueries) {
+      this.closeSessionQuery(sessionId, entry)
+    }
+  }
+
+  async disposeSession(sessionId: string): Promise<void> {
+    const entry = this.activeQueries.get(sessionId)
+    if (entry) {
       this.closeSessionQuery(sessionId, entry)
     }
   }
@@ -1841,7 +1845,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     if (!entry) {
       return
     }
-    const mode = input.mode ?? 'bypassPermissions'
+    const mode = input.mode
+    if (!mode) {
+      return
+    }
     if (this.activePermissionModesBySession.get(sessionId) !== mode) {
       await entry.query.setPermissionMode(mode)
     }

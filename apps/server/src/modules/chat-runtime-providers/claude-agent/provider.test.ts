@@ -642,7 +642,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     )
   })
 
-  it('defaults Claude Agent runs to bypass permissions and persists under Cradle runtime data', async () => {
+  it('defaults Claude Agent runs to default permissions and persists under Cradle runtime data', async () => {
     sdkMocks.query.mockReturnValue(
       createAsyncQuery([
         {
@@ -668,7 +668,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     expect(readQueryOptions(0)).toEqual(
       expect.objectContaining({
-        permissionMode: 'bypassPermissions',
+        permissionMode: 'default',
         allowDangerouslySkipPermissions: true,
         persistSession: true,
         settingSources: [],
@@ -711,7 +711,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     )
   })
 
-  it('starts restricted SDK modes from bypass permissions before syncing the desired mode', async () => {
+  it('starts restricted SDK modes in the configured mode without a bypass window', async () => {
     const activeQuery = createAsyncQuery([
       {
         type: 'result',
@@ -738,10 +738,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     }
 
     expect(readQueryOptions(0)).toEqual(expect.objectContaining({
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       allowDangerouslySkipPermissions: true,
     }))
-    expect(activeQuery.setPermissionMode).toHaveBeenCalledWith('default')
+    expect(activeQuery.setPermissionMode).not.toHaveBeenCalled()
   })
 
   it('passes Volcengine Anthropic credentials through ANTHROPIC_AUTH_TOKEN', async () => {
@@ -1297,11 +1297,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     const options = readQueryOptions(0)
     expect(options).toEqual(expect.objectContaining({
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'plan',
       allowDangerouslySkipPermissions: false,
       systemPrompt: { type: 'preset', preset: 'claude_code' },
     }))
-    expect(activeQuery.setPermissionMode).toHaveBeenCalledWith('plan')
+    expect(activeQuery.setPermissionMode).not.toHaveBeenCalled()
     expect(options.disallowedTools).toEqual([])
     expect(options.disallowedTools).not.toContain('AskUserQuestion')
     expect(options.disallowedTools).not.toContain('EnterPlanMode')
@@ -1367,10 +1367,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     expect(readQueryOptions(0)).toEqual(expect.objectContaining({
       resume: 'claude-session-1',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'plan',
       allowDangerouslySkipPermissions: false,
     }))
-    expect(activeQuery.setPermissionMode).toHaveBeenCalledWith('plan')
+    expect(activeQuery.setPermissionMode).not.toHaveBeenCalled()
   })
 
   it('routes AskUserQuestion through requestUserInput regardless of plan mode', async () => {
@@ -1532,11 +1532,13 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
   })
 
-  it('updates active bridge runtime settings and syncs SDK plan permission mode', async () => {
+  it('retries a failed SDK permission mode update instead of poisoning the mode cache', async () => {
     const activeQuery = createPendingQuery()
-    const permissionError = new Error('Cannot set permission mode to bypassPermissions')
+    const permissionError = new Error('Cannot set permission mode to plan')
+    let failed = false
     activeQuery.setPermissionMode.mockImplementation(async (mode: string) => {
-      if (mode === 'bypassPermissions') {
+      if (mode === 'plan' && !failed) {
+        failed = true
         throw permissionError
       }
     })
@@ -1571,8 +1573,18 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         profile: createProfile(),
         settings: { permissionMode: 'plan' },
       }),
+    ).rejects.toThrow(permissionError)
+
+    await expect(
+      provider.updateRuntimeSettings({
+        runtimeSession,
+        profile: createProfile(),
+        settings: { permissionMode: 'plan' },
+      }),
     ).resolves.toBeUndefined()
-    expect(activeQuery.setPermissionMode).toHaveBeenCalledWith('plan')
+    expect(activeQuery.setPermissionMode).toHaveBeenCalledTimes(2)
+    expect(activeQuery.setPermissionMode).toHaveBeenNthCalledWith(1, 'plan')
+    expect(activeQuery.setPermissionMode).toHaveBeenNthCalledWith(2, 'plan')
 
     await expect(
       (options.canUseTool as CanUseTool)(
@@ -1629,6 +1641,80 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     activeQuery.close()
     await pendingNext
     expect(liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)).toBeUndefined()
+  })
+
+  it('closes a session query when its session is archived or cleaned up', async () => {
+    const activeQuery = createPendingQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-session-disposal',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Keep query alive'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+
+    await vi.waitFor(() => {
+      expect(sdkMocks.query).toHaveBeenCalledOnce()
+    })
+
+    await provider.disposeSession(runtimeSession.chatSessionId)
+
+    expect(activeQuery.close).toHaveBeenCalledOnce()
+    await expect(pendingNext).resolves.toEqual({ done: true, value: undefined })
+
+    await provider.disposeSession(runtimeSession.chatSessionId)
+    expect(activeQuery.close).toHaveBeenCalledOnce()
+  })
+
+  it('refreshes live presentation from commands_changed without another SDK query', async () => {
+    const activeQuery = createControllableQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-commands-changed',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Discover commands'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+    void pendingNext.catch(() => undefined)
+
+    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    activeQuery.push({
+      type: 'system',
+      subtype: 'commands_changed',
+      commands: [{ name: 'review', description: 'Review the change', argumentHint: '<file>' }],
+      uuid: randomUUID(),
+      session_id: 'claude-session-commands-changed',
+    })
+
+    await vi.waitFor(() => {
+      const entry = (provider as unknown as {
+        activeQueries: Map<string, { slashCommands: Array<{ name: string }> | null }>
+      }).activeQueries.get(runtimeSession.chatSessionId)
+      expect(entry?.slashCommands).toEqual([{ name: 'review', description: 'Review the change', argumentHint: '<file>' }])
+    })
+
+    await expect(provider.getPresentation({
+      runtimeSession,
+      profile: createProfile(),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+    })).resolves.toMatchObject({
+      slashCommands: [{ name: 'review', description: 'Review the change', argumentHint: '<file>' }],
+    })
+    expect(activeQuery.supportedCommands).not.toHaveBeenCalled()
+
+    activeQuery.close()
+    await pendingNext
   })
 
   it('resyncs reused canUseTool callback when approval mode changes on a live query', async () => {
@@ -1695,11 +1781,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       }
 
       expect(readQueryOptions(0)).toEqual(expect.objectContaining({
-        permissionMode: 'bypassPermissions',
+        permissionMode: 'plan',
         allowDangerouslySkipPermissions: false,
       }))
       const originalCanUseTool = readQueryOptions(0).canUseTool as CanUseTool
-      expect(readActiveQuery().setPermissionMode).toHaveBeenCalledWith('plan')
+      expect(readActiveQuery().setPermissionMode).not.toHaveBeenCalled()
 
       for await (const _chunk of provider.streamTurn({
         runId: 'run-claude-agent-reused-default',
@@ -2877,7 +2963,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     )
   })
 
-  it('normalizes removed Claude Agent permission modes to bypass permissions', async () => {
+  it('normalizes removed Claude Agent permission modes to default permissions', async () => {
     sdkMocks.query.mockReturnValue(
       createAsyncQuery([
         {
@@ -2903,7 +2989,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     expect(readQueryOptions(0)).toEqual(
       expect.objectContaining({
-        permissionMode: 'bypassPermissions',
+        permissionMode: 'default',
         allowDangerouslySkipPermissions: true,
       }),
     )
@@ -4336,8 +4422,12 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     expect(chunks).toEqual([
       expect.objectContaining({ type: 'abort', reason: 'user' }),
     ])
-    const queryInstance = sdkMocks.query.mock.results[0]?.value as { interrupt: ReturnType<typeof vi.fn> }
+    const queryInstance = sdkMocks.query.mock.results[0]?.value as {
+      interrupt: ReturnType<typeof vi.fn>
+      close: ReturnType<typeof vi.fn>
+    }
     expect(queryInstance.interrupt).toHaveBeenCalledOnce()
+    expect(queryInstance.close).toHaveBeenCalledOnce()
     await provider.dispose()
   })
 
@@ -5106,10 +5196,18 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.dispose()
   })
 
-  it('interrupts the live query even when currentTurn is already cleared', async () => {
+  it('detaches the live query even when currentTurn is already cleared', async () => {
     const activeQuery = createControllableQuery()
     activeQuery.interrupt.mockResolvedValue(undefined)
-    sdkMocks.query.mockReturnValue(activeQuery)
+    sdkMocks.query
+      .mockReturnValueOnce(activeQuery)
+      .mockReturnValueOnce(createAsyncQuery([
+        {
+          type: 'result',
+          session_id: 'claude-session-after-cancel',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        },
+      ]))
 
     const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
     const runtimeSession = createRuntimeSession()
@@ -5141,13 +5239,22 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     await provider.cancelTurn({ runtimeSession, profile: createProfile() })
     expect(activeQuery.interrupt).toHaveBeenCalledOnce()
-    expect(activeQuery.close).not.toHaveBeenCalled()
+    expect(activeQuery.close).toHaveBeenCalledOnce()
 
-    activeQuery.close()
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-claude-agent-after-cancel',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Build a fresh query'),
+      workspaceId: 'workspace-1',
+    })) {
+      // Drain stream.
+    }
+    expect(sdkMocks.query).toHaveBeenCalledTimes(2)
     await provider.dispose()
   })
 
-  it('keeps the live query active after interrupt acknowledgement until the native terminal', async () => {
+  it('detaches the live query and releases submitted native inputs on cancel', async () => {
     const activeQuery = createControllableQuery()
     activeQuery.interrupt.mockResolvedValue({
       still_queued: ['queue-interrupt-native-item-1'],
@@ -5178,17 +5285,14 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await provider.cancelTurn({ runtimeSession, profile: createProfile() })
 
     expect(activeQuery.interrupt).toHaveBeenCalledOnce()
-    expect(activeQuery.close).not.toHaveBeenCalled()
-    expect(live.hasNativeInput!('queue-interrupt-native-item-1')).toBe(true)
-
-    activeQuery.close()
+    expect(activeQuery.close).toHaveBeenCalledOnce()
     await expect(pendingNext).resolves.toEqual(
       expect.objectContaining({ value: expect.objectContaining({ type: 'abort' }) }),
     )
     await provider.dispose()
   })
 
-  it('keeps the live query when a terminal result settles during interrupt', async () => {
+  it('settles cancel without awaiting a wedged interrupt', async () => {
     const activeQuery = createControllableQuery()
     let resolveInterrupt: ((value: { still_queued: string[] }) => void) | undefined
     activeQuery.interrupt.mockImplementation(() => new Promise((resolve) => {
@@ -5218,36 +5322,16 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     const cancelPromise = provider.cancelTurn({ runtimeSession, profile: createProfile() })
     await vi.waitFor(() => expect(activeQuery.interrupt).toHaveBeenCalledOnce())
-
-    // The native terminal, not the interrupt acknowledgement, settles the turn.
-    activeQuery.push({
-      type: 'assistant',
-      uuid: randomUUID(),
-      session_id: 'claude-session-interrupt-settled',
-      message: {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'done' }],
-      },
-      parent_tool_use_id: null,
-    })
-    activeQuery.push({
-      type: 'result',
-      subtype: 'success',
-      uuid: randomUUID(),
-      session_id: 'claude-session-interrupt-settled',
-      usage: { input_tokens: 1, output_tokens: 1 },
-    })
+    await cancelPromise
     const chunks = await drainPromise
 
-    resolveInterrupt!({ still_queued: [] })
-    await cancelPromise
-
-    expect(activeQuery.close).not.toHaveBeenCalled()
-    expect(chunks).toContainEqual(expect.objectContaining({ type: 'finish' }))
+    expect(resolveInterrupt).toBeDefined()
+    expect(activeQuery.close).toHaveBeenCalledOnce()
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'abort', reason: 'user' }))
     await provider.dispose()
   })
 
-  it('surfaces an interrupt failure without closing the live query', async () => {
+  it('ignores an interrupt failure after detaching the live query', async () => {
     const activeQuery = createControllableQuery()
     activeQuery.interrupt.mockRejectedValue(new Error('interrupt transport down'))
     sdkMocks.query.mockReturnValue(activeQuery)
@@ -5267,14 +5351,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
     await expect(readPromptText(0)).resolves.toBe('Initial task')
 
-    await expect(provider.cancelTurn({ runtimeSession, profile: createProfile() })).rejects.toThrow(
-      'interrupt transport down',
-    )
+    await expect(provider.cancelTurn({ runtimeSession, profile: createProfile() })).resolves.toBeUndefined()
 
     expect(activeQuery.interrupt).toHaveBeenCalledOnce()
-    expect(activeQuery.close).not.toHaveBeenCalled()
+    expect(activeQuery.close).toHaveBeenCalledOnce()
 
-    activeQuery.close()
     await pendingNext
     await provider.dispose()
   })

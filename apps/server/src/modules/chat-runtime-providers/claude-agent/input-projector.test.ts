@@ -18,8 +18,9 @@ describe('readClaudeAgentPermissionMode', () => {
     })).toBe('default')
   })
 
-  it('falls back to bypass permissions when unset', () => {
-    expect(readClaudeAgentPermissionMode({})).toBe('bypassPermissions')
+  it('falls back to default permissions when unset or unrecognized', () => {
+    expect(readClaudeAgentPermissionMode({})).toBe('default')
+    expect(readClaudeAgentPermissionMode({ permissionMode: 'dontAsk' })).toBe('default')
   })
 })
 

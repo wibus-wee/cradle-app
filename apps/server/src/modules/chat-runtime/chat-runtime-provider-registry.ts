@@ -91,6 +91,20 @@ export class RuntimeRegistry {
     return this.runtimes.get(runtimeKind)?.runtime
   }
 
+  async disposeAll(): Promise<void> {
+    for (const entry of this.runtimes.values()) {
+      try {
+        await entry.runtime.dispose?.()
+      }
+      catch (error) {
+        createChildLogger({ module: 'chat-runtime-provider' }).warn('runtime dispose failed', {
+          error,
+          runtimeKind: entry.runtime.runtimeKind,
+        })
+      }
+    }
+  }
+
   unregister(runtimeKind: RuntimeKind, pluginOwner: string): void {
     const entry = this.runtimes.get(runtimeKind)
     if (entry?.pluginOwner === pluginOwner) {

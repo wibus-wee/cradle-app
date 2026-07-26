@@ -15,7 +15,7 @@ export function readClaudeAgentPermissionMode(
   if (typeof mode === 'string' && (CLAUDE_AGENT_PERMISSION_MODES as readonly string[]).includes(mode)) {
     return mode as ClaudeAgentPermissionMode
   }
-  return 'bypassPermissions'
+  return 'default'
 }
 
 export function readClaudeAgentAllowDangerouslySkipPermissions(

@@ -9,6 +9,8 @@ import { readObjectRecord as readRecord } from '../../../../helpers/json-record'
 
 export type ClaudeWorkflowExecutionStatus = 'running' | 'completed' | 'failed' | 'stopped'
 
+const CLAUDE_WORKFLOW_LIFECYCLE_LIMIT = 20
+
 export interface ClaudeWorkflowInputRecord {
   script: string | null
   name: string | null
@@ -282,7 +284,7 @@ function mergeClaudeWorkflowLifecycle(
       merged.push(item)
     }
   }
-  return merged
+  return merged.slice(-CLAUDE_WORKFLOW_LIFECYCLE_LIMIT)
 }
 
 function mergeRawOutput(
@@ -313,7 +315,7 @@ function mergeRawLifecycle(
       merged.push(item)
     }
   }
-  return merged
+  return merged.slice(-CLAUDE_WORKFLOW_LIFECYCLE_LIMIT)
 }
 
 function readClaudeWorkflowLifecycleRecord(value: unknown): ClaudeWorkflowLifecycleRecord | null {

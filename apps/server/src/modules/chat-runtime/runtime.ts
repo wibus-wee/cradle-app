@@ -287,6 +287,21 @@ function observeStaleActiveRunCompletion(activeRun: ActiveRun, fence: Parameters
 SessionService.onSessionArchived(releaseSideConversationsByParentSessionId)
 SessionService.onSessionCleanup(releaseSideConversationsByParentSessionId)
 
+function disposeRuntimeSessionResources(sessionId: string): void {
+  const registry = getRuntimeRegistry()
+  for (const item of registry.list()) {
+    const runtime = registry.get(item.runtimeKind)
+    // Session-scoped disposal is a server-local extension, not a runtime contract capability.
+    const disposeSession = (runtime as { disposeSession?: (id: string) => Promise<void> } | undefined)?.disposeSession
+    if (disposeSession) {
+      void disposeSession.call(runtime, sessionId)
+    }
+  }
+}
+
+SessionService.onSessionArchived(disposeRuntimeSessionResources)
+SessionService.onSessionCleanup(disposeRuntimeSessionResources)
+
 function publishRunChunk(runId: string, chunk: UIMessageChunk): void {
   const activeRun = runRegistry.getActiveRun(runId)
   if (!activeRun || activeRun.terminalStatus) {
