@@ -180,7 +180,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 067  | Enforce Cradle's hard tool-call denies via PreToolUse hook in every permission mode | P1 | M | 065 | DONE |
 | 068  | Split claude-agent provider.ts into an owner directory + declaration-extractor re-justification | P2 | L | 065, 066, 067 | TODO |
 | 069  | Demote the claude-agent state snapshot to a checkpoint; rebuild the UI activity feed from authoritative history | P2 | XL | 065, 066 (coordinate with 050, 061) | TODO |
-| 070  | Test the Claude Agent provider against the real wire via a shared model-api-simulator harness | P1 | L | 065, 066 | TODO |
+| 070  | Test the Claude Agent provider against the real wire via a shared model-api-simulator harness | P1 | L | 065, 066 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

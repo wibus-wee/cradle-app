@@ -112,6 +112,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cradle/model-api-simulator": "workspace:*",
     "@electron/rebuild": "4.0.4",
     "@hey-api/openapi-ts": "^0.97.1",
     "@octokit/types": "^16.0.0",

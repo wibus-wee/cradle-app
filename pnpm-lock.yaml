@@ -721,6 +721,9 @@ importers:
         specifier: ^4.3.6
         version: 4.4.3
     devDependencies:
+      '@cradle/model-api-simulator':
+        specifier: workspace:*
+        version: link:../../packages/model-api-simulator
       '@electron/rebuild':
         specifier: 4.0.4
         version: 4.0.4

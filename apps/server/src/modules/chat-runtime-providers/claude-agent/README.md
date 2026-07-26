@@ -58,6 +58,10 @@ The long-lived SDK query may continue emitting messages after the parent Cradle 
 
 Claude SDK `TodoWrite` remains a Claude-owned tool, but the adapter also projects the latest normalized todo list into the Claude Agent provider snapshot and exposes it as the runtime-neutral `progress` UI slot. Claude SDK `TaskCreate`, `TaskUpdate`, and `TaskList` also feed the same progress slot when the SDK provides structured task input/output such as `tool_use_result`; the adapter does not parse human-facing task result strings for IDs. The tool result payload still carries `result.pluginState.todos` for TodoWrite transcript rendering; the provider snapshot is the source for composer-adjacent live progress state.
 
+## Testing
+
+Unit tests with a fake SDK `query` factory own provider-local construction and projection assertions: query options, effort mapping, MCP servers, Skills, and snapshot writers. Tests under `integration/` use one shared model API simulator and the real bundled Claude CLI for behavior that crosses the SDK/process/wire boundary: history payloads, permission gating, cancel teardown, project settings, and HTTP request shapes. New scheduling or lifecycle claims belong in integration tests unless the test is explicitly limited to provider-local state.
+
 ## Files
 
 - `provider.ts`: Claude Agent `ChatRuntime` implementation; starts or resumes long-lived SDK sessions, resolves agent-scoped runtime cwd, projects SDK session titles to Chat Runtime, forwards MCP servers, streams turns, routes active SubAgent child chunks and approvals through provider-thread events, and handles native live steer, UUID-keyed submitted inputs, interrupt/cancel facts, context usage reads, session title generation, and Cradle runtime settings updates through SDK permission mode projection.
