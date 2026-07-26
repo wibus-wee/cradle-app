@@ -15,6 +15,7 @@
 
 ## Status
 
+- **Execution**: BLOCKED — the SDK transcript defaults to 30-day cleanup and omits provider activity facts needed for a lossless cold rebuild. Re-plan the activity feed over normalized Cradle `session_events`; transcripts may remain optional provider artifacts, not authority.
 - **Priority**: P2
 - **Effort**: XL
 - **Risk**: HIGH

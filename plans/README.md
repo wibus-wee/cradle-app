@@ -179,7 +179,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 066  | Make the long-lived Claude Query the authority for history and live config | P0 | M | 065 | DONE |
 | 067  | Enforce Cradle's hard tool-call denies via PreToolUse hook in every permission mode | P1 | M | 065 | DONE |
 | 068  | Split claude-agent provider.ts into an owner directory + declaration-extractor re-justification | P2 | L | 065, 066, 067 | DONE |
-| 069  | Demote the claude-agent state snapshot to a checkpoint; rebuild the UI activity feed from authoritative history | P2 | XL | 065, 066 (coordinate with 050, 061) | TODO |
+| 069  | Demote the claude-agent state snapshot to a checkpoint; rebuild the UI activity feed from authoritative history | P2 | XL | 065, 066 (coordinate with 050, 061) | BLOCKED (SDK transcripts are pruned and omit provider activity facts; re-plan over Cradle `session_events`) |
 | 070  | Test the Claude Agent provider against the real wire via a shared model-api-simulator harness | P1 | L | 065, 066 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
@@ -288,7 +288,7 @@ splitting until this track is stable.
 - 066 requires 065: both rewrite the `streamTurn` prologue; 066's excerpts are pre-065 and must be re-located by symbol name after 065 lands.
 - 067 requires 065: it assumes the Query starts in the user's real permission mode and adds mode-independent denies on top.
 - 068 requires 065-067: splitting `provider.ts` first would force the three behavior plans through a moving target.
-- 069 requires 065 and 066 (it restructures the snapshot and streamTurn code they patch, and reuses 065's caps as checkpoint bounds); its Phase B read-path work assumes the event-history authority that Plans 050/061 establish — if those have not landed, execute Phase A only.
+- 069 is blocked: the SDK transcript defaults to 30-day cleanup and omits permission, auth, rate-limit, and task lifecycle facts, so it cannot be the cold-read authority. Re-plan durable Claude activity as normalized Cradle `session_events`; keep transcripts as optional provider artifacts.
 - 070 requires 065 and 066 (its integration specs assert the fixed behavior; landing them earlier would pin the bugs as green). Its Step 1 is a feasibility gate — if the bundled CLI cannot run against the simulator offline, the plan stops at "keep unit tests" and reports.
 - 042 follows 040 and removes Automation's remaining raw-fetch/auth exception; its authentication bypass can make the entire feature return 401, so execute this P0 first.
 - 043 follows 040 and centralizes Draft state/transport transitions; it is independent of 042 and may run in parallel in an isolated worktree.
