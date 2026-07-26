@@ -67,6 +67,7 @@ import { providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
+import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
@@ -245,6 +246,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(kanban)
   app.use(linkPreview)
   app.use(search)
+  app.use(recall)
   app.use(createPluginsModule({ downloadCenter: downloadCenter.service }))
   app.use(skills)
   app.use(workflowRules)

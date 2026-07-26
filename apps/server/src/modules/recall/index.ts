@@ -3,17 +3,25 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import { registerChatRuntimeReadModelProjector } from '../chat-runtime/read-model-projectors'
 import * as Session from '../session/service'
 import { executeRecallAttune } from './attune-evaluator'
 import { requestAttunement, resolveAttunementRequest } from './attune-service'
 import { executeRecallQuery } from './evaluator'
 import { RecallModel } from './model'
-import { rebuildRecallProjection } from './service'
+import {
+  projectRecallMessage,
+  projectRecallRun,
+  projectRecallToolEvent,
+  rebuildRecallProjection,
+} from './service'
 
 const AttuneIntentSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('remember'), content: z.string().min(1), evidenceIds: z.array(z.string().min(1)).min(1) }),
   z.object({ operation: z.literal('forget'), id: z.string().min(1) }),
 ])
+
+let recallProjectorRegistered = false
 
 function recallContext(chatSessionId: string) {
   const session = Session.get(chatSessionId)
@@ -46,7 +54,10 @@ export const recall = new Elysia({
     const context = recallContext(body.chatSessionId)
     const outcome = await executeRecallAttune({ context, code: body.code })
     if (outcome.kind !== 'completed') {
-      throw new AppError({ code: 'recall_attune_program_invalid', status: 400, message: outcome.error ?? 'Attune program did not complete.' })
+      const message = outcome.kind === 'timeout' || outcome.kind === 'check-passed'
+        ? 'Attune program did not complete.'
+        : outcome.error
+      throw new AppError({ code: 'recall_attune_program_invalid', status: 400, message })
     }
     return requestAttunement({ context, intent: AttuneIntentSchema.parse(outcome.result) })
   },
@@ -66,6 +77,14 @@ export const recall = new Elysia({
 )
 
 export function initializeRecallProjection(): void {
+  if (!recallProjectorRegistered) {
+    registerChatRuntimeReadModelProjector({
+      projectMessage: projectRecallMessage,
+      projectRun: projectRecallRun,
+      projectRunSnapshotEvent: projectRecallToolEvent,
+    })
+    recallProjectorRegistered = true
+  }
   db().transaction((tx) => {
     rebuildRecallProjection(tx)
   })

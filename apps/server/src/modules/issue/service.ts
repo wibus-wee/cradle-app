@@ -1453,7 +1453,7 @@ export type IssueRelationCounterpart = {
   number: number
   title: string
   statusId: string | null
-  priority: string
+  priority: Issue['priority']
 }
 
 export type IssueRelationView = IssueRelation & {

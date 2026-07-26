@@ -17,7 +17,7 @@ import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { OBSERVABILITY_CODES } from '../observability/contract'
 import * as Observability from '../observability/service'
-import { projectRecallToolEvent } from '../recall/public'
+import { projectChatRuntimeRunSnapshotEventReadModels } from './read-model-projectors'
 
 const logger = createChildLogger({ module: 'chat-runtime.run-snapshot' })
 
@@ -229,7 +229,7 @@ export function appendRunSnapshotEvent(
   try {
     const d = db()
     d.insert(backendRunSnapshotEvents).values(row).run()
-    projectRecallToolEvent(d, { sourceEventId: row.id })
+    projectChatRuntimeRunSnapshotEventReadModels(d, { sourceEventId: row.id })
     return toChatRunSnapshotEvent(row as BackendRunSnapshotEvent)
   }
  catch (error) {
@@ -257,7 +257,7 @@ export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPaylo
       .where(eq(backendRunSnapshotEvents.id, input.eventId))
       .run()
     if (result.changes > 0) {
-      projectRecallToolEvent(d, { sourceEventId: input.eventId })
+      projectChatRuntimeRunSnapshotEventReadModels(d, { sourceEventId: input.eventId })
     }
   }
  catch (error) {

@@ -8,7 +8,6 @@ import {
 } from '@cradle/db'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
-import { projectRecallMessage, projectRecallRun } from '../../recall/public'
 import { applyPlanImplementationApprovalResponse } from '../interaction/plan-implementation-message'
 import {
   messagePayloadJoinCondition,
@@ -17,6 +16,10 @@ import {
 } from '../message-payload-store'
 import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import { normalizeQueueItemRuntimeSettingsJson } from '../queue/session-queue'
+import {
+  projectChatRuntimeMessageReadModels,
+  projectChatRuntimeRunReadModels,
+} from '../read-model-projectors'
 import type { ChatMessageStatus } from '../run/stream-chunks'
 import { parseStoredMessageSnapshot } from '../stream/projection'
 import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
@@ -52,7 +55,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
     case 'UserMessageAppended':
     case 'MessageImported':
       d.insert(messages).values(toMessageProjectionValues(event.payload.message)).run()
-      projectRecallMessage(d, { messageId: event.payload.message.id })
+      projectChatRuntimeMessageReadModels(d, { messageId: event.payload.message.id })
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'RunStarted':
@@ -84,7 +87,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
         }
       }
       d.insert(backendRuns).values(event.payload.run).run()
-      projectRecallRun(d, { runId: event.payload.run.id })
+      projectChatRuntimeRunReadModels(d, { runId: event.payload.run.id })
       if (event.payload.queueItemId) {
         projectQueueItemClaimed(d, {
           queueItemId: event.payload.queueItemId,
@@ -109,14 +112,14 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
           ),
         )
         .run()
-      projectRecallMessage(d, { messageId: event.payload.message.id })
+      projectChatRuntimeMessageReadModels(d, { messageId: event.payload.message.id })
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'RunCompleted':
     case 'RunFailed':
     case 'RunAborted':
       projectRunTerminal(d, event.payload)
-      projectRecallRun(d, { runId: event.payload.runId })
+      projectChatRuntimeRunReadModels(d, { runId: event.payload.runId })
       break
     case 'InteractionRequested':
     case 'InteractionResolved':
@@ -161,7 +164,7 @@ export function projectChatSessionEvent(d: ProjectorDb, event: ChatSessionEvent)
       break
     case 'SteerApplied':
       d.insert(messages).values(toMessageProjectionValues(event.payload.message)).run()
-      projectRecallMessage(d, { messageId: event.payload.message.id, isMeta: true })
+      projectChatRuntimeMessageReadModels(d, { messageId: event.payload.message.id, isMeta: true })
       touchSession(d, event.payload.message.sessionId, event.payload.message.updatedAt)
       break
     case 'LastTurnRolledBack':

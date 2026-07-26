@@ -5,6 +5,7 @@ export const SERVER_BOOTSTRAP_PHASES = [
   'database-migration',
   'database-maintenance',
   'persisted-run-recovery',
+  'recall-projection',
   'service-initialization',
   'plugin-activation',
   'listener-establishment',
