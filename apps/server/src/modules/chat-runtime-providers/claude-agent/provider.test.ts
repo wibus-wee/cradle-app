@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type {
-  AccountInfo,
   CanUseTool,
   SDKControlGetContextUsageResponse,
 } from '@anthropic-ai/claude-agent-sdk'
@@ -16,12 +15,19 @@ import { liveRuntimeSessionRegistry } from '../../chat-runtime/runtime-live-sess
 import type {
   ProviderSyntheticTurnEvent,
   ProviderThreadEvent,
-  RuntimeProviderTargetProfile,
-  RuntimeSession,
   RuntimeToolApprovalRequest,
   RuntimeUserInputRequest,
 } from '../../chat-runtime/runtime-provider-types'
 import { ClaudeAgentProvider } from './provider'
+import {
+  createAsyncQuery,
+  createContextUsageResponse,
+  createPendingQuery,
+  createProfile,
+  createResumedRuntimeSession,
+  createRuntimeSession,
+  createUserMessage,
+} from './test-kit'
 
 const sdkMocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -38,94 +44,6 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   listSubagents: sdkMocks.listSubagents,
   renameSession: sdkMocks.renameSession,
 }))
-
-function createAsyncQuery(
-  items: unknown[],
-  commands: Array<{
-    name: string
-    description: string
-    argumentHint: string
-    aliases?: string[]
-  }> = [],
-  account: AccountInfo = {},
-) {
-  let index = 0
-  let done = false
-  return {
-    [Symbol.asyncIterator]() {
-      return this
-    },
-    async next() {
-      if (done || index >= items.length) {
-        return { done: true as const, value: undefined }
-      }
-      const value = items[index]
-      index += 1
-      return { done: false as const, value }
-    },
-    async return() {
-      done = true
-      return { done: true as const, value: undefined }
-    },
-    close: vi.fn(),
-    interrupt: vi.fn(),
-    setModel: vi.fn().mockResolvedValue(undefined),
-    setPermissionMode: vi.fn().mockResolvedValue(undefined),
-    supportedCommands: vi.fn().mockResolvedValue(commands),
-    getContextUsage: vi.fn().mockResolvedValue(createContextUsageResponse()),
-    initializationResult: vi.fn().mockResolvedValue({
-      commands,
-      agents: [],
-      output_style: 'default',
-      available_output_styles: ['default'],
-      models: [],
-      account,
-    }),
-  }
-}
-
-function createPendingQuery(
-  contextUsage: SDKControlGetContextUsageResponse = createContextUsageResponse(),
-) {
-  let resolveNext: (() => void) | null = null
-  let closed = false
-  return {
-    [Symbol.asyncIterator]() {
-      return this
-    },
-    async next() {
-      if (closed) {
-        return { done: true as const, value: undefined }
-      }
-      await new Promise<void>((resolve) => {
-        resolveNext = resolve
-      })
-      return { done: true as const, value: undefined }
-    },
-    async return() {
-      closed = true
-      resolveNext?.()
-      return { done: true as const, value: undefined }
-    },
-    close: vi.fn(() => {
-      closed = true
-      resolveNext?.()
-    }),
-    interrupt: vi.fn().mockResolvedValue(undefined),
-    setModel: vi.fn().mockResolvedValue(undefined),
-    setPermissionMode: vi.fn().mockResolvedValue(undefined),
-    supportedCommands: vi.fn().mockResolvedValue([]),
-    getContextUsage: vi.fn().mockResolvedValue(contextUsage),
-    initializationResult: vi.fn().mockResolvedValue({
-      commands: [],
-      agents: [],
-      output_style: 'default',
-      available_output_styles: ['default'],
-      models: [],
-      account: {},
-    }),
-  }
-}
 
 function createControllableQuery(
   contextUsage: SDKControlGetContextUsageResponse = createContextUsageResponse(),
@@ -296,46 +214,6 @@ function deferred<T>(): { promise: Promise<T>, resolve: (value: T) => void } {
   return { promise, resolve }
 }
 
-function createContextUsageResponse(
-  overrides: Partial<SDKControlGetContextUsageResponse> = {},
-): SDKControlGetContextUsageResponse {
-  return {
-    categories: [
-      { name: 'System prompt', tokens: 100, color: '#2563eb' },
-      { name: 'Messages', tokens: 250, color: '#16a34a' },
-      { name: 'Unclassified provider payload', tokens: 17, color: '#71717a' },
-    ],
-    totalTokens: 367,
-    maxTokens: 200_000,
-    rawMaxTokens: 200_000,
-    percentage: 0.1835,
-    gridRows: [],
-    model: 'claude-sonnet-4-20250514',
-    memoryFiles: [{ path: '/tmp/CLAUDE.md', type: 'project', tokens: 42 }],
-    mcpTools: [{ name: 'search', serverName: 'browser', tokens: 11, isLoaded: true }],
-    agents: [],
-    isAutoCompactEnabled: true,
-    messageBreakdown: {
-      toolCallTokens: 7,
-      toolResultTokens: 13,
-      attachmentTokens: 0,
-      assistantMessageTokens: 150,
-      userMessageTokens: 100,
-      redirectedContextTokens: 0,
-      unattributedTokens: 5,
-      toolCallsByType: [{ name: 'Read', callTokens: 3, resultTokens: 4 }],
-      attachmentsByType: [],
-    },
-    apiUsage: {
-      input_tokens: 367,
-      output_tokens: 21,
-      cache_creation_input_tokens: 0,
-      cache_read_input_tokens: 0,
-    },
-    ...overrides,
-  }
-}
-
 function readQueryOptions(callIndex: number): Record<string, unknown> {
   const call = sdkMocks.query.mock.calls[callIndex]?.[0] as
     | { options?: Record<string, unknown> }
@@ -386,59 +264,6 @@ async function readPromptContent(callIndex: number): Promise<unknown> {
   const result = await prompt![Symbol.asyncIterator]().next()
   expect(result.done).toBe(false)
   return result.value.message.content
-}
-
-function createProfile(config: Record<string, unknown> = {}): RuntimeProviderTargetProfile {
-  return {
-    id: 'profile-claude',
-    name: 'Claude Agent',
-    providerKind: 'anthropic',
-    enabled: true,
-    configJson: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      permissionMode: 'bypassPermissions',
-      ...config,
-    }),
-    credentialRef: 'credential-claude',
-    customModels: '[]',
-    iconSlug: null,
-    providerTargetKind: 'manual',
-    providerTargetId: 'profile-claude',
-  }
-}
-
-function createRuntimeSession(): RuntimeSession {
-  return {
-    id: 'runtime-session-1',
-    chatSessionId: 'chat-session-1',
-    providerTargetId: 'profile-claude',
-    runtimeKind: 'claude-agent',
-    providerSessionId: null,
-    providerStateSnapshot: JSON.stringify({
-      workspacePath: '/tmp/cradle-workspace',
-      models: { currentModelId: null },
-    }),
-  }
-}
-
-function createResumedRuntimeSession(overrides: Partial<RuntimeSession> = {}): RuntimeSession {
-  return {
-    ...createRuntimeSession(),
-    providerSessionId: 'claude-session-1',
-    providerStateSnapshot: JSON.stringify({
-      workspacePath: '/tmp/cradle-workspace',
-      models: { currentModelId: 'claude-sonnet-4-20250514' },
-    }),
-    ...overrides,
-  }
-}
-
-function createUserMessage(text: string): UIMessage {
-  return {
-    id: `user-${text}`,
-    role: 'user',
-    parts: [{ type: 'text', text }],
-  }
 }
 
 function createBangCommandMessage(command: string): UIMessage {
@@ -779,64 +604,6 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe('auth-token-test')
     expect(env.ANTHROPIC_BASE_URL).toBe('https://ark.cn-beijing.volces.com/api/coding')
     expect(env).not.toHaveProperty('ANTHROPIC_API_KEY')
-  })
-
-  it('lists Claude Agent subagent provider threads from SDK transcripts', async () => {
-    sdkMocks.listSubagents.mockResolvedValue(['agent-a'])
-    sdkMocks.getSubagentMessages.mockResolvedValue([
-      {
-        type: 'assistant',
-        uuid: 'msg-subagent-1',
-        session_id: 'claude-session-1',
-        parent_tool_use_id: 'call_agent_1',
-        timestamp: '2026-06-24T05:26:56.810Z',
-        subagent_type: 'general-purpose',
-        task_description: 'Inspect the runtime logs',
-        message: {
-          role: 'assistant',
-          model: 'claude-sonnet-4-20250514',
-          content: [{ type: 'text', text: 'Subagent report' }],
-        },
-      },
-    ])
-
-    const provider = new ClaudeAgentProvider({
-      readSecret: () => 'sk-ant-test',
-    })
-
-    await expect(
-      provider.listProviderThreads({
-        runtimeSession: createResumedRuntimeSession(),
-        profile: createProfile(),
-        workspaceId: 'workspace-1',
-        workspacePath: '/tmp/cradle-workspace',
-      }),
-    ).resolves.toMatchObject({
-      runtimeKind: 'claude-agent',
-      providerSessionId: 'claude-session-1',
-      threads: [
-        {
-          id: 'call_agent_1',
-          providerSessionTreeId: 'claude-session-1',
-          forkedFromId: 'call_agent_1',
-          preview: 'Subagent report',
-          sourceKind: 'subAgent',
-          source: expect.objectContaining({
-            agentId: 'agent-a',
-            parentToolUseId: 'call_agent_1',
-          }),
-          agentNickname: 'general-purpose',
-          agentRole: 'Inspect the runtime logs',
-          modelProvider: 'claude-sonnet-4-20250514',
-        },
-      ],
-    })
-    expect(sdkMocks.listSubagents).toHaveBeenCalledWith('claude-session-1', {
-      dir: '/tmp/cradle-workspace',
-    })
-    expect(sdkMocks.getSubagentMessages).toHaveBeenCalledWith('claude-session-1', 'agent-a', {
-      dir: '/tmp/cradle-workspace',
-    })
   })
 
   it('reads Claude Agent subagent turns by parent tool-call id alias', async () => {
@@ -1606,45 +1373,6 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     activeQuery.close()
     await pendingNext
-  })
-
-  it('registers active queries for idle runtime settings propagation', async () => {
-    const activeQuery = createPendingQuery()
-    sdkMocks.query.mockReturnValue(activeQuery)
-
-    const provider = new ClaudeAgentProvider({
-      readSecret: () => 'sk-ant-test',
-    })
-    const runtimeSession = createRuntimeSession()
-    const stream = provider.streamTurn({
-      runId: 'run-claude-agent-live-registry',
-      runtimeSession,
-      profile: createProfile(),
-      message: createUserMessage('Keep query alive'),
-      workspaceId: 'workspace-1',
-      providerOptions: {
-        runtimeSettings: { permissionMode: 'plan' },
-      },
-    })
-    const pendingNext = stream.next()
-
-    await vi.waitFor(() => {
-      expect(sdkMocks.query).toHaveBeenCalledOnce()
-    })
-
-    const liveRuntimeSession = liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)
-    expect(liveRuntimeSession).toBeDefined()
-    expect(liveRuntimeSession?.readRuntimeSession()).toBe(runtimeSession)
-
-    await liveRuntimeSession!.updateRuntimeSettings({
-      permissionMode: 'bypassPermissions',
-    })
-
-    expect(activeQuery.setPermissionMode).toHaveBeenCalledWith('bypassPermissions')
-
-    activeQuery.close()
-    await pendingNext
-    expect(liveRuntimeSessionRegistry.read(runtimeSession.chatSessionId)).toBeUndefined()
   })
 
   it('closes a session query when its session is archived or cleaned up', async () => {
@@ -6194,20 +5922,6 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     }
   })
 
-  it('returns null context usage when no Claude Agent query is active', async () => {
-    const provider = new ClaudeAgentProvider({
-      readSecret: () => 'sk-ant-test',
-    })
-
-    await expect(
-      provider.getContextUsage({
-        runtimeSession: createRuntimeSession(),
-        profile: createProfile(),
-        workspacePath: '/tmp/cradle-workspace',
-      }),
-    ).resolves.toBeNull()
-  })
-
   it('keeps context usage and compact slot state available after a fast Claude Agent stream ends', async () => {
     const provider = new ClaudeAgentProvider({
       readSecret: () => 'sk-ant-test',
@@ -6267,69 +5981,5 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       }),
     ])
     expect(activeQuery.getContextUsage).toHaveBeenCalledOnce()
-  })
-
-  it('emits only final assistant usage events', async () => {
-    const provider = new ClaudeAgentProvider({
-      readSecret: () => 'sk-ant-test',
-    })
-
-    const activeQuery = createAsyncQuery([
-      {
-        type: 'stream_event',
-        event: { type: 'message_delta', usage: { input_tokens: 100, output_tokens: 50 } },
-        session_id: 'claude-session-1',
-      },
-      {
-        type: 'assistant',
-        session_id: 'claude-session-1',
-        message: {
-          id: 'msg-final',
-          model: 'claude-opus-4-8',
-          content: [{ type: 'text', text: 'Hello' }],
-          usage: { input_tokens: 0, output_tokens: 0 },
-        },
-      },
-      {
-        type: 'assistant',
-        session_id: 'claude-session-1',
-        message: {
-          id: 'msg-final',
-          model: 'claude-opus-4-8',
-          content: [{ type: 'text', text: 'Hello' }],
-          usage: { input_tokens: 100, output_tokens: 50 },
-        },
-      },
-      {
-        type: 'result',
-        usage: { input_tokens: 100, output_tokens: 50 },
-        session_id: 'claude-session-1',
-      },
-    ])
-    sdkMocks.query.mockReturnValue(activeQuery)
-    const usageEvents: unknown[] = []
-
-    const chunks: UIMessageChunk[] = []
-    for await (const chunk of provider.streamTurn({
-      runId: 'run-test',
-      runtimeSession: createRuntimeSession(),
-      profile: createProfile(),
-      message: { id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Test' }] },
-      workspaceId: 'workspace-1',
-      onUsageEvent: (event) => { usageEvents.push(event) },
-    })) {
-      chunks.push(chunk)
-    }
-
-    expect(chunks).toContainEqual(expect.objectContaining({ type: 'finish' }))
-
-    expect(usageEvents).toEqual([
-      expect.objectContaining({
-        providerThreadId: 'claude-session-1',
-        providerTurnId: 'msg-final',
-        modelId: 'claude-opus-4-8',
-        usage: expect.objectContaining({ totalTokens: 150 }),
-      }),
-    ])
   })
 })

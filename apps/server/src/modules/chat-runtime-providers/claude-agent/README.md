@@ -64,7 +64,14 @@ Unit tests with a fake SDK `query` factory own provider-local construction and p
 
 ## Files
 
-- `provider.ts`: Claude Agent `ChatRuntime` implementation; starts or resumes long-lived SDK sessions, resolves agent-scoped runtime cwd, projects SDK session titles to Chat Runtime, forwards MCP servers, streams turns, routes active SubAgent child chunks and approvals through provider-thread events, and handles native live steer, UUID-keyed submitted inputs, interrupt/cancel facts, context usage reads, session title generation, and Cradle runtime settings updates through SDK permission mode projection.
+- `provider.ts`: Thin Claude Agent `ChatRuntime` facade and owner of long-lived query lifecycle, turn streaming, native input, cancellation, and disposal.
+- `provider-internals.ts`: Shared provider-private lifecycle records passed explicitly to extracted owners.
+- `message-dispatch.ts`: Routes SDK session messages and command lifecycle events to active, provider-thread, and synthetic turn projections.
+- `projection/provider-thread-turns.ts`: Owns provider-thread and synthetic-turn creation, publication, completion, approval events, and usage projection.
+- `presentation.ts`: Owns slash-command presentation, runtime UI slot projection, context usage reads, and compact-state caching.
+- `live-settings.ts`: Synchronizes live query permission mode and ultracode settings with runtime settings.
+- `session-artifacts.ts`: Owns session titles, account snapshots, provider-thread filesystem reads, and transcript projection.
+- `quick-question.ts`: Runs isolated non-persistent quick questions through the SDK.
 - `sdk-augmentation.d.ts`: Narrow declaration merge for the real SDK `Query.cancelAsyncMessage()` method missing from 0.3.207 types.
 - `provider.test.ts`: Regression tests for Claude Agent SDK options, title projection, MCP forwarding, history projection, streaming, non-blocking input, native steer, UUID coalescing/cancellation, post-result projection Runs, attachments, model switching, and tool chunk mapping.
 - `metadata.ts`: Claude Agent runtime kind, catalog metadata, static capabilities, slash-command presentation projection, and static runtime UI slots. Slash commands are served from the live Query and replaced on `commands_changed`; only a session without a live Query spawns a short-lived Query for presentation discovery.
