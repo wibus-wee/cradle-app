@@ -224,7 +224,7 @@ describe('resolveFreshCodexChatgptAuthCredential', () => {
     })
     setCodexChatgptAuthRefreshFetchForTests(refresh)
 
-    const credentialRefs = Array.from({ length: 6 }).fill('credential-chatgpt')
+    const credentialRefs = Array.from({ length: 6 }, () => 'credential-chatgpt')
     const results = await Promise.all(credentialRefs.map(credentialRef => resolveFreshCodexChatgptAuthCredential({
       credentialRef,
       store: { readSecret: () => secret, updateSecretValue },
