@@ -676,6 +676,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           ANTHROPIC_API_KEY: 'sk-ant-test',
           CLAUDE_CONFIG_DIR: join(process.env.CRADLE_DATA_DIR!, 'runtimes', 'claude-agent'),
         }),
+        hooks: {
+          PreToolUse: [{ hooks: [expect.any(Function)] }],
+        },
       }),
     )
     expect(readQueryOptions(0).maxTurns).toBeUndefined()
@@ -3157,6 +3160,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     expect(capabilitiesQuery.supportedCommands).toHaveBeenCalledOnce()
     expect(capabilitiesQuery.close).toHaveBeenCalledOnce()
+    expect(readQueryOptions(0).hooks).toBeUndefined()
     const capabilitiesCall = sdkMocks.query.mock.calls[0]?.[0] as { prompt?: unknown } | undefined
     expect(typeof capabilitiesCall?.prompt).toBe('object')
     expect(

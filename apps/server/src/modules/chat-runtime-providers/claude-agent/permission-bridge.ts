@@ -4,7 +4,7 @@
  * Position: Provider-owned bridge between SDK canUseTool and Chat Runtime semantics.
  */
 
-import type { CanUseTool, Options, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool, HookCallback, Options, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 
 import type { GetCapabilitiesInput, ProviderContext, RuntimeSettings, StreamTurnInput } from '../../chat-runtime/runtime-provider-types'
 import { requireRuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
@@ -44,6 +44,44 @@ export function updateClaudeAgentPermissionBridgeState(
   state.runtimeInput = input.runtimeInput
   state.permissionMode = input.permissionMode
   state.runtimeSettings = input.runtimeSettings
+}
+
+export function createClaudeAgentPreToolUseHook(input: {
+  state: ClaudeAgentPermissionBridgeState
+}): HookCallback {
+  return async (hookInput) => {
+    if (hookInput.hook_event_name !== 'PreToolUse') {
+      return { continue: true }
+    }
+
+    if (isClaudeAgentExitPlanModeToolName(hookInput.tool_name)) {
+      return {
+        continue: true,
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: CLAUDE_EXIT_PLAN_MODE_CAPTURED_MESSAGE,
+        },
+      }
+    }
+
+    if (
+      hookInput.tool_name === 'AskUserQuestion'
+      && input.state.permissionMode === 'bypassPermissions'
+    ) {
+      return {
+        continue: true,
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason:
+            'AskUserQuestion is unavailable in bypassPermissions mode; ask the user in plain text instead.',
+        },
+      }
+    }
+
+    return { continue: true }
+  }
 }
 
 export function createClaudeAgentCanUseTool(input: {

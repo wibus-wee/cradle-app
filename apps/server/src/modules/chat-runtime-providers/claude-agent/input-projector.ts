@@ -39,6 +39,7 @@ import type {
 import {
   createClaudeAgentCanUseTool,
   createClaudeAgentPermissionBridgeState,
+  createClaudeAgentPreToolUseHook,
   updateClaudeAgentPermissionBridgeState,
 } from './permission-bridge'
 import {
@@ -286,6 +287,13 @@ export function buildClaudeQueryOptions(input: {
       state: permissionBridgeState,
       emitToolApprovalRequest: input.emitToolApprovalRequest,
     })
+    queryOptions.hooks = {
+      ...queryOptions.hooks,
+      PreToolUse: [
+        ...(queryOptions.hooks?.PreToolUse ?? []),
+        { hooks: [createClaudeAgentPreToolUseHook({ state: permissionBridgeState })] },
+      ],
+    }
   }
   if (shouldPersistSession && input.input.runtimeSession.providerSessionId) {
     queryOptions.resume = input.input.runtimeSession.providerSessionId
