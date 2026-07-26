@@ -537,13 +537,6 @@ export class ClaudeAgentProvider implements ChatRuntime {
       ? input.runtimeSession.providerSessionId
       : null
     const shouldResumeProviderSession = Boolean(resumedProviderSessionId)
-    const projectedUserContent = projectClaudeAgentInput(input.message, 'Claude Agent provider')
-    const userContent = buildClaudeAgentTurnContent({
-      userContent: projectedUserContent,
-      history: input.history,
-      historyScope: shouldResumeProviderSession ? 'recentCradleLocal' : 'full',
-    })
-    const userPromptText = describeClaudeAgentUserContent(userContent)
     const effectiveModel = readClaudeAgentModelId(input, config)
     const pendingModelSwitchId = readClaudeAgentPendingModelSwitchId(
       readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot),
@@ -559,6 +552,16 @@ export class ClaudeAgentProvider implements ChatRuntime {
       this.closeSessionQuery(sessionId, activeEntry)
       activeEntry = undefined
     }
+    const historyScope = (activeEntry || shouldResumeProviderSession)
+      ? 'recentCradleLocal' as const
+      : 'full' as const
+    const projectedUserContent = projectClaudeAgentInput(input.message, 'Claude Agent provider')
+    const userContent = buildClaudeAgentTurnContent({
+      userContent: projectedUserContent,
+      history: input.history,
+      historyScope,
+    })
+    const userPromptText = describeClaudeAgentUserContent(userContent)
     const turnPermissionMode: Options['permissionMode'] = readClaudeAgentPermissionMode(
       input.providerOptions?.runtimeSettings,
     )
@@ -572,17 +575,17 @@ export class ClaudeAgentProvider implements ChatRuntime {
     // otherwise create one for the new query. The sink must outlive the
     // pump loop so it can enrich the surfaced error when the process exits.
     const stderrSink = activeEntry?.stderrSink ?? createClaudeStderrSink()
-    const queryOptions = buildClaudeQueryOptions({
-      deps: this.deps,
-      input,
-      abortController,
-      attachPermissionHandler: true,
-      permissionBridgeState,
-      emitToolApprovalRequest: request =>
-        this.emitClaudeAgentToolApprovalRequest(sessionId, request),
-      onStderr: stderrSink.onStderr,
-    })
     if (!activeEntry) {
+      const queryOptions = buildClaudeQueryOptions({
+        deps: this.deps,
+        input,
+        abortController,
+        attachPermissionHandler: true,
+        permissionBridgeState,
+        emitToolApprovalRequest: request =>
+          this.emitClaudeAgentToolApprovalRequest(sessionId, request),
+        onStderr: stderrSink.onStderr,
+      })
       this.activePermissionModesBySession.set(sessionId, turnPermissionMode)
       const inputStream = new ClaudeAgentInputStream()
       const activeQuery = query({ prompt: inputStream, options: queryOptions })
@@ -759,7 +762,7 @@ export class ClaudeAgentProvider implements ChatRuntime {
     activeEntry.currentTurn = turn
 
     try {
-      if (shouldResumeProviderSession && pendingModelSwitchId) {
+      if (pendingModelSwitchId) {
         await activeEntry.query.setModel(
           pendingModelSwitchId === CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID
             ? undefined

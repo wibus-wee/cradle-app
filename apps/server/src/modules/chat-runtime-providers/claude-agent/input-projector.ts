@@ -232,7 +232,6 @@ export function buildClaudeQueryOptions(input: {
     cwd: runtimeContext.cwd,
     permissionMode,
     allowDangerouslySkipPermissions: readClaudeAgentAllowDangerouslySkipPermissions(runtimeSettings),
-    maxTurns: config.maxTurns,
     additionalDirectories: uniquePaths([
       ...runtimeContext.additionalDirectories,
       ...config.additionalDirectories,
@@ -417,7 +416,8 @@ function claudeAgentSettingSourcesForAuthMode(
       return ['user', 'project', 'local']
     case 'apiKey':
     default:
-      return []
+      // Keep user-global hooks and MCP servers isolated from custom credential-bearing endpoints.
+      return ['project', 'local']
   }
 }
 

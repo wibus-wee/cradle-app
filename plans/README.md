@@ -176,7 +176,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 063  | Eliminate Desktop-owned Server sockets with one multiplexed IPC transport | P0 | XL | 038, 040, 054 | TODO (M0 packaged Electron feasibility gate first; coordinate transport files with 061) |
 | 064  | Connect GitHub through the Cradle App and attribute PR actions to the user | P1 | L | current PR Console work reconciled | IN PROGRESS (implementation complete; real GitHub App acceptance pending) |
 | 065  | Make the Claude Agent SDK integration honest (permission modes, dispose, settle-on-cancel teardown, presentation, snapshot bounds) | P0 | L | — | DONE |
-| 066  | Make the long-lived Claude Query the authority for history and live config | P0 | M | 065 | TODO |
+| 066  | Make the long-lived Claude Query the authority for history and live config | P0 | M | 065 | DONE |
 | 067  | Enforce Cradle's hard tool-call denies via PreToolUse hook in every permission mode | P1 | M | 065 | TODO |
 | 068  | Split claude-agent provider.ts into an owner directory + declaration-extractor re-justification | P2 | L | 065, 066, 067 | TODO |
 | 069  | Demote the claude-agent state snapshot to a checkpoint; rebuild the UI activity feed from authoritative history | P2 | XL | 065, 066 (coordinate with 050, 061) | TODO |

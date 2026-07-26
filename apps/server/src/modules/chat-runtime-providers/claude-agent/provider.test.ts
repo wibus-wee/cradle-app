@@ -671,13 +671,14 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         permissionMode: 'default',
         allowDangerouslySkipPermissions: true,
         persistSession: true,
-        settingSources: [],
+        settingSources: ['project', 'local'],
         env: expect.objectContaining({
           ANTHROPIC_API_KEY: 'sk-ant-test',
           CLAUDE_CONFIG_DIR: join(process.env.CRADLE_DATA_DIR!, 'runtimes', 'claude-agent'),
         }),
       }),
     )
+    expect(readQueryOptions(0).maxTurns).toBeUndefined()
   })
 
   it('projects canonical Ultra to Claude SDK ultracode with xhigh effort', async () => {
@@ -3426,6 +3427,55 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     ).toBeUndefined()
   })
 
+  it('applies a pending model switch to a live claudeAi query without resume', async () => {
+    const activeQuery = createAsyncQuery([
+      {
+        type: 'assistant',
+        session_id: 'claude-ai-session-model-switch',
+        message: {
+          content: [{ type: 'text', text: 'Switched without resuming' }],
+        },
+      },
+      {
+        type: 'result',
+        session_id: 'claude-ai-session-model-switch',
+        usage: { input_tokens: 3, output_tokens: 2 },
+      },
+    ])
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => '' })
+    const profile = createProfile({ authMode: 'claudeAi' })
+    const runtimeSession = await provider.resumeChatSession({
+      runtimeSession: createRuntimeSession(),
+      profile,
+      workspacePath: '/tmp/cradle-workspace',
+      modelId: 'claude-opus-4-20250514',
+    })
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-claude-ai-model-switch',
+      runtimeSession,
+      profile,
+      message: createUserMessage('Switch the live query model'),
+      modelId: 'claude-opus-4-20250514',
+      workspaceId: 'workspace-1',
+    })) {
+      // Drain stream.
+    }
+
+    expect(activeQuery.setModel).toHaveBeenCalledWith('claude-opus-4-20250514')
+    expect(readQueryOptions(0)).toEqual(
+      expect.objectContaining({
+        persistSession: false,
+      }),
+    )
+    expect(readQueryOptions(0)).not.toHaveProperty('resume')
+    expect(
+      JSON.parse(runtimeSession.providerStateSnapshot!).claudeAgent?.pendingModelSwitchId,
+    ).toBeUndefined()
+  })
+
   it('does not call setModel when a resumed turn repeats the snapshot model override', async () => {
     const activeQuery = createAsyncQuery([
       {
@@ -3607,6 +3657,103 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     await provider.dispose()
     expect(activeQueries[0]?.close).toHaveBeenCalledOnce()
+  })
+
+  it('does not replay full history into an existing claudeAi query', async () => {
+    const prompts: unknown[] = []
+    sdkMocks.query.mockImplementation(
+      (call: { prompt?: AsyncIterable<{ message: { content: unknown } }> }) => {
+        expect(call.prompt).toBeDefined()
+        return createPromptDrivenQuery(
+          call.prompt!,
+          [
+            [
+              {
+                type: 'assistant',
+                session_id: 'claude-session-live-history',
+                message: { content: [{ type: 'text', text: 'First response' }] },
+              },
+              {
+                type: 'result',
+                session_id: 'claude-session-live-history',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+            ],
+            [
+              {
+                type: 'assistant',
+                session_id: 'claude-session-live-history',
+                message: { content: [{ type: 'text', text: 'Second response' }] },
+              },
+              {
+                type: 'result',
+                session_id: 'claude-session-live-history',
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+            ],
+          ],
+          prompts,
+        )
+      },
+    )
+
+    const provider = new ClaudeAgentProvider({ readSecret: () => '' })
+    const runtimeSession = createRuntimeSession()
+    const profile = createProfile({ authMode: 'claudeAi' })
+    const earlierUserMessage = createUserMessage('Conversation before the live query')
+    const earlierAssistantMessage: UIMessage = {
+      id: 'assistant-before-live-query',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Earlier response' }],
+    }
+    const firstMessage = createUserMessage('First task')
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-claude-agent-live-history-1',
+      runtimeSession,
+      profile,
+      message: firstMessage,
+      history: [earlierUserMessage, earlierAssistantMessage],
+      workspaceId: 'workspace-1',
+    })) {
+      // Drain the first turn.
+    }
+
+    for await (const _chunk of provider.streamTurn({
+      runId: 'run-claude-agent-live-history-2',
+      runtimeSession,
+      profile,
+      message: createUserMessage('Second task'),
+      history: [
+        earlierUserMessage,
+        earlierAssistantMessage,
+        firstMessage,
+        {
+          id: 'assistant-first-live-turn',
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'First response' }],
+        },
+      ],
+      workspaceId: 'workspace-1',
+    })) {
+      // Drain the second turn.
+    }
+
+    expect(sdkMocks.query).toHaveBeenCalledOnce()
+    expect(prompts).toEqual([
+      [
+        'Previous messages in this Cradle chat session:',
+        'User: Conversation before the live query',
+        '',
+        'Assistant: Earlier response',
+        '',
+        'Current user message:',
+        'First task',
+      ].join('\n'),
+      'Second task',
+    ])
+
+    await provider.dispose()
   })
 
   it('submits a reused-query turn while an earlier synthetic turn is still persisting', async () => {
