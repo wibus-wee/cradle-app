@@ -15,7 +15,7 @@ export function autoAnthropicResponse(
   controller: ScenarioController,
   observed: Omit<ObservedRequest, 'index'>,
 ): Response {
-  const body = isJsonObject(observed.body) ? observed.body : {}
+  const body = observed.body !== undefined && isJsonObject(observed.body) ? observed.body : {}
   if (observed.path === '/v1/messages/count_tokens') {
     return Response.json(
       { input_tokens: estimateInputTokens(body) },
