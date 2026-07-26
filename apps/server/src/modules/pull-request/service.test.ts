@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { resetTokenCache } from '../../lib/github-api'
+import { GitHubApiError, resetTokenCache } from '../../lib/github-api'
 import { isForceWithLeaseRejection, resolveDeliveryPushArgs } from './delivery-push'
 import { parseGitHubOwnerRepo } from './github-remote'
-import { fetchPullRequestDetailByRef, listReviewingPullRequests } from './service'
+import { fetchPullRequestDetailByRef, listReviewingPullRequests, mapGitHubError } from './service'
 
 const originalGitHubToken = process.env.GH_TOKEN
 
@@ -157,6 +157,17 @@ describe('fetchPullRequestDetailByRef', () => {
       { login: 'reviewed', avatarUrl: 'https://avatars.example/reviewed', url: 'https://github.com/reviewed' },
       { login: 'submitted', avatarUrl: 'https://avatars.example/submitted', url: 'https://github.com/submitted' },
     ])
+  })
+
+  it('reports repository access failures without leaking a GitHub 404 as a server error', async () => {
+    expect(() => mapGitHubError(new GitHubApiError({
+      status: 404,
+      path: '/repos/private-owner/private-repo',
+      message: 'Not Found',
+    }), 'Failed to fetch pull request details.')).toThrow(expect.objectContaining({
+      code: 'github_repository_access_unavailable',
+      status: 403,
+    }))
   })
 })
 

@@ -1,7 +1,8 @@
 import { throttling } from '@octokit/plugin-throttling'
 import { Octokit, RequestError } from 'octokit'
 
-import { resolveGitHubToken } from '../github-api-token'
+import { resolveLegacyGitHubToken } from '../github-api-token'
+import { resolveGitHubAppIdentity } from './auth-provider'
 
 const GITHUB_REQUEST_TIMEOUT_MS = 20_000
 /** Below this remaining budget, non-force GETs must not hit the network. */
@@ -14,14 +15,14 @@ export type CradleOctokitInstance = InstanceType<typeof CradleOctokit>
 let rateLimitRemaining = 5000
 let rateLimitReset = 0
 let cachedOctokit: CradleOctokitInstance | null = null
-let cachedOctokitToken: string | null | undefined
+let cachedOctokitCacheKey: string | null | undefined
 
 export { RequestError }
 
 export class GitHubAuthRequiredError extends Error {
   readonly status = 401
 
-  constructor(message = 'GitHub authentication required. Set GH_TOKEN / GITHUB_TOKEN or run `gh auth login`.') {
+  constructor(message = 'GitHub authentication required. Connect GitHub App, set GH_TOKEN / GITHUB_TOKEN, or run `gh auth login`.') {
     super(message)
     this.name = 'GitHubAuthRequiredError'
   }
@@ -74,7 +75,7 @@ export function resetGitHubClientState(): void {
   rateLimitRemaining = 5000
   rateLimitReset = 0
   cachedOctokit = null
-  cachedOctokitToken = undefined
+  cachedOctokitCacheKey = undefined
 }
 
 function createOctokitFetch(): typeof fetch {
@@ -101,17 +102,19 @@ function createOctokitFetch(): typeof fetch {
   }
 }
 
-export function getOctokit(options?: { requireToken?: boolean }): CradleOctokitInstance {
-  const token = resolveGitHubToken()
+export async function getOctokit(options?: { requireToken?: boolean }): Promise<CradleOctokitInstance> {
+  const appIdentity = await resolveGitHubAppIdentity()
+  const token = appIdentity?.accessToken ?? await resolveLegacyGitHubToken()
+  const cacheKey = appIdentity?.cacheKey ?? (token ? 'legacy:process' : null)
   if (options?.requireToken && !token) {
     throw new GitHubAuthRequiredError()
   }
 
-  if (cachedOctokit && cachedOctokitToken === token) {
+  if (cachedOctokit && cachedOctokitCacheKey === cacheKey) {
     return cachedOctokit
   }
 
-  cachedOctokitToken = token
+  cachedOctokitCacheKey = cacheKey
   cachedOctokit = new CradleOctokit({
     auth: token ?? undefined,
     request: {

@@ -11,6 +11,10 @@ Owns session-bound GitHub pull request lifecycle for isolated agent work:
    reviewers, ready/draft) and the cheap fingerprint probe used for cache-aware
    detail refresh
 
+The module consumes the shared asynchronous GitHub API client. GitHub Auth owns
+the selected user credential and its lifecycle, so comments, reviews, and pull
+request mutations use the connected App user identity when present.
+
 The module also owns read-only delivery readiness (`baseRef..HEAD`, cleanliness,
 changed files) and updating an existing open PR after pushing follow-up commits.
 The Work module composes these APIs but does not duplicate Git or GitHub logic.
@@ -25,6 +29,10 @@ GraphQL search - that
 listing has no session or Work dependency at all. Whether a given PR happens
 to have a bound Cradle session is an optional fact layered on top by callers
 (matching owner/repo/number), never a precondition for reading it.
+
+The GitHub App requires repository Contents read access because these global
+feeds include the current head commit and its check-rollup state. Contents
+write access is not required.
 
 `listAuthoredPullRequests` and `listReviewingPullRequests` are cursor-paginated,
 not fixed-size batches. The reviewing feed combines GitHub's independent

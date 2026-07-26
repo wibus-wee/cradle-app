@@ -3536,6 +3536,119 @@ export type PatchExternalIssueSourcesItemsByIdStatusResponses = {
 
 export type PatchExternalIssueSourcesItemsByIdStatusResponse = PatchExternalIssueSourcesItemsByIdStatusResponses[keyof PatchExternalIssueSourcesItemsByIdStatusResponses];
 
+export type DeleteGithubAuthConnectionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/github-auth/connection';
+};
+
+export type DeleteGithubAuthConnectionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteGithubAuthConnectionResponse = DeleteGithubAuthConnectionResponses[keyof DeleteGithubAuthConnectionResponses];
+
+export type GetGithubAuthConnectionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/github-auth/connection';
+};
+
+export type GetGithubAuthConnectionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        state: 'unconfigured' | 'disconnected' | 'pending' | 'connected' | 'expired' | 'error';
+        appName: string | null;
+        appSlug: string | null;
+        installationUrl: string | null;
+        viewer: {
+            login: string;
+            avatarUrl: string | null;
+            profileUrl: string | null;
+        } | null;
+        expiresAt: number | null;
+        refreshTokenExpiresAt: number | null;
+        error: string | null;
+    };
+};
+
+export type GetGithubAuthConnectionResponse = GetGithubAuthConnectionResponses[keyof GetGithubAuthConnectionResponses];
+
+export type PostGithubAuthDeviceLoginData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/github-auth/device-login';
+};
+
+export type PostGithubAuthDeviceLoginResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        loginId: string;
+        verificationUri: string;
+        userCode: string;
+        expiresAt: number;
+        pollInterval: number;
+    };
+};
+
+export type PostGithubAuthDeviceLoginResponse = PostGithubAuthDeviceLoginResponses[keyof PostGithubAuthDeviceLoginResponses];
+
+export type GetGithubAuthDeviceLoginByLoginIdData = {
+    body?: never;
+    path: {
+        loginId: string;
+    };
+    query?: never;
+    url: '/github-auth/device-login/{loginId}';
+};
+
+export type GetGithubAuthDeviceLoginByLoginIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        loginId: string;
+        state: 'pending' | 'completed' | 'failed' | 'cancelled';
+        startedAt: number;
+        completedAt: number | null;
+        error: string | null;
+    };
+};
+
+export type GetGithubAuthDeviceLoginByLoginIdResponse = GetGithubAuthDeviceLoginByLoginIdResponses[keyof GetGithubAuthDeviceLoginByLoginIdResponses];
+
+export type PostGithubAuthDeviceLoginByLoginIdCancelData = {
+    body?: never;
+    path: {
+        loginId: string;
+    };
+    query?: never;
+    url: '/github-auth/device-login/{loginId}/cancel';
+};
+
+export type PostGithubAuthDeviceLoginByLoginIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PostGithubAuthDeviceLoginByLoginIdCancelResponse = PostGithubAuthDeviceLoginByLoginIdCancelResponses[keyof PostGithubAuthDeviceLoginByLoginIdCancelResponses];
+
 export type GetExternalProviderSourcesData = {
     body?: never;
     path?: never;

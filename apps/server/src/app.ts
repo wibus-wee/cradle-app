@@ -10,6 +10,7 @@ import { createAuthPlugin } from './http/auth'
 import { createOpenApiPlugin, registerOpenApiAlias } from './http/openapi'
 import { createRequestIdPlugin } from './http/request-id'
 import { getServerConfig, initializeDatabase, shutdownInfra } from './infra'
+import { setGitHubAuthProvider } from './lib/github/auth-provider'
 import { createAcpModule } from './modules/acp'
 import { agentIdentity } from './modules/agent-identity'
 import { agentInteractionRuntime } from './modules/agent-interaction-runtime'
@@ -43,6 +44,8 @@ import { externalProviderSources } from './modules/external-provider-sources'
 import { externalSessionImport } from './modules/external-session-import'
 import { filesystem } from './modules/filesystem'
 import { git } from './modules/git'
+import { githubAuth } from './modules/github-auth'
+import * as GitHubAuth from './modules/github-auth/service'
 import { health } from './modules/health'
 import { imageOcr } from './modules/image-ocr'
 import { issue } from './modules/issue'
@@ -139,6 +142,7 @@ async function runBootstrapPhase<T>(
 }
 
 export async function createServerContractApp(options: CreateServerContractAppOptions = {}) {
+  setGitHubAuthProvider(GitHubAuth.resolveGitHubAppIdentity)
   registerTurnCheckpointHooks({
     captureStart: async (input) => {
       await TurnCheckpoint.captureRunStart(input)
@@ -213,6 +217,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(relayTransport)
   app.use(remoteHosts)
   app.use(externalIssueSources)
+  app.use(githubAuth)
   app.use(externalProviderSources)
   app.use(externalSessionImport)
   app.use(secrets)

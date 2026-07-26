@@ -315,7 +315,7 @@ export async function validateGitHubReviewTarget(filterJson: string): Promise<vo
 export async function fetchLiveReviewStatus(filterJson: string): Promise<LiveReviewStatus | null> {
   const filter = GitHubReviewFilterJsonSchema.parse(filterJson)
 
-  if (!hasGitHubToken()) {
+  if (!(await hasGitHubToken())) {
     return {
       kind: 'github-review',
       owner: filter.owner,

@@ -749,7 +749,7 @@ export async function validateGitHubCITarget(filterJson: string): Promise<void> 
 export async function fetchLiveCIStatus(filterJson: string): Promise<LiveCIStatus | null> {
   const filter = GitHubCIFilterJsonSchema.parse(filterJson)
 
-  if (!hasGitHubToken()) {
+  if (!(await hasGitHubToken())) {
     return {
       kind: 'github-ci',
       owner: filter.owner,

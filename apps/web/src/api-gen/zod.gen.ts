@@ -769,6 +769,14 @@ export const zPatchExternalIssueSourcesItemsByIdStatusPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetGithubAuthDeviceLoginByLoginIdPath = z.object({
+    loginId: z.string().min(1)
+});
+
+export const zPostGithubAuthDeviceLoginByLoginIdCancelPath = z.object({
+    loginId: z.string().min(1)
+});
+
 export const zPostExternalProviderSourcesBySourceKeyRefreshPath = z.object({
     sourceKey: z.string().min(1)
 });

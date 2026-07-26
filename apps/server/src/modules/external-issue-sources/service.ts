@@ -26,9 +26,9 @@ const MIN_REFRESH_INTERVAL_SECONDS = 3600
 
 type Tx = ReturnType<typeof db>
 
-function createExternalIssueSourceSharedConfig(): ReadonlyMap<string, string> {
+async function createExternalIssueSourceSharedConfig(): Promise<ReadonlyMap<string, string>> {
   const config = new Map<string, string>()
-  const token = resolveGitHubToken()
+  const token = await resolveGitHubToken()
   if (token) {
     config.set('GITHUB_ISSUES_TOKEN', token)
   }
@@ -679,7 +679,7 @@ async function fetchRepositorySnapshot(input: {
         error() {},
         debug() {},
       },
-      sharedConfig: createExternalIssueSourceSharedConfig(),
+      sharedConfig: await createExternalIssueSourceSharedConfig(),
       repository: {
         owner: input.repositoryOwner,
         name: input.repositoryName,

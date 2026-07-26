@@ -60,6 +60,7 @@ import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { cn } from '~/lib/cn'
 
 import { CreateConnectionDialog } from './connection-create-dialog'
+import { GithubAppConnection } from './github-app-connection'
 import type { Adapter, ChannelBinding, Connection, DeliveryAttempt, HealthStatus, Secret, ThreadBinding } from './integrations-primitives'
 import { formatTimestamp, healthStatusLabel, PlatformGlyph, queryKeys, StatusDot, timeAgo } from './integrations-primitives'
 import { SettingsGroup, SettingsMasterDetail, SettingsPage } from './settings-container'
@@ -1873,6 +1874,7 @@ export function IntegrationsSettings() {
         </TabsList>
 
         <TabsContent value="connections" className="mt-0 min-h-0 overflow-y-auto pr-1 pb-10">
+          <GithubAppConnection />
           {isLoading
 ? (
             <SettingsGroup>

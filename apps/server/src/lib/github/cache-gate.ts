@@ -5,6 +5,7 @@ import {
   setCache,
   touchCache,
 } from '../github-cache'
+import { resolveGitHubAppIdentity } from './auth-provider'
 import {
   getOctokit,
   recordGitHubRateLimit,
@@ -48,8 +49,9 @@ export async function cachedGitHubRead<T>(options: GitHubCachedReadOptions<T>): 
     fetcher,
   } = options
 
-  const cached = getCached<T>(cacheKey)
-  const fresh = Boolean(cached && !isCacheStale(cacheKey, ttlS))
+  const scopedCacheKey = await scopedGitHubCacheKey(cacheKey)
+  const cached = getCached<T>(scopedCacheKey)
+  const fresh = Boolean(cached && !isCacheStale(scopedCacheKey, ttlS))
 
   if (mode === 'read' && fresh && cached) {
     return cached.data
@@ -62,19 +64,24 @@ export async function cachedGitHubRead<T>(options: GitHubCachedReadOptions<T>): 
 
   if (mode === 'read' && cached && !fresh) {
     if (swr) {
-      void coalesce(cacheKey, async () => {
-        await revalidate(cacheKey, etag, fetcher)
+      void coalesce(scopedCacheKey, async () => {
+        await revalidate(scopedCacheKey, etag, fetcher)
       })
       return cached.data
     }
-    return coalesce(cacheKey, async () => revalidate(cacheKey, etag, fetcher))
+    return coalesce(scopedCacheKey, async () => revalidate(scopedCacheKey, etag, fetcher))
   }
 
   if (mode !== 'force' && shouldAvoidGitHubNetwork() && !cached) {
     return null
   }
 
-  return coalesce(cacheKey, async () => revalidate(cacheKey, etag, fetcher))
+  return coalesce(scopedCacheKey, async () => revalidate(scopedCacheKey, etag, fetcher))
+}
+
+async function scopedGitHubCacheKey(cacheKey: string): Promise<string> {
+  const identity = await resolveGitHubAppIdentity()
+  return identity ? `${cacheKey}:identity:${identity.cacheKey}` : cacheKey
 }
 
 async function revalidate<T>(
@@ -133,7 +140,7 @@ export async function octokitRestGet<T>(input: {
   etag?: string | null
   requireToken?: boolean
 }): Promise<CachedFetchResult<T>> {
-  const octokit = getOctokit({ requireToken: input.requireToken })
+  const octokit = await getOctokit({ requireToken: input.requireToken })
   try {
     const response = await octokit.request(input.route, {
       ...input.params,

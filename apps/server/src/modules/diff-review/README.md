@@ -4,6 +4,10 @@
 
 The diff-review module owns Cradle Diffs review records, local worktree, branch-compare, commit, and GitHub pull request revisions, review threads, guide generation, agent fix work orders, commit plans, and source readiness projections.
 
+GitHub Auth owns connection credentials and identity selection. This module uses
+the shared GitHub API client for remote review operations and never manages
+tokens itself.
+
 ## Files
 
 - **index.ts**: Elysia routes for workspace diff reviews and CLI-exposed diff commands.

@@ -1,8 +1,22 @@
 import { execSync } from 'node:child_process'
 
+import { resolveGitHubAppIdentity } from './github/auth-provider'
+
 let cachedToken: string | null | undefined
 
-export function resolveGitHubToken(): string | null {
+/**
+ * Prefer the connected GitHub App user. The process/CLI token remains an
+ * explicit legacy-development fallback only when no App user is connected.
+ */
+export async function resolveGitHubToken(): Promise<string | null> {
+  const appIdentity = await resolveGitHubAppIdentity()
+  if (appIdentity) {
+    return appIdentity.accessToken
+  }
+  return resolveLegacyGitHubToken()
+}
+
+export async function resolveLegacyGitHubToken(): Promise<string | null> {
   if (cachedToken !== undefined) {
     return cachedToken
   }
@@ -32,6 +46,6 @@ export function resetGitHubTokenCache(): void {
   cachedToken = undefined
 }
 
-export function hasGitHubToken(): boolean {
-  return resolveGitHubToken() !== null
+export async function hasGitHubToken(): Promise<boolean> {
+  return (await resolveGitHubToken()) !== null
 }

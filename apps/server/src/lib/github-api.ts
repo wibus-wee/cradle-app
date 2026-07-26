@@ -112,7 +112,7 @@ async function restGetCached<T>(options: {
 
 async function graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
   try {
-    const octokit = getOctokit({ requireToken: true })
+    const octokit = await getOctokit({ requireToken: true })
     return await octokit.graphql<T>(query, variables)
   }
   catch (error) {
@@ -371,7 +371,7 @@ function mergePullRequestSearchPages(
 
 export function fetchAuthenticatedUser() {
   return cachedFetch({
-    cacheKey: `viewer:${resolveGitHubToken()?.slice(0, 8) ?? 'anon'}`,
+    cacheKey: 'viewer',
     ttlS: 300,
     etag: false,
     fetcher: async (): Promise<CachedFetchResult<{ viewer: { login: string, avatarUrl: string, url: string } }>> => {
@@ -488,7 +488,7 @@ export function fetchPullRequestComments(
     etag: false,
     fetcher: async () => {
       try {
-        const octokit = getOctokit()
+        const octokit = await getOctokit()
         const items = await octokit.paginate(
           octokit.rest.issues.listComments,
           { owner, repo, issue_number: pr, per_page: 100 },
@@ -517,7 +517,7 @@ export function fetchPullRequestFiles(
     etag: false,
     fetcher: async () => {
       try {
-        const octokit = getOctokit()
+        const octokit = await getOctokit()
         const items = await octokit.paginate(
           octokit.rest.pulls.listFiles,
           { owner, repo, pull_number: pr, per_page: 100 },
@@ -541,7 +541,7 @@ async function fetchPullRequestNodeId(
   pr: number,
 ): Promise<string | null> {
   try {
-    const { data } = await getOctokit().rest.pulls.get({ owner, repo, pull_number: pr })
+    const { data } = await (await getOctokit()).rest.pulls.get({ owner, repo, pull_number: pr })
     return data.node_id
   }
   catch (error) {
@@ -565,7 +565,7 @@ export async function fetchCheckRuns(
     fetcher: async () => {
       try {
         const runs = await paginateRest<CheckRunData>(async (page) => {
-          const { data } = await getOctokit().rest.checks.listForRef({
+          const { data } = await (await getOctokit()).rest.checks.listForRef({
             owner,
             repo,
             ref,
@@ -603,7 +603,7 @@ export async function fetchCheckRun(
   checkRunId: number,
 ): Promise<CheckRunData | null> {
   try {
-    const { data } = await getOctokit().rest.checks.get({
+    const { data } = await (await getOctokit()).rest.checks.get({
       owner,
       repo,
       check_run_id: checkRunId,
@@ -630,7 +630,7 @@ export async function fetchWorkflowRunsForHead(
     etag: false,
     fetcher: async () => {
       try {
-        const { data } = await getOctokit().rest.actions.listWorkflowRunsForRepo({
+        const { data } = await (await getOctokit()).rest.actions.listWorkflowRunsForRepo({
           owner,
           repo,
           head_sha: headSha,
@@ -660,7 +660,7 @@ export async function fetchWorkflowRunJobs(
 ): Promise<{ total_count: number, jobs: WorkflowJobData[] } | null> {
   try {
     const jobs = await paginateRest<WorkflowJobData>(async (page) => {
-      const { data } = await getOctokit().rest.actions.listJobsForWorkflowRun({
+      const { data } = await (await getOctokit()).rest.actions.listJobsForWorkflowRun({
         owner,
         repo,
         run_id: runId,
@@ -735,7 +735,7 @@ export function fetchPullRequestReviews(
     etag: false,
     fetcher: async () => {
       try {
-        const octokit = getOctokit()
+        const octokit = await getOctokit()
         const items = await octokit.paginate(
           octokit.rest.pulls.listReviews,
           { owner, repo, pull_number: pr, per_page: 100 },
@@ -923,7 +923,7 @@ export async function createPullRequest(input: {
   draft?: boolean
 }): Promise<PullRequestData> {
   try {
-    const { data } = await getOctokit({ requireToken: true }).rest.pulls.create({
+    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.create({
       owner: input.owner,
       repo: input.repo,
       title: input.title,
@@ -948,7 +948,7 @@ export async function updatePullRequest(input: {
   body?: string
 }): Promise<PullRequestData> {
   try {
-    const { data } = await getOctokit({ requireToken: true }).rest.pulls.update({
+    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.update({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -974,7 +974,7 @@ export async function submitPullRequestReview(input: {
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 }) {
   try {
-    const { data } = await getOctokit({ requireToken: true }).rest.pulls.createReview({
+    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.createReview({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1005,7 +1005,7 @@ export async function mergePullRequest(input: {
   commitMessage?: string
 }): Promise<MergePullRequestData> {
   try {
-    const { data } = await getOctokit({ requireToken: true }).rest.pulls.merge({
+    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.merge({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1033,7 +1033,7 @@ export async function createPullRequestIssueComment(input: {
   body: string
 }): Promise<IssueCommentData> {
   try {
-    const { data } = await getOctokit({ requireToken: true }).rest.issues.createComment({
+    const { data } = await (await getOctokit({ requireToken: true })).rest.issues.createComment({
       owner: input.owner,
       repo: input.repo,
       issue_number: input.pullRequestNumber,
@@ -1057,7 +1057,7 @@ export async function addPullRequestAssignees(input: {
   assignees: string[]
 }): Promise<void> {
   try {
-    await getOctokit({ requireToken: true }).rest.issues.addAssignees({
+    await (await getOctokit({ requireToken: true })).rest.issues.addAssignees({
       owner: input.owner,
       repo: input.repo,
       issue_number: input.pullRequestNumber,
@@ -1080,7 +1080,7 @@ export async function removePullRequestAssignees(input: {
   assignees: string[]
 }): Promise<void> {
   try {
-    await getOctokit({ requireToken: true }).rest.issues.removeAssignees({
+    await (await getOctokit({ requireToken: true })).rest.issues.removeAssignees({
       owner: input.owner,
       repo: input.repo,
       issue_number: input.pullRequestNumber,
@@ -1103,7 +1103,7 @@ export async function requestPullRequestReviewers(input: {
   reviewers: string[]
 }): Promise<void> {
   try {
-    await getOctokit({ requireToken: true }).rest.pulls.requestReviewers({
+    await (await getOctokit({ requireToken: true })).rest.pulls.requestReviewers({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1126,7 +1126,7 @@ export async function removePullRequestReviewers(input: {
   reviewers: string[]
 }): Promise<void> {
   try {
-    await getOctokit({ requireToken: true }).rest.pulls.removeRequestedReviewers({
+    await (await getOctokit({ requireToken: true })).rest.pulls.removeRequestedReviewers({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,

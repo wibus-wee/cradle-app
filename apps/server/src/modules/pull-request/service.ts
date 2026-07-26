@@ -160,20 +160,34 @@ function nowSeconds(): number {
   return Math.floor(Date.now() / 1000)
 }
 
-function mapGitHubError(err: unknown, fallbackMessage: string): never {
+export function mapGitHubError(err: unknown, fallbackMessage: string): never {
   if (err instanceof GitHubApiError) {
+    if (err.status === 404) {
+      throw new AppError({
+        code: 'github_repository_access_unavailable',
+        status: 403,
+        message: 'This repository was not found or is not available to the selected GitHub identity. If you use the Cradle GitHub App, install it or grant it access to this repository, then retry.',
+        details: { path: err.path, status: err.status },
+      })
+    }
     throw new AppError({
-      code: err.status === 401 || err.status === 403
+      code: err.status === 401
         ? 'github_auth_required'
-        : err.status === 404 || err.status === 422
+        : err.status === 403
+          ? 'github_repository_access_denied'
+          : err.status === 422
           ? 'github_pr_request_failed'
           : 'github_api_error',
-      status: err.status === 401 || err.status === 403
+      status: err.status === 401
         ? 401
-        : err.status === 404 || err.status === 422
+        : err.status === 403
+          ? 403
+          : err.status === 422
           ? 400
           : 502,
-      message: err.message || fallbackMessage,
+      message: err.status === 403
+        ? 'The selected GitHub identity does not have permission to access this repository. If you use the Cradle GitHub App, grant it access to the repository, then retry.'
+        : err.message || fallbackMessage,
       details: { path: err.path, status: err.status },
     })
   }
@@ -523,6 +537,19 @@ export async function fetchPullRequestDetailByRef(
   repo: string,
   number: number,
 ): Promise<SessionPullRequestDetail> {
+  try {
+    return await fetchPullRequestDetailByRefImpl(owner, repo, number)
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to fetch GitHub pull request details.')
+  }
+}
+
+async function fetchPullRequestDetailByRefImpl(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<SessionPullRequestDetail> {
   const [live, comments, reviews, files, mergeSettings] = await Promise.all([
     fetchPullRequestDetail(owner, repo, number),
     fetchPullRequestComments(owner, repo, number),
@@ -716,8 +743,8 @@ function toSearchView(pr: GitHubSearchPullRequest): PullRequestSearchView {
   }
 }
 
-function requireGitHubToken(): void {
-  if (!hasGitHubToken()) {
+async function requireGitHubToken(): Promise<void> {
+  if (!(await hasGitHubToken())) {
     throw new AppError({
       code: 'github_auth_required',
       status: 401,
@@ -734,7 +761,7 @@ function requireGitHubToken(): void {
  * re-resolve it.
  */
 export async function getViewerIdentity(): Promise<GitHubViewer> {
-  requireGitHubToken()
+  await requireGitHubToken()
   try {
     return await fetchAuthenticatedUser()
   }
@@ -749,7 +776,7 @@ export async function getViewerIdentity(): Promise<GitHubViewer> {
  * gate even when the current user has administrative access.
  */
 export async function isViewerPersonalRepositoryOwner(owner: string, repo: string): Promise<boolean> {
-  requireGitHubToken()
+  await requireGitHubToken()
   try {
     const [repository, viewer] = await Promise.all([
       fetchRepo(owner, repo),
@@ -771,7 +798,7 @@ export async function isViewerPersonalRepositoryOwner(owner: string, repo: strin
  * viewer with a long history can page through all of it.
  */
 export async function listAuthoredPullRequests(login: string, after?: string): Promise<PullRequestSearchPage> {
-  requireGitHubToken()
+  await requireGitHubToken()
   try {
     const page = await searchAuthoredPullRequests(login, after || null)
     return { items: page.items.map(toSearchView), hasNextPage: page.hasNextPage, endCursor: page.endCursor }
@@ -787,7 +814,7 @@ export async function listAuthoredPullRequests(login: string, after?: string): P
  * `listAuthoredPullRequests` for pagination semantics.
  */
 export async function listReviewingPullRequests(login: string, after?: string): Promise<PullRequestSearchPage> {
-  requireGitHubToken()
+  await requireGitHubToken()
   try {
     const page = await searchReviewingPullRequests(login, after || null)
     return { items: page.items.map(toSearchView), hasNextPage: page.hasNextPage, endCursor: page.endCursor }
@@ -837,13 +864,7 @@ export async function createDraftPullRequest(input: {
   body?: string
   base?: string
 }): Promise<SessionPullRequestView> {
-  if (!hasGitHubToken()) {
-    throw new AppError({
-      code: 'github_auth_required',
-      status: 401,
-      message: 'GitHub authentication required. Set GH_TOKEN / GITHUB_TOKEN or run `gh auth login`.',
-    })
-  }
+  await requireGitHubToken()
 
   const session = requireSession(input.sessionId)
   const existing = readStoredPullRequest(session.configJson)
@@ -933,13 +954,7 @@ export async function updatePullRequest(input: {
   title: string
   body: string
 }): Promise<SessionPullRequestView> {
-  if (!hasGitHubToken()) {
-    throw new AppError({
-      code: 'github_auth_required',
-      status: 401,
-      message: 'GitHub authentication required. Set GH_TOKEN / GITHUB_TOKEN or run `gh auth login`.',
-    })
-  }
+  await requireGitHubToken()
 
   const session = requireSession(input.sessionId)
   const stored = readStoredPullRequest(session.configJson)
@@ -1006,13 +1021,7 @@ export async function updatePullRequest(input: {
 }
 
 export async function markPullRequestReady(sessionId: string): Promise<SessionPullRequestView> {
-  if (!hasGitHubToken()) {
-    throw new AppError({
-      code: 'github_auth_required',
-      status: 401,
-      message: 'GitHub authentication required. Set GH_TOKEN / GITHUB_TOKEN or run `gh auth login`.',
-    })
-  }
+  await requireGitHubToken()
 
   const session = requireSession(sessionId)
   const stored = readStoredPullRequest(session.configJson)

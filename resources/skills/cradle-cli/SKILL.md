@@ -346,7 +346,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `preferences` | 11 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
 | `provider` | 1 | Inspect provider model availability. | `cradle man provider` |
-| `pull-request` | 4 | Generated Cradle CLI module. | `cradle man pull-request` |
+| `pull-request` | 14 | Generated Cradle CLI module. | `cradle man pull-request` |
 | `relay-server` | 4 | Generated Cradle CLI module. | `cradle man relay-server` |
 | `relay-transport` | 5 | Generated Cradle CLI module. | `cradle man relay-transport` |
 | `remote-host` | 8 | Generated Cradle CLI module. | `cradle man remote-host` |

@@ -1366,7 +1366,7 @@ export async function refreshGitHubPullRequest(input: {
   const repo = input.repo.toLowerCase()
   const [detail, reviewThreads] = await Promise.all([
     PullRequest.fetchPullRequestDetailByRef(owner, repo, input.number),
-    hasGitHubToken()
+    await hasGitHubToken()
       ? fetchPullRequestReviewThreads(owner, repo, input.number)
       : Promise.resolve([]),
   ])

@@ -57,5 +57,15 @@ function readErrorMessage(error: unknown): string | null {
   if (typeof error === 'string' && error.trim().length > 0) {
     return error
   }
+  if (typeof error === 'object' && error !== null) {
+    const apiError = error as {
+      message?: string
+      error?: { message?: string }
+    }
+    const message = apiError.message ?? apiError.error?.message
+    if (message?.trim()) {
+      return message
+    }
+  }
   return null
 }

@@ -18,12 +18,12 @@ import type { PullRequestMergeMethod } from './merge-capability'
 import {
   derivePullRequestMergeCapability,
 } from './merge-capability'
-import { fetchPullRequestDetailByRef } from './service'
+import { fetchPullRequestDetailByRef, mapGitHubError } from './service'
 
 type PullRequestFingerprint = NonNullable<Awaited<ReturnType<typeof fetchPullRequestFingerprint>>>
 
-function requireGitHubToken(): void {
-  if (!hasGitHubToken()) {
+async function requireGitHubToken(): Promise<void> {
+  if (!(await hasGitHubToken())) {
     throw new AppError({
       code: 'github_auth_required',
       status: 401,
@@ -53,7 +53,7 @@ export async function getPullRequestFingerprint(
   repo: string,
   number: number,
 ): Promise<{ fingerprint: PullRequestFingerprint, changed: boolean }> {
-  requireGitHubToken()
+  await requireGitHubToken()
   const fingerprint = await fetchPullRequestFingerprint(owner, repo, number)
   if (!fingerprint) {
     throw new AppError({
@@ -72,7 +72,7 @@ export async function probePullRequestFingerprintChange(
   number: number,
   previous: PullRequestFingerprint | null,
 ): Promise<{ fingerprint: PullRequestFingerprint, changed: boolean }> {
-  requireGitHubToken()
+  await requireGitHubToken()
   const fingerprint = await probePullRequestFingerprint(owner, repo, number)
   if (!fingerprint) {
     throw new AppError({
@@ -92,7 +92,7 @@ export async function commentOnPullRequest(input: {
   number: number
   body: string
 }) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const body = input.body.trim()
   if (!body) {
     throw new AppError({
@@ -122,7 +122,7 @@ export async function submitPullRequestReviewAction(input: {
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
   body?: string
 }) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const body = input.body?.trim() ?? ''
   if (input.event !== 'APPROVE' && !body) {
     throw new AppError({
@@ -154,7 +154,7 @@ export async function mergePullRequestByRef(input: {
   commitTitle?: string
   commitMessage?: string
 }) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const detail = await fetchPullRequestDetailByRef(input.owner, input.repo, input.number)
   const pr = detail.pullRequest
   const capability = derivePullRequestMergeCapability({
@@ -226,7 +226,7 @@ export async function updatePullRequestAssignees(input: {
   add?: string[]
   remove?: string[]
 }) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const add = (input.add ?? []).map(login => login.trim()).filter(Boolean)
   const remove = (input.remove ?? []).map(login => login.trim()).filter(Boolean)
   if (add.length === 0 && remove.length === 0) {
@@ -262,7 +262,7 @@ export async function updatePullRequestReviewers(input: {
   add?: string[]
   remove?: string[]
 }) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const add = (input.add ?? []).map(login => login.trim()).filter(Boolean)
   const remove = (input.remove ?? []).map(login => login.trim()).filter(Boolean)
   if (add.length === 0 && remove.length === 0) {
@@ -296,7 +296,7 @@ export async function markPullRequestReadyByRef(
   repo: string,
   number: number,
 ) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const pullRequest = await markGitHubPullRequestReady(owner, repo, number)
   return {
     owner,
@@ -329,7 +329,7 @@ export async function markPullRequestDraftByRef(
   repo: string,
   number: number,
 ) {
-  requireGitHubToken()
+  await requireGitHubToken()
   const pullRequest = await markGitHubPullRequestDraft(owner, repo, number)
   return {
     owner,
@@ -352,6 +352,11 @@ export async function markPullRequestDraftByRef(
 }
 
 export async function listAssignableUsers(owner: string, repo: string) {
-  requireGitHubToken()
-  return { users: await fetchAssignableUsers(owner, repo) }
+  await requireGitHubToken()
+  try {
+    return { users: await fetchAssignableUsers(owner, repo) }
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to list users assignable to this repository.')
+  }
 }

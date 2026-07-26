@@ -32,6 +32,10 @@ Evaluation failures are classified differently from invalid results. A syntax or
 
 ## GitHub Sources
 
+GitHub Auth owns the connected App-user credential and refresh lifecycle. These
+sources only consume the shared GitHub API client and do not select or persist
+credentials.
+
 `github-ci` waits for all visible check runs and commit statuses on the resolved ref to complete. A CI filter must target exactly one of `{ pr }`, `{ sha }`, or `{ runs_id }`. With `{ repo, runs_id }`, it waits only for that GitHub check run ID and does not fold in sibling checks or legacy statuses from the same commit. It treats `success`, `neutral`, and `skipped` check conclusions as passing; `success` commit statuses as passing; pending signals as still pending; and any failure/error/cancelled/action-required signal as a completed failure. GitHub Actions workflow runs for the same head are also lifecycle barriers: queued or running workflows prevent early success, while a completed failed workflow produces a failure result. If no checks or statuses appear, it waits for `allowNoChecksAfterSeconds` or the default grace period before resuming with `noCIConfigured`.
 
 GitHub await creation performs a read-only preflight against the target repo plus PR or commit. GitHub 404 and 422 responses are treated as non-retryable missing or inaccessible targets, so the create route returns `github_await_target_invalid` instead of registering an await that would poll forever. Other GitHub API failures return `github_await_validation_unavailable` and do not create the await. Existing pending awaits use the same missing-target classification in the poller and live-status route, then move to `failed` rather than remaining pending indefinitely.

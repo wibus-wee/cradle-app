@@ -153,6 +153,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
 | 063  | Eliminate Desktop-owned Server sockets with one multiplexed IPC transport | P0 | XL | 038, 040, 054 | TODO (M0 packaged Electron feasibility gate first; coordinate transport files with 061) |
+| 064  | Connect GitHub through the Cradle App and attribute PR actions to the user | P1 | L | current PR Console work reconciled | IN PROGRESS (implementation complete; real GitHub App acceptance pending) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
@@ -251,6 +252,11 @@ splitting until this track is stable.
 
 - 039 requires 038 so secret administration is not exposed through the old optional-auth boundary.
 - 040 requires 038 because all feature gateways must consume the shared authenticated transport.
+- 064 is independent of the Work/PR delivery track but must not begin until the
+  current uncommitted PR Console and generated OpenAPI changes are committed or
+  deliberately reconciled. It adds GitHub App Device Flow to the local Desktop
+  server and replaces only the shared GitHub identity boundary; it does not add
+  hosted OAuth, webhooks, or bot automation.
 - 041 requires 038 and 040 so server domain boundaries and web projection boundaries converge on one API contract.
 - 042 follows 040 and removes Automation's remaining raw-fetch/auth exception; its authentication bypass can make the entire feature return 401, so execute this P0 first.
 - 043 follows 040 and centralizes Draft state/transport transitions; it is independent of 042 and may run in parallel in an isolated worktree.
