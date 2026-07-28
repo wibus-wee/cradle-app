@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import type { ServerNotification } from './app-server-protocol/ServerNotification'
 import type { TokenUsageBreakdown } from './app-server-protocol/v2/TokenUsageBreakdown'
-import { CodexUsageEventProjectionError, CodexUsageEventProjector } from './usage-event-projector'
+import {
+  CodexUsageEventProjectionError,
+  CodexUsageEventProjector,
+  createCodexUsageEventId,
+} from './usage-event-projector'
 
 describe('codexUsageEventProjector', () => {
   it('projects every model call from last usage with stable replay identity', () => {
@@ -24,13 +28,13 @@ describe('codexUsageEventProjector', () => {
     expect(first?.id).not.toBe(second?.id)
   })
 
-  it('preserves cached and reasoning subsets without adding them to total', () => {
+  it('preserves cache-read, cache-write, and reasoning subsets without adding them to total', () => {
     const projector = new CodexUsageEventProjector('gpt-5.6-sol')
     const event = projector.project(tokenUsageNotification(
       'thread-1',
       'turn-1',
-      usage(500, 50, 400, 20),
-      usage(200, 30, 180, 10),
+      usage(500, 50, 400, 25, 20),
+      usage(200, 30, 180, 15, 10),
     ))
 
     expect(event?.usage).toEqual({
@@ -38,8 +42,18 @@ describe('codexUsageEventProjector', () => {
       completionTokens: 30,
       totalTokens: 230,
       cachedInputTokens: 180,
+      cacheWriteInputTokens: 15,
       reasoningOutputTokens: 10,
     })
+  })
+
+  it('includes cache-write usage in the replay identity', () => {
+    const withoutCacheWrite = usage(200, 30, 180, 0, 10)
+    const withCacheWrite = usage(200, 30, 180, 15, 10)
+    const withoutCacheWriteId = createCodexUsageEventId('thread-1', 'turn-1', withoutCacheWrite)
+    const withCacheWriteId = createCodexUsageEventId('thread-1', 'turn-1', withCacheWrite)
+
+    expect(withoutCacheWriteId).not.toBe(withCacheWriteId)
   })
 
   it('uses the rerouted model for the matching provider turn', () => {
@@ -103,11 +117,13 @@ function usage(
   inputTokens: number,
   outputTokens: number,
   cachedInputTokens = 0,
+  cacheWriteInputTokens = 0,
   reasoningOutputTokens = 0,
 ): TokenUsageBreakdown {
   return {
     inputTokens,
     cachedInputTokens,
+    cacheWriteInputTokens,
     outputTokens,
     reasoningOutputTokens,
     totalTokens: inputTokens + outputTokens,

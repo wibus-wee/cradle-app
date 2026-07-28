@@ -1490,6 +1490,7 @@ export function normalizeTokenUsageBreakdown(value: CodexTokenUsageBreakdown | u
     totalTokens: readNonNegativeNumber(value?.totalTokens),
     inputTokens: readNonNegativeNumber(value?.inputTokens),
     cachedInputTokens: readNonNegativeNumber(value?.cachedInputTokens),
+    cacheWriteInputTokens: readNonNegativeNumber(value?.cacheWriteInputTokens),
     outputTokens: readNonNegativeNumber(value?.outputTokens),
     reasoningOutputTokens: readNonNegativeNumber(value?.reasoningOutputTokens),
   }
@@ -1505,6 +1506,7 @@ export function readCodexLastTokenUsage(value: CodexThreadTokenUsage | undefined
     completionTokens: last.outputTokens,
     totalTokens: last.totalTokens || last.inputTokens + last.outputTokens,
     cachedInputTokens: last.cachedInputTokens,
+    cacheWriteInputTokens: last.cacheWriteInputTokens,
     reasoningOutputTokens: last.reasoningOutputTokens,
   }
 }
@@ -1514,6 +1516,7 @@ function createEmptyTokenUsageBreakdown(): RuntimeTokenUsageBreakdown {
     totalTokens: 0,
     inputTokens: 0,
     cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
     outputTokens: 0,
     reasoningOutputTokens: 0,
   }

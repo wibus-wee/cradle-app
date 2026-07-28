@@ -2161,6 +2161,12 @@ function projectCodexUserInputsToUiParts(inputs: UserInput[]): UIMessage['parts'
       case 'localImage':
         parts.push(projectLocalImageFilePart(input.path))
         break
+      case 'audio':
+        parts.push({ type: 'file', mediaType: 'audio/*', url: input.url })
+        break
+      case 'localAudio':
+        parts.push({ type: 'file', mediaType: 'audio/*', url: `file://${input.path}` })
+        break
       case 'skill':
       case 'mention':
         parts.push({ type: 'text', text: `@${input.name}`, state: 'done' })

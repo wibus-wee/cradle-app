@@ -110,11 +110,13 @@ export function projectCodexEstimatedContextUsage(input: {
     apiUsage: {
       inputTokens: last.inputTokens,
       cachedInputTokens: last.cachedInputTokens,
+      cacheWriteInputTokens: last.cacheWriteInputTokens,
       outputTokens: last.outputTokens,
       reasoningOutputTokens: last.reasoningOutputTokens,
       totalTokens: last.totalTokens,
       lifetimeInputTokens: total.inputTokens,
       lifetimeCachedInputTokens: total.cachedInputTokens,
+      lifetimeCacheWriteInputTokens: total.cacheWriteInputTokens,
       lifetimeOutputTokens: total.outputTokens,
       lifetimeReasoningOutputTokens: total.reasoningOutputTokens,
       lifetimeTotalTokens: total.totalTokens,

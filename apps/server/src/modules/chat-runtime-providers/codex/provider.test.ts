@@ -852,6 +852,51 @@ describe('codexProvider app-server integration', () => {
     })
   })
 
+  it('projects remote and local audio from Codex provider thread history', async () => {
+    const client = new FakeCodexAppServerClient({})
+    client.threadTurnsListData = [
+      {
+        id: 'audio-turn-1',
+        itemsView: 'full',
+        status: 'completed',
+        error: null,
+        startedAt: 1,
+        completedAt: 2,
+        durationMs: 1,
+        items: [
+          {
+            type: 'userMessage',
+            id: 'audio-user-item',
+            clientId: null,
+            content: [
+              { type: 'audio', url: 'https://example.com/prompt.wav' },
+              { type: 'localAudio', path: '/tmp/prompt.wav' },
+            ],
+          },
+        ],
+      },
+    ]
+    const provider = createProvider(client)
+
+    await expect(provider.listProviderThreadTurns({
+      runtimeSession: createRuntimeSession('codex-thread-1'),
+      profile: createProfile(),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+      threadId: 'subagent-thread-1',
+    })).resolves.toMatchObject({
+      messages: [
+        {
+          role: 'user',
+          parts: [
+            { type: 'file', mediaType: 'audio/*', url: 'https://example.com/prompt.wav' },
+            { type: 'file', mediaType: 'audio/*', url: 'file:///tmp/prompt.wav' },
+          ],
+        },
+      ],
+    })
+  })
+
   it('rolls back multiple Codex thread turns without forking', async () => {
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)
@@ -2185,6 +2230,7 @@ describe('codexProvider app-server integration', () => {
             totalTokens: 128_000,
             inputTokens: 96_000,
             cachedInputTokens: 8_000,
+            cacheWriteInputTokens: 2_000,
             outputTokens: 24_000,
             reasoningOutputTokens: 8_000,
           },
@@ -2192,6 +2238,7 @@ describe('codexProvider app-server integration', () => {
             totalTokens: 4_000,
             inputTokens: 3_000,
             cachedInputTokens: 1_000,
+            cacheWriteInputTokens: 250,
             outputTokens: 1_000,
             reasoningOutputTokens: 250,
           },
@@ -2242,6 +2289,7 @@ describe('codexProvider app-server integration', () => {
       completionTokens: 1_000,
       totalTokens: 4_000,
       cachedInputTokens: 1_000,
+      cacheWriteInputTokens: 250,
       reasoningOutputTokens: 250,
     })
     expect(provider.lastModelId).toBe('gpt-5-codex')
@@ -2254,6 +2302,7 @@ describe('codexProvider app-server integration', () => {
         completionTokens: 1_000,
         totalTokens: 4_000,
         cachedInputTokens: 1_000,
+        cacheWriteInputTokens: 250,
         reasoningOutputTokens: 250,
       },
     }))
@@ -2275,8 +2324,8 @@ describe('codexProvider app-server integration', () => {
         autoCompactTokenLimit: 160_000,
         autoCompactPercent: 3,
         usagePercent: 2,
-        total: expect.objectContaining({ totalTokens: 128_000 }),
-        last: expect.objectContaining({ totalTokens: 4_000 }),
+        total: expect.objectContaining({ totalTokens: 128_000, cacheWriteInputTokens: 2_000 }),
+        last: expect.objectContaining({ totalTokens: 4_000, cacheWriteInputTokens: 250 }),
       }),
     ]))
   })
@@ -2297,6 +2346,7 @@ describe('codexProvider app-server integration', () => {
               totalTokens: 10_000,
               inputTokens: 8_000,
               cachedInputTokens: 4_000,
+              cacheWriteInputTokens: 500,
               outputTokens: 2_000,
               reasoningOutputTokens: 500,
             },
@@ -2304,6 +2354,7 @@ describe('codexProvider app-server integration', () => {
               totalTokens: 2_500,
               inputTokens: 2_000,
               cachedInputTokens: 1_200,
+              cacheWriteInputTokens: 125,
               outputTokens: 500,
               reasoningOutputTokens: 100,
             },
@@ -2389,9 +2440,11 @@ describe('codexProvider app-server integration', () => {
     expect(usage?.apiUsage).toEqual(expect.objectContaining({
       inputTokens: 2_000,
       cachedInputTokens: 1_200,
+      cacheWriteInputTokens: 125,
       outputTokens: 500,
       reasoningOutputTokens: 100,
       lifetimeInputTokens: 8_000,
+      lifetimeCacheWriteInputTokens: 500,
     }))
 
     const sections = new Map(usage!.sections.map(section => [section.kind, section]))

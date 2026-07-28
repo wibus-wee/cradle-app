@@ -365,6 +365,7 @@ function usage(inputTokens: number, outputTokens: number): Record<string, number
   return {
     input_tokens: inputTokens,
     cached_input_tokens: Math.floor(inputTokens / 2),
+    cache_write_input_tokens: Math.floor(inputTokens / 4),
     output_tokens: outputTokens,
     reasoning_output_tokens: Math.floor(outputTokens / 2),
     total_tokens: inputTokens + outputTokens,
@@ -375,6 +376,7 @@ function protocolUsage(inputTokens: number, outputTokens: number) {
   return {
     inputTokens,
     cachedInputTokens: Math.floor(inputTokens / 2),
+    cacheWriteInputTokens: Math.floor(inputTokens / 4),
     outputTokens,
     reasoningOutputTokens: Math.floor(outputTokens / 2),
     totalTokens: inputTokens + outputTokens,

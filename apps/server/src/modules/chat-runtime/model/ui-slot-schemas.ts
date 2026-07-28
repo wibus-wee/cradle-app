@@ -94,6 +94,7 @@ export const runtimeTokenUsageBreakdownSchema = t.Object({
   totalTokens: t.Number(),
   inputTokens: t.Number(),
   cachedInputTokens: t.Number(),
+  cacheWriteInputTokens: t.Number(),
   outputTokens: t.Number(),
   reasoningOutputTokens: t.Number(),
 })

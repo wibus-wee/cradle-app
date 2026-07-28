@@ -87,6 +87,7 @@ export function createCodexUsageEventId(
     turnId,
     total.inputTokens,
     total.cachedInputTokens,
+    total.cacheWriteInputTokens,
     total.outputTokens,
     total.reasoningOutputTokens,
     total.totalTokens,
@@ -100,6 +101,7 @@ function toTokenUsage(usage: TokenUsageBreakdown): TokenUsage {
     completionTokens: usage.outputTokens,
     totalTokens: usage.totalTokens || usage.inputTokens + usage.outputTokens,
     cachedInputTokens: usage.cachedInputTokens,
+    cacheWriteInputTokens: usage.cacheWriteInputTokens,
     reasoningOutputTokens: usage.reasoningOutputTokens,
   }
 }

@@ -175,6 +175,7 @@ export function projectClaudeAgentCompactState(input: {
       totalTokens,
       inputTokens: totalTokens,
       cachedInputTokens: readApiUsageTokenCount(input.usage.apiUsage, 'cache_read_input_tokens'),
+      cacheWriteInputTokens: readApiUsageTokenCount(input.usage.apiUsage, 'cache_creation_input_tokens'),
       outputTokens: readApiUsageTokenCount(input.usage.apiUsage, 'output_tokens'),
       reasoningOutputTokens: 0,
     },
@@ -410,6 +411,7 @@ function createEmptyTokenUsageBreakdown(): RuntimeTokenUsageBreakdown {
     totalTokens: 0,
     inputTokens: 0,
     cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
     outputTokens: 0,
     reasoningOutputTokens: 0,
   }
