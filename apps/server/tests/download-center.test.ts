@@ -20,9 +20,27 @@ interface PendingDownload {
 
 class ControlledDownloader {
   readonly pending: PendingDownload[] = []
+  private readonly pendingWaiters = new Map<number, Array<(pending: PendingDownload) => void>>()
 
   download(execution: DownloadExecution): Promise<DownloadExecutionResult> {
-    return new Promise((resolve, reject) => this.pending.push({ execution, resolve, reject }))
+    return new Promise((resolve, reject) => {
+      const pending = { execution, resolve, reject }
+      this.pending.push(pending)
+      for (const waiter of this.pendingWaiters.get(this.pending.length - 1) ?? []) {
+        waiter(pending)
+      }
+      this.pendingWaiters.delete(this.pending.length - 1)
+    })
+  }
+
+  async waitForPending(index: number): Promise<PendingDownload> {
+    const pending = this.pending[index]
+    if (pending) { return pending }
+    return new Promise((resolve) => {
+      const waiters = this.pendingWaiters.get(index) ?? []
+      waiters.push(resolve)
+      this.pendingWaiters.set(index, waiters)
+    })
   }
 
   succeed(index: number): void {
@@ -67,15 +85,6 @@ class ArtifactPromotingDownloader extends ControlledDownloader {
 async function flush(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
-}
-
-async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (predicate()) { return }
-    await flush()
-    await new Promise<void>(resolve => setImmediate(resolve))
-  }
-  throw new Error('Condition did not become true.')
 }
 
 function request(sourceId = 'source-a'): DownloadRequest {
@@ -170,8 +179,8 @@ describe('download center service', () => {
     expect(service.findLatestRetryable({ ...fallbackRequest.owner, resourceId: 'other' }, 'fallback')).toBeNull()
     expect(service.findLatestRetryable(fallbackRequest.owner, 'other')).toBeNull()
     const retry = service.retry(task.taskId, fallbackRequest)
-    await waitFor(() => downloader.pending.length === 2)
-    expect(downloader.pending[1]!.execution.prior).toEqual({ sourceId: 'fallback', etag: '"stable"' })
+    const pendingRetry = await downloader.waitForPending(1)
+    expect(pendingRetry.execution.prior).toEqual({ sourceId: 'fallback', etag: '"stable"' })
     downloader.succeed(1)
     await expect(retry).resolves.toMatchObject({ bytes: 5 })
   })
@@ -185,7 +194,7 @@ describe('download center service', () => {
     await expect(failed).rejects.toMatchObject({ code: 'network_error' })
     const task = service.list()[0]!
     const retries = [service.retry(task.taskId, request()), service.retry(task.taskId, request())]
-    await waitFor(() => downloader.pending.length === 2)
+    await downloader.waitForPending(1)
     downloader.succeed(1)
     await expect(Promise.all(retries)).resolves.toHaveLength(2)
     expect(service.get(task.taskId)?.status).toBe('completed')
@@ -229,7 +238,7 @@ describe('download center service', () => {
     expect(JSON.stringify(service.get(task.taskId))).not.toContain('secret')
 
     const interruptedRetry = service.retry(task.taskId, request())
-    await waitFor(() => downloader.pending.length === 2)
+    await downloader.waitForPending(1)
     downloader.succeed(1)
     await expect(interruptedRetry).resolves.toMatchObject({ bytes: 5 })
 
