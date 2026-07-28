@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import type { ManagedChildProcess } from '../src/infra/managed-process'
+import { spawnManagedProcess } from '../src/infra/managed-process'
 import type { KimiAsyncApiDocument, KimiOpenApiDocument } from '../src/modules/chat-runtime-providers/kimi/protocol/generator'
 import {
   createKimiProtocolManifest,
@@ -17,14 +19,16 @@ const serverRoot = join(scriptDir, '..')
 const protocolRoot = join(serverRoot, 'src/modules/chat-runtime-providers/kimi/protocol')
 const kimiCommand = process.env.KIMI_COMMAND || 'kimi'
 const kimiHome = await mkdtemp(join(tmpdir(), 'cradle-kimi-protocol-'))
+let kimiWebProcess: ManagedChildProcess | null = null
 
 try {
   const runtimeVersion = await readKimiVersion()
-  const port = await startKimiWeb()
+  const kimiWeb = await startKimiWeb()
+  kimiWebProcess = kimiWeb.process
   const token = await readFileWithRetry(join(kimiHome, 'server.token'))
   const [openapi, asyncapi] = await Promise.all([
-    fetchKimiJson<KimiOpenApiDocument>(port, '/openapi.json', token),
-    fetchKimiJson<KimiAsyncApiDocument>(port, '/asyncapi.json', token),
+    fetchKimiJson<KimiOpenApiDocument>(kimiWeb.port, '/openapi.json', token),
+    fetchKimiJson<KimiAsyncApiDocument>(kimiWeb.port, '/asyncapi.json', token),
   ])
 
   if (!openapi.openapi.startsWith('3.')) {
@@ -61,7 +65,7 @@ try {
   console.log(`AsyncAPI SHA-256: ${manifest.asyncapiSha256}`)
 }
 finally {
-  await stopKimiWeb().catch(() => undefined)
+  await stopKimiWeb(kimiWebProcess).catch(() => undefined)
   await rm(kimiHome, { force: true, recursive: true })
 }
 
@@ -94,37 +98,48 @@ function readKimiVersion(): Promise<string> {
   })
 }
 
-function startKimiWeb(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(kimiCommand, ['web', '--port', '0', '--no-open', '--log-level', 'silent'], {
-      env: { ...process.env, KIMI_CODE_HOME: kimiHome },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    let output = ''
-    const timeout = setTimeout(() => {
-      reject(new Error(`Kimi web did not report a loopback port within 10 seconds.`))
-    }, 10_000)
-    const readPort = (chunk: Buffer): void => {
-      output += stripAnsi(chunk.toString())
-      const port = output.match(/http:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
-      if (port) {
-        clearTimeout(timeout)
-        resolve(Number(port))
-      }
-    }
-    child.stdout.on('data', readPort)
-    child.stderr.on('data', readPort)
-    child.once('error', (error) => {
-      clearTimeout(timeout)
-      reject(error)
-    })
-    child.once('exit', (code) => {
-      if (!/http:\/\/127\.0\.0\.1:(\d+)\//.test(output)) {
-        clearTimeout(timeout)
-        reject(new Error(`Kimi web exited before reporting a loopback port (code ${code ?? 1}).`))
-      }
-    })
+async function startKimiWeb(): Promise<{ port: number, process: ManagedChildProcess }> {
+  const child = spawnManagedProcess({
+    kind: 'spawn',
+    command: kimiCommand,
+    args: ['web', '--port', '0', '--no-open', '--log-level', 'silent'],
+    env: { ...process.env, KIMI_CODE_HOME: kimiHome },
+    stdin: 'ignore',
+    shutdownGraceMs: 3_000,
   })
+  try {
+    const port = await new Promise<number>((resolve, reject) => {
+      let output = ''
+      const timeout = setTimeout(() => {
+        reject(new Error(`Kimi web did not report a loopback port within 10 seconds.`))
+      }, 10_000)
+      const readPort = (chunk: Buffer): void => {
+        output += stripAnsi(chunk.toString())
+        const port = output.match(/http:\/\/127\.0\.0\.1:(\d+)\//)?.[1]
+        if (port) {
+          clearTimeout(timeout)
+          resolve(Number(port))
+        }
+      }
+      child.stdout.on('data', readPort)
+      child.stderr.on('data', readPort)
+      child.once('error', (error) => {
+        clearTimeout(timeout)
+        reject(error)
+      })
+      child.once('exit', (code) => {
+        if (!/http:\/\/127\.0\.0\.1:(\d+)\//.test(output)) {
+          clearTimeout(timeout)
+          reject(new Error(`Kimi web exited before reporting a loopback port (code ${code ?? 1}).`))
+        }
+      })
+    })
+    return { port, process: child }
+  }
+  catch (error) {
+    await stopKimiWeb(child)
+    throw error
+  }
 }
 
 async function readFileWithRetry(path: string): Promise<string> {
@@ -161,15 +176,10 @@ async function fetchKimiJson<T>(port: number, path: string, token: string): Prom
   throw new Error(`Could not fetch Kimi ${path}: ${lastError?.message ?? 'unknown error'}`)
 }
 
-function stopKimiWeb(): Promise<void> {
-  return new Promise((resolve) => {
-    const child = spawn(kimiCommand, ['web', 'kill'], {
-      env: { ...process.env, KIMI_CODE_HOME: kimiHome },
-      stdio: 'ignore',
-    })
-    child.once('error', () => resolve())
-    child.once('exit', () => resolve())
-  })
+async function stopKimiWeb(child: ManagedChildProcess | null): Promise<void> {
+  if (child && child.exitCode === null && child.signalCode === null) {
+    await child.stop('SIGTERM')
+  }
 }
 
 function run(file: string, args: string[]): Promise<void> {

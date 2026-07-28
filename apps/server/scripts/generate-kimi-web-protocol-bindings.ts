@@ -11,12 +11,14 @@ import {
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const serverRoot = join(scriptDir, '..')
 const protocolRoot = join(serverRoot, 'src/modules/chat-runtime-providers/kimi/protocol')
+const websocketPath = join(protocolRoot, 'websocket.ts')
 
 const asyncapi = JSON.parse(
   await readFile(join(protocolRoot, 'asyncapi.json'), 'utf8'),
 ) as KimiAsyncApiDocument
 
-await writeFile(join(protocolRoot, 'websocket.ts'), renderKimiWebSocketCatalogue(asyncapi), 'utf8')
+await writeFile(websocketPath, renderKimiWebSocketCatalogue(asyncapi), 'utf8')
+await run('pnpm', ['exec', 'eslint', websocketPath, '--fix'])
 await run('pnpm', ['exec', 'openapi-ts', '--file', 'kimi-openapi-ts.config.ts'])
 
 function run(file: string, args: string[]): Promise<void> {
