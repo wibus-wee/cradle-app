@@ -30,6 +30,7 @@ apps/web/i18n-hardcoded-report.json
 apps/web/i18n-missing-report.json
 apps/web/i18n-unused-keys-report.json
 apps/web/storybook-static/
+apps/mobile/.expo/
 
 .build
 tmp

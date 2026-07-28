@@ -1,0 +1,42 @@
+{
+  "name": "@cradle/mobile",
+  "version": "0.0.1",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "generate": "pnpm --filter @cradle/server exec vite-node scripts/export-openapi.ts && openapi-ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@expo-google-fonts/geist": "^0.4.1",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@tanstack/react-query": "^5.101.4",
+    "expo": "^57.0.8",
+    "expo-build-properties": "~57.0.7",
+    "expo-clipboard": "~57.0.1",
+    "expo-constants": "~57.0.4",
+    "expo-font": "~57.0.1",
+    "expo-haptics": "~57.0.1",
+    "expo-linking": "~57.0.3",
+    "expo-router": "~57.0.8",
+    "expo-secure-store": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "lucide-react-native": "^0.468.0",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-markdown-display": "^7.0.2",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.97.0",
+    "@types/react": "~19.2.0",
+    "typescript": "~6.0.3"
+  }
+}

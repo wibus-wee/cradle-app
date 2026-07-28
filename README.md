@@ -135,6 +135,12 @@ Cradle currently spans **20 major product areas**, grouped into five workflows:
 | [`@cradle/plugin-sdk`](./packages/plugin-sdk) (npm: `@cradleapp/plugin-sdk`) | SDK for building Cradle plugins — manifest types, permission system, and platform-specific entry points (server, web, desktop). | ![Beta](https://img.shields.io/badge/status-Beta-yellow) |
 | [`@cradle/streamdown`](./packages/streamdown) | Streaming markdown renderer with CPS smoothing, block-level FSM, and animated text reveal. | ![Beta](https://img.shields.io/badge/status-Beta-yellow) |
 
+## Apps
+
+| App | Description |
+|---|---|
+| [`@cradle/mobile`](./apps/mobile) | Focused Expo/React Native controller for connecting to a Cradle Server, following project conversations, continuing Work, and reviewing pull requests from iOS or Android. |
+
 
 ## Feedback
 
