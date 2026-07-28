@@ -6,6 +6,10 @@ export const zGetBy__Path = z.object({
     '*': z.string()
 });
 
+export const zGetCatalogProviderPath = z.object({
+    catalog_id: z.string().min(1)
+});
+
 export const zPostApiV1ConfigBody = z.object({
     background: z.unknown().optional(),
     default_model: z.string().optional(),
@@ -45,6 +49,10 @@ export const zFsBrowseQuery = z.object({
     path: z.string().min(1).optional()
 });
 
+export const zFsContentQuery = z.object({
+    path: z.string().min(1)
+});
+
 export const zGetApiV1GuiStoreGetItemQuery = z.object({
     key: z.string().min(1).max(256)
 });
@@ -82,11 +90,79 @@ export const zPostApiV1OauthLogoutBody = z.object({
     provider: z.string().min(1).optional()
 });
 
-export const zRefreshProviderModelsPath = z.object({
+export const zGetApiV1OauthUsageQuery = z.object({
+    provider: z.string().min(1).optional()
+});
+
+export const zCreateProviderBody = z.object({
+    api_key: z.string().optional(),
+    base_url: z.string().optional(),
+    default_model: z.string().min(1).optional(),
+    id: z.string().regex(/^[\p{L}\p{N}][\p{L}\p{N}\-_ ]*$/u),
+    models: z.array(z.object({
+        adaptive_thinking: z.boolean().optional(),
+        capabilities: z.array(z.string()).optional(),
+        display_name: z.string().min(1).optional(),
+        max_context_size: z.int().gte(1).lte(9007199254740991),
+        max_output_size: z.int().gte(1).lte(9007199254740991).optional(),
+        model: z.string().min(1),
+        support_efforts: z.array(z.string().min(1)).optional()
+    })).min(1),
+    type: z.enum([
+        'kimi',
+        'openai',
+        'openai_responses',
+        'anthropic',
+        'google-genai',
+        'vertexai'
+    ])
+});
+
+export const zProviderCollectionActionBody = z.object({
+    api_key: z.string().optional(),
+    base_url: z.string().optional(),
+    catalog_id: z.string().min(1).optional(),
+    id: z.string().regex(/^[\p{L}\p{N}][\p{L}\p{N}\-_ ]*$/u).optional(),
+    url: z.string().min(1).optional()
+});
+
+export const zProviderCollectionActionPath = z.object({
     action: z.string().min(1)
 });
 
+export const zDeleteProviderPath = z.object({
+    provider_id: z.string().min(1)
+});
+
 export const zGetApiV1ProvidersByProviderIdPath = z.object({
+    provider_id: z.string().min(1)
+});
+
+export const zReplaceProviderBody = z.object({
+    api_key: z.string().optional(),
+    base_url: z.string().optional(),
+    default_model: z.string().min(1).optional(),
+    models: z.array(z.object({
+        adaptive_thinking: z.boolean().optional(),
+        capabilities: z.array(z.string()).optional(),
+        display_name: z.string().min(1).optional(),
+        max_context_size: z.int().gte(1).lte(9007199254740991),
+        max_output_size: z.int().gte(1).lte(9007199254740991).optional(),
+        model: z.string().min(1),
+        support_efforts: z.array(z.string().min(1)).optional()
+    })).min(1),
+    new_id: z.string().regex(/^[\p{L}\p{N}][\p{L}\p{N}\-_ ]*$/u).optional(),
+    type: z.enum([
+        'kimi',
+        'openai',
+        'openai_responses',
+        'anthropic',
+        'google-genai',
+        'vertexai'
+    ])
+});
+
+export const zReplaceProviderPath = z.object({
     provider_id: z.string().min(1)
 });
 
@@ -297,6 +373,7 @@ export const zPostApiV1SessionsBySessionIdChildrenPath = z.object({
 });
 
 export const zPostApiV1SessionsBySessionIdExportBody = z.object({
+    desktop: z.boolean().optional(),
     web_log: z.string().optional()
 });
 
@@ -411,6 +488,7 @@ export const zSubmitPromptBody = z.object({
         z.object({
             source: z.union([
                 z.object({
+                    id: z.string().min(1).optional(),
                     kind: z.enum(['url']),
                     url: z.string().min(1)
                 }),
@@ -429,6 +507,7 @@ export const zSubmitPromptBody = z.object({
         z.object({
             source: z.union([
                 z.object({
+                    id: z.string().min(1).optional(),
                     kind: z.enum(['url']),
                     url: z.string().min(1)
                 }),
@@ -457,6 +536,7 @@ export const zSubmitPromptBody = z.object({
             type: z.enum(['thinking'])
         })
     ])).min(1),
+    disabled_tools: z.array(z.string()).optional(),
     goal_control: z.enum([
         'pause',
         'resume',
@@ -471,6 +551,7 @@ export const zSubmitPromptBody = z.object({
         'auto'
     ]).optional(),
     plan_mode: z.boolean().optional(),
+    profile: z.string().min(1).optional(),
     swarm_mode: z.boolean().optional(),
     thinking: z.string().min(1).optional()
 });
@@ -611,6 +692,43 @@ export const zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath = z.object({
     terminal_id: z.string().min(1)
 });
 
+export const zGetApiV1SessionsBySessionIdTranscriptPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptQuery = z.object({
+    agent_id: z.string().min(1),
+    before_turn: z.string().min(1).optional(),
+    after_turn: z.string().min(1).optional(),
+    page_size: z.int().gte(1).lte(100).optional()
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptOpsPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptOpsQuery = z.object({
+    agent_id: z.string().min(1),
+    since_seq: z.int().gte(0).lte(9007199254740991)
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptPlanPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptPlanQuery = z.object({
+    agent_id: z.string().min(1),
+    tool_call_id: z.string().min(1).optional()
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery = z.object({
+    agent_id: z.string().min(1).optional()
+});
+
 export const zGetApiV1SessionsBySessionIdWarningsPath = z.object({
     session_id: z.string().min(1)
 });
@@ -638,40 +756,4 @@ export const zPatchApiV1WorkspacesByWorkspaceIdPath = z.object({
 
 export const zListWorkspaceSkillsPath = z.object({
     workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
-});
-
-export const zGetApiV2ByServiceByMethodPath = z.object({
-    service: z.string(),
-    method: z.string()
-});
-
-export const zPostApiV2ByServiceByMethodPath = z.object({
-    service: z.string(),
-    method: z.string()
-});
-
-export const zGetApiV2SessionBySessionIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    service: z.string(),
-    method: z.string()
-});
-
-export const zPostApiV2SessionBySessionIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    service: z.string(),
-    method: z.string()
-});
-
-export const zGetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    agent_id: z.string(),
-    service: z.string(),
-    method: z.string()
-});
-
-export const zPostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath = z.object({
-    session_id: z.string(),
-    agent_id: z.string(),
-    service: z.string(),
-    method: z.string()
 });

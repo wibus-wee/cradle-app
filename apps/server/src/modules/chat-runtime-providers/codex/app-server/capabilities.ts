@@ -25,8 +25,8 @@ export interface CodexAppServerCapabilityManifest {
 }
 
 const CODEX_APP_SERVER_PROTOCOL = 'codex-app-server'
-const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.144.4'
-const CODEX_APP_SERVER_GENERATED_DATE = '2026-07-14'
+const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.145.0'
+const CODEX_APP_SERVER_GENERATED_DATE = '2026-07-28'
 
 export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'initialize', paramsType: 'InitializeParams', category: 'initialize', operation: 'initialize', interaction: 'request' },
@@ -56,6 +56,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'thread/rollback', paramsType: 'ThreadRollbackParams', category: 'thread', operation: 'rollback', interaction: 'request' },
   { method: 'thread/list', paramsType: 'ThreadListParams', category: 'thread', operation: 'list', interaction: 'request' },
   { method: 'thread/search', paramsType: 'ThreadSearchParams', category: 'thread', operation: 'search', interaction: 'request' },
+  { method: 'thread/searchOccurrences', paramsType: 'ThreadSearchOccurrencesParams', category: 'thread', operation: 'searchOccurrences', interaction: 'request' },
   { method: 'thread/loaded/list', paramsType: 'ThreadLoadedListParams', category: 'thread', operation: 'loaded/list', interaction: 'request' },
   { method: 'thread/read', paramsType: 'ThreadReadParams', category: 'thread', operation: 'read', interaction: 'request' },
   { method: 'thread/turns/list', paramsType: 'ThreadTurnsListParams', category: 'thread', operation: 'turns/list', interaction: 'request' },
@@ -76,7 +77,9 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'plugin/share/list', paramsType: 'PluginShareListParams', category: 'plugin', operation: 'share/list', interaction: 'request' },
   { method: 'plugin/share/checkout', paramsType: 'PluginShareCheckoutParams', category: 'plugin', operation: 'share/checkout', interaction: 'request' },
   { method: 'plugin/share/delete', paramsType: 'PluginShareDeleteParams', category: 'plugin', operation: 'share/delete', interaction: 'request' },
+  { method: 'app/read', paramsType: 'AppsReadParams', category: 'app', operation: 'read', interaction: 'request' },
   { method: 'app/list', paramsType: 'AppsListParams', category: 'app', operation: 'list', interaction: 'request' },
+  { method: 'app/installed', paramsType: 'AppsInstalledParams', category: 'app', operation: 'installed', interaction: 'request' },
   { method: 'fs/readFile', paramsType: 'FsReadFileParams', category: 'fs', operation: 'readFile', interaction: 'request' },
   { method: 'fs/writeFile', paramsType: 'FsWriteFileParams', category: 'fs', operation: 'writeFile', interaction: 'request' },
   { method: 'fs/createDirectory', paramsType: 'FsCreateDirectoryParams', category: 'fs', operation: 'createDirectory', interaction: 'request' },
@@ -115,6 +118,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'mock/experimentalMethod', paramsType: 'MockExperimentalMethodParams', category: 'mock', operation: 'experimentalMethod', interaction: 'request' },
   { method: 'environment/add', paramsType: 'EnvironmentAddParams', category: 'environment', operation: 'add', interaction: 'request' },
   { method: 'environment/info', paramsType: 'EnvironmentInfoParams', category: 'environment', operation: 'info', interaction: 'request' },
+  { method: 'environment/status', paramsType: 'EnvironmentStatusParams', category: 'environment', operation: 'status', interaction: 'request' },
   { method: 'mcpServer/oauth/login', paramsType: 'McpServerOauthLoginParams', category: 'mcp-server', operation: 'oauth/login', interaction: 'request' },
   { method: 'config/mcpServer/reload', paramsType: null, category: 'config', operation: 'mcpServer/reload', interaction: 'request' },
   { method: 'mcpServerStatus/list', paramsType: 'ListMcpServerStatusParams', category: 'mcp-server-status', operation: 'list', interaction: 'request' },
@@ -182,6 +186,8 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'thread/name/updated', paramsType: 'ThreadNameUpdatedNotification', category: 'thread' },
   { method: 'thread/goal/updated', paramsType: 'ThreadGoalUpdatedNotification', category: 'thread' },
   { method: 'thread/goal/cleared', paramsType: 'ThreadGoalClearedNotification', category: 'thread' },
+  { method: 'thread/environment/connected', paramsType: 'EnvironmentConnectionNotification', category: 'thread' },
+  { method: 'thread/environment/disconnected', paramsType: 'EnvironmentConnectionNotification', category: 'thread' },
   { method: 'thread/settings/updated', paramsType: 'ThreadSettingsUpdatedNotification', category: 'thread' },
   { method: 'thread/tokenUsage/updated', paramsType: 'ThreadTokenUsageUpdatedNotification', category: 'thread' },
   { method: 'turn/started', paramsType: 'TurnStartedNotification', category: 'turn' },
@@ -195,6 +201,7 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'item/autoApprovalReview/completed', paramsType: 'ItemGuardianApprovalReviewCompletedNotification', category: 'item' },
   { method: 'item/completed', paramsType: 'ItemCompletedNotification', category: 'item' },
   { method: 'rawResponseItem/completed', paramsType: 'RawResponseItemCompletedNotification', category: 'raw-response-item' },
+  { method: 'rawResponse/completed', paramsType: 'RawResponseCompletedNotification', category: 'raw-response' },
   { method: 'item/agentMessage/delta', paramsType: 'AgentMessageDeltaNotification', category: 'item' },
   { method: 'item/plan/delta', paramsType: 'PlanDeltaNotification', category: 'item' },
   { method: 'command/exec/outputDelta', paramsType: 'CommandExecOutputDeltaNotification', category: 'command' },

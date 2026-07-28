@@ -40,6 +40,12 @@
         "subscribe_ack": {
           "$ref": "#/components/messages/subscribe_ack"
         },
+        "subscribe_v2": {
+          "$ref": "#/components/messages/subscribe_v2"
+        },
+        "subscribe_v2_ack": {
+          "$ref": "#/components/messages/subscribe_v2_ack"
+        },
         "terminal_attach": {
           "$ref": "#/components/messages/terminal_attach"
         },
@@ -75,6 +81,12 @@
         },
         "unsubscribe_ack": {
           "$ref": "#/components/messages/unsubscribe_ack"
+        },
+        "unsubscribe_v2": {
+          "$ref": "#/components/messages/unsubscribe_v2"
+        },
+        "unsubscribe_v2_ack": {
+          "$ref": "#/components/messages/unsubscribe_v2_ack"
         },
         "watch_fs_add": {
           "$ref": "#/components/messages/watch_fs_add"
@@ -239,8 +251,7 @@
                 }
               },
               "required": [
-                "client_id",
-                "subscriptions"
+                "client_id"
               ],
               "type": "object"
             },
@@ -1246,6 +1257,30 @@
                             }
                           },
                           "type": "object"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "agent.created",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "agent.disposed",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -2334,6 +2369,9 @@
                             }
                           ]
                         },
+                        "prompt": {
+                          "type": "string"
+                        },
                         "turnId": {
                           "type": "number"
                         },
@@ -3203,6 +3241,9 @@
                         "commandId": {
                           "type": "string"
                         },
+                        "taskId": {
+                          "type": "string"
+                        },
                         "type": {
                           "const": "shell.output",
                           "type": "string"
@@ -3260,6 +3301,29 @@
                         "type",
                         "commandId",
                         "taskId"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "commandId": {
+                          "type": "string"
+                        },
+                        "isError": {
+                          "type": "boolean"
+                        },
+                        "taskId": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "const": "shell.completed",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "commandId",
+                        "isError"
                       ],
                       "type": "object"
                     },
@@ -4632,6 +4696,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -4705,6 +4773,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -4983,6 +5055,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -5056,6 +5132,10 @@
                                     "oneOf": [
                                       {
                                         "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          },
                                           "kind": {
                                             "const": "url",
                                             "type": "string"
@@ -5428,6 +5508,152 @@
         },
         "summary": "Acknowledgement for subscribe.",
         "title": "Subscribe Ack"
+      },
+      "subscribe_v2": {
+        "contentType": "application/json",
+        "name": "subscribe_v2",
+        "payload": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "payload": {
+              "properties": {
+                "session_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "transcript": {
+                  "additionalProperties": {
+                    "enum": [
+                      "off",
+                      "turn",
+                      "block",
+                      "delta"
+                    ],
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "transcript_since": {
+                  "additionalProperties": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              },
+              "required": [
+                "session_id",
+                "transcript"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "subscribe_v2",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "payload"
+          ],
+          "type": "object"
+        },
+        "summary": "Attach or update this connection's per-agent transcript grade stream for one session.",
+        "title": "Subscribe V2"
+      },
+      "subscribe_v2_ack": {
+        "contentType": "application/json",
+        "name": "subscribe_v2.ack",
+        "payload": {
+          "properties": {
+            "code": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "id": {
+              "type": "string"
+            },
+            "msg": {
+              "type": "string"
+            },
+            "payload": {
+              "properties": {
+                "accepted": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "cursors": {
+                  "additionalProperties": {
+                    "properties": {
+                      "epoch": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "seq": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "seq"
+                    ],
+                    "type": "object"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "not_found": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "resync_required": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "accepted",
+                "not_found",
+                "resync_required"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "ack",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "code",
+            "msg",
+            "payload"
+          ],
+          "type": "object"
+        },
+        "summary": "Acknowledgement for subscribe_v2.",
+        "title": "Subscribe V2 Ack"
       },
       "terminal_attach": {
         "contentType": "application/json",
@@ -6002,6 +6228,133 @@
         "summary": "Acknowledgement for unsubscribe.",
         "title": "Unsubscribe Ack"
       },
+      "unsubscribe_v2": {
+        "contentType": "application/json",
+        "name": "unsubscribe_v2",
+        "payload": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "payload": {
+              "properties": {
+                "agent_ids": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "session_id": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "session_id"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "unsubscribe_v2",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "payload"
+          ],
+          "type": "object"
+        },
+        "summary": "Detach this connection's transcript grade stream for one session, optionally per agent.",
+        "title": "Unsubscribe V2"
+      },
+      "unsubscribe_v2_ack": {
+        "contentType": "application/json",
+        "name": "unsubscribe_v2.ack",
+        "payload": {
+          "properties": {
+            "code": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "id": {
+              "type": "string"
+            },
+            "msg": {
+              "type": "string"
+            },
+            "payload": {
+              "properties": {
+                "accepted": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "cursors": {
+                  "additionalProperties": {
+                    "properties": {
+                      "epoch": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "seq": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "seq"
+                    ],
+                    "type": "object"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "not_found": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "resync_required": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "accepted",
+                "not_found",
+                "resync_required"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "ack",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "code",
+            "msg",
+            "payload"
+          ],
+          "type": "object"
+        },
+        "summary": "Acknowledgement for unsubscribe_v2.",
+        "title": "Unsubscribe V2 Ack"
+      },
       "watch_fs_add": {
         "contentType": "application/json",
         "name": "watch_fs_add",
@@ -6191,7 +6544,7 @@
   "info": {
     "description": "WebSocket protocol for Kimi Code daemon control frames, acknowledgements, system frames, and session event streaming.",
     "title": "Kimi Code WebSocket API",
-    "version": "0.28.0"
+    "version": "0.29.2"
   },
   "operations": {
     "receiveClientMessages": {
@@ -6205,6 +6558,12 @@
         },
         {
           "$ref": "#/components/messages/subscribe"
+        },
+        {
+          "$ref": "#/components/messages/subscribe_v2"
+        },
+        {
+          "$ref": "#/components/messages/unsubscribe_v2"
         },
         {
           "$ref": "#/components/messages/unsubscribe"
@@ -6264,6 +6623,12 @@
         },
         {
           "$ref": "#/components/messages/subscribe_ack"
+        },
+        {
+          "$ref": "#/components/messages/subscribe_v2_ack"
+        },
+        {
+          "$ref": "#/components/messages/unsubscribe_v2_ack"
         },
         {
           "$ref": "#/components/messages/unsubscribe_ack"

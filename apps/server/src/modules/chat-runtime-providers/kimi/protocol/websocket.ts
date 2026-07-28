@@ -156,7 +156,6 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
           },
           required: [
             'client_id',
-            'subscriptions',
           ],
           type: 'object',
         },
@@ -1162,6 +1161,30 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         },
                       },
                       type: 'object',
+                    },
+                  },
+                  required: [
+                    'type',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    type: {
+                      const: 'agent.created',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    type: {
+                      const: 'agent.disposed',
+                      type: 'string',
                     },
                   },
                   required: [
@@ -2250,6 +2273,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         },
                       ],
                     },
+                    prompt: {
+                      type: 'string',
+                    },
                     turnId: {
                       type: 'number',
                     },
@@ -3119,6 +3145,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     commandId: {
                       type: 'string',
                     },
+                    taskId: {
+                      type: 'string',
+                    },
                     type: {
                       const: 'shell.output',
                       type: 'string',
@@ -3176,6 +3205,29 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     'type',
                     'commandId',
                     'taskId',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    commandId: {
+                      type: 'string',
+                    },
+                    isError: {
+                      type: 'boolean',
+                    },
+                    taskId: {
+                      type: 'string',
+                    },
+                    type: {
+                      const: 'shell.completed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'commandId',
+                    'isError',
                   ],
                   type: 'object',
                 },
@@ -4548,6 +4600,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -4621,6 +4677,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -4899,6 +4959,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -4972,6 +5036,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 oneOf: [
                                   {
                                     properties: {
+                                      id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
                                       kind: {
                                         const: 'url',
                                         type: 'string',
@@ -5254,6 +5322,152 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
       required: [
         'type',
         'id',
+        'payload',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'subscribe_v2',
+    title: 'Subscribe V2',
+    summary: 'Attach or update this connection\'s per-agent transcript grade stream for one session.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        id: {
+          type: 'string',
+        },
+        payload: {
+          properties: {
+            session_id: {
+              minLength: 1,
+              type: 'string',
+            },
+            transcript: {
+              additionalProperties: {
+                enum: [
+                  'off',
+                  'turn',
+                  'block',
+                  'delta',
+                ],
+                type: 'string',
+              },
+              propertyNames: {
+                type: 'string',
+              },
+              type: 'object',
+            },
+            transcript_since: {
+              additionalProperties: {
+                maximum: 9007199254740991,
+                minimum: 0,
+                type: 'integer',
+              },
+              propertyNames: {
+                type: 'string',
+              },
+              type: 'object',
+            },
+          },
+          required: [
+            'session_id',
+            'transcript',
+          ],
+          type: 'object',
+        },
+        type: {
+          const: 'subscribe_v2',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'id',
+        'payload',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'subscribe_v2.ack',
+    title: 'Subscribe V2 Ack',
+    summary: 'Acknowledgement for subscribe_v2.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        code: {
+          maximum: 9007199254740991,
+          minimum: -9007199254740991,
+          type: 'integer',
+        },
+        id: {
+          type: 'string',
+        },
+        msg: {
+          type: 'string',
+        },
+        payload: {
+          properties: {
+            accepted: {
+              items: {
+                type: 'string',
+              },
+              type: 'array',
+            },
+            cursors: {
+              additionalProperties: {
+                properties: {
+                  epoch: {
+                    minLength: 1,
+                    type: 'string',
+                  },
+                  seq: {
+                    maximum: 9007199254740991,
+                    minimum: 0,
+                    type: 'integer',
+                  },
+                },
+                required: [
+                  'seq',
+                ],
+                type: 'object',
+              },
+              propertyNames: {
+                type: 'string',
+              },
+              type: 'object',
+            },
+            not_found: {
+              items: {
+                type: 'string',
+              },
+              type: 'array',
+            },
+            resync_required: {
+              items: {
+                type: 'string',
+              },
+              type: 'array',
+            },
+          },
+          required: [
+            'accepted',
+            'not_found',
+            'resync_required',
+          ],
+          type: 'object',
+        },
+        type: {
+          const: 'ack',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'id',
+        'code',
+        'msg',
         'payload',
       ],
       type: 'object',
@@ -5827,6 +6041,133 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
       required: [
         'type',
         'id',
+        'payload',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'unsubscribe_v2',
+    title: 'Unsubscribe V2',
+    summary: 'Detach this connection\'s transcript grade stream for one session, optionally per agent.',
+    direction: 'client_to_server',
+    payload: {
+      properties: {
+        id: {
+          type: 'string',
+        },
+        payload: {
+          properties: {
+            agent_ids: {
+              items: {
+                minLength: 1,
+                type: 'string',
+              },
+              minItems: 1,
+              type: 'array',
+            },
+            session_id: {
+              minLength: 1,
+              type: 'string',
+            },
+          },
+          required: [
+            'session_id',
+          ],
+          type: 'object',
+        },
+        type: {
+          const: 'unsubscribe_v2',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'id',
+        'payload',
+      ],
+      type: 'object',
+    },
+  },
+  {
+    name: 'unsubscribe_v2.ack',
+    title: 'Unsubscribe V2 Ack',
+    summary: 'Acknowledgement for unsubscribe_v2.',
+    direction: 'server_to_client',
+    payload: {
+      properties: {
+        code: {
+          maximum: 9007199254740991,
+          minimum: -9007199254740991,
+          type: 'integer',
+        },
+        id: {
+          type: 'string',
+        },
+        msg: {
+          type: 'string',
+        },
+        payload: {
+          properties: {
+            accepted: {
+              items: {
+                type: 'string',
+              },
+              type: 'array',
+            },
+            cursors: {
+              additionalProperties: {
+                properties: {
+                  epoch: {
+                    minLength: 1,
+                    type: 'string',
+                  },
+                  seq: {
+                    maximum: 9007199254740991,
+                    minimum: 0,
+                    type: 'integer',
+                  },
+                },
+                required: [
+                  'seq',
+                ],
+                type: 'object',
+              },
+              propertyNames: {
+                type: 'string',
+              },
+              type: 'object',
+            },
+            not_found: {
+              items: {
+                type: 'string',
+              },
+              type: 'array',
+            },
+            resync_required: {
+              items: {
+                type: 'string',
+              },
+              type: 'array',
+            },
+          },
+          required: [
+            'accepted',
+            'not_found',
+            'resync_required',
+          ],
+          type: 'object',
+        },
+        type: {
+          const: 'ack',
+          type: 'string',
+        },
+      },
+      required: [
+        'type',
+        'id',
+        'code',
+        'msg',
         'payload',
       ],
       type: 'object',

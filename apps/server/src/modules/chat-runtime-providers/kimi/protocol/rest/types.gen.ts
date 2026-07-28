@@ -64,6 +64,104 @@ export type GetApiV1AuthResponses = {
 
 export type GetApiV1AuthResponse = GetApiV1AuthResponses[keyof GetApiV1AuthResponses];
 
+export type ListCatalogProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/catalog/providers';
+};
+
+export type ListCatalogProvidersResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            items: Array<{
+                env_key: string | null;
+                guessed: boolean;
+                id: string;
+                models: Array<{
+                    capabilities?: Array<string>;
+                    id: string;
+                    max_context_size: number;
+                    name?: string;
+                    reasoning: boolean;
+                }>;
+                name: string;
+                needs_base_url: boolean;
+                reject_reason: string | null;
+                rejected: boolean;
+                wire_type: 'kimi' | 'openai' | 'openai_responses' | 'anthropic' | 'google-genai' | 'vertexai';
+            }>;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 50004;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type ListCatalogProvidersResponse = ListCatalogProvidersResponses[keyof ListCatalogProvidersResponses];
+
+export type GetCatalogProviderData = {
+    body?: never;
+    path: {
+        catalog_id: string;
+    };
+    query?: never;
+    url: '/api/v1/catalog/providers/{catalog_id}';
+};
+
+export type GetCatalogProviderResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            env_key: string | null;
+            guessed: boolean;
+            id: string;
+            models: Array<{
+                capabilities?: Array<string>;
+                id: string;
+                max_context_size: number;
+                name?: string;
+                reasoning: boolean;
+            }>;
+            name: string;
+            needs_base_url: boolean;
+            reject_reason: string | null;
+            rejected: boolean;
+            wire_type: 'kimi' | 'openai' | 'openai_responses' | 'anthropic' | 'google-genai' | 'vertexai';
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40417;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 50004;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetCatalogProviderResponse = GetCatalogProviderResponses[keyof GetCatalogProviderResponses];
+
 export type GetApiV1ConfigData = {
     body?: never;
     path?: never;
@@ -360,6 +458,28 @@ export type FsBrowseResponses = {
 };
 
 export type FsBrowseResponse = FsBrowseResponses[keyof FsBrowseResponses];
+
+export type FsContentData = {
+    body?: never;
+    path?: never;
+    query: {
+        path: string;
+    };
+    url: '/api/v1/fs:content';
+};
+
+export type FsContentResponses = {
+    /**
+     * Default Response
+     */
+    200: Blob | File;
+    /**
+     * Default Response
+     */
+    206: Blob | File;
+};
+
+export type FsContentResponse = FsContentResponses[keyof FsContentResponses];
 
 export type FsHomeData = {
     body?: never;
@@ -855,6 +975,56 @@ export type PostApiV1OauthLogoutResponses = {
 
 export type PostApiV1OauthLogoutResponse = PostApiV1OauthLogoutResponses[keyof PostApiV1OauthLogoutResponses];
 
+export type GetApiV1OauthUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        provider?: string;
+    };
+    url: '/api/v1/oauth/usage';
+};
+
+export type GetApiV1OauthUsageResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            extra_usage: {
+                balance_cents: number;
+                currency: string;
+                monthly_charge_limit_cents: number;
+                monthly_charge_limit_enabled: boolean;
+                monthly_used_cents: number;
+                total_cents: number;
+            } | null;
+            kind: 'ok';
+            limits: Array<{
+                label: string;
+                limit: number;
+                reset_hint?: string;
+                used: number;
+            }>;
+            summary: {
+                label: string;
+                limit: number;
+                reset_hint?: string;
+                used: number;
+            } | null;
+        } | {
+            kind: 'error';
+            message: string;
+            status?: number;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1OauthUsageResponse = GetApiV1OauthUsageResponses[keyof GetApiV1OauthUsageResponses];
+
 export type GetApiV1ProvidersData = {
     body?: never;
     path?: never;
@@ -887,8 +1057,71 @@ export type GetApiV1ProvidersResponses = {
 
 export type GetApiV1ProvidersResponse = GetApiV1ProvidersResponses[keyof GetApiV1ProvidersResponses];
 
-export type RefreshProviderModelsData = {
-    body?: never;
+export type CreateProviderData = {
+    body: {
+        api_key?: string;
+        base_url?: string;
+        default_model?: string;
+        id: string;
+        models: Array<{
+            adaptive_thinking?: boolean;
+            capabilities?: Array<string>;
+            display_name?: string;
+            max_context_size: number;
+            max_output_size?: number;
+            model: string;
+            support_efforts?: Array<string>;
+        }>;
+        type: 'kimi' | 'openai' | 'openai_responses' | 'anthropic' | 'google-genai' | 'vertexai';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/providers';
+};
+
+export type CreateProviderResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            base_url?: string;
+            default_model?: string;
+            has_api_key: boolean;
+            id: string;
+            models?: Array<string>;
+            status: 'connected' | 'error' | 'unconfigured';
+            type: string;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40921;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type CreateProviderResponse = CreateProviderResponses[keyof CreateProviderResponses];
+
+export type ProviderCollectionActionData = {
+    body: {
+        api_key?: string;
+        base_url?: string;
+        catalog_id?: string;
+        id?: string;
+        url?: string;
+    };
     path: {
         action: string;
     };
@@ -896,7 +1129,7 @@ export type RefreshProviderModelsData = {
     url: '/api/v1/providers{action}';
 };
 
-export type RefreshProviderModelsResponses = {
+export type ProviderCollectionActionResponses = {
     /**
      * Default Response
      */
@@ -914,6 +1147,28 @@ export type RefreshProviderModelsResponses = {
                 reason: string;
             }>;
             unchanged: Array<string>;
+        } | {
+            models_imported: number;
+            provider: {
+                base_url?: string;
+                default_model?: string;
+                has_api_key: boolean;
+                id: string;
+                models?: Array<string>;
+                status: 'connected' | 'error' | 'unconfigured';
+                type: string;
+            };
+        } | {
+            models_imported: number;
+            providers: Array<{
+                base_url?: string;
+                default_model?: string;
+                has_api_key: boolean;
+                id: string;
+                models?: Array<string>;
+                status: 'connected' | 'error' | 'unconfigured';
+                type: string;
+            }>;
         };
         details?: unknown;
         msg: string;
@@ -924,10 +1179,86 @@ export type RefreshProviderModelsResponses = {
         details?: unknown;
         msg: string;
         request_id: string;
+    } | {
+        code: 40003;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40004;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40005;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40417;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 50004;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
     };
 };
 
-export type RefreshProviderModelsResponse = RefreshProviderModelsResponses[keyof RefreshProviderModelsResponses];
+export type ProviderCollectionActionResponse = ProviderCollectionActionResponses[keyof ProviderCollectionActionResponses];
+
+export type DeleteProviderData = {
+    body?: never;
+    path: {
+        provider_id: string;
+    };
+    query?: never;
+    url: '/api/v1/providers/{provider_id}';
+};
+
+export type DeleteProviderResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40003;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40412;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+    /**
+     * Provider deleted.
+     */
+    204: unknown;
+};
+
+export type DeleteProviderResponse = DeleteProviderResponses[keyof DeleteProviderResponses];
 
 export type GetApiV1ProvidersByProviderIdData = {
     body?: never;
@@ -945,6 +1276,7 @@ export type GetApiV1ProvidersByProviderIdResponses = {
     200: {
         code: 0;
         data: {
+            api_key?: string;
             base_url?: string;
             default_model?: string;
             has_api_key: boolean;
@@ -972,6 +1304,79 @@ export type GetApiV1ProvidersByProviderIdResponses = {
 };
 
 export type GetApiV1ProvidersByProviderIdResponse = GetApiV1ProvidersByProviderIdResponses[keyof GetApiV1ProvidersByProviderIdResponses];
+
+export type ReplaceProviderData = {
+    body: {
+        api_key?: string;
+        base_url?: string;
+        default_model?: string;
+        models: Array<{
+            adaptive_thinking?: boolean;
+            capabilities?: Array<string>;
+            display_name?: string;
+            max_context_size: number;
+            max_output_size?: number;
+            model: string;
+            support_efforts?: Array<string>;
+        }>;
+        new_id?: string;
+        type: 'kimi' | 'openai' | 'openai_responses' | 'anthropic' | 'google-genai' | 'vertexai';
+    };
+    path: {
+        provider_id: string;
+    };
+    query?: never;
+    url: '/api/v1/providers/{provider_id}';
+};
+
+export type ReplaceProviderResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            provider: {
+                base_url?: string;
+                default_model?: string;
+                has_api_key: boolean;
+                id: string;
+                models?: Array<string>;
+                status: 'connected' | 'error' | 'unconfigured';
+                type: string;
+            };
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40003;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40412;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40921;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type ReplaceProviderResponse = ReplaceProviderResponses[keyof ReplaceProviderResponses];
 
 export type RefreshProviderData = {
     body?: never;
@@ -2007,6 +2412,7 @@ export type PostApiV1SessionsBySessionIdChildrenResponse = PostApiV1SessionsBySe
 
 export type PostApiV1SessionsBySessionIdExportData = {
     body: {
+        desktop?: boolean;
         web_log?: string;
     };
     path: {
@@ -2153,6 +2559,7 @@ export type GetApiV1SessionsBySessionIdMessagesResponses = {
                     type: 'tool_result';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2166,6 +2573,7 @@ export type GetApiV1SessionsBySessionIdMessagesResponses = {
                     type: 'image';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2254,6 +2662,7 @@ export type GetApiV1SessionsBySessionIdMessagesByMessageIdResponses = {
                 type: 'tool_result';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2267,6 +2676,7 @@ export type GetApiV1SessionsBySessionIdMessagesByMessageIdResponses = {
                 type: 'image';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2571,6 +2981,7 @@ export type ListPromptsResponses = {
                     type: 'tool_result';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2584,6 +2995,7 @@ export type ListPromptsResponses = {
                     type: 'image';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2627,6 +3039,7 @@ export type ListPromptsResponses = {
                     type: 'tool_result';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2640,6 +3053,7 @@ export type ListPromptsResponses = {
                     type: 'image';
                 } | {
                     source: {
+                        id?: string;
                         kind: 'url';
                         url: string;
                     } | {
@@ -2700,6 +3114,7 @@ export type SubmitPromptData = {
             type: 'tool_result';
         } | {
             source: {
+                id?: string;
                 kind: 'url';
                 url: string;
             } | {
@@ -2713,6 +3128,7 @@ export type SubmitPromptData = {
             type: 'image';
         } | {
             source: {
+                id?: string;
                 kind: 'url';
                 url: string;
             } | {
@@ -2735,6 +3151,7 @@ export type SubmitPromptData = {
             thinking: string;
             type: 'thinking';
         }>;
+        disabled_tools?: Array<string>;
         goal_control?: 'pause' | 'resume' | 'cancel';
         goal_objective?: string;
         metadata?: {
@@ -2743,6 +3160,7 @@ export type SubmitPromptData = {
         model?: string;
         permission_mode?: 'manual' | 'yolo' | 'auto';
         plan_mode?: boolean;
+        profile?: string;
         swarm_mode?: boolean;
         thinking?: string;
     };
@@ -2775,6 +3193,7 @@ export type SubmitPromptResponses = {
                 type: 'tool_result';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2788,6 +3207,7 @@ export type SubmitPromptResponses = {
                 type: 'image';
             } | {
                 source: {
+                    id?: string;
                     kind: 'url';
                     url: string;
                 } | {
@@ -2860,12 +3280,6 @@ export type SubmitPromptResponses = {
         request_id: string;
     } | {
         code: 40401;
-        data: null;
-        details?: unknown;
-        msg: string;
-        request_id: string;
-    } | {
-        code: 40901;
         data: null;
         details?: unknown;
         msg: string;
@@ -3258,6 +3672,7 @@ export type GetApiV1SessionsBySessionIdSnapshotResponses = {
                         type: 'tool_result';
                     } | {
                         source: {
+                            id?: string;
                             kind: 'url';
                             url: string;
                         } | {
@@ -3271,6 +3686,7 @@ export type GetApiV1SessionsBySessionIdSnapshotResponses = {
                         type: 'image';
                     } | {
                         source: {
+                            id?: string;
                             kind: 'url';
                             url: string;
                         } | {
@@ -3871,6 +4287,1212 @@ export type GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses = {
 
 export type GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponse = GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses[keyof GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses];
 
+export type GetApiV1SessionsBySessionIdTranscriptData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query: {
+        agent_id: string;
+        before_turn?: string;
+        after_turn?: string;
+        page_size?: number;
+    };
+    url: '/api/v1/sessions/{session_id}/transcript';
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            agent_id: string;
+            agents: Array<{
+                agentId: string;
+                createdAt?: string;
+                disposedAt?: string;
+                label?: string;
+                parentAgentId?: string;
+                type?: 'main' | 'sub' | 'independent';
+            }>;
+            attachments: Array<{
+                attachmentId: string;
+                mediaType: string;
+                name?: string;
+                placeholder?: string;
+                size?: number;
+                source?: {
+                    kind: 'url';
+                    url: string;
+                } | {
+                    fileId: string;
+                    kind: 'file';
+                };
+            }>;
+            has_more: boolean;
+            interactions: Array<{
+                interactionId: string;
+                interactionKind: 'approval' | 'question';
+                request?: unknown;
+                response?: unknown;
+                state: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'answered' | 'dismissed';
+                toolCallId?: string;
+            }>;
+            items: Array<{
+                attachmentIds?: Array<string>;
+                durationMs?: number;
+                endedAt?: string;
+                error?: string;
+                kind: 'turn';
+                ordinal: number;
+                origin: {
+                    kind: 'user';
+                    payload?: unknown;
+                } | {
+                    kind: 'cron';
+                    payload?: unknown;
+                    taskId?: string;
+                } | {
+                    kind: 'task';
+                    payload?: unknown;
+                    taskId: string;
+                } | {
+                    kind: 'hook';
+                    payload?: unknown;
+                } | {
+                    kind: 'compaction';
+                    payload?: unknown;
+                } | {
+                    kind: 'side';
+                    payload?: unknown;
+                } | {
+                    kind: 'other';
+                    payload?: unknown;
+                };
+                prompt?: string;
+                startedAt?: string;
+                state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+                steps: Array<{
+                    endedAt?: string;
+                    endMessage?: string;
+                    endReason?: string;
+                    finishReason?: string;
+                    frames: Array<{
+                        attachmentIds?: Array<string>;
+                        frameId: string;
+                        kind: 'text';
+                        role: 'assistant' | 'user';
+                        taskId?: string;
+                        text: string;
+                    } | {
+                        frameId: string;
+                        kind: 'thinking';
+                        text: string;
+                    } | {
+                        agentRefs?: Array<{
+                            agentId: string;
+                            role?: 'child' | 'member';
+                        }>;
+                        approvalId?: string;
+                        display?: unknown;
+                        error?: string;
+                        frameId: string;
+                        input?: unknown;
+                        inputText?: string;
+                        kind: 'tool';
+                        name: string;
+                        output?: unknown;
+                        progress?: {
+                            customData?: unknown;
+                            customKind?: string;
+                            kind: 'stdout' | 'stderr' | 'progress' | 'status' | 'custom';
+                            percent?: number;
+                            text?: string;
+                        };
+                        state: 'running' | 'done' | 'error';
+                        taskId?: string;
+                        todoId?: string;
+                        toolCallId: string;
+                        view?: string;
+                    } | {
+                        detail?: unknown;
+                        frameId: string;
+                        kind: 'notice';
+                        level: 'error' | 'warning' | 'info';
+                        message: string;
+                        source?: string;
+                    }>;
+                    kind: 'step';
+                    ordinal: number;
+                    retry?: {
+                        delayMs: number;
+                        errorMessage: string;
+                        errorName: string;
+                        failedAttempt: number;
+                        maxAttempts: number;
+                        nextAttempt: number;
+                        statusCode?: number;
+                    };
+                    startedAt?: string;
+                    state: 'running' | 'completed' | 'interrupted' | 'failed';
+                    stepId: string;
+                    timing?: {
+                        llmClientConsumeMs?: number;
+                        llmFirstTokenLatencyMs?: number;
+                        llmRequestBuildMs?: number;
+                        llmServerDecodeMs?: number;
+                        llmServerFirstTokenMs?: number;
+                        llmStreamDurationMs?: number;
+                    };
+                    turnId: string;
+                    usage?: {
+                        inputCacheCreation: number;
+                        inputCacheRead: number;
+                        inputOther: number;
+                        output: number;
+                    };
+                }>;
+                turnId: string;
+                usage?: {
+                    cachedTokens?: number;
+                    cost?: number;
+                    inputTokens?: number;
+                    outputTokens?: number;
+                };
+            } | {
+                at?: string;
+                kind: 'marker';
+                marker: string;
+                markerId: string;
+                payload?: unknown;
+            } | {
+                at?: string;
+                kind: 'taskref';
+                refId: string;
+                taskId: string;
+            }>;
+            meta: {
+                activity?: 'idle' | 'turn' | 'disposing' | 'unknown';
+                agent?: {
+                    contextTokens?: number;
+                    contextUsage?: number;
+                    maxContextTokens?: number;
+                    model?: string;
+                    permission?: 'manual' | 'yolo' | 'auto';
+                    phase?: {
+                        kind: 'idle';
+                    } | {
+                        kind: 'running';
+                        since: number;
+                        step: number;
+                        stepId: string;
+                        turnId: number;
+                    } | {
+                        kind: 'streaming';
+                        since: number;
+                        step: number;
+                        stepId: string;
+                        stream: 'assistant' | 'thinking' | 'tool_call';
+                        toolCallId?: string;
+                        toolName?: string;
+                        turnId: number;
+                    } | {
+                        kind: 'tool_call';
+                        name: string;
+                        since: number;
+                        step: number;
+                        toolCallId: string;
+                        turnId: number;
+                    } | {
+                        delayMs: number;
+                        errorName?: string;
+                        failedAttempt: number;
+                        kind: 'retrying';
+                        maxAttempts: number;
+                        nextAttempt: number;
+                        since: number;
+                        statusCode?: number;
+                        step: number;
+                        stepId: string;
+                        turnId: number;
+                    } | {
+                        approval?: unknown;
+                        kind: 'awaiting_approval';
+                        since: number;
+                        step?: number;
+                        turnId: number;
+                    } | {
+                        at: number;
+                        kind: 'interrupted';
+                        message?: string;
+                        reason: 'aborted' | 'max_steps' | 'error';
+                        step?: number;
+                        turnId: number;
+                    } | {
+                        at: number;
+                        durationMs?: number;
+                        kind: 'ended';
+                        reason: 'completed' | 'cancelled' | 'failed' | 'blocked';
+                        turnId: number;
+                    };
+                    thinkingEffort?: string;
+                    usage?: {
+                        byModel?: {
+                            [key: string]: {
+                                inputCacheCreation: number;
+                                inputCacheRead: number;
+                                inputOther: number;
+                                output: number;
+                            };
+                        };
+                        currentTurn?: {
+                            inputCacheCreation: number;
+                            inputCacheRead: number;
+                            inputOther: number;
+                            output: number;
+                        };
+                        total?: {
+                            inputCacheCreation: number;
+                            inputCacheRead: number;
+                            inputOther: number;
+                            output: number;
+                        };
+                    };
+                };
+                goal?: {
+                    budgetLimit?: number;
+                    budgetUsed?: number;
+                    completionCriterion?: string;
+                    objective: string;
+                    status: 'active' | 'paused' | 'blocked' | 'complete';
+                };
+                modes?: {
+                    plan?: {
+                        reviewPath?: string;
+                        version?: number;
+                    };
+                    swarm?: {
+                        trigger?: string;
+                    };
+                };
+            };
+            pending_interactions: Array<string>;
+            prompts: Array<{
+                content?: unknown;
+                createdAt: string;
+                finishedAt?: string;
+                promptId: string;
+                status: 'running' | 'queued' | 'blocked' | 'completed' | 'failed' | 'aborted';
+                steeredAt?: string;
+                userMessageId?: string;
+            }>;
+            seq?: number;
+            tasks: Array<{
+                agentId?: string;
+                description?: string;
+                detached: boolean;
+                endedAt?: string;
+                error?: string;
+                kind: 'shell' | 'subagent' | 'tool' | 'other';
+                outputTail: string;
+                resultSummary?: string;
+                startedAt?: string;
+                state: 'running' | 'completed' | 'failed' | 'timed_out' | 'killed' | 'lost';
+                stateReason?: string;
+                taskId: string;
+                usage?: {
+                    inputCacheCreation: number;
+                    inputCacheRead: number;
+                    inputOther: number;
+                    output: number;
+                };
+            }>;
+            todos: Array<{
+                items: Array<{
+                    status: 'pending' | 'in_progress' | 'done';
+                    title: string;
+                }>;
+                todoId: string;
+                updatedAt?: string;
+            }>;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptResponse = GetApiV1SessionsBySessionIdTranscriptResponses[keyof GetApiV1SessionsBySessionIdTranscriptResponses];
+
+export type GetApiV1SessionsBySessionIdTranscriptOpsData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query: {
+        agent_id: string;
+        since_seq: number;
+    };
+    url: '/api/v1/sessions/{session_id}/transcript/ops';
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptOpsResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            agent_id: string;
+            batches: Array<{
+                ops: Array<{
+                    agentId: string;
+                    op: 'reset';
+                    snapshot: {
+                        attachments: Array<{
+                            attachmentId: string;
+                            mediaType: string;
+                            name?: string;
+                            placeholder?: string;
+                            size?: number;
+                            source?: {
+                                kind: 'url';
+                                url: string;
+                            } | {
+                                fileId: string;
+                                kind: 'file';
+                            };
+                        }>;
+                        hasMoreOlder?: boolean;
+                        interactions: Array<{
+                            interactionId: string;
+                            interactionKind: 'approval' | 'question';
+                            request?: unknown;
+                            response?: unknown;
+                            state: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'answered' | 'dismissed';
+                            toolCallId?: string;
+                        }>;
+                        items: Array<{
+                            attachmentIds?: Array<string>;
+                            durationMs?: number;
+                            endedAt?: string;
+                            error?: string;
+                            kind: 'turn';
+                            ordinal: number;
+                            origin: {
+                                kind: 'user';
+                                payload?: unknown;
+                            } | {
+                                kind: 'cron';
+                                payload?: unknown;
+                                taskId?: string;
+                            } | {
+                                kind: 'task';
+                                payload?: unknown;
+                                taskId: string;
+                            } | {
+                                kind: 'hook';
+                                payload?: unknown;
+                            } | {
+                                kind: 'compaction';
+                                payload?: unknown;
+                            } | {
+                                kind: 'side';
+                                payload?: unknown;
+                            } | {
+                                kind: 'other';
+                                payload?: unknown;
+                            };
+                            prompt?: string;
+                            startedAt?: string;
+                            state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+                            steps: Array<{
+                                endedAt?: string;
+                                endMessage?: string;
+                                endReason?: string;
+                                finishReason?: string;
+                                frames: Array<{
+                                    attachmentIds?: Array<string>;
+                                    frameId: string;
+                                    kind: 'text';
+                                    role: 'assistant' | 'user';
+                                    taskId?: string;
+                                    text: string;
+                                } | {
+                                    frameId: string;
+                                    kind: 'thinking';
+                                    text: string;
+                                } | {
+                                    agentRefs?: Array<{
+                                        agentId: string;
+                                        role?: 'child' | 'member';
+                                    }>;
+                                    approvalId?: string;
+                                    display?: unknown;
+                                    error?: string;
+                                    frameId: string;
+                                    input?: unknown;
+                                    inputText?: string;
+                                    kind: 'tool';
+                                    name: string;
+                                    output?: unknown;
+                                    progress?: {
+                                        customData?: unknown;
+                                        customKind?: string;
+                                        kind: 'stdout' | 'stderr' | 'progress' | 'status' | 'custom';
+                                        percent?: number;
+                                        text?: string;
+                                    };
+                                    state: 'running' | 'done' | 'error';
+                                    taskId?: string;
+                                    todoId?: string;
+                                    toolCallId: string;
+                                    view?: string;
+                                } | {
+                                    detail?: unknown;
+                                    frameId: string;
+                                    kind: 'notice';
+                                    level: 'error' | 'warning' | 'info';
+                                    message: string;
+                                    source?: string;
+                                }>;
+                                kind: 'step';
+                                ordinal: number;
+                                retry?: {
+                                    delayMs: number;
+                                    errorMessage: string;
+                                    errorName: string;
+                                    failedAttempt: number;
+                                    maxAttempts: number;
+                                    nextAttempt: number;
+                                    statusCode?: number;
+                                };
+                                startedAt?: string;
+                                state: 'running' | 'completed' | 'interrupted' | 'failed';
+                                stepId: string;
+                                timing?: {
+                                    llmClientConsumeMs?: number;
+                                    llmFirstTokenLatencyMs?: number;
+                                    llmRequestBuildMs?: number;
+                                    llmServerDecodeMs?: number;
+                                    llmServerFirstTokenMs?: number;
+                                    llmStreamDurationMs?: number;
+                                };
+                                turnId: string;
+                                usage?: {
+                                    inputCacheCreation: number;
+                                    inputCacheRead: number;
+                                    inputOther: number;
+                                    output: number;
+                                };
+                            }>;
+                            turnId: string;
+                            usage?: {
+                                cachedTokens?: number;
+                                cost?: number;
+                                inputTokens?: number;
+                                outputTokens?: number;
+                            };
+                        } | {
+                            at?: string;
+                            kind: 'marker';
+                            marker: string;
+                            markerId: string;
+                            payload?: unknown;
+                        } | {
+                            at?: string;
+                            kind: 'taskref';
+                            refId: string;
+                            taskId: string;
+                        }>;
+                        meta: {
+                            activity?: 'idle' | 'turn' | 'disposing' | 'unknown';
+                            agent?: {
+                                contextTokens?: number;
+                                contextUsage?: number;
+                                maxContextTokens?: number;
+                                model?: string;
+                                permission?: 'manual' | 'yolo' | 'auto';
+                                phase?: {
+                                    kind: 'idle';
+                                } | {
+                                    kind: 'running';
+                                    since: number;
+                                    step: number;
+                                    stepId: string;
+                                    turnId: number;
+                                } | {
+                                    kind: 'streaming';
+                                    since: number;
+                                    step: number;
+                                    stepId: string;
+                                    stream: 'assistant' | 'thinking' | 'tool_call';
+                                    toolCallId?: string;
+                                    toolName?: string;
+                                    turnId: number;
+                                } | {
+                                    kind: 'tool_call';
+                                    name: string;
+                                    since: number;
+                                    step: number;
+                                    toolCallId: string;
+                                    turnId: number;
+                                } | {
+                                    delayMs: number;
+                                    errorName?: string;
+                                    failedAttempt: number;
+                                    kind: 'retrying';
+                                    maxAttempts: number;
+                                    nextAttempt: number;
+                                    since: number;
+                                    statusCode?: number;
+                                    step: number;
+                                    stepId: string;
+                                    turnId: number;
+                                } | {
+                                    approval?: unknown;
+                                    kind: 'awaiting_approval';
+                                    since: number;
+                                    step?: number;
+                                    turnId: number;
+                                } | {
+                                    at: number;
+                                    kind: 'interrupted';
+                                    message?: string;
+                                    reason: 'aborted' | 'max_steps' | 'error';
+                                    step?: number;
+                                    turnId: number;
+                                } | {
+                                    at: number;
+                                    durationMs?: number;
+                                    kind: 'ended';
+                                    reason: 'completed' | 'cancelled' | 'failed' | 'blocked';
+                                    turnId: number;
+                                };
+                                thinkingEffort?: string;
+                                usage?: {
+                                    byModel?: {
+                                        [key: string]: {
+                                            inputCacheCreation: number;
+                                            inputCacheRead: number;
+                                            inputOther: number;
+                                            output: number;
+                                        };
+                                    };
+                                    currentTurn?: {
+                                        inputCacheCreation: number;
+                                        inputCacheRead: number;
+                                        inputOther: number;
+                                        output: number;
+                                    };
+                                    total?: {
+                                        inputCacheCreation: number;
+                                        inputCacheRead: number;
+                                        inputOther: number;
+                                        output: number;
+                                    };
+                                };
+                            };
+                            goal?: {
+                                budgetLimit?: number;
+                                budgetUsed?: number;
+                                completionCriterion?: string;
+                                objective: string;
+                                status: 'active' | 'paused' | 'blocked' | 'complete';
+                            };
+                            modes?: {
+                                plan?: {
+                                    reviewPath?: string;
+                                    version?: number;
+                                };
+                                swarm?: {
+                                    trigger?: string;
+                                };
+                            };
+                        };
+                        prompts: Array<{
+                            content?: unknown;
+                            createdAt: string;
+                            finishedAt?: string;
+                            promptId: string;
+                            status: 'running' | 'queued' | 'blocked' | 'completed' | 'failed' | 'aborted';
+                            steeredAt?: string;
+                            userMessageId?: string;
+                        }>;
+                        tasks: Array<{
+                            agentId?: string;
+                            description?: string;
+                            detached: boolean;
+                            endedAt?: string;
+                            error?: string;
+                            kind: 'shell' | 'subagent' | 'tool' | 'other';
+                            outputTail: string;
+                            resultSummary?: string;
+                            startedAt?: string;
+                            state: 'running' | 'completed' | 'failed' | 'timed_out' | 'killed' | 'lost';
+                            stateReason?: string;
+                            taskId: string;
+                            usage?: {
+                                inputCacheCreation: number;
+                                inputCacheRead: number;
+                                inputOther: number;
+                                output: number;
+                            };
+                        }>;
+                        todos: Array<{
+                            items: Array<{
+                                status: 'pending' | 'in_progress' | 'done';
+                                title: string;
+                            }>;
+                            todoId: string;
+                            updatedAt?: string;
+                        }>;
+                    };
+                } | {
+                    op: 'turn.upsert';
+                    turn: {
+                        attachmentIds?: Array<string>;
+                        durationMs?: number;
+                        endedAt?: string;
+                        error?: string;
+                        kind: 'turn';
+                        ordinal: number;
+                        origin: {
+                            kind: 'user';
+                            payload?: unknown;
+                        } | {
+                            kind: 'cron';
+                            payload?: unknown;
+                            taskId?: string;
+                        } | {
+                            kind: 'task';
+                            payload?: unknown;
+                            taskId: string;
+                        } | {
+                            kind: 'hook';
+                            payload?: unknown;
+                        } | {
+                            kind: 'compaction';
+                            payload?: unknown;
+                        } | {
+                            kind: 'side';
+                            payload?: unknown;
+                        } | {
+                            kind: 'other';
+                            payload?: unknown;
+                        };
+                        prompt?: string;
+                        startedAt?: string;
+                        state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+                        turnId: string;
+                        usage?: {
+                            cachedTokens?: number;
+                            cost?: number;
+                            inputTokens?: number;
+                            outputTokens?: number;
+                        };
+                    };
+                } | {
+                    op: 'step.upsert';
+                    step: {
+                        endedAt?: string;
+                        endMessage?: string;
+                        endReason?: string;
+                        finishReason?: string;
+                        kind: 'step';
+                        ordinal: number;
+                        retry?: {
+                            delayMs: number;
+                            errorMessage: string;
+                            errorName: string;
+                            failedAttempt: number;
+                            maxAttempts: number;
+                            nextAttempt: number;
+                            statusCode?: number;
+                        };
+                        startedAt?: string;
+                        state: 'running' | 'completed' | 'interrupted' | 'failed';
+                        stepId: string;
+                        timing?: {
+                            llmClientConsumeMs?: number;
+                            llmFirstTokenLatencyMs?: number;
+                            llmRequestBuildMs?: number;
+                            llmServerDecodeMs?: number;
+                            llmServerFirstTokenMs?: number;
+                            llmStreamDurationMs?: number;
+                        };
+                        turnId: string;
+                        usage?: {
+                            inputCacheCreation: number;
+                            inputCacheRead: number;
+                            inputOther: number;
+                            output: number;
+                        };
+                    };
+                    turnId: string;
+                } | {
+                    frame: {
+                        attachmentIds?: Array<string>;
+                        frameId: string;
+                        kind: 'text';
+                        role: 'assistant' | 'user';
+                        taskId?: string;
+                        text: string;
+                    } | {
+                        frameId: string;
+                        kind: 'thinking';
+                        text: string;
+                    } | {
+                        agentRefs?: Array<{
+                            agentId: string;
+                            role?: 'child' | 'member';
+                        }>;
+                        approvalId?: string;
+                        display?: unknown;
+                        error?: string;
+                        frameId: string;
+                        input?: unknown;
+                        inputText?: string;
+                        kind: 'tool';
+                        name: string;
+                        output?: unknown;
+                        progress?: {
+                            customData?: unknown;
+                            customKind?: string;
+                            kind: 'stdout' | 'stderr' | 'progress' | 'status' | 'custom';
+                            percent?: number;
+                            text?: string;
+                        };
+                        state: 'running' | 'done' | 'error';
+                        taskId?: string;
+                        todoId?: string;
+                        toolCallId: string;
+                        view?: string;
+                    } | {
+                        detail?: unknown;
+                        frameId: string;
+                        kind: 'notice';
+                        level: 'error' | 'warning' | 'info';
+                        message: string;
+                        source?: string;
+                    };
+                    op: 'frame.upsert';
+                    stepId: string;
+                    turnId: string;
+                } | {
+                    offset: number;
+                    op: 'append';
+                    target: {
+                        frameId: string;
+                        stepId: string;
+                        turnId: string;
+                        type: 'frame';
+                    } | {
+                        taskId: string;
+                        type: 'task';
+                    };
+                    text: string;
+                } | {
+                    beforeTurn?: number;
+                    item: {
+                        at?: string;
+                        kind: 'marker';
+                        marker: string;
+                        markerId: string;
+                        payload?: unknown;
+                    };
+                    op: 'marker.upsert';
+                } | {
+                    beforeTurn?: number;
+                    item: {
+                        at?: string;
+                        kind: 'taskref';
+                        refId: string;
+                        taskId: string;
+                    };
+                    op: 'taskref.upsert';
+                } | {
+                    op: 'task.upsert';
+                    task: {
+                        agentId?: string;
+                        description?: string;
+                        detached: boolean;
+                        endedAt?: string;
+                        error?: string;
+                        kind: 'shell' | 'subagent' | 'tool' | 'other';
+                        outputTail: string;
+                        resultSummary?: string;
+                        startedAt?: string;
+                        state: 'running' | 'completed' | 'failed' | 'timed_out' | 'killed' | 'lost';
+                        stateReason?: string;
+                        taskId: string;
+                        usage?: {
+                            inputCacheCreation: number;
+                            inputCacheRead: number;
+                            inputOther: number;
+                            output: number;
+                        };
+                    };
+                } | {
+                    interaction: {
+                        interactionId: string;
+                        interactionKind: 'approval' | 'question';
+                        request?: unknown;
+                        response?: unknown;
+                        state: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'answered' | 'dismissed';
+                        toolCallId?: string;
+                    };
+                    op: 'interaction.upsert';
+                } | {
+                    attachment: {
+                        attachmentId: string;
+                        mediaType: string;
+                        name?: string;
+                        placeholder?: string;
+                        size?: number;
+                        source?: {
+                            kind: 'url';
+                            url: string;
+                        } | {
+                            fileId: string;
+                            kind: 'file';
+                        };
+                    };
+                    op: 'attachment.upsert';
+                } | {
+                    op: 'todo.upsert';
+                    todo: {
+                        items: Array<{
+                            status: 'pending' | 'in_progress' | 'done';
+                            title: string;
+                        }>;
+                        todoId: string;
+                        updatedAt?: string;
+                    };
+                } | {
+                    op: 'prompt.upsert';
+                    prompt: {
+                        content?: unknown;
+                        createdAt: string;
+                        finishedAt?: string;
+                        promptId: string;
+                        status: 'running' | 'queued' | 'blocked' | 'completed' | 'failed' | 'aborted';
+                        steeredAt?: string;
+                        userMessageId?: string;
+                    };
+                } | {
+                    meta: {
+                        activity?: 'idle' | 'turn' | 'disposing' | 'unknown';
+                        agent?: {
+                            contextTokens?: number;
+                            contextUsage?: number;
+                            maxContextTokens?: number;
+                            model?: string;
+                            permission?: 'manual' | 'yolo' | 'auto';
+                            phase?: {
+                                kind: 'idle';
+                            } | {
+                                kind: 'running';
+                                since: number;
+                                step: number;
+                                stepId: string;
+                                turnId: number;
+                            } | {
+                                kind: 'streaming';
+                                since: number;
+                                step: number;
+                                stepId: string;
+                                stream: 'assistant' | 'thinking' | 'tool_call';
+                                toolCallId?: string;
+                                toolName?: string;
+                                turnId: number;
+                            } | {
+                                kind: 'tool_call';
+                                name: string;
+                                since: number;
+                                step: number;
+                                toolCallId: string;
+                                turnId: number;
+                            } | {
+                                delayMs: number;
+                                errorName?: string;
+                                failedAttempt: number;
+                                kind: 'retrying';
+                                maxAttempts: number;
+                                nextAttempt: number;
+                                since: number;
+                                statusCode?: number;
+                                step: number;
+                                stepId: string;
+                                turnId: number;
+                            } | {
+                                approval?: unknown;
+                                kind: 'awaiting_approval';
+                                since: number;
+                                step?: number;
+                                turnId: number;
+                            } | {
+                                at: number;
+                                kind: 'interrupted';
+                                message?: string;
+                                reason: 'aborted' | 'max_steps' | 'error';
+                                step?: number;
+                                turnId: number;
+                            } | {
+                                at: number;
+                                durationMs?: number;
+                                kind: 'ended';
+                                reason: 'completed' | 'cancelled' | 'failed' | 'blocked';
+                                turnId: number;
+                            };
+                            thinkingEffort?: string;
+                            usage?: {
+                                byModel?: {
+                                    [key: string]: {
+                                        inputCacheCreation: number;
+                                        inputCacheRead: number;
+                                        inputOther: number;
+                                        output: number;
+                                    };
+                                };
+                                currentTurn?: {
+                                    inputCacheCreation: number;
+                                    inputCacheRead: number;
+                                    inputOther: number;
+                                    output: number;
+                                };
+                                total?: {
+                                    inputCacheCreation: number;
+                                    inputCacheRead: number;
+                                    inputOther: number;
+                                    output: number;
+                                };
+                            };
+                        };
+                        goal?: {
+                            budgetLimit?: number;
+                            budgetUsed?: number;
+                            completionCriterion?: string;
+                            objective: string;
+                            status: 'active' | 'paused' | 'blocked' | 'complete';
+                        };
+                        modes?: {
+                            plan?: {
+                                reviewPath?: string;
+                                version?: number;
+                            } | null;
+                            swarm?: {
+                                trigger?: string;
+                            } | null;
+                        };
+                    };
+                    op: 'meta.merge';
+                } | {
+                    ids: Array<string>;
+                    op: 'items.remove';
+                }>;
+                seq: number;
+            }>;
+            complete: boolean;
+            latest_seq: number;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptOpsResponse = GetApiV1SessionsBySessionIdTranscriptOpsResponses[keyof GetApiV1SessionsBySessionIdTranscriptOpsResponses];
+
+export type GetApiV1SessionsBySessionIdTranscriptPlanData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query: {
+        agent_id: string;
+        tool_call_id?: string;
+    };
+    url: '/api/v1/sessions/{session_id}/transcript/plan';
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptPlanResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            agent_id: string;
+            plans: Array<{
+                options?: Array<{
+                    description?: string;
+                    label: string;
+                }>;
+                path?: string;
+                plan: string;
+                review?: {
+                    feedback?: string;
+                    selected_option?: string;
+                    state: 'pending' | 'approved' | 'rejected' | 'cancelled';
+                };
+                source: 'interaction' | 'display' | 'output';
+                tool_call_id: string;
+                turn_id: string;
+            }>;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40416;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptPlanResponse = GetApiV1SessionsBySessionIdTranscriptPlanResponses[keyof GetApiV1SessionsBySessionIdTranscriptPlanResponses];
+
+export type GetApiV1SessionsBySessionIdTranscriptUserMessagesData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query?: {
+        agent_id?: string;
+    };
+    url: '/api/v1/sessions/{session_id}/transcript/user-messages';
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            agents: Array<{
+                agent_id: string;
+                attachments: Array<{
+                    attachmentId: string;
+                    mediaType: string;
+                    name?: string;
+                    placeholder?: string;
+                    size?: number;
+                    source?: {
+                        kind: 'url';
+                        url: string;
+                    } | {
+                        fileId: string;
+                        kind: 'file';
+                    };
+                }>;
+                messages: Array<{
+                    attachment_ids?: Array<string>;
+                    ordinal: number;
+                    origin: {
+                        kind: 'user';
+                        payload?: unknown;
+                    } | {
+                        kind: 'cron';
+                        payload?: unknown;
+                        taskId?: string;
+                    } | {
+                        kind: 'task';
+                        payload?: unknown;
+                        taskId: string;
+                    } | {
+                        kind: 'hook';
+                        payload?: unknown;
+                    } | {
+                        kind: 'compaction';
+                        payload?: unknown;
+                    } | {
+                        kind: 'side';
+                        payload?: unknown;
+                    } | {
+                        kind: 'other';
+                        payload?: unknown;
+                    };
+                    prompt: string;
+                    started_at?: string;
+                    state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+                    turn_id: string;
+                }>;
+            }>;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdTranscriptUserMessagesResponse = GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses[keyof GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses];
+
 export type GetApiV1SessionsBySessionIdWarningsData = {
     body?: never;
     path: {
@@ -3957,6 +5579,7 @@ export type GetApiV1ToolsResponses = {
         code: 0;
         data: {
             tools: Array<{
+                active?: boolean;
                 description: string;
                 input_schema: unknown;
                 mcp_server_id?: string;
@@ -4177,128 +5800,6 @@ export type ListWorkspaceSkillsResponses = {
 };
 
 export type ListWorkspaceSkillsResponse = ListWorkspaceSkillsResponses[keyof ListWorkspaceSkillsResponses];
-
-export type GetApiV2ByServiceByMethodData = {
-    body?: never;
-    path: {
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/{service}/{method}';
-};
-
-export type GetApiV2ByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type PostApiV2ByServiceByMethodData = {
-    body?: never;
-    path: {
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/{service}/{method}';
-};
-
-export type PostApiV2ByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type GetApiV2ChannelsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v2/channels';
-};
-
-export type GetApiV2ChannelsResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type GetApiV2SessionBySessionIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/{service}/{method}';
-};
-
-export type GetApiV2SessionBySessionIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type PostApiV2SessionBySessionIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/{service}/{method}';
-};
-
-export type PostApiV2SessionBySessionIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        agent_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/agent/{agent_id}/{service}/{method}';
-};
-
-export type GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
-
-export type PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData = {
-    body?: never;
-    path: {
-        session_id: string;
-        agent_id: string;
-        service: string;
-        method: string;
-    };
-    query?: never;
-    url: '/api/v2/session/{session_id}/agent/{agent_id}/{service}/{method}';
-};
-
-export type PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses = {
-    /**
-     * Default Response
-     */
-    200: unknown;
-};
 
 export type GetAsyncapiJsonData = {
     body?: never;

@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ActivateSkillData, ActivateSkillResponses, CancelTaskData, CancelTaskResponses, CloseTerminalData, CloseTerminalResponses, DeleteApiV1FilesByFileIdData, DeleteApiV1FilesByFileIdResponses, DeleteApiV1OauthLoginData, DeleteApiV1OauthLoginResponses, DeleteApiV1WorkspacesByWorkspaceIdData, DeleteApiV1WorkspacesByWorkspaceIdResponses, DownloadFileData, DownloadFileResponses, FsActionData, FsActionResponses, FsBrowseData, FsBrowseResponses, FsHomeData, FsHomeResponses, GetApiV1AuthData, GetApiV1AuthResponses, GetApiV1ConfigData, GetApiV1ConfigResponses, GetApiV1ConnectionsData, GetApiV1ConnectionsResponses, GetApiV1FilesByFileIdData, GetApiV1FilesByFileIdErrors, GetApiV1FilesByFileIdResponses, GetApiV1GuiStoreGetItemData, GetApiV1GuiStoreGetItemResponses, GetApiV1GuiStoreLengthData, GetApiV1GuiStoreLengthResponses, GetApiV1HealthzData, GetApiV1HealthzResponses, GetApiV1McpServersData, GetApiV1McpServersResponses, GetApiV1MetaData, GetApiV1MetaResponses, GetApiV1ModelsData, GetApiV1ModelsResponses, GetApiV1OauthLoginData, GetApiV1OauthLoginResponses, GetApiV1ProvidersByProviderIdData, GetApiV1ProvidersByProviderIdResponses, GetApiV1ProvidersData, GetApiV1ProvidersResponses, GetApiV1SessionsBySessionIdApprovalsData, GetApiV1SessionsBySessionIdApprovalsResponses, GetApiV1SessionsBySessionIdChildrenData, GetApiV1SessionsBySessionIdChildrenResponses, GetApiV1SessionsBySessionIdData, GetApiV1SessionsBySessionIdGoalData, GetApiV1SessionsBySessionIdGoalResponses, GetApiV1SessionsBySessionIdMessagesByMessageIdData, GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, GetApiV1SessionsBySessionIdMessagesData, GetApiV1SessionsBySessionIdMessagesResponses, GetApiV1SessionsBySessionIdProfileData, GetApiV1SessionsBySessionIdProfileResponses, GetApiV1SessionsBySessionIdQuestionsData, GetApiV1SessionsBySessionIdQuestionsResponses, GetApiV1SessionsBySessionIdResponses, GetApiV1SessionsBySessionIdSnapshotData, GetApiV1SessionsBySessionIdSnapshotResponses, GetApiV1SessionsBySessionIdStatusData, GetApiV1SessionsBySessionIdStatusResponses, GetApiV1SessionsBySessionIdTasksByTaskIdData, GetApiV1SessionsBySessionIdTasksByTaskIdResponses, GetApiV1SessionsBySessionIdTasksData, GetApiV1SessionsBySessionIdTasksResponses, GetApiV1SessionsBySessionIdTerminalsByTerminalIdData, GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, GetApiV1SessionsBySessionIdTerminalsData, GetApiV1SessionsBySessionIdTerminalsResponses, GetApiV1SessionsBySessionIdWarningsData, GetApiV1SessionsBySessionIdWarningsResponses, GetApiV1SessionsData, GetApiV1SessionsResponses, GetApiV1ToolsData, GetApiV1ToolsResponses, GetApiV1WorkspacesData, GetApiV1WorkspacesResponses, GetApiV2ByServiceByMethodData, GetApiV2ByServiceByMethodResponses, GetApiV2ChannelsData, GetApiV2ChannelsResponses, GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData, GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses, GetApiV2SessionBySessionIdByServiceByMethodData, GetApiV2SessionBySessionIdByServiceByMethodResponses, GetAsyncapiJsonData, GetAsyncapiJsonResponses, GetBy__Data, GetBy__Responses, GetData, GetOpenapiJsonData, GetOpenapiJsonResponses, GetResponses, ListPromptsData, ListPromptsResponses, ListSkillsData, ListSkillsResponses, ListWorkspaceSkillsData, ListWorkspaceSkillsResponses, PatchApiV1WorkspacesByWorkspaceIdData, PatchApiV1WorkspacesByWorkspaceIdResponses, PostApiV1ConfigData, PostApiV1ConfigResponses, PostApiV1FilesData, PostApiV1FilesResponses, PostApiV1GuiStoreClearData, PostApiV1GuiStoreClearResponses, PostApiV1GuiStoreRemoveItemData, PostApiV1GuiStoreRemoveItemResponses, PostApiV1GuiStoreSetItemData, PostApiV1GuiStoreSetItemResponses, PostApiV1OauthLoginData, PostApiV1OauthLoginResponses, PostApiV1OauthLogoutData, PostApiV1OauthLogoutResponses, PostApiV1SessionsBySessionIdApprovalsByApprovalIdData, PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, PostApiV1SessionsBySessionIdChildrenData, PostApiV1SessionsBySessionIdChildrenResponses, PostApiV1SessionsBySessionIdExportData, PostApiV1SessionsBySessionIdExportResponses, PostApiV1SessionsBySessionIdProfileData, PostApiV1SessionsBySessionIdProfileResponses, PostApiV1SessionsBySessionIdQuestionsByTailData, PostApiV1SessionsBySessionIdQuestionsByTailResponses, PostApiV1SessionsBySessionIdTerminalsData, PostApiV1SessionsBySessionIdTerminalsResponses, PostApiV1SessionsData, PostApiV1SessionsResponses, PostApiV1ShutdownData, PostApiV1ShutdownResponses, PostApiV1WorkspacesData, PostApiV1WorkspacesResponses, PostApiV2ByServiceByMethodData, PostApiV2ByServiceByMethodResponses, PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData, PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses, PostApiV2SessionBySessionIdByServiceByMethodData, PostApiV2SessionBySessionIdByServiceByMethodResponses, PromptActionData, PromptActionResponses, RefreshProviderData, RefreshProviderModelsData, RefreshProviderModelsResponses, RefreshProviderResponses, RestartMcpServerData, RestartMcpServerResponses, RunSessionArchiveActionData, RunSessionArchiveActionResponses, SetDefaultModelData, SetDefaultModelResponses, SteerPromptsData, SteerPromptsResponses, SubmitPromptData, SubmitPromptResponses } from './types.gen';
-import { zActivateSkillBody, zActivateSkillPath, zCancelTaskPath, zCloseTerminalPath, zDeleteApiV1FilesByFileIdPath, zDeleteApiV1OauthLoginQuery, zDeleteApiV1WorkspacesByWorkspaceIdPath, zDownloadFilePath, zFsActionBody, zFsActionPath, zFsBrowseQuery, zGetApiV1FilesByFileIdPath, zGetApiV1GuiStoreGetItemQuery, zGetApiV1OauthLoginQuery, zGetApiV1ProvidersByProviderIdPath, zGetApiV1SessionsBySessionIdApprovalsPath, zGetApiV1SessionsBySessionIdApprovalsQuery, zGetApiV1SessionsBySessionIdChildrenPath, zGetApiV1SessionsBySessionIdChildrenQuery, zGetApiV1SessionsBySessionIdGoalPath, zGetApiV1SessionsBySessionIdMessagesByMessageIdPath, zGetApiV1SessionsBySessionIdMessagesPath, zGetApiV1SessionsBySessionIdMessagesQuery, zGetApiV1SessionsBySessionIdPath, zGetApiV1SessionsBySessionIdProfilePath, zGetApiV1SessionsBySessionIdQuestionsPath, zGetApiV1SessionsBySessionIdQuestionsQuery, zGetApiV1SessionsBySessionIdSnapshotPath, zGetApiV1SessionsBySessionIdStatusPath, zGetApiV1SessionsBySessionIdTasksByTaskIdPath, zGetApiV1SessionsBySessionIdTasksByTaskIdQuery, zGetApiV1SessionsBySessionIdTasksPath, zGetApiV1SessionsBySessionIdTasksQuery, zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath, zGetApiV1SessionsBySessionIdTerminalsPath, zGetApiV1SessionsBySessionIdWarningsPath, zGetApiV1SessionsQuery, zGetApiV1ToolsQuery, zGetApiV2ByServiceByMethodPath, zGetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath, zGetApiV2SessionBySessionIdByServiceByMethodPath, zGetBy__Path, zListPromptsPath, zListSkillsPath, zListWorkspaceSkillsPath, zPatchApiV1WorkspacesByWorkspaceIdBody, zPatchApiV1WorkspacesByWorkspaceIdPath, zPostApiV1ConfigBody, zPostApiV1FilesBody, zPostApiV1GuiStoreRemoveItemBody, zPostApiV1GuiStoreSetItemBody, zPostApiV1OauthLoginBody, zPostApiV1OauthLogoutBody, zPostApiV1SessionsBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdPath, zPostApiV1SessionsBySessionIdChildrenBody, zPostApiV1SessionsBySessionIdChildrenPath, zPostApiV1SessionsBySessionIdExportBody, zPostApiV1SessionsBySessionIdExportPath, zPostApiV1SessionsBySessionIdProfileBody, zPostApiV1SessionsBySessionIdProfilePath, zPostApiV1SessionsBySessionIdQuestionsByTailBody, zPostApiV1SessionsBySessionIdQuestionsByTailPath, zPostApiV1SessionsBySessionIdTerminalsBody, zPostApiV1SessionsBySessionIdTerminalsPath, zPostApiV1WorkspacesBody, zPostApiV2ByServiceByMethodPath, zPostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath, zPostApiV2SessionBySessionIdByServiceByMethodPath, zPromptActionPath, zRefreshProviderModelsPath, zRefreshProviderPath, zRestartMcpServerPath, zRunSessionArchiveActionBody, zRunSessionArchiveActionPath, zSetDefaultModelPath, zSteerPromptsBody, zSteerPromptsPath, zSubmitPromptBody, zSubmitPromptPath } from './zod.gen';
+import type { ActivateSkillData, ActivateSkillResponses, CancelTaskData, CancelTaskResponses, CloseTerminalData, CloseTerminalResponses, CreateProviderData, CreateProviderResponses, DeleteApiV1FilesByFileIdData, DeleteApiV1FilesByFileIdResponses, DeleteApiV1OauthLoginData, DeleteApiV1OauthLoginResponses, DeleteApiV1WorkspacesByWorkspaceIdData, DeleteApiV1WorkspacesByWorkspaceIdResponses, DeleteProviderData, DeleteProviderResponses, DownloadFileData, DownloadFileResponses, FsActionData, FsActionResponses, FsBrowseData, FsBrowseResponses, FsContentData, FsContentResponses, FsHomeData, FsHomeResponses, GetApiV1AuthData, GetApiV1AuthResponses, GetApiV1ConfigData, GetApiV1ConfigResponses, GetApiV1ConnectionsData, GetApiV1ConnectionsResponses, GetApiV1FilesByFileIdData, GetApiV1FilesByFileIdErrors, GetApiV1FilesByFileIdResponses, GetApiV1GuiStoreGetItemData, GetApiV1GuiStoreGetItemResponses, GetApiV1GuiStoreLengthData, GetApiV1GuiStoreLengthResponses, GetApiV1HealthzData, GetApiV1HealthzResponses, GetApiV1McpServersData, GetApiV1McpServersResponses, GetApiV1MetaData, GetApiV1MetaResponses, GetApiV1ModelsData, GetApiV1ModelsResponses, GetApiV1OauthLoginData, GetApiV1OauthLoginResponses, GetApiV1OauthUsageData, GetApiV1OauthUsageResponses, GetApiV1ProvidersByProviderIdData, GetApiV1ProvidersByProviderIdResponses, GetApiV1ProvidersData, GetApiV1ProvidersResponses, GetApiV1SessionsBySessionIdApprovalsData, GetApiV1SessionsBySessionIdApprovalsResponses, GetApiV1SessionsBySessionIdChildrenData, GetApiV1SessionsBySessionIdChildrenResponses, GetApiV1SessionsBySessionIdData, GetApiV1SessionsBySessionIdGoalData, GetApiV1SessionsBySessionIdGoalResponses, GetApiV1SessionsBySessionIdMessagesByMessageIdData, GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, GetApiV1SessionsBySessionIdMessagesData, GetApiV1SessionsBySessionIdMessagesResponses, GetApiV1SessionsBySessionIdProfileData, GetApiV1SessionsBySessionIdProfileResponses, GetApiV1SessionsBySessionIdQuestionsData, GetApiV1SessionsBySessionIdQuestionsResponses, GetApiV1SessionsBySessionIdResponses, GetApiV1SessionsBySessionIdSnapshotData, GetApiV1SessionsBySessionIdSnapshotResponses, GetApiV1SessionsBySessionIdStatusData, GetApiV1SessionsBySessionIdStatusResponses, GetApiV1SessionsBySessionIdTasksByTaskIdData, GetApiV1SessionsBySessionIdTasksByTaskIdResponses, GetApiV1SessionsBySessionIdTasksData, GetApiV1SessionsBySessionIdTasksResponses, GetApiV1SessionsBySessionIdTerminalsByTerminalIdData, GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, GetApiV1SessionsBySessionIdTerminalsData, GetApiV1SessionsBySessionIdTerminalsResponses, GetApiV1SessionsBySessionIdTranscriptData, GetApiV1SessionsBySessionIdTranscriptOpsData, GetApiV1SessionsBySessionIdTranscriptOpsResponses, GetApiV1SessionsBySessionIdTranscriptPlanData, GetApiV1SessionsBySessionIdTranscriptPlanResponses, GetApiV1SessionsBySessionIdTranscriptResponses, GetApiV1SessionsBySessionIdTranscriptUserMessagesData, GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, GetApiV1SessionsBySessionIdWarningsData, GetApiV1SessionsBySessionIdWarningsResponses, GetApiV1SessionsData, GetApiV1SessionsResponses, GetApiV1ToolsData, GetApiV1ToolsResponses, GetApiV1WorkspacesData, GetApiV1WorkspacesResponses, GetAsyncapiJsonData, GetAsyncapiJsonResponses, GetBy__Data, GetBy__Responses, GetCatalogProviderData, GetCatalogProviderResponses, GetData, GetOpenapiJsonData, GetOpenapiJsonResponses, GetResponses, ListCatalogProvidersData, ListCatalogProvidersResponses, ListPromptsData, ListPromptsResponses, ListSkillsData, ListSkillsResponses, ListWorkspaceSkillsData, ListWorkspaceSkillsResponses, PatchApiV1WorkspacesByWorkspaceIdData, PatchApiV1WorkspacesByWorkspaceIdResponses, PostApiV1ConfigData, PostApiV1ConfigResponses, PostApiV1FilesData, PostApiV1FilesResponses, PostApiV1GuiStoreClearData, PostApiV1GuiStoreClearResponses, PostApiV1GuiStoreRemoveItemData, PostApiV1GuiStoreRemoveItemResponses, PostApiV1GuiStoreSetItemData, PostApiV1GuiStoreSetItemResponses, PostApiV1OauthLoginData, PostApiV1OauthLoginResponses, PostApiV1OauthLogoutData, PostApiV1OauthLogoutResponses, PostApiV1SessionsBySessionIdApprovalsByApprovalIdData, PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, PostApiV1SessionsBySessionIdChildrenData, PostApiV1SessionsBySessionIdChildrenResponses, PostApiV1SessionsBySessionIdExportData, PostApiV1SessionsBySessionIdExportResponses, PostApiV1SessionsBySessionIdProfileData, PostApiV1SessionsBySessionIdProfileResponses, PostApiV1SessionsBySessionIdQuestionsByTailData, PostApiV1SessionsBySessionIdQuestionsByTailResponses, PostApiV1SessionsBySessionIdTerminalsData, PostApiV1SessionsBySessionIdTerminalsResponses, PostApiV1SessionsData, PostApiV1SessionsResponses, PostApiV1ShutdownData, PostApiV1ShutdownResponses, PostApiV1WorkspacesData, PostApiV1WorkspacesResponses, PromptActionData, PromptActionResponses, ProviderCollectionActionData, ProviderCollectionActionResponses, RefreshProviderData, RefreshProviderResponses, ReplaceProviderData, ReplaceProviderResponses, RestartMcpServerData, RestartMcpServerResponses, RunSessionArchiveActionData, RunSessionArchiveActionResponses, SetDefaultModelData, SetDefaultModelResponses, SteerPromptsData, SteerPromptsResponses, SubmitPromptData, SubmitPromptResponses } from './types.gen';
+import { zActivateSkillBody, zActivateSkillPath, zCancelTaskPath, zCloseTerminalPath, zCreateProviderBody, zDeleteApiV1FilesByFileIdPath, zDeleteApiV1OauthLoginQuery, zDeleteApiV1WorkspacesByWorkspaceIdPath, zDeleteProviderPath, zDownloadFilePath, zFsActionBody, zFsActionPath, zFsBrowseQuery, zFsContentQuery, zGetApiV1FilesByFileIdPath, zGetApiV1GuiStoreGetItemQuery, zGetApiV1OauthLoginQuery, zGetApiV1OauthUsageQuery, zGetApiV1ProvidersByProviderIdPath, zGetApiV1SessionsBySessionIdApprovalsPath, zGetApiV1SessionsBySessionIdApprovalsQuery, zGetApiV1SessionsBySessionIdChildrenPath, zGetApiV1SessionsBySessionIdChildrenQuery, zGetApiV1SessionsBySessionIdGoalPath, zGetApiV1SessionsBySessionIdMessagesByMessageIdPath, zGetApiV1SessionsBySessionIdMessagesPath, zGetApiV1SessionsBySessionIdMessagesQuery, zGetApiV1SessionsBySessionIdPath, zGetApiV1SessionsBySessionIdProfilePath, zGetApiV1SessionsBySessionIdQuestionsPath, zGetApiV1SessionsBySessionIdQuestionsQuery, zGetApiV1SessionsBySessionIdSnapshotPath, zGetApiV1SessionsBySessionIdStatusPath, zGetApiV1SessionsBySessionIdTasksByTaskIdPath, zGetApiV1SessionsBySessionIdTasksByTaskIdQuery, zGetApiV1SessionsBySessionIdTasksPath, zGetApiV1SessionsBySessionIdTasksQuery, zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath, zGetApiV1SessionsBySessionIdTerminalsPath, zGetApiV1SessionsBySessionIdTranscriptOpsPath, zGetApiV1SessionsBySessionIdTranscriptOpsQuery, zGetApiV1SessionsBySessionIdTranscriptPath, zGetApiV1SessionsBySessionIdTranscriptPlanPath, zGetApiV1SessionsBySessionIdTranscriptPlanQuery, zGetApiV1SessionsBySessionIdTranscriptQuery, zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath, zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery, zGetApiV1SessionsBySessionIdWarningsPath, zGetApiV1SessionsQuery, zGetApiV1ToolsQuery, zGetBy__Path, zGetCatalogProviderPath, zListPromptsPath, zListSkillsPath, zListWorkspaceSkillsPath, zPatchApiV1WorkspacesByWorkspaceIdBody, zPatchApiV1WorkspacesByWorkspaceIdPath, zPostApiV1ConfigBody, zPostApiV1FilesBody, zPostApiV1GuiStoreRemoveItemBody, zPostApiV1GuiStoreSetItemBody, zPostApiV1OauthLoginBody, zPostApiV1OauthLogoutBody, zPostApiV1SessionsBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdPath, zPostApiV1SessionsBySessionIdChildrenBody, zPostApiV1SessionsBySessionIdChildrenPath, zPostApiV1SessionsBySessionIdExportBody, zPostApiV1SessionsBySessionIdExportPath, zPostApiV1SessionsBySessionIdProfileBody, zPostApiV1SessionsBySessionIdProfilePath, zPostApiV1SessionsBySessionIdQuestionsByTailBody, zPostApiV1SessionsBySessionIdQuestionsByTailPath, zPostApiV1SessionsBySessionIdTerminalsBody, zPostApiV1SessionsBySessionIdTerminalsPath, zPostApiV1WorkspacesBody, zPromptActionPath, zProviderCollectionActionBody, zProviderCollectionActionPath, zRefreshProviderPath, zReplaceProviderBody, zReplaceProviderPath, zRestartMcpServerPath, zRunSessionArchiveActionBody, zRunSessionArchiveActionPath, zSetDefaultModelPath, zSteerPromptsBody, zSteerPromptsPath, zSubmitPromptBody, zSubmitPromptPath } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -51,6 +51,32 @@ export const getApiV1Auth = <ThrowOnError extends boolean = false>(options?: Opt
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/auth',
+    ...options
+});
+
+/**
+ * Browse the models.dev directory (server-proxied, 10-minute in-memory cache, built-in snapshot fallback). Entries the server cannot import carry `rejected: true` with a machine-readable `reject_reason`; entries with `needs_base_url: true` require a base URL at import time. Items keep the upstream directory order.
+ */
+export const listCatalogProviders = <ThrowOnError extends boolean = false>(options?: Options<ListCatalogProvidersData, ThrowOnError>) => (options?.client ?? client).get<ListCatalogProvidersResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/catalog/providers',
+    ...options
+});
+
+/**
+ * Get one models.dev directory entry by catalog id.
+ */
+export const getCatalogProvider = <ThrowOnError extends boolean = false>(options: Options<GetCatalogProviderData, ThrowOnError>) => (options.client ?? client).get<GetCatalogProviderResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetCatalogProviderPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/catalog/providers/{catalog_id}',
     ...options
 });
 
@@ -151,6 +177,19 @@ export const fsBrowse = <ThrowOnError extends boolean = false>(options?: Options
         query: zFsBrowseQuery.optional()
     }).parseAsync(data),
     url: '/api/v1/fs:browse',
+    ...options
+});
+
+/**
+ * Serve the raw content of any file on the host filesystem by absolute path. Supports ETag caching and single-range requests.
+ */
+export const fsContent = <ThrowOnError extends boolean = false>(options: Options<FsContentData, ThrowOnError>) => (options.client ?? client).get<FsContentResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zFsContentQuery
+    }).parseAsync(data),
+    url: '/api/v1/fs:content',
     ...options
 });
 
@@ -379,6 +418,19 @@ export const postApiV1OauthLogout = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
+ * Get the managed account usage summary
+ */
+export const getApiV1OauthUsage = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1OauthUsageData, ThrowOnError>) => (options?.client ?? client).get<GetApiV1OauthUsageResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zGetApiV1OauthUsageQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/oauth/usage',
+    ...options
+});
+
+/**
  * List configured providers
  */
 export const getApiV1Providers = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1ProvidersData, ThrowOnError>) => (options?.client ?? client).get<GetApiV1ProvidersResponses, unknown, ThrowOnError>({
@@ -392,20 +444,54 @@ export const getApiV1Providers = <ThrowOnError extends boolean = false>(options?
 });
 
 /**
- * Refresh provider model metadata. Use `:refresh` for all providers or `:refresh_oauth` for OAuth-backed providers only.
+ * Create a provider manually (type + credentials + model list). When no global default_model is configured (fresh setup), it is seeded with the new provider default (or first) model; an existing default is never modified.
  */
-export const refreshProviderModels = <ThrowOnError extends boolean = false>(options: Options<RefreshProviderModelsData, ThrowOnError>) => (options.client ?? client).post<RefreshProviderModelsResponses, unknown, ThrowOnError>({
+export const createProvider = <ThrowOnError extends boolean = false>(options: Options<CreateProviderData, ThrowOnError>) => (options.client ?? client).post<CreateProviderResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zRefreshProviderModelsPath,
+        body: zCreateProviderBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/providers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Provider collection actions. Use `:refresh` for all providers or `:refresh_oauth` for OAuth-backed providers only. Use `:import_catalog` to import a models.dev directory entry as a configured provider (201): the wire protocol and endpoint come from the catalog resolution (`base_url` overrides it; required when the entry resolves to needs-base-url), all catalogued models are written as aliases, and importing an id that already exists is a refresh — the provider entry and its aliases are rewritten from the catalog (OAuth-managed providers are rejected instead). `id` overrides the catalog id as the local provider id. Use `:import_registry` to import a models.dev-shaped private registry (api.json `url` + optional Bearer `api_key`, 201): every listed provider is written with a `source` blob so scheduled refreshes rediscover it, and re-importing the same URL removes providers that disappeared upstream (the URL is the stable registry identity). For both imports the global default_provider/default_model pointers are never modified — except that a default_model is seeded from the first imported model when none is configured at all (fresh setup).
+ */
+export const providerCollectionAction = <ThrowOnError extends boolean = false>(options: Options<ProviderCollectionActionData, ThrowOnError>) => (options.client ?? client).post<ProviderCollectionActionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zProviderCollectionActionBody,
+        path: zProviderCollectionActionPath,
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/providers{action}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a provider and all of its model aliases (204, no body). The global default_provider/default_model pointers are left untouched — they are the user's settings, not this endpoint's to garbage-collect. OAuth-managed providers are rejected: log out via /oauth/logout instead.
+ */
+export const deleteProvider = <ThrowOnError extends boolean = false>(options: Options<DeleteProviderData, ThrowOnError>) => (options.client ?? client).delete<DeleteProviderResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteProviderPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/providers/{provider_id}',
     ...options
 });
 
 /**
- * Get a configured provider by ID
+ * Get a configured provider by ID. Unlike the list route, the response reveals the stored `api_key` when one is set, so local clients can prefill an edit form.
  */
 export const getApiV1ProvidersByProviderId = <ThrowOnError extends boolean = false>(options: Options<GetApiV1ProvidersByProviderIdData, ThrowOnError>) => (options.client ?? client).get<GetApiV1ProvidersByProviderIdResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -415,6 +501,23 @@ export const getApiV1ProvidersByProviderId = <ThrowOnError extends boolean = fal
     }).parseAsync(data),
     url: '/api/v1/providers/{provider_id}',
     ...options
+});
+
+/**
+ * Replace a provider in one save (type + base_url + model list), optionally renaming it via `new_id` (the providers key, model aliases, default_provider and a default_model pointing at an old alias all migrate). `api_key` is tri-state: omitted keeps the stored key, "" clears it, any other value replaces it. The provider's model aliases are rebuilt from `models` — aliases no longer listed disappear from config.toml, other providers' aliases are untouched. Beyond the rename migration, the global default pointers are never modified. Answers 200 with `{provider}`. OAuth-managed providers are rejected: log out via /oauth/logout instead.
+ */
+export const replaceProvider = <ThrowOnError extends boolean = false>(options: Options<ReplaceProviderData, ThrowOnError>) => (options.client ?? client).put<ReplaceProviderResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zReplaceProviderBody,
+        path: zReplaceProviderPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/providers/{provider_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -908,6 +1011,58 @@ export const getApiV1SessionsBySessionIdTerminalsByTerminalId = <ThrowOnError ex
 });
 
 /**
+ * Turn-granular session transcript page: live sessions read the in-memory store (wire-records backfill awaited per requested agent), cold sessions rebuild the requested agent from the persisted wire records
+ */
+export const getApiV1SessionsBySessionIdTranscript = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptData, ThrowOnError>) => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdTranscriptPath,
+        query: zGetApiV1SessionsBySessionIdTranscriptQuery
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/transcript',
+    ...options
+});
+
+/**
+ * Point-to-point transcript catch-up: journaled op batches with seq > since_seq for one agent, oldest first. complete:false means the session is not live or the journal no longer reaches back to since_seq — the caller must fall back to a full transcript refresh
+ */
+export const getApiV1SessionsBySessionIdTranscriptOps = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptOpsData, ThrowOnError>) => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptOpsResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdTranscriptOpsPath,
+        query: zGetApiV1SessionsBySessionIdTranscriptOpsQuery
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/transcript/ops',
+    ...options
+});
+
+/**
+ * Plan information of an agent's ExitPlanMode tool calls: the reviewed plan content, plan file path, offered options, and the review outcome, in timeline order. agent_id required; tool_call_id optional — present narrows the read to that one call (unknown id or non-ExitPlanMode call → 40416), absent lists every call with recoverable plan content. Content is projected from the linked approval interaction (interactive reviews, live or cold), the live tool frame display (auto mode), or the tool result output text (cold rebuilds without an interaction). Live sessions read the in-memory store (history backfill awaited), cold sessions rebuild the agent from the persisted wire records
+ */
+export const getApiV1SessionsBySessionIdTranscriptPlan = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptPlanData, ThrowOnError>) => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptPlanResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdTranscriptPlanPath,
+        query: zGetApiV1SessionsBySessionIdTranscriptPlanQuery
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/transcript/plan',
+    ...options
+});
+
+/**
+ * All turn-opening inputs ("user messages") of a session, grouped per agent: every turn with a defined prompt (real user text, user-slash skill/plugin commands, cron prompts — distinguish via origin). agent_id optional: present reads one agent, absent reads every rostered agent. Live sessions answer from the in-memory store (history backfill awaited per agent), cold sessions rebuild from the persisted wire records. Unpaginated; attachment entities referenced by the messages ride along (metadata only)
+ */
+export const getApiV1SessionsBySessionIdTranscriptUserMessages = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdTranscriptUserMessagesData, ThrowOnError>) => (options.client ?? client).get<GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath,
+        query: zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/sessions/{session_id}/transcript/user-messages',
+    ...options
+});
+
+/**
  * Get session-level warnings (e.g. oversized AGENTS.md)
  */
 export const getApiV1SessionsBySessionIdWarnings = <ThrowOnError extends boolean = false>(options: Options<GetApiV1SessionsBySessionIdWarningsData, ThrowOnError>) => (options.client ?? client).get<GetApiV1SessionsBySessionIdWarningsResponses, unknown, ThrowOnError>({
@@ -1016,76 +1171,6 @@ export const listWorkspaceSkills = <ThrowOnError extends boolean = false>(option
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/workspaces/{workspace_id}/skills',
-    ...options
-});
-
-export const getApiV2ByServiceByMethod = <ThrowOnError extends boolean = false>(options: Options<GetApiV2ByServiceByMethodData, ThrowOnError>) => (options.client ?? client).get<GetApiV2ByServiceByMethodResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV2ByServiceByMethodPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/{service}/{method}',
-    ...options
-});
-
-export const postApiV2ByServiceByMethod = <ThrowOnError extends boolean = false>(options: Options<PostApiV2ByServiceByMethodData, ThrowOnError>) => (options.client ?? client).post<PostApiV2ByServiceByMethodResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zPostApiV2ByServiceByMethodPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/{service}/{method}',
-    ...options
-});
-
-export const getApiV2Channels = <ThrowOnError extends boolean = false>(options?: Options<GetApiV2ChannelsData, ThrowOnError>) => (options?.client ?? client).get<GetApiV2ChannelsResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: z.never().optional(),
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/channels',
-    ...options
-});
-
-export const getApiV2SessionBySessionIdByServiceByMethod = <ThrowOnError extends boolean = false>(options: Options<GetApiV2SessionBySessionIdByServiceByMethodData, ThrowOnError>) => (options.client ?? client).get<GetApiV2SessionBySessionIdByServiceByMethodResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV2SessionBySessionIdByServiceByMethodPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/session/{session_id}/{service}/{method}',
-    ...options
-});
-
-export const postApiV2SessionBySessionIdByServiceByMethod = <ThrowOnError extends boolean = false>(options: Options<PostApiV2SessionBySessionIdByServiceByMethodData, ThrowOnError>) => (options.client ?? client).post<PostApiV2SessionBySessionIdByServiceByMethodResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zPostApiV2SessionBySessionIdByServiceByMethodPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/session/{session_id}/{service}/{method}',
-    ...options
-});
-
-export const getApiV2SessionBySessionIdAgentByAgentIdByServiceByMethod = <ThrowOnError extends boolean = false>(options: Options<GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData, ThrowOnError>) => (options.client ?? client).get<GetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/session/{session_id}/agent/{agent_id}/{service}/{method}',
-    ...options
-});
-
-export const postApiV2SessionBySessionIdAgentByAgentIdByServiceByMethod = <ThrowOnError extends boolean = false>(options: Options<PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodData, ThrowOnError>) => (options.client ?? client).post<PostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zPostApiV2SessionBySessionIdAgentByAgentIdByServiceByMethodPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/api/v2/session/{session_id}/agent/{agent_id}/{service}/{method}',
     ...options
 });
 

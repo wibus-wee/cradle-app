@@ -27,6 +27,11 @@ export type ThreadForkParams = { threadId: string,
  */
 lastTurnId?: string | null,
 /**
+ * Optional turn id to fork before, excluding that turn and all later turns.
+ * Cannot be combined with `last_turn_id`.
+ */
+beforeTurnId?: string | null,
+/**
  * [UNSTABLE] Specify the rollout path to fork from.
  * If specified, the thread_id param will be ignored.
  */
@@ -58,4 +63,10 @@ threadSource?: ThreadSource | null,
  * populating `thread.turns`. This is useful when the client plans to call
  * `thread/turns/list` immediately after forking.
  */
-excludeTurns?: boolean, };
+excludeTurns?: boolean,
+/**
+ * When true, carry the source thread's current goal into the fork without
+ * starting its initial automatic continuation. The next explicit turn owns
+ * the goal lifecycle, and normal automatic continuation resumes after it.
+ */
+deferGoalContinuation?: boolean, };
