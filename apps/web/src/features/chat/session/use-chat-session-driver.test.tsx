@@ -68,8 +68,8 @@ vi.mock('./use-chat-session-runtime-controls', () => ({
   useChatSessionRuntimeControls: () => mocks.controls,
 }))
 vi.mock('./stable-message-cache', () => ({
-  readStableMessageRows: vi.fn().mockResolvedValue(null),
-  writeStableMessageRows: vi.fn().mockResolvedValue(undefined),
+  readStableMessageRows: async () => null,
+  writeStableMessageRows: async () => undefined,
 }))
 vi.mock('./use-chat-session-types', () => ({
   QUEUE_DRAIN_SYNC_DELAY_MS: 0,

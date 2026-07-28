@@ -774,14 +774,11 @@ export async function fetchBranchProtection(
       }
       catch (error) {
         const mapped = toGitHubApiError(error, `/repos/${owner}/${repo}/branches/${branch}/protection`)
-        if (mapped.status === 304) {
-          return { data: null, etag: null, status: 304 }
-        }
         if (mapped.status === 404) {
           // Unprotected branch — treat as empty required checks, not a hard miss.
           return { data: null, etag: null, status: 404 }
         }
-        return { data: null, etag: null, status: mapped.status }
+        throw mapped
       }
     },
   })

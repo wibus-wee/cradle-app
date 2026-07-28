@@ -25,12 +25,11 @@ const fullMessage = {
   ],
 } as unknown as UIMessage
 
-function shellMessage(id: string): UIMessage {
+function textMessage(id: string): UIMessage {
   return {
     id,
     role: 'assistant' as const,
-    parts: [{ type: 'text', text: `Preview ${id}` }],
-    metadata: { cradle: { historyShell: true, previewTruncated: false } },
+    parts: [{ type: 'text', text: `Snapshot ${id}` }],
   }
 }
 
@@ -47,7 +46,7 @@ function renderMessage(messageId: string) {
   })
 }
 
-describe('messageBubbleById history shells', () => {
+describe('messageBubbleById snapshot details', () => {
   beforeEach(() => {
     useChatStore.getState().clearSession('session-a')
   })
@@ -57,10 +56,10 @@ describe('messageBubbleById history shells', () => {
     useChatStore.getState().clearSession('session-a')
   })
 
-  it('does not paint text-only history shells', () => {
-    useChatStore.getState().setMessages('session-a', [shellMessage('visible')])
+  it('renders text-only snapshot messages', () => {
+    useChatStore.getState().setMessages('session-a', [textMessage('visible')])
     renderMessage('visible')
-    expect(screen.queryByText('Preview visible')).toBeNull()
+    expect(screen.getByText('Snapshot visible')).toBeTruthy()
     expect(screen.queryByTestId('chat-tool-call-tool-visible')).toBeNull()
   })
 

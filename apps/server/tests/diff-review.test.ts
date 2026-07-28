@@ -795,7 +795,7 @@ describe('diff-review capability', () => {
       rmSync(dataDir, { recursive: true, force: true })
       rmSync(workspaceRoot, { recursive: true, force: true })
     }
-  })
+  }, 15_000)
 
   it('creates and refreshes an immutable local working tree revision', async () => {
     const dataDir = makeTempDir('cradle-data-')

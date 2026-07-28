@@ -42,13 +42,24 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
+function canonicalRouteKey(url: string): string {
+  const parsed = new URL(url, 'https://api.github.com')
+  const params = [...parsed.searchParams.entries()]
+    .filter(([key, value]) => key !== 'page' || value !== '1')
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) =>
+      leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue))
+  const query = new URLSearchParams(params).toString()
+  return query ? `${parsed.pathname}?${query}` : parsed.pathname
+}
+
 function installGitHubFetch(routes: Record<string, unknown | Response>): ReturnType<typeof vi.fn> {
+  const canonicalRoutes = new Map(
+    Object.entries(routes).map(([route, response]) => [canonicalRouteKey(route), response]),
+  )
   const mock = vi.fn(async (input: RequestInfo | URL) => {
     const url = new Request(input).url
     const parsed = new URL(url)
-    const key = `${parsed.pathname}?${parsed.searchParams.toString()}`
-    const pathKey = parsed.pathname
-    const body = routes[key] ?? routes[pathKey]
+    const body = canonicalRoutes.get(canonicalRouteKey(url)) ?? canonicalRoutes.get(parsed.pathname)
     if (body === undefined) {
       return new Response('not found', { status: 404 })
     }
@@ -657,7 +668,10 @@ describe('gitHub session-await sources', () => {
         total_count: 0,
         workflow_runs: [],
       },
-      '/repos/acme/app/branches/main/protection': new Error('GitHub temporarily unavailable'),
+      '/repos/acme/app/branches/main/protection': new Response(JSON.stringify({ message: 'Bad credentials' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      }),
     })
 
     const [result] = await githubCISource.checkPending([

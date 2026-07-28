@@ -1418,8 +1418,16 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
     const pendingNext = stream.next()
     void pendingNext.catch(() => undefined)
+    const activeQueries = (provider as unknown as {
+      activeQueries: Map<string, {
+        query: unknown
+        slashCommands: Array<{ name: string }> | null
+      }>
+    }).activeQueries
 
-    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await vi.waitFor(() => {
+      expect(activeQueries.get(runtimeSession.chatSessionId)?.query).toBe(activeQuery)
+    })
     activeQuery.push({
       type: 'system',
       subtype: 'commands_changed',
@@ -1429,9 +1437,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
 
     await vi.waitFor(() => {
-      const entry = (provider as unknown as {
-        activeQueries: Map<string, { slashCommands: Array<{ name: string }> | null }>
-      }).activeQueries.get(runtimeSession.chatSessionId)
+      const entry = activeQueries.get(runtimeSession.chatSessionId)
       expect(entry?.slashCommands).toEqual([{ name: 'review', description: 'Review the change', argumentHint: '<file>' }])
     })
 
@@ -1445,8 +1451,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
     expect(activeQuery.supportedCommands).not.toHaveBeenCalled()
 
-    activeQuery.close()
-    await pendingNext
+    await provider.disposeSession(runtimeSession.chatSessionId)
   })
 
   it('resyncs reused canUseTool callback when approval mode changes on a live query', async () => {

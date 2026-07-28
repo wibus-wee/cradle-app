@@ -22,6 +22,7 @@ describe('health module', () => {
 
     try {
       app = await createServerApp()
+      resetHealthSamplesForTests()
       const res = await app.handle(new Request('http://localhost/health'))
       expect(res.status).toBe(200)
 

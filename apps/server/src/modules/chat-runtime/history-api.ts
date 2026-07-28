@@ -242,21 +242,6 @@ export function getMessageDetail(sessionId: string, messageId: string): ChatMess
     { id: row.message.id, messageJson: row.payload.messageJson },
     role,
   )
-  if (message.id !== row.message.id || message.role !== role) {
-    throw new AppError({
-      code: 'chat_message_snapshot_invalid',
-      status: 500,
-      message: 'Stored chat message snapshot is invalid',
-      details: {
-        messageId: row.message.id,
-        role,
-        reason:
-          message.id !== row.message.id
-            ? 'message_json.id must match messages.id'
-            : 'message_json.role must match messages.role',
-      },
-    })
-  }
   return { message }
 }
 
@@ -296,7 +281,17 @@ function parseStoredMessageSnapshot(
   role: 'user' | 'assistant',
 ): ChatMessageDetail['message'] {
   try {
-    return parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageDetail['message']
+    const message = parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageDetail['message']
+    if (message.id !== row.id) {
+      throw new TypeError('message_json.id must match messages.id')
+    }
+    if (message.role !== role) {
+      throw new TypeError('message_json.role must match messages.role')
+    }
+    if (!Array.isArray(message.parts)) {
+      throw new TypeError('message_json.parts must be an array')
+    }
+    return message
   }
  catch (error) {
     throw new AppError({

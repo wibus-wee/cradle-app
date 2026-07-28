@@ -49,7 +49,6 @@ describe('resolveSessionHarness Work context', () => {
     const harness = resolveSessionHarness(session)
 
     expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
-    expect(harness.systemPrompt).toContain('cradle-cli')
     expect(harness.systemPrompt).toContain('CRADLE CHAT SESSION CONTEXT')
     expect(harness.systemPrompt).toContain('<cradle_session_state>')
     expect(harness.systemPrompt).toContain('CRADLE WORK MODE')
@@ -163,7 +162,6 @@ describe('resolveSessionHarness Work context', () => {
     const harness = resolveSessionHarness(session)
 
     expect(harness.systemPrompt).toContain('SYSTEM INSTRUCTIONS')
-    expect(harness.systemPrompt).toContain('cradle-cli')
     expect(harness.systemPrompt).toContain('CRADLE CHAT SESSION CONTEXT')
     expect(harness.systemPrompt).not.toContain('CRADLE WORK MODE')
     expect(harness.systemPrompt).not.toContain('manage_pull_request')

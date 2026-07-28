@@ -400,12 +400,12 @@ describe('acp chat runtime capability', () => {
       const assistant = timeline.find(message => message.role === 'assistant')
       expect(user).toEqual(expect.objectContaining({
         role: 'user',
-        content: 'Explain ACP runtime ownership',
+        preview: 'Explain ACP runtime ownership',
         status: 'complete',
       }))
 
       expect(assistant).toEqual(expect.objectContaining({ role: 'assistant', status: 'complete' }))
-      expect(assistant?.content).toBe('Hello from ACP runtime')
+      expect(assistant?.preview).toBe('Hello from ACP runtime')
       expect(assistant?.message.parts).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'reasoning', text: 'Thinking...', state: 'done' }),
         expect.objectContaining({ type: 'text', text: 'Hello from ACP runtime', state: 'done' }),
@@ -523,7 +523,7 @@ describe('acp chat runtime capability', () => {
 
       const timeline = await waitForMessageStatus(app, 'session-acp-agent', 'complete')
       expect(timeline.find(message => message.role === 'assistant')).toEqual(
-        expect.objectContaining({ status: 'complete', content: 'Hello from ACP runtime' }),
+        expect.objectContaining({ status: 'complete', preview: 'Hello from ACP runtime' }),
       )
 
       expect(spawnSpy).toHaveBeenCalledWith(expect.objectContaining({

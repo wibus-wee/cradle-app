@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   ensureCodexRuntime,
-  readCodexRuntimeVersion
+  readCodexRuntimeVersion,
 } from '../../desktop/scripts/sync-codex-runtime.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -22,14 +22,14 @@ const command = [
   'generate-ts',
   '--experimental',
   '--out',
-  protocolRoot
+  protocolRoot,
 ]
 
 await run(command[0], command.slice(1))
 
 const generatorVersion = await readCodexRuntimeVersion(runtime.executablePath)
-const resolvedGeneratorVersion =
-  generatorVersion ?? runtime.manifest.binary.version ?? runtime.manifest.release.tagName
+const resolvedGeneratorVersion
+  = generatorVersion ?? runtime.manifest.binary.version ?? runtime.manifest.release.tagName
 const existingManifest = await readManifest(manifestPath)
 await writeFile(
   manifestPath,
@@ -48,19 +48,20 @@ await writeFile(
           : new Date().toISOString().slice(0, 10),
       notes: [
         'Codex app-server does not expose a separate schema version in generated files; generatorVersion is the schema source version.',
-        'Regenerate with pnpm --filter @cradle/server generate:codex-app-server-protocol so Cradle uses the vendored Codex runtime, not a global codex command.'
-      ]
+        'Regenerate with pnpm --filter @cradle/server generate:codex-app-server-protocol so Cradle uses the vendored Codex runtime, not a global codex command.',
+      ],
     },
     null,
-    2
+    2,
   )}\n`,
-  'utf8'
+  'utf8',
 )
 
 async function readManifest(path) {
   try {
     return JSON.parse(await readFile(path, 'utf8'))
-  } catch {
+  }
+ catch {
     return null
   }
 }
@@ -69,7 +70,7 @@ function run(file, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(file, args, {
       cwd: repoRoot,
-      stdio: 'inherit'
+      stdio: 'inherit',
     })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
@@ -79,8 +80,8 @@ function run(file, args) {
       }
       reject(
         new Error(
-          `${file} ${args.join(' ')} failed with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}`
-        )
+          `${file} ${args.join(' ')} failed with ${signal ? `signal ${signal}` : `code ${code ?? 1}`}`,
+        ),
       )
     })
   })

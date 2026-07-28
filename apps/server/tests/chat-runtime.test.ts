@@ -36,6 +36,11 @@ import {
   commitSessionEventsInTransaction,
 } from '../src/modules/chat-runtime/es/commands'
 import type { ChatSessionEvent } from '../src/modules/chat-runtime/es/events'
+import type {
+  ChatMessageDetail,
+  ChatMessageRow,
+  ChatMessageSnapshot,
+} from '../src/modules/chat-runtime/history-api'
 import {
   readMessagePayload,
   updateMessagePayload,
@@ -87,30 +92,6 @@ import {
   readSideConversation,
 } from '../src/modules/provider-runtime/side-conversation-registry'
 import { insertMessageFixtures } from './helpers/message-fixture'
-
-interface ChatMessageShellRow {
-  messageId: string
-  role: 'user' | 'assistant'
-  status: 'streaming' | 'complete' | 'aborted' | 'failed'
-  errorText?: string
-  preview: string
-  previewTruncated: boolean
-  parentMessageId: string | null
-  parentToolCallId?: string | null
-}
-
-interface ChatMessageDetail {
-  messageId: string
-  message: {
-    parts: Array<{ type: string, text?: string, [key: string]: unknown }>
-    metadata?: Record<string, unknown>
-  }
-}
-
-interface ChatMessageSnapshotResponse {
-  revision: number
-  rows: ChatMessageShellRow[]
-}
 
 interface ChatQueueItemView {
   id: string
@@ -227,15 +208,15 @@ async function createProfileAndSession(
 async function waitForMessageStatus(
   app: ElysiaApp,
   sessionId: string,
-  expectedStatus: ChatMessageShellRow['status'],
-): Promise<ChatMessageShellRow[]> {
-  let latestGroups: ChatMessageShellRow[] = []
+  expectedStatus: ChatMessageRow['status'],
+): Promise<ChatMessageRow[]> {
+  let latestGroups: ChatMessageRow[] = []
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const response = await app.handle(
       new Request(`http://localhost/chat/sessions/${encodeURIComponent(sessionId)}/messages`),
     )
     if (response.status === 200) {
-      const { rows: groups } = (await response.json()) as ChatMessageSnapshotResponse
+      const { rows: groups } = (await response.json()) as ChatMessageSnapshot
       latestGroups = groups
       const assistant = groups.find(group => group.role === 'assistant')
       if (assistant?.status === expectedStatus) {
@@ -250,12 +231,12 @@ async function waitForMessageStatus(
   )
 }
 
-async function getChatMessages(app: ElysiaApp, sessionId: string): Promise<ChatMessageShellRow[]> {
+async function getChatMessages(app: ElysiaApp, sessionId: string): Promise<ChatMessageRow[]> {
   const response = await app.handle(
     new Request(`http://localhost/chat/sessions/${encodeURIComponent(sessionId)}/messages`),
   )
   expect(response.status).toBe(200)
-  return ((await response.json()) as ChatMessageSnapshotResponse).rows
+  return ((await response.json()) as ChatMessageSnapshot).rows
 }
 
 async function getChatMessageDetail(
@@ -4351,15 +4332,15 @@ describe('chat runtime capability', () => {
         new Request('http://localhost/chat/sessions/session-chat-provider-deleted/messages'),
       )
       expect(messagesRes.status).toBe(200)
-      const { rows: messageRows } = (await messagesRes.json()) as ChatMessageSnapshotResponse
+      const { rows: messageRows } = (await messagesRes.json()) as ChatMessageSnapshot
       expect(messageRows).toEqual([
         expect.objectContaining({
           messageId: userMessage.id,
-          content: 'Keep this history readable.',
+          preview: 'Keep this history readable.',
         }),
         expect.objectContaining({
           messageId: assistantMessage.id,
-          content: 'History remains available.',
+          preview: 'History remains available.',
         }),
       ])
 
@@ -4548,17 +4529,13 @@ describe('chat runtime capability', () => {
     }
   })
 
-  it('compacts oversized stored snapshots in hydrated message DTOs without mutating storage', async () => {
+  it('preserves full stored snapshots in history DTOs without mutating storage', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
     const previousSecret = process.env.CRADLE_CREDENTIAL_SECRET
-    const previousRepairMin = process.env.CRADLE_CHAT_STORED_MESSAGE_REPAIR_MIN_CHARS
-    const previousTextLimit = process.env.CRADLE_CHAT_STORED_TEXT_MAX_CHARS
     process.env.CRADLE_DATA_DIR = dataDir
     process.env.CRADLE_CREDENTIAL_SECRET = 'chat-runtime-secret'
-    process.env.CRADLE_CHAT_STORED_MESSAGE_REPAIR_MIN_CHARS = '1'
-    process.env.CRADLE_CHAT_STORED_TEXT_MAX_CHARS = '24'
 
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
@@ -4587,10 +4564,11 @@ describe('chat runtime capability', () => {
         sessionId: 'session-chat-repair-snapshot',
       })
 
+      const oversizedText = `oversized assistant text ${'x'.repeat(2_000)}`
       const originalSnapshot = JSON.stringify({
         id: 'message-repair-snapshot-assistant',
         role: 'assistant',
-        parts: [{ type: 'text', text: `oversized assistant text ${'x'.repeat(2_000)}` }],
+        parts: [{ type: 'text', text: oversizedText }],
       })
       insertMessageFixtures(db(), {
           id: 'message-repair-snapshot-assistant',
@@ -4601,7 +4579,7 @@ describe('chat runtime capability', () => {
           depth: 0,
           role: 'assistant',
           status: 'complete',
-          content: `oversized assistant text ${'x'.repeat(2_000)}`,
+          content: oversizedText,
           messageJson: originalSnapshot,
           errorText: null,
           createdAt: 1700000000,
@@ -4613,14 +4591,15 @@ describe('chat runtime capability', () => {
         app,
         'session-chat-repair-snapshot',
         'message-repair-snapshot-assistant',
-      )).message.parts.find(part => part.type === 'text')?.text).toBe(
-        'oversized assistant text',
-      )
-      expect(messageRows[0]?.preview).toBe('oversized assistant text')
+      )).message.parts.find(part => part.type === 'text')?.text).toBe(oversizedText)
+      expect(messageRows[0]?.message.parts.find(part => part.type === 'text')?.text)
+        .toBe(oversizedText)
+      expect(messageRows[0]?.preview).toBe(oversizedText.slice(0, 2_000))
+      expect(messageRows[0]?.previewTruncated).toBe(true)
 
       const storedRow = readMessagePayload(db(), 'message-repair-snapshot-assistant')
       expect(storedRow?.messageJson).toBe(originalSnapshot)
-      expect(storedRow?.content).toBe(`oversized assistant text ${'x'.repeat(2_000)}`)
+      expect(storedRow?.content).toBe(oversizedText)
     }
  finally {
       shutdownInfra()
@@ -4628,8 +4607,6 @@ describe('chat runtime capability', () => {
       rmSync(workspaceRoot, { recursive: true, force: true })
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
       restoreEnv('CRADLE_CREDENTIAL_SECRET', previousSecret)
-      restoreEnv('CRADLE_CHAT_STORED_MESSAGE_REPAIR_MIN_CHARS', previousRepairMin)
-      restoreEnv('CRADLE_CHAT_STORED_TEXT_MAX_CHARS', previousTextLimit)
       vi.restoreAllMocks()
     }
   })
@@ -5108,7 +5085,7 @@ describe('chat runtime capability', () => {
     }
   })
 
-  it('passes malformed runtime chunks through without synthesizing protocol anchors', async () => {
+  it('fails malformed runtime chunks without synthesizing protocol anchors', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -5155,19 +5132,12 @@ describe('chat runtime capability', () => {
 
       const chunks = await collectSseChunks(runRes)
       expect(chunks).toEqual([
+        expect.objectContaining({ type: 'data-cradle-stream-snapshot' }),
         expect.objectContaining({ type: 'start' }),
         expect.objectContaining({
-          type: 'text-delta',
-          id: 'text-missing-start',
-          delta: 'Recovered text',
+          type: 'error',
+          errorText: 'Received stream delta for missing part text-missing-start',
         }),
-        expect.objectContaining({ type: 'text-end', id: 'text-missing-start' }),
-        expect.objectContaining({
-          type: 'tool-output-available',
-          toolCallId: 'call_missing_tool',
-          output: { ok: true },
-        }),
-        expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
       ])
       expect(chunks).not.toEqual(
         expect.arrayContaining([
@@ -6789,7 +6759,7 @@ describe('chat runtime capability', () => {
         new Request('http://localhost/chat/sessions/session-chat-message-metadata/messages'),
       )
       expect(response.status).toBe(200)
-      const { rows } = (await response.json()) as ChatMessageSnapshotResponse
+      const { rows } = (await response.json()) as ChatMessageSnapshot
       expect(rows).toHaveLength(1)
       expect(rows[0].message.metadata).toEqual({
         cradle: {

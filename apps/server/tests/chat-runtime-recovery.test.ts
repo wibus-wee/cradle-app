@@ -22,7 +22,7 @@ import {
 import {
   getMessageDetail,
   getMessageGroups,
-  getMessageShellSnapshot,
+  getMessageSnapshot,
 } from '../src/modules/chat-runtime/history-api'
 import {
   hydrateMessage,
@@ -299,7 +299,7 @@ describe('chat runtime recovery', () => {
         })
       }
 
-      const firstPage = await getMessageShellSnapshot('session-bounded-history')
+      const firstPage = await getMessageSnapshot('session-bounded-history')
 
       expect(firstPage.rows).toHaveLength(100)
       expect(firstPage.rows[0]?.messageId).toBe('message-0787')
@@ -308,7 +308,7 @@ describe('chat runtime recovery', () => {
       const allIds = [...firstPage.rows.map(row => row.messageId)]
       let cursor = firstPage.nextCursor
       while (cursor) {
-        const page = await getMessageShellSnapshot('session-bounded-history', { cursor })
+        const page = await getMessageSnapshot('session-bounded-history', { cursor })
         allIds.unshift(...page.rows.map(row => row.messageId))
         cursor = page.nextCursor
       }
@@ -350,7 +350,7 @@ describe('chat runtime recovery', () => {
     })
   })
 
-  it('reads malformed and huge durable payloads as bounded history shells', async () => {
+  it('rejects malformed durable payloads from inline history snapshots', async () => {
     await withTempDataDir(async () => {
       const sessionId = 'session-shell-malformed-payload'
       const messageId = 'message-shell-malformed-payload'
@@ -380,15 +380,13 @@ describe('chat runtime recovery', () => {
         updatedAt: createdAt,
       }).run()
 
-      await expect(getMessageShellSnapshot(sessionId)).resolves.toMatchObject({
-        rows: [{
+      await expect(getMessageSnapshot(sessionId)).rejects.toMatchObject({
+        code: 'chat_message_snapshot_invalid',
+        status: 500,
+        details: {
           messageId,
-          preview: 'x'.repeat(2_000),
-          previewTruncated: true,
-        }],
-      })
-      await expect(getMessageShellSnapshot(sessionId)).resolves.not.toMatchObject({
-        rows: [expect.objectContaining({ message: expect.anything() })],
+          role: 'assistant',
+        },
       })
       expect(() => getMessageDetail(sessionId, messageId)).toThrow('Stored chat message snapshot is invalid')
     })
