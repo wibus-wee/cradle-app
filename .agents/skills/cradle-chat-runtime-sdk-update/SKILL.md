@@ -34,14 +34,20 @@ cradle session await javascript \
   --program "async ({ tools }) => { const result = await tools.exec({ argv: ['gh', 'run', 'view', '${run_id}', '--repo', 'wibus-wee/cradle-app', '--json', 'status,conclusion,url'] }); if (result.exitCode !== 0) throw new Error(result.stderr); const run = JSON.parse(result.stdout); if (run.status !== 'completed') return false; return { resumeText: JSON.stringify(run) }; }"
 ```
 
-When resumed, report a failed update immediately. On success, find the generated PR from `automation/chat-runtime-sdk-update`. If there is no PR, report that every SDK and generated artifact was already current. If a PR exists, register the normal CI await and end the turn:
+When resumed, report a failed update immediately. On success, find the generated PR from `automation/chat-runtime-sdk-update`. If there is no PR, report that every SDK and generated artifact was already current.
+
+The workflow creates the PR with the repository `GITHUB_TOKEN`. GitHub creates the resulting `pull_request` CI run in an approval-required state. Resolve the PR head SHA, find the CI run for that exact SHA, approve it with the current user's GitHub credentials, then register the normal CI await and end the turn:
 
 ```bash
-pr_number="$(gh pr list --repo wibus-wee/cradle-app --head automation/chat-runtime-sdk-update --state open --json number --jq '.[0].number')"
+pr_json="$(gh pr list --repo wibus-wee/cradle-app --head automation/chat-runtime-sdk-update --state open --json number,headRefOid --jq '.[0]')"
+pr_number="$(jq -r '.number' <<<"$pr_json")"
+head_sha="$(jq -r '.headRefOid' <<<"$pr_json")"
+ci_run_id="$(gh run list --repo wibus-wee/cradle-app --workflow ci.yml --commit "$head_sha" --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh api --method POST "repos/wibus-wee/cradle-app/actions/runs/${ci_run_id}/approve"
 cradle session await github-ci wibus-wee/cradle-app --pr "$pr_number" --reason "Waiting for Chat Runtime SDK update PR #${pr_number} CI"
 ```
 
-The workflow creates the PR with the repository PAT, not `GITHUB_TOKEN`, so the standard `pull_request` CI is triggered. Do not run duplicate local tests; use the PR CI result.
+If the CI run is not visible immediately, register a short JavaScript await for the exact PR head SHA instead of polling. If GitHub has already started the run, skip the approval call. Do not run duplicate local tests; use the PR CI result.
 
 ## Assess the generated update
 

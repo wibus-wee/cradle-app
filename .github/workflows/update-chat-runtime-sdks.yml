@@ -17,7 +17,8 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: update-chat-runtime-sdks
@@ -46,7 +47,7 @@ jobs:
         env:
           CLAUDE_AGENT_SDK_VERSION: ${{ inputs.claude_agent_sdk_version || 'latest' }}
           CRADLE_CODEX_RELEASE_TAG: ${{ inputs.codex_release_tag || 'latest' }}
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           pnpm --filter @cradle/server up "@anthropic-ai/claude-agent-sdk@${CLAUDE_AGENT_SDK_VERSION}"
           pnpm --filter @cradle/desktop sync:codex-runtime
@@ -56,7 +57,7 @@ jobs:
       - name: Create or update SDK pull request
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          token: ${{ github.token }}
           branch: automation/chat-runtime-sdk-update
           delete-branch: true
           commit-message: 'chore(chat-runtime): update SDKs'
