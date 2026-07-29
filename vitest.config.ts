@@ -9,6 +9,8 @@ const nodeTestIncludes = [
   'src/**/__tests__/**/*.test.tsx',
   'apps/desktop/src/**/*.test.ts',
   'apps/desktop/src/**/*.test.tsx',
+  'apps/mobile/src/**/*.test.ts',
+  'apps/mobile/src/**/*.test.tsx',
   'packages/**/*.test.ts',
   'packages/**/*.test.tsx',
   'packages/**/__tests__/**/*.test.ts',

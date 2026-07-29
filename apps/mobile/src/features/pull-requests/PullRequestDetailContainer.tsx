@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { router } from 'expo-router'
+import { Stack } from 'expo-router'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -37,15 +37,17 @@ export function PullRequestDetailContainer({ owner, repo, number }: PullRequestD
   if (query.isPending) { return <LoadingState /> }
   if (query.error) { return <ErrorState title="Could not open pull request" description={errorMessage(query.error)} /> }
   return (
-    <PullRequestDetailView
-      detail={query.data}
-      isMutating={action.isPending}
-      onBack={() => router.back()}
-      onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
-      onReview={(event, body) => action.mutate({
-        endpoint: 'review',
-        body: { event, ...(body ? { body } : {}) },
-      })}
-    />
+    <>
+      <Stack.Screen options={{ title: `#${query.data.pullRequest.number}` }} />
+      <PullRequestDetailView
+        detail={query.data}
+        isMutating={action.isPending}
+        onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
+        onReview={(event, body) => action.mutate({
+          endpoint: 'review',
+          body: { event, ...(body ? { body } : {}) },
+        })}
+      />
+    </>
   )
 }

@@ -34,7 +34,6 @@ export const chatFixture: ChatViewProps = {
     isolationBoundaryRequired: false,
   },
   messages: [],
-  onBack: () => {},
   onCancel: () => {},
   onSend: () => {},
 }

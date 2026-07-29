@@ -15,9 +15,13 @@ export function EmptyState({ title, description, icon: Icon = Inbox }: StateProp
   const theme = useTheme()
   return (
     <View style={styles.state}>
-      <Icon color={theme.mutedForeground} size={24} />
-      <Text style={[styles.title, { color: theme.foreground }]}>{title}</Text>
-      {description && <Text style={[styles.description, { color: theme.mutedForeground }]}>{description}</Text>}
+      <View style={[styles.media, { backgroundColor: theme.muted }]}>
+        <Icon color={theme.foreground} size={16} />
+      </View>
+      <View style={styles.copy}>
+        <Text style={[styles.title, { color: theme.foreground }]}>{title}</Text>
+        {description && <Text style={[styles.description, { color: theme.mutedForeground }]}>{description}</Text>}
+      </View>
     </View>
   )
 }
@@ -37,22 +41,34 @@ export function LoadingState() {
 
 const styles = StyleSheet.create({
   description: {
-    fontFamily: 'Geist_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-    maxWidth: 280,
+
+    fontSize: 13,
+    lineHeight: 19,
+    maxWidth: 300,
     textAlign: 'center',
+  },
+  copy: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  media: {
+    alignItems: 'center',
+    borderRadius: 8,
+    height: 32,
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    width: 32,
   },
   state: {
     alignItems: 'center',
     flex: 1,
-    gap: spacing.sm,
+    gap: spacing.md,
     justifyContent: 'center',
-    minHeight: 240,
-    padding: spacing.xl,
+    minHeight: 168,
+    padding: spacing.lg,
   },
   title: {
-    fontFamily: 'Geist_600SemiBold',
-    fontSize: 16,
+
+    fontSize: 13,
   },
 })

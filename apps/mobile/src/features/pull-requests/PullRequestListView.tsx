@@ -1,4 +1,5 @@
-import { CheckCircle2, CircleDot, GitPullRequest, XCircle } from 'lucide-react-native'
+import { SegmentedControl } from '@expo/ui/community/segmented-control'
+import { CheckCircle2, CircleDot, XCircle } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -6,12 +7,16 @@ import type {
   GetPullRequestsAuthoredResponse,
   GetPullRequestsReviewingResponse,
 } from '@/api-gen'
-import { PressableScale } from '@/components/ui/pressable-scale'
+import type { AppSection } from '@/components/common/app-menu-button'
+import { AppMenuButton } from '@/components/common/app-menu-button'
+import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { EmptyState } from '@/components/ui/states'
 import { StatusPill } from '@/components/ui/status-pill'
 import { relativeTime } from '@/lib/format'
-import { radius, spacing } from '@/theme/tokens'
+import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 type PullRequest = GetPullRequestsAuthoredResponse['items'][number]
@@ -21,7 +26,9 @@ export interface PullRequestListViewProps {
   reviewing: GetPullRequestsReviewingResponse['items']
   login: string
   isRefreshing?: boolean
+  onNavigate: (section: AppSection) => void
   onOpen: (pullRequest: PullRequest) => void
+  onOpenUsage: () => void
   onRefresh?: () => void
 }
 
@@ -32,41 +39,45 @@ function ChecksIcon({ state }: { state: PullRequest['checksState'] }) {
   return <CircleDot color={state === 'pending' ? theme.warning : theme.mutedForeground} size={17} />
 }
 
+function pullRequestGroup(updatedAt: number) {
+  const timestamp = updatedAt < 10_000_000_000 ? updatedAt * 1_000 : updatedAt
+  const age = Date.now() - timestamp
+  if (age < 86_400_000) { return 'Today' }
+  if (age < 604_800_000) { return 'This week' }
+  return 'Older'
+}
+
 export function PullRequestListView({
   authored,
   reviewing,
-  login,
   isRefreshing = false,
+  onNavigate,
   onOpen,
+  onOpenUsage,
   onRefresh,
 }: PullRequestListViewProps) {
   const theme = useTheme()
   const [mode, setMode] = useState<'authored' | 'reviewing'>('authored')
   const items = mode === 'authored' ? authored : reviewing
+  const groups = ['Today', 'This week', 'Older']
+    .map(title => ({ title, items: items.filter(item => pullRequestGroup(item.updatedAt) === title) }))
+    .filter(group => group.items.length > 0)
 
   return (
     <Screen
+      action={<AppMenuButton current="pull-requests" onSelect={onNavigate} />}
+      leading={<CradleIconButton onPress={onOpenUsage} />}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
-      subtitle={`GitHub activity for @${login}`}
       title="Pull requests"
     >
-      <View style={[styles.segmented, { backgroundColor: theme.muted }]}>
-        {(['authored', 'reviewing'] as const).map(option => (
-          <PressableScale
-            key={option}
-            onPress={() => setMode(option)}
-            style={[
-              styles.segment,
-              option === mode && { backgroundColor: theme.card, shadowColor: theme.shadow, shadowOpacity: 0.08, shadowRadius: 2 },
-            ]}
-          >
-            <Text style={[styles.segmentLabel, { color: option === mode ? theme.foreground : theme.mutedForeground }]}>
-              {option === 'authored' ? 'Authored' : 'Review requests'}
-            </Text>
-          </PressableScale>
-        ))}
-      </View>
+      <SegmentedControl
+        appearance={theme.isDark ? 'dark' : 'light'}
+        onValueChange={value => setMode(value === 'Review requests' ? 'reviewing' : 'authored')}
+        selectedIndex={mode === 'authored' ? 0 : 1}
+        style={styles.segmented}
+        values={['Authored', 'Review requests']}
+      />
 
       {items.length === 0
         ? (
@@ -76,38 +87,33 @@ export function PullRequestListView({
             />
           )
         : (
-            <View style={styles.list}>
-              {items.map(pullRequest => (
-                <PressableScale
-                  key={`${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`}
-                  onPress={() => onOpen(pullRequest)}
-                  style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
-                >
-                  <GitPullRequest color={pullRequest.state === 'open' ? theme.success : theme.mutedForeground} size={20} />
-                  <View style={styles.copy}>
-                    <Text style={[styles.repo, { color: theme.mutedForeground }]}>
-                      {pullRequest.owner}
-/
-{pullRequest.repo}
-{' '}
-#
-{pullRequest.number}
-                    </Text>
-                    <Text numberOfLines={2} style={[styles.title, { color: theme.foreground }]}>
-                      {pullRequest.title}
-                    </Text>
-                    <View style={styles.meta}>
-                      <ChecksIcon state={pullRequest.checksState} />
-                      <StatusPill
-                        label={pullRequest.isDraft ? 'draft' : pullRequest.state}
-                        tone={pullRequest.isDraft ? 'neutral' : pullRequest.state === 'open' ? 'success' : 'neutral'}
-                      />
-                      <Text style={[styles.time, { color: theme.mutedForeground }]}>
-                        {relativeTime(pullRequest.updatedAt)}
-                      </Text>
-                    </View>
-                  </View>
-                </PressableScale>
+            <View>
+              {groups.map(group => (
+                <View key={group.title} style={styles.group}>
+                  <SectionHeading title={group.title} />
+                  {group.items.map(pullRequest => (
+                    <Item
+                      description={`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
+                      footer={(
+                        <View style={styles.meta}>
+                          <ChecksIcon state={pullRequest.checksState} />
+                          <StatusPill
+                            label={pullRequest.isDraft ? 'draft' : pullRequest.state}
+                            tone={pullRequest.isDraft ? 'neutral' : pullRequest.state === 'open' ? 'success' : 'neutral'}
+                          />
+                          <Text style={[styles.time, { color: theme.mutedForeground }]}>
+                            {relativeTime(pullRequest.updatedAt)}
+                          </Text>
+                        </View>
+                      )}
+                      key={`${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`}
+                      media={<View style={[styles.dot, { backgroundColor: pullRequest.state === 'open' ? theme.info : theme.dimForeground }]} />}
+                      monospaceDescription
+                      onPress={() => onOpen(pullRequest)}
+                      title={pullRequest.title}
+                    />
+                  ))}
+                </View>
               ))}
             </View>
           )}
@@ -116,58 +122,28 @@ export function PullRequestListView({
 }
 
 const styles = StyleSheet.create({
-  copy: {
-    flex: 1,
-    gap: 7,
+  dot: {
+    borderRadius: 4,
+    height: 8,
+    marginTop: 5,
+    width: 8,
   },
-  list: {
-    gap: spacing.md,
+  group: {
+    marginBottom: spacing.md,
   },
   meta: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  repo: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 12,
-  },
-  row: {
-    alignItems: 'flex-start',
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 124,
-    padding: spacing.lg,
-  },
-  segment: {
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    flex: 1,
-    height: 38,
-    justifyContent: 'center',
-  },
-  segmentLabel: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 13,
-  },
   segmented: {
-    borderRadius: radius.md,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.xl,
-    padding: spacing.xs,
+    marginBottom: spacing.lg,
+    minHeight: 36,
   },
   time: {
-    fontFamily: 'Geist_400Regular',
+
     fontSize: 11,
     fontVariant: ['tabular-nums'],
     marginLeft: 'auto',
-  },
-  title: {
-    fontFamily: 'Geist_600SemiBold',
-    fontSize: 15,
-    lineHeight: 20,
   },
 })

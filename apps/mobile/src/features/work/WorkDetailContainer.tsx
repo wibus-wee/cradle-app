@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { router } from 'expo-router'
+import { router, Stack } from 'expo-router'
 
 import type { GetWorksByIdResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -41,15 +41,17 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
   if (query.isPending) { return <LoadingState /> }
   if (query.error) { return <ErrorState title="Could not open Work" description={errorMessage(query.error)} /> }
   return (
-    <WorkDetailView
-      detail={query.data}
-      isPreparing={prepare.isPending}
-      isSubmitting={submit.isPending}
-      onBack={() => router.back()}
-      onOpenChat={sessionId => router.push(`/session/${sessionId}`)}
-      onOpenPullRequest={(owner, repo, number) => router.push(`/pull-request/${owner}/${repo}/${number}`)}
-      onPrepare={handoff => prepare.mutate(handoff)}
-      onSubmit={handoff => submit.mutate(handoff)}
-    />
+    <>
+      <Stack.Screen options={{ title: 'Work' }} />
+      <WorkDetailView
+        detail={query.data}
+        isPreparing={prepare.isPending}
+        isSubmitting={submit.isPending}
+        onOpenChat={sessionId => router.push(`/session/${sessionId}`)}
+        onOpenPullRequest={(owner, repo, number) => router.push(`/pull-request/${owner}/${repo}/${number}`)}
+        onPrepare={handoff => prepare.mutate(handoff)}
+        onSubmit={handoff => submit.mutate(handoff)}
+      />
+    </>
   )
 }

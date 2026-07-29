@@ -18,7 +18,6 @@ export const workspaceFixture: WorkspaceViewProps = {
     { type: 'directory', name: 'apps', path: 'apps' },
     { type: 'file', name: 'README.md', path: 'README.md' },
   ],
-  onBack: () => {},
   onOpenSession: () => {},
   onOpenWork: () => {},
 }

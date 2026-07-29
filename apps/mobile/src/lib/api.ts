@@ -15,7 +15,9 @@ function requestUrl(connection: ServerConnection, path: string): string {
 
 function requestHeaders(connection: ServerConnection, options: RequestOptions): Headers {
   const headers = new Headers(options.headers)
-  headers.set('accept', 'application/json')
+  if (!headers.has('accept')) {
+    headers.set('accept', 'application/json')
+  }
   if (connection.token) {
     headers.set('authorization', `Bearer ${connection.token}`)
   }
@@ -46,34 +48,29 @@ export async function cradleRequest<T>(
   return await response.json() as T
 }
 
-export async function cradleStreamRequest(
+export async function cradleStreamResponse(
   connection: ServerConnection,
   path: string,
-  body: object,
-): Promise<void> {
+  options: RequestOptions = {},
+): Promise<Response> {
   const response = await fetch(requestUrl(connection, path), {
-    method: 'POST',
-    headers: requestHeaders(connection, { body }),
-    body: JSON.stringify(body),
+    ...options,
+    headers: requestHeaders(connection, {
+      ...options,
+      headers: {
+        accept: 'text/event-stream',
+        ...Object.fromEntries(new Headers(options.headers)),
+      },
+    }),
+    body: options.body
+      ? typeof options.body === 'string' ? options.body : JSON.stringify(options.body)
+      : undefined,
   })
   if (!response.ok) {
     const error = await response.json().catch(() => null) as { message?: string } | null
     throw new CradleApiError(error?.message ?? `${response.status} ${response.statusText}`, response.status)
   }
-
-  // Drain incrementally while React Query polls the durable projection. This
-  // keeps long-running turns from accumulating a full SSE transcript in RAM.
-  const reader = response.body?.getReader()
-  if (!reader) {
-    await response.text()
-    return
-  }
-  while (true) {
-    const { done } = await reader.read()
-    if (done) {
-      return
-    }
-  }
+  return response
 }
 
 export async function testServerConnection(connection: ServerConnection): Promise<void> {

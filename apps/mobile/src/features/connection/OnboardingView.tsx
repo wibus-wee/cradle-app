@@ -1,17 +1,17 @@
-import { ArrowRight, Link2, LockKeyhole } from 'lucide-react-native'
+import { Link2, LockKeyhole } from 'lucide-react-native'
 import { useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { Button } from '@/components/ui/button'
-import { radius, spacing } from '@/theme/tokens'
+import { InputGroup } from '@/components/ui/input-group'
+import { NativeAction } from '@/components/ui/native-action'
+import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 export interface OnboardingViewProps {
@@ -32,7 +32,7 @@ export function OnboardingView({
   const [token, setToken] = useState('')
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboard}
@@ -46,29 +46,25 @@ export function OnboardingView({
           </View>
 
           <View style={styles.copy}>
-            <Text style={[styles.title, { color: theme.foreground }]}>Take your work with you.</Text>
+            <Text style={[styles.title, { color: theme.foreground }]}>Connect to Cradle</Text>
             <Text style={[styles.description, { color: theme.mutedForeground }]}>
-              Connect this device to a Cradle Server to follow active work and continue any conversation.
+              Use the Server address shown in Cradle Desktop.
             </Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.field}>
               <Text style={[styles.label, { color: theme.foreground }]}>Server URL</Text>
-              <View style={[styles.inputFrame, { borderColor: theme.input, backgroundColor: theme.card }]}>
-                <Link2 color={theme.mutedForeground} size={18} />
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  onChangeText={setUrl}
-                  placeholder="http://192.168.1.20:21423"
-                  placeholderTextColor={theme.mutedForeground}
-                  returnKeyType="next"
-                  style={[styles.input, { color: theme.foreground }]}
-                  value={url}
-                />
-              </View>
+              <InputGroup
+                addon={<Link2 color={theme.tertiaryForeground} size={16} />}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                onChangeText={setUrl}
+                placeholder="http://192.168.1.20:21423"
+                returnKeyType="next"
+                value={url}
+              />
             </View>
 
             <View style={styles.field}>
@@ -76,26 +72,21 @@ export function OnboardingView({
                 <Text style={[styles.label, { color: theme.foreground }]}>Access token</Text>
                 <Text style={[styles.optional, { color: theme.mutedForeground }]}>Optional</Text>
               </View>
-              <View style={[styles.inputFrame, { borderColor: theme.input, backgroundColor: theme.card }]}>
-                <LockKeyhole color={theme.mutedForeground} size={18} />
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setToken}
-                  placeholder="Required for protected servers"
-                  placeholderTextColor={theme.mutedForeground}
-                  secureTextEntry
-                  style={[styles.input, { color: theme.foreground }]}
-                  value={token}
-                />
-              </View>
+              <InputGroup
+                addon={<LockKeyhole color={theme.tertiaryForeground} size={16} />}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setToken}
+                placeholder="Required for protected servers"
+                secureTextEntry
+                value={token}
+              />
             </View>
 
             {error && <Text style={[styles.error, { color: theme.destructive }]}>{error}</Text>}
 
-            <Button
+            <NativeAction
               disabled={!url.trim()}
-              icon={ArrowRight}
               label="Connect to server"
               loading={isConnecting}
               onPress={() => onConnect(url, token)}
@@ -124,13 +115,13 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   description: {
-    fontFamily: 'Geist_400Regular',
-    fontSize: 16,
-    lineHeight: 24,
+
+    fontSize: 13,
+    lineHeight: 20,
     maxWidth: 360,
   },
   error: {
-    fontFamily: 'Geist_500Medium',
+
     fontSize: 13,
     lineHeight: 18,
   },
@@ -140,27 +131,11 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing.lg,
   },
-  input: {
-    flex: 1,
-    fontFamily: 'Geist_400Regular',
-    fontSize: 15,
-    height: 48,
-    paddingVertical: 0,
-  },
-  inputFrame: {
-    alignItems: 'center',
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: spacing.md,
-    height: 50,
-    paddingHorizontal: 14,
-  },
   keyboard: {
     flex: 1,
   },
   label: {
-    fontFamily: 'Geist_600SemiBold',
+
     fontSize: 13,
   },
   labelRow: {
@@ -182,19 +157,19 @@ const styles = StyleSheet.create({
     width: 10,
   },
   optional: {
-    fontFamily: 'Geist_400Regular',
+
     fontSize: 12,
   },
   safeArea: {
     flex: 1,
   },
   title: {
-    fontFamily: 'Geist_600SemiBold',
-    fontSize: 34,
-    lineHeight: 40,
+
+    fontSize: 24,
+    lineHeight: 30,
   },
   wordmark: {
-    fontFamily: 'Geist_600SemiBold',
+
     fontSize: 20,
   },
 })

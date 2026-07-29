@@ -55,12 +55,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     flexDirection: 'row',
     gap: 8,
-    height: 48,
+    height: 44,
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
   label: {
-    fontFamily: 'Geist_600SemiBold',
-    fontSize: 15,
+
+    fontSize: 13,
   },
 })

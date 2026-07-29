@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 
-import { radius } from '@/theme/tokens'
+import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 interface StatusPillProps {
@@ -19,8 +19,8 @@ export function StatusPill({ label, tone = 'neutral' }: StatusPillProps) {
   }[tone]
 
   return (
-    <View style={[styles.pill, { backgroundColor: `${color}18` }]}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
+    <View style={styles.pill}>
+      <View style={[styles.dot, { backgroundColor: tone === 'neutral' ? theme.dimForeground : color }]} />
       <Text style={[styles.label, { color }]}>{label}</Text>
     </View>
   )
@@ -28,22 +28,20 @@ export function StatusPill({ label, tone = 'neutral' }: StatusPillProps) {
 
 const styles = StyleSheet.create({
   dot: {
-    borderRadius: 3,
-    height: 6,
-    width: 6,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
   },
   label: {
-    fontFamily: 'Geist_500Medium',
+
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
   pill: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    borderRadius: radius.sm,
     flexDirection: 'row',
-    gap: 6,
-    minHeight: 26,
-    paddingHorizontal: 8,
+    gap: spacing.xs,
+    minHeight: 24,
   },
 })

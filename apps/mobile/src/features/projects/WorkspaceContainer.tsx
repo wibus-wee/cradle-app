@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { router } from 'expo-router'
+import { router, Stack } from 'expo-router'
+import { useState } from 'react'
 
 import type {
   GetSessionsResponse,
@@ -16,6 +17,7 @@ import { WorkspaceView } from './WorkspaceView'
 
 export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
   const { connection } = useConnection()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
     queryKey: ['workspace', connection?.url, workspaceId],
@@ -43,16 +45,28 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
 : 15_000,
   })
 
+  const refresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await query.refetch()
+    }
+    finally {
+      setIsRefreshing(false)
+    }
+  }
+
   if (query.isPending) { return <LoadingState /> }
   if (query.error) { return <ErrorState title="Could not open project" description={errorMessage(query.error)} /> }
   return (
-    <WorkspaceView
-      {...query.data}
-      isRefreshing={query.isRefetching}
-      onBack={() => router.back()}
-      onOpenSession={sessionId => router.push(`/session/${sessionId}`)}
-      onOpenWork={workId => router.push(`/work/${workId}`)}
-      onRefresh={() => void query.refetch()}
-    />
+    <>
+      <Stack.Screen options={{ title: '' }} />
+      <WorkspaceView
+        {...query.data}
+        isRefreshing={isRefreshing}
+        onOpenSession={sessionId => router.push(`/session/${sessionId}`)}
+        onOpenWork={workId => router.push(`/work/${workId}`)}
+        onRefresh={() => void refresh()}
+      />
+    </>
   )
 }

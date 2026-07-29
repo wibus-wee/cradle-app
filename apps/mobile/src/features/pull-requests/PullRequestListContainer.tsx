@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
+import { useState } from 'react'
 
 import type {
   GetPullRequestsAuthoredResponse,
@@ -15,6 +16,7 @@ import { PullRequestListView } from './PullRequestListView'
 
 export function PullRequestListContainer() {
   const { connection } = useConnection()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
     queryKey: ['pull-requests', connection?.url],
@@ -30,6 +32,16 @@ export function PullRequestListContainer() {
     refetchInterval: 30_000,
   })
 
+  const refresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await query.refetch()
+    }
+    finally {
+      setIsRefreshing(false)
+    }
+  }
+
   if (query.isPending) { return <LoadingState /> }
   if (query.error) {
     return (
@@ -42,11 +54,13 @@ export function PullRequestListContainer() {
   return (
     <PullRequestListView
       {...query.data}
-      isRefreshing={query.isRefetching}
+      isRefreshing={isRefreshing}
+      onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onOpen={pullRequest => router.push(
         `/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`,
       )}
-      onRefresh={() => void query.refetch()}
+      onOpenUsage={() => router.push('/usage')}
+      onRefresh={() => void refresh()}
     />
   )
 }

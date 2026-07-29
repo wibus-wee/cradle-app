@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
+import { useState } from 'react'
 
 import type { GetSessionsResponse, GetWorkspacesResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -11,6 +12,7 @@ import { ProjectsView } from './ProjectsView'
 
 export function ProjectsContainer() {
   const { connection } = useConnection()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
     queryKey: ['projects', connection?.url],
@@ -33,6 +35,16 @@ export function ProjectsContainer() {
 : 15_000,
   })
 
+  const refresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await query.refetch()
+    }
+    finally {
+      setIsRefreshing(false)
+    }
+  }
+
   if (!connection) {
     return null
   }
@@ -44,9 +56,11 @@ export function ProjectsContainer() {
   }
   return (
     <ProjectsView
-      isRefreshing={query.isRefetching}
+      isRefreshing={isRefreshing}
+      onNavigate={section => router.replace(`/(tabs)/${section}`)}
+      onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}
-      onRefresh={() => void query.refetch()}
+      onRefresh={() => void refresh()}
       projects={query.data}
     />
   )

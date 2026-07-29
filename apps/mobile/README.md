@@ -41,8 +41,8 @@ Settings.
 - `src/features/*/*Container.tsx` owns API, persistence, and route dependencies.
 - `src/features/*/*View.tsx` is fixture-renderable and receives typed props and
   callbacks.
-- iOS and Android use Expo Router's native tab bar while sharing the same
-  feature Views with the Web development target.
+- Root destinations use an anchored navigation menu; detail surfaces use Expo
+  Router's native Stack navigation and back gestures.
 - `src/api-gen/` is generated from the authoritative server OpenAPI document.
 - Access tokens are stored in the platform keychain through Expo SecureStore
   on iOS and Android, and in browser storage on Web.

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
+import { useState } from 'react'
 
 import type { GetWorkspacesResponse, GetWorksResponse, PostWorksResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -13,6 +14,7 @@ import { WorkListView } from './WorkListView'
 export function WorkListContainer() {
   const { connection } = useConnection()
   const queryClient = useQueryClient()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
     queryKey: ['works', connection?.url],
@@ -30,6 +32,16 @@ export function WorkListContainer() {
     refetchInterval: data => data.state.data?.works.some(work => work.activity === 'running') ? 2_000 : 12_000,
   })
 
+  const refresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await query.refetch()
+    }
+    finally {
+      setIsRefreshing(false)
+    }
+  }
+
   const create = useMutation({
     mutationFn: (input: CreateWorkInput) => cradleRequest<PostWorksResponse>(
       connection!,
@@ -40,7 +52,7 @@ export function WorkListContainer() {
           workspaceId: input.workspaceId,
           title: input.title,
           objective: input.objective || input.title,
-          baseStrategy: 'source-head',
+          baseStrategy: input.baseStrategy,
         },
       },
     ),
@@ -55,10 +67,12 @@ export function WorkListContainer() {
   return (
     <WorkListView
       isCreating={create.isPending}
-      isRefreshing={query.isRefetching}
+      isRefreshing={isRefreshing}
+      onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onCreate={input => create.mutate(input)}
       onOpen={workId => router.push(`/work/${workId}`)}
-      onRefresh={() => void query.refetch()}
+      onOpenUsage={() => router.push('/usage')}
+      onRefresh={() => void refresh()}
       {...query.data}
     />
   )
