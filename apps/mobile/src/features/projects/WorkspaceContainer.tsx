@@ -10,6 +10,7 @@ import type {
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
+import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 
@@ -17,6 +18,7 @@ import { WorkspaceView } from './WorkspaceView'
 
 export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
   const { connection } = useConnection()
+  const create = useCreateWork()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
@@ -35,7 +37,14 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
       if (!workspace) {
         throw new Error('Workspace not found')
       }
-      return { workspace, sessions, works, files }
+      return {
+        workspace,
+        sessions,
+        works,
+        files,
+        workspaces: workspaces.filter(candidate =>
+          candidate.availability === 'available' && candidate.locator.kind !== 'managed-worktree'),
+      }
     },
     refetchInterval: data => (
       data.state.data?.sessions.some(session => session.status === 'streaming')
@@ -62,7 +71,9 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
       <Stack.Screen options={{ title: '' }} />
       <WorkspaceView
         {...query.data}
+        isCreating={create.isPending}
         isRefreshing={isRefreshing}
+        onCreate={input => create.mutate(input)}
         onOpenSession={sessionId => router.push(`/session/${sessionId}`)}
         onOpenWork={workId => router.push(`/work/${workId}`)}
         onRefresh={() => void refresh()}

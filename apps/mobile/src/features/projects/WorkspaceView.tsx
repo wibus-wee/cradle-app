@@ -1,17 +1,21 @@
 import { ChevronRight, File, Folder, GitBranch, MessageSquareText } from 'lucide-react-native'
-import { StyleSheet, View } from 'react-native'
+import { useRef } from 'react'
+import { Keyboard, StyleSheet, View } from 'react-native'
 
 import type {
   GetSessionsResponse,
   GetWorkspacesByWorkspaceIdFilesChildrenResponse,
   GetWorkspacesResponse,
   GetWorksResponse,
+  PostWorksData,
 } from '@/api-gen'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { EmptyState } from '@/components/ui/states'
 import { StatusPill } from '@/components/ui/status-pill'
+import type { WorkComposerHandle } from '@/features/work/WorkComposer'
+import { WorkComposer } from '@/features/work/WorkComposer'
 import { relativeTime } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
@@ -23,10 +27,13 @@ type FileEntry = GetWorkspacesByWorkspaceIdFilesChildrenResponse[number]
 
 export interface WorkspaceViewProps {
   workspace: Workspace
+  workspaces: Workspace[]
   sessions: Session[]
   works: Work[]
   files: FileEntry[]
+  isCreating?: boolean
   isRefreshing?: boolean
+  onCreate: (input: PostWorksData['body']) => void
   onOpenSession: (sessionId: string) => void
   onOpenWork: (workId: string) => void
   onRefresh?: () => void
@@ -40,18 +47,39 @@ function sessionTone(status: Session['status']) {
 
 export function WorkspaceView({
   workspace,
+  workspaces,
   sessions,
   works,
   files,
+  isCreating = false,
   isRefreshing = false,
+  onCreate,
   onOpenSession,
   onOpenWork,
   onRefresh,
 }: WorkspaceViewProps) {
   const theme = useTheme()
+  const composerRef = useRef<WorkComposerHandle>(null)
+  const canCreateWork = workspaces.some(candidate => candidate.id === workspace.id)
   return (
     <Screen
+      avoidKeyboard={canCreateWork}
+      footer={canCreateWork
+        ? (
+            <WorkComposer
+              initialWorkspaceId={workspace.id}
+              isCreating={isCreating}
+              onCreate={onCreate}
+              ref={composerRef}
+              workspaces={workspaces}
+            />
+          )
+        : undefined}
       insetTop={false}
+      onPressBackground={() => {
+        composerRef.current?.collapse()
+        Keyboard.dismiss()
+      }}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
       title={workspace.name}

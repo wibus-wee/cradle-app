@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Keyboard, StyleSheet, Text, View } from 'react-native'
 
-import type { GetWorkspacesResponse, GetWorksResponse } from '@/api-gen'
+import type { GetWorkspacesResponse, GetWorksResponse, PostWorksData } from '@/api-gen'
 import type { AppSection } from '@/components/common/app-menu-button'
 import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
@@ -20,19 +20,12 @@ import { WorkComposer } from './WorkComposer'
 type Work = GetWorksResponse[number]
 type Workspace = GetWorkspacesResponse[number]
 
-export interface CreateWorkInput {
-  baseStrategy: 'source-head' | 'remote-default'
-  workspaceId: string
-  title: string
-  objective: string
-}
-
 export interface WorkListViewProps {
   works: Work[]
   workspaces: Workspace[]
   isCreating?: boolean
   isRefreshing?: boolean
-  onCreate: (input: CreateWorkInput) => void
+  onCreate: (input: PostWorksData['body']) => void
   onNavigate: (section: AppSection) => void
   onOpen: (workId: string) => void
   onOpenUsage: () => void

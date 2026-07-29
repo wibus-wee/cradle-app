@@ -1,19 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { useState } from 'react'
 
-import type { GetWorkspacesResponse, GetWorksResponse, PostWorksResponse } from '@/api-gen'
+import type { GetWorkspacesResponse, GetWorksResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 
-import type { CreateWorkInput } from './WorkListView'
+import { useCreateWork } from './use-create-work'
 import { WorkListView } from './WorkListView'
 
 export function WorkListContainer() {
   const { connection } = useConnection()
-  const queryClient = useQueryClient()
+  const create = useCreateWork()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
@@ -41,26 +41,6 @@ export function WorkListContainer() {
       setIsRefreshing(false)
     }
   }
-
-  const create = useMutation({
-    mutationFn: (input: CreateWorkInput) => cradleRequest<PostWorksResponse>(
-      connection!,
-      '/works',
-      {
-        method: 'POST',
-        body: {
-          workspaceId: input.workspaceId,
-          title: input.title,
-          objective: input.objective || input.title,
-          baseStrategy: input.baseStrategy,
-        },
-      },
-    ),
-    onSuccess: (work) => {
-      void queryClient.invalidateQueries({ queryKey: ['works', connection?.url] })
-      router.push(`/work/${work.work.id}`)
-    },
-  })
 
   if (query.isPending) { return <LoadingState /> }
   if (query.error) { return <ErrorState title="Could not load Work" description={errorMessage(query.error)} /> }

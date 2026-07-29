@@ -9,6 +9,7 @@ import { ArrowUp, ChevronDown, GitBranch, Plus } from 'lucide-react-native'
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -23,19 +24,20 @@ import {
   View,
 } from 'react-native'
 
-import type { GetWorkspacesResponse } from '@/api-gen'
+import type { GetWorkspacesResponse, PostWorksData } from '@/api-gen'
 import { PressableScale } from '@/components/ui/pressable-scale'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-import type { CreateWorkInput } from './WorkListView'
+import { WorkspacePickerSheet } from './WorkspacePickerSheet'
 
 type Workspace = GetWorkspacesResponse[number]
-type BaseStrategy = CreateWorkInput['baseStrategy']
+type BaseStrategy = NonNullable<PostWorksData['body']['baseStrategy']>
 
 interface WorkComposerProps {
+  initialWorkspaceId?: string
   isCreating: boolean
-  onCreate: (input: CreateWorkInput) => void
+  onCreate: (input: PostWorksData['body']) => void
   workspaces: Workspace[]
 }
 
@@ -55,20 +57,35 @@ const baseStrategies: Array<{
 const supportsLiquidGlass = isGlassEffectAPIAvailable() && isLiquidGlassAvailable()
 
 export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
+  initialWorkspaceId,
   isCreating,
   onCreate,
   workspaces,
 }, ref) => {
   const theme = useTheme()
   const inputRef = useRef<TextInput>(null)
+  const initialWorkspaceIdRef = useRef(initialWorkspaceId)
   const isClosingRef = useRef(false)
+  const workspacePickerOpenRef = useRef(false)
   const expansion = useRef(new Animated.Value(0)).current
   const [expanded, setExpanded] = useState(false)
-  const [workspaceId, setWorkspaceId] = useState(workspaces[0]?.id ?? '')
+  const [workspaceId, setWorkspaceId] = useState(
+    initialWorkspaceId ?? workspaces[0]?.id ?? '',
+  )
+  const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false)
   const [baseStrategy, setBaseStrategy] = useState<BaseStrategy>('source-head')
   const [text, setText] = useState('')
   const workspace = workspaces.find(item => item.id === workspaceId) ?? workspaces[0]
   const base = baseStrategies.find(item => item.value === baseStrategy) ?? baseStrategies[0]!
+
+  useEffect(() => {
+    const nextWorkspaceId = initialWorkspaceId ?? workspaces[0]?.id ?? ''
+    const initialWorkspaceChanged = initialWorkspaceIdRef.current !== initialWorkspaceId
+    if (initialWorkspaceChanged || !workspaces.some(item => item.id === workspaceId)) {
+      setWorkspaceId(nextWorkspaceId)
+    }
+    initialWorkspaceIdRef.current = initialWorkspaceId
+  }, [initialWorkspaceId, workspaceId, workspaces])
 
   const open = () => {
     if (expanded || isClosingRef.current) { return }
@@ -112,13 +129,6 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
     })
   }
 
-  const workspaceActions: MenuAction[] = workspaces.map(item => ({
-    id: item.id,
-    image: 'folder',
-    state: item.id === workspace?.id ? 'on' : 'off',
-    title: item.name,
-  }))
-
   const baseActions: MenuAction[] = baseStrategies.map(item => ({
     id: item.value,
     image: item.image,
@@ -147,30 +157,49 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
     extrapolate: 'clamp',
   })
 
+  const openWorkspacePicker = () => {
+    workspacePickerOpenRef.current = true
+    setWorkspacePickerOpen(true)
+    Keyboard.dismiss()
+  }
+
+  const closeWorkspacePicker = useCallback(() => {
+    Keyboard.dismiss()
+    setWorkspacePickerOpen(false)
+  }, [])
+
+  const restoreComposerFocus = useCallback(() => {
+    workspacePickerOpenRef.current = false
+    if (expanded && !isClosingRef.current) {
+      inputRef.current?.focus()
+    }
+  }, [expanded])
+
   return (
-    <Animated.View
-      style={[
-        styles.composer,
-        {
-          backgroundColor: supportsLiquidGlass ? 'transparent' : theme.surface,
-          borderColor: theme.input,
-          borderRadius: expansion.interpolate({
-            inputRange: [0, 1],
-            outputRange: [29, radius.xxl],
-          }),
-          height: expansion.interpolate({
-            inputRange: [0, 1],
-            outputRange: [58, 218],
-          }),
-          shadowColor: theme.shadow,
-          shadowOpacity: theme.shadowOpacity,
-          shadowRadius: expansion.interpolate({
-            inputRange: [0, 1],
-            outputRange: [5, 8],
-          }),
-        },
-      ]}
-    >
+    <>
+      <Animated.View
+        style={[
+          styles.composer,
+          {
+            backgroundColor: supportsLiquidGlass ? 'transparent' : theme.surface,
+            borderColor: theme.input,
+            borderRadius: expansion.interpolate({
+              inputRange: [0, 1],
+              outputRange: [29, radius.xxl],
+            }),
+            height: expansion.interpolate({
+              inputRange: [0, 1],
+              outputRange: [58, 218],
+            }),
+            shadowColor: theme.shadow,
+            shadowOpacity: theme.shadowOpacity,
+            shadowRadius: expansion.interpolate({
+              inputRange: [0, 1],
+              outputRange: [5, 8],
+            }),
+          },
+        ]}
+      >
       {supportsLiquidGlass && (
         <GlassView
           colorScheme={theme.isDark ? 'dark' : 'light'}
@@ -236,18 +265,17 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
             },
           ]}
         >
-          <MenuView
-            actions={workspaceActions}
-            onPressAction={({ nativeEvent }) => setWorkspaceId(nativeEvent.event)}
-            style={styles.contextMenu}
+          <PressableScale
+            accessibilityLabel="Choose repository"
+            accessibilityRole="button"
+            onPress={openWorkspacePicker}
+            style={[styles.contextButton, styles.contextMenu]}
           >
-            <View style={styles.contextButton}>
-              <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
-                {workspace?.name ?? 'Choose workspace'}
-              </Text>
-              <ChevronDown color={theme.mutedForeground} size={15} />
-            </View>
-          </MenuView>
+            <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
+              {workspace?.name ?? 'Choose repository'}
+            </Text>
+            <ChevronDown color={theme.mutedForeground} size={15} />
+          </PressableScale>
 
           <MenuView
             actions={baseActions}
@@ -284,7 +312,9 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
           <TextInput
             maxLength={12_000}
             multiline
-            onBlur={close}
+            onBlur={() => {
+              if (!workspacePickerOpenRef.current) { close() }
+            }}
             onChangeText={setText}
             placeholder="Plan, ask, build..."
             placeholderTextColor={theme.mutedForeground}
@@ -350,7 +380,16 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
           </PressableScale>
         </Animated.View>
       </View>
-    </Animated.View>
+      </Animated.View>
+      <WorkspacePickerSheet
+        onClose={closeWorkspacePicker}
+        onDismissed={restoreComposerFocus}
+        onSelect={setWorkspaceId}
+        selectedWorkspaceId={workspace?.id ?? ''}
+        visible={workspacePickerOpen}
+        workspaces={workspaces}
+      />
+    </>
   )
 })
 
@@ -390,7 +429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.xs,
-    minHeight: 32,
+    minHeight: 40,
   },
   contextLabel: {
     flexShrink: 1,
