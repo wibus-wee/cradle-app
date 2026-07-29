@@ -71,6 +71,7 @@ export function WorkspaceView({
               isCreating={isCreating}
               onCreate={onCreate}
               ref={composerRef}
+              showWorkType={false}
               workspaces={workspaces}
             />
           )

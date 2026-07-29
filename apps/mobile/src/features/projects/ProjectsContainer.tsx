@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { GetSessionsResponse, GetWorkspacesResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
+import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 
@@ -12,6 +13,7 @@ import { ProjectsView } from './ProjectsView'
 
 export function ProjectsContainer() {
   const { connection } = useConnection()
+  const create = useCreateWork()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection),
@@ -56,7 +58,9 @@ export function ProjectsContainer() {
   }
   return (
     <ProjectsView
+      isCreating={create.isPending}
       isRefreshing={isRefreshing}
+      onCreate={input => create.mutate(input)}
       onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}

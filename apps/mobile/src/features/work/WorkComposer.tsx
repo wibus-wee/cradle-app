@@ -38,6 +38,7 @@ interface WorkComposerProps {
   initialWorkspaceId?: string
   isCreating: boolean
   onCreate: (input: PostWorksData['body']) => void
+  showWorkType?: boolean
   workspaces: Workspace[]
 }
 
@@ -60,6 +61,7 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
   initialWorkspaceId,
   isCreating,
   onCreate,
+  showWorkType = false,
   workspaces,
 }, ref) => {
   const theme = useTheme()
@@ -156,6 +158,14 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
     outputRange: [0, 1],
     extrapolate: 'clamp',
   })
+  const frameRadius = expansion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [29, radius.xxl],
+  })
+  const surfaceRadius = expansion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [28, radius.xxl - 1],
+  })
 
   const openWorkspacePicker = () => {
     workspacePickerOpenRef.current = true
@@ -179,14 +189,11 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
     <>
       <Animated.View
         style={[
-          styles.composer,
+          styles.composerFrame,
           {
-            backgroundColor: supportsLiquidGlass ? 'transparent' : theme.surface,
+            backgroundColor: theme.surface,
             borderColor: theme.input,
-            borderRadius: expansion.interpolate({
-              inputRange: [0, 1],
-              outputRange: [29, radius.xxl],
-            }),
+            borderRadius: frameRadius,
             height: expansion.interpolate({
               inputRange: [0, 1],
               outputRange: [58, 218],
@@ -200,186 +207,201 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
           },
         ]}
       >
-      {supportsLiquidGlass && (
-        <GlassView
-          colorScheme={theme.isDark ? 'dark' : 'light'}
-          glassEffectStyle="regular"
-          pointerEvents="none"
-          style={styles.glass}
-          tintColor={theme.glassTint}
-        />
-      )}
-
-      <Animated.View
-        pointerEvents={expanded ? 'none' : 'auto'}
-        style={[
-          styles.collapsedStage,
-          {
-            opacity: collapsedOpacity,
-            transform: [{
-              translateY: expansion.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, -8],
-              }),
-            }],
-          },
-        ]}
-      >
-        <PressableScale
-          accessibilityLabel="Open Work Composer"
-          accessibilityRole="button"
-          haptic
-          onPress={open}
-          style={styles.collapsedPressable}
-        >
-          <View style={[styles.collapsedAdd, { backgroundColor: theme.muted }]}>
-            <Plus color={theme.tertiaryForeground} size={22} />
-          </View>
-          <Text numberOfLines={1} style={[styles.placeholder, { color: theme.mutedForeground }]}>
-            Plan, ask, build...
-          </Text>
-        </PressableScale>
-      </Animated.View>
-
-      <View pointerEvents={expanded ? 'auto' : 'none'} style={styles.expandedStage}>
-        <PressableScale
-          accessibilityLabel="Collapse Work Composer"
-          accessibilityRole="button"
-          onPress={close}
-          style={styles.handleButton}
-        >
-          <View style={[styles.handle, { backgroundColor: theme.muted }]} />
-        </PressableScale>
-
         <Animated.View
           style={[
-            styles.contextRow,
+            styles.composerSurface,
             {
-              opacity: expandedOpacity,
-              transform: [{
-                translateY: expansion.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              }],
+              backgroundColor: supportsLiquidGlass ? 'transparent' : theme.surface,
+              borderRadius: surfaceRadius,
             },
           ]}
         >
-          <PressableScale
-            accessibilityLabel="Choose repository"
-            accessibilityRole="button"
-            onPress={openWorkspacePicker}
-            style={[styles.contextButton, styles.contextMenu]}
-          >
-            <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
-              {workspace?.name ?? 'Choose repository'}
-            </Text>
-            <ChevronDown color={theme.mutedForeground} size={15} />
-          </PressableScale>
+          {supportsLiquidGlass && (
+            <GlassView
+              colorScheme={theme.isDark ? 'dark' : 'light'}
+              glassEffectStyle="regular"
+              pointerEvents="none"
+              style={styles.glass}
+              tintColor={theme.glassTint}
+            />
+          )}
 
-          <MenuView
-            actions={baseActions}
-            onPressAction={({ nativeEvent }) => {
-              const next = baseStrategies.find(item => item.value === nativeEvent.event)
-              if (next) { setBaseStrategy(next.value) }
-            }}
-            style={styles.contextMenu}
-          >
-            <View style={styles.contextButton}>
-              <GitBranch color={theme.tertiaryForeground} size={16} />
-              <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
-                {base.label}
-              </Text>
-              <ChevronDown color={theme.mutedForeground} size={15} />
-            </View>
-          </MenuView>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.inputStage,
-            {
-              opacity: inputOpacity,
-              transform: [{
-                translateY: expansion.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [10, 0],
-                }),
-              }],
-            },
-          ]}
-        >
-          <TextInput
-            maxLength={12_000}
-            multiline
-            onBlur={() => {
-              if (!workspacePickerOpenRef.current) { close() }
-            }}
-            onChangeText={setText}
-            placeholder="Plan, ask, build..."
-            placeholderTextColor={theme.mutedForeground}
-            ref={inputRef}
-            style={[styles.input, { color: theme.foreground }]}
-            textAlignVertical="top"
-            value={text}
-          />
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.footer,
-            {
-              opacity: footerOpacity,
-              transform: [{
-                translateY: expansion.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              }],
-            },
-          ]}
-        >
-          <View style={styles.workType}>
-            <MenuView
-              actions={baseActions}
-              onPressAction={({ nativeEvent }) => {
-                const next = baseStrategies.find(item => item.value === nativeEvent.event)
-                if (next) { setBaseStrategy(next.value) }
-              }}
-            >
-              <View style={[styles.addButton, { backgroundColor: theme.muted }]}>
-                <Plus color={theme.tertiaryForeground} size={20} />
-              </View>
-            </MenuView>
-            <GitBranch color={theme.foreground} size={16} />
-            <Text style={[styles.workTypeLabel, { color: theme.foreground }]}>Isolated Work</Text>
-          </View>
-
-          <PressableScale
-            accessibilityLabel="Create Work"
-            accessibilityRole="button"
-            disabled={!workspace || !text.trim() || isCreating}
-            haptic
-            onPress={submit}
+          <Animated.View
+            pointerEvents={expanded ? 'none' : 'auto'}
             style={[
-              styles.sendButton,
+              styles.collapsedStage,
               {
-                backgroundColor: text.trim() ? theme.primary : theme.muted,
+                opacity: collapsedOpacity,
+                transform: [{
+                  translateY: expansion.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -8],
+                  }),
+                }],
               },
             ]}
           >
-            {isCreating
-              ? <ActivityIndicator color={theme.primaryForeground} size="small" />
-              : (
-                  <ArrowUp
-                    color={text.trim() ? theme.primaryForeground : theme.mutedForeground}
-                    size={20}
-                    strokeWidth={2.2}
-                  />
-                )}
-          </PressableScale>
+            <PressableScale
+              accessibilityLabel="Open Work Composer"
+              accessibilityRole="button"
+              haptic
+              onPress={open}
+              style={styles.collapsedPressable}
+            >
+              <View style={[styles.collapsedAdd, { backgroundColor: theme.muted }]}>
+                <Plus color={theme.tertiaryForeground} size={22} />
+              </View>
+              <Text numberOfLines={1} style={[styles.placeholder, { color: theme.mutedForeground }]}>
+                Plan, ask, build...
+              </Text>
+            </PressableScale>
+          </Animated.View>
+
+          <View pointerEvents={expanded ? 'auto' : 'none'} style={styles.expandedStage}>
+            <PressableScale
+              accessibilityLabel="Collapse Work Composer"
+              accessibilityRole="button"
+              onPress={close}
+              style={styles.handleButton}
+            >
+              <View style={[styles.handle, { backgroundColor: theme.muted }]} />
+            </PressableScale>
+
+            <Animated.View
+              style={[
+                styles.contextRow,
+                {
+                  opacity: expandedOpacity,
+                  transform: [{
+                    translateY: expansion.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [8, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <PressableScale
+                accessibilityLabel="Choose repository"
+                accessibilityRole="button"
+                onPress={openWorkspacePicker}
+                style={[styles.contextButton, styles.contextMenu]}
+              >
+                <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
+                  {workspace?.name ?? 'Choose repository'}
+                </Text>
+                <ChevronDown color={theme.mutedForeground} size={15} />
+              </PressableScale>
+
+              <MenuView
+                actions={baseActions}
+                onPressAction={({ nativeEvent }) => {
+                  const next = baseStrategies.find(item => item.value === nativeEvent.event)
+                  if (next) { setBaseStrategy(next.value) }
+                }}
+                style={styles.contextMenu}
+              >
+                <View style={styles.contextButton}>
+                  <GitBranch color={theme.tertiaryForeground} size={16} />
+                  <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
+                    {base.label}
+                  </Text>
+                  <ChevronDown color={theme.mutedForeground} size={15} />
+                </View>
+              </MenuView>
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                styles.inputStage,
+                {
+                  opacity: inputOpacity,
+                  transform: [{
+                    translateY: expansion.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [10, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <TextInput
+                maxLength={12_000}
+                multiline
+                onBlur={() => {
+                  if (!workspacePickerOpenRef.current) { close() }
+                }}
+                onChangeText={setText}
+                placeholder="Plan, ask, build..."
+                placeholderTextColor={theme.mutedForeground}
+                ref={inputRef}
+                style={[styles.input, { color: theme.foreground }]}
+                textAlignVertical="top"
+                value={text}
+              />
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                styles.footer,
+                !showWorkType && styles.footerEnd,
+                {
+                  opacity: footerOpacity,
+                  transform: [{
+                    translateY: expansion.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [8, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              {showWorkType && (
+                <View style={styles.workType}>
+                  <MenuView
+                    actions={baseActions}
+                    onPressAction={({ nativeEvent }) => {
+                      const next = baseStrategies.find(item => item.value === nativeEvent.event)
+                      if (next) { setBaseStrategy(next.value) }
+                    }}
+                  >
+                    <View style={[styles.addButton, { backgroundColor: theme.muted }]}>
+                      <Plus color={theme.tertiaryForeground} size={20} />
+                    </View>
+                  </MenuView>
+                  <GitBranch color={theme.foreground} size={16} />
+                  <Text style={[styles.workTypeLabel, { color: theme.foreground }]}>
+                    Isolated Work
+                  </Text>
+                </View>
+              )}
+
+              <PressableScale
+                accessibilityLabel="Create Work"
+                accessibilityRole="button"
+                disabled={!workspace || !text.trim() || isCreating}
+                haptic
+                onPress={submit}
+                style={[
+                  styles.sendButton,
+                  {
+                    backgroundColor: text.trim() ? theme.primary : theme.muted,
+                  },
+                ]}
+              >
+                {isCreating
+                  ? <ActivityIndicator color={theme.primaryForeground} size="small" />
+                  : (
+                      <ArrowUp
+                        color={text.trim() ? theme.primaryForeground : theme.mutedForeground}
+                        size={20}
+                        strokeWidth={2.2}
+                      />
+                    )}
+              </PressableScale>
+            </Animated.View>
+          </View>
         </Animated.View>
-      </View>
       </Animated.View>
       <WorkspacePickerSheet
         onClose={closeWorkspacePicker}
@@ -420,10 +442,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     zIndex: 2,
   },
-  composer: {
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+  composerFrame: {
+    borderWidth: 1,
     shadowOffset: { height: 1, width: 0 },
+  },
+  composerSurface: {
+    flex: 1,
+    overflow: 'hidden',
   },
   contextButton: {
     alignItems: 'center',
@@ -454,6 +479,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
+  },
+  footerEnd: {
+    justifyContent: 'flex-end',
   },
   glass: {
     ...StyleSheet.absoluteFill,

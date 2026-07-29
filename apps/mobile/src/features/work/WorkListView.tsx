@@ -73,6 +73,7 @@ export function WorkListView({
           isCreating={isCreating}
           onCreate={onCreate}
           ref={composerRef}
+          showWorkType
           workspaces={workspaces}
         />
       )}

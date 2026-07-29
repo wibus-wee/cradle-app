@@ -17,6 +17,7 @@ export const projectsFixture: ProjectsViewProps = {
       sessions: [],
     },
   ],
+  onCreate: () => {},
   onNavigate: () => {},
   onOpenUsage: () => {},
   onOpenProject: () => {},
