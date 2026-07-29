@@ -280,7 +280,7 @@ async function spawnServer(opts: {
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
 }): Promise<void> {
-  const { host, port, dataDir, credentialSecret } = opts
+  const { host, port, dataDir, credentialSecret, serverAuthToken } = opts
 
   // In dev, use tsx to run the TS source directly
   // In production, run the compiled server entry
@@ -311,7 +311,8 @@ async function spawnServer(opts: {
     CRADLE_DATA_DIR: dataDir,
     CRADLE_VERSION: app.getVersion(),
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
-    // CRADLE_AUTH_TOKEN: serverAuthToken,
+    // Non-loopback binds (network access mode) require this; local mode also uses it for auth.
+    CRADLE_AUTH_TOKEN: serverAuthToken,
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,
