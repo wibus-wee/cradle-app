@@ -24,6 +24,7 @@ export function UsageDashboard() {
       dailyCost={usage.dailyCost}
       tools={usage.tools}
       costEfficiency={usage.costEfficiency}
+      performance={usage.performance}
       usageReady={usage.usageReady}
       range={range}
       onRangeChange={setRange}

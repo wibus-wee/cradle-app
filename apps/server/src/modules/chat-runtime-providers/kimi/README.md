@@ -29,6 +29,8 @@ Run `pnpm --filter @cradle/server generate:kimi-web-protocol-bindings` to rebuil
 
 ## Streaming Lifecycle
 
-The shared host WebSocket subscribes per Kimi session and maps text, thinking, tool lifecycle, turn completion, approvals, and questions into the Cradle streaming lifecycle. If the connection closes, the host-owned client reconnects and restores every active session subscription. Kimi's `resync_required` frame triggers REST status hydration and resumes pending approval/question bridging before live event consumption continues.
+The shared host WebSocket keeps the legacy session subscription for live turn events and adds `subscribe_v2` wildcard transcript subscriptions with per-agent sequence cursors. If the connection closes, the host-owned client reconnects, restores both subscriptions, and sends `transcript_since` cursors. Subscription acknowledgement and `resync_required` trigger authoritative REST transcript hydration: Cradle recovers missing text, thinking, and terminal tool state, resumes pending approval/question bridging, and terminates the stream when the submitted prompt is already completed, failed, aborted, or blocked. A failed bounded reconnect emits a terminal provider error instead of leaving the run active.
+
+Provider thread history comes from Kimi's typed transcript endpoint rather than the legacy message list. Transcript turns preserve timestamps, duration, structured tool frames, tasks, subagents, and retry metadata; task/subagent state is projected into the shared progress and crew UI slots. Live `agent.status.updated` usage is projected into durable Cradle usage events with model, provider timestamp, current-turn totals, cumulative totals, cache-read tokens, and cache-write tokens.
 
 Native Kimi capabilities that lack a corresponding Cradle contract are documented in [`GAP.md`](./GAP.md), rather than being advertised as supported behavior.

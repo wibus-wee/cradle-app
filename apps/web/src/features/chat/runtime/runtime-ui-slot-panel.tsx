@@ -426,8 +426,12 @@ function CrewModeRow({ mode }: { mode: ChatRuntimeCrewCollaborationMode }) {
 
 function CrewCallRow({ call }: { call: ChatRuntimeCrewCallItem }) {
   const receiverThreadIds = readCrewCallReceiverThreadIds(call)
+  const status = call.retry
+    ? `Retry ${call.retry.attempt}/${call.retry.maxRetries}`
+    : formatStatusLike(call.status)
   const detail = [
     receiverThreadIds.length > 0 ? `${receiverThreadIds.length} targets` : null,
+    call.retry ? `${call.retry.errorCategory} · ${formatRetryDelay(call.retry.retryDelayMs)}` : null,
     call.model,
     call.reasoningEffort,
   ]
@@ -442,7 +446,7 @@ function CrewCallRow({ call }: { call: ChatRuntimeCrewCallItem }) {
             readToneTextClassName(readToolActivityTone(call.status)),
           )}
         >
-          {formatStatusLike(call.status)}
+          {status}
         </span>
         <span className="min-w-0 flex-1 truncate text-foreground">
           {formatStatusLike(call.tool)}
@@ -456,6 +460,13 @@ function CrewCallRow({ call }: { call: ChatRuntimeCrewCallItem }) {
       )}
     </div>
   )
+}
+
+function formatRetryDelay(retryDelayMs: number): string {
+  if (retryDelayMs < 1_000) {
+    return `${retryDelayMs}ms`
+  }
+  return `${Math.round(retryDelayMs / 1_000)}s`
 }
 
 function readStateView(

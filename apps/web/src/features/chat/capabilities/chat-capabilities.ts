@@ -271,6 +271,15 @@ export interface ChatRuntimeCrewAgentItem {
   agentRole: string | null
 }
 
+export interface ChatRuntimeCrewRetryState {
+  agentId: string
+  attempt: number
+  maxRetries: number
+  retryDelayMs: number
+  errorStatus: number | null
+  errorCategory: string
+}
+
 export interface ChatRuntimeCrewCallItem {
   id: string
   tool: string
@@ -281,6 +290,7 @@ export interface ChatRuntimeCrewCallItem {
   model: string | null
   reasoningEffort: string | null
   agents: ChatRuntimeCrewAgentItem[]
+  retry?: ChatRuntimeCrewRetryState | null
   startedAt: number | null
   completedAt: number | null
 }

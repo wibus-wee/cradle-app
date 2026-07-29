@@ -95,6 +95,62 @@ export function denseCostSeries(dailyCost: DailyCost[], days: number): Array<{
   }))
 }
 
+export interface DailyCostComposition {
+  date: string
+  uncachedInputTokens: number
+  cachedInputTokens: number
+  cacheWriteInputTokens: number
+  completionTokens: number
+  uncachedInputCostUsd: number
+  cacheReadCostUsd: number
+  cacheWriteCostUsd: number
+  outputCostUsd: number
+}
+
+export function denseCostCompositionSeries(
+  dailyCost: DailyCost[],
+  days: number,
+): DailyCostComposition[] {
+  const byDate = new Map<string, DailyCostComposition>()
+  for (const row of dailyCost) {
+    const existing = byDate.get(row.date)
+    if (existing) {
+      existing.uncachedInputTokens += row.uncachedInputTokens
+      existing.cachedInputTokens += row.cachedInputTokens
+      existing.cacheWriteInputTokens += row.cacheWriteInputTokens
+      existing.completionTokens += row.completionTokens
+      existing.uncachedInputCostUsd += row.uncachedInputCostUsd
+      existing.cacheReadCostUsd += row.cacheReadCostUsd
+      existing.cacheWriteCostUsd += row.cacheWriteCostUsd
+      existing.outputCostUsd += row.outputCostUsd
+    }
+    else {
+      byDate.set(row.date, {
+        date: row.date,
+        uncachedInputTokens: row.uncachedInputTokens,
+        cachedInputTokens: row.cachedInputTokens,
+        cacheWriteInputTokens: row.cacheWriteInputTokens,
+        completionTokens: row.completionTokens,
+        uncachedInputCostUsd: row.uncachedInputCostUsd,
+        cacheReadCostUsd: row.cacheReadCostUsd,
+        cacheWriteCostUsd: row.cacheWriteCostUsd,
+        outputCostUsd: row.outputCostUsd,
+      })
+    }
+  }
+  return buildDenseDailySeries(Array.from(byDate.values()), days, date => ({
+    date,
+    uncachedInputTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
+    completionTokens: 0,
+    uncachedInputCostUsd: 0,
+    cacheReadCostUsd: 0,
+    cacheWriteCostUsd: 0,
+    outputCostUsd: 0,
+  }))
+}
+
 export interface WeekdayInsight {
   weekdayIndex: number
   totalTokens: number

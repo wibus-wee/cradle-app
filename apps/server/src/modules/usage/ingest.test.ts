@@ -41,6 +41,7 @@ describe('recordRuntimeUsageEvent', () => {
         usage: {
           promptTokens: 200,
           cachedInputTokens: 180,
+          cacheWriteInputTokens: 15,
           completionTokens: 30,
           reasoningOutputTokens: 10,
           totalTokens: 230,
@@ -48,6 +49,7 @@ describe('recordRuntimeUsageEvent', () => {
         providerTotal: {
           promptTokens: 500,
           cachedInputTokens: 400,
+          cacheWriteInputTokens: 25,
           completionTokens: 50,
           reasoningOutputTokens: 20,
           totalTokens: 550,
@@ -71,10 +73,12 @@ describe('recordRuntimeUsageEvent', () => {
       modelId: 'gpt-5.6-sol',
       promptTokens: 200,
       cachedInputTokens: 180,
+      cacheWriteInputTokens: 15,
       completionTokens: 30,
       reasoningOutputTokens: 10,
       totalTokens: 230,
       providerTotalPromptTokens: 500,
+      providerTotalCacheWriteInputTokens: 25,
       providerTotalTokens: 550,
       createdAt: 1_789_000_000,
     })])

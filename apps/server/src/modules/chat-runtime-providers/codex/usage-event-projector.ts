@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { RuntimeUsageEvent, TokenUsage } from '../../chat-runtime/runtime-provider-types'
 import type { CodexAppServerMessage } from './app-server/client'
 import type { ModelReroutedNotification } from './app-server-protocol/v2/ModelReroutedNotification'
+import type { RawResponseCompletedNotification } from './app-server-protocol/v2/RawResponseCompletedNotification'
 import type { ThreadTokenUsageUpdatedNotification } from './app-server-protocol/v2/ThreadTokenUsageUpdatedNotification'
 import type { TokenUsageBreakdown } from './app-server-protocol/v2/TokenUsageBreakdown'
 
@@ -10,6 +11,10 @@ export class CodexUsageEventProjectionError extends Error {}
 
 export class CodexUsageEventProjector {
   private readonly modelByTurn = new Map<string, string>()
+  private readonly pendingExactUsageByTurn = new Map<string, {
+    occurredAt: number
+    usage: TokenUsageBreakdown
+  }>()
 
   constructor(
     private readonly initialModelId: string | null,
@@ -21,10 +26,20 @@ export class CodexUsageEventProjector {
       this.captureModelReroute(notification.params as ModelReroutedNotification)
       return null
     }
+    if (notification.method === 'rawResponse/completed') {
+      this.captureExactUsage(
+        notification.params as RawResponseCompletedNotification,
+        notification.emittedAtMs,
+      )
+      return null
+    }
     if (notification.method !== 'thread/tokenUsage/updated') {
       return null
     }
-    return this.projectTokenUsage(notification.params as ThreadTokenUsageUpdatedNotification)
+    return this.projectTokenUsage(
+      notification.params as ThreadTokenUsageUpdatedNotification,
+      notification.emittedAtMs,
+    )
   }
 
   private captureModelReroute(params: ModelReroutedNotification): void {
@@ -34,20 +49,42 @@ export class CodexUsageEventProjector {
     this.modelByTurn.set(turnKey(params.threadId, params.turnId), params.toModel)
   }
 
-  private projectTokenUsage(params: ThreadTokenUsageUpdatedNotification): RuntimeUsageEvent {
+  private captureExactUsage(params: RawResponseCompletedNotification, emittedAtMs?: number): void {
+    if (!params.threadId || !params.turnId) {
+      throw new CodexUsageEventProjectionError('Codex raw response usage is missing thread or turn identity.')
+    }
+    if (!params.usage) {
+      return
+    }
+    if ((params.usage.totalTokens || params.usage.inputTokens + params.usage.outputTokens) <= 0) {
+      return
+    }
+    this.pendingExactUsageByTurn.set(turnKey(params.threadId, params.turnId), {
+      occurredAt: toUnixSeconds(emittedAtMs) ?? this.readOccurredAt(),
+      usage: params.usage,
+    })
+  }
+
+  private projectTokenUsage(
+    params: ThreadTokenUsageUpdatedNotification,
+    emittedAtMs?: number,
+  ): RuntimeUsageEvent {
     if (!params.threadId || !params.turnId) {
       throw new CodexUsageEventProjectionError('Codex token usage is missing thread or turn identity.')
     }
-    const modelId = this.modelByTurn.get(turnKey(params.threadId, params.turnId)) ?? this.initialModelId
+    const key = turnKey(params.threadId, params.turnId)
+    const modelId = this.modelByTurn.get(key) ?? this.initialModelId
     if (!modelId) {
       throw new CodexUsageEventProjectionError('Codex token usage is missing an effective model.')
     }
+    const exactUsage = this.pendingExactUsageByTurn.get(key)
+    this.pendingExactUsageByTurn.delete(key)
     return createCodexRuntimeUsageEvent({
       threadId: params.threadId,
       turnId: params.turnId,
       modelId,
-      occurredAt: this.readOccurredAt(),
-      last: params.tokenUsage.last,
+      occurredAt: exactUsage?.occurredAt ?? toUnixSeconds(emittedAtMs) ?? this.readOccurredAt(),
+      last: exactUsage?.usage ?? params.tokenUsage.last,
       total: params.tokenUsage.total,
     })
   }
@@ -108,4 +145,10 @@ function toTokenUsage(usage: TokenUsageBreakdown): TokenUsage {
 
 function turnKey(threadId: string, turnId: string): string {
   return `${threadId}:${turnId}`
+}
+
+function toUnixSeconds(emittedAtMs: number | undefined): number | null {
+  return typeof emittedAtMs === 'number' && Number.isFinite(emittedAtMs)
+    ? Math.floor(emittedAtMs / 1000)
+    : null
 }

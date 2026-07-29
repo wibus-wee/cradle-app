@@ -319,6 +319,11 @@ export const zGetUsageCostDailyQuery = z.object({
     to: z.iso.date().optional()
 });
 
+export const zGetUsagePerformanceQuery = z.object({
+    from: z.iso.date().optional(),
+    to: z.iso.date().optional()
+});
+
 export const zGetUsageToolsQuery = z.object({
     from: z.iso.date().optional(),
     to: z.iso.date().optional()

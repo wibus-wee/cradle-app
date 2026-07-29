@@ -6,10 +6,12 @@ import { cn } from '~/lib/cn'
 import { formatTokenCount } from '~/lib/number-format'
 
 import { UsageBreakdown } from './usage-breakdown'
+import { UsageCacheBreakdownView } from './usage-cache-breakdown-view'
 import { CostEfficiencyTrend } from './usage-cost-efficiency'
 import { UsageHeatmap } from './usage-heatmap'
 import { UsageHeroCards } from './usage-hero-cards'
 import { UsagePatterns } from './usage-patterns'
+import { UsageRuntimePerformanceView } from './usage-runtime-performance-view'
 import type { UsageRangeKey } from './usage-time-range'
 import { USAGE_RANGE_OPTIONS } from './usage-time-range'
 import { UsageToolUsageView } from './usage-tool-usage-view'
@@ -21,6 +23,7 @@ import type {
   DailyUsage,
   DailyUsageByModel,
   HourlyUsage,
+  RuntimePerformanceOverview,
   ToolUsageBreakdown,
   UsageStats,
   UsageSummary,
@@ -36,6 +39,7 @@ export interface UsageDashboardViewProps {
   dailyCost: DailyCost[]
   tools: ToolUsageBreakdown | null
   costEfficiency: CostEfficiency[]
+  performance: RuntimePerformanceOverview | null
   usageReady: boolean
   range: UsageRangeKey
   onRangeChange: (range: UsageRangeKey) => void
@@ -52,6 +56,7 @@ export function UsageDashboardView({
   dailyCost,
   tools,
   costEfficiency,
+  performance,
   usageReady,
   range,
   onRangeChange,
@@ -138,6 +143,26 @@ export function UsageDashboardView({
                 themeMode={themeMode}
               />
             </div>
+
+            {costSummary && (
+              <div className="mt-10 border-t border-foreground/8 pt-8">
+                <UsageCacheBreakdownView
+                  costSummary={costSummary}
+                  dailyCost={dailyCost}
+                  range={range}
+                  themeMode={themeMode}
+                />
+              </div>
+            )}
+
+            {performance && (
+              <div className="mt-10 border-t border-foreground/8 pt-8">
+                <UsageRuntimePerformanceView
+                  performance={performance}
+                  themeMode={themeMode}
+                />
+              </div>
+            )}
 
             <div className="mt-12 space-y-8 border-t border-foreground/8 pt-10">
               <SectionCard>

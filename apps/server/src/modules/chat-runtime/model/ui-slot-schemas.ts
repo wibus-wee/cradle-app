@@ -463,6 +463,15 @@ export const runtimeCrewAgentItemSchema = t.Object({
   agentRole: t.Union([t.String(), t.Null()]),
 })
 
+export const runtimeCrewRetryStateSchema = t.Object({
+  agentId: t.String(),
+  attempt: t.Number(),
+  maxRetries: t.Number(),
+  retryDelayMs: t.Number(),
+  errorStatus: t.Union([t.Number(), t.Null()]),
+  errorCategory: t.String(),
+})
+
 export const runtimeCrewCallItemSchema = t.Object({
   id: t.String(),
   tool: t.String(),
@@ -473,6 +482,7 @@ export const runtimeCrewCallItemSchema = t.Object({
   model: t.Union([t.String(), t.Null()]),
   reasoningEffort: t.Union([t.String(), t.Null()]),
   agents: t.Array(runtimeCrewAgentItemSchema),
+  retry: t.Optional(t.Union([runtimeCrewRetryStateSchema, t.Null()])),
   startedAt: t.Union([t.Number(), t.Null()]),
   completedAt: t.Union([t.Number(), t.Null()]),
 })

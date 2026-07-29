@@ -1590,14 +1590,28 @@ export type GetUsageCostSummaryResponses = {
     200: {
         totalCostUsd: number;
         totalPromptTokens: number;
+        totalUncachedInputTokens: number;
+        totalCachedInputTokens: number;
+        totalCacheWriteInputTokens: number;
         totalCompletionTokens: number;
         totalTokens: number;
+        uncachedInputCostUsd: number;
+        cacheReadCostUsd: number;
+        cacheWriteCostUsd: number;
+        outputCostUsd: number;
         byModel: Array<{
             modelId: string;
             costUsd: number;
             promptTokens: number;
+            uncachedInputTokens: number;
+            cachedInputTokens: number;
+            cacheWriteInputTokens: number;
             completionTokens: number;
             totalTokens: number;
+            uncachedInputCostUsd: number;
+            cacheReadCostUsd: number;
+            cacheWriteCostUsd: number;
+            outputCostUsd: number;
             count: number;
         }>;
         byAgent: Array<{
@@ -1605,8 +1619,15 @@ export type GetUsageCostSummaryResponses = {
             agentName: string;
             costUsd: number;
             promptTokens: number;
+            uncachedInputTokens: number;
+            cachedInputTokens: number;
+            cacheWriteInputTokens: number;
             completionTokens: number;
             totalTokens: number;
+            uncachedInputCostUsd: number;
+            cacheReadCostUsd: number;
+            cacheWriteCostUsd: number;
+            outputCostUsd: number;
             count: number;
         }>;
         byProviderTarget: Array<{
@@ -1614,8 +1635,15 @@ export type GetUsageCostSummaryResponses = {
             providerTargetName: string | null;
             costUsd: number;
             promptTokens: number;
+            uncachedInputTokens: number;
+            cachedInputTokens: number;
+            cacheWriteInputTokens: number;
             completionTokens: number;
             totalTokens: number;
+            uncachedInputCostUsd: number;
+            cacheReadCostUsd: number;
+            cacheWriteCostUsd: number;
+            outputCostUsd: number;
             count: number;
         }>;
     };
@@ -1668,13 +1696,88 @@ export type GetUsageCostDailyResponses = {
         modelId: string;
         costUsd: number;
         promptTokens: number;
+        uncachedInputTokens: number;
+        cachedInputTokens: number;
+        cacheWriteInputTokens: number;
         completionTokens: number;
         totalTokens: number;
+        uncachedInputCostUsd: number;
+        cacheReadCostUsd: number;
+        cacheWriteCostUsd: number;
+        outputCostUsd: number;
         stepCount: number;
     }>;
 };
 
 export type GetUsageCostDailyResponse = GetUsageCostDailyResponses[keyof GetUsageCostDailyResponses];
+
+export type GetUsagePerformanceData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/usage/performance';
+};
+
+export type GetUsagePerformanceResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        coverageStartedAt: number | null;
+        coverageEndedAt: number | null;
+        summary: {
+            sampleCount: number;
+            firstTokenSampleCount: number;
+            p50FirstTokenMs: number | null;
+            p95FirstTokenMs: number | null;
+            p50TotalDurationMs: number | null;
+            p95TotalDurationMs: number | null;
+        };
+        byRuntime: Array<{
+            runtimeKind: string;
+            sampleCount: number;
+            firstTokenSampleCount: number;
+            p50FirstTokenMs: number | null;
+            p95FirstTokenMs: number | null;
+            p50TotalDurationMs: number | null;
+            p95TotalDurationMs: number | null;
+        }>;
+        byProviderTarget: Array<{
+            providerTargetId: string | null;
+            providerTargetName: string | null;
+            sampleCount: number;
+            firstTokenSampleCount: number;
+            p50FirstTokenMs: number | null;
+            p95FirstTokenMs: number | null;
+            p50TotalDurationMs: number | null;
+            p95TotalDurationMs: number | null;
+        }>;
+        byModel: Array<{
+            modelId: string;
+            sampleCount: number;
+            firstTokenSampleCount: number;
+            p50FirstTokenMs: number | null;
+            p95FirstTokenMs: number | null;
+            p50TotalDurationMs: number | null;
+            p95TotalDurationMs: number | null;
+        }>;
+        daily: Array<{
+            date: string;
+            runtimeKind: string;
+            sampleCount: number;
+            firstTokenSampleCount: number;
+            p50FirstTokenMs: number | null;
+            p95FirstTokenMs: number | null;
+            p50TotalDurationMs: number | null;
+            p95TotalDurationMs: number | null;
+        }>;
+    };
+};
+
+export type GetUsagePerformanceResponse = GetUsagePerformanceResponses[keyof GetUsagePerformanceResponses];
 
 export type GetUsageToolsData = {
     body?: never;
@@ -21548,6 +21651,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 totalTokens: number;
                 inputTokens: number;
                 cachedInputTokens: number;
+                cacheWriteInputTokens: number;
                 outputTokens: number;
                 reasoningOutputTokens: number;
             };
@@ -21555,6 +21659,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 totalTokens: number;
                 inputTokens: number;
                 cachedInputTokens: number;
+                cacheWriteInputTokens: number;
                 outputTokens: number;
                 reasoningOutputTokens: number;
             };
@@ -21834,6 +21939,14 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                     agentNickname: string | null;
                     agentRole: string | null;
                 }>;
+                retry?: {
+                    agentId: string;
+                    attempt: number;
+                    maxRetries: number;
+                    retryDelayMs: number;
+                    errorStatus: number | null;
+                    errorCategory: string;
+                } | null;
                 startedAt: number | null;
                 completedAt: number | null;
             }>;

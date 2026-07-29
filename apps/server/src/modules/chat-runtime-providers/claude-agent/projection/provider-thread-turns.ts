@@ -657,6 +657,7 @@ export function mapCrewCallToSnapshot(call: ClaudeAgentCapturedCrewCall): {
   outputFile: string | null
   runInBackground: boolean
   status: 'running' | 'completed' | 'failed'
+  retry: ClaudeAgentCapturedCrewCall['retry'] | null
   startedAt: number
   completedAt: number | null
 } {
@@ -673,6 +674,7 @@ export function mapCrewCallToSnapshot(call: ClaudeAgentCapturedCrewCall): {
     outputFile: call.outputFile,
     runInBackground: call.runInBackground,
     status: call.status,
+    retry: call.retry ?? null,
     startedAt: call.startedAt,
     completedAt: call.completedAt,
   }

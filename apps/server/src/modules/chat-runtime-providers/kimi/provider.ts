@@ -1,4 +1,4 @@
-import type { UIMessage, UIMessageChunk } from 'ai'
+import type { UIMessageChunk } from 'ai'
 
 import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
 import type {
@@ -54,11 +54,11 @@ import {
   getApiV1SessionsBySessionId,
   getApiV1SessionsBySessionIdApprovals,
   getApiV1SessionsBySessionIdGoal,
-  getApiV1SessionsBySessionIdMessages,
   getApiV1SessionsBySessionIdQuestions,
   getApiV1SessionsBySessionIdStatus,
   getApiV1SessionsBySessionIdTasks,
   getApiV1SessionsBySessionIdTerminals,
+  getApiV1SessionsBySessionIdTranscript,
   listSkills,
   postApiV1Config,
   postApiV1Sessions,
@@ -70,6 +70,15 @@ import {
   submitPrompt,
 } from './protocol/rest/sdk.gen'
 import type { GetApiV1SessionsBySessionIdQuestionsResponses } from './protocol/rest/types.gen'
+import type { KimiTranscriptTurn } from './transcript-projector'
+import {
+  findKimiPhaseTranscriptTurn,
+  projectKimiTranscriptCrewState,
+  projectKimiTranscriptProgressItems,
+  projectKimiTranscriptTurns,
+} from './transcript-projector'
+import { KimiUsageEventProjector } from './usage-event-projector'
+import { isKimiSessionEvent, requiresKimiTranscriptHydration } from './websocket/client'
 
 const KIMI_COMMAND = process.env.KIMI_COMMAND || 'kimi'
 
@@ -214,7 +223,7 @@ updatedAt: Date.now(),
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     const lease = await this.acquire(profile)
     try {
-      const [status, goal, approvals, questions, tasks, terminals, mcp, skills] = await Promise.all([
+      const [status, goal, approvals, questions, tasks, terminals, mcp, skills, transcript] = await Promise.all([
         lease.resource.http.request(getApiV1SessionsBySessionIdStatus({ client: lease.resource.http.client, path: { session_id: providerSessionId } })),
         lease.resource.http.request(getApiV1SessionsBySessionIdGoal({ client: lease.resource.http.client, path: { session_id: providerSessionId } })),
         lease.resource.http.request(getApiV1SessionsBySessionIdApprovals({ client: lease.resource.http.client, path: { session_id: providerSessionId }, query: { status: 'pending' } })),
@@ -223,6 +232,11 @@ updatedAt: Date.now(),
         lease.resource.http.request(getApiV1SessionsBySessionIdTerminals({ client: lease.resource.http.client, path: { session_id: providerSessionId } })),
         lease.resource.http.request(getApiV1McpServers({ client: lease.resource.http.client })),
         lease.resource.http.request(listSkills({ client: lease.resource.http.client, path: { session_id: providerSessionId } })),
+        lease.resource.http.request(getApiV1SessionsBySessionIdTranscript({
+          client: lease.resource.http.client,
+          path: { session_id: providerSessionId },
+          query: { agent_id: 'main', page_size: 50 },
+        })),
       ])
       const updatedAt = Date.now()
       const states: RuntimeUiSlotState[] = []
@@ -284,12 +298,16 @@ multiSelect: item.multi_select ?? false,
 updatedAt,
         })
       }
-      const taskItems: RuntimeProgressItem[] = tasks.items.map(task => ({
+      const taskItemsById = new Map<string, RuntimeProgressItem>(tasks.items.map(task => [task.id, {
         id: task.id,
 label: task.description,
         status: task.status === 'running' ? 'inProgress' : task.status === 'completed' ? 'completed' : 'pending',
         sourceStatus: task.status,
-      }))
+      }]))
+      for (const task of projectKimiTranscriptProgressItems(transcript)) {
+        taskItemsById.set(task.id ?? `${task.sourceStatus}:${task.label}`, task)
+      }
+      const taskItems = [...taskItemsById.values()]
       states.push({
         kind: 'progress',
 slotId: 'kimi:tasks',
@@ -316,6 +334,10 @@ lastOutputPreview: null,
         backgroundTerminals: terminals.items.filter(terminal => terminal.status === 'running').map(terminal => ({ itemId: terminal.id, processId: terminal.id, command: terminal.shell, cwd: terminal.cwd, osPid: null, cpuPercent: null, rssKb: null })),
 updatedAt,
       })
+      const crewState = projectKimiTranscriptCrewState(transcript, providerSessionId, updatedAt)
+      if (crewState) {
+        states.push(crewState)
+      }
       const mcpServers: RuntimeMcpServerSummary[] = mcp.servers.map(server => ({
         name: server.name,
         status: server.status === 'connected' ? 'ready' : server.status === 'connecting' ? 'starting' : server.status === 'error' ? 'failed' : 'cancelled',
@@ -369,6 +391,10 @@ updatedAt,
     try {
       const snapshot = readProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
       const providerConfig = projectKimiProviderConfig(profile)
+      const usageProjector = new KimiUsageEventProjector(
+        sessionId,
+        input.modelId ?? snapshot.models.currentModelId,
+      )
       await this.applyRuntimeSettings({ lease, sessionId, settings: input.providerOptions?.runtimeSettings })
       const prompt = await lease.resource.http.request(submitPrompt({
         client: lease.resource.http.client,
@@ -385,9 +411,37 @@ updatedAt,
         if ('error' in item.event) {
           throw new ProviderRuntimeError(ProviderErrors.requestFailed(this.runtimeKind, 'websocket.reconnect', item.event.error))
         }
-        if (!('seq' in item.event)) {
-          await this.hydrateAfterResync({ lease, sessionId, input, handledApprovalIds: bridgedApprovalIds, handledQuestionIds: bridgedQuestionIds })
+        if (requiresKimiTranscriptHydration(item.event, prompt.prompt_id)) {
+          const recovered = await this.hydrateAfterResync({
+            lease,
+            sessionId,
+            promptId: prompt.prompt_id,
+            input,
+            handledApprovalIds: bridgedApprovalIds,
+            handledQuestionIds: bridgedQuestionIds,
+          })
+          if (recovered.turn) {
+            for (const chunk of mapper.reconcileTranscriptTurn(recovered.turn)) {
+              yield chunk
+            }
+          }
+          if (recovered.reason) {
+            for (const chunk of mapper.finishFromRecovery(recovered.reason)) {
+              yield chunk
+            }
+            return
+          }
           continue
+        }
+        if (item.event.type === 'transcript.ops' || item.event.type === 'transcript.reset') {
+          continue
+        }
+        if (!isKimiSessionEvent(item.event)) {
+          continue
+        }
+        const usageEvent = usageProjector.project(item.event)
+        if (usageEvent) {
+          await input.onUsageEvent?.(usageEvent)
         }
         if (item.event.payload.type === 'agent.status.updated' && item.event.payload.phase?.kind === 'awaiting_approval') {
           await this.resolvePendingApprovals({ lease, sessionId, runId: input.runId, profile, handledIds: bridgedApprovalIds })
@@ -491,26 +545,23 @@ path: { session_id: sessionId },
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     const lease = await this.acquire(profile)
     try {
-      const result = await lease.resource.http.request(getApiV1SessionsBySessionIdMessages({
+      const result = await lease.resource.http.request(getApiV1SessionsBySessionIdTranscript({
         client: lease.resource.http.client,
         path: { session_id: input.threadId },
-        query: { before_id: input.cursor ?? undefined, page_size: input.limit ?? 100 },
+        query: {
+          agent_id: 'main',
+          before_turn: input.cursor ?? undefined,
+          page_size: input.limit ?? 100,
+        },
       }))
+      const projected = projectKimiTranscriptTurns(result)
       return {
         runtimeKind: this.runtimeKind,
         providerSessionId: input.runtimeSession.providerSessionId,
         threadId: input.threadId,
-        turns: result.items.map(message => ({
-          id: message.id,
-          status: 'complete',
-          startedAt: null,
-          completedAt: null,
-          durationMs: null,
-          itemsView: 'full',
-          items: [message],
-        })),
-        messages: result.items.flatMap(projectKimiUiMessage),
-        nextCursor: result.has_more && result.items.at(-1) ? result.items.at(-1)!.id : null,
+        turns: projected.turns,
+        messages: projected.messages,
+        nextCursor: projected.nextCursor,
         backwardsCursor: null,
       }
     }
@@ -694,14 +745,25 @@ path: { session_id: sessionId },
   private async hydrateAfterResync(input: {
     lease: KimiWebHostLease
     sessionId: string
+    promptId: string
     input: StreamTurnInput
     handledApprovalIds: Set<string>
     handledQuestionIds: Set<string>
-  }): Promise<void> {
-    const status = await input.lease.resource.http.request(getApiV1SessionsBySessionIdStatus({
-      client: input.lease.resource.http.client,
-      path: { session_id: input.sessionId },
-    }))
+  }): Promise<{
+    reason: 'completed' | 'cancelled' | 'failed' | 'blocked' | null
+    turn: KimiTranscriptTurn | null
+  }> {
+    const [status, transcript] = await Promise.all([
+      input.lease.resource.http.request(getApiV1SessionsBySessionIdStatus({
+        client: input.lease.resource.http.client,
+        path: { session_id: input.sessionId },
+      })),
+      input.lease.resource.http.request(getApiV1SessionsBySessionIdTranscript({
+        client: input.lease.resource.http.client,
+        path: { session_id: input.sessionId },
+        query: { agent_id: 'main', page_size: 1 },
+      })),
+    ])
     if (status.busy) {
       await this.resolvePendingApprovals({
         lease: input.lease,
@@ -716,6 +778,23 @@ path: { session_id: sessionId },
         input: input.input,
         handledIds: input.handledQuestionIds,
       })
+    }
+    const prompt = transcript.prompts.find(candidate => candidate.promptId === input.promptId)
+    if (!prompt) {
+      return { reason: null, turn: null }
+    }
+    const turn = findKimiPhaseTranscriptTurn(transcript)
+    switch (prompt.status) {
+      case 'completed':
+        return { reason: 'completed', turn }
+      case 'failed':
+        return { reason: 'failed', turn }
+      case 'aborted':
+        return { reason: 'cancelled', turn }
+      case 'blocked':
+        return { reason: 'blocked', turn }
+      default:
+        return { reason: null, turn }
     }
   }
 }
@@ -772,35 +851,4 @@ function projectKimiProviderThread(session: {
     name: session.title,
     cwd: session.metadata.cwd,
   }
-}
-
-function projectKimiUiMessage(message: {
-  id: string
-  role: 'user' | 'assistant' | 'tool' | 'system'
-  content: Array<
-    | { type: 'text', text: string }
-    | { type: 'thinking', thinking: string }
-    | { type: 'tool_use', tool_call_id: string, tool_name: string, input: unknown }
-    | { type: 'tool_result', tool_call_id: string, output: unknown, is_error?: boolean }
-    | { type: 'image', source: unknown }
-    | { type: 'video', source: unknown }
-    | { type: 'file', file_id: string, media_type: string, name: string, size: number }
-  >
-}): UIMessage[] {
-  if (message.role === 'tool') { return [] }
-  const parts: UIMessage['parts'] = []
-  for (const part of message.content) {
-    switch (part.type) {
-      case 'text':
-        parts.push({ type: 'text', text: part.text })
-        break
-      case 'thinking':
-        parts.push({ type: 'reasoning', text: part.thinking })
-        break
-      default:
-        break
-    }
-  }
-  if (parts.length === 0) { return [] }
-  return [{ id: message.id, role: message.role, parts }]
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { KimiEventToChunkMapper } from './event-to-chunk-mapper'
+import type { KimiTranscriptTurn } from './transcript-projector'
 
 describe('kimi event to chunk mapper', () => {
   it('projects streamed text, thinking, tools, and a terminal turn', () => {
@@ -59,6 +60,53 @@ describe('kimi event to chunk mapper', () => {
       { type: 'text-end', id: 'kimi-text-7-1' },
       { type: 'reasoning-end', id: 'kimi-thinking-7-1' },
       { type: 'finish', finishReason: 'stop' },
+    ])
+  })
+
+  it('closes active blocks when REST recovery observes a terminal prompt', () => {
+    const mapper = new KimiEventToChunkMapper()
+    mapper.map(event({ type: 'assistant.delta', turnId: 7, delta: 'Recovered' }))
+
+    const recovered = mapper.reconcileTranscriptTurn({
+      kind: 'turn',
+      turnId: 't7',
+      ordinal: 1,
+      origin: { kind: 'user' },
+      state: 'completed',
+      steps: [{
+        kind: 'step',
+        stepId: 'step-1',
+        turnId: 't7',
+        ordinal: 1,
+        state: 'completed',
+        frames: [
+          { kind: 'text', frameId: 'text-1', role: 'assistant', text: 'Recovered text' },
+          {
+            kind: 'tool',
+            frameId: 'tool-frame-1',
+            toolCallId: 'tool-recovered',
+            name: 'Bash',
+            input: { command: 'pwd' },
+            output: 'ok',
+            state: 'done',
+          },
+          { kind: 'text', frameId: 'text-2', role: 'assistant', text: ' Done.' },
+        ],
+      }],
+    } as KimiTranscriptTurn)
+
+    expect(recovered.map(chunk => chunk.type)).toEqual([
+      'text-delta',
+      'text-end',
+      'tool-input-start',
+      'tool-input-available',
+      'tool-output-available',
+      'text-start',
+      'text-delta',
+    ])
+    expect(mapper.finishFromRecovery('failed')).toEqual([
+      { type: 'text-end', id: 'kimi-text-7-1' },
+      { type: 'finish', finishReason: 'error' },
     ])
   })
 })

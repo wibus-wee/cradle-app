@@ -143,7 +143,7 @@ export async function startOrResumeThread(
   const method = runtimeSession.providerSessionId ? 'thread/resume' : 'thread/start'
   const requestParams = runtimeSession.providerSessionId
     ? { ...baseParams, threadId: runtimeSession.providerSessionId, excludeTurns: true }
-    : baseParams
+    : { ...baseParams, experimentalRawEvents: true }
   let response: ThreadResponse
   try {
     response = params.requestTimeoutMs

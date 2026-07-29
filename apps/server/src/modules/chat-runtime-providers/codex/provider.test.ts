@@ -1654,6 +1654,10 @@ describe('codexProvider app-server integration', () => {
       expect(client.requests.map(request => request.method)).toEqual(['thread/start', 'turn/start'])
     })
 
+    expect(client.requests[0]).toEqual({
+      method: 'thread/start',
+      params: expect.objectContaining({ experimentalRawEvents: true }),
+    })
     expect(client.requests[1]).toEqual({
       method: 'turn/start',
       params: expect.objectContaining({

@@ -28,6 +28,70 @@ describe('codexUsageEventProjector', () => {
     expect(first?.id).not.toBe(second?.id)
   })
 
+  it('pairs exact raw response usage and provider timestamp with the following cumulative update', () => {
+    const projector = new CodexUsageEventProjector('gpt-5.6-sol', () => 1)
+    expect(projector.project({
+      method: 'rawResponse/completed',
+      emittedAtMs: 1_789_000_123_456,
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        responseId: 'response-1',
+        usage: usage(123, 17, 100, 9, 5),
+      },
+    })).toBeNull()
+
+    const event = projector.project(tokenUsageNotification(
+      'thread-1',
+      'turn-1',
+      usage(500, 50, 400, 25, 20),
+      usage(200, 30, 180, 15, 10),
+    ))
+
+    expect(event).toMatchObject({
+      occurredAt: 1_789_000_123,
+      usage: {
+        promptTokens: 123,
+        completionTokens: 17,
+        totalTokens: 140,
+        cachedInputTokens: 100,
+        cacheWriteInputTokens: 9,
+        reasoningOutputTokens: 5,
+      },
+      providerTotal: {
+        promptTokens: 500,
+        completionTokens: 50,
+        totalTokens: 550,
+      },
+    })
+  })
+
+  it('falls back to the cumulative notification when exact raw usage is absent or null', () => {
+    const projector = new CodexUsageEventProjector('gpt-5.6-sol', () => 1)
+    projector.project({
+      method: 'rawResponse/completed',
+      emittedAtMs: 1_789_000_123_456,
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        responseId: 'response-1',
+        usage: null,
+      },
+    })
+    const notification = tokenUsageNotification(
+      'thread-1',
+      'turn-1',
+      usage(200, 30),
+      usage(80, 10),
+    )
+    notification.emittedAtMs = 1_789_000_999_000
+
+    expect(projector.project(notification)).toMatchObject({
+      occurredAt: 1_789_000_999,
+      usage: { promptTokens: 80, completionTokens: 10, totalTokens: 90 },
+    })
+  })
+
   it('preserves cache-read, cache-write, and reasoning subsets without adding them to total', () => {
     const projector = new CodexUsageEventProjector('gpt-5.6-sol')
     const event = projector.project(tokenUsageNotification(
@@ -102,7 +166,7 @@ function tokenUsageNotification(
   turnId: string,
   total: TokenUsageBreakdown,
   last: TokenUsageBreakdown,
-): ServerNotification {
+): ServerNotification & { emittedAtMs?: number } {
   return {
     method: 'thread/tokenUsage/updated',
     params: {

@@ -504,6 +504,15 @@ export interface RuntimeCrewAgentItem {
   agentRole: string | null
 }
 
+export interface RuntimeCrewRetryState {
+  agentId: string
+  attempt: number
+  maxRetries: number
+  retryDelayMs: number
+  errorStatus: number | null
+  errorCategory: string
+}
+
 export interface RuntimeCrewCallItem {
   id: string
   tool: string
@@ -514,6 +523,7 @@ export interface RuntimeCrewCallItem {
   model: string | null
   reasoningEffort: string | null
   agents: RuntimeCrewAgentItem[]
+  retry?: RuntimeCrewRetryState | null
   startedAt: number | null
   completedAt: number | null
 }

@@ -16,5 +16,7 @@ Dashboard headings, stat labels, chart labels, and empty states are owned by the
 - **usage-hero-cards.tsx**: Range-aware headline KPIs (cost/tokens/turns) with vs-previous-period deltas; streak remains all-history.
 - **usage-heatmap.tsx**: SVG-based rounded-cell heatmap calendar (53 weeks × 7 days)；cell 暴露日期与是否有 usage 的稳定属性，tooltip 可用于回归验证
 - **usage-trend-chart-view.tsx**: Props-only ECharts stacked token/cost trend by model. Theme mode is explicit so the chart does not subscribe to global theme state.
-- **usage-insights.ts**: Dense series helpers, period comparisons, and model stacks for tokens + cost.
-- **use-usage-overview.ts**: Shared renderer hook for Usage dashboard/profile surfaces; wraps generated Usage query options and exports generated-derived response aliases without adding local validation projections.
+- **usage-cache-breakdown-view.tsx**: Props-only cache-aware token/cost summary and daily composition chart for uncached input, cache reads, cache writes, and output.
+- **usage-runtime-performance-view.tsx**: Props-only cross-runtime P50/P95 first-token and total-duration panel with retained-data coverage, daily runtime trends, and runtime comparison.
+- **usage-insights.ts**: Dense series helpers, period comparisons, model stacks, and cache-aware token/cost composition.
+- **use-usage-overview.ts**: Shared renderer hook for Usage dashboard/profile surfaces; wraps generated Usage query options and exports generated-derived response aliases without adding local validation projections. Performance remains an enhancement query and does not block the core dashboard readiness state.

@@ -35,6 +35,31 @@ describe('mapClaudeAgentMessageToChunks', () => {
     })
   })
 
+  it('preserves the originating assistant timestamp in message metadata', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-1',
+      timestamp: '2026-07-29T00:01:02.345Z',
+      message: {
+        id: 'message-1',
+        content: [{ type: 'text', text: 'Timestamped' }],
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(result.chunks[0]).toEqual({
+      type: 'message-metadata',
+      messageMetadata: {
+        claudeAgent: {
+          assistantTimestamps: [{
+            messageId: 'message-1',
+            timestamp: '2026-07-29T00:01:02.345Z',
+          }],
+        },
+      },
+    })
+  })
+
   it('extracts usage from message_delta stream event', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const message = {
@@ -333,6 +358,44 @@ describe('mapClaudeAgentMessageToChunks', () => {
     } as unknown as SDKMessage, state)
 
     expect(result.chunks).toEqual([])
+  })
+
+  it('uses structured tool result metadata for denied and cancelled calls', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-tools',
+      message: {
+        content: [{
+          type: 'tool_use',
+          id: 'toolu_bash_denied',
+          name: 'Bash',
+          input: { command: 'git push' },
+        }],
+      },
+    } as unknown as SDKMessage, state)
+
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'user',
+      session_id: 'claude-session-tools',
+      tool_result_meta: {
+        non_execution_kind: 'denied',
+        user_feedback: 'The user denied this command.',
+      },
+      message: {
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'toolu_bash_denied',
+          content: 'Provider-specific denial prose that should not be parsed.',
+        }],
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(result.chunks).toEqual([{
+      type: 'tool-output-error',
+      toolCallId: 'toolu_bash_denied',
+      errorText: 'The user denied this command.',
+    }])
   })
 
   it('captures Claude plan-file ExitPlanMode signals and suppresses the SDK denial error', async () => {
@@ -893,6 +956,61 @@ describe('mapClaudeAgentMessageToChunks', () => {
         description: 'Background audit complete',
         outputFile: '/tmp/agent-output.json',
         completedAt: expect.any(Number),
+      }),
+    ])
+  })
+
+  it('captures structured subagent retry progress on the existing crew call', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-crew',
+      message: {
+        content: [{
+          type: 'tool_use',
+          id: 'toolu_agent_retry',
+          name: 'Agent',
+          input: {
+            description: 'Inspect protocol changes',
+            prompt: 'Compare SDK versions.',
+            subagent_type: 'Explore',
+          },
+        }],
+      },
+    } as unknown as SDKMessage, state)
+
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'tool_progress',
+      session_id: 'claude-session-crew',
+      uuid: 'tool-progress-retry-1',
+      tool_use_id: 'toolu_agent_retry',
+      tool_name: 'Agent',
+      parent_tool_use_id: null,
+      elapsed_time_seconds: 2,
+      subagent_type: 'Explore',
+      subagent_retry: {
+        agent_id: 'agent-retry-1',
+        attempt: 2,
+        max_retries: 4,
+        retry_delay_ms: 8_000,
+        error_status: 529,
+        error_category: 'overloaded',
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(result.capturedCrewCalls).toEqual([
+      expect.objectContaining({
+        toolCallId: 'toolu_agent_retry',
+        agentId: 'agent-retry-1',
+        status: 'running',
+        retry: {
+          agentId: 'agent-retry-1',
+          attempt: 2,
+          maxRetries: 4,
+          retryDelayMs: 8_000,
+          errorStatus: 529,
+          errorCategory: 'overloaded',
+        },
       }),
     ])
   })

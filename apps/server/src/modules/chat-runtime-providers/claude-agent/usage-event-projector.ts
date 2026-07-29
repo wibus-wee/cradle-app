@@ -23,6 +23,7 @@ type ClaudeAssistantSdkMessage = {
   type: 'assistant'
   session_id?: string
   parent_tool_use_id?: string
+  timestamp?: string
   message?: ClaudeAssistantMessage
 }
 
@@ -57,12 +58,14 @@ export function projectClaudeAssistantUsageEvent(input: {
   }
 
   const providerThreadId = message.parent_tool_use_id?.trim() || providerSessionId
+  const timestamp = message.timestamp ? Date.parse(message.timestamp) : Number.NaN
   return {
     id: createClaudeUsageEventId(providerSessionId, providerThreadId, providerTurnId),
     providerThreadId,
     providerTurnId,
     modelId,
-    occurredAt: input.occurredAt ?? Math.floor(Date.now() / 1000),
+    occurredAt: input.occurredAt
+      ?? (Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : Math.floor(Date.now() / 1000)),
     usage: tokenUsage,
     providerTotal: tokenUsage,
   }
@@ -79,13 +82,15 @@ export function createClaudeUsageEventId(
 }
 
 function toTokenUsage(usage: ClaudeAssistantUsage): TokenUsage {
-  const promptTokens = usage.input_tokens ?? 0
+  const cachedInputTokens = usage.cache_read_input_tokens ?? 0
+  const cacheWriteInputTokens = usage.cache_creation_input_tokens ?? 0
+  const promptTokens = (usage.input_tokens ?? 0) + cachedInputTokens + cacheWriteInputTokens
   const completionTokens = usage.output_tokens ?? 0
   return {
     promptTokens,
     completionTokens,
     totalTokens: promptTokens + completionTokens,
-    cachedInputTokens: usage.cache_read_input_tokens ?? 0,
-    cacheWriteInputTokens: usage.cache_creation_input_tokens ?? 0,
+    cachedInputTokens,
+    cacheWriteInputTokens,
   }
 }

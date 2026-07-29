@@ -24,6 +24,7 @@ export interface CodexAppServerMessage {
   id?: RequestId
   method?: string
   params?: unknown
+  emittedAtMs?: number
   result?: unknown
   error?: {
     code: number

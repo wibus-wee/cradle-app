@@ -288,7 +288,12 @@ export function warmupModelsDevCache(): void {
  *  2. Fuzzy match modelId on local cache (DB-backed, falls back to in-memory).
  * Returns null if no cost data is found.
  */
-export function getCachedModelsDevCost(modelId: string): { input: number, output: number } | null {
+export function getCachedModelsDevCost(modelId: string): {
+  input: number
+  output: number
+  cacheRead?: number
+  cacheWrite?: number
+} | null {
   try {
     const row = db().select().from(modelRegistryMappings).where(eq(modelRegistryMappings.modelId, modelId)).get()
     if (row) {
@@ -296,7 +301,7 @@ export function getCachedModelsDevCost(modelId: string): { input: number, output
         const parsed = ModelsDevModelSchema.parse(JSON.parse(row.modelJson))
         const cost = parsed.cost
         if (cost && (cost.input != null || cost.output != null)) {
-          return { input: cost.input ?? 0, output: cost.output ?? 0 }
+          return projectModelsDevCost(cost)
         }
       }
       // Mapping has a registryModelId but no usable cost in modelJson — resolve from registry cache
@@ -306,12 +311,12 @@ export function getCachedModelsDevCost(modelId: string): { input: number, output
           const exact = findModel(local.data, row.registryModelId)
           const exactCost = exact?.cost
           if (exactCost && (exactCost.input != null || exactCost.output != null)) {
-            return { input: exactCost.input ?? 0, output: exactCost.output ?? 0 }
+            return projectModelsDevCost(exactCost)
           }
           const fuzzy = findModelFuzzy(local.data, row.registryModelId)
           const fuzzyCost = fuzzy?.model?.cost
           if (fuzzyCost && (fuzzyCost.input != null || fuzzyCost.output != null)) {
-            return { input: fuzzyCost.input ?? 0, output: fuzzyCost.output ?? 0 }
+            return projectModelsDevCost(fuzzyCost)
           }
         }
       }
@@ -331,9 +336,20 @@ export function getCachedModelsDevCost(modelId: string): { input: number, output
   if (!cost || (cost.input == null && cost.output == null)) {
     return null
   }
+  return projectModelsDevCost(cost)
+}
+
+function projectModelsDevCost(cost: NonNullable<ModelsDevModel['cost']>): {
+  input: number
+  output: number
+  cacheRead?: number
+  cacheWrite?: number
+} {
   return {
     input: cost.input ?? 0,
     output: cost.output ?? 0,
+    ...(cost.cache_read !== undefined ? { cacheRead: cost.cache_read } : {}),
+    ...(cost.cache_write !== undefined ? { cacheWrite: cost.cache_write } : {}),
   }
 }
 

@@ -14,6 +14,7 @@ import type {
   SDKTaskNotificationMessage,
   SDKTaskProgressMessage,
   SDKTaskStartedMessage,
+  SDKToolProgressMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { UIMessageChunk } from 'ai'
@@ -164,9 +165,28 @@ export interface ClaudeAgentCapturedCrewCall {
   outputFile: string | null
   runInBackground: boolean
   status: 'running' | 'completed' | 'failed'
+  retry?: ClaudeAgentSubagentRetry
   startedAt: number
   completedAt: number | null
   workflow?: ClaudeWorkflowExecutionRecord
+}
+
+export interface ClaudeAgentSubagentRetry {
+  agentId: string
+  attempt: number
+  maxRetries: number
+  retryDelayMs: number
+  errorStatus: number | null
+  errorCategory: string
+}
+
+interface ClaudeToolResultMeta {
+  non_execution_kind?: string
+  user_feedback?: string
+}
+
+type ClaudeUserMessageWithToolResultMeta = SDKUserMessage & {
+  tool_result_meta?: ClaudeToolResultMeta
 }
 
 /**
@@ -469,9 +489,41 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
     )
   }
   else if (msg.type === 'tool_progress') {
-    const progressMsg = msg as { type: string, tool_use_id?: string, tool_name?: string, content?: string, parent_tool_use_id?: string | null }
+    const progressMsg = msg as SDKToolProgressMessage & { content?: string }
     if (progressMsg.content && progressMsg.tool_use_id) {
       chunks.push(providerChunk.toolInputDelta(progressMsg.tool_use_id, progressMsg.content))
+    }
+    const retry = progressMsg.subagent_retry
+    const linkedCrewTool = retry
+      ? resolveClaudeLinkedCrewTool(progressMsg.tool_use_id, state)
+      ?? state.taskLaunchesById.get(retry.agent_id)
+      ?? null
+      : null
+    if (retry && linkedCrewTool) {
+      base.capturedCrewCalls.push({
+        toolCallId: linkedCrewTool.toolCallId,
+        tool: linkedCrewTool.tool,
+        agentId: retry.agent_id,
+        prompt: null,
+        description: null,
+        subagentType: progressMsg.subagent_type ?? null,
+        model: null,
+        reasoningEffort: null,
+        tools: [],
+        outputFile: null,
+        runInBackground: false,
+        status: 'running',
+        retry: {
+          agentId: retry.agent_id,
+          attempt: retry.attempt,
+          maxRetries: retry.max_retries,
+          retryDelayMs: retry.retry_delay_ms,
+          errorStatus: retry.error_status,
+          errorCategory: retry.error_category,
+        },
+        startedAt: 0,
+        completedAt: null,
+      })
     }
   }
 
@@ -598,6 +650,19 @@ function mapAssistant(msg: SDKAssistantMessage, state: ClaudeAgentChunkMapperSta
   const capturedTodos: ClaudeAgentCapturedTodos[] = []
   const capturedInteractionModes: ClaudeAgentCapturedInteractionMode[] = []
   const capturedCrewCalls: ClaudeAgentCapturedCrewCall[] = []
+  if (msg.timestamp) {
+    chunks.push({
+      type: 'message-metadata',
+      messageMetadata: {
+        claudeAgent: {
+          assistantTimestamps: [{
+            messageId: msg.message.id,
+            timestamp: msg.timestamp,
+          }],
+        },
+      },
+    })
+  }
 
   // CRITICAL: do NOT release model-message state here.
   // With includePartialMessages, the consolidating `assistant` snapshot for the
@@ -686,6 +751,8 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
   const capturedTodos: ClaudeAgentCapturedTodos[] = []
   const capturedCrewCalls: ClaudeAgentCapturedCrewCall[] = []
   const content = msg.message.content
+  const toolResultMeta = (msg as ClaudeUserMessageWithToolResultMeta).tool_result_meta
+  const nonExecutionKind = toolResultMeta?.non_execution_kind?.trim() || null
 
   // Extract tool_result blocks from user message content
   if (Array.isArray(content)) {
@@ -703,7 +770,7 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
           // Capture Agent tool result as crew call completion
           if (normalizedToolName === ClaudeCodeToolName.Agent || normalizedToolName === ClaudeCodeToolName.Workflow) {
             const launch = readClaudeAgentAsyncLaunchResult(normalizedOutput)
-            const status = b.is_error
+            const status = b.is_error || nonExecutionKind
               ? 'failed'
               : launch !== null
                 ? 'running'
@@ -748,8 +815,12 @@ async function mapUser(msg: SDKUserMessage, state: ClaudeAgentChunkMapperState):
             })
           }
 
-          if (b.is_error) {
-            const errorText = normalizeToolErrorText(normalizedOutput)
+          if (b.is_error || nonExecutionKind) {
+            const errorText = readClaudeToolResultError(
+              normalizedOutput,
+              nonExecutionKind,
+              toolResultMeta?.user_feedback,
+            )
             if (isCapturedExitPlanModeError(b.tool_use_id, errorText, state)) {
               continue
             }
@@ -1582,4 +1653,22 @@ function normalizeToolErrorText(output: unknown): string {
   catch {
     return String(output)
   }
+}
+
+function readClaudeToolResultError(
+  output: unknown,
+  nonExecutionKind: string | null,
+  userFeedback: string | undefined,
+): string {
+  const feedback = userFeedback?.trim()
+  if (feedback) {
+    return feedback
+  }
+  const errorText = normalizeToolErrorText(output)
+  if (errorText) {
+    return errorText
+  }
+  return nonExecutionKind
+    ? `Claude tool call did not execute: ${nonExecutionKind}.`
+    : 'Claude tool call failed.'
 }

@@ -5,6 +5,7 @@ import type {
   DailyUsage,
   DailyUsageByModel,
   HourlyUsage,
+  RuntimePerformanceOverview,
   UsageStats,
   UsageSummary,
 } from '../use-usage-overview'
@@ -51,14 +52,29 @@ const dailyByModel: DailyUsageByModel[] = daily.flatMap((entry, dayIndex) =>
 const dailyCost: DailyCost[] = dailyByModel.map((entry) => {
   const promptTokens = Math.round(entry.totalTokens * 0.76)
   const completionTokens = entry.totalTokens - promptTokens
-  const rate = entry.modelId.startsWith('claude') ? 12 : entry.modelId.startsWith('gpt') ? 8 : 5
+  const cachedInputTokens = Math.round(promptTokens * 0.4)
+  const cacheWriteInputTokens = Math.round(promptTokens * 0.05)
+  const uncachedInputTokens = promptTokens - cachedInputTokens - cacheWriteInputTokens
+  const inputRate = entry.modelId.startsWith('claude') ? 6 : entry.modelId.startsWith('gpt') ? 4 : 2.5
+  const outputRate = inputRate * 3
+  const uncachedInputCostUsd = uncachedInputTokens * inputRate / 1_000_000
+  const cacheReadCostUsd = cachedInputTokens * inputRate * 0.1 / 1_000_000
+  const cacheWriteCostUsd = cacheWriteInputTokens * inputRate * 1.25 / 1_000_000
+  const outputCostUsd = completionTokens * outputRate / 1_000_000
   return {
     date: entry.date,
     modelId: entry.modelId,
-    costUsd: Number(((entry.totalTokens / 1_000_000) * rate).toFixed(4)),
+    costUsd: uncachedInputCostUsd + cacheReadCostUsd + cacheWriteCostUsd + outputCostUsd,
     promptTokens,
+    uncachedInputTokens,
+    cachedInputTokens,
+    cacheWriteInputTokens,
     completionTokens,
     totalTokens: entry.totalTokens,
+    uncachedInputCostUsd,
+    cacheReadCostUsd,
+    cacheWriteCostUsd,
+    outputCostUsd,
     stepCount: entry.count,
   }
 })
@@ -108,36 +124,66 @@ const summary: UsageSummary = {
 }
 
 const costByModel = modelTotals.map((model) => {
-  const costUsd = dailyCost
-    .filter(entry => entry.modelId === model.modelId)
-    .reduce((sum, entry) => sum + entry.costUsd, 0)
+  const entries = dailyCost.filter(entry => entry.modelId === model.modelId)
   return {
     ...model,
-    costUsd,
-    promptTokens: Math.round(model.totalTokens * 0.76),
-    completionTokens: Math.round(model.totalTokens * 0.24),
+    costUsd: entries.reduce((sum, entry) => sum + entry.costUsd, 0),
+    promptTokens: entries.reduce((sum, entry) => sum + entry.promptTokens, 0),
+    uncachedInputTokens: entries.reduce((sum, entry) => sum + entry.uncachedInputTokens, 0),
+    cachedInputTokens: entries.reduce((sum, entry) => sum + entry.cachedInputTokens, 0),
+    cacheWriteInputTokens: entries.reduce((sum, entry) => sum + entry.cacheWriteInputTokens, 0),
+    completionTokens: entries.reduce((sum, entry) => sum + entry.completionTokens, 0),
+    uncachedInputCostUsd: entries.reduce((sum, entry) => sum + entry.uncachedInputCostUsd, 0),
+    cacheReadCostUsd: entries.reduce((sum, entry) => sum + entry.cacheReadCostUsd, 0),
+    cacheWriteCostUsd: entries.reduce((sum, entry) => sum + entry.cacheWriteCostUsd, 0),
+    outputCostUsd: entries.reduce((sum, entry) => sum + entry.outputCostUsd, 0),
   }
 })
 
 const totalCostUsd = costByModel.reduce((sum, entry) => sum + entry.costUsd, 0)
+const totalUncachedInputTokens = costByModel.reduce((sum, entry) => sum + entry.uncachedInputTokens, 0)
+const totalCachedInputTokens = costByModel.reduce((sum, entry) => sum + entry.cachedInputTokens, 0)
+const totalCacheWriteInputTokens = costByModel.reduce((sum, entry) => sum + entry.cacheWriteInputTokens, 0)
+const uncachedInputCostUsd = costByModel.reduce((sum, entry) => sum + entry.uncachedInputCostUsd, 0)
+const cacheReadCostUsd = costByModel.reduce((sum, entry) => sum + entry.cacheReadCostUsd, 0)
+const cacheWriteCostUsd = costByModel.reduce((sum, entry) => sum + entry.cacheWriteCostUsd, 0)
+const outputCostUsd = costByModel.reduce((sum, entry) => sum + entry.outputCostUsd, 0)
+
+function scaledCostBreakdown(share: number) {
+  return {
+    costUsd: totalCostUsd * share,
+    promptTokens: Math.round(summary.totalPromptTokens * share),
+    uncachedInputTokens: Math.round(totalUncachedInputTokens * share),
+    cachedInputTokens: Math.round(totalCachedInputTokens * share),
+    cacheWriteInputTokens: Math.round(totalCacheWriteInputTokens * share),
+    completionTokens: Math.round(summary.totalCompletionTokens * share),
+    uncachedInputCostUsd: uncachedInputCostUsd * share,
+    cacheReadCostUsd: cacheReadCostUsd * share,
+    cacheWriteCostUsd: cacheWriteCostUsd * share,
+    outputCostUsd: outputCostUsd * share,
+  }
+}
 
 const costSummary: CostSummary = {
   totalCostUsd,
   totalPromptTokens: summary.totalPromptTokens,
+  totalUncachedInputTokens,
+  totalCachedInputTokens,
+  totalCacheWriteInputTokens,
   totalCompletionTokens: summary.totalCompletionTokens,
   totalTokens,
+  uncachedInputCostUsd,
+  cacheReadCostUsd,
+  cacheWriteCostUsd,
+  outputCostUsd,
   byModel: costByModel,
   byAgent: summary.byAgent.map((agent, index) => ({
     ...agent,
-    costUsd: totalCostUsd * [0.58, 0.29, 0.13][index],
-    promptTokens: Math.round(agent.totalTokens * 0.76),
-    completionTokens: Math.round(agent.totalTokens * 0.24),
+    ...scaledCostBreakdown([0.58, 0.29, 0.13][index]),
   })),
   byProviderTarget: summary.byProviderTarget.map((provider, index) => ({
     ...provider,
-    costUsd: totalCostUsd * [0.48, 0.34, 0.18][index],
-    promptTokens: Math.round(provider.totalTokens * 0.76),
-    completionTokens: Math.round(provider.totalTokens * 0.24),
+    ...scaledCostBreakdown([0.48, 0.34, 0.18][index]),
   })),
 }
 
@@ -151,6 +197,67 @@ const stats: UsageStats = {
   avgDailyTokens: Math.round(totalTokens / activeDays.length),
   peakDay: { date: peakDay.date, totalTokens: peakDay.totalTokens },
   todayTokens: daily.at(-1)?.totalTokens ?? 0,
+}
+
+const performanceDaily: RuntimePerformanceOverview['daily'] = daily
+  .slice(-30)
+  .flatMap((entry, index) => {
+    if (entry.count === 0) {
+      return []
+    }
+    return [
+      {
+        date: entry.date,
+        runtimeKind: 'codex',
+        sampleCount: 5 + (index % 6),
+        firstTokenSampleCount: 5 + (index % 6),
+        p50FirstTokenMs: 620 + ((index * 37) % 280),
+        p95FirstTokenMs: 1_350 + ((index * 53) % 620),
+        p50TotalDurationMs: 18_000 + ((index * 1_700) % 15_000),
+        p95TotalDurationMs: 48_000 + ((index * 2_900) % 32_000),
+      },
+      {
+        date: entry.date,
+        runtimeKind: 'claude-agent',
+        sampleCount: 3 + (index % 5),
+        firstTokenSampleCount: 3 + (index % 5),
+        p50FirstTokenMs: 780 + ((index * 41) % 360),
+        p95FirstTokenMs: 1_700 + ((index * 67) % 760),
+        p50TotalDurationMs: 21_000 + ((index * 1_900) % 17_000),
+        p95TotalDurationMs: 55_000 + ((index * 3_100) % 37_000),
+      },
+      {
+        date: entry.date,
+        runtimeKind: 'kimi',
+        sampleCount: 2 + (index % 4),
+        firstTokenSampleCount: index % 4 === 0 ? 1 + (index % 3) : 2 + (index % 4),
+        p50FirstTokenMs: 540 + ((index * 29) % 240),
+        p95FirstTokenMs: 1_100 + ((index * 47) % 480),
+        p50TotalDurationMs: 16_000 + ((index * 1_300) % 13_000),
+        p95TotalDurationMs: 43_000 + ((index * 2_300) % 29_000),
+      },
+    ]
+  })
+
+const runtimePerformance: RuntimePerformanceOverview = {
+  coverageStartedAt: new Date(`${daily.at(-30)!.date}T09:15:00`).getTime(),
+  coverageEndedAt: new Date(`${daily.at(-1)!.date}T19:42:00`).getTime(),
+  summary: {
+    sampleCount: 318,
+    firstTokenSampleCount: 306,
+    p50FirstTokenMs: 710,
+    p95FirstTokenMs: 1_820,
+    p50TotalDurationMs: 23_400,
+    p95TotalDurationMs: 71_600,
+  },
+  byRuntime: [
+    { runtimeKind: 'codex', sampleCount: 151, firstTokenSampleCount: 151, p50FirstTokenMs: 690, p95FirstTokenMs: 1_730, p50TotalDurationMs: 22_100, p95TotalDurationMs: 68_400 },
+    { runtimeKind: 'claude-agent', sampleCount: 103, firstTokenSampleCount: 103, p50FirstTokenMs: 850, p95FirstTokenMs: 2_140, p50TotalDurationMs: 27_800, p95TotalDurationMs: 79_200 },
+    { runtimeKind: 'kimi', sampleCount: 64, firstTokenSampleCount: 52, p50FirstTokenMs: 580, p95FirstTokenMs: 1_390, p50TotalDurationMs: 18_700, p95TotalDurationMs: 61_500 },
+  ],
+  byProviderTarget: [],
+  byModel: [],
+  daily: performanceDaily,
 }
 
 const toolOverall = [
@@ -238,6 +345,7 @@ export const populatedUsageDashboardFixture: UsageDashboardViewProps = {
     totalCostUsd: dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0),
     avgCostPerRun: entry.count > 0 ? dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0) / entry.count : 0,
   })),
+  performance: runtimePerformance,
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},
@@ -269,6 +377,22 @@ export const emptyUsageDashboardFixture: UsageDashboardViewProps = {
   dailyCost: [],
   tools: null,
   costEfficiency: [],
+  performance: {
+    coverageStartedAt: null,
+    coverageEndedAt: null,
+    summary: {
+      sampleCount: 0,
+      firstTokenSampleCount: 0,
+      p50FirstTokenMs: null,
+      p95FirstTokenMs: null,
+      p50TotalDurationMs: null,
+      p95TotalDurationMs: null,
+    },
+    byRuntime: [],
+    byProviderTarget: [],
+    byModel: [],
+    daily: [],
+  },
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},

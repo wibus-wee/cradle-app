@@ -2,6 +2,8 @@ import type { UIMessageChunk } from 'ai'
 
 import { providerChunk } from '../kit/chunk-mapper'
 import { buildKimiToolInput, buildKimiToolOutput } from './tools/mapper'
+import type { KimiTranscriptTurn } from './transcript-projector'
+import { readKimiTranscriptTurnSequence } from './transcript-projector'
 import type { KimiSessionEvent } from './websocket/client'
 
 export class KimiEventToChunkMapper {
@@ -11,6 +13,9 @@ export class KimiEventToChunkMapper {
   private readonly thinkingBlockCounts = new Map<number, number>()
   private readonly toolNames = new Map<string, string>()
   private readonly toolArgs = new Map<string, unknown>()
+  private readonly completedToolCalls = new Set<string>()
+  private readonly emittedTextByTurn = new Map<number, string>()
+  private readonly emittedThinkingByTurn = new Map<number, string>()
 
   map(event: KimiSessionEvent): UIMessageChunk[] {
     const payload = event.payload
@@ -36,6 +41,7 @@ export class KimiEventToChunkMapper {
           preliminary: true,
         })]
       case 'tool.result':
+        this.completedToolCalls.add(payload.toolCallId)
         return payload.isError
           ? [providerChunk.toolOutputError(payload.toolCallId, String(payload.output))]
           : [providerChunk.toolOutputAvailable({ toolCallId: payload.toolCallId, output: buildKimiToolOutput(this.toolNames.get(payload.toolCallId) ?? 'unknown', this.toolArgs.get(payload.toolCallId), payload.output) })]
@@ -46,7 +52,45 @@ export class KimiEventToChunkMapper {
     }
   }
 
+  finishFromRecovery(reason: 'completed' | 'cancelled' | 'failed' | 'blocked'): UIMessageChunk[] {
+    return this.finish(reason)
+  }
+
+  reconcileTranscriptTurn(turn: KimiTranscriptTurn): UIMessageChunk[] {
+    const turnId = readKimiTranscriptTurnSequence(turn.turnId)
+    if (turnId === null) {
+      return []
+    }
+    const chunks: UIMessageChunk[] = []
+    let expectedText = ''
+    let expectedThinking = ''
+    for (const step of turn.steps) {
+      for (const frame of step.frames) {
+        switch (frame.kind) {
+          case 'text':
+            if (frame.role !== 'assistant') {
+              break
+            }
+            expectedText += frame.text
+            chunks.push(...this.reconcileText(turnId, expectedText))
+            break
+          case 'thinking':
+            expectedThinking += frame.text
+            chunks.push(...this.reconcileThinking(turnId, expectedThinking))
+            break
+          case 'tool':
+            chunks.push(...this.reconcileTool(turnId, frame))
+            break
+          case 'notice':
+            break
+        }
+      }
+    }
+    return chunks
+  }
+
   private mapText(turnId: number, delta: string): UIMessageChunk[] {
+    this.emittedTextByTurn.set(turnId, `${this.emittedTextByTurn.get(turnId) ?? ''}${delta}`)
     const activeId = this.textBlocks.get(turnId)
     if (activeId) {
       return [providerChunk.textDelta(activeId, delta)]
@@ -58,6 +102,7 @@ export class KimiEventToChunkMapper {
   }
 
   private mapThinking(turnId: number, delta: string): UIMessageChunk[] {
+    this.emittedThinkingByTurn.set(turnId, `${this.emittedThinkingByTurn.get(turnId) ?? ''}${delta}`)
     const activeId = this.thinkingBlocks.get(turnId)
     if (activeId) {
       return [providerChunk.reasoningDelta(activeId, delta)]
@@ -98,5 +143,59 @@ export class KimiEventToChunkMapper {
     const count = counts.get(turnId) ?? 0
     counts.set(turnId, count + 1)
     return count === 0 ? `${prefix}-${turnId}` : `${prefix}-${turnId}-${count}`
+  }
+
+  private reconcileText(turnId: number, expected: string): UIMessageChunk[] {
+    const emitted = this.emittedTextByTurn.get(turnId) ?? ''
+    return expected.length > emitted.length && expected.startsWith(emitted)
+      ? this.mapText(turnId, expected.slice(emitted.length))
+      : []
+  }
+
+  private reconcileThinking(turnId: number, expected: string): UIMessageChunk[] {
+    const emitted = this.emittedThinkingByTurn.get(turnId) ?? ''
+    return expected.length > emitted.length && expected.startsWith(emitted)
+      ? this.mapThinking(turnId, expected.slice(emitted.length))
+      : []
+  }
+
+  private reconcileTool(
+    turnId: number,
+    frame: Extract<KimiTranscriptTurn['steps'][number]['frames'][number], { kind: 'tool' }>,
+  ): UIMessageChunk[] {
+    const chunks: UIMessageChunk[] = []
+    if (!this.toolNames.has(frame.toolCallId)) {
+      chunks.push(...this.closeActiveBlocks(turnId))
+      this.toolNames.set(frame.toolCallId, frame.name)
+      this.toolArgs.set(frame.toolCallId, frame.input ?? frame.inputText)
+      chunks.push(
+        providerChunk.toolInputStart(frame.toolCallId, frame.name),
+        providerChunk.toolInputAvailable({
+          toolCallId: frame.toolCallId,
+          toolName: frame.name,
+          input: buildKimiToolInput(frame.name, frame.input ?? frame.inputText),
+        }),
+      )
+    }
+    if (frame.state === 'running' || this.completedToolCalls.has(frame.toolCallId)) {
+      return chunks
+    }
+    this.completedToolCalls.add(frame.toolCallId)
+    if (frame.state === 'error') {
+      chunks.push(providerChunk.toolOutputError(
+        frame.toolCallId,
+        frame.error ?? 'Kimi tool call failed.',
+      ))
+      return chunks
+    }
+    chunks.push(providerChunk.toolOutputAvailable({
+      toolCallId: frame.toolCallId,
+      output: buildKimiToolOutput(
+        frame.name,
+        frame.input ?? frame.inputText,
+        frame.output ?? frame.progress,
+      ),
+    }))
+    return chunks
   }
 }

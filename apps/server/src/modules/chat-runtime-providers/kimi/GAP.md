@@ -12,8 +12,42 @@ Kimi exposes typed task list, inspect, and cancel operations (`cancelTask`). Cra
 
 ## Target-scoped model inventory
 
-Kimi's model catalog is produced by a particular Kimi host and its provider configuration. Cradle's `ListRuntimeModelsInput` contains only an optional workspace path, not a provider target/profile. Returning a global catalog would cross credentials and targets, so Kimi currently returns no runtime-global model catalog. The active session model remains supported and visible through the model UI slot.
+Kimi's native model catalog is produced by a particular Kimi host after that host has loaded one provider target's endpoint, credentials, and configuration. It is not a runtime-global fact.
+
+Cradle currently has two different model-catalog paths:
+
+1. `GET /chat/runtimes/:runtimeKind/models` calls `ChatRuntime.listModels`. Its `ListRuntimeModelsInput` contains only `workspacePath`, so it cannot identify a Kimi provider target. Kimi deliberately returns an empty catalog here rather than starting an arbitrary target or combining catalogs across credentials.
+2. The provider catalog and `/providers/targets/:providerTargetId/models-cache` are already target-scoped. They are used by agent and Composer model selection, but they query the generic provider adapter directly and do not describe Kimi-native aliases or host-specific availability.
+
+There is also a `RuntimeOwnedProviderTargets.listModelsForProviderTarget` contract, currently used by OpenCode. It is not the right Kimi hook as-is: OpenCode owns and synthesizes its external provider targets, while Kimi consumes ordinary Cradle provider targets that can also be used by other runtimes. Registering Kimi as their owner would change existing ownership semantics.
+
+### Current effect
+
+- Kimi session creation and resume are not blocked. Host acquisition is already scoped by `providerTargetId`, and its resource fingerprint includes provider configuration and a credential fingerprint.
+- The selected model is still passed into Kimi session creation and remains visible through the model UI slot.
+- Generic target-scoped model choices can still come from the existing provider catalog.
+- What is missing is authoritative Kimi-native discovery before a session starts. Cradle cannot currently ask "which models does Kimi expose for this selected target?" through `ChatRuntime.listModels`.
+
+### Proposed contract
+
+Extend runtime model discovery with a target-aware request rather than making Kimi's catalog global:
+
+1. Add `providerTargetId` to the HTTP request and resolve it server-side into the same `RuntimeProviderTargetProfile` shape used to start a session. Pass the resolved profile to the runtime; providers must not load target rows or secrets directly.
+2. Keep the target optional only for runtimes whose catalog is genuinely runtime-global. Kimi should require it and return a typed target-required error when it is absent.
+3. Key any catalog cache by `runtimeKind`, `providerTargetId`, workspace/host scope, and the host resource fingerprint. Credential rotation or provider-config changes must invalidate the cached inventory without persisting raw credentials.
+4. In Composer, select the provider target first, then request the runtime-native catalog. Merge only explicit custom models from that same target; never union model lists from different targets.
+5. Preserve provider-native model identifiers and aliases in the runtime catalog. Resolution from a display choice to Kimi's `provider/model` reference remains owned by the Kimi adapter.
+
+Required tests are target isolation, credential/config rotation invalidation, reuse of an already-running target host, missing/disabled target behavior, and model aliases that do not match the generic provider catalog.
+
+This is a discovery-contract change, not a Kimi transport rewrite. It should be implemented in the shared runtime model-catalog owner before Kimi exposes native discovery.
 
 ## Terminal transcript streaming
 
 Kimi exposes terminal metadata and close operations, which Cradle supports through its background-terminal contract. It does not expose a typed terminal-output stream in the current Chat Runtime contract. Tool progress is streamed through the normal turn event mapper, but a standalone terminal transcript surface needs a new contract owner before it can be added.
+
+## Step timing diagnostics
+
+The Usage module now owns canonical cross-runtime P50/P95 time-to-first-token and total-run duration, derived from completed run snapshots. Kimi participates through the same runtime-neutral run events as other providers.
+
+Kimi transcript steps additionally expose request-build, server-decode, stream-duration, and client-consume timing fields. Those detailed phases remain native transcript facts until Cradle defines a shared phase taxonomy; they should not be projected into misleading Kimi-only Usage metrics.

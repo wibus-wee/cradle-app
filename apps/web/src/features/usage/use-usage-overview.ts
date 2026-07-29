@@ -9,6 +9,7 @@ import {
   getUsageDailyByModelOptions,
   getUsageDailyOptions,
   getUsagePatternsHourlyOptions,
+  getUsagePerformanceOptions,
   getUsageStatsOptions,
   getUsageSummaryOptions,
   getUsageToolsOptions,
@@ -20,6 +21,7 @@ import type {
   GetUsageDailyByModelResponse,
   GetUsageDailyResponse,
   GetUsagePatternsHourlyResponse,
+  GetUsagePerformanceResponse,
   GetUsageStatsResponse,
   GetUsageSummaryResponse,
   GetUsageToolsResponse,
@@ -39,6 +41,7 @@ export type ToolUsageBreakdown = GetUsageToolsResponse
 export type ToolUsageEntry = ToolUsageBreakdown['overall'][number]
 export type DailyToolUsage = ToolUsageBreakdown['daily'][number]
 export type CostEfficiency = GetUsageCostEfficiencyResponse[number]
+export type RuntimePerformanceOverview = GetUsagePerformanceResponse
 
 const EMPTY_DAILY_USAGE: GetUsageDailyResponse = []
 const EMPTY_DAILY_USAGE_BY_MODEL: GetUsageDailyByModelResponse = []
@@ -85,6 +88,9 @@ export function useUsageOverview(range: UsageRangeKey) {
   const costEfficiencyQuery = useQuery({
     ...getUsageCostEfficiencyOptions({ query: { days: '365' } }),
   })
+  const performanceQuery = useQuery({
+    ...getUsagePerformanceOptions({ query: { from: rangeFrom } }),
+  })
 
   const summary = summaryQuery.data ?? null
 
@@ -97,6 +103,7 @@ export function useUsageOverview(range: UsageRangeKey) {
     dailyCostQuery,
     toolsQuery,
     costEfficiencyQuery,
+    performanceQuery,
     daily: dailyQuery.data ?? EMPTY_DAILY_USAGE,
     // Model breakdown is a drill-down enhancement for tooltips, not core
     // dashboard data — deliberately excluded from `usageReady` below so a
@@ -110,6 +117,9 @@ export function useUsageOverview(range: UsageRangeKey) {
     dailyCost: dailyCostQuery.data ?? EMPTY_DAILY_COST,
     tools: toolsQuery.data ?? null,
     costEfficiency: costEfficiencyQuery.data ?? EMPTY_COST_EFFICIENCY,
+    // Performance is an enhancement backed by retained run snapshots. A
+    // slow or unavailable snapshot query must not blank the usage ledger.
+    performance: performanceQuery.data ?? null,
     usageReady:
       dailyQuery.isSuccess
       && hourlyQuery.isSuccess

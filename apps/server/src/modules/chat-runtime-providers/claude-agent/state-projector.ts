@@ -594,6 +594,14 @@ interface ClaudeAgentCrewCallSnapshot {
   outputFile: string | null
   runInBackground: boolean
   status: 'running' | 'completed' | 'failed'
+  retry?: {
+    agentId: string
+    attempt: number
+    maxRetries: number
+    retryDelayMs: number
+    errorStatus: number | null
+    errorCategory: string
+  } | null
   startedAt: number
   completedAt: number | null
 }
@@ -692,6 +700,7 @@ export function projectClaudeAgentCrewUiSlotState(
     model: call.model,
     reasoningEffort: call.reasoningEffort,
     agents: projectClaudeAgentCrewAgents(call),
+    retry: call.retry ?? null,
     startedAt: call.startedAt,
     completedAt: call.completedAt,
   }))
@@ -760,6 +769,7 @@ function mergeClaudeAgentCrewCall(
     status: next.status,
     startedAt: next.startedAt > 0 ? next.startedAt : existing.startedAt,
     completedAt: next.completedAt ?? existing.completedAt,
+    retry: next.retry ?? null,
   }
 }
 
@@ -795,10 +805,34 @@ function readClaudeAgentCrewCallsSnapshot(value: unknown): ClaudeAgentCrewCallSn
       outputFile: typeof record.outputFile === 'string' ? record.outputFile : null,
       runInBackground: record.runInBackground === true,
       status,
+      retry: readClaudeAgentCrewRetry(record.retry),
       startedAt: typeof record.startedAt === 'number' ? record.startedAt : 0,
       completedAt: typeof record.completedAt === 'number' ? record.completedAt : null,
     }]
   })
+}
+
+function readClaudeAgentCrewRetry(value: unknown): ClaudeAgentCrewCallSnapshot['retry'] {
+  const record = readRecord(value)
+  const agentId = typeof record.agentId === 'string' ? record.agentId.trim() : ''
+  const errorCategory = typeof record.errorCategory === 'string' ? record.errorCategory.trim() : ''
+  if (
+    !agentId
+    || !errorCategory
+    || typeof record.attempt !== 'number'
+    || typeof record.maxRetries !== 'number'
+    || typeof record.retryDelayMs !== 'number'
+  ) {
+    return null
+  }
+  return {
+    agentId,
+    attempt: record.attempt,
+    maxRetries: record.maxRetries,
+    retryDelayMs: record.retryDelayMs,
+    errorStatus: typeof record.errorStatus === 'number' ? record.errorStatus : null,
+    errorCategory,
+  }
 }
 
 function readClaudeAgentReceiverThreadIds(call: ClaudeAgentCrewCallSnapshot): string[] {
@@ -814,7 +848,7 @@ function projectClaudeAgentCrewAgents(call: ClaudeAgentCrewCallSnapshot): Runtim
   }
   return [{
     threadId: call.id,
-    status: call.status,
+    status: call.retry ? 'retrying' : call.status,
     message: call.description ?? call.prompt,
     name: call.subagentType,
     preview: (call.description ?? call.prompt)?.slice(0, 120) ?? null,

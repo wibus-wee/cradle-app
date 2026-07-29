@@ -300,6 +300,7 @@ import { register as registerUsageCostEfficiency } from './usage/cost-efficiency
 import { register as registerUsageDaily } from './usage/daily'
 import { register as registerUsageDailyByModel } from './usage/daily-by-model'
 import { register as registerUsagePatternsHourly } from './usage/patterns/hourly'
+import { register as registerUsagePerformance } from './usage/performance'
 import { register as registerUsageReconcileClaude } from './usage/reconcile/claude'
 import { register as registerUsageSession } from './usage/session'
 import { register as registerUsageSessionsRecent } from './usage/sessions/recent'
@@ -674,6 +675,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerUsageDaily(program)
   registerUsageDailyByModel(program)
   registerUsagePatternsHourly(program)
+  registerUsagePerformance(program)
   registerUsageReconcileClaude(program)
   registerUsageSession(program)
   registerUsageSessionsRecent(program)

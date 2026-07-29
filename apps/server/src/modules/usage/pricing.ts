@@ -4,6 +4,17 @@ import { getCachedModelsDevCost } from '../model-registry/model-info-registry'
 interface ModelPricing {
   input: number
   output: number
+  cacheRead?: number
+  cacheWrite?: number
+}
+
+export interface UsageCostBreakdown {
+  uncachedInputTokens: number
+  uncachedInputCostUsd: number
+  cacheReadCostUsd: number
+  cacheWriteCostUsd: number
+  outputCostUsd: number
+  totalCostUsd: number
 }
 
 /**
@@ -45,11 +56,52 @@ function findFallbackPricing(modelId: string): ModelPricing | null {
 
 export function estimateCost(
   modelId: string,
-  usage: { promptTokens: number, completionTokens: number },
+  usage: {
+    promptTokens: number
+    completionTokens: number
+    cachedInputTokens?: number
+    cacheWriteInputTokens?: number
+  },
 ): number {
+  return estimateCostBreakdown(modelId, usage).totalCostUsd
+}
+
+export function estimateCostBreakdown(
+  modelId: string,
+  usage: {
+    promptTokens: number
+    completionTokens: number
+    cachedInputTokens?: number
+    cacheWriteInputTokens?: number
+  },
+): UsageCostBreakdown {
   const pricing = getCachedModelsDevCost(modelId) ?? findFallbackPricing(modelId)
+  const cachedInputTokens = usage.cachedInputTokens ?? 0
+  const cacheWriteInputTokens = usage.cacheWriteInputTokens ?? 0
+  const uncachedInputTokens = Math.max(
+    0,
+    usage.promptTokens - cachedInputTokens - cacheWriteInputTokens,
+  )
   if (!pricing) {
-    return 0
+    return {
+      uncachedInputTokens,
+      uncachedInputCostUsd: 0,
+      cacheReadCostUsd: 0,
+      cacheWriteCostUsd: 0,
+      outputCostUsd: 0,
+      totalCostUsd: 0,
+    }
   }
-  return (usage.promptTokens * pricing.input + usage.completionTokens * pricing.output) / 1_000_000
+  const uncachedInputCostUsd = uncachedInputTokens * pricing.input / 1_000_000
+  const cacheReadCostUsd = cachedInputTokens * (pricing.cacheRead ?? pricing.input) / 1_000_000
+  const cacheWriteCostUsd = cacheWriteInputTokens * (pricing.cacheWrite ?? pricing.input) / 1_000_000
+  const outputCostUsd = usage.completionTokens * pricing.output / 1_000_000
+  return {
+    uncachedInputTokens,
+    uncachedInputCostUsd,
+    cacheReadCostUsd,
+    cacheWriteCostUsd,
+    outputCostUsd,
+    totalCostUsd: uncachedInputCostUsd + cacheReadCostUsd + cacheWriteCostUsd + outputCostUsd,
+  }
 }

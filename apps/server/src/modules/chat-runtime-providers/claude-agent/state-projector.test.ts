@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { RuntimeSession } from '../../chat-runtime/runtime-provider-types'
 import {
+  projectClaudeAgentCrewUiSlotState,
   readClaudeAgentWorkflowExecutions,
   writeClaudeAgentCrewCall,
   writeClaudeAgentTaskActivity,
@@ -22,6 +23,53 @@ function createRuntimeSession(): RuntimeSession {
     providerStateSnapshot: JSON.stringify({ models: { currentModelId: null } }),
   }
 }
+
+describe('claude crew retry projection', () => {
+  it('preserves retry details and exposes retrying agent state', () => {
+    const runtimeSession = createRuntimeSession()
+    writeClaudeAgentCrewCall(runtimeSession, {
+      id: 'toolu-agent-1',
+      agentId: 'agent-1',
+      tool: 'Agent',
+      prompt: 'Inspect the protocol',
+      description: 'Protocol audit',
+      subagentType: 'Explore',
+      model: null,
+      reasoningEffort: null,
+      tools: [],
+      outputFile: null,
+      runInBackground: false,
+      status: 'running',
+      retry: {
+        agentId: 'agent-1',
+        attempt: 2,
+        maxRetries: 4,
+        retryDelayMs: 8_000,
+        errorStatus: 529,
+        errorCategory: 'overloaded',
+      },
+      startedAt: 100,
+      completedAt: null,
+    })
+
+    expect(projectClaudeAgentCrewUiSlotState(runtimeSession)).toMatchObject({
+      activeCount: 1,
+      calls: [{
+        id: 'toolu-agent-1',
+        status: 'running',
+        retry: {
+          agentId: 'agent-1',
+          attempt: 2,
+          maxRetries: 4,
+          retryDelayMs: 8_000,
+          errorStatus: 529,
+          errorCategory: 'overloaded',
+        },
+      }],
+      agents: [{ threadId: 'toolu-agent-1', status: 'retrying' }],
+    })
+  })
+})
 
 describe('claude Workflow provider snapshot', () => {
   it('merges complete input, output, lifecycle, and raw fields without losing prior data', () => {

@@ -61,7 +61,7 @@ async function readManifest(path) {
   try {
     return JSON.parse(await readFile(path, 'utf8'))
   }
- catch {
+  catch {
     return null
   }
 }

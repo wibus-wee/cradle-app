@@ -35,16 +35,16 @@ describe('projectClaudeAssistantUsageEvent', () => {
       modelId: 'claude-opus-4-8',
       occurredAt: 123,
       usage: {
-        promptTokens: 100,
+        promptTokens: 160,
         completionTokens: 50,
-        totalTokens: 150,
+        totalTokens: 210,
         cachedInputTokens: 40,
         cacheWriteInputTokens: 20,
       },
       providerTotal: {
-        promptTokens: 100,
+        promptTokens: 160,
         completionTokens: 50,
-        totalTokens: 150,
+        totalTokens: 210,
         cachedInputTokens: 40,
         cacheWriteInputTokens: 20,
       },
@@ -74,6 +74,24 @@ describe('projectClaudeAssistantUsageEvent', () => {
       providerTurnId: 'msg-child',
       modelId: 'claude-sonnet-5',
     }))
+  })
+
+  it('uses the originating assistant timestamp with receive-time fallback semantics', () => {
+    const event = projectClaudeAssistantUsageEvent({
+      message: {
+        type: 'assistant',
+        session_id: 'session-root',
+        timestamp: '2026-07-29T00:01:02.345Z',
+        message: {
+          id: 'msg-timestamped',
+          model: 'claude-opus-4-8',
+          usage: { input_tokens: 4, output_tokens: 6 },
+        },
+      } as unknown as SDKMessage,
+      fallbackModelId: null,
+    })
+
+    expect(event?.occurredAt).toBe(1_785_283_262)
   })
 
   it('ignores non-final assistant SDK messages', () => {

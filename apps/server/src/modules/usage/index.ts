@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia'
 
 import { UsageModel } from './model'
+import { getRuntimePerformanceOverview } from './performance'
 import * as Usage from './service'
 
 export const usage = new Elysia({
@@ -114,6 +115,16 @@ export const usage = new Elysia({
     },
     query: UsageModel.dateRangeQuery,
     response: { 200: UsageModel.dailyCost },
+  })
+  .get('/performance', ({ query }) => getRuntimePerformanceOverview(query.from, query.to), {
+    detail: {
+      'summary': 'Get cross-runtime latency and completion timing',
+      'x-cradle-cli': {
+        command: ['usage', 'performance'],
+      },
+    },
+    query: UsageModel.dateRangeQuery,
+    response: { 200: UsageModel.runtimePerformance },
   })
   // occurred_at on snapshot events is millisecond epoch, so `from` stays in ms.
   .get('/tools', ({ query }) => Usage.getToolUsageBreakdown(query.from ? new Date(query.from).getTime() : undefined), {

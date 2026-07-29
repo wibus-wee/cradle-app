@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
 import { reconcileCompletedCradleClaudeUsage } from '../chat-runtime-providers/claude-agent/usage-reconciliation'
-import { estimateCost } from './pricing'
+import { estimateCost, estimateCostBreakdown } from './pricing'
 
 const usageTurnKey = sql`COALESCE(${usageLogs.runId}, ${usageLogs.providerTurnId}, ${usageLogs.id})`
 
@@ -405,22 +405,36 @@ export function getSessionUsage(sessionId: string): {
 export interface CostSummary {
   totalCostUsd: number
   totalPromptTokens: number
+  totalUncachedInputTokens: number
+  totalCachedInputTokens: number
+  totalCacheWriteInputTokens: number
   totalCompletionTokens: number
   totalTokens: number
-  byModel: Array<{ modelId: string, costUsd: number, promptTokens: number, completionTokens: number, totalTokens: number, count: number }>
-  byAgent: Array<{ agentId: string, agentName: string, costUsd: number, promptTokens: number, completionTokens: number, totalTokens: number, count: number }>
-  byProviderTarget: Array<{ providerTargetId: string, providerTargetName: string | null, costUsd: number, promptTokens: number, completionTokens: number, totalTokens: number, count: number }>
+  uncachedInputCostUsd: number
+  cacheReadCostUsd: number
+  cacheWriteCostUsd: number
+  outputCostUsd: number
+  byModel: Array<CostBreakdownTotals & { modelId: string }>
+  byAgent: Array<CostBreakdownTotals & { agentId: string, agentName: string }>
+  byProviderTarget: Array<CostBreakdownTotals & { providerTargetId: string, providerTargetName: string | null }>
 }
 
 interface CostBreakdownTotals {
   costUsd: number
   promptTokens: number
+  uncachedInputTokens: number
+  cachedInputTokens: number
+  cacheWriteInputTokens: number
   completionTokens: number
   totalTokens: number
+  uncachedInputCostUsd: number
+  cacheReadCostUsd: number
+  cacheWriteCostUsd: number
+  outputCostUsd: number
   count: number
 }
 
-function resolveTimeRange(from?: string, to?: string): { fromEpoch: number, toEpoch: number } {
+export function resolveTimeRange(from?: string, to?: string): { fromEpoch: number, toEpoch: number } {
   const fromEpoch = from ? Math.floor(new Date(from).getTime() / 1000) : 0
   const toEpoch = to ? Math.floor(new Date(to).getTime() / 1000) + 86400 : Math.floor(Date.now() / 1000) + 86400
   return { fromEpoch, toEpoch }
@@ -436,6 +450,8 @@ export function getCostSummary(from?: string, to?: string): CostSummary {
     provider_target_id: string | null
     provider_target_name: string | null
     prompt_tokens: number
+    cached_input_tokens: number
+    cache_write_input_tokens: number
     completion_tokens: number
     total_tokens: number
     count: number
@@ -447,6 +463,8 @@ export function getCostSummary(from?: string, to?: string): CostSummary {
       ${usageLogs.providerTargetId} AS provider_target_id,
       ${providerTargets.displayName} AS provider_target_name,
       SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.cachedInputTokens}) AS cached_input_tokens,
+      SUM(${usageLogs.cacheWriteInputTokens}) AS cache_write_input_tokens,
       SUM(${usageLogs.completionTokens}) AS completion_tokens,
       SUM(${usageLogs.totalTokens}) AS total_tokens,
       COUNT(DISTINCT ${usageTurnKey}) AS count
@@ -469,32 +487,55 @@ export function getCostSummary(from?: string, to?: string): CostSummary {
   const providerTargetMap = new Map<string, CostBreakdownTotals & { providerTargetName: string | null }>()
 
   for (const row of rows) {
-    const costUsd = estimateCost(row.model_id, {
+    const cost = estimateCostBreakdown(row.model_id, {
       promptTokens: row.prompt_tokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
       completionTokens: row.completion_tokens,
     })
     addCostBreakdown(modelMap, row.model_id, {
-      costUsd,
+      costUsd: cost.totalCostUsd,
       promptTokens: row.prompt_tokens,
+      uncachedInputTokens: cost.uncachedInputTokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
       completionTokens: row.completion_tokens,
       totalTokens: row.total_tokens,
+      uncachedInputCostUsd: cost.uncachedInputCostUsd,
+      cacheReadCostUsd: cost.cacheReadCostUsd,
+      cacheWriteCostUsd: cost.cacheWriteCostUsd,
+      outputCostUsd: cost.outputCostUsd,
       count: row.count,
     })
     if (row.agent_id && row.agent_name) {
       addNamedCostBreakdown(agentMap, row.agent_id, 'agentName', row.agent_name, {
-        costUsd,
+        costUsd: cost.totalCostUsd,
         promptTokens: row.prompt_tokens,
+        uncachedInputTokens: cost.uncachedInputTokens,
+        cachedInputTokens: row.cached_input_tokens,
+        cacheWriteInputTokens: row.cache_write_input_tokens,
         completionTokens: row.completion_tokens,
         totalTokens: row.total_tokens,
+        uncachedInputCostUsd: cost.uncachedInputCostUsd,
+        cacheReadCostUsd: cost.cacheReadCostUsd,
+        cacheWriteCostUsd: cost.cacheWriteCostUsd,
+        outputCostUsd: cost.outputCostUsd,
         count: row.count,
       })
     }
     if (row.provider_target_id) {
       addNamedCostBreakdown(providerTargetMap, row.provider_target_id, 'providerTargetName', row.provider_target_name, {
-        costUsd,
+        costUsd: cost.totalCostUsd,
         promptTokens: row.prompt_tokens,
+        uncachedInputTokens: cost.uncachedInputTokens,
+        cachedInputTokens: row.cached_input_tokens,
+        cacheWriteInputTokens: row.cache_write_input_tokens,
         completionTokens: row.completion_tokens,
         totalTokens: row.total_tokens,
+        uncachedInputCostUsd: cost.uncachedInputCostUsd,
+        cacheReadCostUsd: cost.cacheReadCostUsd,
+        cacheWriteCostUsd: cost.cacheWriteCostUsd,
+        outputCostUsd: cost.outputCostUsd,
         count: row.count,
       })
     }
@@ -513,8 +554,15 @@ export function getCostSummary(from?: string, to?: string): CostSummary {
   return {
     totalCostUsd: byModel.reduce((sum, row) => sum + row.costUsd, 0),
     totalPromptTokens: byModel.reduce((sum, row) => sum + row.promptTokens, 0),
+    totalUncachedInputTokens: byModel.reduce((sum, row) => sum + row.uncachedInputTokens, 0),
+    totalCachedInputTokens: byModel.reduce((sum, row) => sum + row.cachedInputTokens, 0),
+    totalCacheWriteInputTokens: byModel.reduce((sum, row) => sum + row.cacheWriteInputTokens, 0),
     totalCompletionTokens: byModel.reduce((sum, row) => sum + row.completionTokens, 0),
     totalTokens: byModel.reduce((sum, row) => sum + row.totalTokens, 0),
+    uncachedInputCostUsd: byModel.reduce((sum, row) => sum + row.uncachedInputCostUsd, 0),
+    cacheReadCostUsd: byModel.reduce((sum, row) => sum + row.cacheReadCostUsd, 0),
+    cacheWriteCostUsd: byModel.reduce((sum, row) => sum + row.cacheWriteCostUsd, 0),
+    outputCostUsd: byModel.reduce((sum, row) => sum + row.outputCostUsd, 0),
     byModel,
     byAgent,
     byProviderTarget,
@@ -529,8 +577,15 @@ function addCostBreakdown(map: Map<string, CostBreakdownTotals>, key: string, da
   }
   current.costUsd += data.costUsd
   current.promptTokens += data.promptTokens
+  current.uncachedInputTokens += data.uncachedInputTokens
+  current.cachedInputTokens += data.cachedInputTokens
+  current.cacheWriteInputTokens += data.cacheWriteInputTokens
   current.completionTokens += data.completionTokens
   current.totalTokens += data.totalTokens
+  current.uncachedInputCostUsd += data.uncachedInputCostUsd
+  current.cacheReadCostUsd += data.cacheReadCostUsd
+  current.cacheWriteCostUsd += data.cacheWriteCostUsd
+  current.outputCostUsd += data.outputCostUsd
   current.count += data.count
 }
 
@@ -548,8 +603,15 @@ function addNamedCostBreakdown<NameKey extends string>(
   }
   current.costUsd += data.costUsd
   current.promptTokens += data.promptTokens
+  current.uncachedInputTokens += data.uncachedInputTokens
+  current.cachedInputTokens += data.cachedInputTokens
+  current.cacheWriteInputTokens += data.cacheWriteInputTokens
   current.completionTokens += data.completionTokens
   current.totalTokens += data.totalTokens
+  current.uncachedInputCostUsd += data.uncachedInputCostUsd
+  current.cacheReadCostUsd += data.cacheReadCostUsd
+  current.cacheWriteCostUsd += data.cacheWriteCostUsd
+  current.outputCostUsd += data.outputCostUsd
   current.count += data.count
 }
 
@@ -585,6 +647,8 @@ export function getSessionsCost(from?: string, to?: string): SessionCostEntry[] 
     session_id: string
     model_id: string
     prompt_tokens: number
+    cached_input_tokens: number
+    cache_write_input_tokens: number
     completion_tokens: number
     total_tokens: number
     step_count: number
@@ -593,6 +657,8 @@ export function getSessionsCost(from?: string, to?: string): SessionCostEntry[] 
       ${usageLogs.sessionId} AS session_id,
       COALESCE(${usageLogs.modelId}, 'unknown') AS model_id,
       SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.cachedInputTokens}) AS cached_input_tokens,
+      SUM(${usageLogs.cacheWriteInputTokens}) AS cache_write_input_tokens,
       SUM(${usageLogs.completionTokens}) AS completion_tokens,
       SUM(${usageLogs.totalTokens}) AS total_tokens,
       COUNT(DISTINCT ${usageTurnKey}) AS step_count
@@ -604,7 +670,12 @@ export function getSessionsCost(from?: string, to?: string): SessionCostEntry[] 
 
   const sessionMap = new Map<string, { costUsd: number, promptTokens: number, completionTokens: number, totalTokens: number, stepCount: number }>()
   for (const row of rows) {
-    const cost = estimateCost(row.model_id, { promptTokens: row.prompt_tokens, completionTokens: row.completion_tokens })
+    const cost = estimateCost(row.model_id, {
+      promptTokens: row.prompt_tokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
+      completionTokens: row.completion_tokens,
+    })
     const entry = sessionMap.get(row.session_id)
     if (entry) {
       entry.costUsd += cost
@@ -640,6 +711,8 @@ export function getRecentUsageSessions(limit = 6): RecentUsageSession[] {
     model_id: string
     cost_model_id: string
     prompt_tokens: number
+    cached_input_tokens: number
+    cache_write_input_tokens: number
     completion_tokens: number
     total_tokens: number
     turn_count: number
@@ -671,6 +744,8 @@ export function getRecentUsageSessions(limit = 6): RecentUsageSession[] {
       recent_sessions.model_id AS model_id,
       COALESCE(${usageLogs.modelId}, 'unknown') AS cost_model_id,
       SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.cachedInputTokens}) AS cached_input_tokens,
+      SUM(${usageLogs.cacheWriteInputTokens}) AS cache_write_input_tokens,
       SUM(${usageLogs.completionTokens}) AS completion_tokens,
       SUM(${usageLogs.totalTokens}) AS total_tokens,
       COUNT(DISTINCT ${usageTurnKey}) AS turn_count,
@@ -698,6 +773,8 @@ export function getRecentUsageSessions(limit = 6): RecentUsageSession[] {
   for (const row of rows) {
     const costUsd = estimateCost(row.cost_model_id, {
       promptTokens: row.prompt_tokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
       completionTokens: row.completion_tokens,
     })
     const current = sessionMap.get(row.session_id)
@@ -734,8 +811,15 @@ export interface DailyCostEntry {
   modelId: string
   costUsd: number
   promptTokens: number
+  uncachedInputTokens: number
+  cachedInputTokens: number
+  cacheWriteInputTokens: number
   completionTokens: number
   totalTokens: number
+  uncachedInputCostUsd: number
+  cacheReadCostUsd: number
+  cacheWriteCostUsd: number
+  outputCostUsd: number
   stepCount: number
 }
 
@@ -749,6 +833,8 @@ export function getDailyCost(from?: string, to?: string): DailyCostEntry[] {
     date: string
     model_id: string
     prompt_tokens: number
+    cached_input_tokens: number
+    cache_write_input_tokens: number
     completion_tokens: number
     total_tokens: number
     step_count: number
@@ -757,6 +843,8 @@ export function getDailyCost(from?: string, to?: string): DailyCostEntry[] {
       date(${usageLogs.createdAt}, 'unixepoch', 'localtime') AS date,
       COALESCE(${usageLogs.modelId}, 'unknown') AS model_id,
       SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.cachedInputTokens}) AS cached_input_tokens,
+      SUM(${usageLogs.cacheWriteInputTokens}) AS cache_write_input_tokens,
       SUM(${usageLogs.completionTokens}) AS completion_tokens,
       SUM(${usageLogs.totalTokens}) AS total_tokens,
       COUNT(DISTINCT ${usageTurnKey}) AS step_count
@@ -767,26 +855,45 @@ export function getDailyCost(from?: string, to?: string): DailyCostEntry[] {
     ORDER BY date ASC, model_id ASC
   `)
 
-  return rows.map(row => ({
-    date: row.date,
-    modelId: row.model_id,
-    costUsd: estimateCost(row.model_id, { promptTokens: row.prompt_tokens, completionTokens: row.completion_tokens }),
-    promptTokens: row.prompt_tokens,
-    completionTokens: row.completion_tokens,
-    totalTokens: row.total_tokens,
-    stepCount: row.step_count,
-  }))
+  return rows.map((row) => {
+    const cost = estimateCostBreakdown(row.model_id, {
+      promptTokens: row.prompt_tokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
+      completionTokens: row.completion_tokens,
+    })
+    return {
+      date: row.date,
+      modelId: row.model_id,
+      costUsd: cost.totalCostUsd,
+      promptTokens: row.prompt_tokens,
+      uncachedInputTokens: cost.uncachedInputTokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
+      completionTokens: row.completion_tokens,
+      totalTokens: row.total_tokens,
+      uncachedInputCostUsd: cost.uncachedInputCostUsd,
+      cacheReadCostUsd: cost.cacheReadCostUsd,
+      cacheWriteCostUsd: cost.cacheWriteCostUsd,
+      outputCostUsd: cost.outputCostUsd,
+      stepCount: row.step_count,
+    }
+  })
 }
 
 export function getTodayCostUsd(): number {
   const rows = db().all<{
     model_id: string
     prompt_tokens: number
+    cached_input_tokens: number
+    cache_write_input_tokens: number
     completion_tokens: number
   }>(sql`
     SELECT
       COALESCE(${usageLogs.modelId}, 'unknown') AS model_id,
       SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.cachedInputTokens}) AS cached_input_tokens,
+      SUM(${usageLogs.cacheWriteInputTokens}) AS cache_write_input_tokens,
       SUM(${usageLogs.completionTokens}) AS completion_tokens
     FROM ${usageLogs}
     WHERE date(${usageLogs.createdAt}, 'unixepoch', 'localtime') = date('now', 'localtime')
@@ -794,7 +901,12 @@ export function getTodayCostUsd(): number {
   `)
 
   return rows.reduce(
-    (sum, row) => sum + estimateCost(row.model_id, { promptTokens: row.prompt_tokens, completionTokens: row.completion_tokens }),
+    (sum, row) => sum + estimateCost(row.model_id, {
+      promptTokens: row.prompt_tokens,
+      cachedInputTokens: row.cached_input_tokens,
+      cacheWriteInputTokens: row.cache_write_input_tokens,
+      completionTokens: row.completion_tokens,
+    }),
     0,
   )
 }
@@ -1121,6 +1233,8 @@ export function getCostEfficiencyTrend(days = 90): DailyCostEfficiency[] {
     run_count: number
     model_ids: string
     prompt_tokens: number
+    cached_input_tokens: number
+    cache_write_input_tokens: number
     completion_tokens: number
   }>(sql`
     SELECT
@@ -1129,6 +1243,8 @@ export function getCostEfficiencyTrend(days = 90): DailyCostEfficiency[] {
       COUNT(DISTINCT COALESCE(${usageLogs.runId}, ${usageLogs.providerTurnId}, ${usageLogs.id})) AS run_count,
       GROUP_CONCAT(DISTINCT COALESCE(${usageLogs.modelId}, 'unknown')) AS model_ids,
       SUM(${usageLogs.promptTokens}) AS prompt_tokens,
+      SUM(${usageLogs.cachedInputTokens}) AS cached_input_tokens,
+      SUM(${usageLogs.cacheWriteInputTokens}) AS cache_write_input_tokens,
       SUM(${usageLogs.completionTokens}) AS completion_tokens
     FROM ${usageLogs}
     WHERE ${usageLogs.createdAt} >= unixepoch('now', 'localtime', '-' || ${days} || ' days')
@@ -1140,9 +1256,16 @@ export function getCostEfficiencyTrend(days = 90): DailyCostEfficiency[] {
     // Estimate cost from the model mix
     const modelIds = row.model_ids ? row.model_ids.split(',') : ['unknown']
     const promptPerModel = Math.round(row.prompt_tokens / Math.max(modelIds.length, 1))
+    const cachedInputPerModel = Math.round(row.cached_input_tokens / Math.max(modelIds.length, 1))
+    const cacheWriteInputPerModel = Math.round(row.cache_write_input_tokens / Math.max(modelIds.length, 1))
     const completionPerModel = Math.round(row.completion_tokens / Math.max(modelIds.length, 1))
     const totalCostUsd = modelIds.reduce(
-      (sum, modelId) => sum + estimateCost(modelId, { promptTokens: promptPerModel, completionTokens: completionPerModel }),
+      (sum, modelId) => sum + estimateCost(modelId, {
+        promptTokens: promptPerModel,
+        cachedInputTokens: cachedInputPerModel,
+        cacheWriteInputTokens: cacheWriteInputPerModel,
+        completionTokens: completionPerModel,
+      }),
       0,
     )
     const avgTokensPerRun = row.run_count > 0 ? Math.round(row.total_tokens / row.run_count) : 0
