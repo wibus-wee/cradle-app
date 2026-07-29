@@ -23,6 +23,7 @@
     "test:watch": "vitest",
     "dev:web": "pnpm --filter @cradle/web dev",
     "dev:mobile": "pnpm --filter @cradle/mobile start",
+    "start:mobile": "bash scripts/start-mobile.sh",
     "dev:server": "pnpm --filter @cradle/server dev",
     "dev:fullstack": "concurrently --names server,web -c blue,green \"pnpm dev:server\" \"pnpm dev:web\"",
     "dev:desktop": "pnpm --filter @cradle/desktop dev",

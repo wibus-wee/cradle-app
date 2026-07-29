@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/geist": "^0.4.1",
+    "@expo/metro-runtime": "~57.0.7",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@tanstack/react-query": "^5.101.4",
     "expo": "^57.0.8",
@@ -27,11 +28,13 @@
     "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^0.468.0",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.0",
     "react-native-markdown-display": "^7.0.2",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
