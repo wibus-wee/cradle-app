@@ -110,12 +110,95 @@ describe('plugin runtime registry', () => {
     )
     registerPluginDescriptor(descriptor)
 
-    const first = registerPluginCapability('@cradle/browser-use', 'hook', 'server', 'before-query')
-    const second = registerPluginCapability('@cradle/browser-use', 'hook', 'server', 'before-query')
+    const first = registerPluginCapability('@cradle/browser-use', 'activity-subscription', 'server', 'chat-runs')
+    const second = registerPluginCapability('@cradle/browser-use', 'activity-subscription', 'server', 'chat-runs')
 
-    expect(first.id).toBe('@cradle/browser-use:hook.before-query')
-    expect(second.id).toBe('@cradle/browser-use:hook.before-query#2')
+    expect(first.id).toBe('@cradle/browser-use:activity-subscription.chat-runs')
+    expect(second.id).toBe('@cradle/browser-use:activity-subscription.chat-runs#2')
     expect(listPluginDescriptors()[0]?.capabilities).toHaveLength(2)
+  })
+
+  it('requires external plugins to declare the exact chat run activity capability', () => {
+    const undeclared = manifest('@external/activity-undeclared', { server: 'server.mjs' })
+    const permissionless = manifest('@external/activity-permissionless', {
+      server: 'server.mjs',
+      contributes: {
+        capabilities: [{
+          id: 'chat-runs',
+          type: 'activity-subscription',
+          layer: 'server',
+          label: 'Observe chat run activity',
+          permissions: [],
+        }],
+        permissions: [],
+      },
+    })
+    const declared = manifest('@external/activity-declared', {
+      server: 'server.mjs',
+      contributes: {
+        capabilities: [{
+          id: 'chat-runs',
+          type: 'activity-subscription',
+          layer: 'server',
+          label: 'Observe chat run activity',
+          permissions: ['activity.read'],
+        }],
+        permissions: [{
+          id: 'activity.read',
+          label: 'Read Cradle activity',
+          required: true,
+        }],
+      },
+    })
+    registerPluginDescriptor(createPluginDescriptor(
+      undeclared,
+      classifyPluginSource(undeclared.packageDir, '/external/plugins', 'externalLocal'),
+    ))
+    registerPluginDescriptor(createPluginDescriptor(
+      permissionless,
+      classifyPluginSource(permissionless.packageDir, '/external/plugins', 'externalLocal'),
+    ))
+    registerPluginDescriptor(createPluginDescriptor(
+      declared,
+      classifyPluginSource(declared.packageDir, '/external/plugins', 'externalLocal'),
+    ))
+
+    expect(() => registerPluginCapability(
+      undeclared.name,
+      'activity-subscription',
+      'server',
+      'chat-runs',
+      undefined,
+      undefined,
+      undefined,
+      ['activity.read'],
+    )).toThrow('Runtime capability activity-subscription:chat-runs is not declared')
+
+    expect(() => registerPluginCapability(
+      permissionless.name,
+      'activity-subscription',
+      'server',
+      'chat-runs',
+      undefined,
+      undefined,
+      undefined,
+      ['activity.read'],
+    )).toThrow('must declare permission activity.read')
+
+    expect(registerPluginCapability(
+      declared.name,
+      'activity-subscription',
+      'server',
+      'chat-runs',
+      undefined,
+      undefined,
+      undefined,
+      ['activity.read'],
+    )).toMatchObject({
+      owner: declared.name,
+      type: 'activity-subscription',
+      layer: 'server',
+    })
   })
 
   it('classifies configured external roots as external local sources requiring trust', () => {

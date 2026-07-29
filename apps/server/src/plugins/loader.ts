@@ -330,6 +330,9 @@ async function preparePluginWebLayer(manifest: PluginManifest): Promise<void> {
 async function deactivatePluginServerLayer(pluginName: string): Promise<void> {
   const plugin = activePlugins.get(pluginName)
   activePlugins.delete(pluginName)
+  if (plugin) {
+    disposeSubscriptions(pluginName, plugin.subscriptions)
+  }
   try {
     await stopConversationBridgeConnectionsForOwner(pluginName)
   }
@@ -350,7 +353,6 @@ async function deactivatePluginServerLayer(pluginName: string): Promise<void> {
       catch (err) {
         logger.error('plugin managed process stop failed', { plugin: pluginName, err })
       }
-      disposeSubscriptions(pluginName, plugin.subscriptions)
     }
   }
   clearPluginRoutes(pluginName)

@@ -18,11 +18,10 @@ import type { DownloadCenterService } from '../modules/download-center/service'
 import type { ManagedResourceAdapter, ManagedResourceKey, ManagedResourceProjection, ManagedResourceService } from '../modules/managed-resources/service'
 import type { ProviderKind } from '../modules/provider-contracts/types'
 import { readSecret, removeSecret, upsertSecret } from '../modules/secrets/service'
+import { registerPluginActivitySubscription } from './activity-registry'
 import { registerConversationBridgeAdapter } from './conversation-adapter-registry'
-import { createPluginEventBus } from './event-bus'
 import { registerExternalIssueSource } from './external-issue-source-registry'
 import { registerExternalProviderSource } from './external-provider-source-registry'
-import { registerOwnedAfterResponseHook, registerOwnedBeforeQueryHook } from './hooks'
 import { registerPluginMcpServer } from './mcp-registry'
 import { createPluginProcessService } from './process-registry'
 import { normalizePluginRoutePath, registerPluginRoute, unregisterPluginRoute } from './route-registry'
@@ -95,7 +94,6 @@ export function createServerPluginContext(
     }
   }
 
-  const eventBus = createPluginEventBus()
   const subscriptions: Disposable[] = []
   const hostServices = options.hostServices
   const resourceNamespace = pluginResourceNamespace(routeSegment)
@@ -244,15 +242,6 @@ export function createServerPluginContext(
     },
   } satisfies ServerPluginContext['runtimes']
 
-  const chatHooks = {
-    onBeforeQuery(handler) {
-      return track(registerOwnedBeforeQueryHook(manifest.name, handler))
-    },
-    onAfterResponse(handler) {
-      return track(registerOwnedAfterResponseHook(manifest.name, handler))
-    },
-  } satisfies ServerPluginContext['hooks']['chat']
-
   const resources = {
     register(adapter) {
       if (!hostServices) { throw new Error('Plugin managed resources are unavailable in this host.') }
@@ -375,6 +364,11 @@ export function createServerPluginContext(
 
   return {
     subscriptions,
+    activities: {
+      subscribe(handler) {
+        return track(registerPluginActivitySubscription(manifest.name, handler))
+      },
+    },
     routes: {
       register: registerRoute,
     },
@@ -394,14 +388,5 @@ export function createServerPluginContext(
     logger,
     sharedConfig,
     manifest,
-    hooks: {
-      chat: chatHooks,
-    },
-    events: {
-      on(event, handler) {
-        return track(eventBus.on(event, handler))
-      },
-      emit: eventBus.emit,
-    },
   }
 }

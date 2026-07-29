@@ -107,15 +107,8 @@ function createPluginContext(sharedConfig = new Map<string, string>()): {
     },
     sharedConfig,
     manifest,
-    hooks: {
-      chat: {
-        onBeforeQuery: () => disposable,
-        onAfterResponse: () => disposable,
-      },
-    },
-    events: {
-      on: () => disposable,
-      emit() {},
+    activities: {
+      subscribe: () => disposable,
     },
   }
 

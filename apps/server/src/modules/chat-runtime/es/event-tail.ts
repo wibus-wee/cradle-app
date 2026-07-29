@@ -9,6 +9,7 @@ import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm'
 import { db } from '../../../infra'
 import { readMessagePayload } from '../message-payload-store'
 import { parseStoredMessageSnapshot } from '../ui-message'
+import { publishChatRunActivities } from './activity-tail'
 import type { MessageRecordedFact, StoredChatSessionEvent } from './events'
 import {
   isLegacyAssistantMessageSnapshottedRow,
@@ -193,6 +194,7 @@ export function publishSessionTailEvents(events: StoredChatSessionEvent[]): void
       subscriber({ event, workspaceId })
     }
   }
+  publishChatRunActivities(events)
 }
 
 export function openSessionEventTailStream(input: ChatSessionTailQuery): ReadableStream<Uint8Array> {

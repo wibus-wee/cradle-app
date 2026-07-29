@@ -7,11 +7,13 @@ import { sessionEvents, sessions, workspaces } from '@cradle/db'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
+import { subscribeChatRunActivity } from './activity-tail'
 import {
   openGlobalSessionEventTailStream,
   openSessionEventTailStream,
   openTailStream,
   publishSessionTailEvents,
+  subscribeChatSessionTail,
   toChatSessionTailEvent,
 } from './event-tail'
 import type { StoredChatSessionEvent } from './events'
@@ -383,6 +385,49 @@ describe('chat session event tail', () => {
         queueItemId: null,
       },
     })
+  })
+
+  it('publishes chat run activity exactly once after the session tail', () => {
+    const order: string[] = []
+    const unsubscribeTail = subscribeChatSessionTail('session-activity', () => {
+      order.push('tail')
+    })
+    const unsubscribeActivity = subscribeChatRunActivity(() => {
+      order.push('activity')
+    })
+
+    try {
+      publishSessionTailEvents([
+        storedEvent({
+          aggregateId: 'session-activity',
+          sequenceId: 11,
+          version: 1,
+          type: 'RunStarted',
+          payload: {
+            run: {
+              id: 'run-activity',
+              bindingId: null,
+              chatSessionId: 'session-activity',
+              messageId: 'assistant-activity',
+              origin: 'user',
+              status: 'streaming',
+              stopReason: null,
+              errorText: null,
+              startedAt: 101,
+              finishedAt: null,
+            },
+            assistantMessage: null,
+            queueItemId: null,
+          },
+        }),
+      ])
+
+      expect(order).toEqual(['tail', 'activity'])
+    }
+    finally {
+      unsubscribeActivity()
+      unsubscribeTail()
+    }
   })
 
   it('filters live global tail events by workspace without changing the event DTO', async () => {

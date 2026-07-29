@@ -29,6 +29,9 @@ export interface ServerPluginContext {
   /** Disposables that the host releases when this plugin layer deactivates */
   subscriptions: Disposable[]
 
+  /** Live, post-commit Cradle activity metadata */
+  activities: PluginActivitySubscription
+
   /** Plugin-scoped persistent KV storage */
   storage: PluginStorage
 
@@ -59,11 +62,6 @@ export interface ServerPluginContext {
   /** Plugin manifest metadata */
   manifest: PluginManifest
 
-  /** Chat lifecycle hooks */
-  hooks: ServerPluginHooks
-
-  /** Event bus — subscribe to host-emitted events */
-  events: PluginEventBus
 }
 
 export type PluginManagedResourceState
@@ -687,53 +685,26 @@ export interface PluginStorage {
   delete: (key: string) => Promise<void>
 }
 
-/** Chat lifecycle hooks — intercept/observe agent queries */
-export interface ServerPluginHooks {
-  /** Chat lifecycle hooks grouped under a domain namespace */
-  chat: ServerPluginChatHooks
-}
+export type PluginActivity
+  = | {
+    kind: 'chat.run.started'
+    occurredAt: number
+    sessionId: string
+    runId: string
+    origin: 'user' | 'issue-agent' | 'system'
+  }
+  | {
+    kind: 'chat.run.finished'
+    occurredAt: number
+    sessionId: string
+    runId: string
+    outcome: 'completed' | 'failed' | 'aborted'
+  }
 
-export interface ServerPluginChatHooks {
-  /** Called before an agent query is executed. Can modify the query context. */
-  onBeforeQuery: (handler: BeforeQueryHandler) => Disposable
-  /** Called after an agent response is received (observation only). */
-  onAfterResponse: (handler: AfterResponseHandler) => Disposable
-}
+export type PluginActivityHandler = (activity: PluginActivity) => void | Promise<void>
 
-export type BeforeQueryHandler = (
-  ctx: QueryHookContext,
-) => QueryHookContext | Promise<QueryHookContext>
-
-export interface QueryHookContext {
-  /** Messages to send to the agent */
-  messages: Array<{ role: string, content: string }>
-  /** Model being used */
-  model: string
-  /** Thread ID */
-  threadId: string
-  /** Additional metadata plugins can attach */
-  metadata: Record<string, unknown>
-}
-
-export type AfterResponseHandler = (ctx: ResponseHookContext) => void | Promise<void>
-
-export interface ResponseHookContext {
-  /** Thread ID */
-  threadId: string
-  /** Model used */
-  model: string
-  /** Usage stats if available */
-  usage?: { inputTokens: number, outputTokens: number }
-  /** Duration in ms */
-  durationMs: number
-}
-
-/** Event bus for plugin-to-host communication */
-export interface PluginEventBus {
-  /** Subscribe to a host event */
-  on: (event: string, handler: (data: unknown) => void) => Disposable
-  /** Emit an event (other plugins and host can listen) */
-  emit: (event: string, data: unknown) => void
+export interface PluginActivitySubscription {
+  subscribe: (handler: PluginActivityHandler) => Disposable
 }
 
 /** Server plugin module shape */

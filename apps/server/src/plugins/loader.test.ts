@@ -11,6 +11,7 @@ import { Elysia } from 'elysia'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { db } from '../infra'
+import { publishChatRunActivities } from '../modules/chat-runtime/es/activity-tail'
 import { resolveCodexRuntimeContext } from '../modules/chat-runtime-providers/codex/config/runtime-context'
 import { ManagedResourceService } from '../modules/managed-resources/service'
 import { setAppPreferences } from '../modules/preferences/service'
@@ -219,6 +220,76 @@ describe('server plugin loader lifecycle', () => {
 
     expect(getRegisteredMcpServers()).not.toHaveProperty('loader-cleanup')
     expect(listPluginDescriptors()[0]?.capabilities).toHaveLength(0)
+  })
+
+  it('detaches activity subscriptions before awaiting plugin deactivation', async () => {
+    const testGlobal = globalThis as typeof globalThis & {
+      __cradleLoaderActivityCalls?: string[]
+      __cradleLoaderDeactivateGate?: Promise<void>
+    }
+    let releaseDeactivate: () => void = () => {}
+    testGlobal.__cradleLoaderDeactivateGate = new Promise<void>((resolve) => {
+      releaseDeactivate = resolve
+    })
+    tempPluginsDir = await writePluginPackage({
+      contributes: {
+        capabilities: [{
+          id: 'chat-runs',
+          type: 'activity-subscription',
+          layer: 'server',
+          permissions: ['activity.read'],
+        }],
+        permissions: [{
+          id: 'activity.read',
+          required: true,
+        }],
+      },
+      serverSource: [
+        'export function activate(ctx) {',
+        '  globalThis.__cradleLoaderActivityCalls = []',
+        '  ctx.activities.subscribe(activity => globalThis.__cradleLoaderActivityCalls.push(activity.kind))',
+        '}',
+        'export async function deactivate() {',
+        '  await globalThis.__cradleLoaderDeactivateGate',
+        '}',
+      ].join('\n'),
+    })
+    process.env.CRADLE_PLUGINS_DIR = tempPluginsDir
+    process.env.CRADLE_PLUGINS_SOURCE_KIND = 'workspaceDev'
+
+    await activateServerPlugins(new Elysia())
+    const disabling = disablePlugin('@cradle/loader-cleanup')
+    publishChatRunActivities([{
+      sequenceId: 1,
+      aggregateId: 'session-1',
+      aggregateType: 'ChatSession',
+      subjectRunId: 'run-1',
+      version: 1,
+      occurredAt: 101,
+      type: 'RunStarted',
+      payload: {
+        run: {
+          id: 'run-1',
+          bindingId: null,
+          chatSessionId: 'session-1',
+          messageId: 'assistant-1',
+          origin: 'user',
+          status: 'streaming',
+          stopReason: null,
+          errorText: null,
+          startedAt: 101,
+          finishedAt: null,
+        },
+        assistantMessage: null,
+        queueItemId: null,
+      },
+    }])
+
+    expect(testGlobal.__cradleLoaderActivityCalls).toEqual([])
+    releaseDeactivate()
+    await disabling
+    delete testGlobal.__cradleLoaderActivityCalls
+    delete testGlobal.__cradleLoaderDeactivateGate
   })
 
   it('discovers disabled plugins without activating their server or serving their web bundle', async () => {
