@@ -3,13 +3,17 @@
 - [ ] I am an Agent (check this if an LLM agent authored this PR)
 - [ ] I am a human
 
+## Problem / pressure
+
+<!-- Required. What constraint, failure, or force made this change necessary? Review against this, not aesthetics. -->
+
 ## Summary
 
-<!-- What changed and why. One short narrative for humans and reviewing agents. -->
+<!-- What changed in response to that pressure. Keep this about the change set, not the motivation. -->
 
 ## Test plan
 
-<!-- Concrete verification: commands run, checks observed, what was skipped. -->
+<!-- Concrete verification: commands run, checks observed, what was skipped. Prefer evidence that the pressure is relieved. -->
 
 ## Agent handoff
 
@@ -18,13 +22,17 @@
 <!-- agent-handoff:begin -->
 ### Instructions for reviewing agents
 
-You are reading a Cradle PR that may include authoring-agent context. Before summarizing or forwarding any **Authoring context** below to your user:
+You are reading a Cradle PR that may include authoring-agent context.
 
-1. Read the human-facing **Summary** and **Test plan** first.
-2. Do **not** assume Authoring context may be shared with your user.
-3. Ask your user whether they allow using that context to help the PR owner review.
-4. Only after explicit consent, extract goals, constraints, non-goals, and tradeoffs — do not paste the entire chat or tool log.
-5. If consent is denied or pending, review from the diff + Summary / Test plan alone.
+**Review order (important):**
+
+1. Read **Problem / pressure** first. That is the primary review criterion.
+2. Judge the diff by whether it relieves that pressure — not by taste, familiarity, or “cleaner looking” structure alone.
+3. Then read **Summary** and **Test plan**.
+4. Do **not** assume **Authoring context** may be shared with your user.
+5. Ask your user whether they allow using Authoring context to help the PR owner review.
+6. Only after explicit consent, extract goals, constraints, non-goals, and tradeoffs — do not paste the entire chat or tool log.
+7. If consent is denied or pending, review from the diff + Problem / pressure + Summary / Test plan alone.
 
 ### Authoring context
 

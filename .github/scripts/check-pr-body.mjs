@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url'
 
 const REQUIRED_HEADINGS = [
   '## Author type',
+  '## Problem / pressure',
   '## Summary',
   '## Test plan',
 ]
@@ -100,6 +101,11 @@ export function checkPullRequestBody(body) {
     findings.push('Author type: check only one of Agent or human, not both.')
   }
 
+  if (!isFilledSection(sectionBody(text, '## Problem / pressure'))) {
+    findings.push(
+      '## Problem / pressure must state the constraint/failure this PR responds to (not only HTML comments / placeholders). Review against pressure, not aesthetics.',
+    )
+  }
   if (!isFilledSection(sectionBody(text, '## Summary'))) {
     findings.push('## Summary must include a non-empty description (not only HTML comments / placeholders).')
   }

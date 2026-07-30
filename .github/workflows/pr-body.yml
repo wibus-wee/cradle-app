@@ -54,6 +54,7 @@ jobs:
               'Please update the description to follow `.github/PULL_REQUEST_TEMPLATE.md`:',
               '',
               '- Check **Author type** (`I am an Agent` or `I am a human`)',
+              '- Fill **Problem / pressure** (the constraint this PR responds to — review against pressure, not aesthetics)',
               '- Fill **Summary** and **Test plan**',
               '- If you are an Agent: keep the **Agent handoff** block (reviewing-agent instructions, authoring context, sharing consent)',
               '',
