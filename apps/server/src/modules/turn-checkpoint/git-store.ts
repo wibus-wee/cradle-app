@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -134,7 +135,15 @@ export async function restoreCheckpoint(cwd: string, ref: string): Promise<boole
 }
 
 export async function deleteCheckpointRefs(cwd: string, refs: string[]): Promise<void> {
+  try {
+    await access(cwd, constants.F_OK)
+  }
+  catch {
+    // Worktree was removed out-of-band; hidden refs are unreachable.
+    return
+  }
+
   for (const ref of refs) {
-    await runGit(cwd, ['update-ref', '-d', ref])
+    await runGit(cwd, ['update-ref', '-d', ref], { allowNonZero: true })
   }
 }

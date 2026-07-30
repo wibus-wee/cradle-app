@@ -1,3 +1,4 @@
+import type { ChatMessagePartBoundary } from '@cradle/chat-runtime-contracts'
 import type { UIMessage } from 'ai'
 import isEqual from 'fast-deep-equal'
 
@@ -325,7 +326,10 @@ function buildTailMessage(source: UIMessage, splitParts: MessagePart[], tailId: 
 }
 
 /** Remainder of `source` after consuming an absolute `split` prefix (text/reasoning aware). */
-export function projectTailParts(source: MessagePart[], split: MessagePart[]): MessagePart[] {
+export function projectTailParts(
+  source: MessagePart[],
+  split: ChatMessagePartBoundary[],
+): MessagePart[] {
   let sourceIdx = 0
 
   for (const splitPart of split) {
@@ -343,28 +347,49 @@ export function projectTailParts(source: MessagePart[], split: MessagePart[]): M
   return trimLeadingEmpty(source.slice(sourceIdx))
 }
 
-function isSameStreamPart(a: MessagePart, b: MessagePart): boolean {
+/** Prefix of `source` consumed at an absolute split boundary. */
+export function projectHeadParts(
+  source: MessagePart[],
+  split: ChatMessagePartBoundary[],
+): MessagePart[] {
+  const head: MessagePart[] = []
+
+  for (let sourceIdx = 0; sourceIdx < split.length; sourceIdx++) {
+    const sourcePart = source[sourceIdx]
+    const splitPart = split[sourceIdx]
+    if (!sourcePart || !splitPart || !isSameStreamPart(sourcePart, splitPart)) {
+      break
+    }
+    head.push(getPartPrefix(sourcePart, splitPart))
+  }
+
+  return trimTrailingEmptyParts(head)
+}
+
+function isSameStreamPart(a: MessagePart, b: ChatMessagePartBoundary): boolean {
   if (a.type !== b.type) {
     return false
   }
   if (isToolPart(a)) {
-    return getToolCallId(a) === getToolCallId(b)
+    return getToolCallId(a) === b.toolCallId
   }
   return true
 }
 
-function getPartRemainder(source: MessagePart, split: MessagePart): MessagePart | null {
+function getPartRemainder(
+  source: MessagePart,
+  split: ChatMessagePartBoundary,
+): MessagePart | null {
   if (source.type === 'text' && split.type === 'text') {
     const s = (source as { text: string }).text
-    const p = (split as { text: string }).text
+    const p = split.text ?? ''
     const rest = s.startsWith(p) ? s.slice(p.length) : s
     return rest ? { ...source, text: rest } as MessagePart : null
   }
   if (source.type === 'reasoning' && split.type === 'reasoning') {
     const sourceReasoningPart = source as ReasoningMessagePart
-    const splitReasoningPart = split as ReasoningMessagePart
     const sText = sourceReasoningPart.text ?? sourceReasoningPart.reasoning ?? ''
-    const pText = splitReasoningPart.text ?? splitReasoningPart.reasoning ?? ''
+    const pText = split.text ?? split.reasoning ?? ''
     const rest = sText.startsWith(pText) ? sText.slice(pText.length) : sText
     if (!rest) {
       return null
@@ -376,18 +401,37 @@ function getPartRemainder(source: MessagePart, split: MessagePart): MessagePart 
   return null
 }
 
-function isEmptyPart(part: MessagePart): boolean {
+function getPartPrefix(
+  source: MessagePart,
+  split: ChatMessagePartBoundary,
+): MessagePart {
+  if (source.type === 'text' && split.type === 'text') {
+    return { ...source, text: split.text ?? '' }
+  }
+  if (source.type === 'reasoning' && split.type === 'reasoning') {
+    const sourceReasoningPart = source as ReasoningMessagePart
+    const splitText = split.text ?? split.reasoning ?? ''
+    return sourceReasoningPart.text !== undefined
+      ? { ...source, text: splitText } as MessagePart
+      : { ...source, reasoning: splitText } as MessagePart
+  }
+  return source
+}
+
+type EmptyCheckPart = ChatMessagePartBoundary | MessagePart
+
+function isEmptyPart(part: EmptyCheckPart): boolean {
   if (part.type === 'text') {
-    return !(part as { text: string }).text
+    return !(part as { text?: string }).text
   }
   if (part.type === 'reasoning') {
-    const reasoningPart = part as ReasoningMessagePart
+    const reasoningPart = part as { text?: string, reasoning?: string }
     return !(reasoningPart.text || reasoningPart.reasoning)
   }
   return false
 }
 
-export function trimTrailingEmptyParts(parts: MessagePart[]): MessagePart[] {
+export function trimTrailingEmptyParts<Part extends EmptyCheckPart>(parts: Part[]): Part[] {
   let end = parts.length
   while (end > 0 && isEmptyPart(parts[end - 1])) {
     end--

@@ -11,6 +11,9 @@ export function hasHeroContent(
   if (errorText) {
     return true
   }
+  if (input.truncatedOriginalChars !== null || output.truncatedOriginalChars !== null) {
+    return true
+  }
   switch (descriptor.kind) {
     case 'terminal':
       return !!errorText

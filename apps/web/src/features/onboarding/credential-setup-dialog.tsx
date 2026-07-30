@@ -1,4 +1,4 @@
-import { ArrowRightLine as ArrowRightIcon, ShuffleLine as ShuffleIcon } from '@mingcute/react'
+import { ArrowRightLine as ArrowRightIcon, CheckCircleLine as CheckIcon } from '@mingcute/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -7,7 +7,6 @@ import {
   getExternalProviderSourcesOptions,
   getExternalProviderSourcesRecordsOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
-import { ProviderIcon } from '~/components/common/provider-icons'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -16,194 +15,247 @@ import {
   DialogFooter,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { toastManager } from '~/components/ui/toast'
-import { PROVIDER_PRESETS } from '~/features/agent-management/provider-templates'
+import { DraftSetupPanel } from '~/features/agent-management/draft-setup-panel'
+import type { DraftProvider } from '~/features/agent-management/provider-settings-utils'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
-import { useCredentialSetupStore } from '~/features/onboarding/credential-setup-store'
-import { useOnboardingStore } from '~/features/onboarding/onboarding-store'
+import { GithubAppConnectionView } from '~/features/settings/github-app-connection-view'
+import { useGithubAppConnectionController } from '~/features/settings/use-github-app-connection-controller'
 import { cn } from '~/lib/cn'
-import { openSettingsSection } from '~/navigation/navigation-commands'
+
+import type { FirstRunSetupStepKey } from './credential-setup-store'
+import {
+  areAllFirstRunSetupStepsCompleted,
+  isFirstRunSetupStepCompleted,
+  resolvePendingFirstRunSetupSteps,
+  useFirstRunSetupStore,
+} from './credential-setup-store'
+import { useOnboardingStore } from './onboarding-store'
+
+type DialogStep = FirstRunSetupStepKey | 'done'
 
 const CC_SWITCH_SOURCE_ID = 'cc-switch'
 
-interface Row {
-  key: string
-  kind: 'cc-switch' | 'preset'
-  presetId?: string
-  name: string
-  description: string
-  ready?: boolean
-  onSelect: () => void
-}
-
 /**
- * First-run credential setup dialog.
+ * First-run setup dialog keyed by step.
  *
- * Surfaced after onboarding completes. Lets the user either jump into the
- * Providers settings to configure an API key, adopt their existing cc-switch
- * setup (Cradle reads it directly — no import needed), or skip. Once the user
- * acts (or once we detect existing providers), the gate store is marked
- * complete and the dialog stops appearing.
- *
- * Mount once near the app root; it manages its own visibility.
+ * Opens whenever brand onboarding is done and at least one step key is still
+ * pending (not completed in the store and not environmentally satisfied).
+ * Completing or skipping a step writes that key; dismiss writes all remaining
+ * keys from the current session queue.
  */
 export function CredentialSetupDialog() {
   const { t } = useTranslation('onboarding')
   const onboardingCompleted = useOnboardingStore(s => s.completed)
-  const setupCompleted = useCredentialSetupStore(s => s.completed)
-  const complete = useCredentialSetupStore(s => s.complete)
-  const skip = useCredentialSetupStore(s => s.skip)
+  const completedSteps = useFirstRunSetupStore(s => s.completedSteps)
+  const completeStep = useFirstRunSetupStore(s => s.completeStep)
+  const completeSteps = useFirstRunSetupStore(s => s.completeSteps)
 
   const { providerOptions, isSuccess: targetsReady } = useProviderTargets()
+  const { data: externalSources = [], isSuccess: sourcesReady } = useQuery(getExternalProviderSourcesOptions())
+  const { data: externalRecords = [], isSuccess: recordsReady } = useQuery(getExternalProviderSourcesRecordsOptions())
+  const github = useGithubAppConnectionController()
 
-  const { data: externalSources = [] } = useQuery(getExternalProviderSourcesOptions())
-  const { data: externalRecords = [] } = useQuery(getExternalProviderSourcesRecordsOptions())
+  const hasExternalProviderData = useMemo(() => {
+    const sources = externalSources as Array<{ sourceId?: string }>
+    const records = externalRecords as Array<{ sourceKind?: string, sourceKey?: string }>
+    return records.length > 0
+      || sources.some(source => source.sourceId === CC_SWITCH_SOURCE_ID)
+      || records.some(record => record.sourceKind === CC_SWITCH_SOURCE_ID || record.sourceKey === CC_SWITCH_SOURCE_ID)
+  }, [externalRecords, externalSources])
 
-  const ccSwitchDetected = useMemo(
-    () =>
-      (externalSources as Array<{ sourceId?: string }>).some(
-        source => source.sourceId === CC_SWITCH_SOURCE_ID,
-      )
-      || (externalRecords as Array<{ sourceKind?: string, sourceKey?: string }>).some(
-        record => record.sourceKind === CC_SWITCH_SOURCE_ID,
-      ),
-    [externalSources, externalRecords],
+  const providerSatisfied = targetsReady && (providerOptions.length > 0 || hasExternalProviderData)
+  const githubSatisfied = github.isConnected
+  const inventoryReady = targetsReady && sourcesReady && recordsReady && !github.loading
+
+  const pendingSteps = useMemo(
+    () => resolvePendingFirstRunSetupSteps({
+      completedSteps,
+      providerSatisfied,
+      githubSatisfied,
+    }),
+    [completedSteps, githubSatisfied, providerSatisfied],
   )
 
-  // Already configured? Silently mark complete so we never nag returning users.
+  const [sessionActive, setSessionActive] = useState(false)
+  const [step, setStep] = useState<DialogStep | null>(null)
+  const [sessionQueue, setSessionQueue] = useState<FirstRunSetupStepKey[]>([])
+  const [draft, setDraft] = useState<DraftProvider>({ id: 'first-run-draft', presetId: null })
+
   useEffect(() => {
-    // return
-    if (!setupCompleted && targetsReady && providerOptions.length > 0) {
-      complete()
+    if (!onboardingCompleted || !inventoryReady || pendingSteps.length === 0 || sessionActive) {
+      return
     }
-  }, [setupCompleted, targetsReady, providerOptions.length, complete])
+    setSessionActive(true)
+    setSessionQueue(pendingSteps)
+    setStep(pendingSteps[0] ?? 'done')
+  }, [inventoryReady, onboardingCompleted, pendingSteps, sessionActive])
 
-  const open = onboardingCompleted && !setupCompleted
-  // const open = true
-  const [busy] = useState(false)
+  const open = onboardingCompleted && sessionActive
 
-  function handleConfigurePreset() {
-    complete()
-    openSettingsSection('providers')
-    toastManager.add({
-      type: 'success',
-      title: t('credentials.toast.opening.title'),
-      description: t('credentials.toast.opening.description'),
-    })
+  const visibleSteps: DialogStep[] = sessionQueue.length > 0 ? [...sessionQueue, 'done'] : ['done']
+  const stepIndex = step ? visibleSteps.indexOf(step) : -1
+
+  function closeSession() {
+    setSessionActive(false)
+    setStep(null)
+    setSessionQueue([])
+    setDraft({ id: 'first-run-draft', presetId: null })
   }
 
-  function handleUseCcSwitch() {
-    complete()
-    toastManager.add({
-      type: 'success',
-      title: t('credentials.toast.ccSwitch.title'),
-      description: t('credentials.toast.ccSwitch.description'),
-    })
+  function dismissRemaining() {
+    const remaining = sessionQueue.filter(key => !isFirstRunSetupStepCompleted(completedSteps, key))
+    if (remaining.length > 0) {
+      completeSteps(remaining)
+    }
+    closeSession()
   }
 
-  function handleSkip() {
-    skip()
+  function advanceFrom(current: FirstRunSetupStepKey) {
+    completeStep(current)
+    const currentIndex = sessionQueue.indexOf(current)
+    const next = currentIndex >= 0 ? sessionQueue[currentIndex + 1] : undefined
+    setStep(next ?? 'done')
   }
-
-  const rows: Row[] = [
-    ...(ccSwitchDetected
-      ? [{
-          key: 'cc-switch',
-          kind: 'cc-switch' as const,
-          name: 'CC-Switch',
-          description: t('credentials.ccSwitch.description'),
-          ready: true,
-          onSelect: handleUseCcSwitch,
-        }]
-      : []),
-    ...PROVIDER_PRESETS.map(preset => ({
-      key: preset.id,
-      kind: 'preset' as const,
-      presetId: preset.id,
-      name: preset.name,
-      description: t(`credentials.providers.${preset.id}.tagline`, preset.tagline),
-      onSelect: handleConfigurePreset,
-    })),
-  ]
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) { handleSkip() } }}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]" showCloseButton={false}>
-        {/* Header */}
-        <div className="px-5 pt-5 pb-4">
-          <DialogTitle className="font-heading text-base font-semibold tracking-tight" style={{ textWrap: 'balance' }}>
-            {t('credentials.welcomeTitle')}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          dismissRemaining()
+        }
+      }}
+    >
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[520px]" showCloseButton={false}>
+        <div className="px-5 pt-5 pb-3">
+          <div className="mb-3 flex items-center gap-1.5">
+            {Array.from({ length: Math.max(visibleSteps.length, 1) }, (_, index) => (
+              <span
+                key={index}
+                className={cn(
+                  'h-1 flex-1 rounded-full transition-colors duration-150',
+                  index <= stepIndex
+                    ? 'bg-foreground'
+                    : 'bg-muted',
+                )}
+              />
+            ))}
+          </div>
+          <DialogTitle className="font-heading text-base font-semibold tracking-tight text-balance">
+            {step === 'github'
+              ? t('setup.github.title')
+              : step === 'done'
+                ? t('setup.done.title')
+                : t('setup.provider.title')}
           </DialogTitle>
-          <DialogDescription className="mt-1 text-[13px]" style={{ textWrap: 'pretty' }}>
-            {t('credentials.description')}
+          <DialogDescription className="mt-1 text-[13px] text-pretty">
+            {step === 'github'
+              ? t('setup.github.description')
+              : step === 'done'
+                ? t('setup.done.description')
+                : t('setup.provider.description')}
           </DialogDescription>
         </div>
 
-        {/* Unified list — one hairline-bordered surface, divide-y rows. Vercel-style. */}
-        <div className="px-2.5 pb-2.5">
-          <div className="overflow-hidden rounded-lg border border-border divide-y divide-border">
-            {rows.map(row => (
-              <button
-                key={row.key}
-                type="button"
-                onClick={row.onSelect}
-                className={cn(
-                  'group flex w-full items-center gap-3 px-3 py-2.5 text-left',
-                  'transition-colors duration-150 hover:bg-muted/60 active:bg-muted',
-                )}
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-foreground">
-                  {row.kind === 'cc-switch'
-                    ? <ShuffleIcon className="size-4" />
-                    : <ProviderIcon presetId={row.presetId!} className="size-4" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-medium leading-tight">{row.name}</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">{row.description}</span>
-                </span>
+        <div className="max-h-[min(60vh,480px)] overflow-y-auto px-5 pb-4">
+          {step === null || !inventoryReady
+            ? (
+                <p className="py-6 text-center text-[13px] text-muted-foreground">
+                  {t('setup.loading')}
+                </p>
+              )
+            : null}
 
-                {row.ready && (
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-emerald-500" />
-                    <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      {t('credentials.ready')}
-                    </span>
-                  </span>
-                )}
-
-                <ArrowRightIcon
-                  className={cn(
-                    'size-4 shrink-0 transition-colors duration-150',
-                    'text-muted-foreground/60 group-hover:text-foreground',
-                  )}
+          {step === 'provider'
+            ? (
+                <DraftSetupPanel
+                  draft={draft}
+                  onSelectPreset={presetId => setDraft(prev => ({ ...prev, presetId: presetId || null }))}
+                  onComplete={() => advanceFrom('provider')}
+                  onCancel={() => advanceFrom('provider')}
                 />
-              </button>
-            ))}
-          </div>
+              )
+            : null}
+
+          {step === 'github'
+            ? (
+                <div className="space-y-3">
+                  <GithubAppConnectionView
+                    embedded
+                    connection={github.connection}
+                    pendingLogin={github.pendingLogin}
+                    loading={github.loading}
+                    connecting={github.connecting}
+                    disconnecting={github.disconnecting}
+                    labels={github.labels}
+                    onInstall={github.onInstall}
+                    onConnect={github.onConnect}
+                    onContinueInBrowser={github.onContinueInBrowser}
+                    onCancel={github.onCancel}
+                    onDisconnect={github.onDisconnect}
+                  />
+                  {!github.isConnected
+                    ? (
+                        <p className="text-[12px] text-muted-foreground text-pretty">
+                          {t('setup.github.skipHint')}
+                        </p>
+                      )
+                    : null}
+                </div>
+              )
+            : null}
+
+          {step === 'done'
+            ? (
+                <div className="flex flex-col items-center gap-3 py-6 text-center">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground">
+                    <CheckIcon className="size-5" aria-hidden="true" />
+                  </span>
+                  <p className="text-[13px] text-muted-foreground text-pretty">
+                    {github.isConnected
+                      ? t('setup.done.bodyWithGithub')
+                      : t('setup.done.bodyWithoutGithub')}
+                  </p>
+                </div>
+              )
+            : null}
         </div>
 
-        {/* Footer — divider stays a hairline border (layout separation, not depth) */}
         <DialogFooter variant="bare" className="justify-between border-t border-border px-4 py-3 sm:justify-between">
-          <Button variant="ghost" size="sm" onClick={handleSkip} className="h-7 text-xs text-muted-foreground">
-            {t('credentials.skip')}
+          <Button variant="ghost" size="sm" onClick={dismissRemaining} className="h-7 text-xs text-muted-foreground">
+            {t('setup.skip')}
           </Button>
-          <Button
-            variant="link"
-            size="sm"
-            className="h-7 gap-1 text-xs text-muted-foreground"
-            onClick={() => openSettingsSection('providers')}
-            disabled={busy}
-          >
-            {t('credentials.openSettings')}
-            <ArrowRightIcon className="size-3.5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {step === 'provider'
+              ? (
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => advanceFrom('provider')}>
+                    {t('setup.provider.skip')}
+                  </Button>
+                )
+              : null}
+            {step === 'github'
+              ? (
+                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => advanceFrom('github')}>
+                    {github.isConnected ? t('setup.continue') : t('setup.github.continueAnyway')}
+                    <ArrowRightIcon className="size-3.5" />
+                  </Button>
+                )
+              : null}
+            {step === 'done'
+              ? (
+                  <Button size="sm" className="h-7 text-xs" onClick={closeSession}>
+                    {t('setup.finish')}
+                  </Button>
+                )
+              : null}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-/** Convenience for parents that want to render a "you're all set" affordance after setup. */
+/** True when every known setup step key has been completed or skipped. */
 export function useCredentialSetupDone() {
-  return useCredentialSetupStore(s => s.completed && !s.skipped)
+  return useFirstRunSetupStore(s => areAllFirstRunSetupStepsCompleted(s.completedSteps))
 }

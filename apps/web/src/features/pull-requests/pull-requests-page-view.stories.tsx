@@ -29,7 +29,7 @@ const meta = {
     entries: pullRequestEntriesFixture,
     viewer: pullRequestViewerFixture,
     pending: false,
-    authRequired: false,
+    errorKind: null,
     authoredFeed: {
       ...idleFeed,
       hasNextPage: true,
@@ -67,7 +67,16 @@ export const GitHubAuthenticationRequired: Story = {
   args: {
     entries: [],
     viewer: null,
-    authRequired: true,
+    errorKind: 'cli-auth-required',
+    selectedRef: undefined,
+  },
+}
+
+export const GitHubAppConnectionExpired: Story = {
+  args: {
+    entries: [],
+    viewer: null,
+    errorKind: 'app-connection-expired',
     selectedRef: undefined,
   },
 }

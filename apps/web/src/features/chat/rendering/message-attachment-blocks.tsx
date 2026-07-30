@@ -1,6 +1,7 @@
 import { FileLine as FileIcon, PicLine as ImageIcon } from '@mingcute/react'
 
 import { Button } from '~/components/ui/button'
+import { resolveBlobContentUrl } from '~/features/assets/blob-url'
 import { cn } from '~/lib/cn'
 
 import { AppshotAttachmentCard } from '../composer/appshot-attachment'
@@ -27,24 +28,32 @@ const FILE_ATTACHMENT_CLASS
 
 export function FileAttachmentBlock({
   part,
+  sessionId,
   onClick,
 }: {
   part: FileMessagePart
+  sessionId?: string | null
   onClick?: () => void
 }) {
   const label = part.filename ?? part.mediaType
   const isImage = part.mediaType.startsWith('image/')
   const appshotMetadata = readCradleAppshotMetadata(part)
+  const imageSrc = sessionId ? resolveBlobContentUrl(part.url, sessionId) : part.url
 
   if (appshotMetadata) {
-    return <AppshotAttachmentCard variant="thread" metadata={appshotMetadata} />
+    return (
+      <AppshotAttachmentCard
+        variant="thread"
+        metadata={{ ...appshotMetadata, imageDataUrl: imageSrc }}
+      />
+    )
   }
 
   const content = (
     <>
       {isImage && (
         <img
-          src={part.url}
+          src={imageSrc}
           alt={label}
           className="h-auto max-h-48 w-full max-w-full object-cover"
           loading="lazy"

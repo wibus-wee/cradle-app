@@ -144,7 +144,7 @@ export function PullRequestHeaderActionsView({
   return (
     <>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-col items-end justify-end gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={pending.review}>
               <Button type="button" variant="outline" size="xs" className="gap-1.5">

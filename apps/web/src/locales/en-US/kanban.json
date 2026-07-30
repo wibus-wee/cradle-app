@@ -182,6 +182,7 @@
   "subIssue.openAria": "Open sub-issue {{title}}",
   "subIssue.titleAria": "Sub-issue title",
   "subIssue.titlePlaceholder": "Sub-issue title",
+  "table.title": "Title",
   "toolbar.count": "{{count}} issues",
   "toolbar.countFiltered": "{{count}} of {{total}}",
   "toolbar.searchClear": "Clear search",

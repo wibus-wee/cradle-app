@@ -10,7 +10,7 @@ The Cradle Plugin System runs across **3 runtime layers**:
 
 | Layer | Runtime | Entry Point | Capabilities |
 |-------|---------|-------------|-------------|
-| **Server** | Node.js (Elysia) | `src/server.ts` | HTTP routes, MCP servers, skills, external provider sources, external issue sources, Chat/Jarvis runtimes, hooks, events, KV storage |
+| **Server** | Node.js (Elysia) | `src/server.ts` | HTTP routes, MCP servers, skills, external provider sources, external issue sources, Chat/Jarvis runtimes, activity subscriptions, KV storage |
 | **Web** | Browser (React) | `dist/web.mjs` | UI panels, commands, localStorage |
 | **Desktop** | Electron main | `src/desktop.ts` | System-level access, CDP, IPC, shared config |
 
@@ -198,7 +198,7 @@ External local trust is bound to the package checksum. If package contents chang
 
 ### Host Activation vs Plugin Settings
 
-Cradle owns plugin package activation. Host activation answers whether the package is active at all: whether Cradle imports the server entry, serves the web bundle, dispatches plugin routes, and keeps runtime registrations such as MCP servers, skills, hooks, provider sources, and issue sources.
+Cradle owns plugin package activation. Host activation answers whether the package is active at all: whether Cradle imports the server entry, serves the web bundle, dispatches plugin routes, and keeps runtime registrations such as MCP servers, skills, activity subscriptions, provider sources, and issue sources.
 
 Plugin-owned settings answer what an active plugin should do. They belong in plugin storage or plugin-specific APIs. For example, Nowledge Mem may expose its own `enabled` setting, but that setting is not the same as Cradle's activation policy. A disabled package cannot serve its web bundle or private server routes, so management UI for activation must live in Cradle's app-owned plugin management surface, not inside the plugin panel.
 
@@ -530,62 +530,67 @@ export function activate(ctx: ServerPluginContext): void {
 
 `runtimeKind` must match `myRuntimeProvider.runtimeKind`. `providerKinds` controls which Cradle provider targets are selectable for this runtime. `surfaces` controls where the runtime appears; use `['chat', 'jarvis']` when the same runtime can back both ordinary Chat sessions and Jarvis sessions.
 
-### `ctx.hooks` — Chat Lifecycle Hooks
+### `ctx.activities` — Chat Run Activity
 
-Intercept or observe LLM interactions:
+Observe committed Chat Runtime run lifecycle metadata:
 
 ```ts
 export function activate(ctx: ServerPluginContext): void {
-  // Modify queries before they reach the LLM
-  const dispose1 = ctx.hooks.chat.onBeforeQuery((queryCtx) => {
-    // Add system context
-    queryCtx.metadata.myPlugin = { injectedAt: Date.now() }
-    return queryCtx // Must return the (possibly modified) context
-  })
-
-  // Observe responses (read-only)
-  const dispose2 = ctx.hooks.chat.onAfterResponse((responseCtx) => {
-    console.log(`Model ${responseCtx.model} responded in ${responseCtx.durationMs}ms`)
-    if (responseCtx.usage) {
-      console.log(`Tokens: ${responseCtx.usage.inputTokens} in, ${responseCtx.usage.outputTokens} out`)
+  ctx.activities.subscribe(async (activity) => {
+    if (activity.kind === 'chat.run.started' && activity.origin === 'user') {
+      await recordHeartbeat(activity.sessionId, activity.occurredAt)
     }
   })
 }
 ```
 
-**`QueryHookContext` fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `messages` | `Array<{role, content}>` | Messages being sent to the LLM |
-| `model` | `string` | Model identifier |
-| `threadId` | `string` | Conversation thread ID |
-| `metadata` | `Record<string, unknown>` | Extensible metadata bag |
-
-**`ResponseHookContext` fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `threadId` | `string` | Thread ID |
-| `model` | `string` | Model used |
-| `usage` | `{inputTokens, outputTokens}?` | Token usage stats |
-| `durationMs` | `number` | Response duration in ms |
-
-### `ctx.events` — Event Bus
-
-Subscribe to and emit events across plugins:
+The first activity contract has two events:
 
 ```ts
-export function activate(ctx: ServerPluginContext): void {
-  // Subscribe to events
-  const disposable = ctx.events.on('thread.created', (data) => {
-    console.log('New thread:', data)
-  })
+type PluginActivity =
+  | {
+      kind: 'chat.run.started'
+      occurredAt: number
+      sessionId: string
+      runId: string
+      origin: 'user' | 'issue-agent' | 'system'
+    }
+  | {
+      kind: 'chat.run.finished'
+      occurredAt: number
+      sessionId: string
+      runId: string
+      outcome: 'completed' | 'failed' | 'aborted'
+    }
+```
 
-  // Emit events (other plugins can listen)
-  ctx.events.emit('my-plugin.ready', { version: '1.0' })
+Delivery is live-only, post-commit, and metadata-only. Handlers are invoked synchronously in host publication order, but returned promises are not awaited and may overlap. A synchronous throw or rejected promise is logged without stopping later activity. The plugin owns async serialization, backpressure, batching, and retries. Disposing the returned registration stops future callbacks but does not cancel one already running.
+
+Declare the activity capability and permission in `cradle.contributes`:
+
+```json
+{
+  "capabilities": [
+    {
+      "id": "chat-runs",
+      "type": "activity-subscription",
+      "layer": "server",
+      "label": "Observe chat run activity",
+      "permissions": ["activity.read"]
+    }
+  ],
+  "permissions": [
+    {
+      "id": "activity.read",
+      "label": "Read Cradle activity",
+      "description": "Observe committed chat run lifecycle metadata.",
+      "required": true
+    }
+  ]
 }
 ```
+
+The host rejects an activity subscription unless its matching capability declares `activity.read`. It does not replay activity or expose prompts, responses, model IDs, usage, tool calls, workspace paths, or errors. Plugins own heartbeat timers, async queues, batching, retries, and deduplication.
 
 ### `ctx.sharedConfig` — Desktop-Provided Configuration
 
@@ -989,19 +994,9 @@ app.get('/stream', function* () {
 })
 ```
 
-### Plugin → Plugin (via Event Bus)
+### Plugin → Plugin
 
-Server plugins share a global event bus:
-
-```ts
-// Plugin A
-ctx.events.emit('pluginA.dataReady', { items: [...] })
-
-// Plugin B
-ctx.events.on('pluginA.dataReady', (data) => {
-  console.log('Got data from Plugin A:', data)
-})
-```
+There is no shared plugin event bus. Keep plugin state in the owner's storage and expose an explicit plugin route when another layer or integration needs it. Avoid coupling independent plugins through process-local event names.
 
 ---
 
@@ -1135,12 +1130,11 @@ interface ServerPluginContext {
   processes: PluginProcessService
   lifecycle: PluginLifecycle
   subscriptions: Disposable[]
+  activities: PluginActivitySubscription
   storage: PluginStorage
   logger: Logger
   sharedConfig: ReadonlyMap<string, string>
   manifest: PluginManifest
-  hooks: ServerPluginHooks
-  events: PluginEventBus
 }
 
 interface ServerPluginMcpRegistry {
@@ -1200,36 +1194,8 @@ interface PluginStorage {
   delete(key: string): Promise<void>
 }
 
-interface ServerPluginHooks {
-  chat: ServerPluginChatHooks
-}
-
-interface ServerPluginChatHooks {
-  onBeforeQuery(handler: BeforeQueryHandler): Disposable
-  onAfterResponse(handler: AfterResponseHandler): Disposable
-}
-
-type BeforeQueryHandler = (ctx: QueryHookContext) => QueryHookContext | Promise<QueryHookContext>
-
-interface QueryHookContext {
-  messages: Array<{ role: string; content: string }>
-  model: string
-  threadId: string
-  metadata: Record<string, unknown>
-}
-
-type AfterResponseHandler = (ctx: ResponseHookContext) => void | Promise<void>
-
-interface ResponseHookContext {
-  threadId: string
-  model: string
-  usage?: { inputTokens: number; outputTokens: number }
-  durationMs: number
-}
-
-interface PluginEventBus {
-  on(event: string, handler: (data: unknown) => void): Disposable
-  emit(event: string, data: unknown): void
+interface PluginActivitySubscription {
+  subscribe(handler: (activity: PluginActivity) => void | Promise<void>): Disposable
 }
 ```
 

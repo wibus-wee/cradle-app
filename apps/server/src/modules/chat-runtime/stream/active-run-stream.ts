@@ -2,7 +2,8 @@ import type { UIMessageChunk } from 'ai'
 
 import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { currentUnixSeconds } from '../../../helpers/time'
-import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
+import { db } from '../../../infra'
+import { toDurableMessagePayload } from '../message-durable-payload'
 import {
   flushFinalMessageProjection,
   projectFinalMessageChunk,
@@ -73,28 +74,38 @@ export function createActiveRunStreamController(
   async function persistStreamingMessageSnapshot(activeRun: ActiveRun): Promise<void> {
     const fence = readRunWriteFence(activeRun.runId)
     if (fence.status === 'streaming') {
-      const message = compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage))
-      const messageJson = JSON.stringify(message)
-      if (
-        activeRun.lastStreamingSnapshotMessageJson === messageJson
-        || activeRun.pendingStreamingSnapshotMessageJson === messageJson
-      ) {
-        return
-      }
-
-      activeRun.pendingStreamingSnapshotMessageJson = messageJson
+      let attemptedMessageJson: string | null = null
       try {
-        upsertRunStreamCheckpoint({
-          runId: activeRun.runId,
-          sessionId: activeRun.sessionId,
-          messageId: activeRun.messageId,
-          messageJson,
-          chunkSeq: 0,
-          updatedAt: currentUnixSeconds(),
+        db().transaction((tx) => {
+          const durable = toDurableMessagePayload({
+            sessionId: activeRun.sessionId,
+            message: normalizeMessageSnapshot(activeRun.finalMessage),
+            d: tx,
+          })
+          const messageJson = durable.messageJson
+          if (
+            activeRun.lastStreamingSnapshotMessageJson === messageJson
+            || activeRun.pendingStreamingSnapshotMessageJson === messageJson
+          ) {
+            return
+          }
+
+          attemptedMessageJson = messageJson
+          activeRun.pendingStreamingSnapshotMessageJson = messageJson
+          upsertRunStreamCheckpoint({
+            runId: activeRun.runId,
+            sessionId: activeRun.sessionId,
+            messageId: activeRun.messageId,
+            messageJson,
+            chunkSeq: 0,
+            updatedAt: currentUnixSeconds(),
+          }, tx)
         })
-        activeRun.lastStreamingSnapshotMessageJson = messageJson
+        if (attemptedMessageJson) {
+          activeRun.lastStreamingSnapshotMessageJson = attemptedMessageJson
+        }
       }
- catch (error) {
+      catch (error) {
         const latestFence = readRunWriteFence(activeRun.runId)
         if (latestFence.status !== 'streaming') {
           deps.handleStaleActiveRun(activeRun, latestFence)
@@ -107,8 +118,11 @@ export function createActiveRunStreamController(
           messageId: activeRun.messageId,
         })
       }
- finally {
-        if (activeRun.pendingStreamingSnapshotMessageJson === messageJson) {
+      finally {
+        if (
+          attemptedMessageJson
+          && activeRun.pendingStreamingSnapshotMessageJson === attemptedMessageJson
+        ) {
           activeRun.pendingStreamingSnapshotMessageJson = null
         }
       }

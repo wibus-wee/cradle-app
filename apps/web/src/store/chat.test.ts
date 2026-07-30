@@ -781,6 +781,62 @@ describe('chat store messages', () => {
     ])
   })
 
+  it('compacts legacy attachment payloads while hydrating steer metadata', () => {
+    const imageUrl = 'data:image/png;base64,large-image-payload'
+    useChatStore.getState().setMessages('session-1', [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            url: imageUrl,
+          },
+          { type: 'text', text: 'Before steer. After steer.' },
+        ],
+      },
+      {
+        id: 'continuation-steer-canonical',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Please adjust.' }],
+        metadata: {
+          cradle: {
+            continuation: {
+              mode: 'steer',
+              sourceMessageId: 'assistant-1',
+              splitParts: [
+                {
+                  type: 'file',
+                  mediaType: 'image/png',
+                  url: imageUrl,
+                },
+                { type: 'text', text: 'Before steer.' },
+              ],
+            },
+          },
+        },
+      } as UIMessage,
+    ])
+
+    const state = useChatStore.getState()
+    const storedSteer = state.messagesMap.get('session-1')?.[1]
+    expect(JSON.stringify(storedSteer?.metadata)).not.toContain(imageUrl)
+    expect(JSON.stringify(chatSelectors.displayRows('session-1')(state))).not.toContain(imageUrl)
+    expect(storedSteer?.metadata).toEqual({
+      cradle: {
+        continuation: {
+          mode: 'steer',
+          sourceMessageId: 'assistant-1',
+          splitParts: [
+            { type: 'file' },
+            { type: 'text', text: 'Before steer.' },
+          ],
+        },
+      },
+    })
+  })
+
   it('keeps live steer anchored after the assistant id changes to the server snapshot id', () => {
     useChatStore.getState().setMessages('session-1', [{
       id: 'assistant-temp',

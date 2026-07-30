@@ -12,8 +12,10 @@ import { and, asc, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '../../infra'
+import type { BlobStoreWriteHandle } from '../blob-store/service'
 import { recordImportedSessionMessagesInTransaction } from '../chat-runtime/es/commands'
 import type { MessageRecordedFact } from '../chat-runtime/es/events'
+import { toDurableMessagePayload } from '../chat-runtime/message-durable-payload'
 import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 import { listDurableProviderRuntimeBindingsByProviderSession } from '../provider-runtime/service'
 import * as Session from '../session/service'
@@ -243,7 +245,7 @@ export async function syncExternalSessionImport(input: {
         recordImportedSessionMessagesInTransaction(transaction, {
           sessionId: record.sessionId,
           messages: appended.map((message, index) =>
-            importedMessageFact(record.sessionId, message, updatedAt + index)),
+            importedMessageFact(transaction, record.sessionId, message, updatedAt + index)),
         })
         Session.touchImportedSessionInTransaction(transaction, {
           sessionId: record.sessionId,
@@ -355,7 +357,7 @@ function persistImportedSession(
     recordImportedSessionMessagesInTransaction(transaction, {
       sessionId: session.id,
       messages: newMessages.map((message, index) =>
-        importedMessageFact(session.id, message, createdAt + index)),
+        importedMessageFact(transaction, session.id, message, createdAt + index)),
     })
     const checkpoint = createCheckpoint(source, legacyProjection)
     if (legacy) {
@@ -399,6 +401,7 @@ function persistImportedSession(
 }
 
 function importedMessageFact(
+  d: BlobStoreWriteHandle,
   sessionId: string,
   imported: ExternalSessionImportMessage,
   fallbackCreatedAt: number,
@@ -407,6 +410,11 @@ function importedMessageFact(
   if (imported.message.role !== 'user' && imported.message.role !== 'assistant') {
     throw new Error(`Unsupported imported message role: ${imported.message.role}`)
   }
+  const durable = toDurableMessagePayload({
+    sessionId,
+    message: imported.message,
+    d,
+  })
   return {
     id: imported.message.id,
     sessionId,
@@ -416,8 +424,8 @@ function importedMessageFact(
     depth: 0,
     role: imported.message.role,
     status: 'complete',
-    content: readMessageText(imported.message),
-    messageJson: JSON.stringify(imported.message),
+    content: durable.content,
+    messageJson: durable.messageJson,
     errorText: null,
     createdAt,
     updatedAt: createdAt,

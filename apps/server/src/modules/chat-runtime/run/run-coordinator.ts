@@ -30,8 +30,8 @@ import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace
 import {
   createAssistantMessage,
   createUserMessage,
-  projectLightOcrMessage,
-  projectLightOcrMessages,
+  projectProviderInputMessage,
+  projectProviderInputMessages,
 } from '../ui-message'
 import { createFinalMessageProjectionState } from './final-message-projection'
 import { cancelPendingRuntimeGoalContinuation } from './runtime-goal-continuation'
@@ -351,14 +351,28 @@ export async function createRun(
           ...resolveSessionHarness(context.session),
           history: requestMessages.slice(0, -1),
         }
-      : resolveTurnContext({
+      : await resolveTurnContext({
           sessionId: input.sessionId,
           draftMessageId: draft.assistantMessageId,
           draftUserMessageId: draft.userMessageId,
         })
 
+    // Blob resolution must precede Light OCR; Codex prefers transcript.history
+    // over history, so both must carry the same resolved messages.
+    const providerHistory = turnContext.transcript?.history.length
+      ? turnContext.transcript.history
+      : turnContext.history?.length
+        ? await projectProviderInputMessages(turnContext.history)
+        : undefined
+    const providerTranscript = turnContext.transcript
+      ? {
+          ...turnContext.transcript,
+          history: providerHistory ?? [],
+        }
+      : undefined
+
     void deps.executeRun(activeRun, {
-      message: projectLightOcrMessage(draft.userMessage),
+      message: await projectProviderInputMessage(draft.userMessage),
       profile: context.profile,
       modelId:
         requestedModelId !== undefined
@@ -368,11 +382,9 @@ export async function createRun(
       runtimeSettings,
       systemPrompt: turnContext.systemPrompt,
       harness: turnContext.harness,
-      transcript: turnContext.transcript,
-      history: turnContext.history?.length
-        ? projectLightOcrMessages(turnContext.history)
-        : undefined,
-      originalMessages: projectLightOcrMessages(runtimeRequestMessages),
+      transcript: providerTranscript,
+      history: providerHistory,
+      originalMessages: await projectProviderInputMessages(runtimeRequestMessages),
       workspaceId: context.session.workspaceId,
       workspacePath: context.workspacePath,
       agentId: context.session.agentId,

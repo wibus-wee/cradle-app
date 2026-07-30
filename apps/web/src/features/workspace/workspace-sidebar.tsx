@@ -45,7 +45,10 @@ import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provi
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
+import { GithubRequiredDialog } from '~/features/settings/github-required-dialog'
+import { openGithubRequiredDialog } from '~/features/settings/github-required-dialog-store'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
+import { useGithubAppConnected } from '~/features/settings/use-github-app-connected'
 import { useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
@@ -1205,6 +1208,8 @@ WorkspaceSidebarBody.displayName = 'WorkspaceSidebarBody'
 export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boolean }) => {
   const { t } = useTranslation('workspace')
   const pullRequestsActive = useIsActiveSurfaceId('pull-requests')
+  const { connected: githubConnected, ready: githubReady } = useGithubAppConnected()
+  const githubFeaturesDisabled = githubReady && !githubConnected
   const queryClient = useQueryClient()
   const { workspaces, ready: workspacesReady } = useWorkspaces()
   const { sessions } = useAllSessions()
@@ -1389,20 +1394,40 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
 
   const openSearch = useCallback(() => useGlobalSearchStore.getState().openSearch(), [])
 
+  const handleNewWork = useCallback(() => {
+    if (githubFeaturesDisabled) {
+      openGithubRequiredDialog('new-work')
+      return
+    }
+    openNewWork()
+  }, [githubFeaturesDisabled])
+
+  const handlePullRequests = useCallback(() => {
+    if (githubFeaturesDisabled) {
+      openGithubRequiredDialog('pull-requests')
+      return
+    }
+    openPullRequests()
+  }, [githubFeaturesDisabled])
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <WorkspaceSidebarNavigationView
         collapsed={collapsed}
         pullRequestsActive={pullRequestsActive}
-        onNewWork={openNewWork}
+        githubFeaturesDisabled={githubFeaturesDisabled}
+        disabledLabel={t('nav.disabled')}
+        onNewWork={handleNewWork}
         onNewChat={openNewChat}
         onSearch={openSearch}
         onDiff={openDiff}
-        onPullRequests={openPullRequests}
+        onPullRequests={handlePullRequests}
         onAutomation={openAutomation}
         onUsage={openUsage}
         onSettings={handleOpenSettings}
       />
+
+      <GithubRequiredDialog />
 
       <ScrollArea
         scrollFade

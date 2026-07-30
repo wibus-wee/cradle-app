@@ -3166,6 +3166,21 @@ describe('codexProvider app-server integration', () => {
       'app/list',
       'collaborationMode/list',
     ]))
+    expect(client.requests).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        method: 'thread/list',
+        params: expect.objectContaining({
+          parentThreadId: 'codex-thread-1',
+          sourceKinds: [
+            'subAgent',
+            'subAgentReview',
+            'subAgentCompact',
+            'subAgentThreadSpawn',
+            'subAgentOther',
+          ],
+        }),
+      }),
+    ]))
   })
 
   it('reads Codex crew state from app-server thread history when the live activity snapshot is empty', async () => {

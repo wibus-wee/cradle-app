@@ -11,11 +11,11 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import * as Workspace from '../workspace/service'
 import { commitSessionEvents } from './es/commands'
+import { toDurableMessagePayload } from './message-durable-payload'
 import {
   annotateBangCommandMessage,
   annotateBangResultMessage,
   createUserMessage,
-  extractMessageText,
 } from './ui-message'
 
 const BANG_COMMAND_TIMEOUT_MS = 30_000
@@ -158,6 +158,14 @@ export async function persistBangCommandMessages(input: {
     truncated: input.truncated,
   })
   const now = currentUnixSeconds()
+  const userDurable = await toDurableMessagePayload({
+    sessionId: input.sessionId,
+    message: userMessage,
+  })
+  const resultDurable = await toDurableMessagePayload({
+    sessionId: input.sessionId,
+    message: resultMessage,
+  })
 
   await commitSessionEvents(input.sessionId, [
     {
@@ -172,8 +180,8 @@ export async function persistBangCommandMessages(input: {
           depth: 0,
           role: 'user',
           status: 'complete',
-          content: extractMessageText(userMessage),
-          messageJson: JSON.stringify(userMessage),
+          content: userDurable.content,
+          messageJson: userDurable.messageJson,
           createdAt: now,
           updatedAt: now,
         },
@@ -191,8 +199,8 @@ export async function persistBangCommandMessages(input: {
           depth: 0,
           role: 'user',
           status: 'complete',
-          content: extractMessageText(resultMessage),
-          messageJson: JSON.stringify(resultMessage),
+          content: resultDurable.content,
+          messageJson: resultDurable.messageJson,
           createdAt: now,
           updatedAt: now,
         },

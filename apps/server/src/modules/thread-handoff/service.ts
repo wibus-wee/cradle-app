@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { chatMessagePayloads, chatSessionQueueItems, messages, threadHandoffs } from '@cradle/db'
+import type { UIMessage } from 'ai'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
@@ -8,9 +9,11 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { recordImportedSessionMessages } from '../chat-runtime/es/commands'
 import type { MessageRecordedFact } from '../chat-runtime/es/events'
+import { toDurableMessagePayload } from '../chat-runtime/message-durable-payload'
 import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
 import { runRegistry } from '../chat-runtime/run-registry'
 import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
+import { resolveMessageBlobReferences } from '../chat-runtime/ui-message'
 import { assertAppFeatureFlagEnabled } from '../preferences/service'
 import { runtimeSkipsProviderTarget } from '../provider-contracts/runtime-compatibility'
 import type { RuntimeKind } from '../provider-contracts/types'
@@ -100,8 +103,8 @@ export async function create(input: {
     ProviderTargets.assertProviderTargetCompatibleWithRuntime(target.id, input.destinationRuntimeKind)
   }
 
-  const importedMessages = buildImportedMessages(source.id)
-  if (importedMessages.length === 0) {
+  const sourceMessageRows = readCompletedMessageRows(source.id)
+  if (sourceMessageRows.length === 0) {
     throw new AppError({
       code: 'thread_handoff_empty_transcript',
       status: 409,
@@ -126,7 +129,7 @@ export async function create(input: {
       sessionGroupId: source.sessionGroupId,
       worktreeId: source.worktreeId,
     })
-    const reboundMessages = importedMessages.map(message => ({ ...message, sessionId: destinationId }))
+    const reboundMessages = await buildImportedMessages(sourceMessageRows, destinationId)
     await recordImportedSessionMessages({ sessionId: destinationId, messages: reboundMessages })
     const handoff = db().insert(threadHandoffs).values({
       id: randomUUID(),
@@ -179,11 +182,10 @@ function assertSourceIdle(sessionId: string): void {
   }
 }
 
-function buildImportedMessages(sourceSessionId: string): Array<MessageRecordedFact & { status: 'complete' }> {
-  const rows = db()
+function readCompletedMessageRows(sourceSessionId: string) {
+  return db()
     .select({
       message: messages,
-      content: chatMessagePayloads.content,
       messageJson: chatMessagePayloads.messageJson,
     })
     .from(messages)
@@ -195,24 +197,39 @@ function buildImportedMessages(sourceSessionId: string): Array<MessageRecordedFa
     ))
     .orderBy(asc(messages.createdAt))
     .all()
+}
 
-  return rows.map((row) => {
+async function buildImportedMessages(
+  rows: ReturnType<typeof readCompletedMessageRows>,
+  destinationSessionId: string,
+): Promise<Array<MessageRecordedFact & { status: 'complete' }>> {
+  return await Promise.all(rows.map(async (row) => {
     const id = randomUUID()
-    const snapshot = JSON.parse(row.messageJson) as Record<string, unknown>
+    const sourceSnapshot = JSON.parse(row.messageJson) as UIMessage
+    const resolvedSnapshot = await resolveMessageBlobReferences(sourceSnapshot)
+    const message = {
+      ...resolvedSnapshot,
+      id,
+      role: row.message.role,
+    } as UIMessage
+    const durable = toDurableMessagePayload({
+      sessionId: destinationSessionId,
+      message,
+    })
     return {
       id,
-      sessionId: '',
+      sessionId: destinationSessionId,
       parentMessageId: null,
       parentToolCallId: null,
       taskId: null,
       depth: 0,
       role: row.message.role,
       status: 'complete',
-      content: row.content,
-      messageJson: JSON.stringify({ ...snapshot, id, role: row.message.role }),
+      content: durable.content,
+      messageJson: durable.messageJson,
       errorText: null,
       createdAt: row.message.createdAt,
       updatedAt: row.message.updatedAt,
     }
-  })
+  }))
 }

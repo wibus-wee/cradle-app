@@ -44,6 +44,7 @@ import {
   readEditDiffPreview,
   readFileDiffTarget,
   TerminalExecutionDetails,
+  ToolPayloadTruncationNotice,
 } from './tool-call-details'
 import { WorkflowPhaseListView } from './tool-hero/workflow-phase-list-view'
 import { ToolHeroView } from './tool-hero-view'
@@ -140,17 +141,41 @@ function StatusIcon({ state, animated = true }: { state: ToolState, animated?: b
 // Internal detail components (used only in expanded view)
 // ---------------------------------------------------------------------------
 
+function ToolPayloadDetailValue({
+  payload,
+  blobSessionId,
+}: {
+  payload: ToolPayload
+  blobSessionId?: string | null
+}) {
+  if (payload.truncatedOriginalChars !== null) {
+    return (
+      <div className="grid gap-1.5">
+        <ToolPayloadTruncationNotice
+          truncatedOriginalChars={payload.truncatedOriginalChars}
+          blobId={payload.blobId}
+          sessionId={blobSessionId}
+        />
+        {payload.rawText ? <RawValue value={payload.rawText} /> : null}
+      </div>
+    )
+  }
+  return <RawValue value={payload.rawValue} />
+}
+
 function _ToolDetails({
   descriptor,
   input,
   output,
   errorText,
+  blobSessionId,
   children,
 }: {
   descriptor: ToolUiDescriptor
   input: ToolPayload
   output: ToolPayload
   errorText?: string
+  blobSessionId?: string | null
   children?: ReactNode
 }) {
   const workflowDetails = hasWorkflowDetails(input, output, descriptor)
@@ -158,19 +183,30 @@ function _ToolDetails({
     <div className="grid gap-3">
       {workflowDetails
 ? (
-        <WorkflowExecutionDetails input={input} output={output} />
+        <WorkflowExecutionDetails
+          input={input}
+          output={output}
+          blobSessionId={blobSessionId}
+        />
       )
 : (
         <>
           <ToolSpecificDetails descriptor={descriptor} input={input} output={output} />
           {input !== undefined && (
             <DetailSection title="Input">
-              <RawValue value={input} />
+              <ToolPayloadDetailValue payload={input} blobSessionId={blobSessionId} />
             </DetailSection>
           )}
           {(output !== undefined || errorText) && (
             <DetailSection title={errorText ? 'Error' : 'Output'}>
-              <RawValue value={errorText ?? output} />
+              {errorText
+                ? <RawValue value={errorText} />
+                : (
+                    <ToolPayloadDetailValue
+                      payload={output}
+                      blobSessionId={blobSessionId}
+                    />
+                  )}
             </DetailSection>
           )}
         </>
@@ -268,7 +304,15 @@ function FileDiffDetails({ input, output }: { input: ToolPayload, output: ToolPa
   )
 }
 
-function WorkflowExecutionDetails({ input, output }: { input: ToolPayload, output: ToolPayload }) {
+function WorkflowExecutionDetails({
+  input,
+  output,
+  blobSessionId,
+}: {
+  input: ToolPayload
+  output: ToolPayload
+  blobSessionId?: string | null
+}) {
   const phases = output.workflowPhases.length > 0 ? output.workflowPhases : input.workflowPhases
   const lifecycle = output.workflowLifecycle.length > 0
     ? output.workflowLifecycle
@@ -294,10 +338,10 @@ function WorkflowExecutionDetails({ input, output }: { input: ToolPayload, outpu
       </DetailSection>
       <WorkflowPhaseListView phases={phases} />
       <DetailSection title="Full input">
-        <RawValue value={input.rawValue} />
+        <ToolPayloadDetailValue payload={input} blobSessionId={blobSessionId} />
       </DetailSection>
       <DetailSection title="Full output">
-        <RawValue value={output.rawValue} />
+        <ToolPayloadDetailValue payload={output} blobSessionId={blobSessionId} />
       </DetailSection>
       <DetailSection title="Lifecycle events">
         <RawValue value={lifecycle} />
@@ -316,6 +360,7 @@ export type ToolCallBlockViewProps = Omit<
   ToolCallBlockProps,
   'sessionId' | 'workspaceDiffTarget'
 > & {
+  blobSessionId?: string | null
   onOpenWorkspaceDiff?: (path: string) => void
   onOpenSubagentOutput?: (input: {
     toolCallId: string
@@ -352,6 +397,7 @@ export function ToolCallBlockView({
   onWorkflowSurfaceChange,
   onOpenPlanDocument,
   children,
+  blobSessionId,
 }: ToolCallBlockViewProps) {
   const inputPayload = readToolInputPayload(input, argumentsText)
   const outputPayload = readToolPayload(output)
@@ -624,6 +670,7 @@ export function ToolCallBlockView({
                 errorText={errorText}
                 toolCallId={toolCallId}
                 onOpenPlanDocument={onOpenPlanDocument}
+                blobSessionId={blobSessionId}
               />
             </div>
           )}
@@ -680,6 +727,7 @@ export function ToolCallBlockView({
             input={inputPayload}
             output={outputPayload}
             errorText={errorText}
+            blobSessionId={blobSessionId}
           >
             {children}
           </_ToolDetails>

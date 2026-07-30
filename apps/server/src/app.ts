@@ -23,6 +23,8 @@ import { backgroundActivity } from './modules/background-activity'
 import * as BackgroundActivity from './modules/background-activity/service'
 import { backgroundJob } from './modules/background-job'
 import * as BackgroundJobPoller from './modules/background-job/poller'
+import { blobStore } from './modules/blob-store'
+import { registerBlobStoreMaintenance } from './modules/blob-store/gc'
 import { chatRuntime } from './modules/chat-runtime'
 import { getRuntimeRegistry } from './modules/chat-runtime/chat-runtime-provider-registry'
 import * as ComposerDrafts from './modules/chat-runtime/composer-drafts'
@@ -31,6 +33,8 @@ import {
   chatRuntimeGlobalEventRoutes,
 } from './modules/chat-runtime/http/events.routes'
 import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked-session-proxy'
+import { registerMessageBlobBackfillMaintenance } from './modules/chat-runtime/message-blob-backfill'
+import { registerMessageSteerSplitBackfillMaintenance } from './modules/chat-runtime/message-steer-split-backfill'
 import { runRegistry } from './modules/chat-runtime/run-registry'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
@@ -237,6 +241,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(agentIdentity)
   app.use(automation)
   app.use(assets)
+  app.use(blobStore)
   app.use(backgroundActivity)
   app.use(backgroundJob)
   app.use(session)
@@ -380,6 +385,9 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     ComposerDrafts.registerComposerDraftMaintenance()
     registerRunSnapshotMaintenance()
     TurnCheckpoint.registerTurnCheckpointMaintenance()
+    registerBlobStoreMaintenance()
+    registerMessageBlobBackfillMaintenance()
+    registerMessageSteerSplitBackfillMaintenance()
     Maintenance.registerTask({
       ownerNamespace: 'logging',
       key: 'rotate-server-log',

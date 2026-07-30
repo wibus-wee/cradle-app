@@ -6681,6 +6681,31 @@ export type GetAssetsByIdContentData = {
     url: '/assets/{id}/content';
 };
 
+export type GetBlobsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/blobs/{id}';
+};
+
+export type GetBlobsByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sha256: string;
+        mediaType: string;
+        byteSize: number;
+        storagePath: string;
+        createdAt: number;
+    };
+};
+
+export type GetBlobsByIdResponse = GetBlobsByIdResponses[keyof GetBlobsByIdResponses];
+
 export type GetBackgroundActivitiesData = {
     body?: never;
     path?: never;
@@ -21067,6 +21092,16 @@ export type GetChatSessionsBySessionIdEventsResponses = {
 };
 
 export type GetChatSessionsBySessionIdEventsResponse = GetChatSessionsBySessionIdEventsResponses[keyof GetChatSessionsBySessionIdEventsResponses];
+
+export type GetChatSessionsBySessionIdBlobsByBlobIdContentData = {
+    body?: never;
+    path: {
+        sessionId: string;
+        blobId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/blobs/{blobId}/content';
+};
 
 export type DeleteChatComposerDraftsBySurfaceIdData = {
     body?: never;

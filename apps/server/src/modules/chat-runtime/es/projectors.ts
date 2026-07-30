@@ -9,12 +9,12 @@ import {
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
 import { applyPlanImplementationApprovalResponse } from '../interaction/plan-implementation-message'
+import { toDurableMessagePayload } from '../message-durable-payload'
 import {
   messagePayloadJoinCondition,
   toMessageProjectionValues,
   updateMessagePayload,
 } from '../message-payload-store'
-import { compactStoredMessageSnapshot } from '../message-snapshot-compaction'
 import { normalizeQueueItemRuntimeSettingsJson } from '../queue/session-queue'
 import {
   projectChatRuntimeMessageReadModels,
@@ -22,7 +22,7 @@ import {
 } from '../read-model-projectors'
 import type { ChatMessageStatus } from '../run/stream-chunks'
 import { parseStoredMessageSnapshot } from '../stream/projection'
-import { extractMessageText, normalizeMessageSnapshot } from '../ui-message'
+import { normalizeMessageSnapshot } from '../ui-message'
 import type { ChatRuntimeWriteDb } from './event-store'
 import type {
   ChatSessionEvent,
@@ -227,23 +227,25 @@ function projectPlanImplementationResponded(
     return
   }
 
-  const message = compactStoredMessageSnapshot(
-    normalizeMessageSnapshot(
-      applyPlanImplementationApprovalResponse({
-        message: parseStoredMessageSnapshot({ ...row.message, ...row.payload }, 'assistant'),
-        sessionId: payload.sessionId,
-        messageId: payload.messageId,
-        approvalId: payload.approvalId,
-        approved: payload.approved,
-      }),
-    ),
+  const message = normalizeMessageSnapshot(
+    applyPlanImplementationApprovalResponse({
+      message: parseStoredMessageSnapshot({ ...row.message, ...row.payload }, 'assistant'),
+      sessionId: payload.sessionId,
+      messageId: payload.messageId,
+      approvalId: payload.approvalId,
+      approved: payload.approved,
+    }),
   )
-  const messageJson = JSON.stringify(message)
+  const durable = toDurableMessagePayload({
+    sessionId: payload.sessionId,
+    message,
+    d,
+  })
   updateMessagePayload(d, {
     id: row.message.id,
     sessionId: row.message.sessionId,
-    content: extractMessageText(message),
-    messageJson,
+    content: durable.content,
+    messageJson: durable.messageJson,
     errorText: row.payload.errorText,
     updatedAt: payload.updatedAt,
   })

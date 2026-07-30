@@ -5,6 +5,7 @@ import { Progress } from '~/components/ui/progress'
 import { Table, TableBody, TableCell, TableRow } from '~/components/ui/table'
 import { cn } from '~/lib/cn'
 
+import { BlobOverflowNotice } from '../../rendering/blob-overflow-notice'
 import { EditFileBlock } from '../../rendering/blocks/edit-file-block'
 import { readTerminalOutputSections } from '../../rendering/terminal-tool-details'
 import type { ToolPayload, ToolState } from '../../rendering/tool-ui-classifier'
@@ -196,6 +197,25 @@ export function hasDiffHeroContent(input: ToolPayload, output: ToolPayload): boo
 // ---------------------------------------------------------------------------
 // Shared UI components
 // ---------------------------------------------------------------------------
+
+export function ToolPayloadTruncationNotice({
+  truncatedOriginalChars,
+  blobId,
+  sessionId,
+}: {
+  truncatedOriginalChars: number | null
+  blobId: string | null
+  sessionId?: string | null
+}) {
+  return (
+    <BlobOverflowNotice
+      truncatedOriginalChars={truncatedOriginalChars}
+      blobId={blobId}
+      sessionId={sessionId}
+      fullLabel="open full output"
+    />
+  )
+}
 
 export function RawValue({ value, className }: { value: unknown, className?: string }) {
   const text = formatValue(value)

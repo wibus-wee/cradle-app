@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 
+import { chatRuntimeBlobRoutes } from './http/blob.routes'
 import { chatRuntimeDraftRoutes } from './http/draft.routes'
 import { chatRuntimeHistoryRoutes } from './http/history.routes'
 import { chatRuntimeInteractionRoutes } from './http/interaction.routes'
@@ -13,6 +14,7 @@ export const chatRuntime = new Elysia({
   prefix: '/chat',
   detail: { tags: ['chat-runtime'] },
 })
+  .use(chatRuntimeBlobRoutes)
   .use(chatRuntimeDraftRoutes)
   .use(chatRuntimeIntrospectionRoutes)
   .use(chatRuntimeLifecycleRoutes)

@@ -358,6 +358,20 @@
       "when": 1785258495081,
       "tag": "0050_nebulous_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1785336196415,
+      "tag": "0051_public_magdalene",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1785393864632,
+      "tag": "0052_majestic_marvex",
+      "breakpoints": true
     }
   ]
 }

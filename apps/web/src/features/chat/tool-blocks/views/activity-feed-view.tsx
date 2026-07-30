@@ -5,6 +5,7 @@ import { useState } from 'react'
 
 import { cn } from '~/lib/cn'
 
+import { BlobOverflowNotice } from '../../rendering/blob-overflow-notice'
 import { hasTerminalDetails } from '../../rendering/terminal-tool-details'
 import type { RenderableToolPart, ToolUiKind } from '../../rendering/tool-ui-classifier'
 import {
@@ -43,6 +44,7 @@ export type { ActivityFeedViewEntry } from '../lib/activity-feed-model'
 export interface ActivityFeedViewProps {
   entries: ActivityFeedViewEntry[]
   animated?: boolean
+  blobSessionId?: string | null
   onOpenWorkspaceDiff?: (path: string) => void
   onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
 }
@@ -196,6 +198,7 @@ function FeedRow({
 export function ActivityFeedView({
   entries,
   animated = true,
+  blobSessionId,
   onOpenWorkspaceDiff,
   onOpenPlanDocument,
 }: ActivityFeedViewProps) {
@@ -222,7 +225,11 @@ export function ActivityFeedView({
     const { part } = entry
     const descriptor = describeToolCallCached(part)
     const uiKind = descriptor.kind
-    const expandable = hasExpandableDetails(part, uiKind)
+    const inputPayload = readToolInputPayload(part.input, part.argumentsText)
+    const outputPayload = readToolPayload(part.output)
+    const hasTruncatedPayload = inputPayload.truncatedOriginalChars !== null
+      || outputPayload.truncatedOriginalChars !== null
+    const expandable = hasTruncatedPayload || hasExpandableDetails(part, uiKind)
     const workspaceDiffPath = isEditKind(uiKind)
       ? readFileDiffTarget(part.input, part.output, part.argumentsText)
       : null
@@ -253,7 +260,20 @@ export function ActivityFeedView({
         />
         {expandable && expanded && (
           <div className="mb-1 mt-0.5">
-            {uiKind === 'terminal' && (
+            {hasTruncatedPayload
+              ? (
+                  <ToolHeroView
+                    descriptor={descriptor}
+                    state={part.state}
+                    input={inputPayload}
+                    output={outputPayload}
+                    errorText={part.errorText}
+                    toolCallId={part.toolCallId}
+                    onOpenPlanDocument={onOpenPlanDocument}
+                    blobSessionId={blobSessionId}
+                  />
+                )
+              : uiKind === 'terminal' && (
               <TerminalExecutionDetails
                 input={part.input}
                 output={part.output}
@@ -261,7 +281,7 @@ export function ActivityFeedView({
                 argumentsText={part.argumentsText}
               />
             )}
-            {isEditKind(uiKind) && (
+            {!hasTruncatedPayload && isEditKind(uiKind) && (
               <FileDiffExecutionDetails
                 input={part.input}
                 output={part.output}
@@ -270,15 +290,16 @@ export function ActivityFeedView({
                 state={part.state}
               />
             )}
-            {uiKind !== 'terminal' && !isEditKind(uiKind) && (
+            {!hasTruncatedPayload && uiKind !== 'terminal' && !isEditKind(uiKind) && (
               <ToolHeroView
                 descriptor={descriptor}
                 state={part.state}
-                input={readToolInputPayload(part.input, part.argumentsText)}
-                output={readToolPayload(part.output)}
+                input={inputPayload}
+                output={outputPayload}
                 errorText={part.errorText}
                 toolCallId={part.toolCallId}
                 onOpenPlanDocument={onOpenPlanDocument}
+                blobSessionId={blobSessionId}
               />
             )}
           </div>
@@ -289,7 +310,8 @@ export function ActivityFeedView({
 
   const renderReasoningEntry = (entry: ActivityFeedReasoningEntry) => {
     const expanded = expandedEntries.has(entry.key)
-    const expandable = entry.text.length > 0
+    const hasOverflow = entry.overflowBlobId != null && entry.overflowOriginalChars != null
+    const expandable = entry.text.length > 0 || hasOverflow
     const streaming = entry.state === 'streaming'
     return (
       <div key={entry.key}>
@@ -303,14 +325,24 @@ export function ActivityFeedView({
           onClick={() => toggleEntry(entry.key)}
         />
         {expandable && expanded && (
-          <div className={cn('max-h-82 overflow-y-auto py-0.5', ROW_TEXT_CLASS, GHOST_CLASS)}>
-            <Streamdown
-              content={entry.text}
-              streaming={streaming}
-              animationPreset={REASONING_STREAMDOWN_OPTIONS.animationPreset}
-              animateMode={REASONING_STREAMDOWN_OPTIONS.animateMode}
-              showCursor={REASONING_STREAMDOWN_OPTIONS.showCursor}
-            />
+          <div className={cn('flex max-h-82 flex-col gap-1 overflow-y-auto py-0.5', ROW_TEXT_CLASS, GHOST_CLASS)}>
+            {entry.text.length > 0 && (
+              <Streamdown
+                content={entry.text}
+                streaming={streaming}
+                animationPreset={REASONING_STREAMDOWN_OPTIONS.animationPreset}
+                animateMode={REASONING_STREAMDOWN_OPTIONS.animateMode}
+                showCursor={REASONING_STREAMDOWN_OPTIONS.showCursor}
+              />
+            )}
+            {hasOverflow && (
+              <BlobOverflowNotice
+                truncatedOriginalChars={entry.overflowOriginalChars ?? null}
+                blobId={entry.overflowBlobId ?? null}
+                sessionId={blobSessionId}
+                fullLabel="open full reasoning"
+              />
+            )}
           </div>
         )}
       </div>

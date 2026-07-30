@@ -50,6 +50,13 @@ import {
 
 const CODEX_CREW_TURNS_LIST_LIMIT = 50
 const CODEX_CREW_THREAD_LIST_PAGE_SIZE = 100
+const CODEX_CREW_THREAD_SOURCE_KINDS = [
+  'subAgent',
+  'subAgentReview',
+  'subAgentCompact',
+  'subAgentThreadSpawn',
+  'subAgentOther',
+] as const
 
 interface CodexUiSlotDefinition extends Omit<RuntimeUiSlot, 'surfaces'> {
   surfaces?: RuntimeUiSlot['surfaces']
@@ -1082,7 +1089,8 @@ async function listCodexCrewThreads(
       limit: CODEX_CREW_THREAD_LIST_PAGE_SIZE,
       sortKey: 'updated_at',
       sortDirection: 'desc',
-      sourceKinds: ['subAgentThreadSpawn'],
+      parentThreadId,
+      sourceKinds: [...CODEX_CREW_THREAD_SOURCE_KINDS],
       archived: false,
     })) as ThreadListResponse
     for (const thread of response.data ?? []) {

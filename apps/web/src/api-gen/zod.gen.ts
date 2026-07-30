@@ -1338,6 +1338,10 @@ export const zGetAssetsByIdContentPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetBlobsByIdPath = z.object({
+    id: z.string().min(1)
+});
+
 export const zPostBackgroundActivitiesByOwnerNamespaceByKeyRunPath = z.object({
     ownerNamespace: z.string().min(1),
     key: z.string().min(1)
@@ -3104,6 +3108,11 @@ export const zGetChatSessionsBySessionIdEventsPath = z.object({
 export const zGetChatSessionsBySessionIdEventsQuery = z.object({
     afterVersion: z.number().gte(0).optional(),
     limit: z.number().gte(1).lte(500).optional()
+});
+
+export const zGetChatSessionsBySessionIdBlobsByBlobIdContentPath = z.object({
+    sessionId: z.string().min(1),
+    blobId: z.string().min(1)
 });
 
 export const zDeleteChatComposerDraftsBySurfaceIdPath = z.object({

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import type { UIMessage } from 'ai'
+import { compactChatMessageSplitParts } from '@cradle/chat-runtime-contracts'
 
 import { AppError } from '../../../errors/app-error'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
@@ -15,7 +15,7 @@ import { serializeChatError } from '../run/errors'
 import { annotateContinuationMessage, insertCompletedUserMessage } from '../run/turn-draft'
 import { runRegistry } from '../run-registry'
 import { assertRuntimeCompatibleTarget, getSessionRunContext } from '../runtime-session-context'
-import { createUserMessage, projectLightOcrMessage } from '../ui-message'
+import { createUserMessage, projectProviderInputMessage } from '../ui-message'
 
 export interface SubmitSessionSteerTurnDeps {
   scheduleSessionQueueDrain: (sessionId: string) => void
@@ -133,7 +133,7 @@ export async function submitSessionSteerTurn(
   }
 
   const sourceMessageId = activeRun.messageId
-  const splitParts = structuredClone(activeRun.finalMessage.parts) as UIMessage['parts']
+  const splitParts = compactChatMessageSplitParts(activeRun.finalMessage.parts)
   const steerMessage = annotateContinuationMessage(
     createUserMessage(`steer-${randomUUID()}`, text, files, contextParts),
     { mode: 'steer', sourceMessageId, splitParts },
@@ -142,7 +142,7 @@ export async function submitSessionSteerTurn(
     await steerHook.call(activeRun.runtime, {
       runtimeSession: activeRun.runtimeSession,
       profile: context.profile,
-      message: projectLightOcrMessage(steerMessage),
+      message: await projectProviderInputMessage(steerMessage),
     })
   }
   catch (error) {

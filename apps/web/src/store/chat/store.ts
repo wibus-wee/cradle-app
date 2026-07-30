@@ -1,3 +1,8 @@
+import type { ChatMessagePartBoundary } from '@cradle/chat-runtime-contracts'
+import {
+  compactChatMessageSplitMetadata,
+  compactChatMessageSplitParts,
+} from '@cradle/chat-runtime-contracts'
 import type { UIMessage } from 'ai'
 import isEqual from 'fast-deep-equal'
 import type { Draft } from 'immer'
@@ -20,7 +25,6 @@ import type {
   ChatError,
   ChatRunState,
   ChatState,
-  MessagePart,
   MessageStreamLease,
   PassiveRunStateInput,
   PublicStatus,
@@ -54,7 +58,7 @@ export function createChatStore() {
           const base = reclaimed ? { ...state, ...reclaimed } : state
           const incoming = preserveSteerSplitMetadata(
             stripSteerTailMessages(base.messagesMap.get(sessionId) ?? EMPTY_MESSAGES),
-            stripSteerTailMessages(messages),
+            stripSteerTailMessages(messages).map(compactChatMessageSplitMetadata),
           )
           const current = stripSteerTailMessages(base.messagesMap.get(sessionId) ?? EMPTY_MESSAGES)
           const displayed = preserveLeasedMessages(
@@ -147,14 +151,15 @@ export function createChatStore() {
             return state
           }
 
-          const queueItemId = getQueueItemId(message)
-          if (messages.some(m => m.id === message.id || (queueItemId && getQueueItemId(m) === queueItemId))) {
+          const compactMessage = compactChatMessageSplitMetadata(message)
+          const queueItemId = getQueueItemId(compactMessage)
+          if (messages.some(m => m.id === compactMessage.id || (queueItemId && getQueueItemId(m) === queueItemId))) {
             return state
           }
 
           const runState = readSessionRunState(state, sessionId)
           const activeMessageId = readRunStateMessageId(runState)
-          const metadataSourceId = readSteerSourceMessageId(message)
+          const metadataSourceId = readSteerSourceMessageId(compactMessage)
           const effectiveSourceId = sourceMessageId
             ?? metadataSourceId
             ?? findActiveAssistantId(
@@ -166,7 +171,7 @@ export function createChatStore() {
             ? messages.findIndex(m => m.id === effectiveSourceId && m.role === 'assistant')
             : -1
           const sourceMessage = sourceIdx === -1 ? null : messages[sourceIdx]
-          const steerMessage = ensureSteerSplitMetadata(message, sourceMessage)
+          const steerMessage = ensureSteerSplitMetadata(compactMessage, sourceMessage)
 
           // Append after existing steers for this assistant — never insert at
           // sourceIdx+1 or a later steer would reverse chronological order and
@@ -958,7 +963,7 @@ function stripSteerTailMessages(messages: UIMessage[]): UIMessage[] {
   return messages.filter(message => !message.id.includes(STEER_TAIL_MARKER))
 }
 
-function readSteerSplitParts(message: UIMessage): MessagePart[] | null {
+function readSteerSplitParts(message: UIMessage): ChatMessagePartBoundary[] | null {
   const metadata = (message as { metadata?: unknown }).metadata
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return null
@@ -978,12 +983,12 @@ function readSteerSplitParts(message: UIMessage): MessagePart[] | null {
   if (!splitParts.every(part => part && typeof part === 'object' && typeof (part as { type?: unknown }).type === 'string')) {
     return null
   }
-  return splitParts as MessagePart[]
+  return splitParts as ChatMessagePartBoundary[]
 }
 
 function withSteerContinuationFields(
   message: UIMessage,
-  fields: { sourceMessageId?: string, splitParts?: MessagePart[] },
+  fields: { sourceMessageId?: string, splitParts?: ChatMessagePartBoundary[] },
 ): UIMessage {
   const metadata = (message as { metadata?: unknown }).metadata
   const currentMetadata = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -1008,7 +1013,7 @@ function withSteerContinuationFields(
           ...currentContinuation,
           mode: 'steer',
           ...(fields.sourceMessageId ? { sourceMessageId: fields.sourceMessageId } : {}),
-          ...(fields.splitParts ? { splitParts: structuredClone(fields.splitParts) } : {}),
+          ...(fields.splitParts ? { splitParts: fields.splitParts } : {}),
         },
       },
     },
@@ -1070,7 +1075,7 @@ function ensureSteerSplitMetadata(
   }
   const sourceMessageId = readSteerSourceMessageId(message) ?? sourceMessage.id
   const splitParts = readSteerSplitParts(message)
-    ?? (structuredClone(sourceMessage.parts) as MessagePart[])
+    ?? compactChatMessageSplitParts(sourceMessage.parts)
   if (readSteerSourceMessageId(message) === sourceMessageId && readSteerSplitParts(message)) {
     return message
   }

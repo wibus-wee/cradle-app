@@ -1,4 +1,5 @@
 import type { CradleToolKind } from '@cradle/chat-runtime-contracts'
+import { isChatBlobPayloadRef, readLegacyTruncatedPayload } from '@cradle/chat-runtime-contracts'
 
 import { formatCompactBytes } from '~/lib/number-format'
 
@@ -722,6 +723,8 @@ function readToolObjectPayload(value: unknown): ToolObjectPayload {
 export interface ToolPayload {
   rawText: string | null
   rawValue: unknown
+  truncatedOriginalChars: number | null
+  blobId: string | null
   inputText: string | null
   description: string | null
   type: string | null
@@ -801,6 +804,8 @@ function toolPayloadFromObject(value: ToolObjectPayload): ToolPayload {
   return {
     rawText: null,
     rawValue: value.rawValue,
+    truncatedOriginalChars: null,
+    blobId: null,
     inputText: value.input,
     description: value.description ?? value.workflowDescription ?? value.explanation ?? value.goal ?? value.title ?? value.task,
     type: value.type,
@@ -899,6 +904,25 @@ export function readToolPayload(value: unknown): ToolPayload {
       rawValue: value,
     }
   }
+  if (isChatBlobPayloadRef(value)) {
+    return {
+      ...toolPayloadFromObject(readToolObjectPayload({})),
+      rawText: value.preview,
+      rawValue: value,
+      truncatedOriginalChars: value.originalChars,
+      blobId: value.blobId,
+    }
+  }
+  const legacyTruncated = readLegacyTruncatedPayload(value)
+  if (legacyTruncated) {
+    return {
+      ...toolPayloadFromObject(readToolObjectPayload({})),
+      rawText: legacyTruncated.preview,
+      rawValue: value,
+      truncatedOriginalChars: legacyTruncated.originalChars,
+      blobId: null,
+    }
+  }
   return toolPayloadFromObject(readToolObjectPayload(value))
 }
 
@@ -942,7 +966,7 @@ export function describeToolCall(part: RenderableToolPart): ToolUiDescriptor {
     kind,
     toolName,
     displayName,
-    title: readToolTitle(kind, displayName, input, output),
+    title: readToolTitle(kind, toolName, displayName, input, output),
     target,
     summary: readToolSummary(kind, input, output),
   }
@@ -1248,7 +1272,13 @@ export function formatToolName(toolName: string): string {
     .join(' ')
 }
 
-function readToolTitle(kind: ToolUiKind, displayName: string, input: ToolPayload, output: ToolPayload): string {
+function readToolTitle(
+  kind: ToolUiKind,
+  toolName: string,
+  displayName: string,
+  input: ToolPayload,
+  output: ToolPayload,
+): string {
   if (kind === 'todo') {
     return 'Update todos'
   }
@@ -1278,6 +1308,9 @@ function readToolTitle(kind: ToolUiKind, displayName: string, input: ToolPayload
     case 'web':
       return displayName.includes('Search') ? 'Search web' : 'Fetch web page'
     case 'subagent':
+      if (toolName === 'wait') {
+        return 'Wait for agents'
+      }
       return displayName.includes('Workflow') ? 'Run workflow' : 'Run subagent'
     case 'task-control':
       return displayName.includes('Stop') ? 'Stop task' : 'Read task output'

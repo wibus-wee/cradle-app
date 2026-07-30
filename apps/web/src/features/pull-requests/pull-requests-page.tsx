@@ -4,25 +4,12 @@ import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
 import { pullRequestQueryOptions } from './api/pull-requests'
+import { resolvePullRequestErrorKind } from './pull-request-error'
 import { PullRequestsPageView } from './pull-requests-page-view'
 import type { CradlePullRequest } from './use-pull-requests'
 import { useCradlePullRequests } from './use-pull-requests'
 
 const PULL_REQUEST_LAYOUT_SLOTS = { hasBrowserPanel: true } as const
-
-function isGitHubAuthError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false
-  }
-
-  const record = error as { code?: unknown, error?: unknown }
-  if (record.code === 'github_auth_required') {
-    return true
-  }
-  return !!record.error
-    && typeof record.error === 'object'
-    && (record.error as { code?: unknown }).code === 'github_auth_required'
-}
 
 export interface PullRequestsPageProps {
   selectedRef?: string
@@ -36,13 +23,9 @@ export function PullRequestsPage({
   const queryClient = useQueryClient()
   const { entries, viewer, isPending, error, authored, reviewing } = useCradlePullRequests()
   const openPullRequestTab = useBrowserPanelStore(state => state.openPullRequestTab)
-  const hasGitHubAuthError = isGitHubAuthError(error)
+  const errorKind = error ? resolvePullRequestErrorKind(error) : null
 
   useRegisterLayoutSlots('pull-requests', PULL_REQUEST_LAYOUT_SLOTS)
-
-  if (error && !hasGitHubAuthError) {
-    throw error
-  }
 
   const prefetchPullRequest = (item: CradlePullRequest) => {
     void queryClient.prefetchQuery(pullRequestQueryOptions.detail({
@@ -72,7 +55,24 @@ export function PullRequestsPage({
       entries={entries}
       viewer={viewer}
       pending={isPending}
-      authRequired={hasGitHubAuthError}
+      errorKind={errorKind}
+      retrying={Boolean(error && isPending)}
+      onRetry={error
+        ? () => {
+            void queryClient.invalidateQueries({
+              predicate: (query) => {
+                const head = query.queryKey[0]
+                if (typeof head !== 'object' || head === null || !('_id' in head)) {
+                  return false
+                }
+                const id = (head as { _id?: unknown })._id
+                return id === 'getPullRequestsViewer'
+                  || id === 'getPullRequestsAuthored'
+                  || id === 'getPullRequestsReviewing'
+              },
+            })
+          }
+        : undefined}
       authoredFeed={authored}
       reviewingFeed={reviewing}
       selectedRef={selectedRef}

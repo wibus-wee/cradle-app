@@ -14,5 +14,20 @@
   "credentials.providers.anthropic.tagline": "Anthropic 公式 Claude API またはメッセージ API",
   "credentials.providers.openai.tagline": "OpenAI Responses API または Codex 公式アカウント",
   "credentials.providers.universal.tagline": "OpenAI と Anthropic 対応のカスタムエンドポイント",
-  "nav.continueHint": "で続行"
+  "nav.continueHint": "で続行",
+  "setup.loading": "セットアップを確認しています…",
+  "setup.skip": "スキップ",
+  "setup.continue": "続行",
+  "setup.finish": "はじめる",
+  "setup.provider.title": "プロバイダーを接続",
+  "setup.provider.description": "エージェントを動かすためにプロバイダーを選択してください。後から設定で変更できます。",
+  "setup.provider.skip": "プロバイダーをスキップ",
+  "setup.github.title": "GitHub を接続",
+  "setup.github.description": "Pull request の読み込みと GitHub 上での操作のため、Cradle を承認してください。",
+  "setup.github.skipHint": "後から「設定 → Integrations」で接続できます。それまで Pull Requests は利用できません。",
+  "setup.github.continueAnyway": "GitHub なしで続行",
+  "setup.done.title": "準備完了",
+  "setup.done.description": "このマシンの Cradle セットアップが完了しました。",
+  "setup.done.bodyWithGithub": "チャットを始めるか、Pull Requests で GitHub 上の作業を確認できます。",
+  "setup.done.bodyWithoutGithub": "いつでもチャットを始められます。Pull Requests を使うには、後から「設定 → Integrations」で GitHub を接続してください。"
 }

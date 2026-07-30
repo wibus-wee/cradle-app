@@ -321,6 +321,7 @@ export function SubagentOutputPanel({
             {messages.map(message => (
               <ProviderThreadMessage
                 key={message.id}
+                sessionId={sessionId}
                 viewSessionId={viewSessionId}
                 messageId={message.id}
                 onToolApprovalResponse={handleToolApprovalResponse}
@@ -346,10 +347,12 @@ export function SubagentOutputPanel({
 }
 
 function ProviderThreadMessage({
+  sessionId,
   viewSessionId,
   messageId,
   onToolApprovalResponse,
 }: {
+  sessionId: string
   viewSessionId: string
   messageId: string
   onToolApprovalResponse?: (response: {
@@ -367,6 +370,7 @@ function ProviderThreadMessage({
     <ChatRenderStoreProvider store={rendererChatStore}>
       <MessageBubbleView
         message={message}
+        sessionId={sessionId}
         isStreaming={isStreaming}
         executionDetailsDefaultOpen={false}
         onToolApprovalResponse={onToolApprovalResponse}

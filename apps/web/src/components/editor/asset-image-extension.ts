@@ -23,7 +23,8 @@ export const AssetImage = Image.extend({
       src: {
         default: null,
         parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-cradle-asset-src') ?? element.getAttribute('src'),
+          element.getAttribute('data-cradle-asset-src')
+          ?? element.getAttribute('src'),
       },
       alt: {
         default: null,
@@ -97,7 +98,7 @@ export const AssetImage = Image.extend({
           if (img instanceof HTMLImageElement) {
             img.src = contentUrl
           }
- else if (img) {
+          else if (img) {
             const inner = img.querySelector('img')
             if (inner) {
               inner.src = contentUrl
@@ -162,7 +163,8 @@ export const AssetImage = Image.extend({
 })
 
 function readCanonicalSrcFromElement(element: HTMLElement): string | null {
-  return element.getAttribute('data-cradle-asset-src') ?? element.getAttribute('src')
+  return element.getAttribute('data-cradle-asset-src')
+    ?? element.getAttribute('src')
 }
 
 function readImageDimension(value: string | number | null | undefined): number | null {

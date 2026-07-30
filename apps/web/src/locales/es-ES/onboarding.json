@@ -14,5 +14,20 @@
   "credentials.providers.anthropic.tagline": "API oficial de Claude o API de mensajes de Anthropic",
   "credentials.providers.openai.tagline": "API de OpenAI Responses o cuenta oficial de Codex",
   "credentials.providers.universal.tagline": "Endpoint personalizado compatible con OpenAI y Anthropic",
-  "nav.continueHint": "para continuar"
+  "nav.continueHint": "para continuar",
+  "setup.loading": "Comprobando tu configuración…",
+  "setup.skip": "Omitir por ahora",
+  "setup.continue": "Continuar",
+  "setup.finish": "Empezar",
+  "setup.provider.title": "Conectar un proveedor",
+  "setup.provider.description": "Elige un proveedor para que Cradle pueda ejecutar agentes. Puedes cambiarlo después en Ajustes.",
+  "setup.provider.skip": "Omitir proveedor",
+  "setup.github.title": "Conectar GitHub",
+  "setup.github.description": "Autoriza a Cradle para cargar pull requests y actuar en GitHub como tú.",
+  "setup.github.skipHint": "Puedes omitirlo y conectar después en Ajustes → Integrations. Pull Requests no estará disponible hasta entonces.",
+  "setup.github.continueAnyway": "Continuar sin GitHub",
+  "setup.done.title": "Todo listo",
+  "setup.done.description": "Cradle está configurado en este equipo.",
+  "setup.done.bodyWithGithub": "Empieza un chat o abre Pull Requests para revisar trabajo en GitHub.",
+  "setup.done.bodyWithoutGithub": "Puedes chatear cuando quieras. Conecta GitHub después en Ajustes → Integrations para usar Pull Requests."
 }

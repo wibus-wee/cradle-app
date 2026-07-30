@@ -51,6 +51,11 @@ export const ChatRuntimeModel = {
     messageId: t.String({ minLength: 1 }),
   }),
 
+  sessionBlobParams: t.Object({
+    sessionId: t.String({ minLength: 1 }),
+    blobId: t.String({ minLength: 1 }),
+  }),
+
   runIdParams: t.Object({
     runId: t.String({ minLength: 1 }),
   }),

@@ -5,10 +5,7 @@ import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contra
 import * as Observability from '../../observability/service'
 import { readDurableProviderRuntimeBinding } from '../../provider-runtime/service'
 import { recordRuntimeUsageEvent } from '../../usage/ingest'
-import {
-  compactStoredMessageSnapshot,
-  truncateSnapshotPayload,
-} from '../message-snapshot-compaction'
+import { truncateSnapshotPayload } from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun } from '../run-registry'
 import type {
@@ -240,7 +237,7 @@ export async function executeRun(
       outputChoices: captureMode === 'full'
         ? [{
             role: 'assistant',
-            content: compactStoredMessageSnapshot(activeRun.finalMessage).parts,
+            content: truncateSnapshotPayload(activeRun.finalMessage.parts),
           }]
         : [],
       tools: captureMode === 'full' ? readAiObservationToolNames(activeRun.finalMessage) : [],
@@ -658,11 +655,15 @@ function projectAiObservationInputMessages(input: ExecuteRunInput): unknown[] {
   ]
 }
 
+/**
+ * AI observations are bounded debugging artifacts, so they stay lossy on purpose.
+ * The durable message keeps the full bytes in the blob store; this projection must
+ * not grow with a 20 MB transcript just because the durable path stopped truncating.
+ */
 function projectAiObservationMessage(message: UIMessage): Record<string, unknown> {
-  const compacted = compactStoredMessageSnapshot(message)
   return {
-    role: compacted.role,
-    content: compacted.parts,
+    role: message.role,
+    content: truncateSnapshotPayload(message.parts),
   }
 }
 

@@ -352,6 +352,7 @@ export function ChatShareExport({ sessionId, disabled }: ChatShareExportProps) {
                               <MessageBubbleView
                                 key={message.id}
                                 message={message}
+                                sessionId={sessionId}
                                 isStreaming={false}
                                 presentation="export"
                               />

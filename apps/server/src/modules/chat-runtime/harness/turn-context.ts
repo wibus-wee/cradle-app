@@ -121,16 +121,16 @@ export function resolveSessionSystemPrompt(session: Session | null | undefined):
   return resolveSessionHarness(session).systemPrompt
 }
 
-export function resolveTurnContext(input: {
+export async function resolveTurnContext(input: {
   sessionId: string
   draftMessageId: string
   draftUserMessageId: string
-}): ChatTurnContext {
+}): Promise<ChatTurnContext> {
   const session = db().select().from(sessions).where(eq(sessions.id, input.sessionId)).get()
   const harness = resolveSessionHarness(session)
   // Chronicle per-turn memory context is intentionally disabled for now.
   // It is dynamic and unstable; when re-enabled, decide whether it belongs in system prompt or a lower-authority context channel.
-  const transcript = resolveBoundedTurnHistory({
+  const transcript = await resolveBoundedTurnHistory({
     sessionId: input.sessionId,
     excludedMessageIds: new Set([input.draftMessageId, input.draftUserMessageId]),
   })
@@ -142,11 +142,11 @@ export function resolveTurnContext(input: {
   }
 }
 
-function resolveBoundedTurnHistory(input: {
+async function resolveBoundedTurnHistory(input: {
   sessionId: string
   excludedMessageIds: Set<string>
-}): CradleTurnTranscript {
-  return resolveCradleTurnTranscript({
+}): Promise<CradleTurnTranscript> {
+  return await resolveCradleTurnTranscript({
     sessionId: input.sessionId,
     excludedMessageIds: input.excludedMessageIds,
     maxMessages: readPositiveIntegerEnv(

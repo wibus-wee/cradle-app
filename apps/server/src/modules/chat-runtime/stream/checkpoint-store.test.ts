@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { isChatBlobPayloadRef } from '@cradle/chat-runtime-contracts'
 import {
+  chatMessageBlobRefs,
   messages,
   runStreamCheckpoints,
   sessionEvents,
@@ -24,6 +26,7 @@ import {
 import { finalizeInterruptedRun } from '../es/recovery'
 import { getMessageGroups, getMessageSnapshot } from '../history-api'
 import { putMessagePayload, readMessagePayload } from '../message-payload-store'
+import { parseStoredMessageSnapshot, resolveMessageBlobReferences } from '../ui-message'
 import {
   deleteRunStreamCheckpoint,
   readRunStreamCheckpoint,
@@ -228,6 +231,51 @@ describe('run stream checkpoints', () => {
           .all()
           .map(row => row.eventType),
       ).toEqual(expect.arrayContaining(['AssistantMessageCompleted', 'RunFailed']))
+    })
+  })
+
+  it('externalizes oversized legacy checkpoint payloads before recovery makes them durable', async () => {
+    await withTempDataDir(async () => {
+      const previousLimit = process.env.CRADLE_CHAT_STORED_TOOL_PAYLOAD_MAX_CHARS
+      process.env.CRADLE_CHAT_STORED_TOOL_PAYLOAD_MAX_CHARS = '100'
+      try {
+        const sessionId = 'session-checkpoint-large-recovery'
+        const runId = 'run-checkpoint-large-recovery'
+        const messageId = 'assistant-checkpoint-large-recovery'
+        const body = 'x'.repeat(10_000)
+        seedSession(sessionId)
+        seedStreamingRun({ sessionId, runId, messageId, content: '' })
+        upsertRunStreamCheckpoint({
+          runId,
+          sessionId,
+          messageId,
+          messageJson: JSON.stringify({
+            id: messageId,
+            role: 'assistant',
+            parts: [{
+              type: 'dynamic-tool',
+              toolCallId: 'tool-1',
+              toolName: 'legacy-checkpoint-tool',
+              state: 'output-available',
+              input: {},
+              output: { body },
+            }],
+          }),
+          chunkSeq: 0,
+          updatedAt: 150,
+        })
+
+        expect(await finalizeInterruptedRun(sessionId, runId)).toBe(true)
+        const payload = readMessagePayload(db(), messageId)
+        const stored = parseStoredMessageSnapshot(payload?.messageJson ?? '')
+        expect(isChatBlobPayloadRef((stored.parts[0] as { output: unknown }).output)).toBe(true)
+        expect(db().select().from(chatMessageBlobRefs).all()).toHaveLength(1)
+        const resolved = await resolveMessageBlobReferences(stored)
+        expect((resolved.parts[0] as { output: unknown }).output).toEqual({ body })
+      }
+      finally {
+        restoreEnv('CRADLE_CHAT_STORED_TOOL_PAYLOAD_MAX_CHARS', previousLimit)
+      }
     })
   })
 

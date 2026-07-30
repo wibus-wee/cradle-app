@@ -1,3 +1,4 @@
+import { readCradlePartPayloadRef } from '@cradle/chat-runtime-contracts'
 import type { UIMessage } from 'ai'
 import type { AnchorHTMLAttributes } from 'react'
 
@@ -358,27 +359,64 @@ export function readTextPartFromState(
   return part?.type === 'text' ? part.text : ''
 }
 
+export interface PartOverflowNotice {
+  originalChars: number
+  blobId: string
+}
+
+/** Overflow notice for a text/reasoning part whose remainder lives in a blob. */
+export function readPartOverflowNotice(
+  part: UIMessage['parts'][number] | null | undefined,
+): PartOverflowNotice | null {
+  if (!part || (part.type !== 'text' && part.type !== 'reasoning')) {
+    return null
+  }
+  const ref = readCradlePartPayloadRef(part.providerMetadata)
+  if (!ref) {
+    return null
+  }
+  return {
+    originalChars: ref.originalChars,
+    blobId: ref.blobId,
+  }
+}
+
+export function readTextPartOverflowFromState(
+  state: ChatStoreSnapshot,
+  sessionId: string,
+  messageId: string,
+  partIndex: number,
+  textTransform?: MessageTextTransform,
+): PartOverflowNotice | null {
+  const part = readMessageFromState(state, sessionId, messageId, textTransform)?.parts[partIndex]
+  return readPartOverflowNotice(part)
+}
+
 export function readReasoningPartFromState(
   state: ChatStoreSnapshot,
   sessionId: string,
   messageId: string,
   partIndex: number,
-): { text: string, state?: 'streaming' | 'done' } {
+): { text: string, state?: 'streaming' | 'done', overflow: PartOverflowNotice | null } {
   const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
   if (part?.type !== 'reasoning') {
-    return { text: '', state: 'done' }
+    return { text: '', state: 'done', overflow: null }
   }
   return {
     text: part.text,
     state: (part as { state?: 'streaming' | 'done' }).state,
+    overflow: readPartOverflowNotice(part),
   }
 }
 
 export function areReasoningPartsEqual(
-  left: { text: string, state?: 'streaming' | 'done' },
-  right: { text: string, state?: 'streaming' | 'done' },
+  left: { text: string, state?: 'streaming' | 'done', overflow?: PartOverflowNotice | null },
+  right: { text: string, state?: 'streaming' | 'done', overflow?: PartOverflowNotice | null },
 ): boolean {
-  return left.text === right.text && left.state === right.state
+  return left.text === right.text
+    && left.state === right.state
+    && left.overflow?.blobId === right.overflow?.blobId
+    && left.overflow?.originalChars === right.overflow?.originalChars
 }
 
 export function readFilePartFromState(

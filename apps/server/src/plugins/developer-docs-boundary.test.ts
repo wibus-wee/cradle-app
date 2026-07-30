@@ -8,12 +8,17 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const developerGuidePath = 'packages/plugin-sdk/DEVELOPERS.md'
 
 describe('plugin developer docs boundary', () => {
-  it('documents server hooks under the chat namespace', async () => {
+  it('documents the typed server activity subscription and removes dead observation APIs', async () => {
     const source = await readFile(resolve(repoRoot, developerGuidePath), 'utf8')
 
-    expect(source).toContain('interface ServerPluginHooks {\n  chat: ServerPluginChatHooks\n}')
-    expect(source).toContain('interface ServerPluginChatHooks {')
-    expect(source).not.toContain('interface ServerPluginHooks {\n  onBeforeQuery')
+    expect(source).toContain('interface PluginActivitySubscription {')
+    expect(source).toContain(`kind: 'chat.run.started'`)
+    expect(source).toContain(`kind: 'chat.run.finished'`)
+    expect(source).toContain('activity.read')
+    expect(source).not.toContain(`ServerPlugin${'Hooks'}`)
+    expect(source).not.toContain(`PluginEvent${'Bus'}`)
+    expect(source).not.toContain(`ctx.${'hooks'}`)
+    expect(source).not.toContain(`ctx.${'events'}`)
   })
 
   it('documents the web route client on WebPluginContext', async () => {

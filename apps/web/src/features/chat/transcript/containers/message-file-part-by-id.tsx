@@ -16,5 +16,7 @@ export function MessageFilePartById({ sessionId, messageId, partIndex, onImageCl
   const part = displayPart !== undefined
     ? (displayPart?.type === 'file' ? displayPart : null)
     : storePart
-  return part ? <FileAttachmentView part={part} onClick={onImageClick} /> : null
+  return part
+    ? <FileAttachmentView part={part} sessionId={sessionId} onClick={onImageClick} />
+    : null
 }

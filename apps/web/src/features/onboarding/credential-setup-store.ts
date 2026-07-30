@@ -3,37 +3,96 @@ import { persist } from 'zustand/middleware'
 
 import { persistStorage } from '~/store/persist-storage'
 
-interface CredentialSetupState {
-  /** True once the user has configured a provider, picked cc-switch, or explicitly skipped. */
-  completed: boolean
-  /** True if the user dismissed the dialog without configuring anything. */
-  skipped: boolean
-  complete: () => void
-  skip: () => void
+/** Stable keys for first-run setup steps. Add new steps here when the dialog grows. */
+export const FIRST_RUN_SETUP_STEP_KEYS = ['provider', 'github'] as const
+
+export type FirstRunSetupStepKey = (typeof FIRST_RUN_SETUP_STEP_KEYS)[number]
+
+export type FirstRunSetupCompletedSteps = Partial<Record<FirstRunSetupStepKey, true>>
+
+interface FirstRunSetupState {
+  /** Steps the user has finished or explicitly skipped in the setup dialog. */
+  completedSteps: FirstRunSetupCompletedSteps
+  completeStep: (key: FirstRunSetupStepKey) => void
+  completeSteps: (keys: readonly FirstRunSetupStepKey[]) => void
   reset: () => void
 }
 
+export function isFirstRunSetupStepCompleted(
+  completedSteps: FirstRunSetupCompletedSteps,
+  key: FirstRunSetupStepKey,
+): boolean {
+  return completedSteps[key] === true
+}
+
 /**
- * First-run credential setup gate. Sits between onboarding completion and the
- * main app: once onboarding is done we surface a dialog nudging the user to
- * configure an AI provider (or adopt their existing cc-switch setup). The
- * dialog stops appearing once `completed` is true.
+ * Steps still owed by the user, after subtracting environmentally satisfied
+ * capabilities (existing providers / connected GitHub).
  */
-export const useCredentialSetupStore = create<CredentialSetupState>()(
+export function resolvePendingFirstRunSetupSteps(input: {
+  completedSteps: FirstRunSetupCompletedSteps
+  providerSatisfied: boolean
+  githubSatisfied: boolean
+}): FirstRunSetupStepKey[] {
+  const pending: FirstRunSetupStepKey[] = []
+  if (!isFirstRunSetupStepCompleted(input.completedSteps, 'provider') && !input.providerSatisfied) {
+    pending.push('provider')
+  }
+  if (!isFirstRunSetupStepCompleted(input.completedSteps, 'github') && !input.githubSatisfied) {
+    pending.push('github')
+  }
+  return pending
+}
+
+export function areAllFirstRunSetupStepsCompleted(
+  completedSteps: FirstRunSetupCompletedSteps,
+): boolean {
+  return FIRST_RUN_SETUP_STEP_KEYS.every(key => isFirstRunSetupStepCompleted(completedSteps, key))
+}
+
+/**
+ * First-run setup gate after brand onboarding.
+ *
+ * Persist key `cradle:first-run-setup:v2` stores per-step completion keys so
+ * users only see steps they have not walked yet. Environmentally satisfied
+ * steps (existing providers, connected GitHub) are omitted without writing.
+ */
+export const useFirstRunSetupStore = create<FirstRunSetupState>()(
   persist(
     set => ({
-      completed: false,
-      skipped: false,
+      completedSteps: {},
 
-      complete: () => set({ completed: true, skipped: false }),
-      skip: () => set({ completed: true, skipped: true }),
-      reset: () => set({ completed: false, skipped: false }),
+      completeStep: key => set((state) => {
+        if (state.completedSteps[key]) {
+          return state
+        }
+        return {
+          completedSteps: { ...state.completedSteps, [key]: true },
+        }
+      }),
+
+      completeSteps: keys => set((state) => {
+        let changed = false
+        const next = { ...state.completedSteps }
+        for (const key of keys) {
+          if (!next[key]) {
+            next[key] = true
+            changed = true
+          }
+        }
+        return changed ? { completedSteps: next } : state
+      }),
+
+      reset: () => set({ completedSteps: {} }),
     }),
     {
-      name: 'cradle:credential-setup:v1',
+      name: 'cradle:first-run-setup:v2',
       storage: persistStorage,
-      version: 1,
-      partialize: state => ({ completed: state.completed, skipped: state.skipped }),
+      version: 2,
+      partialize: state => ({ completedSteps: state.completedSteps }),
     },
   ),
 )
+
+/** @deprecated Prefer useFirstRunSetupStore. */
+export const useCredentialSetupStore = useFirstRunSetupStore

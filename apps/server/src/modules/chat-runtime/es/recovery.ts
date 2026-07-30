@@ -8,10 +8,12 @@ import {
   runStreamCheckpoints,
   sessionEvents,
 } from '@cradle/db'
+import type { UIMessage } from 'ai'
 import { and, desc, eq, or, sql } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
+import { toDurableMessagePayload } from '../message-durable-payload'
 import type { HydratedMessage } from '../message-payload-store'
 import {
   hydrateMessage,
@@ -22,13 +24,14 @@ import {
   deleteRunStreamCheckpoint,
   readRunStreamCheckpoint,
 } from '../stream/checkpoint-store'
-import { extractMessageText, parseStoredMessageSnapshot } from '../ui-message'
+import { parseStoredMessageSnapshot } from '../ui-message'
 import {
   appendDecidedSessionEvents,
   appendValidatedRecoverySessionEvents,
   readRunStopReason,
   readRunTerminalEventType,
 } from './commands'
+import type { ChatRuntimeTx } from './event-store'
 import { publishSessionTailEvents } from './event-tail'
 import type { ChatSessionEvent, StoredChatSessionEvent, TerminalRunEventType } from './events'
 import { parseStoredChatSessionEvent } from './events'
@@ -299,39 +302,42 @@ function finalizeInterruptedRunInActor(sessionId: string, runId: string): Stored
   const finishedAt = currentUnixSeconds()
   const queueItemId = readRunQueueItemId(sessionId, runId)
   const bootstrapEvents = readMissingRunBootstrapEvents({ run, message, queueItemId })
-  const events: ChatSessionEvent[] = [...bootstrapEvents]
-  const completedMessage = readInterruptedAssistantMessage({
-    sessionId,
-    run,
-    message,
-    checkpoint,
-    finishedAt,
-  })
-  if (completedMessage) {
-    events.push({
-      type: 'AssistantMessageCompleted',
-      payload: {
-        message: completedMessage,
-      },
-    })
-  }
-  events.push({
-    type: 'RunFailed',
-    payload: {
-      runId,
-      sessionId,
-      queueItemId,
-      ...(run.bindingId !== null ? { bindingId: run.bindingId } : {}),
-      status: 'failed',
-      stopReason: INTERRUPTED_RUN_STOP_REASON,
-      errorText: INTERRUPTED_RUN_ERROR_TEXT,
-      finishedAt,
-    },
-  })
   return commitRecoverySessionEventsInTransaction(sessionId, {
     runId: run.id,
     messageId: run.messageId,
-    events,
+    events: (tx) => {
+      const events: ChatSessionEvent[] = [...bootstrapEvents]
+      const completedMessage = readInterruptedAssistantMessage({
+        sessionId,
+        run,
+        message,
+        checkpoint,
+        finishedAt,
+        d: tx,
+      })
+      if (completedMessage) {
+        events.push({
+          type: 'AssistantMessageCompleted',
+          payload: {
+            message: completedMessage,
+          },
+        })
+      }
+      events.push({
+        type: 'RunFailed',
+        payload: {
+          runId,
+          sessionId,
+          queueItemId,
+          ...(run.bindingId !== null ? { bindingId: run.bindingId } : {}),
+          status: 'failed',
+          stopReason: INTERRUPTED_RUN_STOP_REASON,
+          errorText: INTERRUPTED_RUN_ERROR_TEXT,
+          finishedAt,
+        },
+      })
+      return events
+    },
     alreadyProjectedCount: bootstrapEvents.length,
     afterAppend: (tx) => {
       deleteRunStreamCheckpoint(runId, tx)
@@ -345,6 +351,7 @@ function readInterruptedAssistantMessage(input: {
   message: HydratedMessage | null | undefined
   checkpoint: RunStreamCheckpoint | undefined
   finishedAt: number
+  d: ChatRuntimeTx
 }): {
   id: string
   sessionId: string
@@ -359,24 +366,35 @@ function readInterruptedAssistantMessage(input: {
     return null
   }
 
-  const messageJson = input.checkpoint
+  const sourceJson = input.checkpoint
     ? input.checkpoint.messageJson
     : input.message
       ? normalizeTerminalMessageJson(input.message)
       : JSON.stringify({ id: messageId, role: 'assistant', parts: [] })
-  let content = input.message?.content ?? ''
+  let snapshot: UIMessage
   try {
-    content = extractMessageText(parseStoredMessageSnapshot(messageJson))
+    snapshot = parseStoredMessageSnapshot(sourceJson)
   }
  catch {
-    // Keep projection content when checkpoint JSON is malformed.
+    snapshot = {
+      id: messageId,
+      role: 'assistant',
+      parts: input.message?.content
+        ? [{ type: 'text' as const, text: input.message.content }]
+        : [],
+    }
   }
+  const durable = toDurableMessagePayload({
+    sessionId: input.sessionId,
+    message: snapshot,
+    d: input.d,
+  })
 
   return {
     id: messageId,
     sessionId: input.sessionId,
-    content,
-    messageJson,
+    content: durable.content,
+    messageJson: durable.messageJson,
     status: 'failed',
     errorText: INTERRUPTED_RUN_ERROR_TEXT,
     updatedAt: input.finishedAt,
@@ -388,23 +406,27 @@ function commitRecoverySessionEventsInTransaction(
   input: {
     runId: string
     messageId: string | null
-    events: ChatSessionEvent[]
+    events: ChatSessionEvent[] | ((tx: ChatRuntimeTx) => ChatSessionEvent[])
     alreadyProjectedCount: number
     afterAppend?: (tx: Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0]) => void
   },
 ): StoredChatSessionEvent[] {
-  if (input.events.length === 0) {
+  if (Array.isArray(input.events) && input.events.length === 0) {
     return []
   }
 
   const storedEvents: StoredChatSessionEvent[] = []
   db().transaction((tx) => {
+    const events = typeof input.events === 'function' ? input.events(tx) : input.events
+    if (events.length === 0) {
+      return
+    }
     let appended = 0
     storedEvents.push(
       ...appendValidatedRecoverySessionEvents(tx, sessionId, {
         runId: input.runId,
         messageId: input.messageId,
-        events: input.events,
+        events,
         projectEvent: () => {
           appended += 1
           return appended > input.alreadyProjectedCount
@@ -536,41 +558,42 @@ function abortProjectedStreamingRunInActor(
   const finishedAt = currentUnixSeconds()
   const checkpoint = readRunStreamCheckpoint(runId)
   const message = run.messageId ? readMessage(run.chatSessionId, run.messageId) : null
-  const events: ChatSessionEvent[] = []
-  const completedMessage = readInterruptedAssistantMessage({
-    sessionId: run.chatSessionId,
-    run,
-    message,
-    checkpoint,
-    finishedAt,
-  })
-  if (completedMessage) {
-    events.push({
-      type: 'AssistantMessageCompleted',
-      payload: {
-        message: {
-          ...completedMessage,
-          status: 'aborted',
-          errorText: null,
-        },
-      },
-    })
-  }
-  events.push({
-    type: 'RunAborted',
-    payload: {
-      runId: run.id,
-      sessionId: run.chatSessionId,
-      queueItemId: readRunQueueItemId(run.chatSessionId, run.id),
-      ...(run.bindingId !== null ? { bindingId: run.bindingId } : {}),
-      status: 'aborted',
-      stopReason: 'response.cancelled',
-      errorText: null,
-      finishedAt,
-    },
-  })
   const storedEvents: StoredChatSessionEvent[] = []
   db().transaction((tx) => {
+    const events: ChatSessionEvent[] = []
+    const completedMessage = readInterruptedAssistantMessage({
+      sessionId: run.chatSessionId,
+      run,
+      message,
+      checkpoint,
+      finishedAt,
+      d: tx,
+    })
+    if (completedMessage) {
+      events.push({
+        type: 'AssistantMessageCompleted',
+        payload: {
+          message: {
+            ...completedMessage,
+            status: 'aborted',
+            errorText: null,
+          },
+        },
+      })
+    }
+    events.push({
+      type: 'RunAborted',
+      payload: {
+        runId: run.id,
+        sessionId: run.chatSessionId,
+        queueItemId: readRunQueueItemId(run.chatSessionId, run.id),
+        ...(run.bindingId !== null ? { bindingId: run.bindingId } : {}),
+        status: 'aborted',
+        stopReason: 'response.cancelled',
+        errorText: null,
+        finishedAt,
+      },
+    })
     storedEvents.push(...appendDecidedSessionEvents(tx, run.chatSessionId, events))
     deleteRunStreamCheckpoint(runId, tx)
   })

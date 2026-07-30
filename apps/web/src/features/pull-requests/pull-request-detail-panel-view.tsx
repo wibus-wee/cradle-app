@@ -12,6 +12,8 @@ import { cn } from '~/lib/cn'
 import type { PullRequestDetail } from './api/pull-requests'
 import { PullRequestCodeView } from './pull-request-code-view'
 import { PullRequestDetailSkeletonView } from './pull-request-detail-skeleton-view'
+import type { PullRequestErrorKind } from './pull-request-error'
+import { PullRequestErrorStateView } from './pull-request-error-state-view'
 import type { PullRequestActionsViewProps } from './pull-request-summary-view'
 import { PullRequestSummaryView } from './pull-request-summary-view'
 import { PullRequestTimelineView } from './pull-request-timeline-view'
@@ -25,6 +27,7 @@ export interface PullRequestDetailPanelViewProps {
   number: number
   locale: string
   isFetching: boolean
+  errorKind?: PullRequestErrorKind | null
   initialTab?: PullRequestDetailTab
   now?: number
   onRefresh: () => void
@@ -39,6 +42,7 @@ export function PullRequestDetailPanelView({
   number,
   locale,
   isFetching,
+  errorKind = null,
   initialTab = 'summary',
   now = Date.now(),
   onRefresh,
@@ -47,6 +51,21 @@ export function PullRequestDetailPanelView({
 }: PullRequestDetailPanelViewProps) {
   const { t } = useTranslation('pull-requests')
   const [activeTab, setActiveTab] = useState<PullRequestDetailTab>(initialTab)
+
+  if (errorKind) {
+    return (
+      <div
+        className="absolute inset-0 flex min-h-0 flex-col overflow-hidden bg-background"
+        data-testid="pull-request-detail-panel"
+      >
+        <PullRequestErrorStateView
+          kind={errorKind}
+          retrying={isFetching}
+          onRetry={onRefresh}
+        />
+      </div>
+    )
+  }
 
   if (!detail) {
     return <PullRequestDetailSkeletonView />

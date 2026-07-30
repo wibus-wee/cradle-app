@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
+import { resolveBlobContentUrl } from '~/features/assets/blob-url'
 import { sessionEnvironmentApi } from '~/features/session-environment/api/session-environment'
 import { cn } from '~/lib/cn'
 import { chatSelectors } from '~/store/chat'
@@ -503,7 +504,7 @@ const MessageBubbleSegmentsView = ({
         segment.partIndex,
       )
       return {
-        url: part?.url ?? '',
+        url: part && sessionId ? resolveBlobContentUrl(part.url, sessionId) : (part?.url ?? ''),
         alt: part?.filename ?? part?.mediaType ?? 'Image',
       }
     })
@@ -852,7 +853,7 @@ function MessageBubbleView({
         )
 
       case 'file-attachment':
-        return <FileAttachmentBlock key={item.key} part={item.part} />
+        return <FileAttachmentBlock key={item.key} part={item.part} sessionId={sessionId} />
 
       case 'skill-context':
         return <SkillContextBlock key={item.key} part={item.part} />

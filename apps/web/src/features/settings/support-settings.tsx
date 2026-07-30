@@ -25,6 +25,7 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
+import { useFirstRunSetupStore } from '~/features/onboarding/credential-setup-store'
 import { useOnboardingStore } from '~/features/onboarding/onboarding-store'
 import { getServerUrl, isElectron, nativeIpc } from '~/lib/electron'
 
@@ -382,7 +383,10 @@ export function SupportSettings() {
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => useOnboardingStore.getState().reset()}
+            onClick={() => {
+              useOnboardingStore.getState().reset()
+              useFirstRunSetupStore.getState().reset()
+            }}
           >
             <RotateCcwIcon className="size-3.5" aria-hidden="true" />
             {t('support.action.showOnboarding')}

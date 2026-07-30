@@ -1,5 +1,8 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 
+export * from './blob-reference'
+export * from './message-split-boundary'
+
 export const providerKinds = ['openai-compatible', 'anthropic', 'universal'] as const
 export type ProviderKind = (typeof providerKinds)[number]
 export const providerTargetKinds = ['manual', 'external'] as const

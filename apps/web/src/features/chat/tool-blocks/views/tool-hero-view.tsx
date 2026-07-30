@@ -2,7 +2,7 @@ import { cn } from '~/lib/cn'
 
 import type { ToolPayload, ToolState, ToolUiDescriptor } from '../../rendering/tool-ui-classifier'
 import type { PlanDocumentOpenInput } from './plan-document-preview-view'
-import { DiffSummary } from './tool-call-details'
+import { DiffSummary, RawValue, ToolPayloadTruncationNotice } from './tool-call-details'
 import { FileReadSummaryView } from './tool-hero/file-read-summary-view'
 import { McpSummaryView } from './tool-hero/mcp-summary-view'
 import { PlanImplementationSummaryView } from './tool-hero/plan-implementation-summary-view'
@@ -21,6 +21,7 @@ export interface ToolHeroViewProps {
   output: ToolPayload
   errorText?: string
   toolCallId: string
+  blobSessionId?: string | null
   onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
 }
 
@@ -32,8 +33,29 @@ export function ToolHeroView({
   output,
   errorText,
   toolCallId,
+  blobSessionId,
   onOpenPlanDocument,
 }: ToolHeroViewProps) {
+  const truncatedPayload = output.truncatedOriginalChars !== null
+    ? output
+    : input.truncatedOriginalChars !== null
+      ? input
+      : null
+  if (!errorText && truncatedPayload) {
+    return (
+      <div className="grid gap-1.5">
+        <ToolPayloadTruncationNotice
+          truncatedOriginalChars={truncatedPayload.truncatedOriginalChars}
+          blobId={truncatedPayload.blobId}
+          sessionId={blobSessionId}
+        />
+        {truncatedPayload.rawText
+          ? <RawValue value={truncatedPayload.rawText} className="max-h-64" />
+          : null}
+      </div>
+    )
+  }
+
   switch (descriptor.kind) {
     case 'terminal': return <TerminalSummaryView errorText={errorText} />
     case 'file-read': return <FileReadSummaryView output={output} />
@@ -47,7 +69,8 @@ export function ToolHeroView({
     case 'plan': return <PlanSummaryView input={input} output={output} toolCallId={toolCallId} onOpenPlanDocument={onOpenPlanDocument} />
     case 'question': return <QuestionSummaryView output={output} />
     case 'mcp': return <McpSummaryView output={output} errorText={errorText} />
-    default:
+    default: {
       return <div className={cn('rounded-md bg-muted/30 px-2.5 py-2 text-xs text-muted-foreground', (state === 'output-error' || state === 'output-denied') && 'bg-destructive/5 text-destructive/80')}>{errorText || descriptor.summary || 'Tool details are available below.'}</div>
+    }
   }
 }

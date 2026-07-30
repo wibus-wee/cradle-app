@@ -11,6 +11,7 @@ import { openWork } from '~/navigation/navigation-commands'
 
 import { pullRequestMutations, pullRequestQueryOptions } from './api/pull-requests'
 import { PullRequestDetailPanelView } from './pull-request-detail-panel-view'
+import { resolvePullRequestErrorKind } from './pull-request-error'
 import type { PullRequestActionsPending } from './pull-request-summary-view'
 import { usePullRequestFingerprintSync } from './use-pull-request-fingerprint-sync'
 
@@ -154,7 +155,22 @@ export function PullRequestDetailPanel({
   }
 
   if (detailQuery.error) {
-    throw detailQuery.error
+    return (
+      <PullRequestDetailPanelView
+        detail={null}
+        owner={owner}
+        repo={repo}
+        number={number}
+        locale={i18n.language}
+        isFetching={detailQuery.isFetching}
+        errorKind={resolvePullRequestErrorKind(detailQuery.error)}
+        onRefresh={() => {
+          void resetFingerprint()
+          void detailQuery.refetch()
+        }}
+        onOpenWork={workId ? () => openWork(workId) : undefined}
+      />
+    )
   }
 
   return (
@@ -165,6 +181,7 @@ export function PullRequestDetailPanel({
       number={number}
       locale={i18n.language}
       isFetching={detailQuery.isFetching}
+      errorKind={null}
       onRefresh={() => {
         void resetFingerprint()
         void detailQuery.refetch()

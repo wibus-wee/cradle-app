@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -70,5 +71,12 @@ describe('turn checkpoint git store', () => {
     ])
     expect(() => git('show-ref', '--verify', 'refs/cradle/checkpoints/test/start')).toThrow()
     expect(() => git('show-ref', '--verify', 'refs/cradle/checkpoints/test/end')).toThrow()
+  })
+
+  it('treats missing workspace as already cleaned when deleting refs', async () => {
+    await expect(deleteCheckpointRefs(
+      join(tmpdir(), 'cradle-missing-worktree', randomUUID()),
+      ['refs/cradle/checkpoints/test/start'],
+    )).resolves.toBeUndefined()
   })
 })

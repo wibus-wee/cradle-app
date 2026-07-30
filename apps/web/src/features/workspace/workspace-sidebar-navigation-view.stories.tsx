@@ -24,6 +24,8 @@ const meta = {
   args: {
     collapsed: false,
     pullRequestsActive: false,
+    githubFeaturesDisabled: false,
+    disabledLabel: 'Disabled',
     onNewWork: fn(),
     onNewChat: fn(),
     onSearch: fn(),
@@ -43,6 +45,12 @@ export const Expanded: Story = {}
 export const PullRequestsActive: Story = {
   args: {
     pullRequestsActive: true,
+  },
+}
+
+export const GithubDisabled: Story = {
+  args: {
+    githubFeaturesDisabled: true,
   },
 }
 

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { getChatSessionsBySessionIdRunSnapshotsOptions } from '~/api-gen/@tanstack/react-query.gen'
+import { resolveBlobContentUrl } from '~/features/assets/blob-url'
 import { chatSelectors } from '~/store/chat'
 
 import { BangCommandBlock, BangCommandPromptBlock } from '../../rendering/blocks/bang-command-block'
@@ -77,7 +78,10 @@ export function MessageBubbleSegmentsContainer({
   const imageSegments = segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => imageAttachmentBySegmentKey.has(segment.key))
   const lightboxImages = imageSegments.map(({ segment }) => {
     const part = imageAttachmentBySegmentKey.get(segment.key)
-    return { url: part?.url ?? '', alt: part?.filename ?? part?.mediaType ?? 'Image' }
+    return {
+      url: part ? resolveBlobContentUrl(part.url, sessionId) : '',
+      alt: part?.filename ?? part?.mediaType ?? 'Image',
+    }
   })
 
   const renderSegment = (segment: ChatRenderSegment, index: number) => (

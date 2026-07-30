@@ -49,6 +49,32 @@ export function commitSessionEventsWithProjection(
   })
 }
 
+export function commitPreparedSessionEventsWithProjection<Result>(
+  sessionId: string,
+  prepare: (tx: ChatRuntimeTx) => {
+    events: ChatSessionEvent[]
+    result: Result
+  },
+  projectAdditionalChanges: (tx: ChatRuntimeTx) => void,
+): Promise<Result> {
+  return runSessionActorTask(sessionId, () => {
+    const storedEvents: StoredChatSessionEvent[] = []
+    const result = db().transaction((tx) => {
+      const preparation = prepare(tx)
+      storedEvents.push(...appendDecidedSessionEvents(tx, sessionId, preparation.events))
+      projectAdditionalChanges(tx)
+      return preparation.result
+    })
+    return {
+      storedEvents,
+      result,
+    }
+  }).then(({ storedEvents, result }) => {
+    publishSessionTailEvents(storedEvents)
+    return result
+  })
+}
+
 export function commitSessionEventsInTransaction(
   sessionId: string,
   events: ChatSessionEvent[],

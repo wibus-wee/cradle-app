@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
+import type { ChatMessagePartBoundary } from '@cradle/chat-runtime-contracts'
 import type { BackendRun } from '@cradle/db'
 import type { FileUIPart, UIMessage } from 'ai'
 
@@ -9,19 +10,19 @@ import { readDurableProviderRuntimeBinding } from '../../provider-runtime/servic
 import type { ChatContextPart } from '../context-parts'
 import { commitSessionEvents } from '../es/commands'
 import type { BackendRunStartedFact } from '../es/events'
+import { toDurableMessagePayload } from '../message-durable-payload'
 import type { ChatSessionContinuationMode } from '../queue/session-queue'
 import type { RuntimeGoalContinuation } from '../runtime-provider-types'
 import {
   annotateGoalMessage,
   createUserMessage,
-  extractMessageText,
 } from '../ui-message'
 
 interface ContinuationMetadataInput {
   mode: ChatSessionContinuationMode
   queueItemId?: string
   sourceMessageId?: string
-  splitParts?: UIMessage['parts']
+  splitParts?: ChatMessagePartBoundary[]
 }
 
 export interface DraftTurnInput {
@@ -129,7 +130,7 @@ export async function appendDraftUserMessage(input: {
   const now = currentUnixSeconds()
   await commitSessionEvents(input.sessionId, [{
     type: 'UserMessageAppended',
-    payload: { message: createUserMessageFact(input.sessionId, input.userMessage, now) },
+    payload: { message: await createUserMessageFact(input.sessionId, input.userMessage, now) },
   }])
 }
 
@@ -137,12 +138,16 @@ export async function insertCompletedUserMessage(
   input: InsertCompletedUserMessageInput,
 ): Promise<void> {
   const now = currentUnixSeconds()
+  const durable = await toDurableMessagePayload({
+    sessionId: input.sessionId,
+    message: input.message,
+  })
   await commitSessionEvents(input.sessionId, [
     {
       type: 'SteerApplied',
       payload: {
         message: {
-          id: input.message.id,
+          id: durable.message.id,
           sessionId: input.sessionId,
           parentMessageId: input.parentMessageId ?? null,
           parentToolCallId: null,
@@ -150,8 +155,8 @@ export async function insertCompletedUserMessage(
           depth: 0,
           role: 'user',
           status: 'complete',
-          content: extractMessageText(input.message),
-          messageJson: JSON.stringify(input.message),
+          content: durable.content,
+          messageJson: durable.messageJson,
           createdAt: now,
           updatedAt: now,
         },
@@ -175,11 +180,17 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
     startedAt: now,
     finishedAt: null,
   } satisfies BackendRunStartedFact
+  const assistantDurable = await toDurableMessagePayload({
+    sessionId: input.sessionId,
+    message: input.assistantMessage,
+  })
   await commitSessionEvents(input.sessionId, [
     ...(input.userMessage
       ? [{
           type: 'UserMessageAppended' as const,
-          payload: { message: createUserMessageFact(input.sessionId, input.userMessage, now) },
+          payload: {
+            message: await createUserMessageFact(input.sessionId, input.userMessage, now),
+          },
         }]
       : []),
     {
@@ -195,8 +206,8 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
           depth: 0,
           role: 'assistant',
           status: 'streaming',
-          content: extractMessageText(input.assistantMessage),
-          messageJson: JSON.stringify(input.assistantMessage),
+          content: assistantDurable.content,
+          messageJson: assistantDurable.messageJson,
           errorText: null,
           createdAt: now,
           updatedAt: now,
@@ -208,9 +219,10 @@ export async function startRun(input: StartRunInput): Promise<BackendRun> {
   return run
 }
 
-function createUserMessageFact(sessionId: string, message: UIMessage, now: number) {
+async function createUserMessageFact(sessionId: string, message: UIMessage, now: number) {
+  const durable = await toDurableMessagePayload({ sessionId, message })
   return {
-    id: message.id,
+    id: durable.message.id,
     sessionId,
     parentMessageId: null,
     parentToolCallId: null,
@@ -218,8 +230,8 @@ function createUserMessageFact(sessionId: string, message: UIMessage, now: numbe
     depth: 0,
     role: 'user' as const,
     status: 'complete' as const,
-    content: extractMessageText(message),
-    messageJson: JSON.stringify(message),
+    content: durable.content,
+    messageJson: durable.messageJson,
     createdAt: now,
     updatedAt: now,
   }

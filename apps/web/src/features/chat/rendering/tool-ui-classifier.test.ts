@@ -45,6 +45,22 @@ describe('describeToolCall', () => {
     expect(descriptor.target).toBe('Investigate the failure')
   })
 
+  it('labels a native agent wait as waiting rather than launching a subagent', () => {
+    const descriptor = describeToolCall(toolPart({
+      type: 'cradle.builtin-tool-call.input.v1',
+      identifier: 'codex',
+      apiName: 'wait',
+      kind: 'subagent',
+      args: {
+        tool: 'wait',
+        receiverThreadIds: [],
+      },
+    }, 'tool-wait'))
+
+    expect(descriptor.kind).toBe('subagent')
+    expect(descriptor.title).toBe('Wait for agents')
+  })
+
   it('never promotes a Bash call to subagent just because it carries a description', () => {
     const descriptor = describeToolCall(toolPart({
       type: 'cradle.builtin-tool-call.input.v1',
@@ -160,5 +176,73 @@ describe('describeToolCall', () => {
     expect(outputPayload.rawValue).toBe(output)
     expect(outputPayload.workflowLifecycle).toEqual(output.lifecycle)
     expect(outputPayload.workflowRunId).toBe('wf_run_1')
+  })
+})
+
+describe('readToolPayload', () => {
+  it('exposes a legacy truncated json payload preview instead of an empty block', () => {
+    const marker = {
+      type: 'cradle.truncated-json-payload.v1',
+      originalChars: 250_000,
+      preview: '{"huge":"prefix',
+    }
+
+    const payload = readToolPayload(marker)
+
+    expect(payload.rawText).toBe(marker.preview)
+    expect(payload.rawValue).toBe(marker)
+    expect(payload.truncatedOriginalChars).toBe(250_000)
+    expect(payload.blobId).toBeNull()
+    expect(payload.type).toBeNull()
+  })
+
+  it('exposes a legacy truncated text payload preview instead of an empty block', () => {
+    const marker = {
+      type: 'cradle.truncated-text-payload.v1',
+      originalChars: 180_000,
+      preview: 'partial stdout that used to vanish',
+    }
+
+    const payload = readToolPayload(marker)
+
+    expect(payload.rawText).toBe(marker.preview)
+    expect(payload.rawValue).toBe(marker)
+    expect(payload.truncatedOriginalChars).toBe(180_000)
+    expect(payload.blobId).toBeNull()
+  })
+
+  it('exposes a blob payload ref preview with its fetchable blob id', () => {
+    const ref = {
+      type: 'cradle.blob-payload-ref.v1',
+      blobId: 'blob_abc123',
+      mediaType: 'application/json',
+      originalChars: 900_000,
+      preview: '{"ok":true',
+    }
+
+    const payload = readToolPayload(ref)
+
+    expect(payload.rawText).toBe(ref.preview)
+    expect(payload.rawValue).toBe(ref)
+    expect(payload.truncatedOriginalChars).toBe(900_000)
+    expect(payload.blobId).toBe('blob_abc123')
+  })
+
+  it('classifies an ordinary inline payload exactly as before', () => {
+    const value = {
+      command: 'git status',
+      description: 'Show working tree status',
+      stdout: 'clean',
+    }
+
+    const payload = readToolPayload(value)
+
+    expect(payload.rawValue).toBe(value)
+    expect(payload.rawText).toBeNull()
+    expect(payload.truncatedOriginalChars).toBeNull()
+    expect(payload.blobId).toBeNull()
+    expect(payload.command).toBe('git status')
+    expect(payload.description).toBe('Show working tree status')
+    expect(payload.stdout).toBe('clean')
   })
 })

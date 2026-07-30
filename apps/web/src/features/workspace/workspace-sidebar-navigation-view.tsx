@@ -16,6 +16,8 @@ import { WorkspaceSidebarNavItemView } from './workspace-sidebar-nav-item-view'
 export interface WorkspaceSidebarNavigationViewProps {
   collapsed: boolean
   pullRequestsActive: boolean
+  githubFeaturesDisabled?: boolean
+  disabledLabel?: string
   onNewWork: () => void
   onNewChat: () => void
   onSearch: () => void
@@ -29,6 +31,8 @@ export interface WorkspaceSidebarNavigationViewProps {
 export function WorkspaceSidebarNavigationView({
   collapsed,
   pullRequestsActive,
+  githubFeaturesDisabled = false,
+  disabledLabel,
   onNewWork,
   onNewChat,
   onSearch,
@@ -47,6 +51,8 @@ export function WorkspaceSidebarNavigationView({
           icon={<WorkIcon className="size-3.5" />}
           label={t('nav.newWork')}
           collapsed={collapsed}
+          disabled={githubFeaturesDisabled}
+          disabledLabel={disabledLabel}
           onClick={onNewWork}
           dataTestId="nav-new-work"
         />
@@ -77,6 +83,8 @@ export function WorkspaceSidebarNavigationView({
           label={t('nav.pullRequests')}
           collapsed={collapsed}
           active={pullRequestsActive}
+          disabled={githubFeaturesDisabled}
+          disabledLabel={disabledLabel}
           onClick={onPullRequests}
           dataTestId="nav-pull-requests"
         />

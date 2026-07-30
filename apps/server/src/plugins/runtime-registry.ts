@@ -219,6 +219,7 @@ export function registerPluginCapability(
   label?: string,
   metadata?: Record<string, unknown>,
   candidateDeclaredLocalIds?: string[],
+  requiredDeclaredPermissions?: string[],
 ): PluginCapabilityRecord {
   const descriptor = descriptors.get(owner)
   if (descriptor) {
@@ -230,6 +231,16 @@ export function registerPluginCapability(
     })
     if (!policy.allowed) {
       throw new Error(policy.reason ?? `Runtime capability ${type}:${localId} is not allowed.`)
+    }
+    const declaredCapability = descriptor.declaredCapabilities.find(
+      capability => capability.id === policy.matchedDeclaredCapabilityId,
+    )
+    for (const permission of requiredDeclaredPermissions ?? []) {
+      if (!declaredCapability?.permissions.includes(permission)) {
+        throw new Error(
+          `Runtime capability ${type}:${localId} must declare permission ${permission}.`,
+        )
+      }
     }
     if (policy.warning && !descriptor.warnings.includes(policy.warning)) {
       descriptor.warnings.push(policy.warning)

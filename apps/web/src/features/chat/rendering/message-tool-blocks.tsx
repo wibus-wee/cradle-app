@@ -12,6 +12,7 @@ import { useChatRenderStore } from './chat-render-store'
 import { toolNameFromPart } from './chat-tool-entities'
 import {
   areRenderableToolPartsEqual,
+  readPartOverflowNotice,
   readReasoningPartFromState,
   readRenderableToolPartFromState,
   readToolApproval,
@@ -221,7 +222,14 @@ export function ActivityFeedByPartIndexes({
       return entries.map((entry): ActivityFeedViewEntry | null => {
         if (entry.entryKind === 'reasoning') {
           const part = readReasoningPartFromState(state, sessionId, entry.messageId, entry.partIndex)
-          return { entryKind: 'reasoning', key: entry.key, text: part.text, state: part.state }
+          return {
+            entryKind: 'reasoning',
+            key: entry.key,
+            text: part.text,
+            state: part.state,
+            overflowOriginalChars: part.overflow?.originalChars ?? null,
+            overflowBlobId: part.overflow?.blobId ?? null,
+          }
         }
         const part = readRenderableToolPartFromState(state, sessionId, entry.messageId, entry.partIndex)
         return part ? { entryKind: 'tool-call', key: entry.key, part } : null
@@ -233,14 +241,18 @@ export function ActivityFeedByPartIndexes({
     ? entries.flatMap((entry): ActivityFeedViewEntry[] => {
         const part = displayParts[entry.partIndex]
         if (entry.entryKind === 'reasoning') {
-          return part?.type === 'reasoning'
-            ? [{
-                entryKind: 'reasoning',
-                key: entry.key,
-                text: part.text,
-                state: (part as { state?: 'streaming' | 'done' }).state,
-              }]
-            : []
+          if (part?.type !== 'reasoning') {
+            return []
+          }
+          const overflow = readPartOverflowNotice(part)
+          return [{
+            entryKind: 'reasoning',
+            key: entry.key,
+            text: part.text,
+            state: (part as { state?: 'streaming' | 'done' }).state,
+            overflowOriginalChars: overflow?.originalChars ?? null,
+            overflowBlobId: overflow?.blobId ?? null,
+          }]
         }
         const toolPart = part ? readRenderableToolPart(part) : null
         return toolPart ? [{ entryKind: 'tool-call', key: entry.key, part: toolPart }] : []

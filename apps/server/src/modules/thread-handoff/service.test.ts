@@ -2,10 +2,19 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { messages, providerTargets, sessions, threadHandoffs } from '@cradle/db'
+import { parseBlobUrl } from '@cradle/chat-runtime-contracts'
+import {
+  chatMessageBlobRefs,
+  messages,
+  providerTargets,
+  sessions,
+  threadHandoffs,
+} from '@cradle/db'
+import type { UIMessage } from 'ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
+import { toDurableMessagePayload } from '../chat-runtime/message-durable-payload'
 import {
   putMessagePayload,
   toMessageProjectionValues,
@@ -128,7 +137,10 @@ describe('thread handoff service', () => {
     putMessagePayload(db(), message)
     db().insert(messages).values(toMessageProjectionValues(message)).run()
     sessionMock.get.mockReturnValue(sourceSession)
-    sessionMock.create.mockResolvedValue(destinationSession)
+    sessionMock.create.mockImplementation(async (input: { id: string }) => {
+      seedSession(input.id)
+      return { ...destinationSession, id: input.id }
+    })
     sessionMock.remove.mockResolvedValue({ ok: true })
     providerTargetsMock.getProviderTarget.mockReturnValue({ id: 'destination-target', enabled: true })
     importedMessagesMock.mockRejectedValue(new Error('import failed'))
@@ -180,6 +192,71 @@ describe('thread handoff service', () => {
     expect(result.session).toBe(destinationSession)
     expect(sessionMock.create).not.toHaveBeenCalled()
     expect(importedMessagesMock).not.toHaveBeenCalled()
+  })
+
+  it('rebinds source blob references to the destination session', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    seedProviderTarget('source-target')
+    seedProviderTarget('destination-target')
+    seedSession('source-session')
+    const sourceMessage = {
+      id: 'source-message',
+      role: 'user',
+      parts: [{
+        type: 'file',
+        mediaType: 'image/png',
+        url: `data:image/png;base64,${Buffer.alloc(8_192, 0x41).toString('base64')}`,
+      }],
+    } as UIMessage
+    const sourceDurable = toDurableMessagePayload({
+      sessionId: 'source-session',
+      message: sourceMessage,
+    })
+    const sourceFact = {
+      id: sourceMessage.id,
+      sessionId: 'source-session',
+      parentMessageId: null,
+      parentToolCallId: null,
+      taskId: null,
+      depth: 0,
+      role: 'user',
+      status: 'complete',
+      content: sourceDurable.content,
+      messageJson: sourceDurable.messageJson,
+      errorText: null,
+      createdAt: now,
+      updatedAt: now,
+    } as const
+    putMessagePayload(db(), sourceFact)
+    db().insert(messages).values(toMessageProjectionValues(sourceFact)).run()
+    sessionMock.get.mockReturnValue(sourceSession)
+    sessionMock.create.mockImplementation(async (input: { id: string }) => {
+      seedSession(input.id)
+      return { ...destinationSession, id: input.id }
+    })
+    sessionMock.remove.mockResolvedValue({ ok: true })
+    providerTargetsMock.getProviderTarget.mockReturnValue({
+      id: 'destination-target',
+      enabled: true,
+    })
+    importedMessagesMock.mockResolvedValue(undefined)
+
+    const result = await ThreadHandoff.create({
+      requestId: 'request-with-blob',
+      sourceSessionId: 'source-session',
+      destinationRuntimeKind: 'codex',
+      destinationProviderTargetId: 'destination-target',
+    })
+
+    const imported = importedMessagesMock.mock.calls[0]?.[0].messages as Array<{
+      messageJson: string
+    }>
+    const importedMessage = JSON.parse(imported[0]!.messageJson) as UIMessage
+    const importedPart = importedMessage.parts[0]
+    expect(importedPart?.type).toBe('file')
+    expect(parseBlobUrl(importedPart?.type === 'file' ? importedPart.url : '')).toBeTruthy()
+    expect(db().select().from(chatMessageBlobRefs).all().map(ref => ref.sessionId).sort())
+      .toEqual(['source-session', result.session.id].sort())
   })
 
   it('rejects handing off to the current runtime and provider target combination', async () => {

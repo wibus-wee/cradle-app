@@ -49,6 +49,7 @@ const DEFAULT_STREAMDOWN_OPTIONS = {
 
 export interface MessageBubbleViewProps {
   message: UIMessage
+  sessionId?: string | null
   isStreaming: boolean
   executionDetailsDefaultOpen?: boolean
   presentation?: 'thread' | 'export'
@@ -76,6 +77,7 @@ function useTextStreamIdle(enabled: boolean, textLength: number): boolean {
 /** Fixture-driven renderer for a fully materialized UIMessage. */
 export function MessageBubbleView({
   message,
+  sessionId,
   isStreaming,
   presentation = 'thread',
   onToolApprovalResponse,
@@ -122,7 +124,13 @@ export function MessageBubbleView({
               />
             )
       case 'activity-feed':
-        return <ActivityFeedView key={item.key} entries={item.entries} />
+        return (
+          <ActivityFeedView
+            key={item.key}
+            entries={item.entries}
+            blobSessionId={sessionId}
+          />
+        )
       case 'tool-call': {
         const approval = readToolApproval(item.part)
         return (
@@ -136,13 +144,21 @@ export function MessageBubbleView({
             input={item.part.input}
             output={item.part.output}
             errorText={item.part.errorText}
+            blobSessionId={sessionId}
             onApprovalResponse={approval && onToolApprovalResponse
               ? response => onToolApprovalResponse({ messageId: message.id, approvalId: response.id, approved: response.approved })
               : undefined}
           />
         )
       }
-      case 'file-attachment': return <FileAttachmentView key={item.key} part={item.part} />
+      case 'file-attachment':
+        return (
+          <FileAttachmentView
+            key={item.key}
+            part={item.part}
+            sessionId={sessionId}
+          />
+        )
       case 'skill-context': return <SkillContextView key={item.key} part={item.part} />
       case 'plugin-context': return <PluginContextView key={item.key} part={item.part} />
       case 'runtime-warning': return <RuntimeWarningBlock key={item.key} warning={item.part.data} />

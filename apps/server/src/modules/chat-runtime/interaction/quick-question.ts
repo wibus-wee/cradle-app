@@ -1,4 +1,5 @@
 import { AppError } from '../../../errors/app-error'
+import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
 import {
   assertRunnableSession,
@@ -6,7 +7,10 @@ import {
   resolveRuntimeSessionForContext,
 } from '../runtime-session-context'
 import { openDirectChunkStream } from '../stream/sse'
-import { readFullSessionTranscript } from '../transcript'
+import { resolveCradleTurnTranscript } from '../transcript'
+
+const DEFAULT_QUICK_QUESTION_MAX_MESSAGES = 12
+const DEFAULT_QUICK_QUESTION_MAX_CHARS = 120_000
 
 export interface QuickQuestionInput {
   sessionId: string
@@ -53,14 +57,25 @@ export async function streamQuickQuestion(
     runtime,
   })
 
-  const transcript = await readFullSessionTranscript(input.sessionId)
+  const transcript = await resolveCradleTurnTranscript({
+    sessionId: input.sessionId,
+    excludedMessageIds: new Set(),
+    maxMessages: readPositiveIntegerEnv(
+      'CRADLE_CHAT_QUICK_QUESTION_MAX_MESSAGES',
+      DEFAULT_QUICK_QUESTION_MAX_MESSAGES,
+    ),
+    maxChars: readPositiveIntegerEnv(
+      'CRADLE_CHAT_QUICK_QUESTION_MAX_CHARS',
+      DEFAULT_QUICK_QUESTION_MAX_CHARS,
+    ),
+  })
 
   return openDirectChunkStream(
     runtime.quickQuestion({
       runtimeSession: resolved.runtimeSession,
       profile: context.profile,
       question,
-      transcript,
+      transcript: transcript.history,
       workspaceId: context.session.workspaceId,
       workspacePath: context.workspacePath,
     }),

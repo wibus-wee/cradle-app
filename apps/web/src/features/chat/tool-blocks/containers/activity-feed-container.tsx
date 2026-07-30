@@ -16,6 +16,7 @@ export interface ActivityFeedProps extends Omit<
 
 /** Runtime adapter that connects the props-only activity feed to browser-panel state. */
 export function ActivityFeed({
+  sessionId,
   workspaceDiffTarget,
   ...viewProps
 }: ActivityFeedProps) {
@@ -42,6 +43,7 @@ export function ActivityFeed({
   return (
     <ActivityFeedView
       {...viewProps}
+      blobSessionId={sessionId}
       onOpenWorkspaceDiff={workspaceDiffTarget ? handleOpenWorkspaceDiff : undefined}
       onOpenPlanDocument={handleOpenPlanDocument}
     />

@@ -1,3 +1,7 @@
+import type { ChatMessagePartBoundary } from '@cradle/chat-runtime-contracts'
+import {
+  compactChatMessageSplitParts,
+} from '@cradle/chat-runtime-contracts'
 import type { UIMessage } from 'ai'
 
 import type { ChatContinuationMode } from '../commands/chat-response-command'
@@ -6,7 +10,7 @@ export interface ChatContinuationMetadata {
   mode: ChatContinuationMode
   queueItemId?: string
   sourceMessageId?: string
-  splitParts?: UIMessage['parts']
+  splitParts?: ChatMessagePartBoundary[]
 }
 
 function readRecord(value: unknown): Record<string, unknown> | null {
@@ -39,7 +43,7 @@ export function readChatContinuationMetadata(message: UIMessage): ChatContinuati
   }
 }
 
-function readMessageParts(value: unknown): UIMessage['parts'] | null {
+function readMessageParts(value: unknown): ChatMessagePartBoundary[] | null {
   if (
     !Array.isArray(value)
     || !value.every(part => typeof part === 'object' && part !== null && !Array.isArray(part) && typeof (part as { type?: unknown }).type === 'string')
@@ -47,5 +51,5 @@ function readMessageParts(value: unknown): UIMessage['parts'] | null {
     return null
   }
 
-  return value as UIMessage['parts']
+  return compactChatMessageSplitParts(value as UIMessage['parts'])
 }

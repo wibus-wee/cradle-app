@@ -1,3 +1,24 @@
+export function readApiErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null
+  }
+
+  const record = error as Record<string, unknown>
+  if (typeof record.code === 'string') {
+    return record.code
+  }
+
+  const nested = record.error
+  if (nested && typeof nested === 'object') {
+    const nestedCode = (nested as Record<string, unknown>).code
+    if (typeof nestedCode === 'string') {
+      return nestedCode
+    }
+  }
+
+  return null
+}
+
 export function apiErrorMessage(error: unknown): string {
   if (!error) {
     return 'Unknown error'

@@ -1,15 +1,24 @@
+import type { ChatMessagePartBoundary } from '@cradle/chat-runtime-contracts'
+import {
+  compactChatMessageSplitParts,
+} from '@cradle/chat-runtime-contracts'
 import type { UIMessage } from 'ai'
 
 import {
   hasVisibleParts,
+  projectHeadParts,
   projectTailParts,
   trimTrailingEmptyParts,
 } from './helpers'
-import type { MessagePart } from './types'
 
 export type MessagePartsProjection
-  = | { type: 'fixed', parts: MessagePart[] }
-    | { type: 'tail', afterSplitParts: MessagePart[] }
+  = | { type: 'head', throughSplitParts: ChatMessagePartBoundary[] }
+    | {
+      type: 'mid'
+      afterSplitParts: ChatMessagePartBoundary[]
+      throughSplitParts: ChatMessagePartBoundary[]
+    }
+    | { type: 'tail', afterSplitParts: ChatMessagePartBoundary[] }
 
 /** One virtualized transcript row. Splits are view-only; `messageId` stays canonical. */
 export interface ChatDisplayRow {
@@ -21,7 +30,7 @@ export interface ChatDisplayRow {
 
 interface SteerSplitEntry {
   message: UIMessage
-  splitParts: MessagePart[]
+  splitParts: ChatMessagePartBoundary[]
   order: number
 }
 
@@ -67,27 +76,35 @@ export function expandMessagesForDisplay(messages: UIMessage[]): ChatDisplayRow[
       }
 
       steers.sort((left, right) => left.order - right.order)
-      let previousAbsolute: MessagePart[] | null = null
+      let previousAbsolute: ChatMessagePartBoundary[] | null = null
 
       for (const steer of steers) {
-        const absolute = trimTrailingEmptyParts(structuredClone(steer.splitParts) as MessagePart[])
+        const absolute = trimTrailingEmptyParts(steer.splitParts)
         if (!previousAbsolute) {
-          if (hasVisibleParts(absolute)) {
+          const headParts = projectHeadParts(message.parts, absolute)
+          if (hasVisibleParts(headParts)) {
             rows.push({
               rowKey: `${message.id}#steer-head-${steer.message.id}`,
               messageId: message.id,
-              partsProjection: { type: 'fixed', parts: absolute },
+              partsProjection: { type: 'head', throughSplitParts: absolute },
               allowStreaming: false,
             })
           }
         }
  else {
-          const midParts = projectTailParts(absolute, previousAbsolute)
+          const midParts = projectTailParts(
+            projectHeadParts(message.parts, absolute),
+            previousAbsolute,
+          )
           if (hasVisibleParts(midParts)) {
             rows.push({
               rowKey: `${message.id}#steer-mid-${steer.message.id}`,
               messageId: message.id,
-              partsProjection: { type: 'fixed', parts: midParts },
+              partsProjection: {
+                type: 'mid',
+                afterSplitParts: previousAbsolute,
+                throughSplitParts: absolute,
+              },
               allowStreaming: false,
             })
           }
@@ -123,8 +140,20 @@ export function applyPartsProjection(
   if (!projection) {
     return message
   }
-  if (projection.type === 'fixed') {
-    return { ...message, parts: projection.parts }
+  if (projection.type === 'head') {
+    return {
+      ...message,
+      parts: projectHeadParts(message.parts, projection.throughSplitParts),
+    }
+  }
+  if (projection.type === 'mid') {
+    return {
+      ...message,
+      parts: projectTailParts(
+        projectHeadParts(message.parts, projection.throughSplitParts),
+        projection.afterSplitParts,
+      ),
+    }
   }
   return {
     ...message,
@@ -177,7 +206,7 @@ function readSteerSplitEntry(
   return {
     message,
     sourceMessageId: record.sourceMessageId,
-    splitParts: record.splitParts as MessagePart[],
+    splitParts: compactChatMessageSplitParts(record.splitParts as UIMessage['parts']),
     order,
   }
 }

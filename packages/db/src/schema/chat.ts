@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { index, int, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
+import { blobs } from './blob-store'
 import { agents } from './identity'
 import { issues } from './issue'
 import { providerTargets } from './provider-target'
@@ -79,6 +80,36 @@ export const chatMessagePayloads = sqliteTable('chat_message_payloads', {
   ...timestamps(),
 }, table => ({
   bySession: index('chat_message_payloads_session_id_idx').on(table.sessionId),
+}))
+
+// messageId intentionally has no FK to messages.id. Durable writers must insert
+// blob → ref → message; a FK would force the reverse order. A crash after the
+// message commit but before the ref would leave a cradle-blob:// URL whose blob
+// has zero refs, and the collector would then delete those bytes (silent data loss).
+// Without the FK, a crash mid-write only leaves an extra ref, which Phase A sweeps.
+export const chatMessageBlobRefs = sqliteTable('chat_message_blob_refs', {
+  id: textPk(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  messageId: text('message_id').notNull(),
+  partPath: text('part_path').notNull(),
+  // `text` / `reasoning` are TypeScript-level enum values only — SQLite stores
+  // kind as plain text, so extending the set needs no migration.
+  kind: text('kind', { enum: ['tool_output', 'tool_input', 'file', 'text', 'reasoning'] }).notNull(),
+  // onDelete: 'restrict' — session delete cascades refs away, but only the GC may
+  // delete a blob row. Cascading blob deletes from refs would unlink bytes that
+  // another ref still points at, because the store deduplicates representations.
+  blobId: text('blob_id')
+    .notNull()
+    .references(() => blobs.id, { onDelete: 'restrict' }),
+  ...createdAt(),
+}, table => ({
+  bySession: index('chat_message_blob_refs_session_id_idx').on(table.sessionId),
+  byMessage: index('chat_message_blob_refs_message_id_idx').on(table.messageId),
+  byBlob: index('chat_message_blob_refs_blob_id_idx').on(table.blobId),
+  byMessagePartPath: uniqueIndex('chat_message_blob_refs_message_part_path_unique')
+    .on(table.messageId, table.partPath),
 }))
 
 export const messages = sqliteTable('messages', {
@@ -262,6 +293,8 @@ export type Session = typeof sessions.$inferSelect
 export type NewSession = typeof sessions.$inferInsert
 export type ChatMessagePayload = typeof chatMessagePayloads.$inferSelect
 export type NewChatMessagePayload = typeof chatMessagePayloads.$inferInsert
+export type ChatMessageBlobRef = typeof chatMessageBlobRefs.$inferSelect
+export type NewChatMessageBlobRef = typeof chatMessageBlobRefs.$inferInsert
 export type Message = typeof messages.$inferSelect
 export type NewMessage = typeof messages.$inferInsert
 export type UsageLog = typeof usageLogs.$inferSelect

@@ -7,6 +7,7 @@ describe('matchChatSessionPath', () => {
     expect(matchChatSessionPath('/chat/sessions/abc')).toBe('abc')
     expect(matchChatSessionPath('/chat/sessions/abc/queue')).toBe('abc')
     expect(matchChatSessionPath('/chat/sessions/abc/provider-threads/t1/stream')).toBe('abc')
+    expect(matchChatSessionPath('/chat/sessions/abc/blobs/blob-1/content')).toBe('abc')
   })
 
   it('ignores non-session chat paths', () => {

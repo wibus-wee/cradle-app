@@ -3,20 +3,17 @@ import type { UIMessageChunk } from 'ai'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { evaluateIsolationBoundary } from '../../worktree/service'
 import {
-  commitSessionEventsWithProjection,
+  commitPreparedSessionEventsWithProjection,
   readRunStopReason,
   readRunTerminalEventType,
 } from '../es/commands'
-import {
-  compactStoredMessageSnapshot,
-} from '../message-snapshot-compaction'
+import { toDurableMessagePayload } from '../message-durable-payload'
 import type { ActiveRun, TerminalChatMessageStatus } from '../run-registry'
 import { attachBinding } from '../runtime-session-context'
 import { deleteRunStreamCheckpoint } from '../stream/checkpoint-store'
 import { isChatStreamTraceEnabled, recordChatStreamTrace } from '../stream-trace'
 import {
   annotateRunResultMessage,
-  extractMessageText,
   normalizeMessageSnapshot,
 } from '../ui-message'
 import {
@@ -143,50 +140,58 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     bindingId?: string | null,
   ): Promise<{ messageJsonBytes: number }> {
     const now = currentUnixSeconds()
-    const message = annotateRunResultMessage(
-      compactStoredMessageSnapshot(normalizeMessageSnapshot(activeRun.finalMessage)),
+    const annotated = annotateRunResultMessage(
+      normalizeMessageSnapshot(activeRun.finalMessage),
       {
         runId: activeRun.runId,
         durationMs: Math.max(0, (now - activeRun.startedAtSeconds) * 1000),
       },
     )
-    const messageJson = JSON.stringify(message)
-    await commitSessionEventsWithProjection(
+    return await commitPreparedSessionEventsWithProjection(
       activeRun.sessionId,
-      [
-          {
-            type: 'AssistantMessageCompleted',
-            payload: {
-              message: {
-                id: activeRun.messageId,
-                sessionId: activeRun.sessionId,
-                content: extractMessageText(message),
-                messageJson,
-                status,
-                errorText,
-                updatedAt: now,
+      (tx) => {
+        const durable = toDurableMessagePayload({
+          sessionId: activeRun.sessionId,
+          message: annotated,
+          d: tx,
+        })
+        return {
+          result: { messageJsonBytes: Buffer.byteLength(durable.messageJson) },
+          events: [
+            {
+              type: 'AssistantMessageCompleted',
+              payload: {
+                message: {
+                  id: activeRun.messageId,
+                  sessionId: activeRun.sessionId,
+                  content: durable.content,
+                  messageJson: durable.messageJson,
+                  status,
+                  errorText,
+                  updatedAt: now,
+                },
               },
             },
-          },
-          {
-            type: readRunTerminalEventType(status),
-            payload: {
-              runId: activeRun.runId,
-              sessionId: activeRun.sessionId,
-              queueItemId: activeRun.queueItemId ?? null,
-              ...(bindingId !== undefined ? { bindingId } : {}),
-              status,
-              stopReason: readRunStopReason(status),
-              errorText,
-              finishedAt: now,
+            {
+              type: readRunTerminalEventType(status),
+              payload: {
+                runId: activeRun.runId,
+                sessionId: activeRun.sessionId,
+                queueItemId: activeRun.queueItemId ?? null,
+                ...(bindingId !== undefined ? { bindingId } : {}),
+                status,
+                stopReason: readRunStopReason(status),
+                errorText,
+                finishedAt: now,
+              },
             },
-          },
-      ],
+          ],
+        }
+      },
       (tx) => {
         deleteRunStreamCheckpoint(activeRun.runId, tx)
       },
     )
-    return { messageJsonBytes: Buffer.byteLength(messageJson) }
   }
 
   return {

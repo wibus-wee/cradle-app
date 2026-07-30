@@ -81,6 +81,7 @@ export function ToolCallBlock({
   return (
     <ToolCallBlockView
       {...viewProps}
+      blobSessionId={sessionId}
       onOpenWorkspaceDiff={workspaceDiffTarget ? handleOpenWorkspaceDiff : undefined}
       onOpenSubagentOutput={sessionId ? handleOpenSubagentOutput : undefined}
       onOpenWorkflowSurface={handleOpenWorkflowSurface}

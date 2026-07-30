@@ -20,7 +20,7 @@ import {
 } from './runtime-registry'
 import { getPluginSkills, resetPluginSkillRegistry } from './skill-registry'
 
-function manifest(name: string): PluginManifest {
+function manifest(name: string, withActivity = false): PluginManifest {
   const pkg = CradlePluginPackageJsonSchema.parse({
     name,
     version: '1.0.0',
@@ -28,8 +28,20 @@ function manifest(name: string): PluginManifest {
       apiVersion: '1',
       server: 'src/server.ts',
       contributes: {
-        capabilities: [],
-        permissions: [],
+        capabilities: withActivity
+          ? [{
+              id: 'chat-runs',
+              type: 'activity-subscription',
+              layer: 'server',
+              permissions: ['activity.read'],
+            }]
+          : [],
+        permissions: withActivity
+          ? [{
+              id: 'activity.read',
+              required: true,
+            }]
+          : [],
       },
     },
   })
@@ -231,7 +243,7 @@ describe('server plugin context lifecycle', () => {
   })
 
   it('supports namespace registration APIs without changing capability ownership', () => {
-    const pluginManifest = manifest('@cradle/context-namespaces')
+    const pluginManifest = manifest('@cradle/context-namespaces', true)
     registerDescriptor(pluginManifest)
     const ctx = createServerPluginContext(pluginManifest)
 
@@ -246,13 +258,13 @@ describe('server plugin context lifecycle', () => {
       description: 'A namespaced test skill',
       skillFile: '/tmp/SKILL.md',
     })
-    const hook = ctx.hooks.chat.onAfterResponse(async () => {})
+    const activity = ctx.activities.subscribe(async () => {})
 
-    expect(ctx.subscriptions).toEqual([mcp, skill, hook])
+    expect(ctx.subscriptions).toEqual([mcp, skill, activity])
     expect(listPluginDescriptors()[0]?.capabilities.map(capability => capability.type)).toEqual([
       'mcp-server',
       'skill',
-      'hook',
+      'activity-subscription',
     ])
 
     for (const subscription of [...ctx.subscriptions].reverse()) {

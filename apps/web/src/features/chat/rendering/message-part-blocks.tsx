@@ -2,6 +2,7 @@ import { Streamdown } from '@cradle/streamdown'
 
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
+import { BlobOverflowNotice } from './blob-overflow-notice'
 import { RuntimeWarningBlock } from './blocks/runtime-warning-block'
 import { useChatRenderStore } from './chat-render-store'
 import { MarkdownFileLink } from './markdown-file-link'
@@ -20,6 +21,7 @@ import {
   readRuntimeWarningPartFromState,
   readSkillContextPartFromState,
   readTextPartFromState,
+  readTextPartOverflowFromState,
 } from './message-bubble-selectors'
 import { MESSAGE_STREAMING_ANIMATION_MAX_CHARS } from './message-rendering-constants'
 import { UserMessageText } from './user-message-text'
@@ -41,24 +43,48 @@ export const MessageTextPartById = ({
 }) => {
   const text = useChatRenderStore(state =>
     readTextPartFromState(state, sessionId, messageId, partIndex, textTransform))
+  const overflow = useChatRenderStore(state =>
+    readTextPartOverflowFromState(state, sessionId, messageId, partIndex, textTransform))
   const animated = text.length <= MESSAGE_STREAMING_ANIMATION_MAX_CHARS
 
   if (isUser) {
-    return <UserMessageText text={text} />
+    return (
+      <div className="flex flex-col gap-1">
+        <UserMessageText text={text} />
+        {overflow && (
+          <BlobOverflowNotice
+            truncatedOriginalChars={overflow.originalChars}
+            blobId={overflow.blobId}
+            sessionId={sessionId}
+            fullLabel="open full message"
+          />
+        )}
+      </div>
+    )
   }
 
   return (
-    <Streamdown
-      content={text}
-      streaming={isActiveStreamingSegment}
-      animationPreset={STREAMDOWN_RENDER_OPTIONS.animationPreset}
-      animateMode={STREAMDOWN_RENDER_OPTIONS.animateMode}
-      showCursor={STREAMDOWN_RENDER_OPTIONS.showCursor}
-      animated={animated}
-      components={{
-        a: props => <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} />,
-      }}
-    />
+    <div className="flex flex-col gap-1">
+      <Streamdown
+        content={text}
+        streaming={isActiveStreamingSegment}
+        animationPreset={STREAMDOWN_RENDER_OPTIONS.animationPreset}
+        animateMode={STREAMDOWN_RENDER_OPTIONS.animateMode}
+        showCursor={STREAMDOWN_RENDER_OPTIONS.showCursor}
+        animated={animated}
+        components={{
+          a: props => <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} />,
+        }}
+      />
+      {overflow && (
+        <BlobOverflowNotice
+          truncatedOriginalChars={overflow.originalChars}
+          blobId={overflow.blobId}
+          sessionId={sessionId}
+          fullLabel="open full message"
+        />
+      )}
+    </div>
   )
 }
 MessageTextPartById.displayName = 'MessageTextPartById'
@@ -79,7 +105,7 @@ export const MessageFilePartById = ({
   if (!part) {
     return null
   }
-  return <FileAttachmentBlock part={part} onClick={onImageClick} />
+  return <FileAttachmentBlock part={part} sessionId={sessionId} onClick={onImageClick} />
 }
 MessageFilePartById.displayName = 'MessageFilePartById'
 

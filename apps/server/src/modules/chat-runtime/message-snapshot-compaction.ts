@@ -6,7 +6,6 @@ import { readObjectRecord } from '../../helpers/json-record'
 const DEFAULT_STORED_MESSAGE_TEXT_MAX_CHARS = 256_000
 const DEFAULT_STORED_MESSAGE_REASONING_MAX_CHARS = 64_000
 const DEFAULT_STORED_TOOL_PAYLOAD_MAX_CHARS = 128_000
-const DEFAULT_STORED_MESSAGE_REPAIR_MIN_CHARS = 512 * 1024
 
 export function truncateJsonPayload(value: unknown, maxChars: number): unknown {
   if (value === undefined || value === null) {
@@ -24,7 +23,7 @@ export function truncateJsonPayload(value: unknown, maxChars: number): unknown {
       preview: json.slice(0, maxChars),
     }
   }
- catch {
+  catch {
     const text = String(value)
     if (text.length <= maxChars) {
       return text
@@ -37,6 +36,15 @@ export function truncateJsonPayload(value: unknown, maxChars: number): unknown {
   }
 }
 
+/**
+ * Lossy bounding for **transient** surfaces only: stream checkpoints and
+ * observability snapshots, where losing detail is acceptable because the artifact
+ * is short-lived or purely diagnostic.
+ *
+ * Nothing on the durable path may call this. Durable messages keep their bytes via
+ * `externalizeMessageBlobs`, which moves oversized tool payloads and text/reasoning
+ * overflow into the blob store instead of destroying them.
+ */
 export function truncateSnapshotPayload(value: unknown): unknown {
   return truncateJsonPayload(
     value,
@@ -47,32 +55,11 @@ export function truncateSnapshotPayload(value: unknown): unknown {
   )
 }
 
-export function compactStoredMessageSnapshotForRead<Message extends UIMessage>(input: {
-  rawJson: string
-  message: Message
-}): Message {
-  const repairMinChars = readPositiveIntegerEnv(
-    'CRADLE_CHAT_STORED_MESSAGE_REPAIR_MIN_CHARS',
-    DEFAULT_STORED_MESSAGE_REPAIR_MIN_CHARS,
-  )
-  if (input.rawJson.length < repairMinChars) {
-    return input.message
-  }
-
-  const compactedMessage = compactStoredMessageSnapshot(input.message)
-  if (compactedMessage === input.message) {
-    return input.message
-  }
-
-  const compactedJson = JSON.stringify(compactedMessage)
-  if (compactedJson.length >= input.rawJson.length) {
-    return input.message
-  }
-
-  return compactedMessage as Message
-}
-
-export function compactStoredMessageSnapshot(message: UIMessage): UIMessage {
+/**
+ * Preserve a valid UIMessage shape while bounding transient checkpoint bytes.
+ * Durable messages must use the blob externalization seam instead.
+ */
+export function compactTransientMessageSnapshot(message: UIMessage): UIMessage {
   const textLimit = readPositiveIntegerEnv(
     'CRADLE_CHAT_STORED_TEXT_MAX_CHARS',
     DEFAULT_STORED_MESSAGE_TEXT_MAX_CHARS,
@@ -90,52 +77,33 @@ export function compactStoredMessageSnapshot(message: UIMessage): UIMessage {
   let remainingReasoning = reasoningLimit
 
   const parts = message.parts.map((part) => {
-    if (part.type === 'text') {
-      const nextText
-        = part.text.length <= remainingText ? part.text : part.text.slice(0, remainingText)
-      remainingText = Math.max(0, remainingText - nextText.length)
-      if (nextText !== part.text) {
-        changed = true
-        return {
-          ...part,
-          text: nextText,
-          providerMetadata: {
-            ...readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata),
-            cradle: {
-              ...readObjectRecord(
-                readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata).cradle,
-              ),
-              truncated: true,
-              originalChars: part.text.length,
-            },
-          },
-        } as UIMessage['parts'][number]
+    if (part.type === 'text' || part.type === 'reasoning') {
+      const remaining = part.type === 'text' ? remainingText : remainingReasoning
+      const nextText = part.text.length <= remaining ? part.text : part.text.slice(0, remaining)
+      if (part.type === 'text') {
+        remainingText = Math.max(0, remainingText - nextText.length)
       }
-      return part
-    }
+      else {
+        remainingReasoning = Math.max(0, remainingReasoning - nextText.length)
+      }
+      if (nextText === part.text) {
+        return part
+      }
 
-    if (part.type === 'reasoning') {
-      const nextText
-        = part.text.length <= remainingReasoning ? part.text : part.text.slice(0, remainingReasoning)
-      remainingReasoning = Math.max(0, remainingReasoning - nextText.length)
-      if (nextText !== part.text) {
-        changed = true
-        return {
-          ...part,
-          text: nextText,
-          providerMetadata: {
-            ...readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata),
-            cradle: {
-              ...readObjectRecord(
-                readObjectRecord((part as { providerMetadata?: unknown }).providerMetadata).cradle,
-              ),
-              truncated: true,
-              originalChars: part.text.length,
-            },
+      changed = true
+      const providerMetadata = readObjectRecord(part.providerMetadata)
+      return {
+        ...part,
+        text: nextText,
+        providerMetadata: {
+          ...providerMetadata,
+          cradle: {
+            ...readObjectRecord(providerMetadata.cradle),
+            truncated: true,
+            originalChars: part.text.length,
           },
-        } as UIMessage['parts'][number]
-      }
-      return part
+        },
+      } as UIMessage['parts'][number]
     }
 
     if ('toolCallId' in part && (part.type === 'dynamic-tool' || part.type.startsWith('tool-'))) {

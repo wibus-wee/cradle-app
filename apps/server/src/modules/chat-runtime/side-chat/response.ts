@@ -18,7 +18,7 @@ import {
   assertRuntimeCompatibleTarget,
 } from '../runtime-session-context'
 import { readSessionRuntimeSettings, resolveRunRuntimeSettings } from '../runtime-settings'
-import { createUserMessage, projectLightOcrMessage, projectLightOcrMessages } from '../ui-message'
+import { createUserMessage, projectProviderInputMessage, projectProviderInputMessages } from '../ui-message'
 import { createLiveSideConversationStream } from './live-stream'
 
 export interface StreamSideConversationResponseInput {
@@ -116,13 +116,13 @@ export async function streamSideConversationResponse(
       runtime,
       runtimeSession: record.runtimeSession,
       profile: parentContext.profile,
-      message: projectLightOcrMessage(message),
+      message: await projectProviderInputMessage(message),
       responseMessageId: assistantMessageId,
       modelId,
       thinkingEffort: input.thinkingEffort,
       runtimeSettings,
       systemPrompt: resolveSessionSystemPrompt(parentContext.session),
-      history: projectLightOcrMessages(record.history),
+      history: await projectProviderInputMessages(record.history),
       onComplete: assistantMessage =>
         appendSideConversationHistory(input.sideConversationId, [message, assistantMessage]),
       workspaceId: parentContext.session.workspaceId,

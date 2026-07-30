@@ -12,6 +12,7 @@ conditions, and update the status row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|
 | 001 | Build a deterministic Anthropic Messages and OpenAI Responses API simulator | P1 | L | — | IN PROGRESS |
+| 002 | Expose committed chat-run activity to server plugins | P1 | M | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale).
@@ -21,6 +22,8 @@ reason) | `REJECTED` (with a one-line rationale).
 - Plan 001 is a standalone infrastructure track. It deliberately does not
   migrate Claude Agent or Codex provider tests; those consumers should be
   planned only after the simulator's official-SDK conformance suite passes.
+- Plan 002 is independent of Plan 001. It reuses Chat Runtime's committed fact
+  publication and does not modify any provider implementation.
 
 ## Findings considered and rejected
 
@@ -51,3 +54,16 @@ reason) | `REJECTED` (with a one-line rationale).
   lifecycle, error, and disconnect flows; MCP, hosted search, citations,
   image/audio, computer, shell, code execution/interpreter, custom tools, and
   provider-hosted server-tool event families remain outside the allowlist.
+- **Expose plugin activity through chat hooks**: rejected because observation
+  must not be able to modify a query or delay Chat Runtime. Plan 002 uses a
+  post-commit subscription.
+- **Adapt the existing plugin event bus**: rejected because its
+  `string + unknown` contract has no host producers, type safety, or read/write
+  boundary. Plan 002 replaces it with a narrow read-only discriminated union.
+- **Include tool events, replay, filters, batching, or usage in the first
+  activity contract**: rejected because the motivating WakaTime integration
+  only needs run start/finish signals. The plugin owns heartbeat scheduling and
+  batching.
+- **Build the WakaTime plugin in Plan 002**: rejected. This plan establishes
+  SDK support only; API key UX and WakaTime network behavior are a separate
+  consumer.

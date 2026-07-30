@@ -14,5 +14,20 @@
   "credentials.providers.anthropic.tagline": "Anthropic 官方 Claude API 或消息 API",
   "credentials.providers.openai.tagline": "OpenAI Responses API 或 Codex 官方账号",
   "credentials.providers.universal.tagline": "支持 OpenAI 和 Anthropic 的自定义端点",
-  "nav.continueHint": "即可继续"
+  "nav.continueHint": "即可继续",
+  "setup.loading": "正在检查你的设置…",
+  "setup.skip": "暂时跳过",
+  "setup.continue": "继续",
+  "setup.finish": "开始使用",
+  "setup.provider.title": "连接 Provider",
+  "setup.provider.description": "选择一个 Provider，以便 Cradle 运行 Agent。之后可在设置中更改。",
+  "setup.provider.skip": "跳过 Provider",
+  "setup.github.title": "连接 GitHub",
+  "setup.github.description": "授权 Cradle 以你的身份加载 Pull request 并在 GitHub 上操作。",
+  "setup.github.skipHint": "可以稍后在「设置 → Integrations」中连接。在此之前 Pull Requests 将不可用。",
+  "setup.github.continueAnyway": "暂不连接 GitHub",
+  "setup.done.title": "准备就绪",
+  "setup.done.description": "这台设备上的 Cradle 已完成设置。",
+  "setup.done.bodyWithGithub": "可以开始聊天，或打开 Pull Requests 审查 GitHub 上的工作。",
+  "setup.done.bodyWithoutGithub": "随时可以开始聊天。稍后可在「设置 → Integrations」连接 GitHub 以使用 Pull Requests。"
 }

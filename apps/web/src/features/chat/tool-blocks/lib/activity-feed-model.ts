@@ -17,6 +17,8 @@ export type ActivityFeedViewEntry
       text: string
       state?: 'streaming' | 'done'
       durationMs?: number
+      overflowOriginalChars?: number | null
+      overflowBlobId?: string | null
     }
 
 export type ActivityFeedReasoningEntry = Extract<ActivityFeedViewEntry, { entryKind: 'reasoning' }>

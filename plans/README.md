@@ -108,6 +108,19 @@ terminal ordering 与 Sync liveness 保留；所有 active-run 初次连接/重�
 原 replay observability 改为不持有 payload 的 scalar publication counters。明确不做
 payload 截断、provider 限流、DB raw-chunk log、短 tail cache 或兼容 shim。
 
+2026-07-29 在 commit `facc38f5` 上补充 Plan 072：把 chat message 的字节搬进按内容寻址的
+blob store，并且是无损的。起因是单 session `message_json` 观测到 ~117 MB（base64 附件内联 +
+tool 输出内联），以及一个静默 bug：超过 128 000 字符的 tool payload 在持久化时被销毁成
+`cradle.truncated-json-payload.v1` 标记，而 `apps/web` 完全不认识该标记，导致大 tool 结果渲染成
+空块。方案把 Step 0（渲染修复，纯前端零依赖）排在最前，随后是 blob store + 引用表 + GC、
+统一的 externalization seam（附件字节与 tool payload 同一次遍历）、单一 `toDurableMessagePayload`
+序列化收口、provider 反向投影、前端 `cradle-blob://` 解析，最后 Step 9 回填现有胖行——只有回填
+才让已有 session 真正变小，前面各步只是止住新增长。经讨论明确砍掉三件事：不改道 `assets`
+写入（避免 `ALTER TABLE assets` 与 `deleteAsset` 行为变更，两个字节存储的重复作为已记录的
+延后债）、不外置 composer draft 附件（`surface_id` 不是 session id，且软删会让 GC 永久 pin
+住 blob，收益也不随历史累积）、不给 `chat_message_payloads` 加 `schema_version`。本计划取代
+最初的 072/073/074 三份拆分草稿与其未写的 075 回填。
+
 Each executor: read the plan fully before starting, run its drift check, honor its
 STOP conditions, and update your row below when done. Plans are self-contained —
 they do not assume you saw the audit or any other plan.
@@ -189,6 +202,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 069  | Demote the claude-agent state snapshot to a checkpoint; rebuild the UI activity feed from authoritative history | P2 | XL | 065, 066 (coordinate with 050, 061) | BLOCKED (SDK transcripts are pruned and omit provider activity facts; re-plan over Cradle `session_events`) |
 | 070  | Test the Claude Agent provider against the real wire via a shared model-api-simulator harness | P1 | L | 065, 066 | DONE |
 | 071  | Eliminate active-run replay retention and recover from snapshots | P0 | M | — (supersedes Plan 054 replay retention only) | DONE |
+| 072  | Move chat message bytes into a content-addressed blob store, losslessly | P0 | XL | — | TODO (Step 0 is a standalone web-only bug fix; Step 9 backfill is what shrinks existing sessions) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
@@ -379,6 +393,10 @@ orchestration layer) would be reasonable; a whole-codebase migration is negative
 
 ## Findings considered and rejected (so they aren't re-audited)
 
+- **Fix inline attachment bytes at each producer** — rejected in favor of Plan 072's single persistence seam. There are six known producers of `data:` URLs (web composer, browser appshot, three provider event mappers, Codex local-image reader); patching each is six diffs and still misses the seventh.
+- **Truncate oversized tool payloads at persist time** — rejected by Plan 072. It is the current behavior and it is silent data loss: the bytes exist nowhere afterwards, and `apps/web` never learned to read the truncation marker, so large tool results render as empty blocks. Truncation stays only on transient surfaces (streaming checkpoints, observability snapshots).
+- **Give `chat_message_payloads` a `schema_version` column** — rejected by Plan 072. Message parts are self-describing, so a legacy row is simply a row with no reference parts and hydrates through identical code; a row version would force a dual read path for no benefit. Mirrors how `session_events` versions payloads inside the JSON (`v: 4`) rather than in a column.
+- **Externalize composer draft attachments** — rejected by Plan 072. Drafts do not accumulate (one row per surface, reset on send or discard), `composer_drafts.surface_id` is not a session id, and drafts are only soft-deleted, so ref-table ownership would need `owner_kind`/`owner_id` plus a soft-delete-aware GC liveness check for a bounded sink.
 - **Bound or truncate active-run replay by bytes/count** — rejected in favor of Plan 071. A cap only changes when complete recovery fails and still retains repeated large payload copies below the cap; snapshot bootstrap preserves complete current state without historical retention.
 - **Move raw active-run chunk replay into SQLite** — rejected. Raw AI SDK deltas and repeated tool-output snapshots are transient transport, not domain facts; persisting them duplicates the current message projection and moves the same incorrect retention model to disk.
 - **Throttle repeated provider tool-output updates** — rejected. Live consumers must continue receiving provider updates; Plan 071 changes reconnect storage semantics rather than suppressing upstream events.

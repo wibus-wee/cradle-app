@@ -4,7 +4,10 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
 import { messagePayloadJoinCondition } from './message-payload-store'
-import { parseStoredMessageSnapshot } from './ui-message'
+import {
+  parseStoredMessageSnapshot,
+  projectProviderInputMessage,
+} from './ui-message'
 
 export interface CradleTurnTranscript {
   history: UIMessage[]
@@ -30,7 +33,9 @@ interface TranscriptMessageRow {
 
 const messageInsertOrder = sql`messages.rowid`
 
-export function resolveCradleTurnTranscript(input: ResolveCradleTurnTranscriptInput): CradleTurnTranscript {
+export async function resolveCradleTurnTranscript(
+  input: ResolveCradleTurnTranscriptInput,
+): Promise<CradleTurnTranscript> {
   const rows = db()
     .select({
       id: messages.id,
@@ -52,7 +57,7 @@ export function resolveCradleTurnTranscript(input: ResolveCradleTurnTranscriptIn
     .limit(input.maxMessages + input.excludedMessageIds.size)
     .all() as TranscriptMessageRow[]
 
-  return reconstructCradleTurnTranscript({
+  return await reconstructCradleTurnTranscript({
     rows,
     excludedMessageIds: input.excludedMessageIds,
     maxMessages: input.maxMessages,
@@ -74,12 +79,12 @@ export async function readFullSessionTranscript(sessionId: string): Promise<UIMe
   return rows.map(row => parseStoredMessageSnapshot(row.messageJson))
 }
 
-export function reconstructCradleTurnTranscript(input: {
+export async function reconstructCradleTurnTranscript(input: {
   rows: TranscriptMessageRow[]
   excludedMessageIds: Set<string>
   maxMessages: number
   maxChars: number
-}): CradleTurnTranscript {
+}): Promise<CradleTurnTranscript> {
   const selected: UIMessage[] = []
   let remainingChars = input.maxChars
   let truncated = false
@@ -101,7 +106,10 @@ export function reconstructCradleTurnTranscript(input: {
 
     const hydration = hydrateTranscriptMessage(row)
     fallbackMessageCount += hydration.usedFallback ? 1 : 0
-    const budgeted = budgetTranscriptMessage(hydration.message, remainingChars)
+    // Resolve one candidate at a time so the budget sees the bytes the provider
+    // will actually receive without expanding the entire stored transcript.
+    const providerMessage = await projectProviderInputMessage(hydration.message)
+    const budgeted = budgetTranscriptMessage(providerMessage, remainingChars)
     if (!budgeted.message) {
       truncated = true
       omittedMessageCount += 1
@@ -217,7 +225,7 @@ function compactTranscriptMessage(message: UIMessage, maxChars: number): UIMessa
   let remaining = maxChars
   let keptPartCount = 0
   const parts = message.parts.map((part) => {
-    const estimatedPartChars = JSON.stringify(part).length
+    const estimatedPartChars = estimatePartCharCost(part)
     if (estimatedPartChars <= remaining) {
       remaining -= estimatedPartChars
       keptPartCount += 1

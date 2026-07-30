@@ -1,5 +1,4 @@
 import {
-  ExternalLinkLine as ExternalLinkIcon,
   GitPullRequestLine as PullRequestIcon,
   Search2Line as SearchIcon,
 } from '@mingcute/react'
@@ -9,7 +8,6 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '~/components/ui/button'
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -18,6 +16,8 @@ import {
 import { Input } from '~/components/ui/input'
 
 import type { PullRequestViewer } from './api/pull-requests'
+import type { PullRequestErrorKind } from './pull-request-error'
+import { PullRequestErrorStateView } from './pull-request-error-state-view'
 import { PullRequestFilterTabsView } from './pull-request-filter-tabs-view'
 import { PullRequestListFilterMenuView } from './pull-request-list-filter-menu-view'
 import type { PullRequestFilter, PullRequestStateFilter } from './pull-request-list-presenter'
@@ -37,7 +37,9 @@ export interface PullRequestsPageViewProps {
   entries: CradlePullRequest[]
   viewer: PullRequestViewer | null
   pending: boolean
-  authRequired: boolean
+  errorKind: PullRequestErrorKind | null
+  retrying?: boolean
+  onRetry?: () => void
   authoredFeed: PullRequestFeedPage
   reviewingFeed: PullRequestFeedPage
   selectedRef?: string
@@ -50,7 +52,9 @@ export function PullRequestsPageView({
   entries,
   viewer,
   pending,
-  authRequired,
+  errorKind,
+  retrying = false,
+  onRetry,
   authoredFeed,
   reviewingFeed,
   selectedRef,
@@ -133,28 +137,18 @@ export function PullRequestsPageView({
     }
   }
 
-  if (authRequired) {
+  if (errorKind) {
     return (
       <div className="flex h-full min-h-0 flex-col" data-testid="pull-requests-page">
         <header className="flex shrink-0 items-center border-b border-border/60 px-5 py-4">
           <h1 className="text-lg font-semibold text-foreground">{t('page.title')}</h1>
         </header>
         <div className="min-h-0 flex-1">
-          <Empty className="h-full border-0">
-            <EmptyHeader>
-              <EmptyMedia variant="icon"><PullRequestIcon /></EmptyMedia>
-              <EmptyTitle>{t('auth.emptyTitle')}</EmptyTitle>
-              <EmptyDescription>{t('auth.emptyDescription')}</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent className="flex-row justify-center">
-              <Button variant="outline" size="sm" asChild>
-                <a href="https://cli.github.com/" target="_blank" rel="noreferrer">
-                  <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
-                  {t('auth.install')}
-                </a>
-              </Button>
-            </EmptyContent>
-          </Empty>
+          <PullRequestErrorStateView
+            kind={errorKind}
+            retrying={retrying}
+            onRetry={onRetry}
+          />
         </div>
       </div>
     )
