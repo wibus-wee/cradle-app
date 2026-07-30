@@ -125,7 +125,7 @@ export interface SessionPullRequestDetail {
   }>
 }
 export { parseGitHubOwnerRepo } from './github-remote'
-export { withCradlePullRequestFooter } from './pr-body'
+export { buildWorkPullRequestBody, withCradlePullRequestFooter } from './pr-body'
 
 interface StoredSessionPullRequestAuthor {
   login: string

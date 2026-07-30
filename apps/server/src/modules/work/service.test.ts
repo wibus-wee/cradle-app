@@ -11,6 +11,7 @@ import { localWorkspaceLocatorJson } from '../../../tests/helpers/workspace-fixt
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import * as ChatRuntime from '../chat-runtime/runtime'
+import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
@@ -312,7 +313,10 @@ describe('work delivery control', () => {
     expect(updatePullRequest).toHaveBeenCalledWith({
       sessionId: SESSION_ID,
       title: 'Updated title',
-      body: '## Summary\nUpdated summary.\n\n## Test plan\nUpdated tests.',
+      body: buildWorkPullRequestBody({
+        summary: 'Updated summary.',
+        testPlan: 'Updated tests.',
+      }),
     })
     expect(registerSpy).toHaveBeenCalledTimes(2)
     expect(detail.work.handoffTitle).toBe('Updated title')
@@ -414,7 +418,10 @@ describe('work delivery control', () => {
     expect(createPullRequest).toHaveBeenCalledWith(expect.objectContaining({
       sessionId: SESSION_ID,
       title: 'Draft title',
-      body: '## Summary\nImplemented the flow.\n\n## Test plan\nRun focused tests.',
+      body: buildWorkPullRequestBody({
+        summary: 'Implemented the flow.',
+        testPlan: 'Run focused tests.',
+      }),
     }))
     expect(detail.work.lastSubmittedAt).not.toBeNull()
   })
@@ -445,7 +452,10 @@ describe('work delivery control', () => {
     expect(updatePullRequest).toHaveBeenCalledWith({
       sessionId: SESSION_ID,
       title: 'Updated title',
-      body: '## Summary\nUpdated summary.\n\n## Test plan\nRun updated tests.',
+      body: buildWorkPullRequestBody({
+        summary: 'Updated summary.',
+        testPlan: 'Run updated tests.',
+      }),
     })
   })
 
