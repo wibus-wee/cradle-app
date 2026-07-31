@@ -44,7 +44,7 @@ After(async function (this: CradleWorld, scenario: ITestCaseHookParameter) {
       const consoleSections = [
         `# Scenario\n${this.scenarioName}`,
         `\n# Renderer console\n${this.consoleMessages.join('\n') || '(no renderer console output)'}`,
-        `\n# Mock LLM requests\n${JSON.stringify(this.mockLlmServer?.getRequestLog() ?? [], null, 2)}`,
+        `\n# Simulator requests\n${JSON.stringify(this.simulator?.requests() ?? [], null, 2)}`,
       ]
       writeFileSync(artifacts.consoleLogPath, consoleSections.join('\n'), 'utf8')
 

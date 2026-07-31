@@ -3,7 +3,6 @@ import { Given, Then, When } from '@cucumber/cucumber'
 import type { Locator } from '@playwright/test'
 import { expect } from '@playwright/test'
 
-import { MockLlmServer } from '../support/mock-llm-server'
 import {
   expectPromptEditorToContain,
   fillPromptEditor,
@@ -16,24 +15,19 @@ import {
 } from '../support/ui'
 import type { CradleWorld } from '../support/world'
 
-const DEFAULT_RESPONSE = 'Hello from mock LLM! I am an AI assistant.'
-const SLOW_RESPONSE = Array.from({ length: 30 }).fill('Hello from mock LLM!').join(' ')
-const QUEUED_CONTINUATION_RESPONSES = [
-  Array.from({ length: 16 }).fill('Initial assistant reply: I am expanding the answer.').join(' '),
-  'Follow-up assistant reply: I will continue.',
+const DEFAULT_RESPONSE = 'Hello from E2E simulator!'
+const MULTI_TURN_RESPONSES = [
+  '第一轮助手：已记住苹果',
+  '第二轮助手：你让我记住了苹果',
 ]
-const CONTEXT_RESPONSES = [
-  '第一轮助手回复：我记住了苹果。',
-  '第二轮助手回复：我记住了香蕉。',
-  '第三轮助手回复：你先让我记住苹果，又让我记住香蕉。',
-]
-const MARKDOWN_RESPONSE = 'Markdown 导出助手回复：请复制我。'
+const SLOW_RESPONSE = '慢速助手回复完成'
 const REASONING_TEXT = '第一步分析问题\n第二步形成答案'
+const SLOW_GATE = 'e2e-slow-stream'
 const CHAT_VIEW_TIMEOUT = 20_000
 const CHAT_STATUS_TIMEOUT = 30_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'
 const PREFERRED_RUNTIME_KEY = 'chat.preferred-runtime'
-const MOCK_CLAUDE_AGENT_RE = /Mock Claude Agent/i
+const SIMULATOR_PROVIDER_RE = /E2E Simulator|E2E Claude Agent/i
 
 type SessionAlias = {
   id: string
@@ -110,15 +104,15 @@ async function navigateToNewChat(world: CradleWorld): Promise<void> {
   await waitForNewChatReady(world)
   if (recallPreferredChatRuntime(world) === 'claude-agent') {
     await selectRuntime(world, 'Claude Agent')
-    await selectProvider(world, MOCK_CLAUDE_AGENT_RE)
+    await selectProvider(world, SIMULATOR_PROVIDER_RE)
     return
   }
 
   await selectRuntime(world, 'Standard')
-}
-
-function rememberPreferredChatRuntime(world: CradleWorld, runtime: PreferredChatRuntime): void {
-  world.remember(PREFERRED_RUNTIME_KEY, runtime)
+  const preferredProvider = world.maybeRecall<string>('chat.preferred-provider')
+  if (preferredProvider) {
+    await selectProvider(world, new RegExp(preferredProvider, 'i'))
+  }
 }
 
 function recallPreferredChatRuntime(world: CradleWorld): PreferredChatRuntime {
@@ -159,101 +153,39 @@ async function selectProvider(world: CradleWorld, label: string | RegExp): Promi
   await world.page.keyboard.press('Escape')
 }
 
-function claudeAgentMockBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/v1\/?$/, '')
+async function configureMultiTurnSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure multi-turn Standard simulator provider')
+  await world.configureStandardChat({ texts: MULTI_TURN_RESPONSES })
 }
 
-async function configureDefaultMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure default mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: DEFAULT_RESPONSE,
-    chunkDelay: 5,
+async function configureSlowGatedSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure slow gated Standard simulator provider')
+  await world.configureStandardChat({
+    texts: [SLOW_RESPONSE],
+    gateAfterCreated: SLOW_GATE,
+    chunkDelayYields: 2,
   })
+  world.remember('simulator.slow-gate', SLOW_GATE)
 }
 
-async function configureSlowMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure slow mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: SLOW_RESPONSE,
-    chunkDelay: 120,
-  })
-}
-
-async function configureQueuedContinuationMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure queued continuation mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseTexts: QUEUED_CONTINUATION_RESPONSES,
-    chunkDelay: 80,
-  })
-}
-
-async function configureContextMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure multi-turn context mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseTexts: CONTEXT_RESPONSES,
-    chunkDelay: 5,
-  })
-}
-
-async function configureMarkdownExportMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure markdown export mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: MARKDOWN_RESPONSE,
-    chunkDelay: 5,
-  })
-}
-
-async function configureReasoningMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure reasoning mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: DEFAULT_RESPONSE,
+async function configureReasoningSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure reasoning Standard simulator provider')
+  await world.configureStandardChat({
+    texts: [DEFAULT_RESPONSE],
     reasoningText: REASONING_TEXT,
-    chunkDelay: 5,
   })
 }
 
-async function configureToolCallMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure tool-call mock LLM provider')
-  if (world.mockLlmServer) {
-    await world.mockLlmServer.stop()
-  }
-
-  const mockLlmServer = new MockLlmServer({ chunkDelay: 5, claudeAgentScenario: 'tool-call' })
-  world.mockLlmServer = mockLlmServer
-  world.mockLlmBaseUrl = await mockLlmServer.start()
-
-  const response = await fetch(`${world.params.serverUrl}/profiles/mock-claude-agent`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: 'Mock Claude Agent',
-      providerKind: 'anthropic',
-      enabled: true,
-      config: {
-        baseUrl: claudeAgentMockBaseUrl(world.mockLlmBaseUrl),
-        model: 'claude-sonnet-4-20250514',
-        permissionMode: 'default',
-        apiKey: 'sk-mock-test-key',
-      },
-      credentialRef: null,
-    }),
+async function configureFailingSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure failing Standard simulator provider')
+  await world.configureStandardChat({
+    failureMessage: 'E2E simulator forced failure',
   })
-  if (!response.ok) {
-    throw new Error(`Failed to configure claude-agent tool-call provider: ${response.status} ${await response.text()}`)
-  }
-
-  await world.ensureWorkspaceExists()
-  rememberPreferredChatRuntime(world, 'claude-agent')
-  await world.page?.reload({ waitUntil: 'domcontentloaded' })
 }
 
-async function configureFailingMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure failing mock LLM provider')
-  await world.configureMockLlmProvider({
-    failureMode: 'http-error',
-    errorStatusCode: 503,
-    errorMessage: 'Mock LLM forced failure',
-  })
+async function configureClaudeApprovalSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Claude Agent approval simulator')
+  await world.configureClaudeAgentChat({ mode: 'approval' })
 }
 
 async function waitForSessionSidebarItem(world: CradleWorld, sessionId: string): Promise<void> {
@@ -354,36 +286,48 @@ Given('应用已启动', async function (this: CradleWorld) {
   await this.page.waitForLoadState('domcontentloaded')
 })
 
-Given('我已配置 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureDefaultMockProvider(this)
+Given('我已配置 Standard Simulator Provider', async function (this: CradleWorld) {
+  await configureMultiTurnSimulator(this)
 })
 
-Given('我已配置会慢速流式返回的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureSlowMockProvider(this)
+Given('我已配置带门控的慢速 Standard Simulator Provider', async function (this: CradleWorld) {
+  await configureSlowGatedSimulator(this)
 })
 
-Given('我已配置用于跟进排队的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureQueuedContinuationMockProvider(this)
+Given('我已配置会返回 Reasoning 的 Standard Simulator Provider', async function (this: CradleWorld) {
+  await configureReasoningSimulator(this)
 })
 
-Given('我已配置按轮次返回不同回复的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureContextMockProvider(this)
+Given('我已配置会失败的 Standard Simulator Provider', async function (this: CradleWorld) {
+  await configureFailingSimulator(this)
 })
 
-Given('我已配置用于 Markdown 导出的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureMarkdownExportMockProvider(this)
+Given('我已配置 Claude Agent 审批 Simulator', async function (this: CradleWorld) {
+  await configureClaudeApprovalSimulator(this)
 })
 
-Given('我已配置会返回 Reasoning 的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureReasoningMockProvider(this)
+Given('我已导航到新建聊天并选中 Simulator', async function (this: CradleWorld) {
+  await navigateToNewChat(this)
 })
 
-Given('我已配置会返回 Tool Call 的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureToolCallMockProvider(this)
+When('我选择 Standard 运行时与 Simulator Provider', async function (this: CradleWorld) {
+  await selectRuntime(this, 'Standard')
+  await selectProvider(this, /E2E Simulator/i)
 })
 
-Given('我已配置会失败的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureFailingMockProvider(this)
+When('我选择 Claude Agent 运行时与 Simulator Provider', async function (this: CradleWorld) {
+  await selectRuntime(this, 'Claude Agent')
+  await selectProvider(this, /E2E Claude Agent/i)
+})
+
+When('我释放慢速流门控', async function (this: CradleWorld) {
+  const gate = this.recall<string>('simulator.slow-gate')
+  await this.simulator!.waitForGate(gate)
+  this.simulator!.release(gate)
+})
+
+Then('聊天流应结束于空闲状态', async function (this: CradleWorld) {
+  await waitForChatStatus(this, 'idle')
 })
 
 When('我点击"新建聊天"导航项', async function (this: CradleWorld) {
@@ -464,7 +408,7 @@ Then('当前聊天会话应显示在选中的工作区下', async function (this
 Then('我应该看到 AI 回复消息', async function (this: CradleWorld) {
   await waitForChatStatus(this, 'idle')
   const assistantBubble = await getLastAssistantBubble(this)
-  await expect(assistantBubble).toContainText('Hello from mock LLM!', { timeout: CHAT_STATUS_TIMEOUT })
+  await expect(assistantBubble).toContainText(DEFAULT_RESPONSE, { timeout: CHAT_STATUS_TIMEOUT })
   await expect(this.page.locator('[data-testid="chat-error-banner"]')).toHaveCount(0)
 })
 

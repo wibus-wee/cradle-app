@@ -26,6 +26,9 @@ importers:
       '@cradle/ipc':
         specifier: workspace:*
         version: link:packages/ipc
+      '@cradle/model-api-simulator':
+        specifier: workspace:*
+        version: link:packages/model-api-simulator
       '@dnd-kit/dom':
         specifier: ^0.5.0
         version: 0.5.0

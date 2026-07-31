@@ -157,7 +157,8 @@ BeforeAll({ timeout: 120_000 }, async () => {
         CRADLE_PORT: String(serverPort),
         CRADLE_HOST: '127.0.0.1',
         CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
-        CRADLE_MOCK_LLM_URL: 'http://127.0.0.1:1', // Placeholder — actual URL set per-profile config.baseUrl
+        // Do NOT set CRADLE_MOCK_LLM_URL — E2E must use the real Claude Agent Provider
+        // talking to @cradle/model-api-simulator over Anthropic Messages.
         CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath,
         CRADLE_E2E: '1',
         NODE_ENV: 'test',
