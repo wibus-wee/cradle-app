@@ -4,6 +4,7 @@ import { expect } from '@playwright/test'
 import type { CradleWorld } from '../support/world'
 
 const SETTINGS_TIMEOUT = 10_000
+const APP_SIDEBAR = '[data-testid="app-sidebar"]'
 
 const SETTINGS_NAV_IDS: Record<string, string> = {
   Appearance: 'appearance',
@@ -79,6 +80,12 @@ Then('我应该看到 Appearance 设置页面', async function (this: CradleWorl
   const settings = this.page.locator('[data-testid="appearance-settings"]')
   await expect(settings).toBeVisible({ timeout: SETTINGS_TIMEOUT })
   await expect(settings).toHaveAttribute('data-settings-appearance-ready', 'true', { timeout: SETTINGS_TIMEOUT })
+})
+
+Then('侧边栏应处于设置模式', async function (this: CradleWorld) {
+  const sidebar = this.page.locator(APP_SIDEBAR)
+  await expect(sidebar).toHaveAttribute('data-sidebar-mode', 'settings', { timeout: SETTINGS_TIMEOUT })
+  await expect(this.page.locator('[data-testid="settings-nav-appearance"]')).toBeVisible({ timeout: SETTINGS_TIMEOUT })
 })
 
 Then('我应该看到 Desktop Updates 设置页面', async function (this: CradleWorld) {
