@@ -93,18 +93,6 @@ function updateCurrentBranch(world: CradleWorld, branchName: string): void {
   world.remember(GIT_WORKSPACE_KEY, fixture)
 }
 
-async function addWorkspaceFromPicker(world: CradleWorld, fixture: GitWorkspaceFixture): Promise<void> {
-  const addWorkspaceButton = world.page.locator('[data-testid="add-workspace-btn"]')
-  await expect(addWorkspaceButton).toBeVisible({ timeout: 10_000 })
-  await addWorkspaceButton.click()
-
-  await world.selectDirectoryInBrowser(fixture.dir)
-
-  await expect(
-    world.page.locator('[data-testid^="workspace-open-"]').filter({ hasText: fixture.name }).first(),
-  ).toBeVisible({ timeout: 10_000 })
-}
-
 async function getGitPanelBranchControl(world: CradleWorld) {
   // Wait for the git panel to finish loading git status
   const gitPanel = world.page.locator('[data-testid="git-panel"]')
@@ -148,10 +136,21 @@ async function switchRightAsideToGit(world: CradleWorld): Promise<void> {
 }
 
 Given('我已添加了一个真实 Git 工作区', async function (this: CradleWorld) {
-  console.warn('[step] setup: add real git workspace')
+  console.warn('[step] setup: add real git workspace via API')
   const fixture = createGitWorkspaceFixture(this)
-  await addWorkspaceFromPicker(this, fixture)
+  const response = await fetch(`${this.params.serverUrl}/workspaces/from-directory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: fixture.dir }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to create git workspace: ${response.status} ${await response.text()}`)
+  }
   this.remember(GIT_WORKSPACE_KEY, fixture)
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(
+    this.page.locator('[data-testid^="workspace-open-"]').filter({ hasText: fixture.name }).first(),
+  ).toBeVisible({ timeout: 15_000 })
 })
 
 Given('我在新建聊天中选择 Git 工作区', async function (this: CradleWorld) {

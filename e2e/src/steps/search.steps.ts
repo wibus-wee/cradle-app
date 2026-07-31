@@ -61,14 +61,17 @@ function fileResult(world: CradleWorld, path: string) {
 async function openGlobalSearch(world: CradleWorld): Promise<void> {
   console.warn('[step] open global search dialog')
   const searchButton = world.page.locator('[data-testid="nav-search"]')
+  const dialog = world.page.locator('[data-testid="global-search-dialog"]')
 
   if (await searchButton.isVisible().catch(() => false)) {
     await searchButton.click()
   }
   else {
-    await world.page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
+    // Match app-shell: Ctrl/Meta+K opens the command palette / global search.
+    await world.page.keyboard.press(process.platform === 'darwin' ? 'Meta+KeyK' : 'Control+KeyK')
   }
 
+  await expect(dialog).toBeVisible({ timeout: GLOBAL_SEARCH_TIMEOUT })
   await expect(globalSearchInput(world)).toBeVisible({ timeout: GLOBAL_SEARCH_TIMEOUT })
 }
 
@@ -142,7 +145,9 @@ Then('全局搜索中应该显示会话{string}的标题高亮{string}', async f
   const title = result.locator(`[data-testid="global-search-thread-title-${session.id}"]`)
 
   await expect(result).toBeVisible({ timeout: GLOBAL_SEARCH_TIMEOUT })
-  await expect(title).toContainText(session.firstUserText, { timeout: GLOBAL_SEARCH_TIMEOUT })
+  // Title may be AI-renamed; require the query highlight and that the visible
+  // title still contains the search query token.
+  await expect(title).toContainText(query, { timeout: GLOBAL_SEARCH_TIMEOUT })
   await expect(title.locator('mark')).toContainText(query, { timeout: GLOBAL_SEARCH_TIMEOUT })
 })
 
