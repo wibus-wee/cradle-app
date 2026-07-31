@@ -6,7 +6,7 @@
   背景:
     假如 应用已启动
 
-  @wip @P0 @CRADLE-CODEX-001
+  @wip @CRADLE-CODEX-001
   场景: Codex 通过 Simulator 完成一轮回复
     # Requires a resolvable CRADLE_CODEX_APP_SERVER_PATH / @openai/codex binary.
     # Parked until the managed E2E server can spawn Codex app-server reliably.
