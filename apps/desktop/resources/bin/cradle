@@ -14,7 +14,7 @@ done
 BIN_DIR="$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd)"
 RESOURCE_DIR="$(CDPATH= cd -- "$BIN_DIR/.." && pwd)"
 APP_EXECUTABLE="$RESOURCE_DIR/../MacOS/Cradle"
-CLI_ENTRY="$RESOURCE_DIR/cli/index.js"
+CLI_ENTRY="$RESOURCE_DIR/cli/index.cjs"
 
 if [ ! -x "$APP_EXECUTABLE" ]; then
   echo "Cannot find Cradle app executable at $APP_EXECUTABLE" >&2

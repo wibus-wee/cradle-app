@@ -5,7 +5,7 @@
   "description": "Cradle - AI agent management platform",
   "author": "example.com",
   "bin": {
-    "cradle": "./packages/cli/dist/index.js"
+    "cradle": "./packages/cli/dist/index.cjs"
   },
   "scripts": {
     "format": "prettier --write .",

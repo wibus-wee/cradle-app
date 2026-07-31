@@ -1202,6 +1202,9 @@ importers:
       '@types/node':
         specifier: ^22.19.1
         version: 22.19.17
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33)(jiti@2.7.0)(postcss@8.5.15)(tsx@4.23.0)(typescript@5.9.3)(yaml@2.9.0)
       tsx:
         specifier: ^4.21.0
         version: 4.23.0

@@ -290,7 +290,7 @@ export function splitCliArgv(argv: string[]): { prefix: string[], user: string[]
 
   // Find the CLI entry script — the last runtime-ish token before user input.
   // Under tsx: [node, .../tsx, src/index.ts, ...user]
-  // Under node dist: [node, .../dist/index.js, ...user]
+  // Under node dist: [node, .../dist/index.cjs, ...user]
   let scriptIndex = -1
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i]!
@@ -301,9 +301,11 @@ export function splitCliArgv(argv: string[]): { prefix: string[], user: string[]
     if (
       token.endsWith('index.ts')
       || token.endsWith('index.js')
+      || token.endsWith('index.cjs')
       || token.endsWith(`${pathSep}index.ts`)
       || token.endsWith(`${pathSep}index.js`)
-      || /[/\\]packages[/\\]cli[/\\](?:src|dist)[/\\]index\.(?:ts|js)$/.test(token)
+      || token.endsWith(`${pathSep}index.cjs`)
+      || /[/\\]packages[/\\]cli[/\\](?:src|dist)[/\\]index\.(?:ts|js|cjs)$/.test(token)
       || token.includes(`${pathSep}cli${pathSep}src${pathSep}index.`)
       || token.includes(`${pathSep}cli${pathSep}dist${pathSep}index.`)
     ) {
