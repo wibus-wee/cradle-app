@@ -62,7 +62,7 @@
     而且 最后一条 AI 消息应包含"慢速助手回复完成"
     而且 聊天中不应出现错误提示
 
-  @essence @P1 @CRADLE-CHAT-005
+  @wip @CRADLE-CHAT-005
   场景: 可以展开查看 Thinking 内容
     假如 我已配置会返回 Thinking 的 Claude Agent Simulator
     而且 我已添加了一个工作区
