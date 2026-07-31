@@ -8,10 +8,14 @@ const GLOBAL_SEARCH_TIMEOUT = 15_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'
 
 const COMMAND_LABEL_TO_ID: Record<string, string> = {
-  打开设置: 'open-settings',
-  用量统计: 'open-usage',
-  切换侧栏: 'toggle-sidebar',
-  新建对话: 'new-chat',
+  '打开设置': 'open-settings',
+  'Open settings': 'open-settings',
+  '用量统计': 'open-usage',
+  'Usage': 'open-usage',
+  '切换侧栏': 'toggle-sidebar',
+  'Toggle sidebar': 'toggle-sidebar',
+  '新建对话': 'new-chat',
+  'New chat': 'new-chat',
 }
 
 type SessionAlias = {
