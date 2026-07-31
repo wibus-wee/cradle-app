@@ -161,6 +161,7 @@ function textStreamSteps(input: {
         output_index: outputIndex,
         content_index: 0,
         delta: word,
+        logprobs: [],
       },
     })
   }
@@ -174,6 +175,7 @@ function textStreamSteps(input: {
       output_index: outputIndex,
       content_index: 0,
       text: input.text,
+      logprobs: [],
     },
   })
   steps.push({

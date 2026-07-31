@@ -186,6 +186,7 @@ function streamSteps(response: JsonObject, text: string): readonly StreamStep[] 
       output_index: 0,
       content_index: 0,
       delta: text,
+      logprobs: [],
     },
     {
       type: 'response.output_text.done',
@@ -194,6 +195,7 @@ function streamSteps(response: JsonObject, text: string): readonly StreamStep[] 
       output_index: 0,
       content_index: 0,
       text,
+      logprobs: [],
     },
     {
       type: 'response.content_part.done',
