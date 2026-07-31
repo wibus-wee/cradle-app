@@ -31,15 +31,15 @@ export function createSimulatorApp(
     normalize: 'typebox',
   })
     .use(anthropicRoutes(controller, protocol, autoRespond))
-    .use(openAiRoutes(controller, protocol, openAiResources))
+    .use(openAiRoutes(controller, protocol, openAiResources, autoRespond))
     .get('/v1/models', ({ request }) =>
       isAnthropicRequest(request)
         ? handleAnthropicRequest(controller, protocol, request, autoRespond)
-        : handleOpenAiRequest(controller, protocol, openAiResources, request))
+        : handleOpenAiRequest(controller, protocol, openAiResources, request, autoRespond))
     .get('/v1/models/:model', ({ request }) =>
       isAnthropicRequest(request)
         ? handleAnthropicRequest(controller, protocol, request, autoRespond)
-        : handleOpenAiRequest(controller, protocol, openAiResources, request))
+        : handleOpenAiRequest(controller, protocol, openAiResources, request, autoRespond))
 }
 
 function isAnthropicRequest(request: Request): boolean {

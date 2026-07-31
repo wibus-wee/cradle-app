@@ -5,6 +5,7 @@ import { observeRequest } from '../core/request-ledger'
 import type { ScenarioController } from '../core/scenario-runtime'
 import { createScheduledStream } from '../core/stream-scheduler'
 import { authenticateOpenAi } from './auth'
+import { autoOpenAiResponse } from './auto-respond'
 import { openAiError } from './errors'
 import type { OpenAiResourceStore } from './resource-store'
 import {
@@ -17,21 +18,23 @@ export function openAiRoutes(
   controller: ScenarioController,
   protocol: SimulatorProtocolValidator,
   resources: OpenAiResourceStore,
+  autoRespond = false,
 ) {
   return new Elysia({ name: 'cradle.model-api-simulator.openai' })
-    .post('/v1/responses', ({ request }) => handleOpenAiRequest(controller, protocol, resources, request))
+    .post('/v1/responses', ({ request }) =>
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
     .get('/v1/responses/:response_id', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, resources, request))
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
     .delete('/v1/responses/:response_id', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, resources, request))
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
     .post('/v1/responses/:response_id/cancel', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, resources, request))
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
     .get('/v1/responses/:response_id/input_items', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, resources, request))
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
     .post('/v1/responses/input_tokens', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, resources, request))
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
     .post('/v1/responses/compact', ({ request }) =>
-      handleOpenAiRequest(controller, protocol, resources, request))
+      handleOpenAiRequest(controller, protocol, resources, request, autoRespond))
 }
 
 export async function handleOpenAiRequest(
@@ -39,12 +42,17 @@ export async function handleOpenAiRequest(
   protocol: SimulatorProtocolValidator,
   resources: OpenAiResourceStore,
   request: Request,
+  autoRespond = false,
 ): Promise<Response> {
   const authenticationError = authenticateOpenAi(request)
   if (authenticationError) { return authenticationError }
   try {
     const observed = await observeRequest(request)
     const operation = protocol.validateRequest('openai', request, observed)
+    if (autoRespond && !controller.nextMatches('openai', observed)) {
+      controller.record(observed)
+      return autoOpenAiResponse(controller, observed)
+    }
     const exchange = controller.take('openai', observed)
     const headers = new Headers(exchange.response.headers)
     headers.set(

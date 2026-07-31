@@ -33,7 +33,8 @@ export async function handleAnthropicRequest(
   try {
     const observed = await observeRequest(request)
     const operation = protocol.validateRequest('anthropic', request, observed)
-    if (autoRespond && controller.pendingExchangeCount === 0) {
+    // Absorb probe/noise when the next enqueued exchange does not claim this request.
+    if (autoRespond && !controller.nextMatches('anthropic', observed)) {
       controller.record(observed)
       return autoAnthropicResponse(controller, observed)
     }

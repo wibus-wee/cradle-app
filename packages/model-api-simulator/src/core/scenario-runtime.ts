@@ -161,6 +161,34 @@ export class ScenarioController implements SimulatorController {
     return observed
   }
 
+  /**
+   * Peek whether the next enqueued exchange would accept this request.
+   * Used by autoRespond to absorb probe noise without consuming conversation turns.
+   */
+  nextMatches(
+    provider: SimulatorScenario['provider'],
+    request: Omit<ObservedRequest, 'index'>,
+  ): boolean {
+    const queued = this.#exchanges[0]
+    if (!queued || queued.provider !== provider) {
+      return false
+    }
+    const provisional: ObservedRequest = {
+      ...request,
+      query: request.query ?? {},
+      index: this.#requests.length,
+    }
+    if (matches(provisional, queued.exchange.request)) {
+      return false
+    }
+    for (const [name, expected] of Object.entries(queued.exchange.expectedHeaders ?? {})) {
+      if (provisional.headers[name.toLowerCase()] !== expected) {
+        return false
+      }
+    }
+    return true
+  }
+
   take(
     provider: SimulatorScenario['provider'],
     request: Omit<ObservedRequest, 'index'>,
