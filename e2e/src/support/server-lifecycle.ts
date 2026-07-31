@@ -125,9 +125,26 @@ function resolveManagedCodexAppServerPath(): string | null {
     return createRequire(join(ROOT, 'package.json')).resolve(CODEX_APP_SERVER_PACKAGE_PATH)
   }
   catch {
-    // Codex is optional for essence E2E paths that do not exercise the Codex runtime.
-    return null
+    // Fall through to the desktop-synced native binary when the npm package is absent.
   }
+
+  // Prefer the desktop `sync:codex-runtime` artifact (gitignored binaries under resources/codex).
+  const platformArch = `${process.platform}-${process.arch}`
+  const bundled = join(
+    ROOT,
+    'apps',
+    'desktop',
+    'resources',
+    'codex',
+    platformArch,
+    process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server',
+  )
+  if (existsSync(bundled)) {
+    return bundled
+  }
+
+  // Codex is optional for essence E2E paths that do not exercise the Codex runtime.
+  return null
 }
 
 /**
@@ -187,6 +204,12 @@ BeforeAll({ timeout: 120_000 }, async () => {
     await waitForReady(`${serverUrl}/health`, 'Managed E2E Server')
 
     console.log(`[e2e] Managed server started at ${serverUrl} (data: ${dataDir})`)
+    if (codexAppServerPath) {
+      console.log(`[e2e] Codex app-server: ${codexAppServerPath}`)
+    }
+    else {
+      console.warn('[e2e] Codex app-server not resolved — Codex scenarios will fail until sync:codex-runtime')
+    }
 
     // Start a web dev server pointing to the managed API server
     let webUrl: string | null = null

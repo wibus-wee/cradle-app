@@ -6,10 +6,8 @@
   背景:
     假如 应用已启动
 
-  @wip @CRADLE-CODEX-001
+  @essence @P0 @CRADLE-CODEX-001
   场景: Codex 通过 Simulator 完成一轮回复
-    # Requires a resolvable CRADLE_CODEX_APP_SERVER_PATH / @openai/codex binary.
-    # Parked until the managed E2E server can spawn Codex app-server reliably.
     假如 我已配置 Codex Simulator
     而且 我已添加了一个工作区
     当 我点击"新建聊天"导航项

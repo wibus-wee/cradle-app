@@ -14,6 +14,8 @@ This file applies to everything under `e2e/`.
 ```bash
 # Prefer Node >= 22.15 for zstd (e.g. nvm use 22.22.2)
 pnpm --filter @cradle/plugin-sdk build
+# Optional: provision native Codex app-server for Codex essence scenarios
+pnpm --filter @cradle/desktop sync:codex-runtime
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@essence"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "not @wip"
