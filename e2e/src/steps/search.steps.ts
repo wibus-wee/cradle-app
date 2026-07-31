@@ -60,31 +60,21 @@ function fileResult(world: CradleWorld, path: string) {
 
 async function openGlobalSearch(world: CradleWorld): Promise<void> {
   console.warn('[step] open global search dialog')
-  const searchButton = world.page.locator('[data-testid="nav-search"]')
   const dialog = world.page.locator('[data-testid="global-search-dialog"]')
-
   if (await dialog.isVisible().catch(() => false)) {
     return
   }
 
-  if (await searchButton.count() > 0) {
-    await searchButton.first().click({ force: true }).catch(() => undefined)
-  }
+  const searchButton = world.page.getByTestId('nav-search')
+  await expect(searchButton).toBeVisible({ timeout: GLOBAL_SEARCH_TIMEOUT })
+  await searchButton.click()
 
+  // Fallback: Ctrl/Meta+P (sidebar advertises ⌘P) and Ctrl/Meta+K both open the palette.
   if (!(await dialog.isVisible().catch(() => false))) {
-    // Dispatch a real Ctrl/Meta+K keydown — Playwright press() can miss the
-    // capture-phase listener when focus is elsewhere.
-    await world.page.evaluate(() => {
-      const event = new KeyboardEvent('keydown', {
-        key: 'k',
-        code: 'KeyK',
-        ctrlKey: true,
-        metaKey: false,
-        bubbles: true,
-        cancelable: true,
-      })
-      window.dispatchEvent(event)
-    })
+    await world.page.keyboard.press('Control+P')
+  }
+  if (!(await dialog.isVisible().catch(() => false))) {
+    await world.page.keyboard.press('Control+K')
   }
 
   await expect(dialog).toBeVisible({ timeout: GLOBAL_SEARCH_TIMEOUT })
