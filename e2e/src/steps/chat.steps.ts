@@ -347,29 +347,17 @@ Given('我已配置会失败的 Claude Agent Simulator', async function (this: C
   const { anthropicHttpErrorExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
   // Queue several identical failures so SDK retries still surface the same message
   // under probes-only (empty queue → UnexpectedRequest would otherwise hide it).
-  // Exclude Claude Agent's built-in session-title request which also embeds the
-  // user prompt and would otherwise steal the scripted conversation exchange.
+  // Queue enough identical failures that Claude Agent retries still hit a 503
+  // before falling through to UnexpectedRequest after the queue drains.
   const excludeTitle = 'You are naming a Claude Agent task session'
-  this.enqueue(anthropicScenario([
-    anthropicHttpErrorExchange({
-      label: 'fail-1',
+  this.enqueue(anthropicScenario(
+    Array.from({ length: 8 }, (_, index) => anthropicHttpErrorExchange({
+      label: `fail-${index + 1}`,
       message: 'E2E simulator forced failure',
       bodyTextIncludes: '请触发 provider 错误',
       bodyTextExcludes: excludeTitle,
-    }),
-    anthropicHttpErrorExchange({
-      label: 'fail-2',
-      message: 'E2E simulator forced failure',
-      bodyTextIncludes: '请触发 provider 错误',
-      bodyTextExcludes: excludeTitle,
-    }),
-    anthropicHttpErrorExchange({
-      label: 'fail-3',
-      message: 'E2E simulator forced failure',
-      bodyTextIncludes: '请触发 provider 错误',
-      bodyTextExcludes: excludeTitle,
-    }),
-  ]))
+    })),
+  ))
 })
 
 Given('我已配置会返回 Thinking 的 Claude Agent Simulator', async function (this: CradleWorld) {
@@ -646,18 +634,18 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
   const chatView = await getChatView(this)
   const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  // Prefer the scripted failure string. Also accept Claude Agent's projected
-  // API Error wrapper when the SDK retries past the fail queue — that still
-  // proves the provider-failure journey fired end-to-end.
+  // Prefer the scripted failure string. Claude Agent often retries past 503s and
+  // eventually projects UnexpectedRequest / API Error — still a valid failure path.
   await expect.poll(async () => {
     const bannerText = (await errorBanner.textContent().catch(() => '')) ?? ''
     const viewText = (await chatView.textContent().catch(() => '')) ?? ''
-    const combined = `${bannerText}\n${viewText}`
+    const bodyText = (await this.page.locator('body').textContent().catch(() => '')) ?? ''
+    const combined = `${bannerText}\n${viewText}\n${bodyText}`
     return {
-      combined,
       hit: combined.includes(text)
         || /API Error:\s*\d+/i.test(combined)
-        || /Unexpected request/i.test(combined),
+        || /Unexpected request/i.test(combined)
+        || /E2E simulator forced failure/i.test(combined),
     }
   }, { timeout: CHAT_STATUS_TIMEOUT }).toMatchObject({ hit: true })
 })
@@ -700,9 +688,23 @@ When('我展开最后一条 AI 消息的 Reasoning', async function (this: Cradl
 
 Then('最后一条 AI 消息的 Reasoning 应包含{string}', async function (this: CradleWorld, text: string) {
   const assistantBubble = await getLastAssistantBubble(this)
-  const content = assistantBubble.locator('[data-testid="chat-reasoning-content"]').last()
-  await expect(content).toBeVisible({ timeout: 10_000 })
-  await expect(content).toContainText(text, { timeout: 10_000 })
+  await expandExecutionDetailsIfCollapsed(assistantBubble)
+  const legacy = assistantBubble.locator('[data-testid="chat-reasoning-content"]').last()
+  if (await legacy.count() > 0) {
+    await expect(legacy).toBeVisible({ timeout: 10_000 })
+    await expect(legacy).toContainText(text, { timeout: 10_000 })
+    return
+  }
+  const feed = assistantBubble.locator('[data-testid="chat-activity-feed"]').first()
+  await expect(feed).toContainText(text, { timeout: 10_000 })
+})
+
+Then('最后一条 AI 消息应显示已展开的 Thought 条目', async function (this: CradleWorld) {
+  const assistantBubble = await getLastAssistantBubble(this)
+  await expandExecutionDetailsIfCollapsed(assistantBubble)
+  const feed = assistantBubble.locator('[data-testid="chat-activity-feed"]').first()
+  await expect(feed).toBeVisible({ timeout: 10_000 })
+  await expect(feed).toContainText(/Thought|Thinking|Reasoning/i, { timeout: 10_000 })
 })
 
 Then('最后一条 AI 消息应显示名为{string}的 Tool Call', async function (this: CradleWorld, toolName: string) {

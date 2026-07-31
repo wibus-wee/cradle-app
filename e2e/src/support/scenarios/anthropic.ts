@@ -270,11 +270,6 @@ export function anthropicHttpErrorExchange(input: {
     response: {
       kind: 'json',
       status: input.status ?? 503,
-      headers: {
-        // Ask Anthropic-compatible clients not to retry — otherwise Claude Agent
-        // drains the fail queue and surfaces UnexpectedRequest instead of our message.
-        'x-should-retry': 'false',
-      },
       body: {
         type: 'error',
         request_id: `req_${input.label}`,

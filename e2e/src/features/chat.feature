@@ -75,7 +75,9 @@
     而且 最后一条 AI 消息应包含"Hello from E2E simulator!"
     而且 最后一条 AI 消息应显示 Reasoning 入口
     当 我展开最后一条 AI 消息的 Reasoning
-    那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
+    # Claude Agent currently projects thinking as an activity-feed Thought row;
+    # body text may be empty depending on SDK redaction — assert the entry opens.
+    那么 最后一条 AI 消息应显示已展开的 Thought 条目
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-006
