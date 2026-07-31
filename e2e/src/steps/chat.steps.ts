@@ -347,17 +347,29 @@ Given('我已配置会失败的 Claude Agent Simulator', async function (this: C
   const { anthropicHttpErrorExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
   // Queue several identical failures so SDK retries still surface the same message
   // under probes-only (empty queue → UnexpectedRequest would otherwise hide it).
-  // Queue enough identical failures that Claude Agent retries still hit a 503
-  // before falling through to UnexpectedRequest after the queue drains.
+  // Three scripted 503s cover Claude Agent's typical retry budget; a later
+  // UnexpectedRequest still surfaces as API Error in the chat transcript.
   const excludeTitle = 'You are naming a Claude Agent task session'
-  this.enqueue(anthropicScenario(
-    Array.from({ length: 8 }, (_, index) => anthropicHttpErrorExchange({
-      label: `fail-${index + 1}`,
+  this.enqueue(anthropicScenario([
+    anthropicHttpErrorExchange({
+      label: 'fail-1',
       message: 'E2E simulator forced failure',
       bodyTextIncludes: '请触发 provider 错误',
       bodyTextExcludes: excludeTitle,
-    })),
-  ))
+    }),
+    anthropicHttpErrorExchange({
+      label: 'fail-2',
+      message: 'E2E simulator forced failure',
+      bodyTextIncludes: '请触发 provider 错误',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicHttpErrorExchange({
+      label: 'fail-3',
+      message: 'E2E simulator forced failure',
+      bodyTextIncludes: '请触发 provider 错误',
+      bodyTextExcludes: excludeTitle,
+    }),
+  ]))
 })
 
 Given('我已配置会返回 Thinking 的 Claude Agent Simulator', async function (this: CradleWorld) {
