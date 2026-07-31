@@ -62,6 +62,19 @@
     而且 最后一条 AI 消息应包含"慢速助手回复完成"
     而且 聊天中不应出现错误提示
 
+  @essence @P1 @CRADLE-CHAT-005
+  场景: 可以展开查看 Thinking 内容
+    假如 我已配置会返回 Thinking 的 Claude Agent Simulator
+    而且 我已添加了一个工作区
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"请先思考再回答"
+    而且 我点击发送按钮
+    那么 应该跳转到聊天视图
+    而且 最后一条 AI 消息应包含"Hello from E2E simulator!"
+    而且 最后一条 AI 消息应显示 Reasoning 入口
+    当 我展开最后一条 AI 消息的 Reasoning
+    那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
+
   @essence @P1 @CRADLE-CHAT-006
   场景: 会话生命周期：重命名、置顶、删除
     假如 我已配置 Claude Agent 多轮 Simulator

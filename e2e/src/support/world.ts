@@ -259,11 +259,17 @@ export class CradleWorld extends World {
         state: { completedSteps: { provider: true, github: true } },
         version: 2,
       }))
-      // Suppress What's New corner popup noise.
+      // Suppress What's New corner popup noise (dev mock versions + tips).
       window.localStorage.setItem('cradle:whats-new:v1', JSON.stringify({
         state: {
-          dismissedAnnouncements: ['*'],
-          dismissedTips: ['*'],
+          dismissedAnnouncements: [
+            'dev-mock-20260723.1',
+            'dev-mock-20260710.1',
+          ],
+          dismissedTips: [
+            'dev-mock-tip-split-workspace',
+            'dev-mock-tip-external-link',
+          ],
         },
         version: 1,
       }))

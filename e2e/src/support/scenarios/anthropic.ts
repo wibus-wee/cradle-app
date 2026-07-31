@@ -146,6 +146,54 @@ export function anthropicToolUseExchange(input: {
   ])
 }
 
+export function anthropicThinkingTextExchange(input: {
+  label: string
+  thinking: string
+  text: string
+}): SimulatorExchange {
+  const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
+  return streamExchange(input.label, [
+    messageStart(messageId),
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'thinking', thinking: '', signature: '' },
+      },
+    },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'thinking_delta', thinking: input.thinking },
+      },
+    },
+    { kind: 'event', event: { type: 'content_block_stop', index: 0 } },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'text', text: '', citations: null },
+      },
+    },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_delta',
+        index: 1,
+        delta: { type: 'text_delta', text: input.text },
+      },
+    },
+    { kind: 'event', event: { type: 'content_block_stop', index: 1 } },
+    { kind: 'event', event: messageDelta('end_turn') },
+    { kind: 'event', event: { type: 'message_stop' } },
+    { kind: 'close' },
+  ])
+}
+
 export function anthropicHttpErrorExchange(input: {
   label: string
   status?: number

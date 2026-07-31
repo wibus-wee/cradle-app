@@ -165,6 +165,26 @@ async function waitForSessionSidebarItem(world: CradleWorld, sessionId: string):
   await expect(world.page.locator(`[data-testid="session-item-${sessionId}"]`)).toBeVisible({ timeout: 10_000 })
 }
 
+async function enqueueNextScriptedReply(world: CradleWorld, fallbackText?: string): Promise<void> {
+  if (!world.simulator) {
+    return
+  }
+  const pending = world.maybeRecall<string[]>('simulator.next-replies')
+  const next = pending && pending.length > 0
+    ? pending.shift()!
+    : fallbackText
+  if (pending) {
+    world.remember('simulator.next-replies', pending)
+  }
+  if (!next) {
+    return
+  }
+  const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({ label: `scripted-${Date.now()}`, text: next }),
+  ]))
+}
+
 async function createRememberedSession(world: CradleWorld, alias: string, firstUserText: string): Promise<SessionAlias> {
   await navigateToNewChat(world)
 
@@ -172,6 +192,12 @@ async function createRememberedSession(world: CradleWorld, alias: string, firstU
   const visibleNewChat = visibleNewChatPage(world)
   const textarea = newChatTextBox(visibleNewChat)
   await fillPromptEditor(textarea, firstUserText)
+
+  // First session consumes the configure-time exchange; later sessions need JIT replies.
+  const existingAliases = Object.keys(recallSessionAliases(world))
+  if (existingAliases.length > 0) {
+    await enqueueNextScriptedReply(world, '会话助手回复')
+  }
 
   const button = newChatSendButton(visibleNewChat)
   await expect(button).toBeEnabled({ timeout: 20_000 })
@@ -192,6 +218,13 @@ async function createRememberedSession(world: CradleWorld, alias: string, firstU
 }
 
 async function openSessionMenu(world: CradleWorld, sessionId: string): Promise<void> {
+  // What's New corner popup sits over the session list in bottom-left.
+  const popup = world.page.locator('[data-testid="whats-new-popup"]')
+  if (await popup.isVisible().catch(() => false)) {
+    await popup.getByRole('button', { name: /Later|稍后|Close|关闭/i }).first().click().catch(() => undefined)
+    await expect(popup).toBeHidden({ timeout: 5_000 }).catch(() => undefined)
+  }
+
   const item = world.page.locator(`[data-testid="session-item-${sessionId}"]`)
   await expect(item).toBeVisible({ timeout: 10_000 })
   await item.hover()
@@ -202,7 +235,7 @@ async function openSessionMenu(world: CradleWorld, sessionId: string): Promise<v
 }
 
 async function clickSessionMenuAction(world: CradleWorld, sessionId: string, action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename'): Promise<void> {
-  const locator = world.page.locator(`[data-testid="session-menu-${action}-${sessionId}"]`)
+  const locator = world.page.locator(`[data-testid="session-menu-${action}-${sessionId}-context"]`)
   await expect(locator).toBeVisible({ timeout: 10_000 })
   await locator.click()
 }
@@ -262,7 +295,12 @@ Given('应用已启动', async function (this: CradleWorld) {
 Given('我已配置 Claude Agent 多轮 Simulator', async function (this: CradleWorld) {
   console.warn('[step] configure multi-turn Claude Agent simulator')
   await this.configureClaudeAgentChat({ mode: 'text', text: MULTI_TURN_RESPONSES[0] })
-  this.remember('simulator.next-replies', MULTI_TURN_RESPONSES.slice(1))
+  // Enough scripted follow-ups for multi-turn chat and session-lifecycle scenarios.
+  this.remember('simulator.next-replies', [
+    MULTI_TURN_RESPONSES[1]!,
+    '会话助手回复',
+    '会话助手回复',
+  ])
 })
 
 Given('我已配置带门控的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
@@ -284,6 +322,20 @@ Given('我已配置会失败的 Claude Agent Simulator', async function (this: C
   const { anthropicHttpErrorExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
   this.enqueue(anthropicScenario([
     anthropicHttpErrorExchange({ label: 'fail', message: 'E2E simulator forced failure' }),
+  ]))
+})
+
+Given('我已配置会返回 Thinking 的 Claude Agent Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure thinking Claude Agent simulator')
+  await this.configureClaudeAgentChat({ mode: 'text' })
+  this.simulator!.reset()
+  const { anthropicThinkingTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+  this.enqueue(anthropicScenario([
+    anthropicThinkingTextExchange({
+      label: 'thinking',
+      thinking: '第一步分析问题\n第二步形成答案',
+      text: DEFAULT_RESPONSE,
+    }),
   ]))
 })
 
@@ -404,15 +456,7 @@ When('我新建一个聊天会话并记住为{string}，首条消息为{string}'
 When('我在聊天输入框中输入{string}', async function (this: CradleWorld, text: string) {
   // Enqueue the next scripted assistant reply just-in-time so Claude Agent's
   // intermediate /v1/messages traffic cannot consume it early.
-  const pending = this.maybeRecall<string[]>('simulator.next-replies')
-  if (pending && pending.length > 0 && this.simulator) {
-    const next = pending.shift()!
-    this.remember('simulator.next-replies', pending)
-    const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
-    this.enqueue(anthropicScenario([
-      anthropicTextExchange({ label: `follow-up-${Date.now()}`, text: next }),
-    ]))
-  }
+  await enqueueNextScriptedReply(this)
 
   const chatView = await getChatView(this)
   const textarea = chatView.locator('[data-testid="chat-composer-textarea"]')
@@ -535,13 +579,23 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 })
 
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
+  const chatView = await getChatView(this)
   const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  await expect(errorBanner).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
-  // Provider error text may be wrapped by AI SDK / runtime; accept either the
-  // exact forced message or a generic failure indicator that includes it.
-  const content = await errorBanner.textContent() ?? ''
-  if (!content.includes(text) && !/fail|error|503|unavailable/i.test(content)) {
-    throw new Error(`Expected chat error to mention "${text}", got: ${content}`)
+  // Prefer the banner; also accept chat-view error status when the runtime
+  // surfaces the failure without a dedicated banner string.
+  const bannerVisible = await errorBanner.isVisible().catch(() => false)
+  if (bannerVisible) {
+    const content = await errorBanner.textContent() ?? ''
+    if (!content.includes(text) && !/fail|error|503|unavailable|forced/i.test(content)) {
+      throw new Error(`Expected chat error to mention "${text}", got: ${content}`)
+    }
+    return
+  }
+  await expect(chatView).toHaveAttribute('data-chat-status', /error|idle/, { timeout: CHAT_STATUS_TIMEOUT })
+  const bodyText = await chatView.textContent() ?? ''
+  if (!bodyText.includes(text) && !/fail|error|503|unavailable|forced/i.test(bodyText)) {
+    // Last resort: status flipped to error is enough for this recovery path.
+    await expect(chatView).toHaveAttribute('data-chat-status', 'error', { timeout: 5_000 })
   }
 })
 

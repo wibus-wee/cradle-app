@@ -32,8 +32,8 @@ Then('审批卡片应该消失', async function (this: CradleWorld) {
   await this.approval.expectHidden(APPROVAL_TIMEOUT)
 })
 
-Then('Agent 应该继续执行', async function (this: CradleWorld) {
-  await this.chat.waitStatus('idle', 30_000)
+Then('审批卡片应包含{string}', async function (this: CradleWorld, text: string) {
+  await expect(this.approval.card()).toContainText(text, { timeout: 10_000 })
 })
 
 // Legacy step kept for archived features; essence suite uses Claude Agent 审批 Simulator.
