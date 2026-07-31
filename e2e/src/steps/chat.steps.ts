@@ -634,8 +634,8 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
   const chatView = await getChatView(this)
   const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  // Prefer the scripted failure string. Claude Agent often retries past 503s and
-  // eventually projects UnexpectedRequest / API Error — still a valid failure path.
+  // Claude Agent retries 503s for a while before projecting API Error — allow longer.
+  const errorTimeout = Math.max(CHAT_STATUS_TIMEOUT, 90_000)
   await expect.poll(async () => {
     const bannerText = (await errorBanner.textContent().catch(() => '')) ?? ''
     const viewText = (await chatView.textContent().catch(() => '')) ?? ''
@@ -647,7 +647,7 @@ Then('聊天错误提示应显示{string}', async function (this: CradleWorld, t
         || /Unexpected request/i.test(combined)
         || /E2E simulator forced failure/i.test(combined),
     }
-  }, { timeout: CHAT_STATUS_TIMEOUT }).toMatchObject({ hit: true })
+  }, { timeout: errorTimeout }).toMatchObject({ hit: true })
 })
 
 When('我重新加载当前页面', async function (this: CradleWorld) {
