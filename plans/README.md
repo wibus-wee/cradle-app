@@ -80,6 +80,14 @@ duplex adapter 复用同一 transport。locator 复用的进程显式标记为 `
 binary/module-import feasibility gate；Plan 063 只迁移 transport，不重定义 Plan 061 的 Chat
 lifecycle 或 Plan 054 的 cursor 语义。
 
+2026-07-31 在 commit `00ba970e` 上重新核验 Plan 063：Electron 42 开发态已验证
+custom-protocol streaming/cancellation、FormData、image、dynamic import、binary、renderer
+stream upload 与 default-session isolation；两跳 advanced IPC 与 Elysia `app.handle()` 流式
+Request、以及 default session 的 HttpOnly auth cookie 均已通过一次性探针。当前没有已知架构撞墙；但 packaged artifact、64 MiB memory
+bound 与真实 plugin module/CSP 仍是 M0 的硬门槛。计划随之纳入新的 bootstrap lifecycle、PTY
+status event、raw upload/plugin fetch，以及 Plan 071 的 snapshot-first recovery；不得恢复
+active-run replay。
+
 2026-07-26 在 commit `cc3facef` 上补充 Plans 065-069：Claude Agent SDK 集成正确性系列，
 源自对该 provider 的完整审查（advisor 会话转录）。065 修权限启动竞态、dispose 未接线、
 getPresentation 子进程风暴与 snapshot 无界数组；066 让长生命周期 Query 成为历史与配置的
@@ -193,7 +201,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
-| 063  | Eliminate Desktop-owned Server sockets with one multiplexed IPC transport | P0 | XL | 038, 040, 054 | TODO (M0 packaged Electron feasibility gate first; coordinate transport files with 061) |
+| 063  | Eliminate Desktop-owned Server sockets with one multiplexed IPC transport | P0 | XL | 038, 040, 054, 071 | TODO (revalidated at `00ba970e`; development proof passed; M0 packaged gate remains) |
 | 064  | Connect GitHub through the Cradle App and attribute PR actions to the user | P1 | L | current PR Console work reconciled | IN PROGRESS (implementation complete; real GitHub App acceptance pending) |
 | 065  | Make the Claude Agent SDK integration honest (permission modes, dispose, settle-on-cancel teardown, presentation, snapshot bounds) | P0 | L | — | DONE |
 | 066  | Make the long-lived Claude Query the authority for history and live config | P0 | M | 065 | DONE |
@@ -327,7 +335,7 @@ splitting until this track is stable.
 - 054 follows completed Plans 024 and 040: chat-runtime owns the run cursor/log, while persisted Session projections remain the recovery authority when exact in-memory replay is impossible. It does not depend on unfinished Plans 044 or 050, but those plans must preserve its terminal-publication and snapshot-recovery contracts.
 - 056 consumes Plan 047's already-landed thin Download Center but adds a separate declaration/dispatch layer: Managed Resources owns catalog projection and exact-key command routing; each adapter keeps discovery, versions, installation truth, storage, activation, rollback, and uninstall; Download Center keeps bytes/cancel/resume/history. Chronicle model manifests are the first adapter. Reconcile 047's stale TODO row and execute from a clean worktree because current Server composition, Chronicle, navigation, locale, and generated-client paths overlap operator work.
 - 057 follows 056 and declares `{ opencode, runtime, cli }` through the shared catalog. OpenCode owns release identity, archive extraction, executable verification, installation truth, process leases, and uninstall; its archive transfer uses the same exact resource identity. It must not add an OpenCode-only Settings installer or parallel HTTP command surface.
-- 063 follows completed Plans 038, 040, and 054: IPC requests must still cross the established auth boundary, generated clients remain transport infrastructure beneath feature-owned projections, and cursor-aware reconnect semantics remain owned by Chat Runtime. It coordinates with in-progress Plan 061 only at transport injection points and must stop rather than alter Chat admission/completion/queue semantics. Its internal order is mandatory: packaged custom-protocol proof -> parity fixtures -> versioned contracts/runner relay -> Server `app.handle` host -> main fetch transport -> default-session protocol -> Desktop/Web/SSE migration -> PTY duplex -> credential removal -> zero-socket ratchet and many-Tearoff packaged smoke. Plan 028's HTTP choice is superseded only as transport; plugin ownership remains unchanged.
+- 063 follows completed Plans 038, 040, 054, and 071: IPC requests must still cross the established auth boundary, generated clients remain transport infrastructure beneath feature-owned projections, and cursor-aware snapshot-first recovery remains owned by Chat Runtime. It coordinates with in-progress Plan 061 only at transport injection points and must stop rather than alter Chat admission/completion/queue semantics or restore active-run replay superseded by 071. Its internal order is mandatory: packaged custom-protocol proof -> parity fixtures -> versioned contracts/runner relay -> Server `app.handle` host -> main fetch transport -> default-session protocol -> Desktop/Web/SSE migration -> PTY duplex -> credential removal -> zero-socket ratchet and many-Tearoff packaged smoke. Plan 028's HTTP choice is superseded only as transport; plugin ownership remains unchanged.
 - 040 supersedes blocked Plan 023: generated clients remain transport infrastructure, while feature-owned gateways own query/error/invalidation semantics.
 - 041 supersedes blocked Plans 020 and 021: dependency enforcement and lifecycle ownership precede god-file extraction.
 
