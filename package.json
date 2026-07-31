@@ -115,7 +115,10 @@
     "vaul": "^1.1.2",
     "virtua": "^0.49.1",
     "zod": "^4.4.3",
-    "zustand": "^5.0.12"
+    "zustand": "^5.0.12",
+    "expo": "~57.0.7",
+    "react": "19.2.3",
+    "react-native": "0.86.0"
   },
   "optionalDependencies": {
     "appdmg": "^0.6.6"
