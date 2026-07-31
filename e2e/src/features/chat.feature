@@ -23,6 +23,7 @@
     而且 我点击聊天发送按钮
     那么 最后一条 AI 消息应包含"第二轮助手：你让我记住了苹果"
     而且 聊天流应结束于空闲状态
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P0 @CRADLE-CHAT-002
   场景: 流式回复进行中可以停止生成
@@ -37,7 +38,7 @@
     那么 停止生成按钮应消失
     而且 聊天中不应出现错误提示
 
-  @wip @CRADLE-CHAT-003
+  @essence @P0 @CRADLE-CHAT-003
   场景: Provider 失败时显示错误状态
     假如 我已配置会失败的 Claude Agent Simulator
     而且 我已添加了一个工作区
@@ -61,8 +62,9 @@
     那么 我应该看到用户消息"刷新恢复测试消息"
     而且 最后一条 AI 消息应包含"慢速助手回复完成"
     而且 聊天中不应出现错误提示
+    而且 Simulator 脚本化交换应全部耗尽
 
-  @wip @CRADLE-CHAT-005
+  @essence @P1 @CRADLE-CHAT-005
   场景: 可以展开查看 Thinking 内容
     假如 我已配置会返回 Thinking 的 Claude Agent Simulator
     而且 我已添加了一个工作区
@@ -74,6 +76,7 @@
     而且 最后一条 AI 消息应显示 Reasoning 入口
     当 我展开最后一条 AI 消息的 Reasoning
     那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-006
   场景: 会话生命周期：重命名、置顶、删除
@@ -91,3 +94,15 @@
     当 我打开会话"旧会话"的菜单
     而且 我点击会话"旧会话"的删除菜单项
     那么 侧栏中不应显示会话"旧会话"
+
+  @essence @P1 @CRADLE-CHAT-007
+  场景: 可以将会话复制为 Markdown 到剪贴板
+    假如 我已配置 Claude Agent 多轮 Simulator
+    而且 我已添加了一个工作区
+    当 我新建一个聊天会话并记住为"Markdown 会话"，首条消息为"导出 Markdown 测试标题"
+    而且 我清空 Electron 剪贴板
+    而且 我打开会话"Markdown 会话"的菜单
+    而且 我点击会话"Markdown 会话"的复制 Markdown 菜单项
+    那么 Electron 剪贴板中应包含以下 Markdown 片段:
+      | 导出 Markdown 测试标题 |
+      | 第一轮助手：已记住苹果 |

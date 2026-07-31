@@ -1,5 +1,7 @@
 import { Elysia } from 'elysia'
 
+import type { AutoRespondMode } from '../contract'
+import { shouldAutoRespondForController } from '../core/auto-respond-policy'
 import type { SimulatorProtocolValidator } from '../core/protocol-validation'
 import { observeRequest } from '../core/request-ledger'
 import type { ScenarioController } from '../core/scenario-runtime'
@@ -18,7 +20,7 @@ export function openAiRoutes(
   controller: ScenarioController,
   protocol: SimulatorProtocolValidator,
   resources: OpenAiResourceStore,
-  autoRespond = false,
+  autoRespond: AutoRespondMode = false,
 ) {
   return new Elysia({ name: 'cradle.model-api-simulator.openai' })
     .post('/v1/responses', ({ request }) =>
@@ -42,14 +44,17 @@ export async function handleOpenAiRequest(
   protocol: SimulatorProtocolValidator,
   resources: OpenAiResourceStore,
   request: Request,
-  autoRespond = false,
+  autoRespond: AutoRespondMode = false,
 ): Promise<Response> {
   const authenticationError = authenticateOpenAi(request)
   if (authenticationError) { return authenticationError }
   try {
     const observed = await observeRequest(request)
     const operation = protocol.validateRequest('openai', request, observed)
-    if (autoRespond && !controller.nextMatches('openai', observed)) {
+    if (
+      shouldAutoRespondForController(autoRespond, 'openai', observed, controller)
+      && !controller.nextMatches('openai', observed)
+    ) {
       controller.record(observed)
       return autoOpenAiResponse(controller, observed)
     }

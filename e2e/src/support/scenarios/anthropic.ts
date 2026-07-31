@@ -77,6 +77,8 @@ export function anthropicTextExchange(input: {
   label: string
   text: string
   gateAfterStart?: string
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
   const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
   const steps: StreamStep[] = [messageStart(messageId)]
@@ -105,7 +107,32 @@ export function anthropicTextExchange(input: {
     { kind: 'event', event: { type: 'message_stop' } },
     { kind: 'close' },
   )
-  return streamExchange(input.label, steps)
+  const exchange = streamExchange(input.label, steps)
+  return withBodyTextMatch(exchange, input)
+}
+
+function withBodyTextMatch(
+  exchange: SimulatorExchange,
+  input: {
+    bodyTextIncludes?: string | readonly string[]
+    bodyTextExcludes?: string | readonly string[]
+  },
+): SimulatorExchange {
+  if (input.bodyTextIncludes === undefined && input.bodyTextExcludes === undefined) {
+    return exchange
+  }
+  return {
+    ...exchange,
+    request: {
+      ...exchange.request,
+      ...(input.bodyTextIncludes === undefined
+        ? {}
+        : { bodyTextIncludes: input.bodyTextIncludes }),
+      ...(input.bodyTextExcludes === undefined
+        ? {}
+        : { bodyTextExcludes: input.bodyTextExcludes }),
+    },
+  }
 }
 
 export function anthropicToolUseExchange(input: {
@@ -150,16 +177,23 @@ export function anthropicThinkingTextExchange(input: {
   label: string
   thinking: string
   text: string
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
   const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
-  return streamExchange(input.label, [
+  const exchange = streamExchange(input.label, [
     messageStart(messageId),
     {
       kind: 'event',
       event: {
         type: 'content_block_start',
         index: 0,
-        content_block: { type: 'thinking', thinking: '', signature: '' },
+        content_block: {
+          type: 'thinking',
+          thinking: '',
+          // Non-empty signature keeps Claude Agent / Anthropic clients happy.
+          signature: `e2e_sig_${input.label}`,
+        },
       },
     },
     {
@@ -192,30 +226,48 @@ export function anthropicThinkingTextExchange(input: {
     { kind: 'event', event: { type: 'message_stop' } },
     { kind: 'close' },
   ])
+  return withBodyTextMatch(exchange, input)
 }
 
 export function anthropicHttpErrorExchange(input: {
   label: string
   status?: number
   message: string
+  /** Substrings that must appear in the request body (e.g. user prompt). */
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
+  // Claude Agent always streams. A JSON HTTP error body is validated by the SDK
+  // as AnthropicBetaMessage and surfaces as a schema 400 — emit an SSE error event instead.
   return {
     label: input.label,
     request: {
       method: 'POST',
       path: '/v1/messages',
       bodyFields: { '/stream': true },
+      ...(input.bodyTextIncludes === undefined
+        ? {}
+        : { bodyTextIncludes: input.bodyTextIncludes }),
+      ...(input.bodyTextExcludes === undefined
+        ? {}
+        : { bodyTextExcludes: input.bodyTextExcludes }),
     },
     response: {
-      kind: 'json',
-      status: input.status ?? 503,
-      body: {
-        type: 'error',
-        error: {
-          type: 'api_error',
-          message: input.message,
+      kind: 'stream',
+      steps: [
+        {
+          kind: 'event',
+          event: {
+            type: 'error',
+            request_id: `req_${input.label}`,
+            error: {
+              type: 'api_error',
+              message: input.message,
+            },
+          },
         },
-      },
+        { kind: 'close' },
+      ],
     },
   }
 }

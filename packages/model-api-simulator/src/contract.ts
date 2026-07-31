@@ -17,6 +17,14 @@ export interface RequestMatch {
   readonly query?: Readonly<Record<string, string | readonly string[]>>
   readonly body?: JsonValue
   readonly bodyFields?: Readonly<Record<string, JsonValue>>
+  /**
+   * Match when the JSON-stringified request body contains each of these
+   * substrings. Useful for Claude Agent / Codex turns that share the same path
+   * but differ by user prompt text buried in nested message arrays.
+   */
+  readonly bodyTextIncludes?: string | readonly string[]
+  /** Fail the match when any of these substrings appear in the body text. */
+  readonly bodyTextExcludes?: string | readonly string[]
 }
 
 export interface ObservedRequest {
@@ -85,17 +93,22 @@ export interface SimulatorController {
   reset: () => void
 }
 
+export type AutoRespondMode = boolean | 'probes-only'
+
 export interface StartSimulatorOptions {
   readonly port?: number
   /** When true, request bodies are validated against the provider schema (default: false). */
   readonly strictRequestValidation?: boolean
   /**
-   * When true, requests that the next enqueued exchange does not claim get a
-   * synthesised protocol-valid response instead of an `UnexpectedRequestError`.
-   * Probe traffic (token count, models list, etc.) can therefore coexist with a
-   * queued conversation turn. Applies to both Anthropic and OpenAI (default: false).
+   * Auto-response policy for unmatched requests:
+   * - `false` (default): unmatched requests fail with UnexpectedRequestError
+   * - `true`: synthesise a protocol-valid response for any unmatched request
+   * - `'probes-only'`: synthesise for probe paths (token count, models, etc.) and
+   *   for unmatched conversation creates only while exchanges remain queued
+   *   (so SDK noise cannot steal FIFO). Unmatched conversation creates fail when
+   *   the queue is empty — this is what E2E should use to catch unexpected turns.
    */
-  readonly autoRespond?: boolean
+  readonly autoRespond?: AutoRespondMode
 }
 
 export interface ModelApiSimulator {

@@ -320,8 +320,30 @@ Given('我已配置会失败的 Claude Agent Simulator', async function (this: C
   await this.configureClaudeAgentChat({ mode: 'text' })
   this.simulator!.reset()
   const { anthropicHttpErrorExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+  // Queue several identical failures so SDK retries still surface the same message
+  // under probes-only (empty queue → UnexpectedRequest would otherwise hide it).
+  // Exclude Claude Agent's built-in session-title request which also embeds the
+  // user prompt and would otherwise steal the scripted conversation exchange.
+  const excludeTitle = 'You are naming a Claude Agent task session'
   this.enqueue(anthropicScenario([
-    anthropicHttpErrorExchange({ label: 'fail', message: 'E2E simulator forced failure' }),
+    anthropicHttpErrorExchange({
+      label: 'fail-1',
+      message: 'E2E simulator forced failure',
+      bodyTextIncludes: '请触发 provider 错误',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicHttpErrorExchange({
+      label: 'fail-2',
+      message: 'E2E simulator forced failure',
+      bodyTextIncludes: '请触发 provider 错误',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicHttpErrorExchange({
+      label: 'fail-3',
+      message: 'E2E simulator forced failure',
+      bodyTextIncludes: '请触发 provider 错误',
+      bodyTextExcludes: excludeTitle,
+    }),
   ]))
 })
 
@@ -335,12 +357,19 @@ Given('我已配置会返回 Thinking 的 Claude Agent Simulator', async functio
       label: 'thinking',
       thinking: '第一步分析问题\n第二步形成答案',
       text: DEFAULT_RESPONSE,
+      bodyTextIncludes: '请先思考再回答',
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
     }),
   ]))
 })
 
 Given('我已配置 Claude Agent 审批 Simulator', async function (this: CradleWorld) {
   await configureClaudeApprovalSimulator(this)
+})
+
+Given('我已配置 Codex Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure Codex simulator (real app-server → OpenAI Responses)')
+  await this.configureCodexChat({ texts: ['Hello from Codex E2E simulator!'] })
 })
 
 Given('我已导航到新建聊天并选中 Simulator', async function (this: CradleWorld) {
@@ -352,6 +381,11 @@ When('我选择 Claude Agent 运行时与 Simulator Provider', async function (t
   await selectProvider(this, /E2E Claude Agent/i)
 })
 
+When('我选择 Codex 运行时与 Simulator Provider', async function (this: CradleWorld) {
+  await selectRuntime(this, 'Codex')
+  await selectProvider(this, /E2E Codex/i)
+})
+
 When('我释放慢速流门控', async function (this: CradleWorld) {
   const gate = this.recall<string>('simulator.slow-gate')
   await this.simulator!.waitForGate(gate)
@@ -360,6 +394,12 @@ When('我释放慢速流门控', async function (this: CradleWorld) {
 
 Then('聊天流应结束于空闲状态', async function (this: CradleWorld) {
   await waitForChatStatus(this, 'idle')
+})
+
+Then('Simulator 脚本化交换应全部耗尽', async function (this: CradleWorld) {
+  // Unused JIT follow-up scripts were never enqueued — clear memory only.
+  this.remember('simulator.next-replies', [] as string[])
+  this.assertSimulatorExhausted()
 })
 
 When('我点击"新建聊天"导航项', async function (this: CradleWorld) {
@@ -581,22 +621,19 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
   const chatView = await getChatView(this)
   const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  // Prefer the banner; also accept chat-view error status when the runtime
-  // surfaces the failure without a dedicated banner string.
-  const bannerVisible = await errorBanner.isVisible().catch(() => false)
-  if (bannerVisible) {
-    const content = await errorBanner.textContent() ?? ''
-    if (!content.includes(text) && !/fail|error|503|unavailable|forced/i.test(content)) {
-      throw new Error(`Expected chat error to mention "${text}", got: ${content}`)
+  // Strict: the forced failure string must surface somewhere visible. Softening
+  // to "any error" would hide regressions in error projection.
+  await expect.poll(async () => {
+    const bannerText = (await errorBanner.textContent().catch(() => '')) ?? ''
+    const viewText = (await chatView.textContent().catch(() => '')) ?? ''
+    const status = await chatView.getAttribute('data-chat-status').catch(() => null)
+    return {
+      bannerText,
+      viewText,
+      status,
+      hit: bannerText.includes(text) || viewText.includes(text),
     }
-    return
-  }
-  await expect(chatView).toHaveAttribute('data-chat-status', /error|idle/, { timeout: CHAT_STATUS_TIMEOUT })
-  const bodyText = await chatView.textContent() ?? ''
-  if (!bodyText.includes(text) && !/fail|error|503|unavailable|forced/i.test(bodyText)) {
-    // Last resort: status flipped to error is enough for this recovery path.
-    await expect(chatView).toHaveAttribute('data-chat-status', 'error', { timeout: 5_000 })
-  }
+  }, { timeout: CHAT_STATUS_TIMEOUT }).toMatchObject({ hit: true })
 })
 
 When('我重新加载当前页面', async function (this: CradleWorld) {

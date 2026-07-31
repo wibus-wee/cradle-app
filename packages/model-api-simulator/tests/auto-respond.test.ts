@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { startModelApiSimulator } from '../src'
 import { createSimulatorApp, createSimulatorRuntime } from '../src/server'
 
 const anthropicHeaders = {
@@ -162,23 +161,149 @@ describe('autoRespond', () => {
     expect(() => runtime.controller.assertExhausted()).not.toThrow()
   })
 
-  it('openai autoRespond streams a text reply when nothing is queued', async () => {
-    const simulator = await startModelApiSimulator({ autoRespond: true })
-    try {
-      const response = await fetch(`${simulator.openaiBaseUrl}/responses`, {
-        method: 'POST',
-        headers: openAiHeaders,
-        body: JSON.stringify({ model: 'gpt-test', input: 'ping', stream: true }),
-      })
-      expect(response.status).toBe(200)
-      expect(response.headers.get('content-type')).toContain('text/event-stream')
-      const body = await response.text()
-      expect(body).toContain('response.created')
-      expect(body).toContain('[simulator] received: ping')
-      expect(body).toContain('response.completed')
-    }
-    finally {
-      await simulator.close()
-    }
+  it('probes-only: unmatched POST /v1/messages fails when queue is empty', async () => {
+    const runtime = createSimulatorRuntime()
+    const app = createSimulatorApp(runtime, { autoRespond: 'probes-only' })
+    runtime.controller.enqueue({
+      provider: 'anthropic',
+      exchanges: [
+        {
+          label: 'only-one',
+          request: { method: 'POST', path: '/v1/messages' },
+          response: {
+            kind: 'json',
+            body: {
+              id: 'msg_only',
+              type: 'message',
+              role: 'assistant',
+              model: 'claude-test',
+              content: [{ type: 'text', text: 'one', citations: null }],
+              container: null,
+              stop_details: null,
+              stop_reason: 'end_turn',
+              stop_sequence: null,
+              usage: {
+                cache_creation: null,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
+                inference_geo: null,
+                input_tokens: 1,
+                output_tokens: 1,
+                output_tokens_details: null,
+                server_tool_use: null,
+                service_tier: null,
+              },
+            },
+          },
+        },
+      ],
+    })
+
+    // Probe still works
+    const probe = await app.handle(new Request('http://simulator/v1/messages/count_tokens', {
+      method: 'POST',
+      headers: anthropicHeaders,
+      body: JSON.stringify({
+        model: 'claude-test',
+        messages: [{ role: 'user', content: 'probe' }],
+      }),
+    }))
+    expect(probe.status).toBe(200)
+
+    // Consume the only exchange
+    const first = await app.handle(new Request('http://simulator/v1/messages', {
+      method: 'POST',
+      headers: anthropicHeaders,
+      body: JSON.stringify({
+        model: 'claude-test',
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'hello' }],
+      }),
+    }))
+    expect(first.status).toBe(200)
+
+    // Second conversation create must fail (not silent auto) — queue empty
+    const second = await app.handle(new Request('http://simulator/v1/messages', {
+      method: 'POST',
+      headers: anthropicHeaders,
+      body: JSON.stringify({
+        model: 'claude-test',
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'again' }],
+      }),
+    }))
+    expect(second.status).toBe(400)
+    expect(await second.text()).toMatch(/Unexpected request/i)
+  })
+
+  it('probes-only: absorbs unmatched noise while a turn remains queued', async () => {
+    const runtime = createSimulatorRuntime()
+    const app = createSimulatorApp(runtime, { autoRespond: 'probes-only' })
+    runtime.controller.enqueue({
+      provider: 'anthropic',
+      exchanges: [
+        {
+          label: 'stream-turn',
+          request: {
+            method: 'POST',
+            path: '/v1/messages',
+            bodyFields: { '/stream': true },
+          },
+          response: {
+            kind: 'json',
+            body: {
+              id: 'msg_turn',
+              type: 'message',
+              role: 'assistant',
+              model: 'claude-test',
+              content: [{ type: 'text', text: 'queued', citations: null }],
+              container: null,
+              stop_details: null,
+              stop_reason: 'end_turn',
+              stop_sequence: null,
+              usage: {
+                cache_creation: null,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
+                inference_geo: null,
+                input_tokens: 1,
+                output_tokens: 1,
+                output_tokens_details: null,
+                server_tool_use: null,
+                service_tier: null,
+              },
+            },
+          },
+        },
+      ],
+    })
+
+    // Non-stream POST does not match the queued stream exchange → absorb as noise
+    const noise = await app.handle(new Request('http://simulator/v1/messages', {
+      method: 'POST',
+      headers: anthropicHeaders,
+      body: JSON.stringify({
+        model: 'claude-test',
+        max_tokens: 16,
+        stream: false,
+        messages: [{ role: 'user', content: 'noise' }],
+      }),
+    }))
+    expect(noise.status).toBe(200)
+    expect(runtime.controller.pendingExchangeCount).toBe(1)
+
+    const turn = await app.handle(new Request('http://simulator/v1/messages', {
+      method: 'POST',
+      headers: anthropicHeaders,
+      body: JSON.stringify({
+        model: 'claude-test',
+        max_tokens: 16,
+        stream: true,
+        messages: [{ role: 'user', content: 'real' }],
+      }),
+    }))
+    expect(turn.status).toBe(200)
+    expect(await turn.json()).toMatchObject({ content: [{ text: 'queued' }] })
+    runtime.controller.assertExhausted()
   })
 })

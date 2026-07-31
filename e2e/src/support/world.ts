@@ -13,8 +13,10 @@ import { startE2ESimulator } from './model-api-simulator'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
 import {
   configureClaudeAgentSimulatorProvider,
+  configureCodexSimulatorProvider,
   configureStandardSimulatorProvider,
   E2E_CLAUDE_AGENT_NAME,
+  E2E_CODEX_AGENT_NAME,
   E2E_OPENAI_AGENT_NAME,
 } from './providers'
 import { anthropicApprovalExchanges, anthropicScenario, anthropicTextExchange } from './scenarios/anthropic'
@@ -216,6 +218,48 @@ export class CradleWorld extends World {
     this.remember('chat.preferred-runtime', 'claude-agent' as const)
     this.remember('chat.preferred-provider', E2E_CLAUDE_AGENT_NAME)
     await this.page?.reload({ waitUntil: 'domcontentloaded' })
+  }
+
+  /**
+   * Real Codex app-server whose upstream OpenAI Responses wire hits the simulator.
+   */
+  async configureCodexChat(options: {
+    texts?: string[]
+    failureMessage?: string
+  } = {}): Promise<void> {
+    const simulator = await this.ensureSimulator()
+    simulator.reset()
+
+    if (options.failureMessage) {
+      this.enqueueOpenAi(openAiHttpErrorExchange({
+        label: 'codex-forced-failure',
+        message: options.failureMessage,
+      }))
+    }
+    else {
+      const texts = options.texts?.length ? options.texts : ['Hello from Codex E2E simulator!']
+      this.enqueueOpenAi(...texts.map((text, index) => openAiTextExchange({
+        label: `codex-turn-${index + 1}`,
+        text,
+      })))
+    }
+
+    await configureCodexSimulatorProvider({
+      serverUrl: this.params.serverUrl,
+      openaiBaseUrl: simulator.openaiBaseUrl,
+      createTempDir: () => this.createTempWorkspaceDir(),
+    })
+    this.remember('chat.preferred-runtime', 'codex' as const)
+    this.remember('chat.preferred-provider', E2E_CODEX_AGENT_NAME)
+    await this.page?.reload({ waitUntil: 'domcontentloaded' })
+  }
+
+  /** Fail the scenario if any scripted simulator exchange remains unused. */
+  assertSimulatorExhausted(): void {
+    if (!this.simulator) {
+      throw new Error('Simulator is not started')
+    }
+    this.simulator.assertExhausted()
   }
 
   async ensureWorkspaceExists(): Promise<void> {

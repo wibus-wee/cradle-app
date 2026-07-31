@@ -4,25 +4,28 @@ This file applies to everything under `e2e/`.
 
 ## Stack
 
-- Use `@cucumber/cucumber` for feature files and step definitions.
-- Use `@playwright/test` (Chromium) for the **web** E2E path: managed `apps/server` + `apps/web`.
-- Use `@cradle/model-api-simulator` as the deterministic LLM wire substitute (OpenAI Responses + Anthropic Messages).
-- Do **not** set `CRADLE_MOCK_LLM_URL` in E2E — that swaps in a fake Claude Agent runtime. Essence tests must use the real Claude Agent Provider.
-- Keep the E2E config in `e2e/cucumber.mjs` and `e2e/tsconfig.json`.
+- `@cucumber/cucumber` + Playwright Chromium (web E2E)
+- LLM wire substitute: **`@cradle/model-api-simulator` only** (`autoRespond: 'probes-only'`)
+- Runtimes under test: **real Claude Agent Provider** and **real Codex** (app-server)
+- **Never** set `CRADLE_MOCK_LLM_URL` and **never** restore `MockLlmServer`
 
 ## Commands
 
-- Run essence / P0 scenarios (server+web auto-start via BeforeAll):
-  - `npx cucumber-js --config e2e/cucumber.mjs --tags "@P0"`
-- Run full essence suite:
-  - `npx cucumber-js --config e2e/cucumber.mjs --tags "@essence"`
-- Clean up leftover test data:
-  - `npx tsx e2e/scripts/cleanup.ts`
+```bash
+# Prefer Node >= 22.15 for zstd (e.g. nvm use 22.22.2)
+pnpm --filter @cradle/plugin-sdk build
+pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
+pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@essence"
+pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "not @wip"
+```
 
 ## Quality bar（精）
 
 Every scenario must be a real multi-link user journey. Prefer depth over count.
 Shallow “page is visible” checks belong in unit/component tests, not here.
+
+If the simulator cannot express a needed wire behaviour, **extend the simulator** —
+do not invent a parallel mock LLM.
 
 Archive retired features under `e2e/_archive/` (outside cucumber `paths`).
 
@@ -33,17 +36,17 @@ Archive retired features under `e2e/_archive/` (outside cucumber `paths`).
 - Put reusable setup in `e2e/src/support/` (simulator, providers, scenarios, pages).
 - Keep step definitions thin; use page objects under `e2e/src/support/pages/`.
 - Prefer `data-testid` selectors first.
-- Each scenario launches a fresh browser context; server state is reset via `/test/reset`.
+- After LLM turns settle, prefer `Simulator 脚本化交换应全部耗尽` (`assertExhausted`).
 
 ## Simulator usage
 
-- `CradleWorld.configureStandardChat(...)` enqueues OpenAI Responses exchanges and upserts an openai-compatible profile.
-- `CradleWorld.configureClaudeAgentChat(...)` enqueues Anthropic Messages exchanges, disables title generation via a dead sink profile, and uses the real Claude Agent runtime.
-- Use scenario builders in `e2e/src/support/scenarios/` — do not hand-roll invalid SSE.
-- `autoRespond` absorbs probe traffic; conversation turns stay FIFO-matched.
+- `configureClaudeAgentChat` — Anthropic Messages + real Claude Agent
+- `configureCodexChat` — OpenAI Responses + real Codex app-server
+- `configureStandardChat` — OpenAI Responses + standard runtime (legacy / Agents path)
+- Scenario builders live in `e2e/src/support/scenarios/`
+- Just-in-time enqueue for multi-turn Claude so intermediate SDK calls cannot steal FIFO
 
 ## Scenario Scope
 
-- `P0`: smoke — core chat, Claude approval, workspace/kanban entry.
-- `P1`: deeper recovery, reasoning, session lifecycle, important side paths.
-- Do not expand with watery scenarios; each new journey must clear the quality bar.
+- `P0`: smoke — core chat, Claude approval, Codex one-shot, workspace/kanban entry
+- `P1`: recovery, reasoning, session lifecycle, search/git/terminal, important side paths

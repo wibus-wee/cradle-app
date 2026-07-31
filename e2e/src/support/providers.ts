@@ -3,9 +3,11 @@ import { E2E_OPENAI_MODEL } from './scenarios/openai'
 
 export const E2E_OPENAI_PROFILE_ID = 'e2e-openai-simulator'
 export const E2E_ANTHROPIC_PROFILE_ID = 'e2e-anthropic-simulator'
+export const E2E_CODEX_PROFILE_ID = 'e2e-codex-simulator'
 export const E2E_TITLE_SINK_PROFILE_ID = 'e2e-title-sink'
 export const E2E_OPENAI_AGENT_NAME = 'E2E Simulator'
 export const E2E_CLAUDE_AGENT_NAME = 'E2E Claude Agent'
+export const E2E_CODEX_AGENT_NAME = 'E2E Codex'
 
 async function putJson(url: string, body: unknown): Promise<Response> {
   return fetch(url, {
@@ -70,6 +72,33 @@ export async function upsertAnthropicSimulatorProfile(input: {
   }
 }
 
+export async function upsertCodexSimulatorProfile(input: {
+  serverUrl: string
+  openaiBaseUrl: string
+  model?: string
+}): Promise<void> {
+  const model = input.model ?? E2E_OPENAI_MODEL
+  const response = await putJson(`${input.serverUrl}/profiles/${E2E_CODEX_PROFILE_ID}`, {
+    name: E2E_CODEX_AGENT_NAME,
+    providerKind: 'openai-compatible',
+    enabled: true,
+    config: {
+      baseUrl: input.openaiBaseUrl,
+      model,
+      apiMode: 'responses',
+      apiKey: 'sk-e2e-codex-simulator',
+      authMode: 'apikey',
+      approvalPolicy: 'never',
+      sandboxMode: 'danger-full-access',
+      reasoningEffort: 'minimal',
+    },
+    credentialRef: null,
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to upsert Codex simulator profile: ${response.status} ${await response.text()}`)
+  }
+}
+
 /**
  * Route Claude Agent title generation to a dead endpoint so it cannot steal
  * FIFO conversation exchanges from the shared simulator.
@@ -111,7 +140,7 @@ export async function ensureAgentForProfile(input: {
   name: string
   providerTargetId: string
   modelId: string
-  runtimeKind: 'standard' | 'claude-agent'
+  runtimeKind: 'standard' | 'claude-agent' | 'codex'
 }): Promise<void> {
   const listResponse = await fetch(`${input.serverUrl}/agents`)
   if (!listResponse.ok) {
@@ -190,6 +219,22 @@ export async function configureClaudeAgentSimulatorProvider(input: {
     providerTargetId: E2E_ANTHROPIC_PROFILE_ID,
     modelId: E2E_ANTHROPIC_MODEL,
     runtimeKind: 'claude-agent',
+  })
+  await ensureWorkspace(input)
+}
+
+export async function configureCodexSimulatorProvider(input: {
+  serverUrl: string
+  openaiBaseUrl: string
+  createTempDir: () => string
+}): Promise<void> {
+  await upsertCodexSimulatorProfile(input)
+  await ensureAgentForProfile({
+    serverUrl: input.serverUrl,
+    name: E2E_CODEX_AGENT_NAME,
+    providerTargetId: E2E_CODEX_PROFILE_ID,
+    modelId: E2E_OPENAI_MODEL,
+    runtimeKind: 'codex',
   })
   await ensureWorkspace(input)
 }

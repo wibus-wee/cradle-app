@@ -329,6 +329,37 @@ function matches(request: ObservedRequest, match: RequestMatch): Mismatch | unde
     const fieldMismatch = compareJson(actual, expected, `/body${pointer}`)
     if (fieldMismatch) { return fieldMismatch }
   }
+  const includes = match.bodyTextIncludes === undefined
+    ? []
+    : Array.isArray(match.bodyTextIncludes)
+      ? match.bodyTextIncludes
+      : [match.bodyTextIncludes]
+  const excludes = match.bodyTextExcludes === undefined
+    ? []
+    : Array.isArray(match.bodyTextExcludes)
+      ? match.bodyTextExcludes
+      : [match.bodyTextExcludes]
+  if (includes.length > 0 || excludes.length > 0) {
+    const bodyText = request.body === undefined ? '' : JSON.stringify(request.body)
+    for (const needle of includes) {
+      if (!bodyText.includes(needle)) {
+        return {
+          path: '/bodyTextIncludes',
+          expected: needle,
+          actual: bodyText.length > 200 ? `${bodyText.slice(0, 200)}…` : bodyText,
+        }
+      }
+    }
+    for (const needle of excludes) {
+      if (bodyText.includes(needle)) {
+        return {
+          path: '/bodyTextExcludes',
+          expected: `not containing ${needle}`,
+          actual: `contains ${needle}`,
+        }
+      }
+    }
+  }
   return undefined
 }
 

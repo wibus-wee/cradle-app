@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { anthropicRoutes, handleAnthropicRequest } from './anthropic/routes'
+import type { AutoRespondMode } from './contract'
 import { SimulatorProtocolValidator } from './core/protocol-validation'
 import { ScenarioController } from './core/scenario-runtime'
 import { OpenAiResourceStore } from './openai/resource-store'
@@ -21,11 +22,11 @@ export function createSimulatorRuntime(): SimulatorRuntime {
 
 export function createSimulatorApp(
   runtime: SimulatorRuntime,
-  options: { strictRequestValidation?: boolean, autoRespond?: boolean } = {},
+  options: { strictRequestValidation?: boolean, autoRespond?: AutoRespondMode } = {},
 ) {
   const { controller, openAiResources } = runtime
   const protocol = new SimulatorProtocolValidator(options.strictRequestValidation ?? false)
-  const autoRespond = options.autoRespond ?? false
+  const autoRespond: AutoRespondMode = options.autoRespond ?? false
   return new Elysia({
     name: 'cradle.model-api-simulator',
     normalize: 'typebox',
