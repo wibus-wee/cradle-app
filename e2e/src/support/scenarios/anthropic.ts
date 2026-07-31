@@ -201,7 +201,20 @@ export function anthropicThinkingTextExchange(input: {
       event: {
         type: 'content_block_delta',
         index: 0,
-        delta: { type: 'thinking_delta', thinking: input.thinking },
+        delta: {
+          type: 'thinking_delta',
+          thinking: input.thinking,
+          // Required when thinking-token-count beta is enabled (Claude Agent).
+          estimated_tokens: null,
+        },
+      },
+    },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'signature_delta', signature: `e2e_sig_${input.label}` },
       },
     },
     { kind: 'event', event: { type: 'content_block_stop', index: 0 } },
@@ -237,8 +250,10 @@ export function anthropicHttpErrorExchange(input: {
   bodyTextIncludes?: string | readonly string[]
   bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
-  // Claude Agent always streams. A JSON HTTP error body is validated by the SDK
-  // as AnthropicBetaMessage and surfaces as a schema 400 — emit an SSE error event instead.
+  // Prefer HTTP error JSON (not SSE error events): Claude Agent's stream decoder
+  // validates every SSE frame as AnthropicBetaRawMessageStreamEvent, which does
+  // not include `type: error`, and remaps those into schema 400s that hide the
+  // scripted failure message.
   return {
     label: input.label,
     request: {
@@ -253,21 +268,21 @@ export function anthropicHttpErrorExchange(input: {
         : { bodyTextExcludes: input.bodyTextExcludes }),
     },
     response: {
-      kind: 'stream',
-      steps: [
-        {
-          kind: 'event',
-          event: {
-            type: 'error',
-            request_id: `req_${input.label}`,
-            error: {
-              type: 'api_error',
-              message: input.message,
-            },
-          },
+      kind: 'json',
+      status: input.status ?? 503,
+      headers: {
+        // Ask Anthropic-compatible clients not to retry — otherwise Claude Agent
+        // drains the fail queue and surfaces UnexpectedRequest instead of our message.
+        'x-should-retry': 'false',
+      },
+      body: {
+        type: 'error',
+        request_id: `req_${input.label}`,
+        error: {
+          type: 'api_error',
+          message: input.message,
         },
-        { kind: 'close' },
-      ],
+      },
     },
   }
 }

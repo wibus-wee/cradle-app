@@ -46,15 +46,21 @@ export async function handleAnthropicRequest(
     const headers = new Headers(exchange.response.headers)
     headers.set('request-id', headers.get('request-id') ?? `req_simulator_${controller.requests().length}`)
     if (exchange.response.kind === 'json') {
-      protocol.validateJsonResponse(
-        operation,
-        request,
-        exchange.response.status ?? 200,
-        exchange.response.body,
-      )
+      const status = exchange.response.status ?? 200
+      // Error payloads are AnthropicErrorResponse, not Message — do not validate
+      // them against the success response schema (that remaps into a 400 and hides
+      // the scripted failure message from Claude Agent).
+      if (status < 400) {
+        protocol.validateJsonResponse(
+          operation,
+          request,
+          status,
+          exchange.response.body,
+        )
+      }
       headers.set('content-type', 'application/json')
       return Response.json(exchange.response.body, {
-        status: exchange.response.status ?? 200,
+        status,
         headers,
       })
     }

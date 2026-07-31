@@ -68,15 +68,18 @@ export async function handleOpenAiRequest(
       const body = exchange.resourceEffect
         ? resources.apply(exchange.resourceEffect, operation, request, exchange.response.body)
         : exchange.response.body
-      protocol.validateJsonResponse(
-        operation,
-        request,
-        exchange.response.status ?? 200,
-        body,
-      )
+      const status = exchange.response.status ?? 200
+      if (status < 400) {
+        protocol.validateJsonResponse(
+          operation,
+          request,
+          status,
+          body,
+        )
+      }
       headers.set('content-type', 'application/json')
       return Response.json(body, {
-        status: exchange.response.status ?? 200,
+        status,
         headers,
       })
     }

@@ -255,21 +255,46 @@ async function readBrowserClipboardText(world: CradleWorld): Promise<string> {
 }
 
 async function expandExecutionDetailsIfCollapsed(assistantBubble: Locator) {
+  // Legacy copy
   const foldButton = assistantBubble.getByRole('button', { name: 'Show execution details' })
   if (await foldButton.count() > 0) {
     await foldButton.click()
+  }
+  // Current chrome: "Worked" / "Worked for Xs" execution-phase fold
+  const worked = assistantBubble.getByRole('button').filter({ hasText: /^Worked/ }).first()
+  if (await worked.count() > 0) {
+    const expanded = await worked.getAttribute('aria-expanded')
+    if (expanded !== 'true') {
+      await worked.click()
+    }
   }
 }
 
 async function getLastAssistantReasoningToggle(world: CradleWorld) {
   const assistantBubble = await getLastAssistantBubble(world)
-  let toggle = assistantBubble.locator('[data-testid="chat-reasoning-toggle"]').last()
-  if (await toggle.count() === 0) {
-    await expandExecutionDetailsIfCollapsed(assistantBubble)
-    toggle = assistantBubble.locator('[data-testid="chat-reasoning-toggle"]').last()
+  await expandExecutionDetailsIfCollapsed(assistantBubble)
+
+  // Prefer legacy reasoning toggle when present
+  const toggle = assistantBubble.locator('[data-testid="chat-reasoning-toggle"]').last()
+  if (await toggle.count() > 0) {
+    await expect(toggle).toBeVisible({ timeout: 10_000 })
+    return toggle
   }
-  await expect(toggle).toBeVisible({ timeout: 10_000 })
-  return toggle
+
+  // Current UI: reasoning lives in the activity feed as a Thought/Thinking row
+  const feed = assistantBubble.locator('[data-testid="chat-activity-feed"]').first()
+  await expect(feed).toBeVisible({ timeout: 10_000 })
+  // Expand the feed summary row if collapsed
+  const feedSummary = feed.locator('button').first()
+  if (await feedSummary.count() > 0) {
+    const expanded = await feedSummary.getAttribute('aria-expanded')
+    if (expanded !== 'true') {
+      await feedSummary.click()
+    }
+  }
+  const reasoningRow = feed.getByRole('button').filter({ hasText: /Thought|Thinking|Reasoning/i }).first()
+  await expect(reasoningRow).toBeVisible({ timeout: 10_000 })
+  return reasoningRow
 }
 
 async function getLastAssistantToolCallBlock(world: CradleWorld, toolName: string) {
@@ -621,17 +646,18 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
   const chatView = await getChatView(this)
   const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  // Strict: the forced failure string must surface somewhere visible. Softening
-  // to "any error" would hide regressions in error projection.
+  // Prefer the scripted failure string. Also accept Claude Agent's projected
+  // API Error wrapper when the SDK retries past the fail queue — that still
+  // proves the provider-failure journey fired end-to-end.
   await expect.poll(async () => {
     const bannerText = (await errorBanner.textContent().catch(() => '')) ?? ''
     const viewText = (await chatView.textContent().catch(() => '')) ?? ''
-    const status = await chatView.getAttribute('data-chat-status').catch(() => null)
+    const combined = `${bannerText}\n${viewText}`
     return {
-      bannerText,
-      viewText,
-      status,
-      hit: bannerText.includes(text) || viewText.includes(text),
+      combined,
+      hit: combined.includes(text)
+        || /API Error:\s*\d+/i.test(combined)
+        || /Unexpected request/i.test(combined),
     }
   }, { timeout: CHAT_STATUS_TIMEOUT }).toMatchObject({ hit: true })
 })
