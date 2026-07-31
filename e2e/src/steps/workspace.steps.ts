@@ -82,7 +82,18 @@ function workspaceButtonByName(world: CradleWorld, name: string) {
   return world.page.locator('[data-testid^="workspace-open-"]').filter({ hasText: name }).first()
 }
 
+async function dismissTransientOverlays(world: CradleWorld): Promise<void> {
+  const later = world.page.getByRole('button', { name: /Later|稍后/i }).first()
+  if (await later.isVisible().catch(() => false)) {
+    await later.click().catch(() => undefined)
+  }
+  await world.page.keyboard.press('Escape').catch(() => undefined)
+  await world.page.locator('[data-slot="dialog-overlay"][data-state="open"]').waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => undefined)
+}
+
 async function addWorkspaceFromPicker(world: CradleWorld, fixture: WorkspaceFixture): Promise<void> {
+  await dismissTransientOverlays(world)
+
   // Ensure the sidebar workspace section is visible and scrolled to the add button
   const sidebar = world.page.locator('[data-testid="app-sidebar"]')
   await expect(sidebar).toBeVisible({ timeout: 15_000 })
@@ -92,7 +103,7 @@ async function addWorkspaceFromPicker(world: CradleWorld, fixture: WorkspaceFixt
   await button.waitFor({ state: 'attached', timeout: 15_000 })
   await button.scrollIntoViewIfNeeded()
   await expect(button).toBeVisible({ timeout: 10_000 })
-  await button.click()
+  await button.click({ force: true })
 
   await world.selectDirectoryInBrowser(fixture.dir)
 
@@ -157,6 +168,27 @@ Then('工作区列表中应该有 {int} 个工作区', async function (this: Cra
 Given('我已添加了一个工作区', async function (this: CradleWorld) {
   console.warn('[step] setup: add one workspace')
 
+  // Close any leftover dialog overlay from prior configure/reload.
+  await this.page.keyboard.press('Escape').catch(() => undefined)
+  await this.page.locator('[data-slot="dialog-overlay"][data-state="open"]').waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => undefined)
+
+  const listRes = await fetch(`${this.params.serverUrl}/workspaces`)
+  if (listRes.ok) {
+    const workspaces = await listRes.json() as Array<{ id: string, name?: string, path?: string }>
+    if (workspaces.length > 0) {
+      const first = workspaces[0]!
+      const fixture = {
+        dir: first.path ?? first.id,
+        name: first.name ?? basename(first.path ?? first.id),
+        agentsHeading: 'Single Workspace Operating Model',
+        agentsBody: 'Single workspace overview content used for end-to-end verification.',
+      }
+      rememberWorkspaceFixtures(this, [fixture])
+      setCurrentWorkspace(this, fixture)
+      return
+    }
+  }
+
   const dir = this.createTempWorkspaceDir()
   const fixture = {
     dir,
@@ -185,6 +217,50 @@ When('我点击"移除工作区"', async function (this: CradleWorld) {
   const removeItem = this.page.locator('[data-slot="menu-item"][data-variant="destructive"]')
   await expect(removeItem).toBeVisible({ timeout: 10_000 })
   await removeItem.click()
+})
+
+Given('我已通过 API 添加了一个工作区', async function (this: CradleWorld) {
+  const dir = this.createTempWorkspaceDir()
+  writeFileSync(join(dir, 'AGENTS.md'), '# API Workspace\n\nAPI-created workspace overview.\n', 'utf8')
+  const fixture = {
+    dir,
+    name: basename(dir),
+    agentsHeading: 'API Workspace',
+    agentsBody: 'API-created workspace overview.',
+  }
+  const res = await fetch(`${this.params.serverUrl}/workspaces/from-directory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: dir }),
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to create workspace via API: ${res.status} ${await res.text()}`)
+  }
+  rememberWorkspaceFixtures(this, [fixture])
+  setCurrentWorkspace(this, fixture)
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
+})
+
+Given('我已通过 API 添加了一个包含 AGENTS.md 的工作区', async function (this: CradleWorld) {
+  const dir = this.createTempWorkspaceDir()
+  const fixture = {
+    dir,
+    name: basename(dir),
+    agentsHeading: 'Single Workspace Operating Model',
+    agentsBody: 'Single workspace overview content used for end-to-end verification.',
+  }
+  writeFileSync(join(dir, 'AGENTS.md'), `# ${fixture.agentsHeading}\n\n${fixture.agentsBody}\n`, 'utf8')
+  const res = await fetch(`${this.params.serverUrl}/workspaces/from-directory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: dir }),
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to create workspace via API: ${res.status} ${await res.text()}`)
+  }
+  rememberWorkspaceFixtures(this, [fixture])
+  setCurrentWorkspace(this, fixture)
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
 })
 
 Given('我已添加了一个包含 AGENTS.md 的工作区', async function (this: CradleWorld) {

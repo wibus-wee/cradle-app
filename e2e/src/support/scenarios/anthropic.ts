@@ -146,6 +146,32 @@ export function anthropicToolUseExchange(input: {
   ])
 }
 
+export function anthropicHttpErrorExchange(input: {
+  label: string
+  status?: number
+  message: string
+}): SimulatorExchange {
+  return {
+    label: input.label,
+    request: {
+      method: 'POST',
+      path: '/v1/messages',
+      bodyFields: { '/stream': true },
+    },
+    response: {
+      kind: 'json',
+      status: input.status ?? 503,
+      body: {
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: input.message,
+        },
+      },
+    },
+  }
+}
+
 export function anthropicScenario(exchanges: SimulatorExchange[]) {
   return { provider: 'anthropic' as const, exchanges }
 }
@@ -164,9 +190,6 @@ export function anthropicApprovalExchanges(input: {
         plan: input.planText ?? '1. Run echo hello\n2. Report the command output',
       },
     }),
-    anthropicTextExchange({
-      label: 'approval-complete',
-      text: input.completionText ?? 'Approved. The command execution plan completed.',
-    }),
+    // Completion text is enqueued just-in-time on Allow to avoid FIFO theft.
   ]
 }

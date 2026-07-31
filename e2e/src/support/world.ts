@@ -254,6 +254,19 @@ export class CradleWorld extends World {
         state: { completed: true, step: 4 },
         version: 1,
       }))
+      // Skip first-run provider/GitHub setup dialog so E2E can reach core surfaces.
+      window.localStorage.setItem('cradle:first-run-setup:v2', JSON.stringify({
+        state: { completedSteps: { provider: true, github: true } },
+        version: 2,
+      }))
+      // Suppress What's New corner popup noise.
+      window.localStorage.setItem('cradle:whats-new:v1', JSON.stringify({
+        state: {
+          dismissedAnnouncements: ['*'],
+          dismissedTips: ['*'],
+        },
+        version: 1,
+      }))
     })
     this.page = await this.context.newPage()
     await this.page.goto(this.params.webUrl)

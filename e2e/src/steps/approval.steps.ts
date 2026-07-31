@@ -10,6 +10,17 @@ When('审批卡片出现', async function (this: CradleWorld) {
 })
 
 When('我点击"允许"按钮', async function (this: CradleWorld) {
+  // Just-in-time enqueue the post-approval completion so intermediate Claude
+  // Agent /v1/messages traffic cannot consume it before the user continues.
+  if (this.simulator) {
+    const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+    this.enqueue(anthropicScenario([
+      anthropicTextExchange({
+        label: `approval-complete-${Date.now()}`,
+        text: 'Approved. The command execution plan completed.',
+      }),
+    ]))
+  }
   await this.approval.allow()
 })
 

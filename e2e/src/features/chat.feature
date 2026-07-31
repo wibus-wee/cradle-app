@@ -1,17 +1,18 @@
 # language: zh-CN
 @cradle
 功能: 精华聊天旅程
-  作为用户，我希望通过真实 Provider 协议完成多轮聊天、中断、错误恢复与会话管理
+  作为用户，我希望通过真实 Claude Agent SDK 与 Anthropic Messages 协议完成多轮聊天、中断、错误恢复与会话管理
+  （产品已从新会话目录移除 Standard runtime，精华聊天主路径对齐 Claude Agent）
 
   背景:
     假如 应用已启动
 
   @essence @P0 @CRADLE-CHAT-001
-  场景: 添加工作区后完成多轮 Standard 聊天
-    假如 我已配置 Standard Simulator Provider
+  场景: 添加工作区后完成多轮 Claude Agent 聊天
+    假如 我已配置 Claude Agent 多轮 Simulator
     而且 我已添加了一个工作区
     当 我点击"新建聊天"导航项
-    而且 我选择 Standard 运行时与 Simulator Provider
+    而且 我选择 Claude Agent 运行时与 Simulator Provider
     而且 我在新建聊天输入框中输入"第一轮：请记住苹果"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
@@ -25,7 +26,7 @@
 
   @essence @P0 @CRADLE-CHAT-002
   场景: 流式回复进行中可以停止生成
-    假如 我已配置带门控的慢速 Standard Simulator Provider
+    假如 我已配置带门控的慢速 Claude Agent Simulator
     而且 我已添加了一个工作区
     而且 我已导航到新建聊天并选中 Simulator
     当 我在新建聊天输入框中输入"请生成一段较长说明"
@@ -36,9 +37,9 @@
     那么 停止生成按钮应消失
     而且 聊天中不应出现错误提示
 
-  @essence @P0 @CRADLE-CHAT-003
+  @essence @P1 @CRADLE-CHAT-003
   场景: Provider 失败时显示错误状态
-    假如 我已配置会失败的 Standard Simulator Provider
+    假如 我已配置会失败的 Claude Agent Simulator
     而且 我已添加了一个工作区
     而且 我已导航到新建聊天并选中 Simulator
     当 我在新建聊天输入框中输入"请触发 provider 错误"
@@ -48,7 +49,7 @@
 
   @essence @P1 @CRADLE-CHAT-004
   场景: 流式过程中刷新页面后仍能看到用户消息与最终回复
-    假如 我已配置带门控的慢速 Standard Simulator Provider
+    假如 我已配置带门控的慢速 Claude Agent Simulator
     而且 我已添加了一个工作区
     而且 我已导航到新建聊天并选中 Simulator
     当 我在新建聊天输入框中输入"刷新恢复测试消息"
@@ -61,22 +62,9 @@
     而且 最后一条 AI 消息应包含"慢速助手回复完成"
     而且 聊天中不应出现错误提示
 
-  @essence @P1 @CRADLE-CHAT-005
-  场景: 可以展开查看 Reasoning 内容
-    假如 我已配置会返回 Reasoning 的 Standard Simulator Provider
-    而且 我已添加了一个工作区
-    而且 我已导航到新建聊天并选中 Simulator
-    当 我在新建聊天输入框中输入"请先思考再回答"
-    而且 我点击发送按钮
-    那么 应该跳转到聊天视图
-    而且 最后一条 AI 消息应包含"Hello from E2E simulator!"
-    而且 最后一条 AI 消息应显示 Reasoning 入口
-    当 我展开最后一条 AI 消息的 Reasoning
-    那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
-
   @essence @P1 @CRADLE-CHAT-006
   场景: 会话生命周期：重命名、置顶、删除
-    假如 我已配置 Standard Simulator Provider
+    假如 我已配置 Claude Agent 多轮 Simulator
     而且 我已添加了一个工作区
     当 我新建一个聊天会话并记住为"旧会话"，首条消息为"旧会话消息"
     而且 我新建一个聊天会话并记住为"新会话"，首条消息为"新会话消息"

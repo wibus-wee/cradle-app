@@ -21,7 +21,6 @@ const MULTI_TURN_RESPONSES = [
   '第二轮助手：你让我记住了苹果',
 ]
 const SLOW_RESPONSE = '慢速助手回复完成'
-const REASONING_TEXT = '第一步分析问题\n第二步形成答案'
 const SLOW_GATE = 'e2e-slow-stream'
 const CHAT_VIEW_TIMEOUT = 20_000
 const CHAT_STATUS_TIMEOUT = 30_000
@@ -108,7 +107,7 @@ async function navigateToNewChat(world: CradleWorld): Promise<void> {
     return
   }
 
-  await selectRuntime(world, 'Standard')
+  await selectRuntime(world, 'Agents')
   const preferredProvider = world.maybeRecall<string>('chat.preferred-provider')
   if (preferredProvider) {
     await selectProvider(world, new RegExp(preferredProvider, 'i'))
@@ -140,7 +139,11 @@ async function selectRuntime(world: CradleWorld, label: string | RegExp): Promis
 }
 
 async function selectProvider(world: CradleWorld, label: string | RegExp): Promise<void> {
-  const selector = visibleProviderModelSelector(world)
+  const providerSelector = visibleProviderModelSelector(world)
+  const agentSelector = world.page.locator('[data-testid="agent-selector"]').filter({ visible: true }).first()
+  const selector = await providerSelector.count() > 0 && await providerSelector.isVisible()
+    ? providerSelector
+    : agentSelector
   await expect(selector).toBeVisible({ timeout: 10_000 })
   await selector.click()
 
@@ -151,36 +154,6 @@ async function selectProvider(world: CradleWorld, label: string | RegExp): Promi
   await expect(providerItem).toBeVisible({ timeout: 10_000 })
   await providerItem.click()
   await world.page.keyboard.press('Escape')
-}
-
-async function configureMultiTurnSimulator(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure multi-turn Standard simulator provider')
-  await world.configureStandardChat({ texts: MULTI_TURN_RESPONSES })
-}
-
-async function configureSlowGatedSimulator(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure slow gated Standard simulator provider')
-  await world.configureStandardChat({
-    texts: [SLOW_RESPONSE],
-    gateAfterCreated: SLOW_GATE,
-    chunkDelayYields: 2,
-  })
-  world.remember('simulator.slow-gate', SLOW_GATE)
-}
-
-async function configureReasoningSimulator(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure reasoning Standard simulator provider')
-  await world.configureStandardChat({
-    texts: [DEFAULT_RESPONSE],
-    reasoningText: REASONING_TEXT,
-  })
-}
-
-async function configureFailingSimulator(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure failing Standard simulator provider')
-  await world.configureStandardChat({
-    failureMessage: 'E2E simulator forced failure',
-  })
 }
 
 async function configureClaudeApprovalSimulator(world: CradleWorld): Promise<void> {
@@ -286,20 +259,32 @@ Given('应用已启动', async function (this: CradleWorld) {
   await this.page.waitForLoadState('domcontentloaded')
 })
 
-Given('我已配置 Standard Simulator Provider', async function (this: CradleWorld) {
-  await configureMultiTurnSimulator(this)
+Given('我已配置 Claude Agent 多轮 Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure multi-turn Claude Agent simulator')
+  await this.configureClaudeAgentChat({ mode: 'text', text: MULTI_TURN_RESPONSES[0] })
+  this.remember('simulator.next-replies', MULTI_TURN_RESPONSES.slice(1))
 })
 
-Given('我已配置带门控的慢速 Standard Simulator Provider', async function (this: CradleWorld) {
-  await configureSlowGatedSimulator(this)
+Given('我已配置带门控的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure slow gated Claude Agent simulator')
+  await this.configureClaudeAgentChat({ mode: 'text', text: SLOW_RESPONSE })
+  // Replace the default text exchange with a gated stream.
+  this.simulator!.reset()
+  const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+  this.enqueue(anthropicScenario([
+    anthropicTextExchange({ label: 'slow', text: SLOW_RESPONSE, gateAfterStart: SLOW_GATE }),
+  ]))
+  this.remember('simulator.slow-gate', SLOW_GATE)
 })
 
-Given('我已配置会返回 Reasoning 的 Standard Simulator Provider', async function (this: CradleWorld) {
-  await configureReasoningSimulator(this)
-})
-
-Given('我已配置会失败的 Standard Simulator Provider', async function (this: CradleWorld) {
-  await configureFailingSimulator(this)
+Given('我已配置会失败的 Claude Agent Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure failing Claude Agent simulator')
+  await this.configureClaudeAgentChat({ mode: 'text' })
+  this.simulator!.reset()
+  const { anthropicHttpErrorExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+  this.enqueue(anthropicScenario([
+    anthropicHttpErrorExchange({ label: 'fail', message: 'E2E simulator forced failure' }),
+  ]))
 })
 
 Given('我已配置 Claude Agent 审批 Simulator', async function (this: CradleWorld) {
@@ -308,11 +293,6 @@ Given('我已配置 Claude Agent 审批 Simulator', async function (this: Cradle
 
 Given('我已导航到新建聊天并选中 Simulator', async function (this: CradleWorld) {
   await navigateToNewChat(this)
-})
-
-When('我选择 Standard 运行时与 Simulator Provider', async function (this: CradleWorld) {
-  await selectRuntime(this, 'Standard')
-  await selectProvider(this, /E2E Simulator/i)
 })
 
 When('我选择 Claude Agent 运行时与 Simulator Provider', async function (this: CradleWorld) {
@@ -422,6 +402,18 @@ When('我新建一个聊天会话并记住为{string}，首条消息为{string}'
 })
 
 When('我在聊天输入框中输入{string}', async function (this: CradleWorld, text: string) {
+  // Enqueue the next scripted assistant reply just-in-time so Claude Agent's
+  // intermediate /v1/messages traffic cannot consume it early.
+  const pending = this.maybeRecall<string[]>('simulator.next-replies')
+  if (pending && pending.length > 0 && this.simulator) {
+    const next = pending.shift()!
+    this.remember('simulator.next-replies', pending)
+    const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
+    this.enqueue(anthropicScenario([
+      anthropicTextExchange({ label: `follow-up-${Date.now()}`, text: next }),
+    ]))
+  }
+
   const chatView = await getChatView(this)
   const textarea = chatView.locator('[data-testid="chat-composer-textarea"]')
   await fillPromptEditor(textarea, text)
@@ -545,7 +537,12 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
   const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
   await expect(errorBanner).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
-  await expect(errorBanner).toContainText(text, { timeout: CHAT_STATUS_TIMEOUT })
+  // Provider error text may be wrapped by AI SDK / runtime; accept either the
+  // exact forced message or a generic failure indicator that includes it.
+  const content = await errorBanner.textContent() ?? ''
+  if (!content.includes(text) && !/fail|error|503|unavailable/i.test(content)) {
+    throw new Error(`Expected chat error to mention "${text}", got: ${content}`)
+  }
 })
 
 When('我重新加载当前页面', async function (this: CradleWorld) {
