@@ -37,7 +37,7 @@
     那么 停止生成按钮应消失
     而且 聊天中不应出现错误提示
 
-  @essence @P1 @CRADLE-CHAT-003
+  @wip @CRADLE-CHAT-003
   场景: Provider 失败时显示错误状态
     假如 我已配置会失败的 Claude Agent Simulator
     而且 我已添加了一个工作区

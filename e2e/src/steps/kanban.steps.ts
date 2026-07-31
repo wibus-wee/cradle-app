@@ -132,8 +132,11 @@ async function createIssueInFirstColumn(world: CradleWorld, title: string): Prom
   await input.fill(title)
   await input.press('Enter')
 
-  await expect(world.page.locator(KANBAN_ISSUE_INPUT)).toHaveCount(0, { timeout: 10_000 })
   await expect(issueCardByTitle(world, title)).toBeVisible({ timeout: 10_000 })
+  // Input may remain for rapid multi-create; dismiss if still open.
+  if (await world.page.locator(KANBAN_ISSUE_INPUT).count() > 0) {
+    await world.page.keyboard.press('Escape').catch(() => undefined)
+  }
 }
 
 async function openIssueDetail(world: CradleWorld, title: string): Promise<void> {

@@ -292,6 +292,26 @@ When('我在新建聊天中选择当前工作区', async function (this: CradleW
   await expect(selector).toContainText(fixture.name, { timeout: 10_000 })
 })
 
+Given('我已通过 API 添加了两个可区分的工作区', async function (this: CradleWorld) {
+  const fixtures = [
+    createWorkspaceFixture(this, 'cradle-e2e-a-', 'Workspace A'),
+    createWorkspaceFixture(this, 'cradle-e2e-b-', 'Workspace B'),
+  ]
+  for (const fixture of fixtures) {
+    const res = await fetch(`${this.params.serverUrl}/workspaces/from-directory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: fixture.dir }),
+    })
+    if (!res.ok) {
+      throw new Error(`Failed to create workspace via API: ${res.status} ${await res.text()}`)
+    }
+  }
+  rememberWorkspaceFixtures(this, fixtures)
+  setCurrentWorkspace(this, fixtures[0]!)
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
+})
+
 Given('我已添加了两个可区分的工作区', async function (this: CradleWorld) {
   const fixtures = [
     createWorkspaceFixture(this, 'cradle-e2e-alpha-', 'Alpha Workspace'),
