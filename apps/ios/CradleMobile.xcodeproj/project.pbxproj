@@ -15,6 +15,7 @@
 		35D152C8C4928A2B4B1138CB /* GrowingTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B9756F57C9887C1AA7FA3B /* GrowingTextView.swift */; };
 		3C3C81727840927817BD59B2 /* CradleAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 67C99DB16EA9345736AAD3B8 /* CradleAPI */; };
 		61B9E5AF8BC6E64FDD684189 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA498FC12A17E959F7862E1 /* ConnectionView.swift */; };
+		7B1605BF06387FE0E0CD9B09 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1F2BC4C51710DCD68D299E0A /* Assets.xcassets */; };
 		80EE2D6F64355C9CC0CF30B0 /* ConnectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9A51FA6443D5AB9C01C0C4 /* ConnectionStore.swift */; };
 		88BEC6CC7028947CD34ACA42 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9034C713C6963A1E84B9B678 /* EmptyStateView.swift */; };
 		9D7AF45DEC2A2BFA97287E2A /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EF131760B27F9B8FDB3BDBE /* ChatView.swift */; };
@@ -27,6 +28,7 @@
 
 /* Begin PBXFileReference section */
 		0E8B7C4C25F26EB995806FBD /* CradleAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CradleAPI; path = Packages/CradleAPI; sourceTree = SOURCE_ROOT; };
+		1F2BC4C51710DCD68D299E0A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		30B9756F57C9887C1AA7FA3B /* GrowingTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowingTextView.swift; sourceTree = "<group>"; };
 		37ACB645CBD8B2D4E85AE542 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		40AD5FF5C092627812864846 /* RootContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContainer.swift; sourceTree = "<group>"; };
@@ -78,6 +80,7 @@
 		2CA2DC4459868D76B32755AA /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				1F2BC4C51710DCD68D299E0A /* Assets.xcassets */,
 				91F381F8ACDB7DDD6E11BD76 /* Info.plist */,
 			);
 			path = Resources;
@@ -184,6 +187,7 @@
 			buildConfigurationList = FA2897D0F400A6643BD3858C /* Build configuration list for PBXNativeTarget "CradleMobile" */;
 			buildPhases = (
 				9BBAC2977FF4D5F7928F3F28 /* Sources */,
+				8760742AB62F452FBD9DEDF8 /* Resources */,
 				0639C8B889370CEE7A833C4B /* Frameworks */,
 			);
 			buildRules = (
@@ -237,6 +241,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8760742AB62F452FBD9DEDF8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B1605BF06387FE0E0CD9B09 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9BBAC2977FF4D5F7928F3F28 /* Sources */ = {
