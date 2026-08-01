@@ -28,6 +28,7 @@
 
 /* Begin PBXFileReference section */
 		0E8B7C4C25F26EB995806FBD /* CradleAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CradleAPI; path = Packages/CradleAPI; sourceTree = SOURCE_ROOT; };
+		1D2851F6294CBE5E7F6CA61B /* Cradle.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Cradle.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F2BC4C51710DCD68D299E0A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		30B9756F57C9887C1AA7FA3B /* GrowingTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowingTextView.swift; sourceTree = "<group>"; };
 		37ACB645CBD8B2D4E85AE542 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -41,7 +42,6 @@
 		BC9A51FA6443D5AB9C01C0C4 /* ConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStore.swift; sourceTree = "<group>"; };
 		BEA498FC12A17E959F7862E1 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
 		E1FD0A62DAC95ADC4E006602 /* CradleMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CradleMobileApp.swift; sourceTree = "<group>"; };
-		F4B0608101A9E9D3F64349A3 /* CradleMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CradleMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8FF1013061291F2A6D1ED63 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		FD3EC24DB6F8AC39E95B357D /* ComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -154,7 +154,7 @@
 		B9DF8BA6FFF2A045AE134649 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F4B0608101A9E9D3F64349A3 /* CradleMobile.app */,
+				1D2851F6294CBE5E7F6CA61B /* Cradle.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -201,7 +201,7 @@
 				E334A3221BE86148403EF4FF /* KeychainAccess */,
 			);
 			productName = CradleMobile;
-			productReference = F4B0608101A9E9D3F64349A3 /* CradleMobile.app */;
+			productReference = 1D2851F6294CBE5E7F6CA61B /* Cradle.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -214,6 +214,7 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					8C9CB1DF2C288F7EAAF463C0 = {
+						DevelopmentTeam = 947UYU6LTQ;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -404,13 +405,21 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 947UYU6LTQ;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CradleMobile/Resources/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.cradle.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.wibus.cradle-mobile";
 				PRODUCT_NAME = Cradle;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -428,13 +437,21 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 947UYU6LTQ;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CradleMobile/Resources/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.cradle.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.wibus.cradle-mobile";
 				PRODUCT_NAME = Cradle;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;

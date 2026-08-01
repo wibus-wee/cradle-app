@@ -17,22 +17,7 @@ targets:
   CradleMobile:
     type: application
     platform: iOS
-    info:
-      path: CradleMobile/Resources/Info.plist
-      properties:
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
-          NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: Cradle uses your local network to connect to a Cradle Server hosted on your Mac or LAN.
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
+    productName: Cradle
     sources:
       - path: CradleMobile
     dependencies:
@@ -41,8 +26,17 @@ targets:
       - package: KeychainAccess
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.cradle.mobile
+        PRODUCT_BUNDLE_IDENTIFIER: com.wibus.cradle-mobile
         PRODUCT_NAME: Cradle
+        DEVELOPMENT_TEAM: 947UYU6LTQ
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_FILE: CradleMobile/Resources/Info.plist
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         MARKETING_VERSION: 0.1.0
         CURRENT_PROJECT_VERSION: 1
         SWIFT_VERSION: 6.0
