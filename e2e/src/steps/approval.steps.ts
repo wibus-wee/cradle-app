@@ -5,22 +5,6 @@ import type { CradleWorld } from '../support/world'
 
 const APPROVAL_TIMEOUT = 30_000
 
-async function enqueueClaudeNoiseAbsorber(world: CradleWorld, label: string, text: string): Promise<void> {
-  if (!world.simulator) {
-    return
-  }
-  const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
-  // Title-naming / follow-up Claude Agent /v1/messages after the plan tool_use
-  // must not surface as UnexpectedRequest once the scripted queue is empty.
-  world.enqueue(anthropicScenario([
-    anthropicTextExchange({
-      label: `${label}-${Date.now()}`,
-      text,
-      bodyTextIncludes: 'You are naming a Claude Agent task session',
-    }),
-  ]))
-}
-
 When('审批卡片出现', async function (this: CradleWorld) {
   await this.approval.waitVisible(APPROVAL_TIMEOUT)
 })
@@ -42,9 +26,6 @@ When('我点击"允许"按钮', async function (this: CradleWorld) {
 })
 
 When('我点击"拒绝"按钮', async function (this: CradleWorld) {
-  // Absorb Claude Agent title-naming / follow-up /v1/messages after deny so the
-  // transcript does not show UnexpectedRequest as a false "error" outcome.
-  await enqueueClaudeNoiseAbsorber(this, 'approval-title-deny', 'Plan denied')
   await this.approval.deny()
 })
 
