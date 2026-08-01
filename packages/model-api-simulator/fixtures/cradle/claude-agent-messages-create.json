@@ -1,0 +1,41 @@
+{
+  "_comment": "Anonymized Claude Agent SDK POST /v1/messages shape captured from E2E ledger. Secrets stripped; tools truncated; prompt replaced.",
+  "method": "POST",
+  "path": "/v1/messages",
+  "query": { "beta": "true" },
+  "headers": {
+    "accept": "application/json",
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+    "x-api-key": "sk-ant-e2e-simulator",
+    "x-app": "cli"
+  },
+  "body": {
+    "model": "claude-sonnet-4-5",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "请先思考再回答"
+          }
+        ]
+      }
+    ],
+    "system": [
+      {
+        "type": "text",
+        "text": "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
+        "cache_control": { "type": "ephemeral" }
+      }
+    ],
+    "tools": [],
+    "max_tokens": 32000,
+    "thinking": {
+      "budget_tokens": 31999,
+      "type": "enabled"
+    },
+    "stream": true
+  }
+}

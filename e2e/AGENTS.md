@@ -47,6 +47,8 @@ Archive retired features under `e2e/_archive/` (outside cucumber `paths`).
 - `configureStandardChat` — OpenAI Responses + standard runtime (legacy / Agents path)
 - Scenario builders live in `e2e/src/support/scenarios/`
 - Just-in-time enqueue for multi-turn Claude so intermediate SDK calls cannot steal FIFO
+- Page objects live in `e2e/src/support/pages/` — keep step defs thin
+- Cradle wire fixtures / conformance: `packages/model-api-simulator/fixtures/cradle/`
 
 ## Scenario Scope
 
