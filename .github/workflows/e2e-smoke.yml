@@ -4,9 +4,15 @@ name: E2E Smoke (PR)
 # This is opt-in to avoid running the full E2E suite on every PR push.
 # Maintainers add the `e2e` label to PRs that touch critical user-facing paths.
 
+name: E2E Smoke (PR)
+
+# Runs P0 E2E scenarios on pull requests when the `e2e` label is applied.
+# Always checks out the PR head (never main) and provisions Codex app-server
+# so @CRADLE-CODEX-* scenarios can pass on clean runners.
+
 on:
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize, opened, reopened]
 
 permissions:
   contents: read
@@ -14,13 +20,15 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Only run when the triggering label is exactly 'e2e'
+  # Opt-in via `e2e` label (re-runs on later pushes while the label remains).
   gate:
     name: Check label
     runs-on: ubuntu-latest
-    if: github.event.label.name == 'e2e'
+    if: >
+      contains(github.event.pull_request.labels.*.name, 'e2e') ||
+      github.event.label.name == 'e2e'
     steps:
-      - run: echo "e2e label added — smoke run will proceed"
+      - run: echo "e2e label present — smoke run will proceed against the PR head"
 
   e2e-smoke:
     name: E2E Smoke (P0)
@@ -34,7 +42,8 @@ jobs:
         with:
           repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: main
+          # Test the PR head, not main — otherwise labeled PRs never exercise their own commits.
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: ./.github/actions/setup
         with:
@@ -43,6 +52,9 @@ jobs:
       - name: Install Playwright browsers
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium-headless-shell
+
+      - name: Provision Codex app-server for E2E
+        run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Prepare Cucumber CI config
         run: |

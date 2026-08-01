@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       tags:
-        description: 'Cucumber tags filter (e.g. "@P0 or @P1"). Leave empty for full suite.'
+        description: 'Cucumber tags filter (default @essence). Use "not @wip" for broader.'
         required: false
-        default: ''
+        default: '@essence'
       source_ref:
         description: Git ref from wibus-wee/cradle-app to test
         required: false
@@ -44,6 +44,9 @@ jobs:
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium-headless-shell
 
+      - name: Provision Codex app-server for E2E
+        run: pnpm --filter @cradle/desktop sync:codex-runtime
+
       - name: Prepare Cucumber CI config
         run: |
           node <<'NODE'
@@ -74,14 +77,13 @@ jobs:
           CRADLE_CREDENTIAL_SECRET: e2e-test-secret
         run: |
           mkdir -p e2e/artifacts
-          TAGS="${{ github.event.inputs.tags || '' }}"
+          # Default daily gate: essence journeys (精). Override via workflow_dispatch tags.
+          TAGS="${{ github.event.inputs.tags || '@essence' }}"
           CMD=(pnpm exec cucumber-js --config e2e/cucumber-ci.mjs
             --format summary
             --format summary:e2e/artifacts/cucumber-summary.txt
-            --format junit:e2e/artifacts/cucumber-junit.xml)
-          if [ -n "$TAGS" ]; then
-            CMD+=(--tags "$TAGS")
-          fi
+            --format junit:e2e/artifacts/cucumber-junit.xml
+            --tags "$TAGS")
           "${CMD[@]}" 2>&1 | tee e2e/artifacts/cucumber-output.log
 
       - name: Summarize E2E result
